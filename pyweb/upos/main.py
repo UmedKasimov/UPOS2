@@ -2987,6 +2987,30 @@ def create_app() -> FastAPI:
                     "История взаимодействий по клиенту.",
                 ],
             },
+            "messengers": {
+                "title": "Месенджеры",
+                "kicker": "Диалоги и рассылки",
+                "subtitle": "Чаты, кампании, шаблоны и каналы связи",
+                "heading": "Центр сообщений",
+                "action": "+ Сообщение",
+                "launcher": [
+                    {"id": "inbox", "title": "Диалоги", "subtitle": "Чаты и обращения", "icon": "chat"},
+                    {"id": "campaigns", "title": "Рассылки", "subtitle": "Кампании и сегменты", "icon": "broadcast"},
+                    {"id": "templates", "title": "Шаблоны", "subtitle": "Тексты и сценарии", "icon": "template"},
+                ],
+                "filters": ["Поиск", "Канал", "Ответственный", "Статус"],
+                "columns": ["Канал", "Контакт", "Последнее сообщение", "Ответственный", "Статус"],
+                "list_title": "Коммуникации",
+                "status": "Каркас",
+                "empty": "Здесь будут диалоги, рассылки и шаблоны сообщений в стиле ibox.",
+                "logic": [
+                    "Единый список диалогов по клиентам и каналам связи.",
+                    "Шаблоны сообщений для типовых ответов и уведомлений.",
+                    "Рассылки по сегментам клиентов и статусам сделок.",
+                    "Связь сообщений с CRM, клиентами и продажами.",
+                    "История контактов по каждому каналу.",
+                ],
+            },
         }
         return modules[key]
 
@@ -5310,6 +5334,45 @@ def create_app() -> FastAPI:
             crm_options=crm_options,
             crm_records=crm_records,
             today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.get("/messengers", response_class=HTMLResponse, name="messengers_get")
+    def messengers_get(
+        request: Request,
+        q: str = "",
+        channel: str = "",
+        responsible: str = "",
+        status: str = "all",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "channel": channel.strip(),
+            "responsible": responsible.strip(),
+            "status": status.strip() or "all",
+        }
+        user = request.session.get("user") or {}
+        channel_options = ["Telegram", "WhatsApp", "Instagram", "Facebook Messenger", "SMS"]
+        responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="messengers",
+            module=_business_module_context("messengers"),
+            messenger_filters=filters,
+            messenger_options={
+                "channels": channel_options,
+                "responsibles": responsible_options,
+            },
+            messenger_threads=[],
+            messenger_campaigns=[],
+            messenger_templates=[],
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )

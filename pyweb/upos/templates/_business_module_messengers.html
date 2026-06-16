@@ -1,0 +1,145 @@
+<div class="business-module-toolbar" data-workspace-view="inbox campaigns templates" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" disabled>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('messengers_get') }}" data-workspace-view="inbox campaigns templates" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ messenger_filters.q }}" placeholder="Клиент, чат, шаблон" /></label>
+  <label>
+    <span>Канал</span>
+    <input name="channel" list="messenger-channel-list" value="{{ messenger_filters.channel }}" placeholder="Telegram" />
+  </label>
+  <label>
+    <span>Ответственный</span>
+    <input name="responsible" list="messenger-responsible-list" value="{{ messenger_filters.responsible }}" placeholder="Ответственный" />
+  </label>
+  <label>
+    <span>Статус</span>
+    <select name="status">
+      <option value="all" {% if messenger_filters.status == 'all' %}selected{% endif %}>Все</option>
+      <option value="active" {% if messenger_filters.status == 'active' %}selected{% endif %}>Активный</option>
+      <option value="waiting" {% if messenger_filters.status == 'waiting' %}selected{% endif %}>Ожидает</option>
+      <option value="paused" {% if messenger_filters.status == 'paused' %}selected{% endif %}>Пауза</option>
+      <option value="archived" {% if messenger_filters.status == 'archived' %}selected{% endif %}>Архив</option>
+    </select>
+  </label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('messengers_get') }}">Очистить</a>
+</form>
+
+<datalist id="messenger-channel-list">
+  {% for item in messenger_options.channels %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="messenger-responsible-list">
+  {% for item in messenger_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
+</datalist>
+
+<div class="products-layout" data-workspace-view="inbox campaigns templates" hidden>
+  <article class="products-list-panel" data-workspace-view="inbox" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Диалоги</h2>
+        <span>Всего: {{ messenger_threads|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Канал</th>
+            <th>Контакт</th>
+            <th>Последнее сообщение</th>
+            <th>Ответственный</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in messenger_threads %}
+            <tr>
+              <td>{{ row.channel }}</td>
+              <td><strong>{{ row.contact }}</strong><small>{{ row.topic or row.channel }}</small></td>
+              <td>{{ row.last_message or "-" }}</td>
+              <td>{{ row.responsible or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">Диалогов пока нет. Здесь появятся чаты из Telegram, WhatsApp и других каналов.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="campaigns" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Рассылки</h2>
+        <span>Всего: {{ messenger_campaigns|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Канал</th>
+            <th>Сегмент</th>
+            <th>Дата запуска</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in messenger_campaigns %}
+            <tr>
+              <td><strong>{{ row.title }}</strong><small>{{ row.note or row.segment }}</small></td>
+              <td>{{ row.channel }}</td>
+              <td>{{ row.segment or "-" }}</td>
+              <td>{{ row.run_at or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">Рассылок пока нет. Здесь будут кампании по сегментам клиентов и сделок.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="templates" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Шаблоны</h2>
+        <span>Всего: {{ messenger_templates|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Канал</th>
+            <th>Сценарий</th>
+            <th>Обновлено</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in messenger_templates %}
+            <tr>
+              <td><strong>{{ row.title }}</strong><small>{{ row.preview or row.channel }}</small></td>
+              <td>{{ row.channel }}</td>
+              <td>{{ row.scenario or "-" }}</td>
+              <td>{{ row.updated_at or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">Шаблонов пока нет. Здесь будут заготовки сообщений и сценарии ответов.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</div>

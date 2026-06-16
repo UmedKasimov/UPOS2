@@ -221,6 +221,10 @@
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15h3v3H7z"/><path d="M14 7h3v11h-3z"/><path d="M7 8h3v4H7z"/></svg>
                 <span class="nav-label">CRM</span>
               </a>
+              <a href="{{ url_for('messengers_get') }}" class="nav-link {{ 'active' if active == 'messengers' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
+                <span class="nav-label">Месенджеры</span>
+              </a>
               {% if not user.get('is_employee') or emp_perms.get('reports') %}
               <a href="{{ url_for('home_reports') }}" class="nav-link {{ 'active' if active == 'home_reports' else '' }}">
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
@@ -309,7 +313,7 @@
       window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
     </script>
     <script src="{{ url_for('static', path='theme.js') }}"></script>
-    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=4" defer></script>
+    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='layout-sidebar.js') }}" defer></script>
     <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=7" defer></script>
