@@ -330,6 +330,96 @@ _REQUIRED_COLUMN_PATCHES: tuple[tuple[str, str], ...] = (
         "ADD COLUMN IF NOT EXISTS doc_status VARCHAR(20) NOT NULL DEFAULT 'new'",
     ),
     (
+        "counterparties.kind",
+        "ALTER TABLE counterparties "
+        "ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'client'",
+    ),
+    (
+        "counterparties.data",
+        "ALTER TABLE counterparties "
+        "ADD COLUMN IF NOT EXISTS data JSONB NOT NULL DEFAULT '{}'::jsonb",
+    ),
+    (
+        "counterparties.created_at",
+        "ALTER TABLE counterparties "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "counterparties.updated_at",
+        "ALTER TABLE counterparties "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "products.updated_at",
+        "ALTER TABLE products "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "warehouses.updated_at",
+        "ALTER TABLE warehouses "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "sale_documents.created_at",
+        "ALTER TABLE sale_documents "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "sale_documents.updated_at",
+        "ALTER TABLE sale_documents "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "purchase_documents.created_at",
+        "ALTER TABLE purchase_documents "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "purchase_documents.updated_at",
+        "ALTER TABLE purchase_documents "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "warehouse_operations.created_at",
+        "ALTER TABLE warehouse_operations "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "warehouse_operations.updated_at",
+        "ALTER TABLE warehouse_operations "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "crm_records.created_at",
+        "ALTER TABLE crm_records "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "crm_records.updated_at",
+        "ALTER TABLE crm_records "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "payment_documents.created_at",
+        "ALTER TABLE payment_documents "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "payment_documents.updated_at",
+        "ALTER TABLE payment_documents "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "expense_documents.created_at",
+        "ALTER TABLE expense_documents "
+        "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "expense_documents.updated_at",
+        "ALTER TABLE expense_documents "
+        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+    ),
+    (
         "telegram_bot_configs.notification_prefs",
         "ALTER TABLE telegram_bot_configs "
         "ADD COLUMN IF NOT EXISTS notification_prefs JSONB NOT NULL DEFAULT '{}'::jsonb",
