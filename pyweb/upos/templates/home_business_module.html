@@ -24,6 +24,11 @@
   {% set module_views_ns.value = module_views_ns.value ~ (' ' if module_views_ns.value else '') ~ item.id %}
 {% endfor %}
 {% set module_views = module_views_ns.value %}
+{% if active == "clients" and selected_client_card %}
+  {% set module_stack_views = module_views ~ " profile" %}
+{% else %}
+  {% set module_stack_views = module_views %}
+{% endif %}
 
 {% block page_header %}
   <div class="general-page-header">
@@ -39,6 +44,7 @@
     data-workspace-tabs
     data-workspace-key="{{ active }}"
     data-workspace-home-href="{{ module_home_url }}"
+    {% if active == "clients" and selected_client_card %}data-workspace-default-tab="client-{{ selected_client_card.id }}"{% endif %}
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Изменения сохранены.</div>
@@ -99,7 +105,7 @@
       {% endfor %}
     </section>
 
-    <div class="workspace-module-stack" data-workspace-view="{{ module_views }}" hidden>
+    <div class="workspace-module-stack" data-workspace-view="{{ module_stack_views }}" hidden>
       {% if active == "warehouse" %}
         {% include "_business_module_warehouse.html" %}
       {% elif active == "clients" %}

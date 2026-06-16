@@ -39,6 +39,8 @@ from upos.db_models import (
     Product,
     PurchaseDocument,
     SaleDocument,
+    TelegramChat,
+    TelegramSubscriber,
     Transaction,
     User,
     UserAuthSession,
@@ -4671,6 +4673,229 @@ def create_app() -> FastAPI:
             "currency": row.currency,
         }
 
+    def _client_card_context(
+        session: Any,
+        workspace_owner_id: str,
+        client_id: str,
+        *,
+        balance_by_id: dict[str, Decimal],
+        balance_by_name: dict[str, Decimal],
+        last_date_by_id: dict[str, str],
+        last_date_by_name: dict[str, str],
+    ) -> dict[str, Any] | None:
+        row = session.get(Counterparty, client_id)
+        if not row or row.workspace_owner_id != workspace_owner_id:
+            return None
+        has_client, _ = _counterparty_role_flags(row.kind)
+        if not has_client:
+            return None
+
+        client = _counterparty_view_data(
+            row,
+            balance_by_id=balance_by_id,
+            balance_by_name=balance_by_name,
+            last_date_by_id=last_date_by_id,
+            last_date_by_name=last_date_by_name,
+        )
+        extra = _counterparty_extra(row)
+        client_names = {
+            str(client.get("name") or "").strip().lower(),
+            str(client.get("official_name") or "").strip().lower(),
+        }
+        client_names.discard("")
+
+        def digits(value: Any) -> str:
+            return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+        def matches_client_name(value: Any) -> bool:
+            lowered = str(value or "").strip().lower()
+            return bool(lowered and lowered in client_names)
+
+        sale_rows = list(
+            session.execute(
+                select(SaleDocument)
+                .where(SaleDocument.workspace_owner_id == workspace_owner_id)
+                .order_by(SaleDocument.updated_at.desc())
+            ).scalars()
+        )
+        sales: list[dict[str, Any]] = []
+        orders: list[dict[str, Any]] = []
+        returns: list[dict[str, Any]] = []
+        matched_sale_rows: list[SaleDocument] = []
+        for sale_row in sale_rows:
+            data = _json_object(sale_row.data)
+            counterparty_id = str(data.get("counterparty_id") or sale_row.counterparty_id or "").strip()
+            if counterparty_id != client_id and not matches_client_name(data.get("client")):
+                continue
+            item = _sales_document_data(sale_row)
+            matched_sale_rows.append(sale_row)
+            if item["doc_type"] == "order":
+                orders.append(item)
+            elif item["doc_type"] == "return":
+                returns.append(item)
+            else:
+                sales.append(item)
+
+        reconciliation_rows: list[dict[str, str]] = []
+        running_balance = Decimal("0")
+        for sale_row in sorted(
+            matched_sale_rows,
+            key=lambda item: (str(_json_object(item.data).get("date") or ""), item.created_at),
+        ):
+            data = _json_object(sale_row.data)
+            item = _sales_document_data(sale_row)
+            amount = _sales_decimal(sale_row.amount)
+            paid_amount = _sales_decimal(data.get("paid_amount"))
+            if item["doc_type"] == "return":
+                debit = Decimal("0")
+                credit = amount
+                running_balance -= amount
+            else:
+                debit = amount
+                credit = Decimal("0")
+                running_balance += amount
+            reconciliation_rows.append(
+                {
+                    "date": item["date"] or sale_row.created_at.date().isoformat(),
+                    "document": f"{item['doc_type_label']} {item['number']}",
+                    "debit": _sales_money_label(debit),
+                    "credit": _sales_money_label(credit),
+                    "balance": _sales_money_label(running_balance),
+                    "currency": item["currency"],
+                }
+            )
+            if paid_amount > 0 and item["doc_type"] != "return":
+                running_balance -= paid_amount
+                reconciliation_rows.append(
+                    {
+                        "date": item["date"] or sale_row.created_at.date().isoformat(),
+                        "document": f"Оплата по {item['number']}",
+                        "debit": _sales_money_label(Decimal("0")),
+                        "credit": _sales_money_label(paid_amount),
+                        "balance": _sales_money_label(running_balance),
+                        "currency": item["currency"],
+                    }
+                )
+
+        crm_rows = list(
+            session.execute(
+                select(CrmRecord)
+                .where(CrmRecord.workspace_owner_id == workspace_owner_id)
+                .order_by(CrmRecord.updated_at.desc())
+            ).scalars()
+        )
+        tasks: list[dict[str, Any]] = []
+        deals: list[dict[str, Any]] = []
+        correspondence: list[dict[str, Any]] = []
+        for crm_row in crm_rows:
+            data = _json_object(crm_row.data)
+            if crm_row.counterparty_id != client_id and not matches_client_name(data.get("client")):
+                continue
+            item = _crm_record_data(crm_row)
+            if item["item_type"] == "task":
+                tasks.append(item)
+            elif item["item_type"] == "deal":
+                deals.append(item)
+            else:
+                correspondence.append(item)
+
+        phone_digits = digits(client.get("phone"))
+        telegram_value = str(client.get("telegram") or extra.get("telegram") or "").strip()
+        telegram_key = telegram_value.lstrip("@").lower()
+        subscriber_rows = list(
+            session.execute(
+                select(TelegramSubscriber)
+                .where(TelegramSubscriber.workspace_owner_id == workspace_owner_id)
+                .order_by(TelegramSubscriber.requested_at.desc())
+            ).scalars()
+        )
+        matched_subscribers: list[TelegramSubscriber] = []
+        for subscriber in subscriber_rows:
+            username_key = str(subscriber.username or "").lstrip("@").lower()
+            display_name = str(subscriber.display_name or "").strip().lower()
+            subscriber_phone_digits = digits(subscriber.phone)
+            if (
+                (phone_digits and subscriber_phone_digits and subscriber_phone_digits.endswith(phone_digits[-9:]))
+                or (telegram_key and username_key == telegram_key)
+                or (display_name and display_name in client_names)
+            ):
+                matched_subscribers.append(subscriber)
+
+        chat_ids = {subscriber.chat_id for subscriber in matched_subscribers}
+        chat_rows = []
+        if chat_ids:
+            chat_rows = list(
+                session.execute(
+                    select(TelegramChat)
+                    .where(
+                        TelegramChat.workspace_owner_id == workspace_owner_id,
+                        TelegramChat.chat_id.in_(chat_ids),
+                    )
+                ).scalars()
+            )
+        chat_by_id = {chat.chat_id: chat for chat in chat_rows}
+        conversations: list[dict[str, Any]] = []
+        for subscriber in matched_subscribers:
+            chat = chat_by_id.get(subscriber.chat_id)
+            conversations.append(
+                {
+                    "channel": "Telegram",
+                    "title": subscriber.display_name or client["name"],
+                    "username": f"@{subscriber.username}" if subscriber.username else "",
+                    "phone": subscriber.phone,
+                    "status": subscriber.status,
+                    "chat_title": chat.title if chat else "",
+                    "chat_id": str(subscriber.chat_id),
+                }
+            )
+        if not conversations and telegram_value:
+            conversations.append(
+                {
+                    "channel": "Telegram",
+                    "title": client["name"],
+                    "username": telegram_value,
+                    "phone": client.get("phone") or "",
+                    "status": "linked",
+                    "chat_title": "",
+                    "chat_id": "",
+                }
+            )
+
+        total_sales = sum(
+            (_sales_decimal(item.amount) for item in matched_sale_rows if _json_object(item.data).get("doc_type") != "return"),
+            Decimal("0"),
+        )
+        total_returns = sum(
+            (_sales_decimal(item.amount) for item in matched_sale_rows if _json_object(item.data).get("doc_type") == "return"),
+            Decimal("0"),
+        )
+        total_paid = sum(
+            (_sales_decimal(_json_object(item.data).get("paid_amount")) for item in matched_sale_rows),
+            Decimal("0"),
+        )
+
+        client.update(
+            {
+                "orders": orders[:12],
+                "sales": sales[:12],
+                "returns": returns[:12],
+                "tasks": tasks[:12],
+                "deals": deals[:12],
+                "correspondence": correspondence[:12],
+                "conversations": conversations[:8],
+                "reconciliation": reconciliation_rows[-18:],
+                "summary": {
+                    "sales": _sales_money_label(total_sales),
+                    "returns": _sales_money_label(total_returns),
+                    "paid": _sales_money_label(total_paid),
+                    "orders_count": len(orders),
+                    "tasks_count": len(tasks),
+                    "messages_count": len(conversations) + len(correspondence),
+                },
+            }
+        )
+        return client
+
     def _module_flash_error(request: Request) -> str:
         return request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else "")
 
@@ -4930,6 +5155,7 @@ def create_app() -> FastAPI:
         category: str = "",
         route: str = "",
         status: str = "all",
+        client: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -4946,8 +5172,20 @@ def create_app() -> FastAPI:
         clients_records: list[dict[str, Any]] = []
         client_routes: list[dict[str, Any]] = []
         client_balances: list[dict[str, Any]] = []
+        selected_client_card: dict[str, Any] | None = None
         with session_scope() as session:
             balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
+            selected_client_id = client.strip()
+            if selected_client_id:
+                selected_client_card = _client_card_context(
+                    session,
+                    wid,
+                    selected_client_id,
+                    balance_by_id=balance_by_id,
+                    balance_by_name=balance_by_name,
+                    last_date_by_id=last_date_by_id,
+                    last_date_by_name=last_date_by_name,
+                )
             rows = list(
                 session.execute(
                     select(Counterparty)
@@ -5011,6 +5249,7 @@ def create_app() -> FastAPI:
             clients_records=clients_records,
             client_routes=client_routes,
             client_balances=client_balances,
+            selected_client_card=selected_client_card,
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )

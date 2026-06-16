@@ -57,7 +57,22 @@
         <tbody>
           {% for client in clients_records %}
             <tr>
-              <td><strong>{{ client.name }}</strong><small>{{ client.route or client.territory or "Без маршрута" }}</small></td>
+              {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
+              <td>
+                <a
+                  class="client-open-link product-cell-meta"
+                  href="{{ client_tab_href }}#client-card"
+                  data-workspace-trigger="profile"
+                  data-workspace-tab-id="client-{{ client.id }}"
+                  data-workspace-view-id="profile"
+                  data-workspace-tab-title="{{ client.name }}"
+                  data-workspace-tab-hash="client-card"
+                  data-workspace-tab-href="{{ client_tab_href }}"
+                >
+                  <strong>{{ client.name }}</strong>
+                  <small>{{ client.route or client.territory or "Без маршрута" }}</small>
+                </a>
+              </td>
               <td>{{ client.official_name }}</td>
               <td>{{ client.balance }} UZS</td>
               <td>{{ client.last_date or "-" }}</td>
@@ -109,6 +124,209 @@
     </form>
   </aside>
 </div>
+
+{% if selected_client_card %}
+  {% set selected_client_href = url_for('clients_get') ~ '?client=' ~ selected_client_card.id %}
+  <span
+    hidden
+    data-workspace-trigger="profile"
+    data-workspace-tab-id="client-{{ selected_client_card.id }}"
+    data-workspace-view-id="profile"
+    data-workspace-tab-title="{{ selected_client_card.name }}"
+    data-workspace-tab-hash="client-card"
+    data-workspace-tab-href="{{ selected_client_href }}"
+  ></span>
+
+  <section class="client-card-shell" id="client-card" data-workspace-view="profile" hidden>
+    <header class="client-card-header">
+      <div>
+        <span class="client-card-kicker">Карточка клиента</span>
+        <h2>{{ selected_client_card.name }}</h2>
+        <p>{{ selected_client_card.official_name or selected_client_card.category or "Клиентская карточка" }}</p>
+      </div>
+      <div class="client-card-actions">
+        <a class="btn btn-secondary" href="{{ url_for('sales_get') }}?client={{ selected_client_card.name }}#journal">Заказы</a>
+        <a class="btn btn-secondary" href="{{ url_for('crm_get') }}#tasks">Задачи</a>
+        <a class="btn" href="{{ url_for('messengers_get') }}#telegram">Переписка</a>
+      </div>
+    </header>
+
+    <div class="client-card-metrics" aria-label="Ключевые показатели клиента">
+      <div>
+        <span>Баланс</span>
+        <strong>{{ selected_client_card.balance }} UZS</strong>
+      </div>
+      <div>
+        <span>Продажи</span>
+        <strong>{{ selected_client_card.summary.sales }} UZS</strong>
+      </div>
+      <div>
+        <span>Оплачено</span>
+        <strong>{{ selected_client_card.summary.paid }} UZS</strong>
+      </div>
+      <div>
+        <span>Заказы / задачи</span>
+        <strong>{{ selected_client_card.summary.orders_count }} / {{ selected_client_card.summary.tasks_count }}</strong>
+      </div>
+    </div>
+
+    <div class="client-card-grid">
+      <article class="client-card-panel client-card-panel--wide">
+        <header>
+          <div>
+            <h3>Акт сверки</h3>
+            <span>Документы, оплаты и текущий остаток</span>
+          </div>
+          <strong>{{ selected_client_card.balance }} UZS</strong>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Дебет</th>
+                <th>Кредит</th>
+                <th>Остаток</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.reconciliation %}
+                <tr>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.document }}</td>
+                  <td>{{ row.debit }} {{ row.currency }}</td>
+                  <td>{{ row.credit }} {{ row.currency }}</td>
+                  <td>{{ row.balance }} {{ row.currency }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5">Документов для акта сверки пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <aside class="client-card-panel">
+        <header>
+          <div>
+            <h3>Информация</h3>
+            <span>Контакты и реквизиты</span>
+          </div>
+        </header>
+        <dl class="client-card-info">
+          <div><dt>Телефон</dt><dd>{{ selected_client_card.phone or "-" }}</dd></div>
+          <div><dt>Telegram</dt><dd>{{ selected_client_card.telegram or "-" }}</dd></div>
+          <div><dt>Email</dt><dd>{{ selected_client_card.email or "-" }}</dd></div>
+          <div><dt>ИНН</dt><dd>{{ selected_client_card.tax_id or "-" }}</dd></div>
+          <div><dt>Территория</dt><dd>{{ selected_client_card.territory or "-" }}</dd></div>
+          <div><dt>Маршрут</dt><dd>{{ selected_client_card.route or "-" }}</dd></div>
+          <div><dt>Категория</dt><dd>{{ selected_client_card.category or "-" }}</dd></div>
+          <div><dt>Адрес</dt><dd>{{ selected_client_card.address or "-" }}</dd></div>
+        </dl>
+      </aside>
+    </div>
+
+    <div class="client-card-grid client-card-grid--even">
+      <article class="client-card-panel">
+        <header>
+          <div>
+            <h3>Заказы и продажи</h3>
+            <span>Последние документы клиента</span>
+          </div>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Тип</th>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.orders + selected_client_card.sales + selected_client_card.returns %}
+                <tr>
+                  <td>{{ row.number }}</td>
+                  <td>{{ row.doc_type_label }}</td>
+                  <td>{{ row.date or "-" }}</td>
+                  <td>{{ row.amount }} {{ row.currency }}</td>
+                  <td>{{ row.status_label }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5">Заказов и продаж по клиенту пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="client-card-panel">
+        <header>
+          <div>
+            <h3>Задачи</h3>
+            <span>CRM-работа по клиенту</span>
+          </div>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Задача</th>
+                <th>Ответственный</th>
+                <th>Срок</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.tasks %}
+                <tr>
+                  <td><strong>{{ row.title }}</strong><small>{{ row.note or row.stage }}</small></td>
+                  <td>{{ row.responsible or "-" }}</td>
+                  <td>{{ row.due_date or row.date or "-" }}</td>
+                  <td>{{ row.status_label }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4">Задач по клиенту пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+
+    <article class="client-card-panel">
+      <header>
+        <div>
+          <h3>Переписки</h3>
+          <span>Telegram и история контактов</span>
+        </div>
+        <strong>{{ selected_client_card.summary.messages_count }}</strong>
+      </header>
+      <div class="client-card-conversations">
+        {% for row in selected_client_card.conversations %}
+          <div class="client-card-conversation">
+            <strong>{{ row.channel }} · {{ row.title }}</strong>
+            <span>{{ row.username or row.phone or row.chat_title or "Контакт привязан" }}</span>
+            <small>Статус: {{ row.status }}{% if row.chat_id %} · chat {{ row.chat_id }}{% endif %}</small>
+          </div>
+        {% endfor %}
+        {% for row in selected_client_card.correspondence %}
+          <div class="client-card-conversation">
+            <strong>{{ row.title }}</strong>
+            <span>{{ row.contact_type or row.date or "CRM история" }}</span>
+            <small>{{ row.note or row.status_label }}</small>
+          </div>
+        {% endfor %}
+        {% if not selected_client_card.conversations and not selected_client_card.correspondence %}
+          <p class="client-card-empty">Переписок по клиенту пока нет.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+{% endif %}
 
 <section class="products-dictionaries" data-workspace-view="routes balances" hidden>
   <article data-workspace-view="routes" hidden>
