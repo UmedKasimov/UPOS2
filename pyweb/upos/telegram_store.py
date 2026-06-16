@@ -456,6 +456,15 @@ def get_subscriber_by_telegram_user(workspace_owner_id: str, telegram_user_id: i
         return _subscriber_row_to_dict(row) if row else None
 
 
+def get_chat_by_row_id(workspace_owner_id: str, chat_row_id: str) -> dict[str, Any] | None:
+    wid = (workspace_owner_id or "").strip()
+    with session_scope() as session:
+        row = session.get(TelegramChat, chat_row_id)
+        if row is None or row.workspace_owner_id != wid:
+            return None
+        return _chat_row_to_dict(row)
+
+
 def upsert_chat(
     workspace_owner_id: str,
     *,

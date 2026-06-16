@@ -515,6 +515,148 @@
     });
   }
 
+  function initSocialTelegramIntegration() {
+    var root = document.querySelector("[data-social-telegram]");
+    if (!root) return;
+    var tokenInput = root.querySelector("[data-social-tg-token]");
+    var statusEl = root.querySelector("[data-social-tg-status]");
+    var botEl = root.querySelector("[data-social-tg-bot]");
+    var countEl = root.querySelector("[data-social-tg-chat-count]");
+    var connectBtn = root.querySelector("[data-social-tg-connect]");
+    var refreshBtn = root.querySelector("[data-social-tg-refresh]");
+    var disconnectBtn = root.querySelector("[data-social-tg-disconnect]");
+
+    function setStatus(message, variant) {
+      if (!statusEl) return;
+      statusEl.textContent = message || "";
+      if (variant) statusEl.setAttribute("data-variant", variant);
+      else statusEl.removeAttribute("data-variant");
+    }
+
+    function setBusy(btn, busy, text) {
+      if (!btn) return;
+      if (busy) {
+        btn.dataset.originalText = btn.textContent || "";
+        btn.textContent = text || "Загрузка...";
+      } else if (btn.dataset.originalText) {
+        btn.textContent = btn.dataset.originalText;
+      }
+      btn.disabled = !!busy;
+    }
+
+    function call(method, url, body) {
+      var headers = { "X-CSRF-Token": csrfToken() };
+      var opts = { method: method, headers: headers };
+      if (body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        opts.body = JSON.stringify(body || {});
+      }
+      return fetch(url, opts).then(function (res) {
+        return res
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (payload) {
+            if (!res.ok || payload.error) throw new Error(payload.error || t("settings.js.save_err"));
+            return payload;
+          });
+      });
+    }
+
+    function renderStatus(payload) {
+      var cfg = payload.config || {};
+      var connected = !!payload.connected;
+      if (botEl) {
+        botEl.textContent = connected
+          ? (cfg.bot_username ? "@" + cfg.bot_username : cfg.bot_first_name || "Telegram бот")
+          : "Бот не подключен";
+      }
+      if (countEl) {
+        countEl.textContent =
+          "Чатов: " +
+          String(payload.admin_chats_count || 0) +
+          ", активных: " +
+          String(payload.enabled_chats_count || 0);
+      }
+      if (refreshBtn) refreshBtn.disabled = !connected || !payload.can_manage;
+      if (disconnectBtn) disconnectBtn.disabled = !connected || !payload.can_manage;
+      if (connectBtn) connectBtn.disabled = !payload.can_manage;
+      if (!connected) {
+        setStatus("Не подключен. Вставьте токен BotFather и нажмите подключить.", "warn");
+      } else if (cfg.last_error) {
+        setStatus(cfg.last_error, "warn");
+      } else {
+        setStatus("Telegram подключен и готов к работе.", "ok");
+      }
+    }
+
+    function loadStatus() {
+      return call("GET", "/api/telegram/status?webhook=1")
+        .then(renderStatus)
+        .catch(function (err) {
+          setStatus(err.message || "Не удалось проверить Telegram", "err");
+        });
+    }
+
+    if (connectBtn) {
+      connectBtn.addEventListener("click", function () {
+        var token = tokenInput ? (tokenInput.value || "").trim() : "";
+        if (!token) {
+          if (tokenInput) tokenInput.focus();
+          setStatus("Укажите токен Telegram-бота.", "warn");
+          return;
+        }
+        setBusy(connectBtn, true, "Подключаем...");
+        call("POST", "/api/telegram/verify", { token: token })
+          .then(function () {
+            if (tokenInput) tokenInput.value = "";
+            return loadStatus();
+          })
+          .then(function () {
+            showPrefToast();
+          })
+          .catch(function (err) {
+            setStatus(err.message || "Telegram не подключен", "err");
+          })
+          .finally(function () {
+            setBusy(connectBtn, false);
+          });
+      });
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        setBusy(refreshBtn, true, "Обновляем...");
+        call("POST", "/api/telegram/chats/refresh")
+          .then(loadStatus)
+          .catch(function (err) {
+            setStatus(err.message || "Не удалось обновить чаты", "err");
+          })
+          .finally(function () {
+            setBusy(refreshBtn, false);
+          });
+      });
+    }
+
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener("click", function () {
+        if (!confirm("Отключить Telegram-бота от программы?")) return;
+        setBusy(disconnectBtn, true, "Отключаем...");
+        call("DELETE", "/api/telegram/disconnect")
+          .then(loadStatus)
+          .catch(function (err) {
+            setStatus(err.message || "Не удалось отключить Telegram", "err");
+          })
+          .finally(function () {
+            setBusy(disconnectBtn, false);
+          });
+      });
+    }
+
+    loadStatus();
+  }
+
   var PW_RULES = [
     {
       key: "settings.profile.pw_tip.length",
@@ -1492,6 +1634,7 @@
     initPreferencesAutoSave();
     initIntegrationModals();
     initSocialSettings();
+    initSocialTelegramIntegration();
     initProfileEditor();
     initCurrencyVisibility();
     initRolePermissions();

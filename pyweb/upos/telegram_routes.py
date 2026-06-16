@@ -38,7 +38,9 @@ from upos.telegram_store import (
     disconnect_bot,
     get_bot_config_with_token,
     get_telegram_dashboard,
+    get_chat_by_row_id,
     list_active_configs,
+    log_delivery,
     refresh_chats_admin_status,
     save_bot_config,
     save_notification_prefs,
@@ -465,6 +467,56 @@ def register_telegram_routes(
         if not delete_chat(oid, chat_row_id):
             return JSONResponse({"error": "not_found"}, status_code=404)
         return {"ok": True}
+
+    @app.post("/api/telegram/chats/{chat_row_id}/send")
+    async def api_telegram_chat_send(chat_row_id: str, request: Request):
+        csrf_error = _csrf_or_error(request)
+        if csrf_error:
+            return csrf_error
+        user = request.session.get("user") or {}
+        if not can_manage_telegram(user):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        oid, err = _telegram_workspace_owner(request)
+        if err:
+            return err
+        assert oid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        text = str((body or {}).get("text") or "").strip()
+        if not text:
+            return JSONResponse({"error": "message_required"}, status_code=400)
+        text = text[:4000]
+        cfg, token = get_bot_config_with_token(oid)
+        if not cfg or not token:
+            return JSONResponse({"error": "not_connected"}, status_code=400)
+        chat = get_chat_by_row_id(oid, chat_row_id)
+        if not chat:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        if not chat.get("bot_is_admin"):
+            return JSONResponse({"error": "bot_not_admin"}, status_code=400)
+        target_chat_id = int(chat.get("chat_id") or 0)
+        try:
+            tg_send_message(token, target_chat_id, text)
+        except TelegramApiError as exc:
+            log_delivery(
+                oid,
+                kind="manual_message",
+                target_chat_id=target_chat_id,
+                dedupe_key=f"manual:{uuid.uuid4()}",
+                ok=False,
+                error=str(exc),
+            )
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        log_delivery(
+            oid,
+            kind="manual_message",
+            target_chat_id=target_chat_id,
+            dedupe_key=f"manual:{uuid.uuid4()}",
+            ok=True,
+        )
+        return {"ok": True, "chat": chat}
 
     @app.post("/api/telegram/subscribers/{subscriber_id}/approve")
     def api_telegram_subscriber_approve(subscriber_id: str, request: Request):

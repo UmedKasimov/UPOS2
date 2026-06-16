@@ -37,6 +37,82 @@
   {% for item in messenger_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
 </datalist>
 
+<section class="messenger-telegram-workspace" data-workspace-view="telegram" data-messenger-telegram hidden>
+  <header class="messenger-telegram-head">
+    <div>
+      <p class="settings-ios-footnote">Telegram</p>
+      <h2>Управление чатами</h2>
+      <span data-messenger-tg-status>Проверяем подключение...</span>
+    </div>
+    <div class="messenger-telegram-actions">
+      <a class="btn btn-secondary" href="{{ url_for('settings_get') }}?tab=social">Привязка</a>
+      <button type="button" class="btn btn-secondary" data-messenger-tg-refresh>Обновить чаты</button>
+      <button type="button" class="btn" data-messenger-tg-repair>Починить webhook</button>
+    </div>
+  </header>
+
+  <div class="messenger-telegram-shell">
+    <aside class="messenger-telegram-list-panel" aria-label="Telegram чаты">
+      <div class="messenger-telegram-panel-title">
+        <strong>Чаты Telegram</strong>
+        <small data-messenger-tg-count>0</small>
+      </div>
+      <div class="messenger-telegram-list" data-messenger-tg-chat-list></div>
+      <div class="messenger-telegram-empty" data-messenger-tg-empty hidden>
+        Чатов пока нет. Подключите бота, добавьте его в группу и нажмите «Обновить чаты».
+      </div>
+    </aside>
+
+    <section class="messenger-telegram-chat-panel" aria-label="Выбранный чат">
+      <div class="messenger-telegram-chat-top">
+        <div>
+          <p class="settings-ios-footnote" data-messenger-tg-detail-meta>Выберите чат слева</p>
+          <h3 data-messenger-tg-detail-title>Telegram</h3>
+        </div>
+        <label class="messenger-telegram-toggle">
+          <input type="checkbox" data-messenger-tg-enabled disabled />
+          <span>Активен</span>
+        </label>
+      </div>
+
+      <div class="messenger-telegram-chat-body" data-messenger-tg-log>
+        <div class="messenger-telegram-placeholder">
+          Здесь будет рабочее место для выбранного Telegram-чата: статус, отправка сообщений и связь с клиентами.
+        </div>
+      </div>
+
+      <div class="messenger-telegram-composer">
+        <textarea data-messenger-tg-message rows="3" placeholder="Напишите сообщение клиенту или группе..." disabled></textarea>
+        <button type="button" class="btn" data-messenger-tg-send disabled>Отправить</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="messenger-telegram-subscribers">
+    <header>
+      <div>
+        <p class="settings-ios-footnote">Доступы</p>
+        <h3>Заявки и подписчики</h3>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Контакт</th>
+            <th>Username</th>
+            <th>Статус</th>
+            <th>Дата</th>
+          </tr>
+        </thead>
+        <tbody data-messenger-tg-subscribers>
+          <tr><td colspan="4">Данные Telegram загружаются...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
 <div class="products-layout" data-workspace-view="inbox campaigns templates" hidden>
   <article class="products-list-panel" data-workspace-view="inbox" hidden>
     <header class="products-panel-head">
