@@ -4,13 +4,18 @@
 {% set current = edit_product or {} %}
 {% set prices = current.prices if current and current.prices else [{"name": "Продажная цена", "price": "", "currency": "UZS"}] %}
 {% set stocks = current.stocks if current and current.stocks else [{"warehouse": "Основной склад", "quantity": "", "price": "", "date": ""}] %}
-{% set products_default_tab = 'create' if edit_product else '' %}
+{% set products_default_tab = ('product-' ~ edit_product.id) if edit_product else '' %}
 
 {% block page_header %}
   <div class="general-page-header">
     <span class="general-page-kicker">Торговый контур</span>
     <h1 class="page-title settings-ios-page-title">Товары</h1>
   </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', path='products-table.js') }}?v=2" defer></script>
 {% endblock %}
 
 {% block main %}
@@ -25,6 +30,10 @@
       <div class="flash ok settings-ios-flash">Товар сохранён.</div>
     {% elif flash_ok == "deleted" %}
       <div class="flash ok settings-ios-flash">Товар удалён.</div>
+    {% elif flash_ok == "imported" %}
+      <div class="flash ok settings-ios-flash">Импорт завершён: {{ imported_count }} строк.</div>
+    {% elif flash_ok == "bulk_saved" %}
+      <div class="flash ok settings-ios-flash">Обновлено товаров: {{ bulk_updated_count }}.</div>
     {% endif %}
     {% if flash_err %}
       <div class="flash err settings-ios-flash">{{ flash_err }}</div>
@@ -107,6 +116,25 @@
       </label>
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('products_get') }}">Очистить</a>
+      <div class="products-filter-actions">
+        <form method="get" action="{{ url_for('products_export') }}" class="products-filter-inline-form">
+          <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+          <input type="hidden" name="q" value="{{ product_filters.q }}" />
+          <input type="hidden" name="category" value="{{ product_filters.category }}" />
+          <input type="hidden" name="group" value="{{ product_filters.group }}" />
+          <input type="hidden" name="brand" value="{{ product_filters.brand }}" />
+          <input type="hidden" name="status" value="{{ product_filters.status }}" />
+          <button class="btn btn-secondary" type="submit">Экспорт Excel</button>
+        </form>
+        <form method="post" action="{{ url_for('products_import') }}" enctype="multipart/form-data" class="products-filter-inline-form">
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+          <label class="btn btn-secondary products-import-trigger">
+            <span>Импорт Excel</span>
+            <input type="file" name="excel_file" accept=".xlsx" onchange="if (this.files && this.files.length) this.form.submit()" hidden />
+          </label>
+        </form>
+      </div>
     </form>
 
     <datalist id="product-category-list">
@@ -133,24 +161,126 @@
             {% if product_filters.kind == 'service' %}+ Услуга{% else %}+ Товар{% endif %}
           </a>
         </header>
-        <div class="products-table-wrap">
-          <table class="products-table">
+        <form
+          id="products-bulk-form"
+          class="products-bulk-toolbar"
+          method="post"
+          action="{{ url_for('products_bulk_update') }}"
+          data-products-bulk-form
+          hidden
+        >
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="q" value="{{ product_filters.q }}" />
+          <input type="hidden" name="category" value="{{ product_filters.category }}" />
+          <input type="hidden" name="group" value="{{ product_filters.group }}" />
+          <input type="hidden" name="brand" value="{{ product_filters.brand }}" />
+          <input type="hidden" name="status" value="{{ product_filters.status }}" />
+          <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+          <div class="products-bulk-summary">
+            <strong>Выбрано: <span data-products-selected-count>0</span></strong>
+            <small>Массовое обновление категории, группы, бренда и папки.</small>
+          </div>
+          <label>
+            <span>Категория</span>
+            <input name="bulk_category" list="product-category-list" placeholder="Новая категория" data-products-bulk-input disabled />
+          </label>
+          <label>
+            <span>Группа</span>
+            <input name="bulk_group" list="product-group-list" placeholder="Новая группа" data-products-bulk-input disabled />
+          </label>
+          <label>
+            <span>Бренд</span>
+            <input name="bulk_brand" list="product-brand-list" placeholder="Новый бренд" data-products-bulk-input disabled />
+          </label>
+          <label>
+            <span>Папка</span>
+            <input name="bulk_folder" list="product-folder-list" placeholder="Новая папка" data-products-bulk-input disabled />
+          </label>
+          <div class="products-bulk-actions">
+            <button class="btn" type="submit" data-products-bulk-submit disabled>Применить</button>
+            <button class="btn btn-secondary" type="button" data-products-clear-selection disabled>Снять выбор</button>
+          </div>
+        </form>
+        <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table" id="products-catalog-table" data-upos-column-controls data-products-table>
             <thead>
               <tr>
-                <th>Название</th>
-                <th>На складе</th>
-                <th>Цена продажи</th>
-                <th>Категория</th>
-                <th>Статус</th>
-                <th></th>
+                <th data-column-label="Выбор" class="products-check-col">
+                  <input type="checkbox" class="products-bulk-checkbox" data-products-select-all aria-label="Выбрать все товары" />
+                </th>
+                <th data-column-label="Название" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="name">
+                    <span>Название</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="На складе" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="quantity">
+                    <span>На складе</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Цена продажи" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price">
+                    <span>Цена продажи</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Категория" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="category">
+                    <span>Категория</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Статус" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="status">
+                    <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Действия" class="products-actions-head"></th>
               </tr>
             </thead>
             <tbody>
               {% for product in products %}
-                <tr>
+                {% set product_tab_id = 'product-' ~ product.id %}
+                {% set product_tab_href = url_for('products_get') ~ '?edit=' ~ product.id %}
+                <tr
+                  data-product-row
+                  data-sort-name="{{ (product.name or '')|lower }}"
+                  data-sort-quantity="{{ product.quantity or 0 }}"
+                  data-sort-price="{{ product.sale_price or 0 }}"
+                  data-sort-category="{{ (product.category or '')|lower }}"
+                  data-sort-status="{{ product.status or '' }}"
+                >
+                  <td class="products-check-col">
+                    <input
+                      type="checkbox"
+                      class="products-bulk-checkbox"
+                      name="product_ids"
+                      value="{{ product.id }}"
+                      form="products-bulk-form"
+                      data-products-select
+                      aria-label="Выбрать товар {{ product.name }}"
+                    />
+                  </td>
                   <td>
-                    <strong>{{ product.name }}</strong>
-                    <small>{{ product.sku or product.barcode or "Без артикула" }}</small>
+                    <div class="product-cell-main">
+                      {% if product.photo_url %}
+                        <img class="product-thumb" src="{{ product.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      {% endif %}
+                      <a
+                        class="product-open-link product-cell-meta"
+                        href="{{ product_tab_href }}#product-form"
+                        data-workspace-trigger="create"
+                        data-workspace-tab-id="{{ product_tab_id }}"
+                        data-workspace-view-id="create"
+                        data-workspace-tab-title="{{ product.name }}"
+                        data-workspace-tab-hash="product-form"
+                        data-workspace-tab-href="{{ product_tab_href }}"
+                      >
+                        <strong>{{ product.name }}</strong>
+                        <small>{{ product.sku or product.barcode or "Без артикула" }}</small>
+                        {% if product.purchase_history %}
+                          <small>Приходов: {{ product.purchase_history|length }}</small>
+                        {% endif %}
+                      </a>
+                    </div>
                   </td>
                   <td>{{ product.quantity }} {{ product.unit }}</td>
                   <td>
@@ -161,6 +291,15 @@
                   <td>{{ "Активный" if product.status == "active" else "Неактивный" }}</td>
                   <td class="products-row-actions">
                     <a href="{{ url_for('products_get') }}?edit={{ product.id }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="Редактирование" data-workspace-tab-hash="product-form">Изменить</a>
+                    <a
+                      href="{{ product_tab_href }}#product-form"
+                      data-workspace-trigger="create"
+                      data-workspace-tab-id="{{ product_tab_id }}"
+                      data-workspace-view-id="create"
+                      data-workspace-tab-title="{{ product.name }}"
+                      data-workspace-tab-hash="product-form"
+                      data-workspace-tab-href="{{ product_tab_href }}"
+                    >РР·РјРµРЅРёС‚СЊ</a>
                     <form method="post" action="{{ url_for('products_delete', product_id=product.id) }}">
                       {% include "_csrf_field.html" %}
                       <button type="submit">Удалить</button>
@@ -169,7 +308,7 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="6">Пока нет товаров. Создайте первый товар справа.</td>
+                  <td colspan="7">Пока нет товаров. Создайте первый товар справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -239,6 +378,15 @@
                 <option value="CODE128" {% if current.barcode_type == 'CODE128' %}selected{% endif %}>CODE128</option>
               </select>
             </div>
+          </section>
+
+          <section class="product-form-section">
+            <h3>Фото и история</h3>
+            <div class="product-form-grid">
+              <label class="wide"><span>Фото URL</span><input name="photo_url" type="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
+              <label class="wide"><span>История приходов JSON</span><textarea name="purchase_history_json" rows="6" placeholder='[{"date":"2026-06-16","warehouse":"Основной склад","quantity":"10","price":"50000","supplier":"Foxid"}]'>{{ current.purchase_history_json or '' }}</textarea></label>
+            </div>
+            <p class="product-form-hint">Для анализа можно хранить историю приходов, закупочную цену, количество и ссылку на фото из внешней системы.</p>
           </section>
 
           <section class="product-form-section">

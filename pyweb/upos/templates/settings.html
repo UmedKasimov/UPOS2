@@ -42,6 +42,8 @@
     {% set active_settings_label = _('settings.tab.telegram') %}
   {% elif active_settings_tab == 'integrations' %}
     {% set active_settings_label = _('settings.tab.integrations') %}
+  {% elif active_settings_tab == 'social' %}
+    {% set active_settings_label = 'Соцсети' %}
   {% elif active_settings_tab == 'dictionary' %}
     {% set active_settings_label = _('settings.tab.dictionary') %}
   {% elif active_settings_tab == 'roles' %}
@@ -87,6 +89,15 @@
         </span>
         <span>{{ _('settings.tab.dictionary') }}</span>
         <small>Данные и роли</small>
+      </a>
+      {% endif %}
+      {% if settings_can_manage_settings | default(false) %}
+      <a class="general-report-card general-settings-card {{ 'active' if active_settings_tab == 'social' else '' }}" href="{{ settings_base_url }}?tab=social" {% if active_settings_tab == 'social' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l1.76-1.76a5 5 0 1 0-7.07-7.07L10 5.93"/><path d="M14 11a5 5 0 0 0-7.07 0l-1.76 1.76a5 5 0 1 0 7.07 7.07L14 18.07"/><path d="M8.5 15.5 15.5 8.5"/></svg>
+        </span>
+        <span>Соцсети</span>
+        <small>Привязка профилей и каналов</small>
       </a>
       {% endif %}
       {% if telegram_can_manage | default(false) %}
@@ -167,6 +178,18 @@
             >
               <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
               <span class="settings-tab-title">{{ _('settings.tab.integrations') }}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="settings-tab settings-tab--rail"
+              id="tab-social"
+              data-settings-tab="social"
+              aria-selected="false"
+              aria-controls="panel-social"
+            >
+              <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l1.76-1.76a5 5 0 1 0-7.07-7.07L10 5.93"/><path d="M14 11a5 5 0 0 0-7.07 0l-1.76 1.76a5 5 0 1 0 7.07 7.07L14 18.07"/><path d="M8.5 15.5 15.5 8.5"/></svg>
+              <span class="settings-tab-title">Соцсети</span>
             </button>
             {% endif %}
             {% if settings_can_manage_dictionary | default(false) %}
@@ -1267,6 +1290,83 @@
 
           <div
             class="settings-panel"
+            id="panel-social"
+            data-settings-panel="social"
+            role="tabpanel"
+            aria-labelledby="tab-social"
+            hidden
+          >
+            <div class="settings-general-business" data-settings-social>
+              <div class="settings-business-grid settings-business-grid--compact">
+                <section class="settings-ios-group settings-business-panel settings-business-panel--wide" aria-labelledby="cap-social-tab">
+                  <div class="tg-hero-row">
+                    <div>
+                      <p id="cap-social-tab" class="settings-ios-footnote">Соцсети</p>
+                      <p class="settings-business-meta">Привязка публичных профилей, мессенджеров и главных каналов связи организации.</p>
+                    </div>
+                  </div>
+                  <div class="settings-profile-form-grid">
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_primary_channel">Основной канал</label>
+                      <span class="settings-select-wrap settings-select-wrap--wide">
+                        <select id="social_primary_channel" class="settings-ios-select settings-compact-select" data-social-field="primary_channel">
+                          <option value="" {% if not settings.social_links.primary_channel %}selected{% endif %}>Не выбран</option>
+                          <option value="telegram" {% if settings.social_links.primary_channel == 'telegram' %}selected{% endif %}>Telegram</option>
+                          <option value="whatsapp" {% if settings.social_links.primary_channel == 'whatsapp' %}selected{% endif %}>WhatsApp</option>
+                          <option value="instagram" {% if settings.social_links.primary_channel == 'instagram' %}selected{% endif %}>Instagram</option>
+                          <option value="facebook" {% if settings.social_links.primary_channel == 'facebook' %}selected{% endif %}>Facebook</option>
+                          <option value="tiktok" {% if settings.social_links.primary_channel == 'tiktok' %}selected{% endif %}>TikTok</option>
+                          <option value="youtube" {% if settings.social_links.primary_channel == 'youtube' %}selected{% endif %}>YouTube</option>
+                          <option value="website" {% if settings.social_links.primary_channel == 'website' %}selected{% endif %}>Сайт</option>
+                        </select>
+                        <svg class="settings-select-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                      </span>
+                    </div>
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_telegram_url">Telegram</label>
+                      <input id="social_telegram_url" class="settings-profile-input" type="text" value="{{ settings.social_links.telegram_url }}" placeholder="@upos_finance или https://t.me/..." data-social-field="telegram_url" />
+                    </div>
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_whatsapp_phone">WhatsApp</label>
+                      <input id="social_whatsapp_phone" class="settings-profile-input" type="text" value="{{ settings.social_links.whatsapp_phone }}" placeholder="+998 ..." data-social-field="whatsapp_phone" />
+                    </div>
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_instagram_url">Instagram</label>
+                      <input id="social_instagram_url" class="settings-profile-input" type="url" value="{{ settings.social_links.instagram_url }}" placeholder="https://instagram.com/..." data-social-field="instagram_url" />
+                    </div>
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_facebook_url">Facebook</label>
+                      <input id="social_facebook_url" class="settings-profile-input" type="url" value="{{ settings.social_links.facebook_url }}" placeholder="https://facebook.com/..." data-social-field="facebook_url" />
+                    </div>
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_tiktok_url">TikTok</label>
+                      <input id="social_tiktok_url" class="settings-profile-input" type="url" value="{{ settings.social_links.tiktok_url }}" placeholder="https://tiktok.com/@..." data-social-field="tiktok_url" />
+                    </div>
+                    <div class="settings-profile-field">
+                      <label class="settings-profile-field-label" for="social_youtube_url">YouTube</label>
+                      <input id="social_youtube_url" class="settings-profile-input" type="url" value="{{ settings.social_links.youtube_url }}" placeholder="https://youtube.com/..." data-social-field="youtube_url" />
+                    </div>
+                    <div class="settings-profile-field settings-profile-field--full">
+                      <label class="settings-profile-field-label" for="social_website_url">Сайт</label>
+                      <input id="social_website_url" class="settings-profile-input" type="url" value="{{ settings.social_links.website_url }}" placeholder="https://..." data-social-field="website_url" />
+                    </div>
+                    <div class="settings-profile-field settings-profile-field--full">
+                      <label class="settings-profile-field-label" for="social_note">Комментарий</label>
+                      <input id="social_note" class="settings-profile-input" type="text" value="{{ settings.social_links.note }}" placeholder="Какие каналы показывать клиентам и какой из них приоритетный" data-social-field="note" />
+                    </div>
+                  </div>
+                  <div class="settings-integrations-save-row">
+                    <span class="settings-business-note">Эти привязки можно использовать в CRM, карточке клиента и разделе Месенджеры.</span>
+                    <span class="integr-status-pill" data-social-status hidden></span>
+                    <button type="button" class="btn" data-social-save>Сохранить</button>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="settings-panel"
             id="panel-roles"
             data-settings-panel="roles"
             role="tabpanel"
@@ -1530,6 +1630,6 @@
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=7" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=25" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=26" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

@@ -7,6 +7,8 @@
   {% set module_home_url = url_for('clients_get') %}
 {% elif active == "suppliers" %}
   {% set module_home_url = url_for('suppliers_get') %}
+{% elif active == "messengers" %}
+  {% set module_home_url = url_for('messengers_get') %}
 {% else %}
   {% set module_home_url = url_for('crm_get') %}
 {% endif %}
@@ -68,6 +70,12 @@
               <svg viewBox="0 0 24 24" focusable="false"><path d="M9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
             {% elif item.icon == "deals" %}
               <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18" /><path d="M7 15h3v3H7z" /><path d="M14 7h3v11h-3z" /><path d="M7 8h3v4H7z" /></svg>
+            {% elif item.icon == "chat" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><path d="M8 9h8" /><path d="M8 13h5" /></svg>
+            {% elif item.icon == "broadcast" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M3 11v2" /><path d="M7.6 5.6A9 9 0 0 1 12 5a9 9 0 0 1 4.4.6" /><path d="M5 15a14 14 0 0 1 7-2 14 14 0 0 1 7 2" /><path d="M12 19h.01" /></svg>
+            {% elif item.icon == "template" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5h16v14H4z" /><path d="M8 9h8" /><path d="M8 13h6" /><path d="M8 17h4" /></svg>
             {% else %}
               <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" /></svg>
             {% endif %}
@@ -85,6 +93,8 @@
         {% include "_business_module_clients.html" %}
       {% elif active == "suppliers" %}
         {% include "_business_module_suppliers.html" %}
+      {% elif active == "messengers" %}
+        {% include "_business_module_messengers.html" %}
       {% else %}
         {% include "_business_module_crm.html" %}
       {% endif %}

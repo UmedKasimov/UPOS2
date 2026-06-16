@@ -1,5 +1,5 @@
 (() => {
-  const TABLE_SELECTOR = 'table.org-ops-table';
+  const TABLE_SELECTOR = 'table.org-ops-table, table[data-upos-column-controls]';
   const READY_ATTR = 'data-upos-column-controls-ready';
   const CONTROL_CELL = 'upos-table-column-control-cell';
   const HIDDEN_CLASS = 'upos-table-column-hidden';

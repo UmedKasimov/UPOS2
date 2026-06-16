@@ -21,6 +21,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from openpyxl import Workbook, load_workbook
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -2986,6 +2987,30 @@ def create_app() -> FastAPI:
                     "История взаимодействий по клиенту.",
                 ],
             },
+            "messengers": {
+                "title": "Месенджеры",
+                "kicker": "Диалоги и рассылки",
+                "subtitle": "Чаты, кампании, шаблоны и каналы связи",
+                "heading": "Центр сообщений",
+                "action": "+ Сообщение",
+                "launcher": [
+                    {"id": "inbox", "title": "Диалоги", "subtitle": "Чаты и обращения", "icon": "chat"},
+                    {"id": "campaigns", "title": "Рассылки", "subtitle": "Кампании и сегменты", "icon": "broadcast"},
+                    {"id": "templates", "title": "Шаблоны", "subtitle": "Тексты и сценарии", "icon": "template"},
+                ],
+                "filters": ["Поиск", "Канал", "Ответственный", "Статус"],
+                "columns": ["Канал", "Контакт", "Последнее сообщение", "Ответственный", "Статус"],
+                "list_title": "Коммуникации",
+                "status": "Каркас",
+                "empty": "Здесь будут диалоги, рассылки и шаблоны сообщений в стиле ibox.",
+                "logic": [
+                    "Единый список диалогов по клиентам и каналам связи.",
+                    "Шаблоны сообщений для типовых ответов и уведомлений.",
+                    "Рассылки по сегментам клиентов и статусам сделок.",
+                    "Связь сообщений с CRM, клиентами и продажами.",
+                    "История контактов по каждому каналу.",
+                ],
+            },
         }
         return modules[key]
 
@@ -3362,6 +3387,7 @@ def create_app() -> FastAPI:
         data = row.data if isinstance(row.data, dict) else {}
         prices = data.get("prices") if isinstance(data.get("prices"), list) else []
         stocks = data.get("stocks") if isinstance(data.get("stocks"), list) else []
+        purchase_history = data.get("purchase_history") if isinstance(data.get("purchase_history"), list) else []
         qty = Decimal("0")
         for item in stocks:
             if not isinstance(item, dict):
@@ -3370,6 +3396,17 @@ def create_app() -> FastAPI:
                 qty += Decimal(str(item.get("quantity") or "0"))
             except Exception:
                 pass
+        if not purchase_history and stocks:
+            purchase_history = [
+                {
+                    "warehouse": str(item.get("warehouse") or ""),
+                    "quantity": str(item.get("quantity") or ""),
+                    "price": str(item.get("price") or ""),
+                    "date": str(item.get("date") or ""),
+                }
+                for item in stocks
+                if isinstance(item, dict) and any(item.get(key) for key in ("warehouse", "quantity", "price", "date"))
+            ]
         sale_price = ""
         sale_currency = "UZS"
         if prices and isinstance(prices[0], dict):
@@ -3395,13 +3432,32 @@ def create_app() -> FastAPI:
             "characteristics": str(data.get("characteristics") or ""),
             "classification": str(data.get("classification") or ""),
             "owner": str(data.get("owner") or ""),
+            "photo_url": str(data.get("photo_url") or ""),
             "prices": prices,
             "stocks": stocks,
+            "purchase_history": purchase_history,
+            "purchase_history_json": json.dumps(purchase_history, ensure_ascii=False, indent=2) if purchase_history else "",
             "quantity": str(qty.normalize() if qty else 0),
             "sale_price": sale_price,
             "sale_currency": sale_currency,
             "updated_at": row.updated_at,
         }
+
+    def _product_json_rows(raw: Any, *, note_key: str = "note") -> list[dict[str, Any]]:
+        if isinstance(raw, list):
+            return [dict(item) for item in raw if isinstance(item, dict)]
+        text = str(raw or "").strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return [{note_key: text}]
+        if isinstance(parsed, dict):
+            return [parsed]
+        if isinstance(parsed, list):
+            return [dict(item) for item in parsed if isinstance(item, dict)]
+        return []
 
     def _product_form_payload(form: Any) -> dict[str, Any]:
         def val(name: str, default: str = "") -> str:
@@ -3447,10 +3503,184 @@ def create_app() -> FastAPI:
             "characteristics": val("characteristics"),
             "classification": val("classification"),
             "owner": val("owner"),
+            "photo_url": val("photo_url"),
             "prices": prices,
             "stocks": stocks,
+            "purchase_history": _product_json_rows(form.get("purchase_history_json")),
         }
         return data
+
+    def _product_filters_payload(
+        q: str = "",
+        category: str = "",
+        group: str = "",
+        brand: str = "",
+        status: str = "active",
+        kind: str = "product",
+    ) -> dict[str, str]:
+        return {
+            "q": q.strip(),
+            "category": category.strip(),
+            "group": group.strip(),
+            "brand": brand.strip(),
+            "status": status.strip() or "all",
+            "kind": kind.strip() or "product",
+        }
+
+    def _product_matches_filters(item: dict[str, Any], filters: dict[str, str]) -> bool:
+        if filters["kind"] != "all" and item["kind"] != filters["kind"]:
+            return False
+        if filters["status"] != "all" and item["status"] != filters["status"]:
+            return False
+        if filters["category"] and item["category"] != filters["category"]:
+            return False
+        if filters["group"] and item["group"] != filters["group"]:
+            return False
+        if filters["brand"] and item["brand"] != filters["brand"]:
+            return False
+        hay = " ".join([item["name"], item["sku"], item["barcode"], item["category"], item["brand"]]).lower()
+        q_clean = filters["q"].lower()
+        if q_clean and q_clean not in hay:
+            return False
+        return True
+
+    def _collect_products_view_data(
+        session: Any,
+        workspace_owner_id: str,
+        filters: dict[str, str],
+        *,
+        edit: str = "",
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, dict[str, list[str]]]:
+        products: list[dict[str, Any]] = []
+        edit_product = None
+        rows = list(
+            session.execute(
+                select(Product)
+                .where(Product.workspace_owner_id == workspace_owner_id)
+                .order_by(Product.updated_at.desc())
+            ).scalars()
+        )
+        for row in rows:
+            item = _product_data(row)
+            if not _product_matches_filters(item, filters):
+                continue
+            products.append(item)
+            if edit and row.id == edit:
+                edit_product = item
+        if edit and edit_product is None:
+            found = session.get(Product, edit)
+            if found and found.workspace_owner_id == workspace_owner_id:
+                edit_product = _product_data(found)
+        options = {
+            "categories": sorted({p["category"] for p in products if p["category"]}),
+            "groups": sorted({p["group"] for p in products if p["group"]}),
+            "brands": sorted({p["brand"] for p in products if p["brand"]}),
+            "folders": sorted({p["folder"] for p in products if p["folder"]}),
+            "price_types": sorted(
+                {
+                    str(price.get("name") or "")
+                    for p in products
+                    for price in p["prices"]
+                    if isinstance(price, dict) and price.get("name")
+                }
+            ),
+        }
+        return products, edit_product, options
+
+    def _product_excel_text(raw: Any) -> str:
+        return str(raw or "").strip()
+
+    def _decimal_plain_text(value: Decimal) -> str:
+        if not value:
+            return ""
+        text = format(value, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        return text
+
+    def _product_excel_decimal_text(raw: Any) -> str:
+        value = _sales_decimal(raw)
+        return _decimal_plain_text(value)
+
+    def _product_excel_bool(raw: Any) -> bool:
+        return str(raw or "").strip().lower() in {"1", "true", "yes", "y", "да", "активно"}
+
+    def _product_excel_kind(raw: Any, fallback: str = "product") -> str:
+        normalized = str(raw or "").strip().lower()
+        mapping = {
+            "product": "product",
+            "товар": "product",
+            "simple": "product",
+            "service": "service",
+            "услуга": "service",
+            "collection": "collection",
+            "комплект": "collection",
+            "коллекция": "collection",
+        }
+        return mapping.get(normalized, fallback)
+
+    def _product_excel_status(raw: Any, fallback: str = "active") -> str:
+        normalized = str(raw or "").strip().lower()
+        mapping = {
+            "active": "active",
+            "активный": "active",
+            "inactive": "inactive",
+            "неактивный": "inactive",
+        }
+        return mapping.get(normalized, fallback)
+
+    def _product_import_redirect_url(kind: str, *, msg: str = "", count: int = 0, error: str = "") -> str:
+        query: dict[str, str] = {}
+        clean_kind = str(kind or "").strip()
+        if clean_kind and clean_kind != "product":
+            query["kind"] = clean_kind
+        if msg:
+            query["msg"] = msg
+        if count > 0:
+            query["count"] = str(count)
+        if error:
+            query["error"] = error
+        suffix = f"?{urlencode(query)}" if query else ""
+        target_hash = "#service" if clean_kind == "service" else "#catalog"
+        return f"/products{suffix}{target_hash}"
+
+    def _product_list_redirect_url(
+        *,
+        q: str = "",
+        category: str = "",
+        group: str = "",
+        brand: str = "",
+        status: str = "active",
+        kind: str = "product",
+        msg: str = "",
+        count: int = 0,
+        error: str = "",
+        anchor: str = "catalog",
+    ) -> str:
+        query: dict[str, str] = {}
+        if q.strip():
+            query["q"] = q.strip()
+        if category.strip():
+            query["category"] = category.strip()
+        if group.strip():
+            query["group"] = group.strip()
+        if brand.strip():
+            query["brand"] = brand.strip()
+        clean_status = status.strip() or "active"
+        if clean_status:
+            query["status"] = clean_status
+        clean_kind = kind.strip() or "product"
+        if clean_kind:
+            query["kind"] = clean_kind
+        if msg:
+            query["msg"] = msg
+        if count > 0:
+            query["count"] = str(count)
+        if error:
+            query["error"] = error
+        suffix = f"?{urlencode(query)}" if query else ""
+        target_hash = f"#{anchor}" if anchor else ""
+        return f"/products{suffix}{target_hash}"
 
     @app.get("/products", response_class=HTMLResponse, name="products_get")
     def products_get(
@@ -3467,55 +3697,9 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        q_clean = q.strip().lower()
-        filters = {
-            "q": q.strip(),
-            "category": category.strip(),
-            "group": group.strip(),
-            "brand": brand.strip(),
-            "status": status.strip() or "all",
-            "kind": kind.strip() or "product",
-        }
-        products: list[dict[str, Any]] = []
-        edit_product = None
+        filters = _product_filters_payload(q, category, group, brand, status, kind)
         with session_scope() as session:
-            rows = list(
-                session.execute(
-                    select(Product)
-                    .where(Product.workspace_owner_id == wid)
-                    .order_by(Product.updated_at.desc())
-                ).scalars()
-            )
-            for row in rows:
-                item = _product_data(row)
-                if filters["kind"] != "all" and item["kind"] != filters["kind"]:
-                    continue
-                if filters["status"] != "all" and item["status"] != filters["status"]:
-                    continue
-                if filters["category"] and item["category"] != filters["category"]:
-                    continue
-                if filters["group"] and item["group"] != filters["group"]:
-                    continue
-                if filters["brand"] and item["brand"] != filters["brand"]:
-                    continue
-                hay = " ".join([item["name"], item["sku"], item["barcode"], item["category"], item["brand"]]).lower()
-                if q_clean and q_clean not in hay:
-                    continue
-                products.append(item)
-                if edit and row.id == edit:
-                    edit_product = item
-            if edit and edit_product is None:
-                found = session.get(Product, edit)
-                if found and found.workspace_owner_id == wid:
-                    edit_product = _product_data(found)
-
-        options = {
-            "categories": sorted({p["category"] for p in products if p["category"]}),
-            "groups": sorted({p["group"] for p in products if p["group"]}),
-            "brands": sorted({p["brand"] for p in products if p["brand"]}),
-            "folders": sorted({p["folder"] for p in products if p["folder"]}),
-            "price_types": sorted({str(price.get("name") or "") for p in products for price in p["prices"] if isinstance(price, dict) and price.get("name")}),
-        }
+            products, edit_product, options = _collect_products_view_data(session, wid, filters, edit=edit)
         return tpl(
             request,
             "home_products.html",
@@ -3526,8 +3710,285 @@ def create_app() -> FastAPI:
             product_options=options,
             edit_product=edit_product,
             flash_ok=request.query_params.get("msg"),
+            imported_count=request.query_params.get("count") or "0",
+            bulk_updated_count=request.query_params.get("count") or "0",
             flash_err=request.query_params.get("error"),
         )
+
+    @app.get("/products/export", name="products_export")
+    def products_export(
+        request: Request,
+        q: str = "",
+        category: str = "",
+        group: str = "",
+        brand: str = "",
+        status: str = "active",
+        kind: str = "product",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = _product_filters_payload(q, category, group, brand, status, kind)
+        with session_scope() as session:
+            products, _, _ = _collect_products_view_data(session, wid, filters)
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Products"
+        headers = [
+            "ID",
+            "Тип",
+            "Название",
+            "Артикул",
+            "Штрихкод",
+            "Категория",
+            "Папка",
+            "Группа",
+            "Бренд",
+            "Единица",
+            "Вторая единица",
+            "Статус",
+            "Цена продажи",
+            "Валюта цены",
+            "Склад",
+            "Количество",
+            "Себестоимость",
+            "Дата остатка",
+            "Тип штрихкода",
+            "Партийный учет",
+            "Упаковки",
+            "Мин. остаток",
+            "Характеристики",
+            "Классификация",
+            "Владелец",
+            "Цены JSON",
+            "Остатки JSON",
+        ]
+        headers.extend(["Photo URL", "Purchase History JSON"])
+        sheet.append(headers)
+        for product in products:
+            prices = product["prices"] if isinstance(product.get("prices"), list) else []
+            stocks = product["stocks"] if isinstance(product.get("stocks"), list) else []
+            primary_price = prices[0] if prices and isinstance(prices[0], dict) else {}
+            primary_stock = stocks[0] if stocks and isinstance(stocks[0], dict) else {}
+            export_row = [
+                    product["id"],
+                    product["kind"],
+                    product["name"],
+                    product["sku"],
+                    product["barcode"],
+                    product["category"],
+                    product["folder"],
+                    product["group"],
+                    product["brand"],
+                    product["unit"],
+                    product["second_unit"],
+                    product["status"],
+                    str(primary_price.get("price") or ""),
+                    str(primary_price.get("currency") or product["sale_currency"] or "UZS"),
+                    str(primary_stock.get("warehouse") or ""),
+                    product["quantity"],
+                    str(primary_stock.get("price") or ""),
+                    str(primary_stock.get("date") or ""),
+                    product["barcode_type"],
+                    "1" if product["batch_tracking"] else "0",
+                    product["packages"],
+                    product["min_stock"],
+                    product["characteristics"],
+                    product["classification"],
+                    product["owner"],
+                    json.dumps(prices, ensure_ascii=False),
+                    json.dumps(stocks, ensure_ascii=False),
+                ]
+            export_row.extend(
+                [
+                    product["photo_url"],
+                    json.dumps(product["purchase_history"], ensure_ascii=False),
+                ]
+            )
+            sheet.append(export_row)
+        sheet.freeze_panes = "A2"
+        sheet.auto_filter.ref = sheet.dimensions
+        stream = io.BytesIO()
+        workbook.save(stream)
+        filename = f"products-{filters['kind'] or 'all'}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.xlsx"
+        return Response(
+            content=stream.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
+        )
+
+    @app.post("/products/import", name="products_import")
+    async def products_import(
+        request: Request,
+        csrf_token: str = Form(default=""),
+        kind: str = Form(default="product"),
+        excel_file: UploadFile = File(...),
+    ):
+        if not csrf_matches_session(request, csrf_token):
+            return RedirectResponse(url=_product_import_redirect_url(kind, error="Форма устарела. Обновите страницу и повторите."), status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        if not excel_file.filename or not excel_file.filename.lower().endswith(".xlsx"):
+            return RedirectResponse(url=_product_import_redirect_url(kind, error="Нужен файл Excel в формате .xlsx"), status_code=302)
+        try:
+            payload = await excel_file.read()
+            workbook = load_workbook(io.BytesIO(payload), data_only=True)
+        except Exception:
+            return RedirectResponse(url=_product_import_redirect_url(kind, error="Не удалось прочитать Excel-файл"), status_code=302)
+
+        sheet = workbook.active
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            return RedirectResponse(url=_product_import_redirect_url(kind, error="Excel-файл пустой"), status_code=302)
+
+        header_map = {
+            _product_excel_text(value).lower(): index
+            for index, value in enumerate(rows[0])
+            if _product_excel_text(value)
+        }
+
+        def cell(row_values: tuple[Any, ...], *names: str) -> Any:
+            for name in names:
+                idx = header_map.get(name.lower())
+                if idx is not None and idx < len(row_values):
+                    return row_values[idx]
+            return ""
+
+        imported_count = 0
+        with session_scope() as session:
+            for row_values in rows[1:]:
+                name = _product_excel_text(cell(row_values, "Название", "Name"))
+                if not name:
+                    continue
+                imported_count += 1
+                imported_kind = _product_excel_kind(cell(row_values, "Тип", "Kind"), fallback=str(kind or "product"))
+                sku = _product_excel_text(cell(row_values, "Артикул", "SKU"))
+                barcode = _product_excel_text(cell(row_values, "Штрихкод", "Barcode"))
+                product_id = _product_excel_text(cell(row_values, "ID"))
+                row = session.get(Product, product_id) if product_id else None
+                if row and row.workspace_owner_id != wid:
+                    row = None
+                if row is None and sku:
+                    row = session.execute(
+                        select(Product).where(
+                            Product.workspace_owner_id == wid,
+                            Product.sku == sku,
+                        )
+                    ).scalars().first()
+                if row is None and barcode:
+                    row = session.execute(
+                        select(Product).where(
+                            Product.workspace_owner_id == wid,
+                            Product.barcode == barcode,
+                        )
+                    ).scalars().first()
+                if row is None:
+                    row = session.execute(
+                        select(Product).where(
+                            Product.workspace_owner_id == wid,
+                            func.lower(Product.name) == name.lower(),
+                        )
+                    ).scalars().first()
+
+                prices_json = _product_excel_text(cell(row_values, "Цены JSON"))
+                prices: list[dict[str, str]] = []
+                if prices_json:
+                    try:
+                        parsed_prices = json.loads(prices_json)
+                        if isinstance(parsed_prices, list):
+                            prices = [dict(item) for item in parsed_prices if isinstance(item, dict)]
+                    except Exception:
+                        prices = []
+                primary_price = _product_excel_text(cell(row_values, "Цена продажи"))
+                primary_currency = _product_excel_text(cell(row_values, "Валюта цены")) or "UZS"
+                if primary_price:
+                    if prices:
+                        prices[0]["name"] = str(prices[0].get("name") or "Продажная цена")
+                        prices[0]["price"] = primary_price
+                        prices[0]["currency"] = primary_currency.upper()
+                    else:
+                        prices = [{"name": "Продажная цена", "price": primary_price, "currency": primary_currency.upper()}]
+
+                stocks_json = _product_excel_text(cell(row_values, "Остатки JSON"))
+                stocks: list[dict[str, str]] = []
+                if stocks_json:
+                    try:
+                        parsed_stocks = json.loads(stocks_json)
+                        if isinstance(parsed_stocks, list):
+                            stocks = [dict(item) for item in parsed_stocks if isinstance(item, dict)]
+                    except Exception:
+                        stocks = []
+                raw_stock_warehouse = _product_excel_text(cell(row_values, "Склад"))
+                stock_warehouse = raw_stock_warehouse or "Основной склад"
+                stock_quantity = _product_excel_decimal_text(cell(row_values, "Количество"))
+                stock_price = _product_excel_decimal_text(cell(row_values, "Себестоимость"))
+                stock_date = _product_excel_text(cell(row_values, "Дата остатка"))
+                if raw_stock_warehouse or stock_quantity or stock_price or stock_date:
+                    if stocks:
+                        stocks[0]["warehouse"] = stock_warehouse
+                        stocks[0]["quantity"] = stock_quantity
+                        stocks[0]["price"] = stock_price
+                        stocks[0]["date"] = stock_date
+                    else:
+                        stocks = [
+                            {
+                                "warehouse": stock_warehouse,
+                                "quantity": stock_quantity,
+                                "price": stock_price,
+                                "date": stock_date,
+                            }
+                        ]
+                purchase_history = _product_json_rows(cell(row_values, "Purchase History JSON"))
+
+                data = {
+                    "kind": imported_kind,
+                    "category": _product_excel_text(cell(row_values, "Категория")),
+                    "folder": _product_excel_text(cell(row_values, "Папка")),
+                    "group": _product_excel_text(cell(row_values, "Группа")),
+                    "brand": _product_excel_text(cell(row_values, "Бренд")),
+                    "unit": _product_excel_text(cell(row_values, "Единица")) or "Штука",
+                    "second_unit": _product_excel_text(cell(row_values, "Вторая единица")),
+                    "status": _product_excel_status(cell(row_values, "Статус")),
+                    "barcode_type": _product_excel_text(cell(row_values, "Тип штрихкода")) or "EAN13",
+                    "batch_tracking": _product_excel_bool(cell(row_values, "Партийный учет")),
+                    "packages": _product_excel_text(cell(row_values, "Упаковки")),
+                    "min_stock": _product_excel_decimal_text(cell(row_values, "Мин. остаток")),
+                    "characteristics": _product_excel_text(cell(row_values, "Характеристики")),
+                    "classification": _product_excel_text(cell(row_values, "Классификация")),
+                    "owner": _product_excel_text(cell(row_values, "Владелец")),
+                    "photo_url": _product_excel_text(cell(row_values, "Photo URL")),
+                    "prices": prices,
+                    "stocks": stocks,
+                    "purchase_history": purchase_history,
+                }
+
+                if row is None:
+                    next_id = product_id or str(uuid.uuid4())
+                    row = Product(
+                        id=next_id,
+                        workspace_owner_id=wid,
+                        name=name,
+                        sku=sku,
+                        barcode=barcode,
+                        external_source="local",
+                        external_id=next_id,
+                        data=data,
+                    )
+                    session.add(row)
+                else:
+                    row.name = name
+                    row.sku = sku
+                    row.barcode = barcode
+                    row.external_source = row.external_source or "local"
+                    row.external_id = row.external_id or row.id
+                    row.data = data
+        if imported_count <= 0:
+            return RedirectResponse(url=_product_import_redirect_url(kind, error="В Excel не найдено ни одной строки товара"), status_code=302)
+        return RedirectResponse(url=_product_import_redirect_url(kind, msg="imported", count=imported_count), status_code=302)
 
     @app.post("/products/save", name="products_save")
     async def products_save(request: Request):
@@ -3570,6 +4031,68 @@ def create_app() -> FastAPI:
                 row.external_id = row.external_id or row.id
                 row.data = data
         return RedirectResponse(url="/products?msg=saved", status_code=302)
+
+    @app.post("/products/bulk-update", name="products_bulk_update")
+    async def products_bulk_update(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+
+        filters = _product_filters_payload(
+            str(form.get("q") or ""),
+            str(form.get("category") or ""),
+            str(form.get("group") or ""),
+            str(form.get("brand") or ""),
+            str(form.get("status") or "active"),
+            str(form.get("kind") or "product"),
+        )
+        product_ids = [str(item or "").strip() for item in form.getlist("product_ids") if str(item or "").strip()]
+        updates = {
+            "category": str(form.get("bulk_category") or "").strip(),
+            "group": str(form.get("bulk_group") or "").strip(),
+            "brand": str(form.get("bulk_brand") or "").strip(),
+            "folder": str(form.get("bulk_folder") or "").strip(),
+        }
+        updates = {key: value for key, value in updates.items() if value}
+
+        if not product_ids:
+            return RedirectResponse(
+                url=_product_list_redirect_url(**filters, error="Отметьте хотя бы один товар для массового редактирования"),
+                status_code=302,
+            )
+        if not updates:
+            return RedirectResponse(
+                url=_product_list_redirect_url(**filters, error="Заполните хотя бы одно поле: категория, группа, бренд или папка"),
+                status_code=302,
+            )
+
+        updated_count = 0
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(Product).where(
+                        Product.workspace_owner_id == wid,
+                        Product.id.in_(product_ids),
+                    )
+                ).scalars()
+            )
+            for row in rows:
+                data = dict(row.data) if isinstance(row.data, dict) else {}
+                for key, value in updates.items():
+                    data[key] = value
+                row.data = data
+                row.external_source = row.external_source or "local"
+                row.external_id = row.external_id or row.id
+                updated_count += 1
+
+        return RedirectResponse(
+            url=_product_list_redirect_url(**filters, msg="bulk_saved", count=updated_count),
+            status_code=302,
+        )
 
     @app.post("/products/{product_id}/delete", name="products_delete")
     async def products_delete(request: Request, product_id: str):
@@ -4811,6 +5334,45 @@ def create_app() -> FastAPI:
             crm_options=crm_options,
             crm_records=crm_records,
             today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.get("/messengers", response_class=HTMLResponse, name="messengers_get")
+    def messengers_get(
+        request: Request,
+        q: str = "",
+        channel: str = "",
+        responsible: str = "",
+        status: str = "all",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "channel": channel.strip(),
+            "responsible": responsible.strip(),
+            "status": status.strip() or "all",
+        }
+        user = request.session.get("user") or {}
+        channel_options = ["Telegram", "WhatsApp", "Instagram", "Facebook Messenger", "SMS"]
+        responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="messengers",
+            module=_business_module_context("messengers"),
+            messenger_filters=filters,
+            messenger_options={
+                "channels": channel_options,
+                "responsibles": responsible_options,
+            },
+            messenger_threads=[],
+            messenger_campaigns=[],
+            messenger_templates=[],
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
@@ -8240,6 +8802,18 @@ def create_app() -> FastAPI:
         else:
             data = load_workspace_settings("")
             categories = []
+        social_links = data.get("social_links") if isinstance(data.get("social_links"), dict) else {}
+        data["social_links"] = {
+            "primary_channel": str(social_links.get("primary_channel") or "").strip(),
+            "instagram_url": str(social_links.get("instagram_url") or "").strip(),
+            "facebook_url": str(social_links.get("facebook_url") or "").strip(),
+            "telegram_url": str(social_links.get("telegram_url") or "").strip(),
+            "whatsapp_phone": str(social_links.get("whatsapp_phone") or "").strip(),
+            "youtube_url": str(social_links.get("youtube_url") or "").strip(),
+            "tiktok_url": str(social_links.get("tiktok_url") or "").strip(),
+            "website_url": str(social_links.get("website_url") or "").strip(),
+            "note": str(social_links.get("note") or "").strip(),
+        }
         tab_raw = (request.query_params.get("tab") or "").strip().lower()
         settings_can_manage_employees = _can_manage_employees(u)
         settings_can_manage_config = bool((not u.get("is_employee")) or _has_permission(u, "settings"))
@@ -8256,7 +8830,7 @@ def create_app() -> FastAPI:
             if default_allowed_tab not in allowed_tabs:
                 default_allowed_tab = "employees"
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations"})
+            allowed_tabs.update({"telegram", "integrations", "social"})
         if settings_can_manage_dictionary:
             allowed_tabs.add("dictionary")
             if default_allowed_tab not in allowed_tabs:
@@ -8455,7 +9029,7 @@ def create_app() -> FastAPI:
         if settings_can_manage_employees:
             allowed_tabs.add("employees")
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations", "dictionary"})
+            allowed_tabs.update({"telegram", "integrations", "social", "dictionary"})
         if settings_can_manage_roles:
             allowed_tabs.add("roles")
         tab = active_settings_tab.strip().lower() if active_settings_tab.strip().lower() in allowed_tabs else "general"
@@ -8753,6 +9327,37 @@ def create_app() -> FastAPI:
         if connection:
             out["connection"] = connection
         return out
+
+    @app.post("/api/settings/social-links")
+    async def api_settings_social_links(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _role_permissions_owner_id(request)
+        if err:
+            return err
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        raw_links = body.get("social_links") if isinstance(body.get("social_links"), dict) else {}
+        data = load_workspace_settings(wid)
+        data["social_links"] = {
+            "primary_channel": str(raw_links.get("primary_channel") or "").strip(),
+            "instagram_url": str(raw_links.get("instagram_url") or "").strip(),
+            "facebook_url": str(raw_links.get("facebook_url") or "").strip(),
+            "telegram_url": str(raw_links.get("telegram_url") or "").strip(),
+            "whatsapp_phone": str(raw_links.get("whatsapp_phone") or "").strip(),
+            "youtube_url": str(raw_links.get("youtube_url") or "").strip(),
+            "tiktok_url": str(raw_links.get("tiktok_url") or "").strip(),
+            "website_url": str(raw_links.get("website_url") or "").strip(),
+            "note": str(raw_links.get("note") or "").strip(),
+        }
+        _save_workspace_settings_from_user(request, data)
+        return {"ok": True, "social_links": data["social_links"]}
 
     @app.post("/api/settings/account")
     async def api_settings_account(request: Request):
