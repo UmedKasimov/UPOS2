@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from upos.db import session_scope
 from upos.db_models import (
+    Counterparty,
     TelegramBotConfig,
     TelegramChat,
     TelegramDeliveryLog,
@@ -24,6 +26,8 @@ from upos.telegram_events import hub
 logger = logging.getLogger(__name__)
 
 _SUBSCRIBER_STATUSES = frozenset({"pending", "approved", "rejected", "disabled"})
+_PHONE_CLEAN_RE = re.compile(r"\D+")
+_TELEGRAM_COUNTERPARTY_SOURCE = "telegram"
 
 DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
     "reports": {
@@ -116,6 +120,196 @@ DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _is_private_chat_type(chat_type: str | None) -> bool:
+    return str(chat_type or "").strip().lower() == "private"
+
+
+def _chat_can_send(row: TelegramChat) -> bool:
+    return _is_private_chat_type(row.chat_type) or bool(row.bot_is_admin)
+
+
+def _phone_digits(value: str | None) -> str:
+    return _PHONE_CLEAN_RE.sub("", str(value or ""))
+
+
+def _counterparty_data(row: Counterparty) -> dict[str, Any]:
+    raw = getattr(row, "data", {}) or {}
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _telegram_external_id(telegram_user_id: int) -> str:
+    return f"user:{int(telegram_user_id)}"
+
+
+def _telegram_handle(username: str | None, telegram_user_id: int) -> str:
+    clean = str(username or "").strip().lstrip("@")
+    return f"@{clean}" if clean else f"tg://user?id={int(telegram_user_id)}"
+
+
+def _subscriber_title(row: TelegramSubscriber) -> str:
+    for value in (row.display_name, f"@{row.username}" if row.username else "", row.phone):
+        clean = str(value or "").strip()
+        if clean:
+            return clean
+    return f"Telegram {row.telegram_user_id}"
+
+
+def _client_row_to_dict(row: Counterparty) -> dict[str, Any]:
+    extra = _counterparty_data(row)
+    return {
+        "id": row.id,
+        "name": row.name,
+        "phone": row.phone,
+        "telegram": str(extra.get("telegram") or ""),
+    }
+
+
+def _ensure_client_role(row: Counterparty) -> None:
+    if row.kind == "supplier":
+        row.kind = "both"
+    elif row.kind not in {"client", "both"}:
+        row.kind = "client"
+
+
+def _find_counterparty_by_phone(session: Session, workspace_owner_id: str, phone: str) -> Counterparty | None:
+    digits = _phone_digits(phone)
+    if not digits:
+        return None
+    rows = session.execute(
+        select(Counterparty).where(
+            Counterparty.workspace_owner_id == workspace_owner_id,
+            Counterparty.phone != "",
+        ),
+    ).scalars().all()
+    for row in rows:
+        if _phone_digits(row.phone) == digits:
+            return row
+    return None
+
+
+def _ensure_counterparty_for_subscriber(
+    session: Session,
+    workspace_owner_id: str,
+    row: TelegramSubscriber,
+) -> dict[str, Any] | None:
+    telegram_user_id = int(row.telegram_user_id)
+    external_id = _telegram_external_id(telegram_user_id)
+    client = _find_counterparty_by_phone(session, workspace_owner_id, row.phone)
+    if client is None:
+        client = session.execute(
+            select(Counterparty).where(
+                Counterparty.workspace_owner_id == workspace_owner_id,
+                Counterparty.external_source == _TELEGRAM_COUNTERPARTY_SOURCE,
+                Counterparty.external_id == external_id,
+            ),
+        ).scalar_one_or_none()
+
+    if client is None:
+        client = Counterparty(
+            id=str(uuid.uuid4()),
+            workspace_owner_id=workspace_owner_id,
+            kind="client",
+            name=_subscriber_title(row),
+            phone=(row.phone or "")[:64],
+            tax_id="",
+            external_source=_TELEGRAM_COUNTERPARTY_SOURCE,
+            external_id=external_id[:180],
+            data={},
+        )
+        session.add(client)
+    else:
+        old_kind = client.kind
+        _ensure_client_role(client)
+        if not (client.phone or "").strip() and row.phone:
+            client.phone = row.phone[:64]
+        if client.kind != old_kind:
+            session.flush()
+
+    current_extra = _counterparty_data(client)
+    extra = dict(current_extra)
+    updates = {
+        "is_client": True,
+        "telegram": _telegram_handle(row.username, telegram_user_id),
+        "telegram_username": str(row.username or "").strip().lstrip("@"),
+        "telegram_user_id": str(telegram_user_id),
+        "telegram_chat_id": str(int(row.chat_id)),
+        "telegram_subscriber_id": row.id,
+        "telegram_status": row.status,
+    }
+    for key, value in updates.items():
+        if extra.get(key) != value:
+            extra[key] = value
+    if not extra.get("telegram_linked_at"):
+        extra["telegram_linked_at"] = _now().isoformat()
+    if client.kind == "both" and extra.get("is_supplier") is not True:
+        extra["is_supplier"] = True
+    if extra != current_extra:
+        client.data = extra
+    session.flush()
+    return _client_row_to_dict(client)
+
+
+def _upsert_private_chat_for_subscriber(
+    session: Session,
+    workspace_owner_id: str,
+    row: TelegramSubscriber,
+    *,
+    touch: bool = True,
+) -> TelegramChat:
+    now = _now()
+    chat = session.execute(
+        select(TelegramChat).where(
+            TelegramChat.workspace_owner_id == workspace_owner_id,
+            TelegramChat.chat_id == int(row.chat_id),
+        ),
+    ).scalar_one_or_none()
+    title = _subscriber_title(row)
+    if chat is None:
+        chat = TelegramChat(
+            id=str(uuid.uuid4()),
+            workspace_owner_id=workspace_owner_id,
+            chat_id=int(row.chat_id),
+            chat_type="private",
+            title=title,
+            bot_is_admin=True,
+            is_enabled=True,
+            discovered_at=now,
+            last_seen_at=now,
+        )
+        session.add(chat)
+    else:
+        if chat.chat_type != "private":
+            chat.chat_type = "private"
+        if chat.title != title:
+            chat.title = title
+        if not chat.bot_is_admin:
+            chat.bot_is_admin = True
+        if not chat.is_enabled:
+            chat.is_enabled = True
+        if touch:
+            chat.last_seen_at = now
+    session.flush()
+    return chat
+
+
+def sync_subscriber_private_chats(workspace_owner_id: str) -> list[dict[str, Any]]:
+    """Backfill private Telegram chats and client links from subscriber requests."""
+    wid = (workspace_owner_id or "").strip()
+    updated: list[dict[str, Any]] = []
+    with session_scope() as session:
+        rows = session.execute(
+            select(TelegramSubscriber).where(
+                TelegramSubscriber.workspace_owner_id == wid,
+                TelegramSubscriber.status != "disabled",
+            ),
+        ).scalars().all()
+        for row in rows:
+            chat = _upsert_private_chat_for_subscriber(session, wid, row, touch=False)
+            _ensure_counterparty_for_subscriber(session, wid, row)
+            updated.append(_chat_row_to_dict(chat))
+    return updated
 
 
 def mask_token(token: str) -> str:
@@ -480,6 +674,8 @@ def upsert_chat(
 
     def _upsert(sess: Session) -> TelegramChat:
         nonlocal is_new
+        chat_type_clean = (chat_type or "group").strip() or "group"
+        is_private = _is_private_chat_type(chat_type_clean)
         row = sess.execute(
             select(TelegramChat).where(
                 TelegramChat.workspace_owner_id == wid,
@@ -492,20 +688,22 @@ def upsert_chat(
                 id=str(uuid.uuid4()),
                 workspace_owner_id=wid,
                 chat_id=int(chat_id),
-                chat_type=(chat_type or "group").strip() or "group",
+                chat_type=chat_type_clean,
                 title=(title or "").strip() or f"Chat {chat_id}",
-                bot_is_admin=bool(bot_is_admin),
-                is_enabled=False,
+                bot_is_admin=True if is_private else bool(bot_is_admin),
+                is_enabled=True if is_private else False,
                 discovered_at=now,
                 last_seen_at=now,
             )
             sess.add(row)
         else:
-            row.chat_type = (chat_type or row.chat_type).strip() or row.chat_type
+            row.chat_type = chat_type_clean or row.chat_type
             if title:
                 row.title = title.strip()
-            row.bot_is_admin = bool(bot_is_admin)
-            if not row.bot_is_admin:
+            row.bot_is_admin = True if _is_private_chat_type(row.chat_type) else bool(bot_is_admin)
+            if _is_private_chat_type(row.chat_type):
+                row.is_enabled = True if is_new else row.is_enabled
+            elif not row.bot_is_admin:
                 row.is_enabled = False
             row.last_seen_at = now
         sess.flush()
@@ -525,7 +723,7 @@ def set_chat_enabled(workspace_owner_id: str, chat_row_id: str, enabled: bool) -
     wid = (workspace_owner_id or "").strip()
     with session_scope() as session:
         row = session.get(TelegramChat, chat_row_id)
-        if row is None or row.workspace_owner_id != wid or not row.bot_is_admin:
+        if row is None or row.workspace_owner_id != wid or not _chat_can_send(row):
             return None
         row.is_enabled = bool(enabled)
         row.last_seen_at = _now()
@@ -619,8 +817,13 @@ def upsert_subscriber_request(
             row.phone = (phone or row.phone).strip()
             if contact_payload:
                 row.contact_payload = contact_payload
+        chat = _upsert_private_chat_for_subscriber(session, wid, row)
+        client = _ensure_counterparty_for_subscriber(session, wid, row)
         session.flush()
         out = _subscriber_row_to_dict(row)
+        out["chat"] = _chat_row_to_dict(chat)
+        if client:
+            out["client"] = client
     if became_pending:
         hub.publish(wid, "subscriber_pending", out)
     else:
@@ -690,6 +893,12 @@ def refresh_chats_admin_status(workspace_owner_id: str, token: str, bot_id: int)
             select(TelegramChat).where(TelegramChat.workspace_owner_id == wid),
         ).scalars().all()
         for row in rows:
+            if _is_private_chat_type(row.chat_type):
+                row.bot_is_admin = True
+                row.last_seen_at = _now()
+                session.flush()
+                updated.append(_chat_row_to_dict(row))
+                continue
             try:
                 member = get_chat_member(token, int(row.chat_id), int(bot_id))
                 row.bot_is_admin = bot_is_admin(member)
@@ -856,6 +1065,7 @@ def get_webhook_status(workspace_owner_id: str) -> dict[str, Any]:
 def get_telegram_dashboard(workspace_owner_id: str) -> dict[str, Any]:
     wid = (workspace_owner_id or "").strip()
     cfg = get_bot_config(wid)
+    sync_subscriber_private_chats(wid)
     chats = list_chats(wid, admin_only=True)
     pending = list_subscribers(wid, status="pending")
     approved = list_subscribers(wid, status="approved")

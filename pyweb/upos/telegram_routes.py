@@ -54,6 +54,10 @@ _LOCAL_WEBHOOK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _PLACEHOLDER_WEBHOOK_HOSTS = {"your-app.up.railway.app", "your-app.railway.app"}
 
 
+def _telegram_chat_can_send(chat: dict[str, Any]) -> bool:
+    return str(chat.get("chat_type") or "").strip().lower() == "private" or bool(chat.get("bot_is_admin"))
+
+
 def _public_base_from_value(raw: str | None) -> str:
     value = str(raw or "").strip().rstrip("/")
     if not value:
@@ -312,7 +316,7 @@ def register_telegram_routes(
         return {
             "ok": True,
             "webhook": webhook,
-            "chats": [chat for chat in chats if chat.get("bot_is_admin")],
+            "chats": [chat for chat in chats if _telegram_chat_can_send(chat)],
         }
 
     @app.post("/api/telegram/verify")
@@ -429,7 +433,7 @@ def register_telegram_routes(
         if not cfg or not token:
             return JSONResponse({"error": "not_connected"}, status_code=400)
         chats = refresh_chats_admin_status(oid, token, int(cfg.get("bot_id") or 0))
-        return {"ok": True, "chats": [chat for chat in chats if chat.get("bot_is_admin")]}
+        return {"ok": True, "chats": [chat for chat in chats if _telegram_chat_can_send(chat)]}
 
     @app.patch("/api/telegram/chats/{chat_row_id}")
     async def api_telegram_chat_patch(chat_row_id: str, request: Request):
@@ -494,7 +498,7 @@ def register_telegram_routes(
         chat = get_chat_by_row_id(oid, chat_row_id)
         if not chat:
             return JSONResponse({"error": "not_found"}, status_code=404)
-        if not chat.get("bot_is_admin"):
+        if not _telegram_chat_can_send(chat):
             return JSONResponse({"error": "bot_not_admin"}, status_code=400)
         target_chat_id = int(chat.get("chat_id") or 0)
         try:

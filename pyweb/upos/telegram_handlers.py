@@ -192,6 +192,13 @@ def _handle_telegram_update_inner(workspace_owner_id: str, update: dict[str, Any
     tg_user_id = int(user.get("id") or 0)
     if not tg_user_id:
         return
+    upsert_chat(
+        workspace_owner_id,
+        chat_id=chat_id,
+        chat_type="private",
+        title=_user_display(user),
+        bot_is_admin=True,
+    )
 
     contact = message.get("contact")
 

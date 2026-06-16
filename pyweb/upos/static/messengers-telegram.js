@@ -82,6 +82,10 @@
       }) || null;
     }
 
+    function canSendToChat(chat) {
+      return !!chat && (String(chat.chat_type || "").toLowerCase() === "private" || chat.bot_is_admin !== false);
+    }
+
     function setStatus(snapshot) {
       var cfg = snapshot.config || {};
       state.connected = !!snapshot.connected;
@@ -113,24 +117,26 @@
           '<div class="messenger-telegram-placeholder">Здесь будет рабочее место для выбранного Telegram-чата: статус, отправка сообщений и связь с клиентами.</div>';
         return;
       }
+      var isPrivate = String(chat.chat_type || "").toLowerCase() === "private";
+      var canSend = canSendToChat(chat);
       detailTitle.textContent = chat.title || String(chat.chat_id || "Telegram");
       detailMeta.textContent =
-        (chat.chat_type || "chat") +
+        (isPrivate ? "Личный Telegram-чат" : chat.chat_type || "chat") +
         " · ID " +
         (chat.chat_id || "-") +
         " · Обновлен " +
         shortDate(chat.last_seen_at || chat.discovered_at);
       enabledBox.checked = !!chat.is_enabled;
-      enabledBox.disabled = !state.canManage || !chat.bot_is_admin;
-      messageEl.disabled = !state.canManage || !state.connected || !chat.bot_is_admin;
+      enabledBox.disabled = !state.canManage || !canSend;
+      messageEl.disabled = !state.canManage || !state.connected || !canSend;
       sendBtn.disabled = messageEl.disabled || !String(messageEl.value || "").trim();
       logEl.innerHTML =
         '<div class="messenger-telegram-message messenger-telegram-message--system">' +
         '<strong>' +
-        escapeHtml(chat.bot_is_admin ? "Бот администратор" : "Боту нужны права администратора") +
+        escapeHtml(isPrivate ? "Личный чат клиента" : chat.bot_is_admin ? "Бот администратор" : "Боту нужны права администратора") +
         "</strong>" +
         "<span>" +
-        escapeHtml(chat.is_enabled ? "Чат включен для уведомлений и ручных сообщений." : "Чат найден, но пока выключен.") +
+        escapeHtml(isPrivate ? "Можно отвечать клиенту прямо из U-POS через подключенного Telegram-бота." : chat.is_enabled ? "Чат включен для уведомлений и ручных сообщений." : "Чат найден, но пока выключен.") +
         "</span>" +
         "</div>";
     }
@@ -152,7 +158,7 @@
           '<span class="messenger-telegram-chat-main"><strong>' +
           escapeHtml(chat.title || chat.chat_id || "Telegram") +
           "</strong><small>" +
-          escapeHtml((chat.chat_type || "chat") + " · " + (chat.is_enabled ? "активен" : "выключен")) +
+          escapeHtml((String(chat.chat_type || "").toLowerCase() === "private" ? "клиент" : chat.chat_type || "chat") + " · " + (chat.is_enabled ? "активен" : "выключен")) +
           "</small></span>" +
           '<span class="messenger-telegram-dot" data-enabled="' +
           (chat.is_enabled ? "1" : "0") +
@@ -278,7 +284,7 @@
     if (messageEl && sendBtn) {
       messageEl.addEventListener("input", function () {
         var chat = selectedChat();
-        sendBtn.disabled = !chat || !state.canManage || !state.connected || !String(messageEl.value || "").trim();
+        sendBtn.disabled = !canSendToChat(chat) || !state.canManage || !state.connected || !String(messageEl.value || "").trim();
       });
       sendBtn.addEventListener("click", function () {
         var chat = selectedChat();
