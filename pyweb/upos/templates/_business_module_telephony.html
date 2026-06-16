@@ -1,0 +1,143 @@
+<div class="business-module-toolbar" data-workspace-view="calls numbers providers" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" disabled>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('telephony_get') }}" data-workspace-view="calls numbers providers" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Клиент, номер, сотрудник" /></label>
+  <label>
+    <span>Провайдер</span>
+    <input name="provider" list="telephony-provider-list" value="{{ telephony_filters.provider }}" placeholder="SIP / АТС" />
+  </label>
+  <label>
+    <span>Ответственный</span>
+    <input name="responsible" list="telephony-responsible-list" value="{{ telephony_filters.responsible }}" placeholder="Ответственный" />
+  </label>
+  <label>
+    <span>Статус</span>
+    <select name="status">
+      <option value="all" {% if telephony_filters.status == 'all' %}selected{% endif %}>Все</option>
+      <option value="answered" {% if telephony_filters.status == 'answered' %}selected{% endif %}>Отвечен</option>
+      <option value="missed" {% if telephony_filters.status == 'missed' %}selected{% endif %}>Пропущен</option>
+      <option value="planned" {% if telephony_filters.status == 'planned' %}selected{% endif %}>Запланирован</option>
+      <option value="blocked" {% if telephony_filters.status == 'blocked' %}selected{% endif %}>Заблокирован</option>
+    </select>
+  </label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('telephony_get') }}">Очистить</a>
+</form>
+
+<datalist id="telephony-provider-list">
+  {% for item in telephony_options.providers %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="telephony-responsible-list">
+  {% for item in telephony_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
+</datalist>
+
+<div class="products-layout" data-workspace-view="calls numbers providers" hidden>
+  <article class="products-list-panel" data-workspace-view="calls" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Журнал звонков</h2>
+        <span>Всего: {{ telephony_calls|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Клиент</th>
+            <th>Номер</th>
+            <th>Направление</th>
+            <th>Ответственный</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in telephony_calls %}
+            <tr>
+              <td><strong>{{ row.client }}</strong><small>{{ row.note or row.started_at }}</small></td>
+              <td>{{ row.phone }}</td>
+              <td>{{ row.direction }}</td>
+              <td>{{ row.responsible or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">Звонков пока нет. Здесь появится история входящих, исходящих и пропущенных звонков.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="numbers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Номера</h2>
+        <span>Всего: {{ telephony_numbers|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Номер</th>
+            <th>Линия</th>
+            <th>Ответственный</th>
+            <th>Режим</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in telephony_numbers %}
+            <tr>
+              <td><strong>{{ row.number }}</strong><small>{{ row.label or row.provider }}</small></td>
+              <td>{{ row.line or "-" }}</td>
+              <td>{{ row.responsible or "-" }}</td>
+              <td>{{ row.mode or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">Номера пока не подключены. Здесь будут линии, сотрудники и правила маршрутизации.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="providers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Интеграции телефонии</h2>
+        <span>Всего: {{ telephony_providers|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Провайдер</th>
+            <th>Тип</th>
+            <th>Адрес</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in telephony_providers %}
+            <tr>
+              <td><strong>{{ row.name }}</strong><small>{{ row.note or row.account }}</small></td>
+              <td>{{ row.kind }}</td>
+              <td>{{ row.endpoint or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">Интеграции пока не настроены. Здесь будут SIP, АТС и внешние сервисы звонков.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</div>

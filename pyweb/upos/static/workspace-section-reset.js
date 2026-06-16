@@ -11,6 +11,7 @@
     { path: '/clients', keys: ['upos.clients.openTabs'] },
     { path: '/suppliers', keys: ['upos.suppliers.openTabs'] },
     { path: '/crm', keys: ['upos.crm.openTabs'] },
+    { path: '/telephony', keys: ['upos.telephony.openTabs'] },
     { path: '/messengers', keys: ['upos.messengers.openTabs'] },
     { path: '/reports', keys: ['upos.homeReports.openTabs'] },
     { path: '/shipments', keys: ['upos.shipments.openTabs'] },

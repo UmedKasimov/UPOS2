@@ -2987,6 +2987,29 @@ def create_app() -> FastAPI:
                     "История взаимодействий по клиенту.",
                 ],
             },
+            "telephony": {
+                "title": "Телефония",
+                "kicker": "Звонки и номера",
+                "subtitle": "История звонков, рабочие номера и интеграции связи",
+                "heading": "Центр телефонии",
+                "action": "+ Звонок",
+                "launcher": [
+                    {"id": "calls", "title": "Звонки", "subtitle": "Журнал и статусы", "icon": "phone"},
+                    {"id": "numbers", "title": "Номера", "subtitle": "Линии и сотрудники", "icon": "numbers"},
+                    {"id": "providers", "title": "Интеграции", "subtitle": "АТС и SIP", "icon": "adjustment"},
+                ],
+                "filters": ["Поиск", "Провайдер", "Ответственный", "Статус"],
+                "columns": ["Клиент", "Номер", "Направление", "Ответственный", "Статус"],
+                "list_title": "Журнал звонков",
+                "status": "Каркас",
+                "empty": "Здесь будет журнал входящих и исходящих звонков с привязкой к CRM и клиентам.",
+                "logic": [
+                    "Входящие и исходящие звонки по клиентам и ответственным.",
+                    "Привязка номеров к сотрудникам, отделам и каналам продаж.",
+                    "История звонков в карточке клиента и CRM.",
+                    "Интеграции с SIP/АТС и статусами пропущенных звонков.",
+                ],
+            },
             "messengers": {
                 "title": "Месенджеры",
                 "kicker": "Диалоги и рассылки",
@@ -5335,6 +5358,45 @@ def create_app() -> FastAPI:
             crm_options=crm_options,
             crm_records=crm_records,
             today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.get("/telephony", response_class=HTMLResponse, name="telephony_get")
+    def telephony_get(
+        request: Request,
+        q: str = "",
+        provider: str = "",
+        responsible: str = "",
+        status: str = "all",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "provider": provider.strip(),
+            "responsible": responsible.strip(),
+            "status": status.strip() or "all",
+        }
+        user = request.session.get("user") or {}
+        provider_options = ["SIP", "АТС", "Telegram Call", "WhatsApp Call"]
+        responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="telephony",
+            module=_business_module_context("telephony"),
+            telephony_filters=filters,
+            telephony_options={
+                "providers": provider_options,
+                "responsibles": responsible_options,
+            },
+            telephony_calls=[],
+            telephony_numbers=[],
+            telephony_providers=[],
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
