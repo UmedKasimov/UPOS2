@@ -1,30 +1,4 @@
-<div class="business-module-toolbar" data-workspace-view="tasks deals history" hidden>
-  <div>
-    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
-    <h2 id="business-module-title">{{ module.heading }}</h2>
-  </div>
-  <button type="button" class="btn" disabled>{{ module.action }}</button>
-</div>
-
-<form class="business-module-filters" method="get" action="{{ url_for('crm_get') }}" data-workspace-view="tasks deals history" hidden>
-  <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" placeholder="Задача, клиент, ответственный" /></label>
-  <label><span>Клиент</span><input name="client" list="crm-client-list" value="{{ crm_filters.client }}" placeholder="Клиент" /></label>
-  <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ crm_filters.responsible }}" placeholder="Ответственный" /></label>
-  <label>
-    <span>Статус</span>
-    <select name="status">
-      <option value="all" {% if crm_filters.status == 'all' %}selected{% endif %}>Все</option>
-      <option value="new" {% if crm_filters.status == 'new' %}selected{% endif %}>Новый</option>
-      <option value="in_progress" {% if crm_filters.status == 'in_progress' %}selected{% endif %}>В работе</option>
-      <option value="planned" {% if crm_filters.status == 'planned' %}selected{% endif %}>Запланировано</option>
-      <option value="done" {% if crm_filters.status == 'done' %}selected{% endif %}>Завершено</option>
-      <option value="won" {% if crm_filters.status == 'won' %}selected{% endif %}>Успешно</option>
-      <option value="lost" {% if crm_filters.status == 'lost' %}selected{% endif %}>Потеряно</option>
-    </select>
-  </label>
-  <button class="btn btn-secondary" type="submit">Применить</button>
-  <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Очистить</a>
-</form>
+<h2 id="business-module-title" class="crm-page-title-hidden">{{ module.heading }}</h2>
 
 <datalist id="crm-client-list">
   {% for item in crm_options.clients %}<option value="{{ item }}">{% endfor %}
@@ -34,19 +8,38 @@
 </datalist>
 
 <section class="crm-pipeline-shell" data-workspace-view="tasks deals" hidden>
-  <header class="crm-pipeline-head">
-    <div>
-      <span class="settings-ios-footnote">Канбан-воронка</span>
-      <h2>CRM воронка</h2>
-    </div>
-    <form method="post" action="{{ url_for('crm_stages_save') }}" class="crm-stage-settings">
-      {% include "_csrf_field.html" %}
+  <header class="crm-pipeline-head crm-pipeline-head--filters">
+    <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
+      <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" placeholder="Задача, клиент, ответственный" /></label>
+      <label><span>Клиент</span><input name="client" list="crm-client-list" value="{{ crm_filters.client }}" placeholder="Клиент" /></label>
+      <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ crm_filters.responsible }}" placeholder="Ответственный" /></label>
       <label>
-        <span>Этапы</span>
-        <textarea name="stages" rows="2">{{ crm_pipeline_stage_lines }}</textarea>
+        <span>Статус</span>
+        <select name="status">
+          <option value="all" {% if crm_filters.status == 'all' %}selected{% endif %}>Все</option>
+          <option value="new" {% if crm_filters.status == 'new' %}selected{% endif %}>Новый</option>
+          <option value="in_progress" {% if crm_filters.status == 'in_progress' %}selected{% endif %}>В работе</option>
+          <option value="planned" {% if crm_filters.status == 'planned' %}selected{% endif %}>Запланировано</option>
+          <option value="done" {% if crm_filters.status == 'done' %}selected{% endif %}>Завершено</option>
+          <option value="won" {% if crm_filters.status == 'won' %}selected{% endif %}>Успешно</option>
+          <option value="lost" {% if crm_filters.status == 'lost' %}selected{% endif %}>Потеряно</option>
+        </select>
       </label>
-      <button class="btn btn-secondary" type="submit">Сохранить этапы</button>
+      <button class="btn btn-secondary" type="submit">Применить</button>
+      <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Очистить</a>
+      <button class="btn" type="button" data-crm-open-dialog data-crm-kind="deal">+ Сделка</button>
     </form>
+    <details class="crm-stage-settings crm-stage-settings--compact">
+      <summary>Этапы</summary>
+      <form method="post" action="{{ url_for('crm_stages_save') }}">
+        {% include "_csrf_field.html" %}
+        <label>
+          <span>Настройка воронки</span>
+          <textarea name="stages" rows="4">{{ crm_pipeline_stage_lines }}</textarea>
+        </label>
+        <button class="btn btn-secondary" type="submit">Сохранить</button>
+      </form>
+    </details>
   </header>
 
   <div
@@ -165,39 +158,45 @@
     </div>
   </article>
 
-  <aside class="product-form-panel" data-workspace-view="tasks deals history" hidden>
-    <header class="products-panel-head">
-      <div>
-        <h2>Новая запись</h2>
-        <span>Задача, сделка или история контакта</span>
-      </div>
-    </header>
-    <form method="post" action="{{ url_for('crm_save') }}" class="product-form">
-      {% include "_csrf_field.html" %}
-      <div class="product-kind-toggle">
-        <label><input type="radio" name="item_type" value="task" checked /> Задача</label>
-        <label><input type="radio" name="item_type" value="deal" /> Сделка</label>
-        <label><input type="radio" name="item_type" value="history" /> История</label>
-      </div>
-      <div class="product-form-grid">
-        <label class="wide"><span>Название*</span><input name="title" required /></label>
-        <label><span>Клиент</span><input name="client" list="crm-client-list" /></label>
-        <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ user.name if user else '' }}" /></label>
-        <label><span>Источник лида</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
-        <label><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
-        <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
-        <label><span>Привязка чата</span><input name="chat_ref" placeholder="@username, ссылка или chat id" /></label>
-        <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
-        <label><span>Срок</span><input name="due_date" type="date" value="{{ today }}" /></label>
-        <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option></select></label>
-        <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
-        <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
-        <label class="wide"><span>Комментарий</span><input name="note" /></label>
-      </div>
-      <div class="product-form-actions">
-        <button class="btn" type="submit">Сохранить запись</button>
-        <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Отмена</a>
-      </div>
-    </form>
-  </aside>
 </div>
+
+<dialog class="settings-profile-modal crm-record-dialog" id="crm-record-dialog" aria-labelledby="crm-record-dialog-title">
+  <div class="settings-profile-modal-surface crm-record-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-record-dialog-title" class="settings-profile-modal-title">Новая запись</h2>
+        <p class="settings-profile-modal-sub">Сделка, задача или история контакта</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-close-dialog aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll">
+      <form method="post" action="{{ url_for('crm_save') }}" class="product-form crm-record-form">
+        {% include "_csrf_field.html" %}
+        <div class="product-kind-toggle">
+          <label><input type="radio" name="item_type" value="task" /> Задача</label>
+          <label><input type="radio" name="item_type" value="deal" checked /> Сделка</label>
+          <label><input type="radio" name="item_type" value="history" /> История</label>
+        </div>
+        <div class="product-form-grid crm-record-form-grid">
+          <label class="wide"><span>Название*</span><input name="title" required /></label>
+          <label><span>Клиент</span><input name="client" list="crm-client-list" /></label>
+          <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ user.name if user else '' }}" /></label>
+          <label><span>Источник лида</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+          <label><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
+          <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
+          <label><span>Привязка чата</span><input name="chat_ref" placeholder="@username, ссылка или chat id" /></label>
+          <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+          <label><span>Срок</span><input name="due_date" type="date" value="{{ today }}" /></label>
+          <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option></select></label>
+          <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
+          <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+          <label class="wide"><span>Комментарий</span><input name="note" /></label>
+        </div>
+        <div class="product-form-actions crm-record-form-actions">
+          <button class="btn" type="submit">Сохранить запись</button>
+          <button class="btn btn-secondary" type="button" data-crm-close-dialog>Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</dialog>

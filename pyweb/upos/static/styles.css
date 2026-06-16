@@ -1862,6 +1862,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin: 0;
 }
 
+.crm-page-title-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .crm-pipeline-shell {
   display: grid;
   gap: 1rem;
@@ -1884,18 +1896,25 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 1rem;
 }
 
+.crm-pipeline-head--filters {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  padding: 0.75rem;
+}
+
 .crm-pipeline-head h2,
 .crm-kanban-column h3 {
   margin: 0;
 }
 
-.crm-stage-settings {
+.crm-kanban-filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(13rem, 1.35fr) repeat(3, minmax(10rem, 1fr)) auto auto auto;
   gap: 0.75rem;
   align-items: end;
 }
 
+.crm-kanban-filters label,
 .crm-stage-settings label {
   display: grid;
   gap: 0.35rem;
@@ -1904,9 +1923,62 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 800;
 }
 
+.crm-kanban-filters input,
+.crm-kanban-filters select,
+.crm-stage-settings textarea {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: var(--radius);
+  background: var(--control-bg, var(--background));
+  color: var(--foreground);
+  font: inherit;
+  box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 44%) inset;
+}
+
 .crm-stage-settings textarea {
   min-height: 2.65rem;
   resize: vertical;
+}
+
+.crm-stage-settings--compact {
+  position: relative;
+  align-self: end;
+}
+
+.crm-stage-settings--compact summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card) 88%, white), var(--card));
+  font-size: var(--text-sm);
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+}
+
+.crm-stage-settings--compact[open] {
+  z-index: 20;
+}
+
+.crm-stage-settings--compact form {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  display: grid;
+  gap: 0.75rem;
+  width: min(34rem, 70vw);
+  padding: 0.85rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  box-shadow: 0 18px 40px rgb(15 23 42 / 0.18);
 }
 
 .crm-kanban {
@@ -2026,6 +2098,40 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-radius: var(--workbench-radius-sm, 8px);
 }
 
+.settings-profile-modal.crm-record-dialog {
+  width: min(62rem, 96vw);
+  max-width: min(62rem, 96vw);
+}
+
+.crm-record-dialog .crm-record-dialog-surface {
+  width: 100%;
+  max-height: min(88vh, 58rem);
+}
+
+.crm-record-dialog .settings-profile-modal-scroll {
+  max-height: calc(88vh - 5rem);
+  overflow: auto;
+}
+
+.crm-record-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.crm-record-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.crm-record-form-actions {
+  position: sticky;
+  bottom: 0;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+  background: linear-gradient(180deg, transparent, var(--card) 24%);
+}
+
 @media (max-width: 980px) {
   .client-card-header,
   .client-card-grid,
@@ -2042,8 +2148,24 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   }
 
   .crm-pipeline-head,
-  .crm-stage-settings {
+  .crm-kanban-filters,
+  .crm-record-form-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crm-pipeline-head--filters {
+    align-items: stretch;
+  }
+
+  .crm-stage-settings--compact,
+  .crm-stage-settings--compact summary {
+    width: 100%;
+  }
+
+  .crm-stage-settings--compact form {
+    position: static;
+    width: auto;
+    margin-top: 0.5rem;
   }
 }
 

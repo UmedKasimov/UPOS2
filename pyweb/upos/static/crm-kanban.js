@@ -72,8 +72,47 @@
     root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
   }
 
+  function initDialog() {
+    const dialog = document.getElementById("crm-record-dialog");
+    if (!dialog) return;
+
+    const setKind = (kind) => {
+      if (!kind) return;
+      const input = dialog.querySelector(`input[name="item_type"][value="${CSS.escape(kind)}"]`);
+      if (input) input.checked = true;
+    };
+    const openDialog = (kind) => {
+      setKind(kind);
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+      const firstField = dialog.querySelector('input[name="title"]');
+      if (firstField) firstField.focus();
+    };
+    const closeDialog = () => {
+      if (dialog.open && typeof dialog.close === "function") {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    };
+
+    document.querySelectorAll("[data-crm-open-dialog]").forEach((button) => {
+      button.addEventListener("click", () => openDialog(button.dataset.crmKind || "deal"));
+    });
+    dialog.querySelectorAll("[data-crm-close-dialog]").forEach((button) => {
+      button.addEventListener("click", closeDialog);
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) closeDialog();
+    });
+  }
+
   function init() {
     document.querySelectorAll("[data-crm-kanban]").forEach(initKanban);
+    initDialog();
   }
 
   if (document.readyState === "loading") {
