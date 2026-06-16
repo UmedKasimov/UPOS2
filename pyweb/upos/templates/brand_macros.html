@@ -1,0 +1,14 @@
+{# PNG logo: cannot use url_for() inside Jinja macros (no request in macro context). Static mount is /static. #}
+{% macro octopus_svg(grad_id, size) -%}
+<img
+  src="/static/octopus-logo.png?v=5"
+  width="{{ size }}"
+  height="{{ size }}"
+  class="brand-octopus brand-octopus--raster"
+  alt=""
+  aria-hidden="true"
+  loading="eager"
+  decoding="async"
+  draggable="false"
+/>
+{%- endmacro %}

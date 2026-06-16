@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ _('general.kassa.title_page') }}{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">{{ _('nav.kassa') }}</h1>
+  </div>
+{% endblock %}
+
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <meta name="general-kassa-timezone" content="{{ workspace_timezone | default('Asia/Tashkent') | e }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=23" />
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--fluid">
+    {% if flash_err %}
+      <div class="organizations-flash-group">
+        <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+      </div>
+    {% endif %}
+
+    <script type="application/json" id="general-kassa-orgs">{{ organizations_for_filters | tojson }}</script>
+    <div id="general-kassa-root" class="general-kassa-root"></div>
+  </div>
+
+  <script src="{{ url_for('static', path='general-kassa-page.js') }}?v=11" defer></script>
+{% endblock %}

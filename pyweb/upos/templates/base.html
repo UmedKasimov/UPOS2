@@ -1,0 +1,307 @@
+{% import "brand_macros.html" as brand %}
+<!DOCTYPE html>
+<html lang="{{ html_lang | default('ru') }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#141d2e" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v=4" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.png') }}?v=4" type="image/png" sizes="48x48" />
+    <title>{% block title %}UPOS FINANCE{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=129" />
+    <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body
+    data-theme="{{ body_theme | default('light') }}"
+    data-shell="{{ variant | default('user') }}"
+    {% if user %}data-user-id="{{ user.user_id | default(user.id) | e }}" data-user-name="{{ (user.name or user.username or '') | e }}"{% endif %}
+    {% if user and not user.get('is_employee') and user.get('role') == 'user' %}data-device-heartbeat="1"{% endif %}
+  >
+    <div class="layout">
+      <div
+        class="sidebar-backdrop"
+        data-sidebar-backdrop
+        hidden
+        aria-hidden="true"
+      ></div>
+      <aside class="sidebar" id="app-sidebar">
+        <div class="sidebar-head">
+          <div class="sidebar-head-row">
+            {% if variant == "admin" %}
+              <a href="/admin" class="brand-lockup" aria-label="{{ _('brand.admin') }}">
+                {{ brand.octopus_svg("octSb", 48) }}
+                <div class="brand-lockup-text">
+                  <div class="brand-lockup-title">
+                    <span class="brand-lockup-upos">UPOS</span>
+                    <span class="brand-lockup-fin">FINANCE</span>
+                  </div>
+                </div>
+              </a>
+            {% else %}
+              <a href="/" class="brand-lockup" aria-label="{{ _('brand.user') }}">
+                {{ brand.octopus_svg("octSb", 48) }}
+                <div class="brand-lockup-text">
+                  <div class="brand-lockup-title">
+                    <span class="brand-lockup-upos">UPOS</span>
+                    <span class="brand-lockup-fin">FINANCE</span>
+                  </div>
+                </div>
+              </a>
+            {% endif %}
+            <button
+              type="button"
+              class="sidebar-rail-toggle"
+              data-sidebar-rail-toggle
+              aria-expanded="true"
+              aria-controls="app-sidebar"
+              title="{{ _('nav.collapse_menu') }}"
+              aria-label="{{ _('nav.collapse_sidebar') }}"
+            >
+              <svg class="sidebar-rail-toggle-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <nav class="nav" aria-label="{{ _('nav.aria') }}">
+          {% if variant == "admin" %}
+            <a href="/admin" class="nav-link {{ 'active' if active == 'admin_home' else '' }}">
+              <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+              <span class="nav-label">{{ _('nav.overview') }}</span>
+            </a>
+          {% else %}
+            {% if user.get('can_switch_organizations') %}
+              {% set is_general_scope = user.get('org_scope') == 'general' %}
+              {% set active_workspace_name = user.get('active_organization_name') or _('workspace.default_name') %}
+              <details class="workspace-switcher" data-workspace-switcher>
+                <summary>
+                  <span class="workspace-switcher-trigger" aria-label="{{ _('workspace.switch_aria') }}">
+                    <span class="workspace-switcher-mark" aria-hidden="true">{{ (active_workspace_name or _('workspace.default_name'))[0]|upper }}</span>
+                    <span class="workspace-switcher-current">
+                      <span class="workspace-switcher-kicker">{{ _('workspace.kicker') }}</span>
+                      <span class="workspace-switcher-name">{{ active_workspace_name }}</span>
+                    </span>
+                    <svg class="workspace-switcher-chevrons" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </span>
+                </summary>
+                <div class="workspace-switcher-panel">
+                  <div class="workspace-switcher-head">
+                    <span class="workspace-switcher-head-title">{{ _('workspace.head_title') }}</span>
+                  </div>
+                  <div class="workspace-options">
+                    {% for org in user.get('organizations') or [] %}
+                      {% set org_name = org.name or _('workspace.default_name') %}
+                      {% set org_note = (org.note or '') | string | trim %}
+                      <form method="post" action="{{ url_for('organizations_switch') }}" class="workspace-option-form">
+                        {% include "_csrf_field.html" %}
+                        <input type="hidden" name="organization_id" value="{{ org.id }}" />
+                        <button type="submit" class="workspace-option {% if (not is_general_scope) and user.get('active_org_id') == org.id %}active{% endif %}">
+                          <span class="workspace-option-mark" aria-hidden="true">{{ org_name[0]|upper }}</span>
+                          <span class="workspace-option-copy">
+                            <span class="workspace-option-name">{{ org_name }}</span>
+                            {% if org_note and org_note != 'workspace.default_meta' %}
+                              <span class="workspace-option-meta">{{ org_note }}</span>
+                            {% endif %}
+                          </span>
+                        </button>
+                      </form>
+                    {% else %}
+                      <p class="workspace-switcher-empty">{{ _('workspace.empty') }}</p>
+                    {% endfor %}
+                  </div>
+                  <a href="{{ url_for('organizations_get') }}" class="workspace-switcher-manage">
+                    <span>{{ _('workspace.manage') }}</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                  </a>
+                </div>
+              </details>
+            {% endif %}
+            {% if user.get('org_scope') == 'general' %}
+              {% set general_home_nav_open = active in ['organizations', 'organizations_kassa', 'organizations_schet', 'organizations_reports', 'organizations_settings', 'organizations_users'] %}
+              <div class="nav-folder nav-folder--pinned{% if general_home_nav_open %} nav-folder--active-branch{% endif %}">
+                <div class="nav-folder-row">
+                    <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span class="nav-folder-label nav-label">{{ _('nav.home') }}</span>
+                </div>
+                <div class="nav-folder-panel" role="group" aria-label="{{ _('nav.general_sections') }}">
+                  <a href="{{ url_for('organizations_get') }}" class="nav-sublink {{ 'active' if active == 'organizations' else '' }}" title="{{ _('nav.organizations_panel') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M3 17h18"/><path d="M7 3v18"/><path d="M17 3v18"/></svg></span>
+                    <span class="nav-label">{{ _('nav.organizations_panel') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_kassa_get') }}" class="nav-sublink {{ 'active' if active == 'organizations_kassa' else '' }}" title="{{ _('nav.kassa') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg></span>
+                    <span class="nav-label">{{ _('nav.kassa') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_schet_get') }}" class="nav-sublink {{ 'active' if active == 'organizations_schet' else '' }}" title="{{ _('nav.account') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                    <span class="nav-label">{{ _('nav.account') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_reports_get') }}" class="nav-sublink {{ 'active' if active == 'organizations_reports' else '' }}" title="{{ _('nav.reports') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
+                    <span class="nav-label">{{ _('nav.reports') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_settings_get') }}" class="nav-sublink {{ 'active' if active in ['organizations_settings', 'organizations_users'] else '' }}" title="{{ _('nav.settings') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                    <span class="nav-label">{{ _('nav.settings') }}</span>
+                  </a>
+                </div>
+              </div>
+            {% else %}
+              {% set home_nav_active = active == 'home_account' or active == 'home_kassa' or active == 'home_reports' or active == 'home_adjustments' or active == 'home_shipments' or active == 'home_hr' or active == 'settings' %}
+              <div class="nav-folder nav-folder--pinned{% if home_nav_active %} nav-folder--active-branch{% endif %}">
+                <div class="nav-folder-row">
+                  <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                  <span class="nav-folder-label nav-label">{{ _('nav.home') }}</span>
+                </div>
+                <div class="nav-folder-panel" role="group" aria-label="{{ _('nav.home_sections') }}">
+                  {% set emp_perms = user.get('employee_permissions') or {} %}
+                  {% if not user.get('is_employee') or emp_perms.get('schet') %}
+                  <a href="{{ url_for('home_schet') }}" class="nav-sublink {{ 'active' if active == 'home_account' else '' }}" title="{{ _('nav.account') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                    <span class="nav-label">{{ _('nav.account') }}</span>
+                  </a>
+                  {% endif %}
+                  {% if not user.get('is_employee') or emp_perms.get('kassa') %}
+                  <a href="{{ url_for('home_kassa') }}" class="nav-sublink {{ 'active' if active == 'home_kassa' else '' }}" title="{{ _('nav.kassa') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg></span>
+                    <span class="nav-label">{{ _('nav.kassa') }}</span>
+                  </a>
+                  {% endif %}
+                  {% if not user.get('is_employee') or emp_perms.get('reports') %}
+                  <a href="{{ url_for('home_reports') }}" class="nav-sublink {{ 'active' if active == 'home_reports' else '' }}" title="{{ _('nav.reports') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
+                    <span class="nav-label">{{ _('nav.reports') }}</span>
+                  </a>
+                  {% endif %}
+                  {% if not user.get('is_employee') or emp_perms.get('adjustments') %}
+                  <a href="{{ url_for('home_adjustments') }}" class="nav-sublink {{ 'active' if active == 'home_adjustments' else '' }}" title="Корректировки">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 8h14"/><path d="M7 16h10"/><path d="m8 5-3 3 3 3"/><path d="m16 13 3 3-3 3"/></svg></span>
+                    <span class="nav-label">Корректировки</span>
+                  </a>
+                  {% endif %}
+                  {% if not user.get('is_employee') or emp_perms.get('shipments') or ((emp_perms.get('shipments') is none) and (emp_perms.get('kassa') or emp_perms.get('reports'))) %}
+                  <a href="{{ url_for('home_shipments') }}" class="nav-sublink {{ 'active' if active == 'home_shipments' else '' }}" title="Отгрузки">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H3v12h3"/><path d="M14 17h1a2 2 0 1 0 4 0h1v-5l-3-4h-3"/><circle cx="8" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+                    <span class="nav-label">Отгрузки</span>
+                  </a>
+                  {% endif %}
+                  {% if not user.get('is_employee') or emp_perms.get('hr') or ((emp_perms.get('hr') is none) and emp_perms.get('employees')) %}
+                  <a href="{{ url_for('home_hr') }}" class="nav-sublink {{ 'active' if active == 'home_hr' else '' }}" title="HR">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                    <span class="nav-label">HR</span>
+                  </a>
+                  {% endif %}
+                  {% if not user.get('is_employee') or emp_perms.get('settings') or emp_perms.get('dictionary') %}
+                  <a href="{% if user.get('is_employee') and not emp_perms.get('settings') and emp_perms.get('dictionary') %}{{ url_for('settings_get') }}?tab=dictionary{% else %}{{ url_for('settings_get') }}{% endif %}" class="nav-sublink {{ 'active' if active == 'settings' else '' }}" title="{{ _('nav.settings') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                    <span class="nav-label">{{ _('nav.settings') }}</span>
+                  </a>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% endif %}
+        </nav>
+        <div class="sidebar-foot">
+          {% if user %}
+            <div class="sidebar-user">
+              <div class="sidebar-user-avatar" id="sidebar-avatar-trigger" style="cursor: pointer; position: relative; overflow: hidden;" title="{{ _('profile.avatar') }}">
+                {% if user.avatar_path %}
+                  <img src="/static/{{ user.avatar_path }}" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;">
+                {% else %}
+                  {{ (user.name or user.email or user.username or 'U')[0]|upper }}
+                {% endif %}
+                <input type="file" id="sidebar-avatar-input" accept="image/*" style="display: none;">
+              </div>
+              <div class="sidebar-user-info">
+                {% if user.get('is_employee') and user.get('workspace_owner_name') %}
+                  <div class="sidebar-team-hint">{{ user.workspace_owner_name }}</div>
+                {% endif %}
+                <div class="who">{{ user.name or _('profile.placeholder') }}</div>
+                {% if user.email %}
+                  <div class="mail">{{ user.email }}</div>
+                {% elif user.username %}
+                  <div class="mail">{{ user.username }}</div>
+                {% endif %}
+                <div class="sidebar-user-role" aria-label="{{ _('profile.role') }}">
+                  {% if user.get('is_employee') %}
+                    {{ user.get('employee_role_name') or _('staff.role.' ~ (user.get('staff_role') or 'viewer')) }}
+                  {% elif user.get('role') == 'admin' %}
+                    {{ _('profile.role.admin') }}
+                  {% else %}
+                    {{ _('profile.role.owner') }}
+                  {% endif %}
+                </div>
+              </div>
+              <form action="{{ url_for('logout') }}" method="post" class="sidebar-logout-form">
+                {% include "_csrf_field.html" %}
+                <button type="submit" class="logout-btn-icon" aria-label="{{ _('logout.aria') }}" title="{{ _('logout.aria') }}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                </button>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+      </aside>
+      <div class="main-column">
+        <header class="mobile-topbar">
+          <button
+            type="button"
+            class="mobile-nav-toggle"
+            data-sidebar-toggle
+            aria-label="{{ _('mobile.open_nav') }}"
+            aria-expanded="false"
+            aria-controls="app-sidebar"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <span class="mobile-topbar-brand">
+            <span class="mobile-topbar-upos">UPOS</span>
+            <span class="mobile-topbar-fin">FINANCE</span>
+          </span>
+        </header>
+        <header class="page-header"><div class="page-header-inner">{% block page_header %}{% endblock %}</div></header>
+        <div class="page-body">
+          {% if request.query_params.get("err") == "csrf" %}
+            <div class="flash err">{{ _('flash.csrf') }}</div>
+          {% endif %}
+          {% block main %}{% endblock %}
+        </div>
+      </div>
+    </div>
+    <script>
+      window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
+    </script>
+    <script src="{{ url_for('static', path='theme.js') }}"></script>
+    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='layout-sidebar.js') }}" defer></script>
+    <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=6" defer></script>
+    <script src="{{ url_for('static', path='table-column-controls.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
+    <script src="{{ url_for('static', path='date-range-picker.js') }}?v=10"></script>
+    <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=1" defer></script>
+    {% if user %}
+    <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
+    <script src="{{ url_for('static', path='money-auto-format.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>
+    <script src="{{ url_for('static', path='currency-select.js') }}?v=6"></script>
+    <script src="{{ url_for('static', path='avatar-upload.js') }}?v=2" defer></script>
+    {% if not user.get('is_employee') and user.get('role') == 'user' %}
+    <script src="{{ url_for('static', path='device-sessions.js') }}?v=2" defer></script>
+    {% endif %}
+    {% if user.get('can_switch_organizations') %}
+    <script src="{{ url_for('static', path='workspace-switcher.js') }}?v=3" defer></script>
+    {% endif %}
+    {% endif %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

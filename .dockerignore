@@ -1,0 +1,12 @@
+# Контекст Docker = корень репозитория
+.git
+_legacy_nextjs/node_modules
+_legacy_nextjs/.next
+**/__pycache__
+*.py[cod]
+.env
+.env.local
+pyweb/.venv
+pyweb/data
+.agent
+.gemini

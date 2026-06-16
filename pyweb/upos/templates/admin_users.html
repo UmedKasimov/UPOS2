@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}{{ _('admin.users.title_page') }}{% endblock %}
+
+{% macro pwd_eye() %}
+  <button
+    type="button"
+    class="pwd-toggle"
+    aria-label="{{ _('pwd.show') }}"
+    aria-pressed="false"
+    data-label-show="{{ _('pwd.show') }}"
+    data-label-hide="{{ _('pwd.hide') }}"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  </button>
+{% endmacro %}
+
+{% macro account_tile(u) %}
+  <details class="user-tile">
+    <summary>
+      <span class="user-tile-main">
+        <span class="user-tile-login">{{ u.username }}</span>
+        <span class="user-tile-sep">·</span>
+        <span class="user-tile-meta">ID {{ u.account_id or u.id }}</span>
+        <span class="user-tile-sep">·</span>
+        <span class="user-tile-meta">{{ u.name }}</span>
+        {% if u.email %}
+          <span class="user-tile-sep">·</span>
+          <span class="user-tile-email">{{ u.email }}</span>
+        {% endif %}
+        {% if u.superuser %}
+          <span class="tag tag-main">{{ _('admin.users.superuser_tag') }}</span>
+        {% elif u.role == "admin" %}
+          <span class="tag">{{ _('admin.users.admin_tag') }}</span>
+        {% endif %}
+      </span>
+      <span class="user-tile-edit-hint">{{ _('admin.users.edit') }}</span>
+    </summary>
+    <div class="user-tile-form">
+      {% if u.superuser %}
+        <form method="post" action="{{ url_for('admin_users_update') }}" class="mini-form">
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="edit_old_username" value="{{ u.username }}" />
+          <label for="su-{{ u.username }}">{{ _('admin.users.login') }}</label>
+          <input id="su-{{ u.username }}" name="edit_username" type="text" required value="{{ u.username }}" autocomplete="off" />
+          <label for="se-{{ u.username }}">{{ _('admin.users.email') }}</label>
+          <input
+            id="se-{{ u.username }}"
+            name="edit_email"
+            type="email"
+            required
+            value="{{ u.email }}"
+            autocomplete="email"
+            placeholder="name@company.ru"
+          />
+          <label for="sp-{{ u.username }}">{{ _('admin.users.new_password') }}</label>
+          <div class="pwd-wrap">
+            <input
+              id="sp-{{ u.username }}"
+              name="edit_password"
+              class="pwd-input"
+              type="password"
+              autocomplete="new-password"
+              placeholder="{{ _('admin.users.password_keep') }}"
+            />
+            {{ pwd_eye() }}
+          </div>
+          <div class="mini-form-actions">
+            <button type="submit" class="btn btn-xs">{{ _('admin.users.save') }}</button>
+          </div>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('admin_users_update') }}" class="mini-form">
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="edit_old_username" value="{{ u.username }}" />
+          <label for="eu-{{ u.username }}">{{ _('admin.users.login') }}</label>
+          <input id="eu-{{ u.username }}" name="edit_username" type="text" required value="{{ u.username }}" autocomplete="off" />
+          <label for="ee-{{ u.username }}">{{ _('admin.users.email') }}</label>
+          <input
+            id="ee-{{ u.username }}"
+            name="edit_email"
+            type="email"
+            required
+            value="{{ u.email }}"
+            autocomplete="email"
+            placeholder="name@company.ru"
+          />
+          <label for="en-{{ u.username }}">{{ _('admin.users.name') }}</label>
+          <input id="en-{{ u.username }}" name="edit_name" type="text" value="{{ u.name }}" />
+          <label for="er-{{ u.username }}">{{ _('admin.users.role') }}</label>
+          <select id="er-{{ u.username }}" name="edit_role">
+            <option value="user" {% if u.role != "admin" %}selected{% endif %}>{{ _('admin.users.role_user') }}</option>
+            <option value="admin" {% if u.role == "admin" %}selected{% endif %}>{{ _('admin.users.role_admin') }}</option>
+          </select>
+          <label for="ep-{{ u.username }}">{{ _('admin.users.new_password') }}</label>
+          <div class="pwd-wrap">
+            <input
+              id="ep-{{ u.username }}"
+              name="edit_password"
+              class="pwd-input"
+              type="password"
+              autocomplete="new-password"
+              placeholder="{{ _('admin.users.password_keep') }}"
+            />
+            {{ pwd_eye() }}
+          </div>
+          <div class="mini-form-actions">
+            <button type="submit" class="btn btn-xs">{{ _('admin.users.save') }}</button>
+          </div>
+        </form>
+        <form
+          method="post"
+          action="{{ url_for('admin_users_delete') }}"
+          class="mini-form-delete"
+          onsubmit="return confirm({{ _('admin.users.confirm_delete', username=u.username) | tojson }});"
+        >
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="del_username" value="{{ u.username }}" />
+          <button type="submit" class="btn btn-xs btn-danger-ghost">{{ _('admin.users.delete') }}</button>
+        </form>
+      {% endif %}
+    </div>
+  </details>
+{% endmacro %}
+
+{% block page_header %}
+  <h1 class="page-title">{{ _('admin.users.title') }}</h1>
+{% endblock %}
+{% block main %}
+  {% if flash_ok == "created" %}
+    <div class="flash ok">{{ _('admin.users.flash.created') }}</div>
+  {% elif flash_ok == "deleted" %}
+    <div class="flash ok">{{ _('admin.users.flash.deleted') }}</div>
+  {% elif flash_ok == "updated" %}
+    <div class="flash ok">{{ _('admin.users.flash.updated') }}</div>
+  {% endif %}
+  {% if flash_err %}
+    <div class="flash err">{{ flash_err }}</div>
+  {% endif %}
+
+  <div class="card card-tight">
+    <details class="user-tile user-tile-add">
+      <summary>
+        <span class="user-tile-main"><strong>{{ _('admin.users.new') }}</strong></span>
+        <span class="user-tile-edit-hint">{{ _('admin.users.expand') }}</span>
+      </summary>
+      <div class="user-tile-form">
+        <form method="post" action="{{ url_for('admin_users_create') }}" class="mini-form">
+          {% include "_csrf_field.html" %}
+          <label for="nu">{{ _('admin.users.login') }}</label>
+          <input id="nu" name="new_username" type="text" required autocomplete="off" />
+          <label for="ne">{{ _('admin.users.email') }}</label>
+          <input id="ne" name="new_email" type="email" required autocomplete="email" placeholder="name@company.ru" />
+          <label for="np">{{ _('admin.users.password_min') }}</label>
+          <div class="pwd-wrap">
+            <input
+              id="np"
+              name="new_password"
+              class="pwd-input"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            />
+            {{ pwd_eye() }}
+          </div>
+          <label for="nn">{{ _('admin.users.name') }}</label>
+          <input id="nn" name="new_name" type="text" placeholder="{{ _('admin.users.name_ph') }}" />
+          <label for="nr">{{ _('admin.users.role') }}</label>
+          <select id="nr" name="new_role">
+            <option value="user">{{ _('admin.users.role_user') }}</option>
+            <option value="admin">{{ _('admin.users.role_admin') }}</option>
+          </select>
+          <div class="mini-form-actions">
+            <button type="submit" class="btn btn-xs">{{ _('admin.users.create') }}</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </div>
+
+  <div class="card card-tight">
+    <h2 class="section-label">{{ _('admin.users.admins') }}</h2>
+    {% if admins %}
+      <div class="user-tile-stack">
+        {% for u in admins %}{{ account_tile(u) }}{% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-hint">{{ _('admin.users.admins_empty') }}</p>
+    {% endif %}
+
+    <h2 class="section-label section-label-spaced">{{ _('admin.users.users') }}</h2>
+    {% if regular_users %}
+      <div class="user-tile-stack">
+        {% for u in regular_users %}{{ account_tile(u) }}{% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-hint">{{ _('admin.users.users_empty') }}</p>
+    {% endif %}
+  </div>
+{% endblock %}

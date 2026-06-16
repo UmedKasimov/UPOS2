@@ -1,0 +1,4272 @@
+{
+  "app.title_suffix": {
+    "ru": "UPOS FINANCE",
+    "en": "UPOS FINANCE",
+    "uz": "UPOS FINANCE"
+  },
+  "nav.aria": {
+    "ru": "Основная навигация",
+    "en": "Main navigation",
+    "uz": "Asosiy navigatsiya"
+  },
+  "nav.overview": {
+    "ru": "Обзор",
+    "en": "Overview",
+    "uz": "Umumiy ko‘rinish"
+  },
+  "nav.settings": {
+    "ru": "Настройки",
+    "en": "Settings",
+    "uz": "Sozlamalar"
+  },
+  "nav.users": {
+    "ru": "Пользователи",
+    "en": "Users",
+    "uz": "Foydalanuvchilar"
+  },
+  "nav.home": {
+    "ru": "Главная",
+    "en": "Home",
+    "uz": "Bosh sahifa"
+  },
+  "nav.home_sections": {
+    "ru": "Разделы главной",
+    "en": "Home sections",
+    "uz": "Bosh bo‘limlari"
+  },
+  "nav.account": {
+    "ru": "Счёт",
+    "en": "Account",
+    "uz": "Hisob"
+  },
+  "nav.kassa": {
+    "ru": "Касса",
+    "en": "Cash desk",
+    "uz": "Kassa"
+  },
+  "nav.reports": {
+    "ru": "Отчёты",
+    "en": "Reports",
+    "uz": "Hisobotlar"
+  },
+  "nav.employees": {
+    "ru": "Сотрудники",
+    "en": "Team",
+    "uz": "Xodimlar"
+  },
+  "nav.collapse_menu": {
+    "ru": "Свернуть меню",
+    "en": "Collapse menu",
+    "uz": "Menyuni yig‘ish"
+  },
+  "nav.collapse_sidebar": {
+    "ru": "Свернуть боковое меню",
+    "en": "Collapse sidebar",
+    "uz": "Yon menyuni yig‘ish"
+  },
+  "nav.general_sections": {
+    "ru": "Разделы общей главной",
+    "en": "General home sections",
+    "uz": "Umumiy bosh sahifa bo‘limlari"
+  },
+  "nav.organizations_panel": {
+    "ru": "Панель организаций",
+    "en": "Organizations panel",
+    "uz": "Tashkilotlar paneli"
+  },
+  "workspace.kicker": {
+    "ru": "Организация",
+    "en": "Organization",
+    "uz": "Tashkilot"
+  },
+  "workspace.head_title": {
+    "ru": "Выбор организации",
+    "en": "Choose organization",
+    "uz": "Tashkilotni tanlash"
+  },
+  "workspace.head_note": {
+    "ru": "Переключите контекст кассы, счёта и отчётов.",
+    "en": "Switch cash desk, account and reports context.",
+    "uz": "Kassa, hisob va hisobotlar kontekstini almashtiring."
+  },
+  "workspace.general": {
+    "ru": "Общий",
+    "en": "General",
+    "uz": "Umumiy"
+  },
+  "workspace.general_meta": {
+    "ru": "Сводка по всем организациям",
+    "en": "Summary across all organizations",
+    "uz": "Barcha tashkilotlar bo‘yicha jamlanma"
+  },
+  "workspace.default_name": {
+    "ru": "Организация",
+    "en": "Organization",
+    "uz": "Tashkilot"
+  },
+  "workspace.switch_aria": {
+    "ru": "Сменить организацию",
+    "en": "Switch organization",
+    "uz": "Tashkilotni almashtirish"
+  },
+  "workspace.active": {
+    "ru": "Активна",
+    "en": "Active",
+    "uz": "Faol"
+  },
+  "workspace.empty": {
+    "ru": "Ничего не найдено",
+    "en": "Nothing found",
+    "uz": "Hech narsa topilmadi"
+  },
+  "workspace.manage": {
+    "ru": "Управление организациями",
+    "en": "Manage organizations",
+    "uz": "Tashkilotlarni boshqarish"
+  },
+  "workspace.org_meta_default": {
+    "ru": "Основная",
+    "en": "Primary",
+    "uz": "Asosiy"
+  },
+  "workspace.org_meta_other": {
+    "ru": "Организация",
+    "en": "Organization",
+    "uz": "Tashkilot"
+  },
+  "workspace.search_ph": {
+    "ru": "Поиск…",
+    "en": "Search…",
+    "uz": "Qidirish…"
+  },
+  "general.mode": {
+    "ru": "Общий режим",
+    "en": "General mode",
+    "uz": "Umumiy rejim"
+  },
+  "general.no_rate": {
+    "ru": "Нет курса",
+    "en": "No FX rate",
+    "uz": "Kurs yo‘q"
+  },
+  "general.no_balances": {
+    "ru": "Нет остатков",
+    "en": "No balances",
+    "uz": "Qoldiq yo‘q"
+  },
+  "general.no_data": {
+    "ru": "Нет данных",
+    "en": "No data",
+    "uz": "Ma’lumot yo‘q"
+  },
+  "general.error_loading": {
+    "ru": "Ошибка загрузки",
+    "en": "Loading error",
+    "uz": "Yuklash xatosi"
+  },
+  "general.organization": {
+    "ru": "Организация",
+    "en": "Organization",
+    "uz": "Tashkilot"
+  },
+  "general.organizations": {
+    "ru": "Организации",
+    "en": "Organizations",
+    "uz": "Tashkilotlar"
+  },
+  "general.integrations": {
+    "ru": "Интеграции",
+    "en": "Integrations",
+    "uz": "Integratsiyalar"
+  },
+  "general.integrations_aria": {
+    "ru": "Интеграции",
+    "en": "Integrations",
+    "uz": "Integratsiyalar"
+  },
+  "general.integration.connected": {
+    "ru": "подключено",
+    "en": "connected",
+    "uz": "ulangan"
+  },
+  "general.integration.disconnected": {
+    "ru": "не подключено",
+    "en": "not connected",
+    "uz": "ulanmagan"
+  },
+  "general.organizations.title_page": {
+    "ru": "Панель организаций · UPOS FINANCE",
+    "en": "Organizations panel · UPOS FINANCE",
+    "uz": "Tashkilotlar paneli · UPOS FINANCE"
+  },
+  "general.organizations.title": {
+    "ru": "Панель организаций",
+    "en": "Organizations panel",
+    "uz": "Tashkilotlar paneli"
+  },
+  "general.org.form.name": {
+    "ru": "Название",
+    "en": "Name",
+    "uz": "Nomi"
+  },
+  "general.org.form.name_ph": {
+    "ru": "Например: Ресторан на Чиланзаре",
+    "en": "Example: Chilanzar restaurant",
+    "uz": "Masalan: Chilonzor restorani"
+  },
+  "general.org.form.note": {
+    "ru": "Комментарий",
+    "en": "Comment",
+    "uz": "Izoh"
+  },
+  "general.org.form.note_ph": {
+    "ru": "Юрлицо, бренд, город или короткая пометка",
+    "en": "Legal entity, brand, city or a short note",
+    "uz": "Yuridik shaxs, brend, shahar yoki qisqa izoh"
+  },
+  "general.org.form.create": {
+    "ru": "Создать",
+    "en": "Create",
+    "uz": "Yaratish"
+  },
+  "general.org.form.save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "general.flash.org_created": {
+    "ru": "Организация создана",
+    "en": "Organization created",
+    "uz": "Tashkilot yaratildi"
+  },
+  "general.flash.org_updated": {
+    "ru": "Организация обновлена",
+    "en": "Organization updated",
+    "uz": "Tashkilot yangilandi"
+  },
+  "general.org_not_found": {
+    "ru": "Организация не найдена.",
+    "en": "Organization not found.",
+    "uz": "Tashkilot topilmadi."
+  },
+  "general.owner_not_found": {
+    "ru": "Владелец не найден.",
+    "en": "Owner not found.",
+    "uz": "Egasi topilmadi."
+  },
+  "general.org_duplicate": {
+    "ru": "Организация с таким названием уже существует.",
+    "en": "An organization with this name already exists.",
+    "uz": "Bunday nomdagi tashkilot allaqachon mavjud."
+  },
+  "general.capital.title": {
+    "ru": "Общий капитал",
+    "en": "Total capital",
+    "uz": "Umumiy kapital"
+  },
+  "general.capital.display_in_currency": {
+    "ru": "В пересчёте на {currency}",
+    "en": "Converted to {currency}",
+    "uz": "{currency} bo‘yicha hisoblangan"
+  },
+  "general.display_currency": {
+    "ru": "Валюта отображения",
+    "en": "Display currency",
+    "uz": "Ko‘rsatish valyutasi"
+  },
+  "general.currency": {
+    "ru": "Валюта",
+    "en": "Currency",
+    "uz": "Valyuta"
+  },
+  "general.actual_balances": {
+    "ru": "Фактические остатки по валютам",
+    "en": "Actual balances by currency",
+    "uz": "Valyutalar bo‘yicha haqiqiy qoldiq"
+  },
+  "general.metrics_aria": {
+    "ru": "Ключевые показатели",
+    "en": "Key metrics",
+    "uz": "Asosiy ko‘rsatkichlar"
+  },
+  "general.net_month": {
+    "ru": "Чистое за месяц",
+    "en": "Net this month",
+    "uz": "Oy bo‘yicha sof"
+  },
+  "general.org.list_kicker": {
+    "ru": "Рабочие контуры",
+    "en": "Workspaces",
+    "uz": "Ish konturlari"
+  },
+  "general.org.list_title": {
+    "ru": "Список организаций",
+    "en": "Organization list",
+    "uz": "Tashkilotlar ro‘yxati"
+  },
+  "general.edit_aria": {
+    "ru": "Редактировать {name}",
+    "en": "Edit {name}",
+    "uz": "{name}ni tahrirlash"
+  },
+  "general.org_meta_default": {
+    "ru": "текущие данные",
+    "en": "current data",
+    "uz": "joriy ma’lumotlar"
+  },
+  "general.org_meta_other": {
+    "ru": "отдельная организация",
+    "en": "separate organization",
+    "uz": "alohida tashkilot"
+  },
+  "general.selected": {
+    "ru": "выбрана",
+    "en": "selected",
+    "uz": "tanlangan"
+  },
+  "general.balances": {
+    "ru": "Остатки",
+    "en": "Balances",
+    "uz": "Qoldiqlar"
+  },
+  "general.accounts_count": {
+    "ru": "счетов",
+    "en": "accounts",
+    "uz": "hisob"
+  },
+  "general.integrations_count": {
+    "ru": "интеграций",
+    "en": "integrations",
+    "uz": "integratsiya"
+  },
+  "general.connections": {
+    "ru": "Подключения",
+    "en": "Connections",
+    "uz": "Ulanishlar"
+  },
+  "general.open": {
+    "ru": "Открыть",
+    "en": "Open",
+    "uz": "Ochish"
+  },
+  "general.org.empty": {
+    "ru": "Пока нет организаций",
+    "en": "No organizations yet",
+    "uz": "Hali tashkilotlar yo‘q"
+  },
+  "general.org.new": {
+    "ru": "Новая организация",
+    "en": "New organization",
+    "uz": "Yangi tashkilot"
+  },
+  "general.org.create_title": {
+    "ru": "Создание рабочего контура",
+    "en": "Create workspace",
+    "uz": "Ish konturini yaratish"
+  },
+  "general.org.editing": {
+    "ru": "Редактирование",
+    "en": "Editing",
+    "uz": "Tahrirlash"
+  },
+  "general.kassa.title_page": {
+    "ru": "Общая касса · UPOS FINANCE",
+    "en": "General cash desk · UPOS FINANCE",
+    "uz": "Umumiy kassa · UPOS FINANCE"
+  },
+  "general.kassa.desc": {
+    "ru": "Консолидированный журнал операций по всем организациям. Создание операций — только в кассе конкретной организации.",
+    "en": "A consolidated transaction journal across all organizations. New transactions are created only inside a specific organization.",
+    "uz": "Barcha tashkilotlar bo‘yicha jamlangan operatsiyalar jurnali. Yangi operatsiyalar faqat aniq tashkilot kassasida yaratiladi."
+  },
+  "general.schet.title_page": {
+    "ru": "Общий счёт · UPOS FINANCE",
+    "en": "General account · UPOS FINANCE",
+    "uz": "Umumiy hisob · UPOS FINANCE"
+  },
+  "general.schet.desc": {
+    "ru": "Консолидированные остатки по всем организациям. Редактирование счетов — в режиме конкретной организации.",
+    "en": "Consolidated balances across all organizations. Accounts are edited inside a specific organization.",
+    "uz": "Barcha tashkilotlar bo‘yicha jamlangan qoldiqlar. Hisoblar aniq tashkilot rejimida tahrirlanadi."
+  },
+  "general.reports.title_page": {
+    "ru": "Общие отчёты · UPOS FINANCE",
+    "en": "General reports · UPOS FINANCE",
+    "uz": "Umumiy hisobotlar · UPOS FINANCE"
+  },
+  "general.reports.desc": {
+    "ru": "Обороты и остатки по всем организациям. Детальная разбивка по-прежнему в отчётах каждой организации.",
+    "en": "Turnover and balances across all organizations. Detailed breakdowns remain in each organization’s reports.",
+    "uz": "Barcha tashkilotlar bo‘yicha aylanmalar va qoldiqlar. Batafsil tahlil har bir tashkilot hisobotlarida qoladi."
+  },
+  "general.reports.tabs_aria": {
+    "ru": "Разделы отчётов",
+    "en": "Report sections",
+    "uz": "Hisobot bo‘limlari"
+  },
+  "general.reports.tab.pnl": {
+    "ru": "ОиУ",
+    "en": "P&L",
+    "uz": "Foyda va zarar"
+  },
+  "general.reports.tab.balance": {
+    "ru": "Остатки",
+    "en": "Balances",
+    "uz": "Qoldiqlar"
+  },
+  "general.summary": {
+    "ru": "Сводка",
+    "en": "Summary",
+    "uz": "Jamlanma"
+  },
+  "general.operations": {
+    "ru": "Операций",
+    "en": "Operations",
+    "uz": "Operatsiyalar"
+  },
+  "general.income": {
+    "ru": "Доход",
+    "en": "Income",
+    "uz": "Kirim"
+  },
+  "general.expense": {
+    "ru": "Расход",
+    "en": "Expense",
+    "uz": "Chiqim"
+  },
+  "general.net": {
+    "ru": "Чистое",
+    "en": "Net",
+    "uz": "Sof"
+  },
+  "general.transfers": {
+    "ru": "Переводы",
+    "en": "Transfers",
+    "uz": "O‘tkazmalar"
+  },
+  "general.cashout": {
+    "ru": "Обнал",
+    "en": "Cash out",
+    "uz": "Naqd yechish"
+  },
+  "general.truncated_warn": {
+    "ru": "Показаны последние {limit}; сводка по всем попаданиям.",
+    "en": "Showing latest {limit}; summary covers all matches.",
+    "uz": "Oxirgi {limit} ko‘rsatilgan; jamlanma barcha mos yozuvlar bo‘yicha."
+  },
+  "general.kassa.empty": {
+    "ru": "Нет операций по выбранным фильтрам. Создайте операцию в кассе конкретной организации.",
+    "en": "No transactions match the selected filters. Create a transaction in a specific organization.",
+    "uz": "Tanlangan filtrlarga mos operatsiyalar yo‘q. Operatsiyani aniq tashkilot kassasida yarating."
+  },
+  "general.all_categories": {
+    "ru": "Все категории",
+    "en": "All categories",
+    "uz": "Barcha toifalar"
+  },
+  "general.all_currencies": {
+    "ru": "Все валюты",
+    "en": "All currencies",
+    "uz": "Barcha valyutalar"
+  },
+  "general.all_organizations": {
+    "ru": "Все организации",
+    "en": "All organizations",
+    "uz": "Barcha tashkilotlar"
+  },
+  "general.period": {
+    "ru": "Период",
+    "en": "Period",
+    "uz": "Davr"
+  },
+  "general.date_from": {
+    "ru": "С даты",
+    "en": "From",
+    "uz": "Boshlanish"
+  },
+  "general.date_to": {
+    "ru": "По дату",
+    "en": "To",
+    "uz": "Tugash"
+  },
+  "general.type": {
+    "ru": "Тип",
+    "en": "Type",
+    "uz": "Turi"
+  },
+  "general.all_types": {
+    "ru": "Все типы",
+    "en": "All types",
+    "uz": "Barcha turlar"
+  },
+  "general.type.income": {
+    "ru": "Доход",
+    "en": "Income",
+    "uz": "Kirim"
+  },
+  "general.type.expense": {
+    "ru": "Расход",
+    "en": "Expense",
+    "uz": "Chiqim"
+  },
+  "general.type.transfer": {
+    "ru": "Перевод",
+    "en": "Transfer",
+    "uz": "O‘tkazma"
+  },
+  "general.type.cashout": {
+    "ru": "Обнал",
+    "en": "Cash out",
+    "uz": "Naqd yechish"
+  },
+  "general.category": {
+    "ru": "Категория",
+    "en": "Category",
+    "uz": "Toifa"
+  },
+  "general.source": {
+    "ru": "Источник",
+    "en": "Source",
+    "uz": "Manba"
+  },
+  "general.all": {
+    "ru": "Все",
+    "en": "All",
+    "uz": "Hammasi"
+  },
+  "general.manual": {
+    "ru": "Вручную",
+    "en": "Manual",
+    "uz": "Qo‘lda"
+  },
+  "general.date": {
+    "ru": "Дата",
+    "en": "Date",
+    "uz": "Sana"
+  },
+  "general.amount": {
+    "ru": "Сумма",
+    "en": "Amount",
+    "uz": "Summa"
+  },
+  "general.currency_short": {
+    "ru": "Вал.",
+    "en": "Cur.",
+    "uz": "Val."
+  },
+  "general.comment": {
+    "ru": "Комментарий",
+    "en": "Comment",
+    "uz": "Izoh"
+  },
+  "general.fx_stale": {
+    "ru": "Курсы могут быть устаревшими.",
+    "en": "FX rates may be stale.",
+    "uz": "Kurslar eskirgan bo‘lishi mumkin."
+  },
+  "general.fx_missing": {
+    "ru": "Нет курса для: {list}",
+    "en": "Missing rates for: {list}",
+    "uz": "Kurs yo‘q: {list}"
+  },
+  "general.schet.consolidated": {
+    "ru": "Консолидированный счёт",
+    "en": "Consolidated account",
+    "uz": "Jamlangan hisob"
+  },
+  "general.estimated_in": {
+    "ru": "Оценочно в {currency}",
+    "en": "Estimated in {currency}",
+    "uz": "{currency} bo‘yicha taxminiy"
+  },
+  "general.balances_by_currency": {
+    "ru": "Остатки по валютам",
+    "en": "Balances by currency",
+    "uz": "Valyutalar bo‘yicha qoldiq"
+  },
+  "general.schet.empty": {
+    "ru": "Нет данных по организациям. Откройте счёт конкретной организации для настройки.",
+    "en": "No organization data. Open a specific organization account to configure it.",
+    "uz": "Tashkilotlar bo‘yicha ma’lumot yo‘q. Sozlash uchun aniq tashkilot hisobini oching."
+  },
+  "general.storage_places_count": {
+    "ru": "Мест хранения: {count}",
+    "en": "Storage places: {count}",
+    "uz": "Saqlash joylari: {count}"
+  },
+  "general.open_account": {
+    "ru": "Открыть счёт",
+    "en": "Open account",
+    "uz": "Hisobni ochish"
+  },
+  "general.no_accounts": {
+    "ru": "Нет счетов",
+    "en": "No accounts",
+    "uz": "Hisoblar yo‘q"
+  },
+  "general.ops_short": {
+    "ru": "Оп.",
+    "en": "Ops",
+    "uz": "Op."
+  },
+  "general.net_by_org": {
+    "ru": "Чистый результат по организациям",
+    "en": "Net result by organization",
+    "uz": "Tashkilotlar bo‘yicha sof natija"
+  },
+  "general.by_currency": {
+    "ru": "По валютам",
+    "en": "By currency",
+    "uz": "Valyutalar bo‘yicha"
+  },
+  "general.income_currency": {
+    "ru": "Доход ({currency})",
+    "en": "Income ({currency})",
+    "uz": "Kirim ({currency})"
+  },
+  "general.expense_currency": {
+    "ru": "Расход ({currency})",
+    "en": "Expense ({currency})",
+    "uz": "Chiqim ({currency})"
+  },
+  "general.profit_currency": {
+    "ru": "Прибыль ({currency})",
+    "en": "Profit ({currency})",
+    "uz": "Foyda ({currency})"
+  },
+  "general.no_org_data": {
+    "ru": "Нет данных по организациям",
+    "en": "No organization data",
+    "uz": "Tashkilotlar bo‘yicha ma’lumot yo‘q"
+  },
+  "general.all_currencies_breakdown": {
+    "ru": "По всем валютам",
+    "en": "All currencies",
+    "uz": "Barcha valyutalar bo‘yicha"
+  },
+  "general.income_plural": {
+    "ru": "Доходы",
+    "en": "Income",
+    "uz": "Kirimlar"
+  },
+  "general.expense_plural": {
+    "ru": "Расходы",
+    "en": "Expenses",
+    "uz": "Chiqimlar"
+  },
+  "brand.admin": {
+    "ru": "UPOS Finance — админ-панель",
+    "en": "UPOS Finance — admin",
+    "uz": "UPOS Finance — admin panel"
+  },
+  "brand.user": {
+    "ru": "UPOS Finance — главная",
+    "en": "UPOS Finance — home",
+    "uz": "UPOS Finance — bosh sahifa"
+  },
+  "mobile.open_nav": {
+    "ru": "Открыть меню навигации",
+    "en": "Open navigation menu",
+    "uz": "Navigatsiya menyusini ochish"
+  },
+  "profile.avatar": {
+    "ru": "Сменить аватар",
+    "en": "Change avatar",
+    "uz": "Avatarni almashtirish"
+  },
+  "profile.placeholder": {
+    "ru": "Профиль",
+    "en": "Profile",
+    "uz": "Profil"
+  },
+  "profile.role": {
+    "ru": "Роль",
+    "en": "Role",
+    "uz": "Rol"
+  },
+  "profile.role.owner": {
+    "ru": "Ген Директор",
+    "en": "General Director",
+    "uz": "Bosh direktor"
+  },
+  "profile.role.admin": {
+    "ru": "Администратор",
+    "en": "Administrator",
+    "uz": "Administrator"
+  },
+  "logout.aria": {
+    "ru": "Выйти",
+    "en": "Sign out",
+    "uz": "Chiqish"
+  },
+  "auth.title_page": {
+    "ru": "Вход · UPOS FINANCE",
+    "en": "Sign in · UPOS FINANCE",
+    "uz": "Kirish · UPOS FINANCE"
+  },
+  "auth.title": {
+    "ru": "Вход в систему",
+    "en": "Sign in",
+    "uz": "Tizimga kirish"
+  },
+  "auth.login": {
+    "ru": "Логин",
+    "en": "Username",
+    "uz": "Login"
+  },
+  "auth.login_ph": {
+    "ru": "Например: ivan",
+    "en": "e.g. ivan",
+    "uz": "Masalan: ivan"
+  },
+  "auth.password": {
+    "ru": "Пароль",
+    "en": "Password",
+    "uz": "Parol"
+  },
+  "auth.submit": {
+    "ru": "Войти",
+    "en": "Sign in",
+    "uz": "Kirish"
+  },
+  "pwd.show": {
+    "ru": "Показать пароль",
+    "en": "Show password",
+    "uz": "Parolni ko‘rsatish"
+  },
+  "pwd.hide": {
+    "ru": "Скрыть пароль",
+    "en": "Hide password",
+    "uz": "Parolni yashirish"
+  },
+  "pwd.show_token": {
+    "ru": "Показать токен",
+    "en": "Show token",
+    "uz": "Tokenni ko‘rsatish"
+  },
+  "pwd.hide_token": {
+    "ru": "Скрыть токен",
+    "en": "Hide token",
+    "uz": "Tokenni yashirish"
+  },
+  "error.credentials": {
+    "ru": "Неверный логин или пароль.",
+    "en": "Wrong username or password.",
+    "uz": "Noto‘g‘ri login yoki parol."
+  },
+  "error.no_users": {
+    "ru": "Нет учётных записей.",
+    "en": "No user accounts yet.",
+    "uz": "Hisob yozuvlari yo‘q."
+  },
+  "error.csrf_auth": {
+    "ru": "Запрос устарел. Обновите страницу и попробуйте войти снова.",
+    "en": "Request expired. Refresh and try again.",
+    "uz": "So‘rov eskirgan. Sahifani yangilang."
+  },
+  "flash.csrf": {
+    "ru": "Запрос устарел. Обновите страницу и повторите действие.",
+    "en": "Request expired. Refresh the page.",
+    "uz": "So‘rov eskirgan. Sahifani yangilang."
+  },
+  "flash.saved": {
+    "ru": "Сохранено",
+    "en": "Saved",
+    "uz": "Saqlandi"
+  },
+  "flash.profile_saved": {
+    "ru": "Учётная запись обновлена",
+    "en": "Your account was updated",
+    "uz": "Akkaunt yangilandi"
+  },
+  "flash.settings_load": {
+    "ru": "Не удалось загрузить сохранённые настройки. Попробуйте позже или обратитесь в поддержку.",
+    "en": "Could not load settings. Try later or contact support.",
+    "uz": "Sozlamalarni yuklab bo‘lmadi. Keyinroq urinib ko‘ring."
+  },
+  "settings.title_page": {
+    "ru": "Настройки · UPOS FINANCE",
+    "en": "Settings · UPOS FINANCE",
+    "uz": "Sozlamalar · UPOS FINANCE"
+  },
+  "settings.title": {
+    "ru": "Настройки",
+    "en": "Settings",
+    "uz": "Sozlamalar"
+  },
+  "settings.aria_rail": {
+    "ru": "Разделы настроек",
+    "en": "Settings sections",
+    "uz": "Sozlamalar bo‘limlari"
+  },
+  "settings.tab.general": {
+    "ru": "Основное",
+    "en": "General",
+    "uz": "Asosiy"
+  },
+  "settings.tab.telegram": {
+    "ru": "Telegram уведомление",
+    "en": "Telegram notifications",
+    "uz": "Telegram xabarnomasi"
+  },
+  "settings.tab.integrations": {
+    "ru": "Интеграция",
+    "en": "Integrations",
+    "uz": "Integratsiya"
+  },
+  "settings.tab.dictionary": {
+    "ru": "Справочники",
+    "en": "Directories",
+    "uz": "Ma‘lumotnomalar"
+  },
+  "settings.theme": {
+    "ru": "Тема",
+    "en": "Theme",
+    "uz": "Mavzu"
+  },
+  "settings.theme_aria": {
+    "ru": "Тема интерфейса",
+    "en": "Interface theme",
+    "uz": "Interfeys mavzusi"
+  },
+  "settings.theme.light": {
+    "ru": "Светлая",
+    "en": "Light",
+    "uz": "Yorug‘"
+  },
+  "settings.theme.dark": {
+    "ru": "Тёмная",
+    "en": "Dark",
+    "uz": "Qorong‘u"
+  },
+  "settings.theme.emerald": {
+    "ru": "Изумрудная",
+    "en": "Emerald",
+    "uz": "Zumrad"
+  },
+  "settings.theme.light_title": {
+    "ru": "Светлая тема",
+    "en": "Light theme",
+    "uz": "Yorug‘ mavzu"
+  },
+  "settings.theme.dark_title": {
+    "ru": "Тёмная тема",
+    "en": "Dark theme",
+    "uz": "Qorong‘u mavzu"
+  },
+  "settings.theme.emerald_title": {
+    "ru": "Изумрудная тема",
+    "en": "Emerald theme",
+    "uz": "Zumrad mavzu"
+  },
+  "settings.language": {
+    "ru": "Язык интерфейса",
+    "en": "Interface language",
+    "uz": "Interfeys tili"
+  },
+  "settings.language_hint": {
+    "ru": "Применяется ко всем экранам этой рабочей области, включая кассу и отчёты.",
+    "en": "Applies to all screens in this workspace, including cash desk and reports.",
+    "uz": "Bu ish maydonidagi barcha ekranlarga, jumladan kassa va hisobotlarga qo‘llaniladi."
+  },
+  "settings.lang.ru": {
+    "ru": "Русский",
+    "en": "Russian",
+    "uz": "Rus tili"
+  },
+  "settings.lang.en": {
+    "ru": "English",
+    "en": "English",
+    "uz": "Ingliz tili"
+  },
+  "settings.lang.uz": {
+    "ru": "Oʻzbekcha",
+    "en": "Uzbek",
+    "uz": "O‘zbek tili"
+  },
+  "settings.datetime": {
+    "ru": "Дата и время",
+    "en": "Date & time",
+    "uz": "Sana va vaqt"
+  },
+  "settings.tz": {
+    "ru": "Часовой пояс",
+    "en": "Time zone",
+    "uz": "Vaqt zonasi"
+  },
+  "settings.tz_help": {
+    "ru": "Касса, фильтры по датам и отчёт за месяц используют это время. На сервере хранится UTC.",
+    "en": "Cash desk, date filters and monthly report use this time. Server stores UTC.",
+    "uz": "Kassa, sanalar bo‘yicha filterlar va oylik hisobot shu vaqtdan foydalanadi. Server UTC saqlaydi."
+  },
+  "settings.tz_current": {
+    "ru": "Текущий",
+    "en": "Current",
+    "uz": "Joriy"
+  },
+  "settings.telegram": {
+    "ru": "Telegram",
+    "en": "Telegram",
+    "uz": "Telegram"
+  },
+  "settings.profile.title": {
+    "ru": "Учётная запись",
+    "en": "Your account",
+    "uz": "Akkauntingiz"
+  },
+  "settings.profile.subtitle": {
+    "ru": "Логин, почта и имя, как при создании учётной записи администратором. Чтобы сохранить изменения, подтвердите текущий пароль.",
+    "en": "Login, email and name mirror admin-created accounts. Confirm your current password to save.",
+    "uz": "Login, pochta va ism administrator yaratgani kabi. O‘zgartirish uchun joriy parolni tasdiqlang."
+  },
+  "settings.profile.login": {
+    "ru": "Логин",
+    "en": "Username",
+    "uz": "Login"
+  },
+  "settings.profile.email": {
+    "ru": "Электронная почта",
+    "en": "Email",
+    "uz": "Email"
+  },
+  "settings.profile.name": {
+    "ru": "Имя",
+    "en": "Full name",
+    "uz": "Ism"
+  },
+  "settings.profile.current_pw": {
+    "ru": "Текущий пароль",
+    "en": "Current password",
+    "uz": "Joriy parol"
+  },
+  "settings.profile.new_pw": {
+    "ru": "Новый пароль",
+    "en": "New password",
+    "uz": "Yangi parol"
+  },
+  "settings.profile.confirm_pw": {
+    "ru": "Подтверждение пароля",
+    "en": "Confirm password",
+    "uz": "Parolni tasdiqlash"
+  },
+  "settings.profile.pw_leave_blank": {
+    "ru": "Не заполняйте, если не меняете пароль",
+    "en": "Leave blank if you are not changing the password",
+    "uz": "Parolni o‘zgartirmasangiz, bo‘sh qoldiring"
+  },
+  "settings.profile.save": {
+    "ru": "Сохранить профиль",
+    "en": "Save profile",
+    "uz": "Profilni saqlash"
+  },
+  "settings.profile.security_hint": {
+    "ru": "Новый пароль — от 8 символов и только при необходимости.",
+    "en": "New password must be at least 8 characters and is optional.",
+    "uz": "Yangi parol kamida 8 belgi va ixtiyoriy."
+  },
+  "settings.profile.err_bad_current": {
+    "ru": "Неверный текущий пароль.",
+    "en": "Current password is incorrect.",
+    "uz": "Joriy parol noto‘g‘ri."
+  },
+  "settings.profile.err_pw_mismatch": {
+    "ru": "Новый пароль и подтверждение не совпадают.",
+    "en": "New password and confirmation do not match.",
+    "uz": "Yangi parol va tasdiqlash mos kelmaydi."
+  },
+  "settings.profile.err_update": {
+    "ru": "Не удалось сохранить изменения. Попробуйте позже.",
+    "en": "Could not save changes. Try again later.",
+    "uz": "O‘zgartirishlarni saqlab bo‘lmadi. Keyinroq urinib ko‘ring."
+  },
+  "settings.integrations.save_modal": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "settings.integrations.connected": {
+    "ru": "Подключение есть",
+    "en": "Connected",
+    "uz": "Ulanish bor"
+  },
+  "settings.integrations.not_connected": {
+    "ru": "Нет подключения",
+    "en": "Not connected",
+    "uz": "Ulanish yo‘q"
+  },
+  "settings.integrations.not_configured": {
+    "ru": "Не настроено",
+    "en": "Not configured",
+    "uz": "Sozlanmagan"
+  },
+  "settings.integrations.testing": {
+    "ru": "Проверка…",
+    "en": "Checking…",
+    "uz": "Tekshirilmoqda…"
+  },
+  "settings.dict.ccy_edit": {
+    "ru": "Редактировать",
+    "en": "Edit",
+    "uz": "Tahrirlash"
+  },
+  "settings.dict.ccy_save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "settings.prefs_saved": {
+    "ru": "Изменения сохранены",
+    "en": "Changes saved",
+    "uz": "O'zgarishlar saqlandi"
+  },
+  "settings.profile.cancel": {
+    "ru": "Отмена",
+    "en": "Cancel",
+    "uz": "Bekor qilish"
+  },
+  "settings.profile.close": {
+    "ru": "Закрыть",
+    "en": "Close",
+    "uz": "Yopish"
+  },
+  "settings.profile.edit": {
+    "ru": "Редактировать",
+    "en": "Edit",
+    "uz": "Tahrirlash"
+  },
+  "settings.profile.edit_title": {
+    "ru": "Редактирование профиля",
+    "en": "Edit profile",
+    "uz": "Profilni tahrirlash"
+  },
+  "settings.devices.open": {
+    "ru": "Устройства",
+    "en": "Devices",
+    "uz": "Qurilmalar"
+  },
+  "settings.devices.title": {
+    "ru": "Подключённые устройства",
+    "en": "Connected devices",
+    "uz": "Ulangan qurilmalar"
+  },
+  "settings.devices.subtitle": {
+    "ru": "Сессии входа в ваш аккаунт. Можно завершить доступ или заблокировать устройство.",
+    "en": "Sign-in sessions for your account. End access or block a device.",
+    "uz": "Hisobingizga kirish seanslari. Kirishni tugatish yoki qurilmani bloklash mumkin."
+  },
+  "settings.devices.empty": {
+    "ru": "Нет записанных устройств",
+    "en": "No devices recorded",
+    "uz": "Qurilmalar yo‘q"
+  },
+  "settings.devices.online": {
+    "ru": "Онлайн",
+    "en": "Online",
+    "uz": "Onlayn"
+  },
+  "settings.devices.current": {
+    "ru": "Это устройство",
+    "en": "This device",
+    "uz": "Bu qurilma"
+  },
+  "settings.devices.last_seen": {
+    "ru": "Был онлайн: {time}",
+    "en": "Last seen: {time}",
+    "uz": "Oxirgi faollik: {time}"
+  },
+  "settings.devices.never": {
+    "ru": "Ещё не было активности",
+    "en": "No activity yet",
+    "uz": "Hali faollik yo‘q"
+  },
+  "settings.devices.ip": {
+    "ru": "IP",
+    "en": "IP",
+    "uz": "IP"
+  },
+  "settings.devices.revoke": {
+    "ru": "Выйти",
+    "en": "Sign out",
+    "uz": "Chiqish"
+  },
+  "settings.devices.block": {
+    "ru": "Заблокировать",
+    "en": "Block",
+    "uz": "Bloklash"
+  },
+  "settings.devices.block_confirm": {
+    "ru": "Заблокировать это устройство? Повторный вход с него будет невозможен.",
+    "en": "Block this device? It will not be able to sign in again.",
+    "uz": "Ushbu qurilma bloklansinmi? Qayta kira olmaydi."
+  },
+  "settings.devices.revoke_confirm": {
+    "ru": "Завершить сессию на этом устройстве?",
+    "en": "End the session on this device?",
+    "uz": "Ushbu qurilmadagi seans tugatilsinmi?"
+  },
+  "settings.devices.load_err": {
+    "ru": "Не удалось загрузить список устройств",
+    "en": "Could not load devices",
+    "uz": "Qurilmalar ro‘yxatini yuklab bo‘lmadi"
+  },
+  "settings.devices.action_err": {
+    "ru": "Не удалось выполнить действие",
+    "en": "Action failed",
+    "uz": "Amalni bajarib bo‘lmadi"
+  },
+  "settings.profile.err_email_invalid": {
+    "ru": "Укажите корректный адрес электронной почты.",
+    "en": "Enter a valid email address.",
+    "uz": "To‘g‘ri email manzilini kiriting."
+  },
+  "settings.profile.err_login_required": {
+    "ru": "Укажите логин.",
+    "en": "Enter a username.",
+    "uz": "Loginni kiriting."
+  },
+  "settings.profile.err_pw_short": {
+    "ru": "Пароль должен быть не короче 8 символов.",
+    "en": "Password must be at least 8 characters.",
+    "uz": "Parol kamida 8 belgidan iborat bo‘lishi kerak."
+  },
+  "settings.profile.pw_strength.fair": {
+    "ru": "Средний — почти готово",
+    "en": "Fair — almost there",
+    "uz": "O‘rtacha — deyarli tayyor"
+  },
+  "settings.profile.pw_strength.good": {
+    "ru": "Хороший пароль",
+    "en": "Good password",
+    "uz": "Yaxshi parol"
+  },
+  "settings.profile.pw_strength.strong": {
+    "ru": "Надёжный пароль",
+    "en": "Strong password",
+    "uz": "Kuchli parol"
+  },
+  "settings.profile.pw_strength.weak": {
+    "ru": "Слабый — добавьте цифры и разные буквы",
+    "en": "Weak — add digits and mixed letters",
+    "uz": "Zaif — raqam va harflar qo‘shing"
+  },
+  "settings.profile.pw_tip.digit": {
+    "ru": "Цифра",
+    "en": "A digit",
+    "uz": "Raqam"
+  },
+  "settings.profile.pw_tip.length": {
+    "ru": "Минимум 8 символов",
+    "en": "At least 8 characters",
+    "uz": "Kamida 8 belgi"
+  },
+  "settings.profile.pw_tip.lower": {
+    "ru": "Строчная буква",
+    "en": "A lowercase letter",
+    "uz": "Kichik harf"
+  },
+  "settings.profile.pw_tip.symbol": {
+    "ru": "Спецсимвол, например ! или @",
+    "en": "A special character, e.g. ! or @",
+    "uz": "Maxsus belgi, masalan ! yoki @"
+  },
+  "settings.profile.pw_tip.upper": {
+    "ru": "Заглавная буква",
+    "en": "An uppercase letter",
+    "uz": "Bosh harf"
+  },
+  "settings.tg.action_delete": {
+    "ru": "Удалить бота",
+    "en": "Remove bot",
+    "uz": "Botni o‘chirish"
+  },
+  "settings.tg.action_destinations": {
+    "ru": "Группы и подписчики",
+    "en": "Groups and subscribers",
+    "uz": "Guruhlar va obunachilar"
+  },
+  "settings.tg.action_settings": {
+    "ru": "Настройки отчётов",
+    "en": "Report settings",
+    "uz": "Hisobot sozlamalari"
+  },
+  "settings.tg.action_tests": {
+    "ru": "Тестовые отчёты",
+    "en": "Test reports",
+    "uz": "Sinov hisobotlari"
+  },
+  "settings.tg.approve": {
+    "ru": "Одобрить",
+    "en": "Approve",
+    "uz": "Tasdiqlash"
+  },
+  "settings.tg.approved": {
+    "ru": "Активные",
+    "en": "Active",
+    "uz": "Faol"
+  },
+  "settings.tg.approved_empty": {
+    "ru": "Нет активных подписчиков",
+    "en": "No active subscribers",
+    "uz": "Faol obunachilar yo‘q"
+  },
+  "settings.tg.connected_ok": {
+    "ru": "Бот подключён",
+    "en": "Bot connected",
+    "uz": "Bot ulandi"
+  },
+  "settings.tg.delete_confirm": {
+    "ru": "Отключить бота и удалить все настройки Telegram для этой организации?",
+    "en": "Disconnect the bot and remove all Telegram settings for this organization?",
+    "uz": "Botni uzib, ushbu tashkilot uchun barcha Telegram sozlamalarini o‘chirasizmi?"
+  },
+  "settings.tg.disconnect": {
+    "ru": "Отключить бота",
+    "en": "Disconnect bot",
+    "uz": "Botni uzish"
+  },
+  "settings.tg.disconnect_confirm": {
+    "ru": "Отключить Telegram-бота и очистить списки?",
+    "en": "Disconnect Telegram bot and clear lists?",
+    "uz": "Telegram bot va ro‘yxatlarni tozalab uzilsinmi?"
+  },
+  "settings.tg.disconnected": {
+    "ru": "Бот отключён",
+    "en": "Bot disconnected",
+    "uz": "Bot uzildi"
+  },
+  "settings.tg.enabled": {
+    "ru": "включено",
+    "en": "enabled",
+    "uz": "yoqilgan"
+  },
+  "settings.tg.forbidden": {
+    "ru": "Недостаточно прав",
+    "en": "Not enough permissions",
+    "uz": "Ruxsat yetarli emas"
+  },
+  "settings.tg.groups_empty": {
+    "ru": "Групп пока нет. Добавьте бота в группу Telegram.",
+    "en": "No groups yet. Add the bot to a Telegram group.",
+    "uz": "Hali guruhlar yo‘q. Botni Telegram guruhiga qo‘shing."
+  },
+  "settings.tg.groups_hint": {
+    "ru": "Добавьте бота в группу и назначьте администратором. Здесь отображаются только группы, где бот — админ.",
+    "en": "Add the bot to a group and make it an admin. Only groups where the bot is admin are listed.",
+    "uz": "Botni guruhga qo‘shing va admin qiling. Faqat bot admin bo‘lgan guruhlar ko‘rsatiladi."
+  },
+  "settings.tg.groups_title": {
+    "ru": "Группы для отчётов",
+    "en": "Report groups",
+    "uz": "Hisobot guruhlari"
+  },
+  "settings.tg.hub_activity_err": {
+    "ru": "Есть проблема с подключением",
+    "en": "Connection issue",
+    "uz": "Ulanish muammosi"
+  },
+  "settings.tg.hub_activity_ok": {
+    "ru": "Бот активен",
+    "en": "Bot is active",
+    "uz": "Bot faol"
+  },
+  "settings.tg.hub_activity_warn": {
+    "ru": "Подключён, ожидает активности",
+    "en": "Connected, awaiting activity",
+    "uz": "Ulangan, faollik kutilmoqda"
+  },
+  "settings.tg.hub_last_sent": {
+    "ru": "Последнее сообщение: {time}",
+    "en": "Last message: {time}",
+    "uz": "Oxirgi xabar: {time}"
+  },
+  "settings.tg.hub_last_sent_never": {
+    "ru": "Сообщений пока не отправлялось",
+    "en": "No messages sent yet",
+    "uz": "Hali xabar yuborilmagan"
+  },
+  "settings.tg.invalid_token": {
+    "ru": "Неверный токен бота",
+    "en": "Invalid bot token",
+    "uz": "Bot tokeni noto‘g‘ri"
+  },
+  "settings.tg.modal_dest_title": {
+    "ru": "Куда отправлять",
+    "en": "Delivery destinations",
+    "uz": "Qayerga yuborish"
+  },
+  "settings.tg.modal_prefs_title": {
+    "ru": "Настройки уведомлений",
+    "en": "Notification settings",
+    "uz": "Bildirishnoma sozlamalari"
+  },
+  "settings.tg.no_targets": {
+    "ru": "Выберите хотя бы одну группу или одобрите пользователя",
+    "en": "Select at least one group or approve a user",
+    "uz": "Kamida bitta guruhni tanlang yoki foydalanuvchini tasdiqlang"
+  },
+  "settings.tg.no_transactions": {
+    "ru": "Операций пока нет",
+    "en": "No transactions yet",
+    "uz": "Hali operatsiyalar yo‘q"
+  },
+  "settings.tg.not_connected": {
+    "ru": "Бот не подключён",
+    "en": "Bot not connected",
+    "uz": "Bot ulanmagan"
+  },
+  "settings.tg.organization_required": {
+    "ru": "Сначала выберите организацию",
+    "en": "Select an organization first",
+    "uz": "Avval tashkilotni tanlang"
+  },
+  "settings.tg.pending": {
+    "ru": "Ожидают",
+    "en": "Pending",
+    "uz": "Kutilmoqda"
+  },
+  "settings.tg.pending_empty": {
+    "ru": "Нет заявок",
+    "en": "No pending requests",
+    "uz": "Arizalar yo‘q"
+  },
+  "settings.tg.pref_balance": {
+    "ru": "Остатки счетов",
+    "en": "Account balances",
+    "uz": "Hisob qoldiqlari"
+  },
+  "settings.tg.pref_daily": {
+    "ru": "Итоги за день",
+    "en": "Daily summary",
+    "uz": "Kunlik yakun"
+  },
+  "settings.tg.pref_daily_hour": {
+    "ru": "Время ежедневного отчёта",
+    "en": "Daily report time",
+    "uz": "Kunlik hisobot vaqti"
+  },
+  "settings.tg.pref_monthly": {
+    "ru": "Итоги за месяц",
+    "en": "Monthly summary",
+    "uz": "Oylik yakun"
+  },
+  "settings.tg.pref_transactions": {
+    "ru": "Операции и касса",
+    "en": "Transactions and POS",
+    "uz": "Operatsiyalar va kassa"
+  },
+  "settings.tg.pref_transactions_hint": {
+    "ru": "Уведомления о доходах, расходах и переводах из кассы",
+    "en": "Alerts for income, expense and transfers from the register",
+    "uz": "Kassadan kirim, chiqim va o‘tkazmalar haqida xabarlar"
+  },
+  "settings.tg.pref_weekly": {
+    "ru": "Итоги за неделю",
+    "en": "Weekly summary",
+    "uz": "Haftalik yakun"
+  },
+  "settings.tg.prefs_saved": {
+    "ru": "Настройки сохранены",
+    "en": "Settings saved",
+    "uz": "Sozlamalar saqlandi"
+  },
+  "settings.tg.refresh": {
+    "ru": "Обновить",
+    "en": "Refresh",
+    "uz": "Yangilash"
+  },
+  "settings.tg.refresh_done": {
+    "ru": "Список обновлён",
+    "en": "List updated",
+    "uz": "Ro‘yxat yangilandi"
+  },
+  "settings.tg.refreshing": {
+    "ru": "Обновление списка групп…",
+    "en": "Refreshing groups…",
+    "uz": "Guruhlar yangilanmoqda…"
+  },
+  "settings.tg.reject": {
+    "ru": "Отклонить",
+    "en": "Reject",
+    "uz": "Rad etish"
+  },
+  "settings.tg.remove": {
+    "ru": "Удалить",
+    "en": "Remove",
+    "uz": "O‘chirish"
+  },
+  "settings.tg.sending_test": {
+    "ru": "Отправка…",
+    "en": "Sending…",
+    "uz": "Yuborilmoqda…"
+  },
+  "settings.tg.subscribers_title": {
+    "ru": "Подписчики",
+    "en": "Subscribers",
+    "uz": "Obunachilar"
+  },
+  "settings.tg.tab_groups": {
+    "ru": "Группы",
+    "en": "Groups",
+    "uz": "Guruhlar"
+  },
+  "settings.tg.tab_subscribers": {
+    "ru": "Подписчики",
+    "en": "Subscribers",
+    "uz": "Obunachilar"
+  },
+  "settings.tg.test_balance": {
+    "ru": "Остатки счетов",
+    "en": "Account balances",
+    "uz": "Hisob qoldiqlari"
+  },
+  "settings.tg.test_daily": {
+    "ru": "Итоги за сегодня",
+    "en": "Today summary",
+    "uz": "Bugungi jami"
+  },
+  "settings.tg.test_daily_empty": {
+    "ru": "Пустой день",
+    "en": "Empty day",
+    "uz": "Bo‘sh kun"
+  },
+  "settings.tg.test_expense": {
+    "ru": "Расход",
+    "en": "Expense",
+    "uz": "Xarajat"
+  },
+  "settings.tg.test_income": {
+    "ru": "Доход",
+    "en": "Income",
+    "uz": "Daromad"
+  },
+  "settings.tg.test_month": {
+    "ru": "Итоги месяца",
+    "en": "Month summary",
+    "uz": "Oy yakuni"
+  },
+  "settings.tg.test_real": {
+    "ru": "Последняя операция",
+    "en": "Last transaction",
+    "uz": "Oxirgi operatsiya"
+  },
+  "settings.tg.test_sent": {
+    "ru": "Отчёт отправлен",
+    "en": "Report sent",
+    "uz": "Hisobot yuborildi"
+  },
+  "settings.tg.test_transfer": {
+    "ru": "Перевод",
+    "en": "Transfer",
+    "uz": "O‘tkazma"
+  },
+  "settings.tg.test_weekly": {
+    "ru": "Итоги недели",
+    "en": "Week summary",
+    "uz": "Hafta yakuni"
+  },
+  "settings.tg.test_yesterday": {
+    "ru": "Итоги за вчера",
+    "en": "Yesterday summary",
+    "uz": "Kecha jami"
+  },
+  "settings.tg.tests_hint": {
+    "ru": "Отправить пример в выбранные группы и одобренным подписчикам.",
+    "en": "Send a sample to selected groups and approved subscribers.",
+    "uz": "Namuna tanlangan guruhlar va tasdiqlangan obunachilarga yuboriladi."
+  },
+  "settings.tg.tests_title": {
+    "ru": "Тестовые отчёты",
+    "en": "Test reports",
+    "uz": "Sinov hisobotlari"
+  },
+  "settings.tg.token_required": {
+    "ru": "Введите токен бота",
+    "en": "Enter bot token",
+    "uz": "Bot tokenini kiriting"
+  },
+  "settings.tg.token_saved_hint": {
+    "ru": "Токен сохранён на сервере: {token}. В поле ввода его не нужно держать — для смены вставьте новый токен.",
+    "en": "Token saved on server: {token}. You do not need to keep it in the field — paste a new token to replace.",
+    "uz": "Token serverda saqlangan: {token}. Maydonda saqlash shart emas — almashtirish uchun yangi token kiriting."
+  },
+  "settings.tg.verify": {
+    "ru": "Проверить и подключить",
+    "en": "Verify and connect",
+    "uz": "Tekshirish va ulash"
+  },
+  "settings.tg.verifying": {
+    "ru": "Проверка токена…",
+    "en": "Verifying token…",
+    "uz": "Token tekshirilmoqda…"
+  },
+  "settings.tg.webhook_error": {
+    "ru": "Ошибка webhook",
+    "en": "Webhook error",
+    "uz": "Webhook xatosi"
+  },
+  "settings.tg.webhook_ok": {
+    "ru": "Webhook Telegram подключён. Напишите боту /start в личку или отправьте сообщение в группу с ботом.",
+    "en": "Telegram webhook is active. Message the bot /start in DM or post in a group with the bot.",
+    "uz": "Telegram webhook ulangan. Botga shaxsiy chatda /start yuboring yoki bot bor guruhda xabar yozing."
+  },
+  "settings.tg_token": {
+    "ru": "Токен бота",
+    "en": "Bot token",
+    "uz": "Bot tokeni"
+  },
+  "settings.integrations_aria": {
+    "ru": "Интеграции",
+    "en": "Integrations",
+    "uz": "Integratsiyalar"
+  },
+  "settings.gw_login": {
+    "ru": "Логин",
+    "en": "Login",
+    "uz": "Login"
+  },
+  "settings.gw_password": {
+    "ru": "Пароль",
+    "en": "Password",
+    "uz": "Parol"
+  },
+  "settings.gw_placeholder_pw": {
+    "ru": "пароль Smartup для Basic Auth",
+    "en": "Smartup password for Basic Auth",
+    "uz": "Basic Auth uchun Smartup paroli"
+  },
+  "settings.gw_project_code": {
+    "ru": "Project code",
+    "en": "Project code",
+    "uz": "Project code"
+  },
+  "settings.gw_filial_id": {
+    "ru": "Filial ID",
+    "en": "Filial ID",
+    "uz": "Filial ID"
+  },
+  "settings.gw_filial_code": {
+    "ru": "Filial code",
+    "en": "Filial code",
+    "uz": "Filial code"
+  },
+  "settings.gw_filial_code_ph": {
+    "ru": "если работаете через головную организацию",
+    "en": "for head organization mode",
+    "uz": "bosh tashkilot rejimi uchun"
+  },
+  "settings.gw_sync_days": {
+    "ru": "Дней синхронизации (1-7)",
+    "en": "Sync days (1-7)",
+    "uz": "Sinxron kunlari (1-7)"
+  },
+  "settings.gw_sync": {
+    "ru": "Помечать интеграцию включённой (для ваших записей служебно)",
+    "en": "Mark integration enabled (internal)",
+    "uz": "Integratsiyani yoqilgan deb belgilash (ichki)"
+  },
+  "settings.gw_test": {
+    "ru": "Проверить подключение",
+    "en": "Test connection",
+    "uz": "Ulanishni tekshirish"
+  },
+  "settings.gw_sync_btn": {
+    "ru": "Синхронизировать",
+    "en": "Synchronize",
+    "uz": "Sinxronlash"
+  },
+  "settings.gw_last": {
+    "ru": "Последняя синхронизация",
+    "en": "Last sync",
+    "uz": "Oxirgi sinxron"
+  },
+  "settings.gw_help": {
+    "ru": "Сохраните настройки («Сохранить» снизу), затем нажмите «Проверить» или «Синхронизировать».",
+    "en": "Save settings (Save below), then Test or Sync.",
+    "uz": "Avval sozlamalarni saqlang, keyin Tekshirish yoki Sinxron."
+  },
+  "settings.api_base_url": {
+    "ru": "Базовый URL API",
+    "en": "API base URL",
+    "uz": "API bazaviy URL"
+  },
+  "settings.api_url": {
+    "ru": "URL API",
+    "en": "API URL",
+    "uz": "API URL"
+  },
+  "settings.api_key": {
+    "ru": "API-ключ",
+    "en": "API key",
+    "uz": "API kaliti"
+  },
+  "settings.terminal_id": {
+    "ru": "ID терминала",
+    "en": "Terminal ID",
+    "uz": "Terminal ID"
+  },
+  "settings.client_id": {
+    "ru": "Client ID",
+    "en": "Client ID",
+    "uz": "Client ID"
+  },
+  "settings.client_secret": {
+    "ru": "Client Secret",
+    "en": "Client Secret",
+    "uz": "Client Secret"
+  },
+  "settings.brand": {
+    "ru": "Brand",
+    "en": "Brand",
+    "uz": "Brand"
+  },
+  "settings.integrator_id": {
+    "ru": "Integrator ID",
+    "en": "Integrator ID",
+    "uz": "Integrator ID"
+  },
+  "settings.venue_id_optional": {
+    "ru": "Venue ID (необязательно)",
+    "en": "Venue ID (optional)",
+    "uz": "Venue ID (ixtiyoriy)"
+  },
+  "settings.clopos_help": {
+    "ru": "Clopos Open API v2: сохранение проверяет /auth и получает JWT для запросов с заголовком x-token.",
+    "en": "Clopos Open API v2: saving checks /auth and receives a JWT for x-token requests.",
+    "uz": "Clopos Open API v2: saqlash /auth orqali tekshiradi va x-token so'rovlari uchun JWT oladi."
+  },
+  "settings.onec_base": {
+    "ru": "База / URL",
+    "en": "Database / URL",
+    "uz": "Baza / URL"
+  },
+  "settings.onec_user": {
+    "ru": "Пользователь",
+    "en": "User",
+    "uz": "Foydalanuvchi"
+  },
+  "settings.dict.ccy": {
+    "ru": "Отображаемые валюты",
+    "en": "Displayed currencies",
+    "uz": "Ko‘rinadigan valyutalar"
+  },
+  "settings.dict.ccy_note": {
+    "ru": "Этот список управляет валютами в выпадающих списках на вкладке «Счёт» и в кассовых формах. Уже использованные валюты остаются доступными в существующих счетах.",
+    "en": "Controls currency dropdowns on Account and cash forms. Already used currencies stay available.",
+    "uz": "Hisob va kassa formlaridagi valyuta ro‘yxatlarini boshqaradi. Allaqachon ishlatilgan valyutalar saqlanadi."
+  },
+  "settings.dict.cats": {
+    "ru": "Категории операций",
+    "en": "Transaction categories",
+    "uz": "Operatsiya toifalari"
+  },
+  "settings.dict.cats_note": {
+    "ru": "Категории используются в кассе и отчетах. Название можно изменить на месте, удаление очищает категорию у связанных операций.",
+    "en": "Used in cash desk and reports. Rename inline; delete clears linked transactions.",
+    "uz": "Kassa va hisobotlarda ishlatiladi. Nomini joyida o‘zgartirish mumkin; o‘chirish bog‘langan operatsiyalardagi toifani tozalaydi."
+  },
+  "settings.cat.income": {
+    "ru": "Доход",
+    "en": "Income",
+    "uz": "Daromad"
+  },
+  "settings.cat.expense": {
+    "ru": "Расход",
+    "en": "Expense",
+    "uz": "Xarajat"
+  },
+  "settings.cat.transfer": {
+    "ru": "Перевод",
+    "en": "Transfer",
+    "uz": "O‘tkazma"
+  },
+  "settings.cat.income_desc": {
+    "ru": "Поступления денег и выручка",
+    "en": "Inflows and revenue",
+    "uz": "Pul tushumi va daromad"
+  },
+  "settings.cat.expense_desc": {
+    "ru": "Списания, закупки и операционные расходы",
+    "en": "Payments, purchases, operating expenses",
+    "uz": "To‘lovlar, xaridlar, operatsiya xarajatlari"
+  },
+  "settings.cat.transfer_desc": {
+    "ru": "Движение денег между счетами",
+    "en": "Moves between accounts",
+    "uz": "Hisoblararo harakat"
+  },
+  "settings.cat.name_aria": {
+    "ru": "Название категории",
+    "en": "Category name",
+    "uz": "Kategoriya nomi"
+  },
+  "settings.cat.save_aria": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "settings.cat.del_aria": {
+    "ru": "Удалить",
+    "en": "Delete",
+    "uz": "O‘chirish"
+  },
+  "settings.cat.add_placeholder": {
+    "ru": "Новая категория...",
+    "en": "New category...",
+    "uz": "Yangi kategoriya..."
+  },
+  "settings.cat.add": {
+    "ru": "Добавить",
+    "en": "Add",
+    "uz": "Qo‘shish"
+  },
+  "settings.save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "settings.general.eyebrow": {
+    "ru": "Рабочее пространство",
+    "en": "Workspace",
+    "uz": "Ish maydoni"
+  },
+  "settings.general.title": {
+    "ru": "Основные параметры бизнеса",
+    "en": "Core business settings",
+    "uz": "Biznesning asosiy sozlamalari"
+  },
+  "settings.general.subtitle": {
+    "ru": "Единый центр для языка, внешнего вида, часового пояса и служебных подключений рабочего пространства.",
+    "en": "One place for workspace language, appearance, time zone and service connections.",
+    "uz": "Ish maydoni tili, ko‘rinishi, vaqt zonasi va xizmat ulanishlari uchun yagona joy."
+  },
+  "settings.general.locale_meta": {
+    "ru": "Локализация",
+    "en": "Localization",
+    "uz": "Lokalizatsiya"
+  },
+  "settings.general.theme_meta": {
+    "ru": "Оформление",
+    "en": "Appearance",
+    "uz": "Ko‘rinish"
+  },
+  "settings.general.tz_meta": {
+    "ru": "Операционное время",
+    "en": "Operating time",
+    "uz": "Operatsion vaqt"
+  },
+  "settings.general.telegram_meta": {
+    "ru": "Уведомления",
+    "en": "Notifications",
+    "uz": "Bildirishnomalar"
+  },
+  "settings.general.interface_section": {
+    "ru": "Интерфейс",
+    "en": "Interface",
+    "uz": "Interfeys"
+  },
+  "settings.general.operations_section": {
+    "ru": "Операционный контур",
+    "en": "Operations",
+    "uz": "Operatsiyalar"
+  },
+  "settings.general.telegram_hint": {
+    "ru": "Токен хранится скрыто. Откройте поле только на время проверки или замены.",
+    "en": "The token is kept hidden. Reveal it only while checking or replacing it.",
+    "uz": "Token yashirilgan holda saqlanadi. Faqat tekshirish yoki almashtirish vaqtida ko‘rsating."
+  },
+  "admin.settings.title_page": {
+    "ru": "Админ — настройки · UPOS FINANCE",
+    "en": "Admin — settings · UPOS FINANCE",
+    "uz": "Admin — sozlamalar · UPOS FINANCE"
+  },
+  "admin.settings.title": {
+    "ru": "Настройки (админ)",
+    "en": "Settings (admin)",
+    "uz": "Sozlamalar (admin)"
+  },
+  "admin.settings.global_title": {
+    "ru": "Глобальные параметры",
+    "en": "Global options",
+    "uz": "Global parametrlar"
+  },
+  "admin.settings.global_desc": {
+    "ru": "Политики доступа, лимиты запросов и служебные ключи платформы можно будет задать в этом разделе.",
+    "en": "Access policies, rate limits and platform keys will be configured here.",
+    "uz": "Kirish siyosati, limitlar va kalitlar keyinroq bu yerda qo‘llanadi."
+  },
+  "admin.settings.lang_note": {
+    "ru": "Язык админ-панели сохраняется в общих настройках сервера.",
+    "en": "Admin UI language is saved in server-wide settings.",
+    "uz": "Admin panel tili server sozlamalarida saqlanadi."
+  },
+  "admin.settings.save": {
+    "ru": "Сохранить язык",
+    "en": "Save language",
+    "uz": "Tilni saqlash"
+  },
+  "reports.title_page": {
+    "ru": "Отчёты · UPOS FINANCE",
+    "en": "Reports · UPOS FINANCE",
+    "uz": "Hisobotlar · UPOS FINANCE"
+  },
+  "reports.eyebrow": {
+    "ru": "Финансовая аналитика",
+    "en": "Financial analytics",
+    "uz": "Moliyaviy tahlil"
+  },
+  "reports.title": {
+    "ru": "Отчёты",
+    "en": "Reports",
+    "uz": "Hisobotlar"
+  },
+  "reports.tabs_aria": {
+    "ru": "Раздел отчёта",
+    "en": "Report section",
+    "uz": "Hisobot bo‘limi"
+  },
+  "reports.period_aria": {
+    "ru": "Выбор периода отчёта",
+    "en": "Report period",
+    "uz": "Hisobot davri"
+  },
+  "reports.period_preset_aria": {
+    "ru": "Шаблон периода",
+    "en": "Period preset",
+    "uz": "Davr shabloni"
+  },
+  "reports.period_dates_aria": {
+    "ru": "Границы периода",
+    "en": "Date bounds",
+    "uz": "Sana oralig‘i"
+  },
+  "reports.tab.pnl": {
+    "ru": "ОиУ",
+    "en": "P-L",
+    "uz": "D-X"
+  },
+  "reports.tab.balance": {
+    "ru": "Баланс",
+    "en": "Balance",
+    "uz": "Balans"
+  },
+  "reports.kpi_aria": {
+    "ru": "Ключевые показатели",
+    "en": "Key metrics",
+    "uz": "Asosiy ko‘rsatkichlar"
+  },
+  "reports.income": {
+    "ru": "Доходы",
+    "en": "Income",
+    "uz": "Daromadlar"
+  },
+  "reports.expense": {
+    "ru": "Расходы",
+    "en": "Expenses",
+    "uz": "Xarajatlar"
+  },
+  "reports.ops_short": {
+    "ru": "операций",
+    "en": "transactions",
+    "uz": "operatsiya"
+  },
+  "reports.expense_note": {
+    "ru": "подтвержденные",
+    "en": "confirmed",
+    "uz": "tasdiqlangan"
+  },
+  "reports.net_result": {
+    "ru": "Финансовый результат",
+    "en": "Net result",
+    "uz": "Natijaviy natija"
+  },
+  "reports.net_formula": {
+    "ru": "Доходы минус расходы",
+    "en": "Income minus expenses",
+    "uz": "Daromad minus xarajat"
+  },
+  "reports.accounts": {
+    "ru": "Счета и валюты",
+    "en": "Accounts & currencies",
+    "uz": "Hisoblar va valyutalar"
+  },
+  "reports.accounts_short": {
+    "ru": "сч.",
+    "en": "acct.",
+    "uz": "his."
+  },
+  "reports.currencies_in_balance": {
+    "ru": "валют в балансе",
+    "en": "currencies in balance",
+    "uz": "balansdagi valyutalar"
+  },
+  "reports.pl_title": {
+    "ru": "Отчет о доходах и расходах",
+    "en": "Profit and loss",
+    "uz": "Daromad va xarajat hisoboti"
+  },
+  "reports.pl_sub": {
+    "ru": "Текущий месяц · суммы показаны в исходных валютах без конвертации.",
+    "en": "Current month · amounts in original currencies without conversion.",
+    "uz": "Joriy oy · summalar konvertatsiyasiz asl valyutada."
+  },
+  "reports.pl_formula_aria": {
+    "ru": "Формула финансового результата",
+    "en": "Net result formula",
+    "uz": "Natija formulasi"
+  },
+  "reports.currency_strip_aria": {
+    "ru": "Сводка по валютам",
+    "en": "Currency summary",
+    "uz": "Valyuta bo‘yicha"
+  },
+  "reports.line_income": {
+    "ru": "Доход",
+    "en": "Income",
+    "uz": "Daromad"
+  },
+  "reports.line_expense": {
+    "ru": "Расход",
+    "en": "Expense",
+    "uz": "Xarajat"
+  },
+  "reports.uncategorized": {
+    "ru": "Без категории",
+    "en": "Uncategorized",
+    "uz": "Kategoriyasiz"
+  },
+  "reports.flow.income": {
+    "ru": "Доходы",
+    "en": "Income",
+    "uz": "Daromadlar"
+  },
+  "reports.flow.expense": {
+    "ru": "Расходы",
+    "en": "Expenses",
+    "uz": "Xarajatlar"
+  },
+  "reports.flow.income_sub": {
+    "ru": "Структура поступлений",
+    "en": "Inflow structure",
+    "uz": "Tushumlar tuzilmasi"
+  },
+  "reports.flow.expense_sub": {
+    "ru": "Структура списаний",
+    "en": "Outflow structure",
+    "uz": "Chiqimlar tuzilmasi"
+  },
+  "reports.ops": {
+    "ru": "операций",
+    "en": "transactions",
+    "uz": "operatsiya"
+  },
+  "reports.balance_title": {
+    "ru": "Баланс счёта",
+    "en": "Balance sheet",
+    "uz": "Balans"
+  },
+  "reports.balance_panel_h2": {
+    "ru": "Баланс по счетам",
+    "en": "Balance by accounts",
+    "uz": "Hisoblar bo‘yicha balans"
+  },
+  "reports.balance_sub": {
+    "ru": "Остатки по местам хранения в валютах.",
+    "en": "Balances by storage in currencies.",
+    "uz": "Saqlash joylari bo‘yicha qoldiqlar."
+  },
+  "reports.total_row": {
+    "ru": "Всего по категории",
+    "en": "Category total",
+    "uz": "Kategoriya bo‘yicha jami"
+  },
+  "reports.account_default": {
+    "ru": "Счёт",
+    "en": "Account",
+    "uz": "Hisob"
+  },
+  "reports.account_kind_default": {
+    "ru": "Свой счёт",
+    "en": "Custom account",
+    "uz": "Maxsus hisob"
+  },
+  "reports.empty": {
+    "ru": "Нет данных для отображения.",
+    "en": "No data to display.",
+    "uz": "Ko‘rsatish uchun ma‘lumot yo‘q."
+  },
+  "reports.by_category.income": {
+    "ru": "Доходы по категориям",
+    "en": "Income by category",
+    "uz": "Daromadlar toifalari bo‘yicha"
+  },
+  "reports.by_category.expense": {
+    "ru": "Расходы по категориям",
+    "en": "Expenses by category",
+    "uz": "Xarajatlar toifalari bo‘yicha"
+  },
+  "reports.ops_abbr": {
+    "ru": "оп.",
+    "en": "tx",
+    "uz": "ta"
+  },
+  "reports.no_income": {
+    "ru": "Доходов за период пока нет.",
+    "en": "No income in this period yet.",
+    "uz": "Bu davrda daromad yo‘q."
+  },
+  "reports.no_expense": {
+    "ru": "Расходов за период пока нет.",
+    "en": "No expenses in this period yet.",
+    "uz": "Bu davrda xarajat yo‘q."
+  },
+  "period.period": {
+    "ru": "Период",
+    "en": "Period",
+    "uz": "Davr"
+  },
+  "period.today": {
+    "ru": "Сегодня",
+    "en": "Today",
+    "uz": "Bugun"
+  },
+  "period.this_month": {
+    "ru": "Этот месяц",
+    "en": "This month",
+    "uz": "Shu oy"
+  },
+  "period.all_time": {
+    "ru": "Всё время",
+    "en": "All time",
+    "uz": "Barcha vaqt"
+  },
+  "period.custom": {
+    "ru": "Выбрать даты",
+    "en": "Custom dates",
+    "uz": "Sana tanlash"
+  },
+  "period.from": {
+    "ru": "С",
+    "en": "From",
+    "uz": "Dan"
+  },
+  "period.to": {
+    "ru": "По",
+    "en": "To",
+    "uz": "Gacha"
+  },
+  "period.apply": {
+    "ru": "Применить",
+    "en": "Apply",
+    "uz": "Qo‘llash"
+  },
+  "schet.movement_period_aria": {
+    "ru": "Период движения по счетам",
+    "en": "Account movement period",
+    "uz": "Hisoblar harakati davri"
+  },
+  "schet.movement_zero": {
+    "ru": "0",
+    "en": "0",
+    "uz": "0"
+  },
+  "schet.movement_none": {
+    "ru": "Нет движения",
+    "en": "No movement",
+    "uz": "Harakat yo‘q"
+  },
+  "schet.movement_fx_missing": {
+    "ru": "Нет курса",
+    "en": "Rate missing",
+    "uz": "Kurs yo‘q"
+  },
+  "schet.movement_loading": {
+    "ru": "Обновление периода...",
+    "en": "Updating period...",
+    "uz": "Davr yangilanmoqda..."
+  },
+  "reports.pnl_empty": {
+    "ru": "За текущий месяц нет подтвержденных кассовых операций.",
+    "en": "No confirmed cash transactions this month.",
+    "uz": "Joriy oyda tasdiqlangan kassa operatsiyalari yo‘q."
+  },
+  "reports.balance_from_schet": {
+    "ru": "Остатки берутся из вкладки «Счёт» и кассовых проводок.",
+    "en": "Balances come from Account and cash postings.",
+    "uz": "Qoldiqlar «Hisob» va kassa yozuvlaridan olinadi."
+  },
+  "reports.no_ccy_balances": {
+    "ru": "Остатков по валютам нет.",
+    "en": "No balances by currency.",
+    "uz": "Valyuta bo‘yicha qoldiq yo‘q."
+  },
+  "reports.no_accounts": {
+    "ru": "Счета ещё не созданы. Баланс появится после настройки вкладки «Счёт».",
+    "en": "No accounts yet. Balance appears after you set up Account.",
+    "uz": "Hisoblar hali yo‘q. «Hisob» sozlangach balans paydo bo‘ladi."
+  },
+  "employees.title_page": {
+    "ru": "Сотрудники · UPOS FINANCE",
+    "en": "Team · UPOS FINANCE",
+    "uz": "Xodimlar · UPOS FINANCE"
+  },
+  "employees.title": {
+    "ru": "Сотрудники",
+    "en": "Team",
+    "uz": "Xodimlar"
+  },
+  "employees.login": {
+    "ru": "Логин",
+    "en": "Login",
+    "uz": "Login"
+  },
+  "employees.email": {
+    "ru": "Электронная почта",
+    "en": "Email",
+    "uz": "Email"
+  },
+  "employees.name": {
+    "ru": "Имя",
+    "en": "Name",
+    "uz": "Ism"
+  },
+  "employees.position": {
+    "ru": "Должность",
+    "en": "Role / title",
+    "uz": "Lavozim"
+  },
+  "employees.role": {
+    "ru": "Роль",
+    "en": "Role",
+    "uz": "Rol"
+  },
+  "employees.new_password": {
+    "ru": "Новый пароль",
+    "en": "New password",
+    "uz": "Yangi parol"
+  },
+  "employees.pw_keep": {
+    "ru": "Не менять",
+    "en": "Leave unchanged",
+    "uz": "O‘zgartirmaslik"
+  },
+  "employees.save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "employees.add": {
+    "ru": "Добавить",
+    "en": "Add",
+    "uz": "Qo‘shish"
+  },
+  "employees.delete_access": {
+    "ru": "Удалить доступ",
+    "en": "Remove access",
+    "uz": "Kirishni olib tashlash"
+  },
+  "employees.confirm_delete_access": {
+    "ru": "Удалить доступ {username}?",
+    "en": "Remove access for {username}?",
+    "uz": "{username} kirishini olib tashlaysizmi?"
+  },
+  "employees.flash.created": {
+    "ru": "Добавлен",
+    "en": "Added",
+    "uz": "Qo‘shildi"
+  },
+  "employees.flash.deleted": {
+    "ru": "Удалён",
+    "en": "Removed",
+    "uz": "Olib tashlandi"
+  },
+  "employees.flash.updated": {
+    "ru": "Сохранено",
+    "en": "Saved",
+    "uz": "Saqlandi"
+  },
+  "employees.new": {
+    "ru": "Новый сотрудник",
+    "en": "New team member",
+    "uz": "Yangi xodim"
+  },
+  "employees.password": {
+    "ru": "Пароль",
+    "en": "Password",
+    "uz": "Parol"
+  },
+  "employees.team": {
+    "ru": "Команда",
+    "en": "Team",
+    "uz": "Jamoa"
+  },
+  "employees.empty": {
+    "ru": "Пока никого нет",
+    "en": "No team members yet",
+    "uz": "Hozircha xodimlar yo‘q"
+  },
+  "employees.add_title": {
+    "ru": "Новый сотрудник",
+    "en": "New team member",
+    "uz": "Yangi xodim"
+  },
+  "employees.edit_title": {
+    "ru": "Редактирование сотрудника",
+    "en": "Edit team member",
+    "uz": "Xodimni tahrirlash"
+  },
+  "employees.edit": {
+    "ru": "Редактировать",
+    "en": "Edit",
+    "uz": "Tahrirlash"
+  },
+  "employees.close": {
+    "ru": "Закрыть",
+    "en": "Close",
+    "uz": "Yopish"
+  },
+  "employees.devices.open": {
+    "ru": "Устройства",
+    "en": "Devices",
+    "uz": "Qurilmalar"
+  },
+  "employees.devices.title": {
+    "ru": "Устройства сотрудника",
+    "en": "Employee devices",
+    "uz": "Xodim qurilmalari"
+  },
+  "employees.devices.title_named": {
+    "ru": "Устройства · {name}",
+    "en": "Devices · {name}",
+    "uz": "Qurilmalar · {name}"
+  },
+  "employees.devices.subtitle": {
+    "ru": "Сессии входа этого сотрудника. Можно завершить или заблокировать устройство.",
+    "en": "This employee's sign-in sessions. You can sign out or block a device.",
+    "uz": "Xodimning kirish sessiyalari. Qurilmani tugatish yoki bloklash mumkin."
+  },
+  "employees.devices.empty": {
+    "ru": "Нет записанных устройств",
+    "en": "No devices recorded",
+    "uz": "Qurilmalar yo‘q"
+  },
+  "employees.devices.online": {
+    "ru": "Онлайн",
+    "en": "Online",
+    "uz": "Onlayn"
+  },
+  "employees.devices.last_seen": {
+    "ru": "Был онлайн: {time}",
+    "en": "Last seen: {time}",
+    "uz": "Oxirgi faollik: {time}"
+  },
+  "employees.devices.never": {
+    "ru": "Ещё не было активности",
+    "en": "No activity yet",
+    "uz": "Hali faollik yo‘q"
+  },
+  "employees.devices.ip": {
+    "ru": "IP",
+    "en": "IP",
+    "uz": "IP"
+  },
+  "employees.devices.revoke": {
+    "ru": "Выйти",
+    "en": "Sign out",
+    "uz": "Chiqish"
+  },
+  "employees.devices.block": {
+    "ru": "Заблокировать",
+    "en": "Block",
+    "uz": "Bloklash"
+  },
+  "employees.devices.block_confirm": {
+    "ru": "Заблокировать это устройство? Повторный вход сотрудника с него будет невозможен.",
+    "en": "Block this device? The employee will not be able to sign in from it again.",
+    "uz": "Ushbu qurilmani bloklash? Xodim undan qayta kira olmaydi."
+  },
+  "employees.devices.revoke_confirm": {
+    "ru": "Завершить сессию на этом устройстве?",
+    "en": "End the session on this device?",
+    "uz": "Ushbu qurilmadagi sessiyani tugatish?"
+  },
+  "employees.devices.load_err": {
+    "ru": "Не удалось загрузить список устройств",
+    "en": "Could not load devices",
+    "uz": "Qurilmalar ro‘yxatini yuklab bo‘lmadi"
+  },
+  "employees.devices.action_err": {
+    "ru": "Не удалось выполнить действие",
+    "en": "Action failed",
+    "uz": "Amalni bajarib bo‘lmadi"
+  },
+  "staff.role.viewer": {
+    "ru": "Только просмотр",
+    "en": "View only",
+    "uz": "Faqat ko‘rish"
+  },
+  "staff.role.editor": {
+    "ru": "Редактор",
+    "en": "Editor",
+    "uz": "Tahrirlovchi"
+  },
+  "staff.role.manager": {
+    "ru": "Руководитель",
+    "en": "Manager",
+    "uz": "Rahbar"
+  },
+  "staff.role.admin": {
+    "ru": "Администратор",
+    "en": "Administrator",
+    "uz": "Administrator"
+  },
+  "not_found.title": {
+    "ru": "Страница не найдена · UPOS FINANCE",
+    "en": "Not found · UPOS FINANCE",
+    "uz": "Topilmadi · UPOS FINANCE"
+  },
+  "server_error.title": {
+    "ru": "Ошибка сервера · UPOS FINANCE",
+    "en": "Server error · UPOS FINANCE",
+    "uz": "Server xatosi · UPOS FINANCE"
+  },
+  "server_error.heading": {
+    "ru": "Что-то пошло не так",
+    "en": "Something went wrong",
+    "uz": "Nimadir xato ketdi"
+  },
+  "server_error.desc": {
+    "ru": "Попробуйте обновить страницу или зайти позже. Если проблема повторяется, передайте описание администратору.",
+    "en": "Refresh the page or try again later. If it repeats, share the details with an administrator.",
+    "uz": "Sahifani yangilang yoki keyinroq urinib ko‘ring. Muammo takrorlansa, administratorga xabar bering."
+  },
+  "server_error.home": {
+    "ru": "На главную",
+    "en": "Home",
+    "uz": "Bosh sahifa"
+  },
+  "forbidden.title": {
+    "ru": "Доступ запрещён · UPOS FINANCE",
+    "en": "Forbidden · UPOS FINANCE",
+    "uz": "Kirish taqiqlanadi · UPOS FINANCE"
+  },
+  "admin.home.title_page": {
+    "ru": "Админ — обзор · UPOS FINANCE",
+    "en": "Admin — overview · UPOS FINANCE",
+    "uz": "Admin — umumiy ko‘rinish · UPOS FINANCE"
+  },
+  "admin.home.title": {
+    "ru": "Обзор",
+    "en": "Overview",
+    "uz": "Umumiy ko‘rinish"
+  },
+  "admin.home.empty_title": {
+    "ru": "Сводка по системе",
+    "en": "System overview",
+    "uz": "Tizim xulosasi"
+  },
+  "admin.home.empty_desc": {
+    "ru": "Показатели и журнал действий появятся после подключения модулей мониторинга.",
+    "en": "Metrics and activity log will appear after monitoring modules are connected.",
+    "uz": "Monitoring modullari ulangandan keyin ko‘rsatkichlar va harakatlar jurnali chiqadi."
+  },
+  "admin.home.users_cta": {
+    "ru": "Управление пользователями",
+    "en": "Manage users",
+    "uz": "Foydalanuvchilarni boshqarish"
+  },
+  "admin.users.title_page": {
+    "ru": "Пользователи · админ",
+    "en": "Users · admin",
+    "uz": "Foydalanuvchilar · admin"
+  },
+  "admin.users.title": {
+    "ru": "Пользователи",
+    "en": "Users",
+    "uz": "Foydalanuvchilar"
+  },
+  "admin.users.password_hidden": {
+    "ru": "Пароль скрыт",
+    "en": "Password hidden",
+    "uz": "Parol yashirilgan"
+  },
+  "admin.users.superuser_tag": {
+    "ru": "главный",
+    "en": "owner",
+    "uz": "asosiy"
+  },
+  "admin.users.admin_tag": {
+    "ru": "админ",
+    "en": "admin",
+    "uz": "admin"
+  },
+  "admin.users.edit": {
+    "ru": "Изменить",
+    "en": "Edit",
+    "uz": "Tahrirlash"
+  },
+  "admin.users.login": {
+    "ru": "Логин",
+    "en": "Login",
+    "uz": "Login"
+  },
+  "admin.users.email": {
+    "ru": "Электронная почта",
+    "en": "Email",
+    "uz": "Email"
+  },
+  "admin.users.name": {
+    "ru": "Имя",
+    "en": "Name",
+    "uz": "Ism"
+  },
+  "admin.users.role": {
+    "ru": "Роль",
+    "en": "Role",
+    "uz": "Rol"
+  },
+  "admin.users.new_password": {
+    "ru": "Новый пароль",
+    "en": "New password",
+    "uz": "Yangi parol"
+  },
+  "admin.users.password_keep": {
+    "ru": "Пусто — не менять",
+    "en": "Blank means unchanged",
+    "uz": "Bo‘sh bo‘lsa o‘zgarmaydi"
+  },
+  "admin.users.save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "admin.users.delete": {
+    "ru": "Удалить",
+    "en": "Delete",
+    "uz": "O‘chirish"
+  },
+  "admin.users.confirm_delete": {
+    "ru": "Удалить {username}?",
+    "en": "Delete {username}?",
+    "uz": "{username} o‘chirilsinmi?"
+  },
+  "admin.users.role_user": {
+    "ru": "Пользователь",
+    "en": "User",
+    "uz": "Foydalanuvchi"
+  },
+  "admin.users.role_admin": {
+    "ru": "Администратор",
+    "en": "Administrator",
+    "uz": "Administrator"
+  },
+  "admin.users.flash.created": {
+    "ru": "Пользователь добавлен.",
+    "en": "User added.",
+    "uz": "Foydalanuvchi qo‘shildi."
+  },
+  "admin.users.flash.deleted": {
+    "ru": "Пользователь удалён.",
+    "en": "User deleted.",
+    "uz": "Foydalanuvchi o‘chirildi."
+  },
+  "admin.users.flash.updated": {
+    "ru": "Изменения сохранены.",
+    "en": "Changes saved.",
+    "uz": "O‘zgarishlar saqlandi."
+  },
+  "admin.users.new": {
+    "ru": "Новый пользователь",
+    "en": "New user",
+    "uz": "Yangi foydalanuvchi"
+  },
+  "admin.users.expand": {
+    "ru": "Развернуть",
+    "en": "Expand",
+    "uz": "Ochish"
+  },
+  "admin.users.password_min": {
+    "ru": "Пароль (≥ 8 символов)",
+    "en": "Password (8+ characters)",
+    "uz": "Parol (kamida 8 belgi)"
+  },
+  "admin.users.name_ph": {
+    "ru": "Как в интерфейсе",
+    "en": "Display name",
+    "uz": "Interfeysdagi ism"
+  },
+  "admin.users.create": {
+    "ru": "Создать",
+    "en": "Create",
+    "uz": "Yaratish"
+  },
+  "admin.users.admins": {
+    "ru": "Администраторы",
+    "en": "Administrators",
+    "uz": "Administratorlar"
+  },
+  "admin.users.admins_empty": {
+    "ru": "Нет записей с ролью администратора.",
+    "en": "No administrator accounts.",
+    "uz": "Administrator roli bilan yozuv yo‘q."
+  },
+  "admin.users.users": {
+    "ru": "Пользователи",
+    "en": "Users",
+    "uz": "Foydalanuvchilar"
+  },
+  "admin.users.users_empty": {
+    "ru": "Обычных пользователей пока нет.",
+    "en": "No regular users yet.",
+    "uz": "Oddiy foydalanuvchilar hozircha yo‘q."
+  },
+  "kassa.title_page": {
+    "ru": "Касса · UPOS FINANCE",
+    "en": "Cash desk · UPOS FINANCE",
+    "uz": "Kassa · UPOS FINANCE"
+  },
+  "kassa.title": {
+    "ru": "Касса",
+    "en": "Cash desk",
+    "uz": "Kassa"
+  },
+  "kassa.search_ph": {
+    "ru": "Поиск",
+    "en": "Search",
+    "uz": "Qidiruv"
+  },
+  "kassa.filter.category": {
+    "ru": "Категория",
+    "en": "Category",
+    "uz": "Kategoriya"
+  },
+  "kassa.export": {
+    "ru": "Экспорт",
+    "en": "Export",
+    "uz": "Eksport"
+  },
+  "kassa.create": {
+    "ru": "Создать новый",
+    "en": "Create new",
+    "uz": "Yangi yaratish"
+  },
+  "kassa.filter.type": {
+    "ru": "Тип",
+    "en": "Type",
+    "uz": "Tur"
+  },
+  "kassa.filter.branch": {
+    "ru": "Филиал",
+    "en": "Branch",
+    "uz": "Filial"
+  },
+  "kassa.filter.supplier": {
+    "ru": "Поставщик",
+    "en": "Supplier",
+    "uz": "Yetkazib beruvchi"
+  },
+  "kassa.filter.pocket": {
+    "ru": "Кошелек",
+    "en": "Wallet",
+    "uz": "Hamyon"
+  },
+  "kassa.type.income": {
+    "ru": "Доход",
+    "en": "Income",
+    "uz": "Daromad"
+  },
+  "kassa.type.expense": {
+    "ru": "Расход",
+    "en": "Expense",
+    "uz": "Xarajat"
+  },
+  "kassa.type.transfer": {
+    "ru": "Перевод",
+    "en": "Transfer",
+    "uz": "O‘tkazma"
+  },
+  "kassa.date_from": {
+    "ru": "Дата с",
+    "en": "Date from",
+    "uz": "Sanadan"
+  },
+  "kassa.date_to": {
+    "ru": "Дата по",
+    "en": "Date to",
+    "uz": "Sanagacha"
+  },
+  "kassa.columns_toggle": {
+    "ru": "Показать / скрыть",
+    "en": "Show / hide",
+    "uz": "Ko‘rsatish / yashirish"
+  },
+  "kassa.columns.template": {
+    "ru": "Шаблон колонок",
+    "en": "Column template",
+    "uz": "Ustunlar shabloni"
+  },
+  "kassa.columns.menu_title": {
+    "ru": "Колонки",
+    "en": "Columns",
+    "uz": "Ustunlar"
+  },
+  "kassa.columns.show_all": {
+    "ru": "Показать все",
+    "en": "Show all",
+    "uz": "Barchasini ko‘rsatish"
+  },
+  "kassa.columns.reset": {
+    "ru": "Сбросить",
+    "en": "Reset",
+    "uz": "Tiklash"
+  },
+  "kassa.columns.template_all": {
+    "ru": "Все",
+    "en": "All",
+    "uz": "Barchasi"
+  },
+  "kassa.columns.template_default": {
+    "ru": "Текущий вид",
+    "en": "Current layout",
+    "uz": "Joriy ko‘rinish"
+  },
+  "kassa.columns.template_name_ph": {
+    "ru": "Название шаблона",
+    "en": "Template name",
+    "uz": "Shablon nomi"
+  },
+  "kassa.columns.save_template": {
+    "ru": "Сохранить шаблон",
+    "en": "Save template",
+    "uz": "Shablonni saqlash"
+  },
+  "kassa.columns.delete_template": {
+    "ru": "Удалить шаблон",
+    "en": "Delete template",
+    "uz": "Shablonni o‘chirish"
+  },
+  "kassa.columns.template_name_required": {
+    "ru": "Введите название шаблона",
+    "en": "Enter a template name",
+    "uz": "Shablon nomini kiriting"
+  },
+  "kassa.pagination.aria": {
+    "ru": "Навигация по страницам",
+    "en": "Pagination",
+    "uz": "Sahifalar"
+  },
+  "kassa.pagination.prev": {
+    "ru": "Назад",
+    "en": "Previous",
+    "uz": "Orqaga"
+  },
+  "kassa.pagination.next": {
+    "ru": "Вперёд",
+    "en": "Next",
+    "uz": "Oldinga"
+  },
+  "kassa.pagination.empty": {
+    "ru": "Нет операций",
+    "en": "No operations",
+    "uz": "Operatsiyalar yo‘q"
+  },
+  "kassa.pagination.range": {
+    "ru": "Показано {start}–{end} из {total}",
+    "en": "Showing {start}–{end} of {total}",
+    "uz": "Ko‘rsatilgan {start}–{end} / {total}"
+  },
+  "kassa.pagination.all": {
+    "ru": "Показано все {count}",
+    "en": "Showing all {count}",
+    "uz": "Barchasi ko‘rsatilgan: {count}"
+  },
+  "kassa.page_size.label": {
+    "ru": "На странице",
+    "en": "Per page",
+    "uz": "Sahifada"
+  },
+  "kassa.page_size.all": {
+    "ru": "Все",
+    "en": "All",
+    "uz": "Barchasi"
+  },
+  "kassa.page_size.all_blocked": {
+    "ru": "Слишком много строк — уточните фильтр",
+    "en": "Too many rows — narrow the filter",
+    "uz": "Juda ko‘p qator — filterni toraytiring"
+  },
+  "kassa.status.loading": {
+    "ru": "Загрузка…",
+    "en": "Loading…",
+    "uz": "Yuklanmoqda…"
+  },
+  "kassa.status.loading_count": {
+    "ru": "Загрузка… {count}",
+    "en": "Loading… {count}",
+    "uz": "Yuklanmoqda… {count}"
+  },
+  "kassa.load_err_tx": {
+    "ru": "Не удалось загрузить операции",
+    "en": "Failed to load transactions",
+    "uz": "Operatsiyalarni yuklab bo‘lmadi"
+  },
+  "kassa.load_err_treasury": {
+    "ru": "Не удалось загрузить кассу",
+    "en": "Failed to load treasury",
+    "uz": "Kassani yuklab bo‘lmadi"
+  },
+  "kassa.load_err_categories": {
+    "ru": "Не удалось загрузить категории",
+    "en": "Failed to load categories",
+    "uz": "Kategoriyalarni yuklab bo‘lmadi"
+  },
+  "kassa.render_err": {
+    "ru": "Ошибка отображения таблицы",
+    "en": "Failed to render table",
+    "uz": "Jadvalni ko‘rsatib bo‘lmadi"
+  },
+  "kassa.pagination.capped": {
+    "ru": "уточните фильтр ({total} всего)",
+    "en": "narrow the filter ({total} total)",
+    "uz": "filterni toraytiring (jami {total})"
+  },
+  "kassa.pagination.page_of": {
+    "ru": "Стр. {page} / {pages}",
+    "en": "Page {page} / {pages}",
+    "uz": "{page} / {pages} sah."
+  },
+  "kassa.columns_aria": {
+    "ru": "Действия кассы",
+    "en": "Cash desk actions",
+    "uz": "Kassa harakatlari"
+  },
+  "kassa.summary.ops": {
+    "ru": "Операции",
+    "en": "Operations",
+    "uz": "Operatsiyalar"
+  },
+  "kassa.summary.income": {
+    "ru": "Доходы",
+    "en": "Income",
+    "uz": "Daromadlar"
+  },
+  "kassa.summary.expense": {
+    "ru": "Расходы",
+    "en": "Expenses",
+    "uz": "Xarajatlar"
+  },
+  "kassa.summary.transfers": {
+    "ru": "Переводы денег",
+    "en": "Money transfers",
+    "uz": "Pul o‘tkazmalari"
+  },
+  "kassa.summary.total": {
+    "ru": "Итого",
+    "en": "Total",
+    "uz": "Jami"
+  },
+  "kassa.summary.empty": {
+    "ru": "нет операций в выборке",
+    "en": "Nothing in selection",
+    "uz": "Tanlovda operatsiya yo‘q"
+  },
+  "kassa.dialog.new": {
+    "ru": "Новый платеж",
+    "en": "New payment",
+    "uz": "Yangi to‘lov"
+  },
+  "kassa.dialog.close": {
+    "ru": "Закрыть",
+    "en": "Close",
+    "uz": "Yopish"
+  },
+  "kassa.tabs_aria": {
+    "ru": "Тип платежа",
+    "en": "Payment type",
+    "uz": "To‘lov turi"
+  },
+  "kassa.f.cat": {
+    "ru": "Категория платежа",
+    "en": "Payment category",
+    "uz": "To‘lov kategoriyasi"
+  },
+  "kassa.f.confirmed": {
+    "ru": "Подтвержден",
+    "en": "Confirmed",
+    "uz": "Tasdiqlangan"
+  },
+  "kassa.f.created": {
+    "ru": "Дата создания",
+    "en": "Created at",
+    "uz": "Yaratilgan sana"
+  },
+  "kassa.hint.tz": {
+    "ru": "Время в часовом поясе из «Настройки» → «Дата и время».",
+    "en": "Time uses the zone from Settings → Date & time.",
+    "uz": "Vaqt «Sozlamalar» → «Sana va vaqt» zonasidan."
+  },
+  "kassa.f.from_pocket": {
+    "ru": "Счёт / кошелёк (списание)",
+    "en": "Account / wallet (debit)",
+    "uz": "Hisob (chiqim)"
+  },
+  "kassa.f.to_pocket": {
+    "ru": "Счёт / кошелёк (зачисление)",
+    "en": "Account / wallet (credit)",
+    "uz": "Hisob (tushum)"
+  },
+  "kassa.select_pocket": {
+    "ru": "Выберите счёт…",
+    "en": "Select account…",
+    "uz": "Hisobni tanlang…"
+  },
+  "kassa.f.currency": {
+    "ru": "Валюта операции",
+    "en": "Transaction currency",
+    "uz": "Operatsiya valyutasi"
+  },
+  "kassa.select_first_pocket": {
+    "ru": "Сначала выберите счёт…",
+    "en": "Select account first…",
+    "uz": "Avval hisobni tanlang…"
+  },
+  "kassa.f.amount": {
+    "ru": "Сумма",
+    "en": "Amount",
+    "uz": "Summa"
+  },
+  "kassa.badge.debit": {
+    "ru": "Списание",
+    "en": "Debit",
+    "uz": "Chiqim"
+  },
+  "kassa.badge.credit": {
+    "ru": "Зачисление",
+    "en": "Credit",
+    "uz": "Tushum"
+  },
+  "kassa.split.add": {
+    "ru": "Добавить ещё счёт / валюту",
+    "en": "Add another account / currency",
+    "uz": "Yana hisob / valyuta qo‘shish"
+  },
+  "kassa.split.block_title": {
+    "ru": "Дополнительный счёт {n}",
+    "en": "Additional account {n}",
+    "uz": "Qo‘shimcha hisob {n}"
+  },
+  "kassa.split.account": {
+    "ru": "Счёт",
+    "en": "Account",
+    "uz": "Hisob"
+  },
+  "kassa.split.remove": {
+    "ru": "Удалить строку",
+    "en": "Remove row",
+    "uz": "Qatorni olib tashlash"
+  },
+  "kassa.split.err.account": {
+    "ru": "Выберите счёт во всех строках.",
+    "en": "Choose an account in every row.",
+    "uz": "Har bir qatorda hisobni tanlang."
+  },
+  "kassa.split.err.currency": {
+    "ru": "Выберите валюту во всех строках.",
+    "en": "Choose a currency in every row.",
+    "uz": "Har bir qatorda valyutani tanlang."
+  },
+  "kassa.split.err.amount": {
+    "ru": "Укажите сумму во всех строках.",
+    "en": "Enter an amount in every row.",
+    "uz": "Har bir qatorda summani kiriting."
+  },
+  "kassa.split.err.duplicate": {
+    "ru": "Один и тот же счёт с одной валютой нельзя добавить два раза.",
+    "en": "The same account and currency cannot be added twice.",
+    "uz": "Bir xil hisob va valyutani ikki marta qo‘shib bo‘lmaydi."
+  },
+  "kassa.transfer_kind": {
+    "ru": "Тип перевода",
+    "en": "Transfer type",
+    "uz": "O‘tkazma turi"
+  },
+  "kassa.transfer_kind.transfer": {
+    "ru": "Перевод",
+    "en": "Transfer",
+    "uz": "O‘tkazma"
+  },
+  "kassa.transfer_kind.cashout": {
+    "ru": "Обнал",
+    "en": "Cash out",
+    "uz": "Naqd qilish"
+  },
+  "kassa.transfer.lead_out": {
+    "ru": "Со счёта отправителя спишутся указанная валюта и сумма.",
+    "en": "Sender account will be debited in the currency and amount below.",
+    "uz": "Jo‘natuvchi hisobidan valyuta va summa yechiladi."
+  },
+  "kassa.transfer.lead_in": {
+    "ru": "На счёт получателя поступят сумма и валюта ниже.",
+    "en": "Recipient account will be credited as below.",
+    "uz": "Qabul qiluvchi hisobiga quyidagicha tushadi."
+  },
+  "kassa.f.debit_ccy": {
+    "ru": "Валюта списания",
+    "en": "Debit currency",
+    "uz": "Chiqim valyutasi"
+  },
+  "kassa.f.credit_ccy": {
+    "ru": "Валюта зачисления",
+    "en": "Credit currency",
+    "uz": "Tushum valyutasi"
+  },
+  "kassa.select_debit_pocket": {
+    "ru": "Сначала выберите счёт списания…",
+    "en": "Select debit account first…",
+    "uz": "Avval chiqim hisobini tanlang…"
+  },
+  "kassa.select_credit_pocket": {
+    "ru": "Сначала выберите счёт зачисления…",
+    "en": "Select credit account first…",
+    "uz": "Avval tushum hisobini tanlang…"
+  },
+  "kassa.f.debit_amt": {
+    "ru": "Сумма списания",
+    "en": "Debit amount",
+    "uz": "Chiqim summasi"
+  },
+  "kassa.f.credit_amt": {
+    "ru": "Сумма зачисления",
+    "en": "Credit amount",
+    "uz": "Tushum summasi"
+  },
+  "kassa.convert_title": {
+    "ru": "Конвертация",
+    "en": "Conversion",
+    "uz": "Konvertatsiya"
+  },
+  "kassa.transfer_money": {
+    "ru": "Перевод денег",
+    "en": "Money transfer",
+    "uz": "Pul o‘tkazmasi"
+  },
+  "kassa.col.confirmation": {
+    "ru": "Подтверждение",
+    "en": "Confirmation",
+    "uz": "Tasdiq"
+  },
+  "kassa.f.rate": {
+    "ru": "Курс",
+    "en": "Rate",
+    "uz": "Kurs"
+  },
+  "kassa.f.transfer_commission_accounting": {
+    "ru": "Комиссия (учётная, не меняет остатки)",
+    "en": "Commission (for records, does not change balances)",
+    "uz": "Komissiya (hisob uchun, qoldiqlarni o‘zgartirmaydi)"
+  },
+  "kassa.no_category": {
+    "ru": "Без категории",
+    "en": "No category",
+    "uz": "Kategoriyasiz"
+  },
+  "kassa.no_name": {
+    "ru": "Без названия",
+    "en": "Untitled",
+    "uz": "Nomsiz"
+  },
+  "kassa.load_err": {
+    "ru": "Ошибка загрузки данных",
+    "en": "Failed to load data",
+    "uz": "Ma’lumotlarni yuklashda xato"
+  },
+  "kassa.no_rows": {
+    "ru": "Операции не найдены",
+    "en": "No operations found",
+    "uz": "Operatsiyalar topilmadi"
+  },
+  "kassa.export.empty": {
+    "ru": "Нет данных для экспорта",
+    "en": "No data to export",
+    "uz": "Eksport uchun ma’lumot yo‘q"
+  },
+  "kassa.ccy_available": {
+    "ru": "{currency} · доступно {amount}",
+    "en": "{currency} · available {amount}",
+    "uz": "{currency} · mavjud {amount}"
+  },
+  "kassa.select_debit_first": {
+    "ru": "Сначала выберите счёт списания…",
+    "en": "Select debit account first…",
+    "uz": "Avval chiqim hisobini tanlang…"
+  },
+  "kassa.select_credit_first": {
+    "ru": "Сначала выберите счёт зачисления…",
+    "en": "Select credit account first…",
+    "uz": "Avval tushum hisobini tanlang…"
+  },
+  "kassa.no_ccy_on_account": {
+    "ru": "Нет валютных остатков на счёте",
+    "en": "No currency balances on this account",
+    "uz": "Bu hisobda valyuta qoldiqlari yo‘q"
+  },
+  "kassa.add_ccy_hint": {
+    "ru": "Добавьте суммы по валютам для этого счёта на вкладке «Счёт».",
+    "en": "Add currency balances for this account on Account.",
+    "uz": "Bu hisob uchun valyuta summalarini «Hisob»da kiriting."
+  },
+  "kassa.debit_amount_hint": {
+    "ru": "Сумму списания вводите в выбранной валюте.",
+    "en": "Enter the debit amount in the selected currency.",
+    "uz": "Chiqim summasini tanlangan valyutada kiriting."
+  },
+  "kassa.credit_empty_hint": {
+    "ru": "На счёте пока нет остатков — выберите валюту зачисления (можно первый раз).",
+    "en": "This account has no balances yet. Choose a credit currency to start.",
+    "uz": "Hisobda hali qoldiq yo‘q. Boshlash uchun tushum valyutasini tanlang."
+  },
+  "kassa.credit_amount_hint": {
+    "ru": "Сумму зачисления можно править вручную — пересчитается курс.",
+    "en": "You can edit the credit amount manually; the rate recalculates.",
+    "uz": "Tushum summasini qo‘lda o‘zgartirish mumkin; kurs qayta hisoblanadi."
+  },
+  "kassa.same_ccy_hint": {
+    "ru": "Та же валюта — суммы совпадают.",
+    "en": "Same currency; amounts match.",
+    "uz": "Valyuta bir xil; summalar teng."
+  },
+  "kassa.enter_amounts_or_rate": {
+    "ru": "Укажите суммы или курс.",
+    "en": "Enter amounts or rate.",
+    "uz": "Summalar yoki kursni kiriting."
+  },
+  "kassa.rate_for_pair": {
+    "ru": "За 1 {credit} — списание в {debit}",
+    "en": "For 1 {credit} — debit in {debit}",
+    "uz": "1 {credit} uchun — {debit}da chiqim"
+  },
+  "kassa.transfer_rate_explainer": {
+    "ru": "Измените курс или сумму зачисления — второе значение пересчитается. Сумма списания задаёт объём отправки.",
+    "en": "Change the rate or credit amount; the other value recalculates. Debit amount defines the sent volume.",
+    "uz": "Kurs yoki tushum summasini o‘zgartiring; ikkinchi qiymat qayta hisoblanadi. Chiqim summasi jo‘natma hajmini belgilaydi."
+  },
+  "kassa.market_rate_hint": {
+    "ru": "Ориентир (по курсам к USD): 1 {debit} ≈ {amount} {credit}.",
+    "en": "Reference (via USD rates): 1 {debit} ≈ {amount} {credit}.",
+    "uz": "Mo‘ljal (USD kurslari orqali): 1 {debit} ≈ {amount} {credit}."
+  },
+  "kassa.no_pair_rate": {
+    "ru": "Нет курса для пары валют — дождитесь загрузки курсов или задайте сумму зачисления вручную.",
+    "en": "No rate for this currency pair. Wait for rates or enter the credit amount manually.",
+    "uz": "Bu valyuta juftligi uchun kurs yo‘q. Kurslarni kuting yoki tushum summasini qo‘lda kiriting."
+  },
+  "kassa.market_hint_asof": {
+    "ru": "Ориентир по курсу к USD · {as_of}",
+    "en": "USD rate reference · {as_of}",
+    "uz": "USD kursi bo‘yicha mo‘ljal · {as_of}"
+  },
+  "kassa.cache_suffix": {
+    "ru": " · кэш",
+    "en": " · cache",
+    "uz": " · kesh"
+  },
+  "kassa.market_hint_approx": {
+    "ru": "Ориентир по курсу приблизительный.",
+    "en": "Rate reference is approximate.",
+    "uz": "Kurs mo‘ljali taxminiy."
+  },
+  "kassa.rate_saved_note": {
+    "ru": "Курс хранится в операции; он может отличаться от рыночного, если вы его меняли.",
+    "en": "The rate is stored on the operation and may differ from market if edited.",
+    "uz": "Kurs operatsiyada saqlanadi; o‘zgartirilgan bo‘lsa bozor kursidan farq qilishi mumkin."
+  },
+  "kassa.debit_available": {
+    "ru": "На счёте списания: {amount} {currency}",
+    "en": "Debit account: {amount} {currency}",
+    "uz": "Chiqim hisobida: {amount} {currency}"
+  },
+  "kassa.credit_available": {
+    "ru": "На счёте получателя сейчас: {amount} {currency}",
+    "en": "Recipient account now: {amount} {currency}",
+    "uz": "Qabul qiluvchi hisobida hozir: {amount} {currency}"
+  },
+  "kassa.credit_after": {
+    "ru": "После перевода на счёте получателя: {amount} {currency}.",
+    "en": "After transfer on recipient account: {amount} {currency}.",
+    "uz": "O‘tkazmadan keyin qabul qiluvchi hisobida: {amount} {currency}."
+  },
+  "kassa.after_operation": {
+    "ru": "После операции по {currency}: останется {amount}",
+    "en": "After operation in {currency}: {amount} remains",
+    "uz": "{currency} bo‘yicha operatsiyadan keyin: {amount} qoladi"
+  },
+  "kassa.current_rate": {
+    "ru": "Текущий курс: {amount} {debit} за 1 {credit}.",
+    "en": "Current rate: {amount} {debit} per 1 {credit}.",
+    "uz": "Joriy kurs: 1 {credit} uchun {amount} {debit}."
+  },
+  "kassa.implied_rate": {
+    "ru": "Подразумевается {amount} {debit} за 1 {credit}.",
+    "en": "Implied {amount} {debit} per 1 {credit}.",
+    "uz": "1 {credit} uchun {amount} {debit} nazarda tutilgan."
+  },
+  "kassa.fx_base_asof": {
+    "ru": "Курс: единиц валюты за 1 USD · {as_of}",
+    "en": "Rate: currency units per 1 USD · {as_of}",
+    "uz": "Kurs: 1 USD uchun valyuta birliklari · {as_of}"
+  },
+  "kassa.fx_approx": {
+    "ru": "Курсы к USD приблизительные.",
+    "en": "USD rates are approximate.",
+    "uz": "USD kurslari taxminiy."
+  },
+  "kassa.fx_base": {
+    "ru": "Курсы к USD",
+    "en": "USD rates",
+    "uz": "USD kurslari"
+  },
+  "kassa.close_unsaved": {
+    "ru": "Закрыть без сохранения? Несохранённые изменения пропадут.",
+    "en": "Close without saving? Unsaved changes will be lost.",
+    "uz": "Saqlamasdan yopilsinmi? O‘zgarishlar yo‘qoladi."
+  },
+  "kassa.export.number": {
+    "ru": "Номер",
+    "en": "Number",
+    "uz": "Raqam"
+  },
+  "kassa.export.amount_transfer": {
+    "ru": "Сумма / перевод",
+    "en": "Amount / transfer",
+    "uz": "Summa / o‘tkazma"
+  },
+  "kassa.export.debit_ccy": {
+    "ru": "Валюта списания",
+    "en": "Debit currency",
+    "uz": "Chiqim valyutasi"
+  },
+  "kassa.export.credit_ccy": {
+    "ru": "Валюта зачисления",
+    "en": "Credit currency",
+    "uz": "Tushum valyutasi"
+  },
+  "kassa.export.date": {
+    "ru": "Дата",
+    "en": "Date",
+    "uz": "Sana"
+  },
+  "kassa.export.confirmed": {
+    "ru": "Подтверждено",
+    "en": "Confirmed",
+    "uz": "Tasdiqlangan"
+  },
+  "kassa.export.commission": {
+    "ru": "Комиссия (перевод)",
+    "en": "Commission (transfer)",
+    "uz": "Komissiya (o‘tkazma)"
+  },
+  "schet.title_page": {
+    "ru": "Счёт · UPOS FINANCE",
+    "en": "Account · UPOS FINANCE",
+    "uz": "Hisob · UPOS FINANCE"
+  },
+  "schet.total_label": {
+    "ru": "Всего (пересчёт)",
+    "en": "Total (converted)",
+    "uz": "Jami (qayta hisoblangan)"
+  },
+  "schet.total_currency": {
+    "ru": "Валюта итога",
+    "en": "Total currency",
+    "uz": "Jami valyutasi"
+  },
+  "schet.compact.billion": {
+    "ru": "млрд",
+    "en": "bn",
+    "uz": "mlrd"
+  },
+  "schet.compact.million": {
+    "ru": "млн",
+    "en": "m",
+    "uz": "mln"
+  },
+  "schet.compact.thousand": {
+    "ru": "тыс",
+    "en": "k",
+    "uz": "ming"
+  },
+  "schet.overview_title": {
+    "ru": "Распределение средств",
+    "en": "Funds distribution",
+    "uz": "Mablag‘lar taqsimoti"
+  },
+  "schet.overview_hint": {
+    "ru": "Сводка по каждому месту хранения. Чтобы менять суммы, нажмите «Корректировка» и выберите счёт в списке.",
+    "en": "A summary by storage place. To edit amounts, click Adjust and choose an account from the list.",
+    "uz": "Har bir saqlash joyi bo‘yicha xulosa. Summalarni o‘zgartirish uchun «Tuzatish»ni bosing va hisobni tanlang."
+  },
+  "schet.chart_title": {
+    "ru": "Визуализация",
+    "en": "Visualization",
+    "uz": "Vizualizatsiya"
+  },
+  "schet.chart_type_aria": {
+    "ru": "Тип диаграммы мест",
+    "en": "Account chart type",
+    "uz": "Hisob diagrammasi turi"
+  },
+  "schet.chart_doughnut": {
+    "ru": "Кольцо",
+    "en": "Donut",
+    "uz": "Halqa"
+  },
+  "schet.chart_bar": {
+    "ru": "Столбцы",
+    "en": "Bars",
+    "uz": "Ustunlar"
+  },
+  "schet.chart_by_pockets": {
+    "ru": "По местам хранения",
+    "en": "By storage places",
+    "uz": "Saqlash joylari bo‘yicha"
+  },
+  "schet.chart_by_pockets_hint": {
+    "ru": "Доли в выбранной валюте итога",
+    "en": "Shares in selected total currency",
+    "uz": "Tanlangan jami valyutasidagi ulushlar"
+  },
+  "schet.chart_by_currency": {
+    "ru": "По валютам (вклад)",
+    "en": "By currency (share)",
+    "uz": "Valyutalar bo‘yicha (ulush)"
+  },
+  "schet.chart_by_currency_hint": {
+    "ru": "Доли валют в эквиваленте",
+    "en": "Currency shares in equivalent",
+    "uz": "Valyutalar ulushi ekvivalentda"
+  },
+  "schet.chart_pockets_aria": {
+    "ru": "Диаграмма по местам",
+    "en": "Chart by storage places",
+    "uz": "Saqlash joylari diagrammasi"
+  },
+  "schet.chart_currency_aria": {
+    "ru": "Диаграмма по валютам",
+    "en": "Chart by currencies",
+    "uz": "Valyutalar diagrammasi"
+  },
+  "schet.tpl_dialog_title": {
+    "ru": "Шаблон места хранения",
+    "en": "Storage place template",
+    "uz": "Saqlash joyi shabloni"
+  },
+  "schet.close": {
+    "ru": "Закрыть",
+    "en": "Close",
+    "uz": "Yopish"
+  },
+  "schet.tpl_region_uz": {
+    "ru": "Узбекистан и регион",
+    "en": "Uzbekistan and region",
+    "uz": "O‘zbekiston va mintaqa"
+  },
+  "schet.tpl_region_intl": {
+    "ru": "Международные и прочие",
+    "en": "International and other",
+    "uz": "Xalqaro va boshqa"
+  },
+  "schet.editor_title": {
+    "ru": "Корректировка казны",
+    "en": "Treasury adjustment",
+    "uz": "G‘azna tuzatishi"
+  },
+  "schet.editor_sub": {
+    "ru": "Сначала выберите место в списке с иконками — откроется форма только этого счёта.",
+    "en": "Choose a place from the icon list first; only that account form will open.",
+    "uz": "Avval ikonli ro‘yxatdan joyni tanlang; faqat shu hisob formasi ochiladi."
+  },
+  "schet.cancel": {
+    "ru": "Отмена",
+    "en": "Cancel",
+    "uz": "Bekor qilish"
+  },
+  "schet.save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "schet.confirm_title": {
+    "ru": "Подтверждение удаления",
+    "en": "Delete confirmation",
+    "uz": "O‘chirishni tasdiqlash"
+  },
+  "schet.confirm_text": {
+    "ru": "Вы уверены, что хотите удалить этот элемент? Это действие невозможно отменить.",
+    "en": "Are you sure you want to delete this item? This action cannot be undone.",
+    "uz": "Bu elementni o‘chirishni xohlaysizmi? Bu amalni bekor qilib bo‘lmaydi."
+  },
+  "schet.confirm_yes_count": {
+    "ru": "Да ({seconds})",
+    "en": "Yes ({seconds})",
+    "uz": "Ha ({seconds})"
+  },
+  "schet.confirm_yes": {
+    "ru": "Да",
+    "en": "Yes",
+    "uz": "Ha"
+  },
+  "month.jan": {
+    "ru": "Январь",
+    "en": "January",
+    "uz": "Yanvar"
+  },
+  "month.feb": {
+    "ru": "Февраль",
+    "en": "February",
+    "uz": "Fevral"
+  },
+  "month.mar": {
+    "ru": "Март",
+    "en": "March",
+    "uz": "Mart"
+  },
+  "month.apr": {
+    "ru": "Апрель",
+    "en": "April",
+    "uz": "Aprel"
+  },
+  "month.may": {
+    "ru": "Май",
+    "en": "May",
+    "uz": "May"
+  },
+  "month.jun": {
+    "ru": "Июнь",
+    "en": "June",
+    "uz": "Iyun"
+  },
+  "month.jul": {
+    "ru": "Июль",
+    "en": "July",
+    "uz": "Iyul"
+  },
+  "month.aug": {
+    "ru": "Август",
+    "en": "August",
+    "uz": "Avgust"
+  },
+  "month.sep": {
+    "ru": "Сентябрь",
+    "en": "September",
+    "uz": "Sentyabr"
+  },
+  "month.oct": {
+    "ru": "Октябрь",
+    "en": "October",
+    "uz": "Oktyabr"
+  },
+  "month.nov": {
+    "ru": "Ноябрь",
+    "en": "November",
+    "uz": "Noyabr"
+  },
+  "month.dec": {
+    "ru": "Декабрь",
+    "en": "December",
+    "uz": "Dekabr"
+  },
+  "tz.group.uz_neighbors": {
+    "ru": "Узбекистан и соседи",
+    "en": "Uzbekistan & neighbors",
+    "uz": "O‘zbekiston va qo‘shnilar"
+  },
+  "tz.group.russia": {
+    "ru": "Россия",
+    "en": "Russia",
+    "uz": "Rossiya"
+  },
+  "tz.group.europe_us": {
+    "ru": "Европа и США",
+    "en": "Europe & US",
+    "uz": "Yevropa va AQSH"
+  },
+  "tz.group.asia": {
+    "ru": "Азия",
+    "en": "Asia",
+    "uz": "Osiyo"
+  },
+  "tz.zone.Asia__Tashkent": {
+    "ru": "Ташкент — UTC+5",
+    "en": "Tashkent — UTC+5",
+    "uz": "Toshkent — UTC+5"
+  },
+  "tz.zone.Asia__Samarkand": {
+    "ru": "Самарканд — UTC+5",
+    "en": "Samarkand — UTC+5",
+    "uz": "Samarqand — UTC+5"
+  },
+  "tz.zone.Asia__Dushanbe": {
+    "ru": "Душанбе — UTC+5",
+    "en": "Dushanbe — UTC+5",
+    "uz": "Dushanbe — UTC+5"
+  },
+  "tz.zone.Asia__Bishkek": {
+    "ru": "Бишкек — UTC+6",
+    "en": "Bishkek — UTC+6",
+    "uz": "Bishkek — UTC+6"
+  },
+  "tz.zone.Asia__Almaty": {
+    "ru": "Алматы — UTC+5",
+    "en": "Almaty — UTC+5",
+    "uz": "Olmota — UTC+5"
+  },
+  "tz.zone.Europe__Moscow": {
+    "ru": "Москва — UTC+3",
+    "en": "Moscow — UTC+3",
+    "uz": "Moskva — UTC+3"
+  },
+  "tz.zone.Europe__Samara": {
+    "ru": "Самара — UTC+4",
+    "en": "Samara — UTC+4",
+    "uz": "Samara — UTC+4"
+  },
+  "tz.zone.Asia__Yekaterinburg": {
+    "ru": "Екатеринбург — UTC+5",
+    "en": "Yekaterinburg — UTC+5",
+    "uz": "Yekaterinburg — UTC+5"
+  },
+  "tz.zone.Asia__Omsk": {
+    "ru": "Омск — UTC+6",
+    "en": "Omsk — UTC+6",
+    "uz": "Omsk — UTC+6"
+  },
+  "tz.zone.Asia__Krasnoyarsk": {
+    "ru": "Красноярск — UTC+7",
+    "en": "Krasnoyarsk — UTC+7",
+    "uz": "Krasnoyarsk — UTC+7"
+  },
+  "tz.zone.Asia__Novosibirsk": {
+    "ru": "Новосибирск — UTC+7",
+    "en": "Novosibirsk — UTC+7",
+    "uz": "Novosibirsk — UTC+7"
+  },
+  "tz.zone.Asia__Irkutsk": {
+    "ru": "Иркутск — UTC+8",
+    "en": "Irkutsk — UTC+8",
+    "uz": "Irkutsk — UTC+8"
+  },
+  "tz.zone.Asia__Vladivostok": {
+    "ru": "Владивосток — UTC+10",
+    "en": "Vladivostok — UTC+10",
+    "uz": "Vladivostok — UTC+10"
+  },
+  "tz.zone.UTC": {
+    "ru": "UTC",
+    "en": "UTC",
+    "uz": "UTC"
+  },
+  "tz.zone.Europe__Kaliningrad": {
+    "ru": "Калининград — UTC+2",
+    "en": "Kaliningrad — UTC+2",
+    "uz": "Kaliningrad — UTC+2"
+  },
+  "tz.zone.Europe__Berlin": {
+    "ru": "Берлин — UTC+1/+2",
+    "en": "Berlin — UTC+1/+2",
+    "uz": "Berlin — UTC+1/+2"
+  },
+  "tz.zone.Europe__London": {
+    "ru": "Лондон — UTC+0/+1",
+    "en": "London — UTC+0/+1",
+    "uz": "London — UTC+0/+1"
+  },
+  "tz.zone.America__New_York": {
+    "ru": "Нью-Йорк — восток США",
+    "en": "New York — US East",
+    "uz": "Nyu-York — AQSH sharqi"
+  },
+  "tz.zone.America__Los_Angeles": {
+    "ru": "Лос-Анджелес — запад США",
+    "en": "Los Angeles — US West",
+    "uz": "Los-Anjeles — AQSH g‘arbi"
+  },
+  "tz.zone.Asia__Dubai": {
+    "ru": "Дубай — UTC+4",
+    "en": "Dubai — UTC+4",
+    "uz": "Dubay — UTC+4"
+  },
+  "tz.zone.Asia__Karachi": {
+    "ru": "Карачи — UTC+5",
+    "en": "Karachi — UTC+5",
+    "uz": "Karachi — UTC+5"
+  },
+  "tz.zone.Asia__Kolkata": {
+    "ru": "Индия — UTC+5:30",
+    "en": "India — UTC+5:30",
+    "uz": "Hindiston — UTC+5:30"
+  },
+  "tz.zone.Asia__Bangkok": {
+    "ru": "Бангкок — UTC+7",
+    "en": "Bangkok — UTC+7",
+    "uz": "Bangkok — UTC+7"
+  },
+  "tz.zone.Asia__Singapore": {
+    "ru": "Сингапур — UTC+8",
+    "en": "Singapore — UTC+8",
+    "uz": "Singapur — UTC+8"
+  },
+  "tz.zone.Asia__Tokyo": {
+    "ru": "Токио — UTC+9",
+    "en": "Tokyo — UTC+9",
+    "uz": "Tokio — UTC+9"
+  },
+  "tz.zone.Asia__Seoul": {
+    "ru": "Сеул — UTC+9",
+    "en": "Seoul — UTC+9",
+    "uz": "Seul — UTC+9"
+  },
+  "tz.zone.Asia__Shanghai": {
+    "ru": "Шанхай — UTC+8",
+    "en": "Shanghai — UTC+8",
+    "uz": "Shanxay — UTC+8"
+  },
+  "tpl.cash_uz.title": {
+    "ru": "Наличные",
+    "en": "Cash",
+    "uz": "Naqd"
+  },
+  "tpl.cash_uz.subtitle": {
+    "ru": "Касса, сейф, оборотная касса",
+    "en": "Till, safe, petty cash",
+    "uz": "Kassa, seyf, aylanma kassa"
+  },
+  "tpl.bank_settlement_uz.title": {
+    "ru": "Расчётный счёт",
+    "en": "Settlement account",
+    "uz": "Hisobvaraq hisobi"
+  },
+  "tpl.bank_settlement_uz.subtitle": {
+    "ru": "Юрлицо в банке Узбекистана",
+    "en": "Legal entity bank in Uzbekistan",
+    "uz": "O‘zbekistondagi yuridik hisob"
+  },
+  "tpl.transit_company_uz.title": {
+    "ru": "Транзит / лицевой счёт",
+    "en": "Transit / ledger account",
+    "uz": "Tranzit / lits evoy hisob"
+  },
+  "tpl.transit_company_uz.subtitle": {
+    "ru": "Счёт компании для перечислений",
+    "en": "Company account for transfers",
+    "uz": "Kompaniya o‘tkazmalari uchun hisob"
+  },
+  "tpl.plastic_uz.title": {
+    "ru": "Банковская карта",
+    "en": "Bank card",
+    "uz": "Bank kartasi"
+  },
+  "tpl.plastic_uz.subtitle": {
+    "ru": "Humo, Uzcard, Visa, Mastercard",
+    "en": "Humo, Uzcard, Visa, Mastercard",
+    "uz": "Humo, Uzcard, Visa, Mastercard"
+  },
+  "tpl.mobile_uz.title": {
+    "ru": "Мобильные кошельки",
+    "en": "Mobile wallets",
+    "uz": "Mobil hamyonlar"
+  },
+  "tpl.mobile_uz.subtitle": {
+    "ru": "Payme, Click, Uzum Bank и др.",
+    "en": "Payme, Click, Uzum Bank, etc.",
+    "uz": "Payme, Click, Uzum Bank va boshqalar"
+  },
+  "tpl.foreign_currency_uz.title": {
+    "ru": "Валютный счёт",
+    "en": "FX account",
+    "uz": "Valyuta hisobi"
+  },
+  "tpl.foreign_currency_uz.subtitle": {
+    "ru": "USD / EUR в узбекском банке",
+    "en": "USD / EUR at UZ bank",
+    "uz": "O‘zbek bankida USD / EUR"
+  },
+  "tpl.safe.title": {
+    "ru": "Сейф / резерв",
+    "en": "Safe / reserve",
+    "uz": "Seyf / zaxira"
+  },
+  "tpl.safe.subtitle": {
+    "ru": "Заначка, запас наличных",
+    "en": "Cash stash",
+    "uz": "Naqd zaxirasi"
+  },
+  "tpl.cash_intl.title": {
+    "ru": "Наличные (общее)",
+    "en": "Cash (general)",
+    "uz": "Naqd (umumiy)"
+  },
+  "tpl.cash_intl.subtitle": {
+    "ru": "Личные / офисные средства",
+    "en": "Personal / office cash",
+    "uz": "Shaxsiy / ofis mablag‘lari"
+  },
+  "tpl.bank_corporate.title": {
+    "ru": "Корпоративный банк",
+    "en": "Corporate bank",
+    "uz": "Korporativ bank"
+  },
+  "tpl.bank_corporate.subtitle": {
+    "ru": "Основной банковский счёт",
+    "en": "Main bank account",
+    "uz": "Asosiy bank hisobi"
+  },
+  "tpl.broker.title": {
+    "ru": "Брокер / инвестиции",
+    "en": "Broker / investments",
+    "uz": "Broker / investitsiyalar"
+  },
+  "tpl.broker.subtitle": {
+    "ru": "Ценные бумаги, депозитарий",
+    "en": "Securities, depositary",
+    "uz": "Qimmatli qog‘ozlar"
+  },
+  "tpl.crypto.title": {
+    "ru": "Криптоактивы",
+    "en": "Crypto",
+    "uz": "Kriptoaktivlar"
+  },
+  "tpl.crypto.subtitle": {
+    "ru": "Биржа, холодный кошелёк",
+    "en": "Exchange, cold wallet",
+    "uz": "Birja, sovuq hamyon"
+  },
+  "tpl.receivable.title": {
+    "ru": "Дебиторка",
+    "en": "Receivables",
+    "uz": "Debitor qarz"
+  },
+  "tpl.receivable.subtitle": {
+    "ru": "Долги перед вами",
+    "en": "Money owed to you",
+    "uz": "Sizga qarz"
+  },
+  "tpl.custom.title": {
+    "ru": "Своё место",
+    "en": "Custom",
+    "uz": "Maxsus joy"
+  },
+  "tpl.custom.subtitle": {
+    "ru": "Произвольное название и заметка",
+    "en": "Custom name and note",
+    "uz": "Ixtiyoriy nom va eslatma"
+  },
+  "kassa.col.number": {
+    "ru": "№",
+    "en": "#",
+    "uz": "№"
+  },
+  "kassa.col.amount": {
+    "ru": "Сумма",
+    "en": "Amount",
+    "uz": "Summa"
+  },
+  "kassa.col.date": {
+    "ru": "Дата создания",
+    "en": "Created at",
+    "uz": "Yaratilgan sana"
+  },
+  "kassa.col.client": {
+    "ru": "Клиент",
+    "en": "Client",
+    "uz": "Mijoz"
+  },
+  "kassa.col.employee": {
+    "ru": "Сотрудник",
+    "en": "Employee",
+    "uz": "Xodim"
+  },
+  "kassa.col.from": {
+    "ru": "Из кошелька",
+    "en": "From wallet",
+    "uz": "Hamyondan"
+  },
+  "kassa.col.to": {
+    "ru": "В кошелек",
+    "en": "To wallet",
+    "uz": "Hamyonga"
+  },
+  "kassa.col.month": {
+    "ru": "Месяц",
+    "en": "Month",
+    "uz": "Oy"
+  },
+  "kassa.col.type": {
+    "ru": "Тип",
+    "en": "Type",
+    "uz": "Tur"
+  },
+  "kassa.col.confirmed": {
+    "ru": "Подтв...",
+    "en": "Conf.",
+    "uz": "Tasdiq"
+  },
+  "kassa.col.category": {
+    "ru": "Категория",
+    "en": "Category",
+    "uz": "Kategoriya"
+  },
+  "kassa.col.assets": {
+    "ru": "Основные средства",
+    "en": "Fixed assets",
+    "uz": "Asosiy vositalar"
+  },
+  "kassa.col.supplier": {
+    "ru": "Поставщик",
+    "en": "Supplier",
+    "uz": "Yetkazib beruvchi"
+  },
+  "kassa.col.supplier_balance": {
+    "ru": "Сальдо поставщика",
+    "en": "Supplier balance",
+    "uz": "Yetkazib beruvchi saldosi"
+  },
+  "kassa.col.author": {
+    "ru": "Автор",
+    "en": "Author",
+    "uz": "Muallif"
+  },
+  "kassa.col.branch": {
+    "ru": "Филиал",
+    "en": "Branch",
+    "uz": "Filial"
+  },
+  "kassa.col.note": {
+    "ru": "Примечание",
+    "en": "Note",
+    "uz": "Izoh"
+  },
+  "kassa.col.actions": {
+    "ru": "Действия",
+    "en": "Actions",
+    "uz": "Harakatlar"
+  },
+  "kassa.yes": {
+    "ru": "Да",
+    "en": "Yes",
+    "uz": "Ha"
+  },
+  "kassa.no": {
+    "ru": "Нет",
+    "en": "No",
+    "uz": "Yo‘q"
+  },
+  "kassa.edit": {
+    "ru": "Редактировать",
+    "en": "Edit",
+    "uz": "Tahrirlash"
+  },
+  "kassa.delete": {
+    "ru": "Удалить",
+    "en": "Delete",
+    "uz": "O‘chirish"
+  },
+  "kassa.err.csrf": {
+    "ru": "Запрос устарел (защита формы). Повторите сохранение — токен уже обновлён.",
+    "en": "Request expired (CSRF). Retry save.",
+    "uz": "So‘rov eskirgan. Qayta saqlang."
+  },
+  "kassa.err.json": {
+    "ru": "Сервер не разобрал данные. Обновите страницу и попробуйте снова.",
+    "en": "Server could not parse data. Refresh.",
+    "uz": "Ma’lumot tahlil qilinmadi. Yangilang."
+  },
+  "kassa.err.internal": {
+    "ru": "Внутренняя ошибка сервера. Попробуйте позже или обновите страницу.",
+    "en": "Internal server error. Try later.",
+    "uz": "Ichki server xatosi."
+  },
+  "kassa.err.generic": {
+    "ru": "Ошибка при сохранении",
+    "en": "Save error",
+    "uz": "Saqlashda xato"
+  },
+  "kassa.err.pick_from": {
+    "ru": "Выберите счёт для списания.",
+    "en": "Select debit account.",
+    "uz": "Chiqim hisobini tanlang."
+  },
+  "kassa.err.no_ccy": {
+    "ru": "На счёте нет выбранной валюты — задайте остаток на вкладке «Счёт».",
+    "en": "No balance in this currency — set it on Account.",
+    "uz": "Valyutada qoldiq yo‘q — «Hisob»da kiriting."
+  },
+  "kassa.err.overdraft": {
+    "ru": "Сумма больше доступного остатка по этой валюте.",
+    "en": "Amount exceeds available balance.",
+    "uz": "Mavjud qoldiqdan oshiq."
+  },
+  "kassa.err.pick_dc": {
+    "ru": "Выберите валюту списания.",
+    "en": "Select debit currency.",
+    "uz": "Chiqim valyutasini tanlang."
+  },
+  "kassa.err.pick_cc": {
+    "ru": "Выберите валюту зачисления.",
+    "en": "Select credit currency.",
+    "uz": "Tushum valyutasini tanlang."
+  },
+  "kassa.err.amt_debit": {
+    "ru": "Укажите сумму списания.",
+    "en": "Enter debit amount.",
+    "uz": "Chiqim summasini kiriting."
+  },
+  "kassa.err.amt_credit": {
+    "ru": "Укажите сумму зачисления.",
+    "en": "Enter credit amount.",
+    "uz": "Tushum summasini kiriting."
+  },
+  "kassa.err.same_pocket": {
+    "ru": "Выберите разные счета для перевода.",
+    "en": "Choose two different accounts.",
+    "uz": "Turli hisoblarni tanlang."
+  },
+  "kassa.err.pick_ccy_op": {
+    "ru": "Выберите счёт и валюту операции.",
+    "en": "Select account and currency.",
+    "uz": "Hisob va valyutani tanlang."
+  },
+  "kassa.status.saving": {
+    "ru": "Сохранение...",
+    "en": "Saving…",
+    "uz": "Saqlanmoqda…"
+  },
+  "kassa.status.saved": {
+    "ru": "Сохранено",
+    "en": "Saved",
+    "uz": "Saqlandi"
+  },
+  "kassa.status.deleting": {
+    "ru": "Удаление...",
+    "en": "Deleting…",
+    "uz": "O‘chirilmoqda…"
+  },
+  "kassa.status.deleted": {
+    "ru": "Удалено",
+    "en": "Deleted",
+    "uz": "O‘chirildi"
+  },
+  "kassa.confirm.delete_tx": {
+    "ru": "Удалить эту операцию?",
+    "en": "Delete this transaction?",
+    "uz": "Ushbu operatsiyani o‘chirasizmi?"
+  },
+  "kassa.err.delete": {
+    "ru": "Ошибка при удалении",
+    "en": "Delete failed",
+    "uz": "O‘chirishda xato"
+  },
+  "kassa.dialog.payment_num": {
+    "ru": "Платеж №",
+    "en": "Payment #",
+    "uz": "To‘lov №"
+  },
+  "schet.load_err": {
+    "ru": "Не удалось загрузить данные счёта.",
+    "en": "Could not load account.",
+    "uz": "Hisob ma’lumotlari yuklanmadi."
+  },
+  "schet.saving": {
+    "ru": "Сохранение…",
+    "en": "Saving…",
+    "uz": "Saqlanmoqda…"
+  },
+  "schet.saved": {
+    "ru": "Сохранено",
+    "en": "Saved",
+    "uz": "Saqlandi"
+  },
+  "schet.net_err": {
+    "ru": "Сеть недоступна",
+    "en": "Network unavailable",
+    "uz": "Tarmoq yo‘q"
+  },
+  "schet.edit_aria": {
+    "ru": "Редактировать",
+    "en": "Edit",
+    "uz": "Tahrirlash"
+  },
+  "schet.del_row_aria": {
+    "ru": "Удалить строку",
+    "en": "Delete row",
+    "uz": "Qatorni o‘chirish"
+  },
+  "schet.pocket_default": {
+    "ru": "Место хранения",
+    "en": "Storage",
+    "uz": "Saqlash joyi"
+  },
+  "schet.adjust_title": {
+    "ru": "Корректировка счёта",
+    "en": "Account adjustment",
+    "uz": "Hisobni tuzatish"
+  },
+  "schet.editor_help": {
+    "ru": "Валюты и суммы. «К списку мест» — выбрать другой счёт без закрытия окна.",
+    "en": "Currencies and amounts. Pick another account from the list without closing.",
+    "uz": "Valyutalar va summalar."
+  },
+  "schet.confirm.del_ccy": {
+    "ru": "Вы уверены, что хотите удалить эту валюту из счёта? Остаток по ней будет обнулён.",
+    "en": "Remove this currency from the account? Balance will zero.",
+    "uz": "Bu valyutani olib tashlaysizmi?"
+  },
+  "schet.confirm.del_pocket": {
+    "ru": "Вы уверены, что хотите полностью удалить этот счёт / место хранения? Все остатки по валютам будут удалены.",
+    "en": "Delete this wallet entirely? All balances removed.",
+    "uz": "Butun hisobni o‘chirasizmi?"
+  },
+  "schet.confirm.close": {
+    "ru": "Закрыть без сохранения? Несохранённые изменения пропадут.",
+    "en": "Close without saving?",
+    "uz": "Saqlanmagan o‘zgarishlar yo‘qoladi."
+  },
+  "schet.draft_hint": {
+    "ru": "Добавляется в черновик корректировки — сохраните форму, чтобы зафиксировать на главном экране.",
+    "en": "Added to adjustment draft — save to apply.",
+    "uz": "Qoralama turiga qo‘shildi."
+  },
+  "schet.pick_type": {
+    "ru": "Выберите тип счёта или кошелька.",
+    "en": "Choose account type.",
+    "uz": "Hisob turini tanlang."
+  },
+  "schet.fx_missing": {
+    "ru": "Часть валют не найдена в курсах. Обновите курсы или скорректируйте коды валют.",
+    "en": "Some currencies missing FX rates.",
+    "uz": "Valyuta kurslari topilmadi."
+  },
+  "schet.fx_usd_hint": {
+    "ru": "Пересчёт через USD: каждая сумма переводится в доллары, затем в выбранную валюту.",
+    "en": "Recalculation via USD.",
+    "uz": "USD orqali qayta hisoblash."
+  },
+  "schet.rates_to_usd": {
+    "ru": "Курсы к USD ·",
+    "en": "Rates vs USD ·",
+    "uz": "USD bo‘yicha kurslar ·"
+  },
+  "schet.rates_approx": {
+    "ru": "Курсы приблизительные — проверьте соединение.",
+    "en": "Rates approximate — check connection.",
+    "uz": "Taxminiy kurslar."
+  },
+  "schet.save_error": {
+    "ru": "Ошибка сохранения",
+    "en": "Save error",
+    "uz": "Saqlash xatosi"
+  },
+  "settings.js.req_err": {
+    "ru": "Ошибка запроса",
+    "en": "Request error",
+    "uz": "So‘rov xatosi"
+  },
+  "settings.js.leave_one_ccy": {
+    "ru": "Оставьте хотя бы одну валюту.",
+    "en": "Keep at least one currency.",
+    "uz": "Kamida bitta valyuta qoldiring."
+  },
+  "settings.js.smartup_err": {
+    "ru": "Ошибка Smartup",
+    "en": "Smartup error",
+    "uz": "Smartup xatosi"
+  },
+  "settings.js.gw_testing": {
+    "ru": "Проверяем подключение...",
+    "en": "Testing connection…",
+    "uz": "Ulanish tekshirilmoqda…"
+  },
+  "settings.js.gw_ok": {
+    "ru": "Подключение работает",
+    "en": "Connection OK",
+    "uz": "Ulanish ishlayapti"
+  },
+  "settings.js.gw_syncing": {
+    "ru": "Синхронизация Smartup...",
+    "en": "Syncing Smartup…",
+    "uz": "Smartup sinxronlanmoqda…"
+  },
+  "settings.js.gw_sync_done": {
+    "ru": "Синхронизация завершена",
+    "en": "Sync complete",
+    "uz": "Sinxron tugadi"
+  },
+  "settings.js.save_err": {
+    "ru": "Ошибка сохранения",
+    "en": "Save failed",
+    "uz": "Saqlash xatosi"
+  },
+  "settings.js.net_err": {
+    "ru": "Ошибка сети",
+    "en": "Network error",
+    "uz": "Tarmoq xatosi"
+  },
+  "settings.js.cat_del_confirm": {
+    "ru": "Удалить категорию? У связанных операций поле категории будет очищено.",
+    "en": "Delete category? Linked transactions lose category.",
+    "uz": "Kategoriyani o‘chirishmi? Bog‘langan operatsiyalarda toifa maydoni tozalanadi."
+  },
+  "settings.js.del_err": {
+    "ru": "Ошибка удаления",
+    "en": "Delete failed",
+    "uz": "O‘chirish xatosi"
+  },
+  "settings.js.create_err": {
+    "ru": "Ошибка создания",
+    "en": "Create failed",
+    "uz": "Yaratish xatosi"
+  },
+  "settings.js.imported": {
+    "ru": "Импортировано: {n}",
+    "en": "Imported: {n}",
+    "uz": "Import qilindi: {n}"
+  },
+  "layout.error": {
+    "ru": "Ошибка",
+    "en": "Error",
+    "uz": "Xato"
+  },
+  "error.not_found_title": {
+    "ru": "Страница не найдена",
+    "en": "Page not found",
+    "uz": "Sahifa topilmadi"
+  },
+  "error.not_found_lead": {
+    "ru": "По адресу {path} раздела нет.",
+    "en": "There is no section at {path}.",
+    "uz": "{path} manzilda bo‘lim yo‘q."
+  },
+  "error.go_home": {
+    "ru": "На главную",
+    "en": "Home",
+    "uz": "Bosh sahifa"
+  },
+  "error.go_admin": {
+    "ru": "Админ-панель",
+    "en": "Admin",
+    "uz": "Admin panel"
+  },
+  "forbidden.page_title": {
+    "ru": "Доступ ограничен · UPOS FINANCE",
+    "en": "Access restricted · UPOS FINANCE",
+    "uz": "Kirish cheklangan · UPOS FINANCE"
+  },
+  "forbidden.heading": {
+    "ru": "Доступ ограничен",
+    "en": "Access restricted",
+    "uz": "Kirish cheklangan"
+  },
+  "forbidden.lead": {
+    "ru": "Раздел администрирования доступен только учётным записям с ролью администратора.",
+    "en": "Administration is only available to administrator accounts.",
+    "uz": "Administratsiya faqat administrator rolli uchun mavjud."
+  },
+  "forbidden.home": {
+    "ru": "На главную",
+    "en": "Home",
+    "uz": "Bosh sahifa"
+  },
+  "schet.adjust": {
+    "ru": "Корректировка",
+    "en": "Adjust",
+    "uz": "Tuzatish"
+  },
+  "schet.actions_aria": {
+    "ru": "Действия",
+    "en": "Actions",
+    "uz": "Harakatlar"
+  },
+  "schet.empty.title": {
+    "ru": "Пока нет ни одной позиции",
+    "en": "No positions yet",
+    "uz": "Hali pozitsiyalar yo‘q"
+  },
+  "schet.empty.text": {
+    "ru": "Нажмите «Корректировка», добавьте места хранения и суммы по валютам — затем сохраните.",
+    "en": "Click “Adjust”, add wallets and currency amounts — then save.",
+    "uz": "«Tuzatish»ni bosing, hamyonlar va valyuta summalarini qo‘shing — keyin saqlang."
+  },
+  "employees.cant_delete_self": {
+    "ru": "Нельзя удалить свою учётку здесь",
+    "en": "You cannot delete your own account here.",
+    "uz": "O‘z akkauntingizni bu yerda o‘chirib bo‘lmaydi."
+  },
+  "schet.empty.cta": {
+    "ru": "Открыть корректировку",
+    "en": "Open adjustment",
+    "uz": "Tuzatishni ochish"
+  },
+  "kassa.editor.cancel": {
+    "ru": "Отмена",
+    "en": "Cancel",
+    "uz": "Bekor qilish"
+  },
+  "kassa.editor.save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "uz": "Saqlash"
+  },
+  "kassa.f.client": {
+    "ru": "Клиент",
+    "en": "Client",
+    "uz": "Mijoz"
+  },
+  "kassa.f.supplier": {
+    "ru": "Поставщик",
+    "en": "Supplier",
+    "uz": "Yetkazib beruvchi"
+  },
+  "kassa.f.branch": {
+    "ru": "Филиал",
+    "en": "Branch",
+    "uz": "Filial"
+  },
+  "kassa.f.note": {
+    "ru": "Примечание",
+    "en": "Note",
+    "uz": "Izoh"
+  },
+  "kassa.ph.client": {
+    "ru": "Имя клиента",
+    "en": "Client name",
+    "uz": "Mijoz ismi"
+  },
+  "kassa.ph.supplier": {
+    "ru": "Имя поставщика",
+    "en": "Supplier name",
+    "uz": "Yetkazib beruvchi"
+  },
+  "kassa.ph.branch": {
+    "ru": "Название филиала",
+    "en": "Branch name",
+    "uz": "Filial nomi"
+  },
+  "kassa.ph.note": {
+    "ru": "Дополнительная информация...",
+    "en": "Additional details...",
+    "uz": "Qo‘shimcha ma’lumot..."
+  },
+  "kassa.commission_hint": {
+    "ru": "Сумма в валюте списания; необязательно. Сохраняется в карточке операции.",
+    "en": "Amount in debit currency; optional. Stored on the transaction.",
+    "uz": "Chiqim valyutasida; ixtiyoriy. Operatsiyada saqlanadi."
+  },
+  "kassa.transfer_rate": {
+    "ru": "Курс конвертации",
+    "en": "Conversion rate",
+    "uz": "Konversiya kursi"
+  },
+  "kassa.transfer_commission": {
+    "ru": "Комиссия",
+    "en": "Commission",
+    "uz": "Komissiya"
+  },
+  "schet.title_short": {
+    "ru": "Счёт",
+    "en": "Account",
+    "uz": "Hisob"
+  },
+  "schet.no_amounts": {
+    "ru": "Нет сумм",
+    "en": "No amounts",
+    "uz": "Summalar yo‘q"
+  },
+  "schet.formatting_loading": {
+    "ru": "Загрузка форматирования…",
+    "en": "Loading formatting…",
+    "uz": "Formatlash yuklanmoqda…"
+  },
+  "schet.no_amounts_adjust": {
+    "ru": "Нет сумм — откройте корректировку.",
+    "en": "No amounts. Open adjustment.",
+    "uz": "Summalar yo‘q. Tuzatishni oching."
+  },
+  "schet.formatting_reload": {
+    "ru": "Обновите страницу (не загружено форматирование сумм).",
+    "en": "Refresh the page; amount formatting is not loaded.",
+    "uz": "Sahifani yangilang; summa formatlash yuklanmadi."
+  },
+  "schet.total_word": {
+    "ru": "Итого",
+    "en": "Total",
+    "uz": "Jami"
+  },
+  "schet.currency_aria": {
+    "ru": "Валюта",
+    "en": "Currency",
+    "uz": "Valyuta"
+  },
+  "schet.add_rows_hint": {
+    "ru": "Добавьте строки по валютам.",
+    "en": "Add currency rows.",
+    "uz": "Valyuta qatorlarini qo‘shing."
+  },
+  "schet.delete_pocket": {
+    "ru": "Удалить место",
+    "en": "Delete place",
+    "uz": "Joyni o‘chirish"
+  },
+  "schet.note_ph": {
+    "ru": "Заметка (банк, филиал, номер счёта…)",
+    "en": "Note (bank, branch, account number…)",
+    "uz": "Izoh (bank, filial, hisob raqami…)"
+  },
+  "schet.add_currency": {
+    "ru": "+ Валюта",
+    "en": "+ Currency",
+    "uz": "+ Valyuta"
+  },
+  "schet.no_pockets": {
+    "ru": "Пока нет мест хранения. Добавьте первое — банк, наличные, карта и т.д.",
+    "en": "No storage places yet. Add the first one: bank, cash, card and so on.",
+    "uz": "Hozircha saqlash joylari yo‘q. Birinchisini qo‘shing: bank, naqd, karta va boshqalar."
+  },
+  "schet.add_pocket": {
+    "ru": "Добавить место",
+    "en": "Add place",
+    "uz": "Joy qo‘shish"
+  },
+  "schet.back_to_pockets": {
+    "ru": "К списку мест",
+    "en": "Back to places",
+    "uz": "Joylar ro‘yxatiga"
+  },
+  "schet.chart_share_label": {
+    "ru": "Доля, {currency}",
+    "en": "Share, {currency}",
+    "uz": "Ulush, {currency}"
+  },
+  "schet.rates_cache": {
+    "ru": " (кэш / запас)",
+    "en": " (cache / fallback)",
+    "uz": " (kesh / zaxira)"
+  },
+  "avatar.err.too_large": {
+    "ru": "Файл слишком большой (макс 10МБ)",
+    "en": "File is too large (max 10 MB)",
+    "uz": "Fayl juda katta (maks. 10 MB)"
+  },
+  "avatar.err.upload": {
+    "ru": "Ошибка при загрузке: {error}",
+    "en": "Upload failed: {error}",
+    "uz": "Yuklashda xato: {error}"
+  },
+  "avatar.err.unknown": {
+    "ru": "неизвестно",
+    "en": "unknown",
+    "uz": "noma’lum"
+  },
+  "avatar.err.network": {
+    "ru": "Ошибка сети или сервера",
+    "en": "Network or server error",
+    "uz": "Tarmoq yoki server xatosi"
+  }
+}

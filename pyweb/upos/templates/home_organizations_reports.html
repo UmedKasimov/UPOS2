@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ _('general.reports.title_page') }}{% endblock %}
+
+{% block page_header %}
+  <div class="general-reports-header">
+    <div class="general-page-header">
+      <span class="general-page-kicker">{{ _('general.mode') }}</span>
+      <h1 class="page-title settings-ios-page-title">{{ _('nav.reports') }}</h1>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <meta name="general-reports-timezone" content="{{ workspace_timezone | default('Asia/Tashkent') | e }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=23" />
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--fluid">
+    <nav class="general-module-tabs" aria-label="{{ _('nav.general_sections') }}" data-report-open-tabs>
+      <a class="general-module-tab active" href="{{ url_for('organizations_reports_get') }}" aria-current="page" data-report-home-tab>{{ _('nav.reports') }}</a>
+    </nav>
+
+    <section class="general-report-launcher" role="tablist" aria-label="{{ _('general.reports.tabs_aria') }}">
+      <button type="button" class="general-report-card" role="tab" data-gr-tab="pnl" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 3 5-7"/></svg>
+        </span>
+        <span>P&amp;L</span>
+        <small>Прибыль и убытки</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-gr-tab="balance" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+        </span>
+        <span>Баланс</span>
+        <small>Остатки средств</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-gr-tab="cashflow" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m17 8-5-5-5 5"/><path d="m7 16 5 5 5-5"/></svg>
+        </span>
+        <span>Cash Flow</span>
+        <small>Денежный поток</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-gr-tab="odds" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 7h10"/><path d="M7 17h10"/><path d="m16 3 5 5-5 5"/><path d="m8 21-5-5 5-5"/></svg>
+        </span>
+        <span>ОДДС</span>
+        <small>Движение денег</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-gr-tab="dds" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><path d="M8 4v16"/><path d="M16 4v16"/></svg>
+        </span>
+        <span>ДДС</span>
+        <small>Приход и расход</small>
+      </button>
+    </section>
+
+    <script type="application/json" id="general-reports-orgs">{{ organizations_for_filters | tojson }}</script>
+    <div id="general-reports-root" class="general-reports-root"></div>
+  </div>
+
+  <script src="{{ url_for('static', path='general-reports-page.js') }}?v=18" defer></script>
+{% endblock %}

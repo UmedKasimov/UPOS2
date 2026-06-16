@@ -1,0 +1,358 @@
+.upos-date {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.upos-date-hidden-input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.upos-date-auto {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.upos-date-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 760;
+  letter-spacing: 0;
+  padding: 0.45rem 0.72rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.upos-date-trigger:hover,
+.upos-date-trigger:focus-visible {
+  border-color: color-mix(in oklch, var(--primary), var(--border) 38%);
+  outline: none;
+}
+
+.upos-date-trigger svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.upos-date-summary {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.upos-date-panel {
+  position: fixed;
+  z-index: 120;
+  display: grid;
+  grid-template-columns: 11.5rem minmax(34rem, 1fr);
+  width: min(45rem, calc(100vw - 2rem));
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius, 12px);
+  background: var(--card);
+  box-shadow: 0 22px 70px color-mix(in oklch, var(--foreground), transparent 82%);
+  overflow: hidden;
+}
+
+.upos-date-presets {
+  display: grid;
+  align-content: start;
+  gap: 0.1rem;
+  padding: 0.7rem;
+  border-right: 1px solid var(--workbench-line, var(--border));
+  background: color-mix(in oklch, var(--muted), transparent 74%);
+}
+
+.upos-date-preset {
+  min-height: 2.4rem;
+  border: 0;
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+}
+
+.upos-date-preset:hover,
+.upos-date-preset.active {
+  background: var(--card);
+  color: var(--primary);
+}
+
+.upos-date-main {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.8rem;
+}
+
+.upos-date-nav {
+  display: grid;
+  grid-template-columns: 2rem 1fr 2rem;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.upos-date-nav button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.upos-date-nav button:hover {
+  border-color: var(--workbench-line, var(--border));
+  background: color-mix(in oklch, var(--muted), transparent 70%);
+  color: var(--foreground);
+}
+
+.upos-date-months {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.upos-date-month-title {
+  margin-bottom: 0.55rem;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 760;
+  text-align: center;
+}
+
+.upos-date-title-btn,
+.upos-date-year-title {
+  display: inline-grid;
+  place-items: center;
+  min-height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 820;
+  letter-spacing: 0;
+  padding: 0.2rem 0.45rem;
+}
+
+.upos-date-title-btn:hover,
+.upos-date-title-btn:focus-visible,
+.upos-date-year-title:hover,
+.upos-date-year-title:focus-visible {
+  border-color: color-mix(in oklch, var(--primary), transparent 58%);
+  background: color-mix(in oklch, var(--primary), transparent 91%);
+  color: var(--primary);
+  outline: none;
+}
+
+.upos-date-picker-view {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-height: 15.1rem;
+}
+
+.upos-date-picker-view .upos-date-year-title {
+  justify-self: center;
+}
+
+.upos-date-month-grid,
+.upos-date-year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.upos-date-pick-cell {
+  min-height: 3.15rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.upos-date-pick-cell:hover,
+.upos-date-pick-cell:focus-visible {
+  border-color: color-mix(in oklch, var(--primary), transparent 44%);
+  background: color-mix(in oklch, var(--primary), transparent 91%);
+  color: var(--primary);
+  outline: none;
+}
+
+.upos-date-pick-cell.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.upos-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0;
+}
+
+.upos-date-weekday,
+.upos-date-day {
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  font-size: var(--text-sm);
+}
+
+.upos-date-weekday {
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  color: var(--foreground);
+  font-weight: 820;
+}
+
+.upos-date-day {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.upos-date-day:hover,
+.upos-date-day:focus-visible {
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+  outline: none;
+}
+
+.upos-date-day.is-muted {
+  color: color-mix(in oklch, var(--muted-foreground), transparent 35%);
+}
+
+.upos-date-day.in-range {
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.upos-date-day.is-start,
+.upos-date-day.is-end {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 820;
+}
+
+.upos-date-day.is-start::after,
+.upos-date-day.is-end::after {
+  position: absolute;
+  top: 0.08rem;
+  right: 0.12rem;
+  font-size: 0.48rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.upos-date-day.is-start::after {
+  content: "От";
+}
+
+.upos-date-day.is-end::after {
+  content: "До";
+}
+
+.upos-date-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.upos-date-selected {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 720;
+}
+
+.upos-date-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.upos-date-apply,
+.upos-date-close {
+  min-height: 2.3rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 760;
+  padding: 0.45rem 0.8rem;
+}
+
+.upos-date-apply {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.upos-date-close {
+  background: var(--card);
+  color: var(--foreground);
+}
+
+@media (max-width: 720px) {
+  .upos-date {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .upos-date-trigger,
+  .upos-date-summary {
+    width: 100%;
+  }
+
+  .upos-date-panel {
+    left: 1rem !important;
+    right: 1rem;
+    grid-template-columns: 1fr;
+    width: auto;
+  }
+
+  .upos-date-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-right: 0;
+    border-bottom: 1px solid var(--workbench-line, var(--border));
+  }
+
+  .upos-date-months {
+    grid-template-columns: 1fr;
+  }
+}

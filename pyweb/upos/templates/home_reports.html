@@ -1,0 +1,1093 @@
+{% extends "base.html" %}
+{% block title %}{{ _('reports.title_page') }}{% endblock %}
+
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=24" />
+  <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=24" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ user.get('active_organization_name') or _('workspace.default_name') }}</span>
+    <h1 class="page-title settings-ios-page-title">{{ _('nav.reports') }}</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root org-reports-page">
+    <nav class="general-module-tabs" aria-label="{{ _('nav.home_sections') }}" data-org-report-open-tabs>
+      <a class="general-module-tab active" href="{{ url_for('home_reports') }}" aria-current="page" data-org-report-home-tab>{{ _('nav.reports') }}</a>
+    </nav>
+
+    <section class="general-report-launcher org-report-launcher" role="tablist" aria-label="Отчёты организации">
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="courier-debts" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M16 17l2 2 4-5"/></svg>
+        </span>
+        <span>Долги доставщиков</span>
+        <small>Акт сверки</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="delivery-shipments" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M10 17h4V5H3v12h3"/><path d="M14 17h1a2 2 0 1 0 4 0h1v-5l-3-4h-3"/><circle cx="8" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
+        <span>Отгрузки</span>
+        <small>Журнал отгрузок</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="courier-balance" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16V9"/><path d="M12 16V6"/><path d="M16 16v-4"/><path d="M7 20h10"/></svg>
+        </span>
+        <span>Баланс доставщиков</span>
+        <small>Дебет / кредит</small>
+      </button>
+    </section>
+
+    <div class="reports-root general-reports-root org-reports-root" data-org-reports-root hidden>
+      <section class="reports-panel" id="report-courier-debts" data-org-report-panel="courier-debts" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Delivery</p>
+            <h2>Долги доставщиков</h2>
+            <p>Сверка по отгрузкам и оплатам через кассу.</p>
+          </div>
+        </header>
+        <div class="reports-analysis-grid reports-analysis-grid--single">
+          <article class="reports-flow">
+            <div class="reports-flow-head">
+              <span class="reports-flow-dot" aria-hidden="true"></span>
+              <div>
+                <h3>Акт сверки</h3>
+                <p>{{ delivery_debts|length }} доставщиков</p>
+              </div>
+            </div>
+            <div class="reports-category-list">
+              {% for debt in delivery_debts %}
+                <div class="reports-category-row">
+                  <div class="reports-category-main">
+                    <span>{{ debt.courier_name }}</span>
+                    <strong>{{ debt.debt_amount_label }} {{ debt.currency }}</strong>
+                  </div>
+                  <div class="reports-category-meta">
+                    <span>Отгружено {{ debt.total_amount_label }} · оплачено {{ debt.paid_amount_label }}</span>
+                    <div class="reports-bar-track">
+                      {% set paid_width = (debt.paid_amount / debt.total_amount * 100) if debt.total_amount else 0 %}
+                      <span style="width: {{ paid_width|round(0, 'floor') }}%"></span>
+                    </div>
+                  </div>
+                </div>
+              {% else %}
+                <div class="reports-empty-state">Долгов доставщиков пока нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-courier-balance" data-org-report-panel="courier-balance" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Delivery</p>
+            <h2>Баланс доставщиков</h2>
+            <p>Сводный дебет, кредит и остаток долга по каждому доставщику.</p>
+          </div>
+        </header>
+        <div class="reports-courier-balance" data-courier-balance-dashboard>
+          <div class="reports-courier-balance-switcher" role="tablist" aria-label="Виды диаграмм баланса доставщиков">
+            <button type="button" data-courier-balance-view="bars" aria-selected="true">Полосы</button>
+            <button type="button" data-courier-balance-view="stack">Кредит / долг</button>
+            <button type="button" data-courier-balance-view="ranking">Рейтинг</button>
+            <button type="button" data-courier-balance-view="share">Доля долга</button>
+            <button type="button" data-courier-balance-view="limits">Контроль баланса</button>
+          </div>
+          <div class="reports-courier-balance-totals" data-courier-balance-totals></div>
+          <div class="reports-courier-balance-charts">
+            <article class="reports-flow reports-courier-balance-chart">
+              <div class="reports-flow-head">
+                <span class="reports-flow-dot" aria-hidden="true"></span>
+                <div>
+                  <h3 data-courier-balance-title>Диаграмма дебета и кредита</h3>
+                  <p data-courier-balance-count>0 доставщиков</p>
+                </div>
+              </div>
+              <div class="reports-courier-balance-list" data-courier-balance-chart></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-delivery-shipments" data-org-report-panel="delivery-shipments" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Delivery</p>
+            <h2>Отгрузки</h2>
+            <p>Журнал созданных отгрузок с оплатой и остатком долга.</p>
+          </div>
+          {% if delivery_shipment_totals.currencies %}
+            <div class="reports-balance-total">
+              {% for row in delivery_shipment_totals.currencies %}
+                <span><b>{{ row.debt_label }}</b> {{ row.currency }} долг · {{ row.count }} отгрузок</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </header>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Доставщик</th>
+                <th>Товар</th>
+                <th>Сумма</th>
+                <th>Оплата</th>
+                <th>Долг</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for shipment in delivery_shipments %}
+                {% set first_item = shipment.items[0] if shipment.items else None %}
+                <tr>
+                  <td>{{ shipment.number }}</td>
+                  <td>{{ shipment.shipment_date }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="reports-courier-link"
+                      data-courier-name="{{ shipment.courier_name }}"
+                      aria-label="Открыть акт сверки {{ shipment.courier_name }}"
+                    >{{ shipment.courier_name }}</button>
+                  </td>
+                  <td>{{ first_item.product_name if first_item else shipment.note }}</td>
+                  <td>{{ shipment.total_amount_label }} {{ shipment.currency }}</td>
+                  <td>{{ shipment.paid_amount_label }} {{ shipment.currency }}</td>
+                  <td><strong>{{ shipment.debt_amount_label }} {{ shipment.currency }}</strong></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7" class="reports-empty-cell">Отгрузок пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-courier-reconcile" data-org-report-panel="courier-reconcile" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Акт сверки</p>
+            <h2 data-reconcile-title>Доставщик</h2>
+            <p data-reconcile-subtitle>Дебет, кредит и итог по отгрузкам.</p>
+          </div>
+        </header>
+        <div class="reports-reconcile-toolbar" data-reconcile-filter>
+          <div id="reports-reconcile-date-picker"></div>
+        </div>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table reports-reconcile-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Дебет</th>
+                <th>Кредит</th>
+                <th>Итог</th>
+              </tr>
+            </thead>
+            <tbody data-reconcile-rows></tbody>
+          </table>
+          <h3 class="reports-reconcile-subhead">Поступления из кассы</h3>
+          <table class="reports-data-table reports-reconcile-payments-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Операция</th>
+                <th>Наличные</th>
+                <th>Перечисление</th>
+                <th>Возврат</th>
+                <th>Скидка</th>
+                <th>Терминал</th>
+                <th>Долг</th>
+                <th>Старый долг</th>
+                <th>Расходы</th>
+                <th>Разница</th>
+              </tr>
+            </thead>
+            <tbody data-reconcile-payment-rows></tbody>
+          </table>
+          <div class="reports-reconcile-summary" data-reconcile-summary></div>
+        </div>
+      </section>
+    </div>
+
+    <script type="application/json" id="delivery-shipments-report-data">{{ delivery_shipments|tojson }}</script>
+    <script type="application/json" id="delivery-payments-report-data">{{ delivery_payments|tojson }}</script>
+    <script type="application/json" id="delivery-debts-report-data">{{ delivery_debts|tojson }}</script>
+    <script type="application/json" id="delivery-debt-limits-data">{{ courier_debt_limits|tojson }}</script>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='date-range-picker.js') }}?v=10"></script>
+<script>
+(() => {
+  const dataNode = document.getElementById('delivery-shipments-report-data');
+  const paymentsNode = document.getElementById('delivery-payments-report-data');
+  const debtsNode = document.getElementById('delivery-debts-report-data');
+  const debtLimitsNode = document.getElementById('delivery-debt-limits-data');
+  const tabsShell = document.querySelector('[data-org-report-open-tabs]');
+  const homeTab = document.querySelector('[data-org-report-home-tab]');
+  const launcher = document.querySelector('.org-report-launcher');
+  const root = document.querySelector('[data-org-reports-root]');
+  if (!tabsShell || !homeTab || !launcher || !root) return;
+
+  const reportMeta = {
+    'courier-debts': 'Долги доставщиков',
+    'courier-balance': 'Баланс доставщиков',
+    'delivery-shipments': 'Отгрузки',
+  };
+  reportMeta['courier-reconcile'] = 'Акт сверки';
+  const openTabs = [];
+  let activeTab = '';
+  let reconcileCourierName = '';
+  let reconcilePeriod = 'all';
+  let reconcileDateFrom = '';
+  let reconcileDateTo = '';
+  let reconcileDatePicker = null;
+  let shipments = [];
+  let payments = [];
+  let courierDebts = [];
+  let courierDebtLimits = {};
+  let courierDebtLimitSaving = false;
+  let courierDebtLimitStatus = '';
+  let courierBalanceView = 'bars';
+  try {
+    shipments = JSON.parse(dataNode?.textContent || '[]');
+  } catch {
+    shipments = [];
+  }
+  try {
+    payments = JSON.parse(paymentsNode?.textContent || '[]');
+  } catch {
+    payments = [];
+  }
+  try {
+    courierDebts = JSON.parse(debtsNode?.textContent || '[]');
+  } catch {
+    courierDebts = [];
+  }
+  try {
+    courierDebtLimits = JSON.parse(debtLimitsNode?.textContent || '{}') || {};
+  } catch {
+    courierDebtLimits = {};
+  }
+
+  const numberFormatter = new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 2,
+  });
+
+  function money(value, currency) {
+    const amount = Number(value || 0);
+    return `${numberFormatter.format(amount)} ${currency || 'UZS'}`;
+  }
+
+  function percent(value, max) {
+    const cleanMax = Number(max || 0);
+    if (cleanMax <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round(Number(value || 0) / cleanMax * 100)));
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+      || document.querySelector('input[name="csrf_token"]')?.value
+      || '';
+  }
+
+  function parseLimitAmount(value) {
+    const normalized = String(value || '').replace(/\s|\u202f/g, '').replace(',', '.');
+    const amount = Number(normalized);
+    return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : 0;
+  }
+
+  function formatLimitAmount(value) {
+    const text = String(value || '').replace(/[^\d.,\s\u202f]/g, '').replace(/\s|\u202f/g, '').replace('.', ',');
+    if (!text) return '';
+    const [rawInteger, rawFraction = ''] = text.split(',');
+    const integer = Number(rawInteger || 0);
+    if (!Number.isFinite(integer)) return '';
+    const formatted = numberFormatter.format(integer).replace(/\u00a0|\u202f/g, ' ');
+    const fraction = rawFraction.replace(/\D/g, '').slice(0, 2);
+    return fraction ? `${formatted},${fraction}` : formatted;
+  }
+
+  function formatLimitInput(input) {
+    const formatted = formatLimitAmount(input.value);
+    input.value = formatted;
+  }
+
+  function courierLimitKey(row) {
+    return `${encodeURIComponent(String(row?.courier_name || '').trim())}|${String(row?.currency || 'UZS').toUpperCase()}`;
+  }
+
+  function courierLimitValue(row) {
+    return Number(courierDebtLimits[courierLimitKey(row)] || 0);
+  }
+
+  function courierNameButton(name, className = '') {
+    return `<button type="button" class="reports-courier-link ${className}" data-courier-name="${escapeHtml(name)}" aria-label="Открыть акт сверки ${escapeHtml(name)}">${escapeHtml(name)}</button>`;
+  }
+
+  function collectCourierDebtLimits() {
+    const limits = {};
+    document.querySelectorAll('[data-courier-limit-input]').forEach((input) => {
+      const key = input.getAttribute('data-courier-limit-input') || '';
+      const amount = parseLimitAmount(input.value);
+      if (key && amount > 0) limits[key] = amount;
+    });
+    return limits;
+  }
+
+  function setCourierLimitStatus(text) {
+    courierDebtLimitStatus = text || '';
+    document.querySelectorAll('[data-courier-limit-status]').forEach((node) => {
+      node.textContent = courierDebtLimitStatus;
+    });
+  }
+
+  async function saveCourierDebtLimits() {
+    if (courierDebtLimitSaving) return;
+    const limits = collectCourierDebtLimits();
+    courierDebtLimits = limits;
+    courierDebtLimitSaving = true;
+    setCourierLimitStatus('Сохранение...');
+    document.querySelectorAll('[data-courier-limit-save]').forEach((button) => { button.disabled = true; });
+    try {
+      const response = await fetch('/api/reports/courier-debt-limits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken(),
+        },
+        body: JSON.stringify({ limits }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'save_failed');
+      }
+      courierDebtLimits = payload.limits || limits;
+      setCourierLimitStatus('Лимиты сохранены');
+    } catch (err) {
+      setCourierLimitStatus('Не удалось сохранить лимиты');
+    } finally {
+      courierDebtLimitSaving = false;
+      renderCourierBalancePanel();
+    }
+  }
+
+  function txDate(tx) {
+    return String(tx?.created_at || '').slice(0, 10);
+  }
+
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function monthStartIso() {
+    const date = new Date();
+    date.setDate(1);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function yearStartIso() {
+    const date = new Date();
+    date.setMonth(0, 1);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function resetReconcileFilter() {
+    reconcilePeriod = 'month';
+    reconcileDateFrom = monthStartIso();
+    reconcileDateTo = todayIso();
+  }
+
+  function setReconcilePreset(period) {
+    reconcilePeriod = period || 'all';
+    if (reconcilePeriod === 'today') {
+      const today = todayIso();
+      reconcileDateFrom = today;
+      reconcileDateTo = today;
+    } else if (reconcilePeriod === 'month') {
+      reconcileDateFrom = monthStartIso();
+      reconcileDateTo = todayIso();
+    } else if (reconcilePeriod === 'year') {
+      reconcileDateFrom = yearStartIso();
+      reconcileDateTo = todayIso();
+    } else if (reconcilePeriod === 'all') {
+      reconcileDateFrom = '';
+      reconcileDateTo = '';
+    }
+  }
+
+  function tabLabel(tab) {
+    if (tab === 'courier-reconcile') {
+      return reconcileCourierName ? `Акт: ${reconcileCourierName}` : reportMeta[tab];
+    }
+    return reportMeta[tab] || tab;
+  }
+
+  function sortedCourierRows(courierName) {
+    const clean = String(courierName || '').trim();
+    return shipments
+      .filter((row) => String(row?.courier_name || '').trim() === clean)
+      .slice()
+      .sort((a, b) => {
+        const dateCompare = String(a.shipment_date || '').localeCompare(String(b.shipment_date || ''));
+        if (dateCompare) return dateCompare;
+        return Number(a.number || 0) - Number(b.number || 0);
+      });
+  }
+
+  function filteredCourierRows(courierName) {
+    return sortedCourierRows(courierName).filter((row) => {
+      const date = String(row?.shipment_date || '');
+      if (reconcileDateFrom && date < reconcileDateFrom) return false;
+      if (reconcileDateTo && date > reconcileDateTo) return false;
+      return true;
+    });
+  }
+
+  function filteredCourierPayments(courierName) {
+    const clean = String(courierName || '').trim();
+    return payments
+      .filter((tx) => {
+        const name = String(tx?.data?.courier_name || tx?.supplier || tx?.client || '').trim();
+        const date = txDate(tx);
+        if (name !== clean) return false;
+        if (reconcileDateFrom && date < reconcileDateFrom) return false;
+        if (reconcileDateTo && date > reconcileDateTo) return false;
+        return true;
+      })
+      .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')) || Number(a.number || 0) - Number(b.number || 0));
+  }
+
+  function buildReconcileSummary(summaryNode, totals) {
+    const currencies = Object.keys(totals).sort();
+    summaryNode.replaceChildren();
+    if (!currencies.length) {
+      const empty = document.createElement('div');
+      empty.className = 'reports-empty-state';
+      empty.textContent = 'По этому доставщику пока нет отгрузок.';
+      summaryNode.appendChild(empty);
+      return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'reports-data-table reports-reconcile-total-table';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Валюта</th>
+          <th>Итого дебет</th>
+          <th>Итого кредит</th>
+          <th>Итоговый долг</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector('tbody');
+
+    currencies.forEach((currency) => {
+      const row = totals[currency];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${currency}</td>
+        <td>${money(row.debit, currency)}</td>
+        <td>${money(row.credit, currency)}</td>
+        <td><strong>${money(row.balance, currency)}</strong></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    summaryNode.appendChild(table);
+  }
+
+  function renderReconcilePanel() {
+    const title = document.querySelector('[data-reconcile-title]');
+    const subtitle = document.querySelector('[data-reconcile-subtitle]');
+    const rowsNode = document.querySelector('[data-reconcile-rows]');
+    const paymentRowsNode = document.querySelector('[data-reconcile-payment-rows]');
+    const summaryNode = document.querySelector('[data-reconcile-summary]');
+    if (!title || !subtitle || !rowsNode || !paymentRowsNode || !summaryNode) return;
+
+    initReconcileDatePicker();
+    if (reconcileDatePicker && typeof reconcileDatePicker.setValue === 'function') {
+      reconcileDatePicker.setValue({
+        preset: reconcilePeriod,
+        date_from: reconcileDateFrom,
+        date_to: reconcileDateTo,
+      });
+    }
+
+    const allRows = sortedCourierRows(reconcileCourierName);
+    const rows = filteredCourierRows(reconcileCourierName);
+    const totals = {};
+    rowsNode.replaceChildren();
+    paymentRowsNode.replaceChildren();
+    title.textContent = reconcileCourierName || 'Акт сверки';
+    subtitle.textContent = `${rows.length} из ${allRows.length} отгрузок в акте сверки.`;
+
+    rows.forEach((row) => {
+      const currency = row.currency || 'UZS';
+      if (!totals[currency]) totals[currency] = { debit: 0, credit: 0, balance: 0 };
+      const debit = Number(row.total_amount || 0);
+      const credit = Number(row.paid_amount || 0);
+      totals[currency].debit += debit;
+      totals[currency].credit += credit;
+      totals[currency].balance += debit - credit;
+
+      const tr = document.createElement('tr');
+      const firstItem = Array.isArray(row.items) && row.items.length ? row.items[0] : null;
+      const documentName = firstItem?.product_name
+        ? `Отгрузка №${row.number} - ${firstItem.product_name}`
+        : `Отгрузка №${row.number}`;
+      tr.innerHTML = `
+        <td>${row.shipment_date || ''}</td>
+        <td>${documentName}</td>
+        <td>${money(debit, currency)}</td>
+        <td>${money(credit, currency)}</td>
+        <td><strong>${money(totals[currency].balance, currency)}</strong></td>
+      `;
+      rowsNode.appendChild(tr);
+    });
+
+    if (!rows.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="reports-empty-cell">За выбранный период отгрузок нет.</td>';
+      rowsNode.appendChild(tr);
+    }
+
+    const paymentRows = filteredCourierPayments(reconcileCourierName);
+    paymentRows.forEach((tx) => {
+      const currency = tx.currency || 'UZS';
+      const b = tx?.data?.courier_breakdown || {};
+      const accountLine = (text) => text ? `<br><small>${escapeHtml(text)}</small>` : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(txDate(tx))}</td>
+        <td>Касса №${escapeHtml(tx.number || '')}</td>
+        <td>${escapeHtml(money(b.cash ?? tx.amount, currency))}${accountLine(b.cash_account_id_label)}</td>
+        <td>${escapeHtml(money(b.transfer, currency))}${accountLine(b.transfer_account_id_label)}</td>
+        <td>${escapeHtml(money(b.return_goods, currency))}</td>
+        <td>${escapeHtml(money(b.discount, currency))}</td>
+        <td>${escapeHtml(money(b.terminal, currency))}${accountLine(b.terminal_account_id_label)}</td>
+        <td>${escapeHtml(money(b.current_debt, currency))}</td>
+        <td>${escapeHtml(money(b.old_debt, currency))}</td>
+        <td>${escapeHtml(money(b.expense, currency))}${b.expense_type ? `<br><small>${escapeHtml(b.expense_type)}</small>` : ''}</td>
+        <td><strong>${escapeHtml(money(b.difference, currency))}</strong></td>
+      `;
+      paymentRowsNode.appendChild(tr);
+    });
+    if (!paymentRows.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="11" class="reports-empty-cell">Поступлений из кассы за выбранный период нет.</td>';
+      paymentRowsNode.appendChild(tr);
+    }
+
+    buildReconcileSummary(summaryNode, totals);
+  }
+
+  function balanceRows() {
+    const byKey = new Map();
+    courierDebts.forEach((row) => {
+      const courier = String(row?.courier_name || '').trim();
+      const currency = String(row?.currency || 'UZS').toUpperCase();
+      if (!courier) return;
+      const key = `${courier}|${currency}`;
+      const item = byKey.get(key) || {
+        courier_name: courier,
+        currency,
+        debit: 0,
+        credit: 0,
+        debt: 0,
+        shipment_count: 0,
+      };
+      item.debit += Number(row?.total_amount || 0);
+      item.credit += Number(row?.paid_amount || 0);
+      item.debt += Number(row?.debt_amount || 0);
+      item.shipment_count += Number(row?.shipment_count || 0);
+      byKey.set(key, item);
+    });
+    return [...byKey.values()].sort((a, b) => (
+      b.debt - a.debt
+      || b.debit - a.debit
+      || a.courier_name.localeCompare(b.courier_name, 'ru')
+      || a.currency.localeCompare(b.currency)
+    ));
+  }
+
+  const balanceViewMeta = {
+    bars: {
+      title: 'Дебет, кредит и долг',
+      count: (rows) => `${rows.length} доставщиков`,
+    },
+    stack: {
+      title: 'Кредит и долг внутри дебета',
+      count: (rows) => `${rows.length} доставщиков`,
+    },
+    ranking: {
+      title: 'Рейтинг по задолженности',
+      count: (rows) => `Топ ${rows.length} доставщиков`,
+    },
+    share: {
+      title: 'Доля в общей задолженности',
+      count: (rows) => `${rows.length} долей`,
+    },
+    limits: {
+      title: 'Контроль лимита долга',
+      count: (rows) => `${rows.length} доставщиков`,
+    },
+  };
+
+  function updateBalanceViewButtons() {
+    document.querySelectorAll('[data-courier-balance-view]').forEach((button) => {
+      const isActive = button.getAttribute('data-courier-balance-view') === courierBalanceView;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+  }
+
+  function renderBalanceBars(chartNode, rows, maxByCurrency) {
+    rows.forEach((row) => {
+      const max = maxByCurrency.get(row.currency) || 0;
+      const item = document.createElement('div');
+      item.className = 'reports-courier-balance-row';
+      item.innerHTML = `
+        <div class="reports-courier-balance-name">
+          <strong>${courierNameButton(row.courier_name)}</strong>
+          <span>${escapeHtml(row.currency)} · ${row.shipment_count} отгрузок</span>
+        </div>
+        <div class="reports-courier-balance-bars">
+          <div class="reports-courier-balance-bar reports-courier-balance-bar--debit">
+            <span>Дебет</span>
+            <i><b style="width:${percent(row.debit, max)}%"></b></i>
+            <em>${escapeHtml(money(row.debit, row.currency))}</em>
+          </div>
+          <div class="reports-courier-balance-bar reports-courier-balance-bar--credit">
+            <span>Кредит</span>
+            <i><b style="width:${percent(row.credit, max)}%"></b></i>
+            <em>${escapeHtml(money(row.credit, row.currency))}</em>
+          </div>
+          <div class="reports-courier-balance-bar reports-courier-balance-bar--debt">
+            <span>Долг</span>
+            <i><b style="width:${percent(row.debt, max)}%"></b></i>
+            <em>${escapeHtml(money(row.debt, row.currency))}</em>
+          </div>
+        </div>
+      `;
+      chartNode.appendChild(item);
+    });
+  }
+
+  function renderBalanceStack(chartNode, rows) {
+    rows.forEach((row) => {
+      const base = Math.max(Number(row.debit || 0), Number(row.credit || 0) + Number(row.debt || 0));
+      const creditWidth = percent(row.credit, base);
+      const debtWidth = Math.max(0, 100 - creditWidth);
+      const item = document.createElement('div');
+      item.className = 'reports-courier-balance-stack';
+      item.innerHTML = `
+        <div class="reports-courier-balance-name">
+          <strong>${courierNameButton(row.courier_name)}</strong>
+          <span>${escapeHtml(money(row.debit, row.currency))} дебет · ${row.shipment_count} отгрузок</span>
+        </div>
+        <div class="reports-courier-stack-track" aria-label="Кредит и долг">
+          <span class="reports-courier-stack-credit" style="width:${creditWidth}%"></span>
+          <span class="reports-courier-stack-debt" style="width:${debtWidth}%"></span>
+        </div>
+        <div class="reports-courier-stack-legend">
+          <span><i class="reports-courier-stack-credit"></i> Кредит ${escapeHtml(money(row.credit, row.currency))}</span>
+          <span><i class="reports-courier-stack-debt"></i> Долг ${escapeHtml(money(row.debt, row.currency))}</span>
+        </div>
+      `;
+      chartNode.appendChild(item);
+    });
+  }
+
+  function renderBalanceRanking(chartNode, rows, maxDebt) {
+    const list = document.createElement('div');
+    list.className = 'reports-courier-balance-ranking';
+    rows.forEach((row, index) => {
+      const item = document.createElement('div');
+      item.className = 'reports-courier-rank-card';
+      item.innerHTML = `
+        <div class="reports-courier-rank-number">${index + 1}</div>
+        <div class="reports-courier-rank-bar"><span style="height:${percent(row.debt, maxDebt)}%"></span></div>
+        <strong>${courierNameButton(row.courier_name)}</strong>
+        <em>${escapeHtml(money(row.debt, row.currency))}</em>
+      `;
+      list.appendChild(item);
+    });
+    chartNode.appendChild(list);
+  }
+
+  function renderBalanceShare(chartNode, rows, debtTotals) {
+    const list = document.createElement('div');
+    list.className = 'reports-courier-balance-share';
+    const visibleRows = rows.filter((row) => Number(row.debt || 0) > 0 && Number(debtTotals.get(row.currency) || 0) > 0);
+    if (!visibleRows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'reports-empty-state reports-empty-state--large';
+      empty.textContent = 'По долям задолженности пока нет данных.';
+      chartNode.appendChild(empty);
+      return;
+    }
+    visibleRows.forEach((row) => {
+      const share = percent(row.debt, debtTotals.get(row.currency) || 0);
+      const item = document.createElement('div');
+      item.className = 'reports-courier-share-card';
+      item.innerHTML = `
+        <div class="reports-courier-share-ring" style="--share:${share}%"><span>${share}%</span></div>
+        <div>
+          <strong>${courierNameButton(row.courier_name)}</strong>
+          <span>${escapeHtml(money(row.debt, row.currency))} из общей задолженности ${escapeHtml(row.currency)}</span>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+    chartNode.appendChild(list);
+  }
+
+  function renderBalanceLimits(chartNode, rows) {
+    const shell = document.createElement('div');
+    shell.className = 'reports-courier-limit-shell';
+    shell.innerHTML = `
+      <div class="reports-courier-limit-toolbar">
+        <div>
+          <strong>Контроль баланса</strong>
+          <span>Закрепите максимальный долг и смотрите, на сколько процентов доставщик заполнил лимит.</span>
+        </div>
+        <button type="button" class="btn btn-secondary" data-courier-limit-save ${courierDebtLimitSaving ? 'disabled' : ''}>Сохранить лимиты</button>
+        <em data-courier-limit-status>${escapeHtml(courierDebtLimitStatus)}</em>
+      </div>
+      <div class="reports-courier-limit-grid"></div>
+    `;
+    const grid = shell.querySelector('.reports-courier-limit-grid');
+    rows.forEach((row) => {
+      const limit = courierLimitValue(row);
+      const filled = limit > 0 ? Math.round(Number(row.debt || 0) / limit * 100) : 0;
+      const capped = Math.max(0, Math.min(100, filled));
+      const isOver = limit > 0 && Number(row.debt || 0) > limit;
+      const card = document.createElement('article');
+      card.className = `reports-courier-limit-card${isOver ? ' is-over' : ''}`;
+      card.innerHTML = `
+        <div class="reports-courier-limit-head">
+          <div>
+            <strong>${courierNameButton(row.courier_name)}</strong>
+            <span>${escapeHtml(row.currency)} · ${row.shipment_count} отгрузок</span>
+          </div>
+          <div class="reports-courier-limit-ring${isOver ? ' is-over' : ''}" style="--fill:${capped}%"><span>${limit > 0 ? `${filled}%` : '0%'}</span></div>
+        </div>
+        <div class="reports-courier-limit-track"><span style="width:${capped}%"></span></div>
+        <div class="reports-courier-limit-values">
+          <span>Долг <b>${escapeHtml(money(row.debt, row.currency))}</b></span>
+          <label>Максимальный долг
+            <input
+              class="reports-courier-limit-input"
+              type="text"
+              inputmode="decimal"
+              data-courier-limit-input="${escapeHtml(courierLimitKey(row))}"
+              value="${limit > 0 ? escapeHtml(formatLimitAmount(String(limit))) : ''}"
+              placeholder="0"
+            />
+          </label>
+        </div>
+        <small>${limit > 0 ? escapeHtml(money(Math.max(limit - Number(row.debt || 0), 0), row.currency)) + ' осталось до лимита' : 'Лимит не задан'}</small>
+      `;
+      grid.appendChild(card);
+    });
+    chartNode.appendChild(shell);
+  }
+
+  function renderCourierBalancePanel() {
+    const totalsNode = document.querySelector('[data-courier-balance-totals]');
+    const chartNode = document.querySelector('[data-courier-balance-chart]');
+    const countNode = document.querySelector('[data-courier-balance-count]');
+    const titleNode = document.querySelector('[data-courier-balance-title]');
+    if (!totalsNode || !chartNode) return;
+
+    const rows = balanceRows();
+    const totals = new Map();
+    const maxByCurrency = new Map();
+    const debtTotals = new Map();
+    let maxDebt = 0;
+    rows.forEach((row) => {
+      const current = totals.get(row.currency) || { debit: 0, credit: 0, debt: 0, count: 0 };
+      current.debit += row.debit;
+      current.credit += row.credit;
+      current.debt += row.debt;
+      current.count += 1;
+      totals.set(row.currency, current);
+      debtTotals.set(row.currency, (debtTotals.get(row.currency) || 0) + row.debt);
+      maxDebt = Math.max(maxDebt, row.debt);
+      maxByCurrency.set(
+        row.currency,
+        Math.max(maxByCurrency.get(row.currency) || 0, row.debit, row.credit, row.debt)
+      );
+    });
+
+    updateBalanceViewButtons();
+    const viewMeta = balanceViewMeta[courierBalanceView] || balanceViewMeta.bars;
+    if (titleNode) titleNode.textContent = viewMeta.title;
+    totalsNode.replaceChildren();
+    chartNode.replaceChildren();
+    if (countNode) countNode.textContent = viewMeta.count(rows);
+
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'reports-empty-state reports-empty-state--large';
+      empty.textContent = 'По доставщикам пока нет данных для баланса.';
+      chartNode.appendChild(empty);
+      return;
+    }
+
+    [...totals.entries()]
+      .filter(([, item]) => Number(item.debit || 0) || Number(item.credit || 0) || Number(item.debt || 0))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([currency, item]) => {
+        const card = document.createElement('article');
+        card.className = 'reports-courier-balance-total';
+        card.innerHTML = `
+          <span>${escapeHtml(currency)}</span>
+          <strong>${escapeHtml(money(item.debt, currency))}</strong>
+          <small>Общая задолженность</small>
+          <div>
+            <b>Дебет ${escapeHtml(money(item.debit, currency))}</b>
+            <b>Кредит ${escapeHtml(money(item.credit, currency))}</b>
+          </div>
+        `;
+        totalsNode.appendChild(card);
+      });
+
+    if (courierBalanceView === 'stack') {
+      renderBalanceStack(chartNode, rows);
+    } else if (courierBalanceView === 'ranking') {
+      renderBalanceRanking(chartNode, rows, maxDebt);
+    } else if (courierBalanceView === 'share') {
+      renderBalanceShare(chartNode, rows, debtTotals);
+    } else if (courierBalanceView === 'limits') {
+      renderBalanceLimits(chartNode, rows);
+    } else {
+      renderBalanceBars(chartNode, rows, maxByCurrency);
+    }
+  }
+
+  function initReconcileDatePicker() {
+    const mount = document.getElementById('reports-reconcile-date-picker');
+    if (!mount || !window.UPOS_DATE_RANGE || reconcileDatePicker) return;
+    reconcileDatePicker = window.UPOS_DATE_RANGE.create(mount, {
+      preset: reconcilePeriod,
+      date_from: reconcileDateFrom,
+      date_to: reconcileDateTo,
+      onApply: (range) => {
+        reconcilePeriod = range.preset || 'custom';
+        reconcileDateFrom = range.date_from || '';
+        reconcileDateTo = range.date_to || range.date_from || '';
+        renderReconcilePanel();
+      },
+    });
+  }
+
+  function ensureOpen(tab) {
+    if (!reportMeta[tab]) return;
+    if (!openTabs.includes(tab)) openTabs.push(tab);
+  }
+
+  const storageKey = 'upos.homeReports.openTabs';
+
+  function saveState() {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ openTabs, activeTab }));
+    } catch (err) {
+      /* localStorage can be unavailable in private contexts. */
+    }
+  }
+
+  function restoreState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      const savedTabs = Array.isArray(saved.openTabs)
+        ? saved.openTabs.filter((tab) => reportMeta[tab])
+        : [];
+      savedTabs.forEach(ensureOpen);
+      activeTab = reportMeta[saved.activeTab] ? saved.activeTab : '';
+      if (activeTab) ensureOpen(activeTab);
+    } catch (err) {
+      activeTab = '';
+    }
+  }
+
+  function closeTab(tab) {
+    const idx = openTabs.indexOf(tab);
+    if (idx === -1) return;
+    openTabs.splice(idx, 1);
+    if (tab === 'courier-reconcile') reconcileCourierName = '';
+    if (activeTab === tab) {
+      activeTab = openTabs[idx] || openTabs[idx - 1] || '';
+    }
+    render();
+  }
+
+  function renderOpenTabs() {
+    tabsShell.querySelectorAll('[data-org-report-open-tab]').forEach((node) => node.remove());
+    const homeActive = !activeTab;
+    homeTab.classList.toggle('active', homeActive);
+    if (homeActive) homeTab.setAttribute('aria-current', 'page');
+    else homeTab.removeAttribute('aria-current');
+
+    openTabs.forEach((tab) => {
+      const item = document.createElement('span');
+      item.className = 'general-module-tab general-module-tab--report';
+      item.setAttribute('data-org-report-open-tab', tab);
+
+      const activate = document.createElement('button');
+      activate.type = 'button';
+      activate.className = 'general-module-tab-activate';
+      activate.setAttribute('data-org-report-activate', tab);
+      activate.setAttribute('role', 'tab');
+      activate.textContent = tabLabel(tab);
+
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'general-module-tab-close';
+      close.setAttribute('data-org-report-close-tab', tab);
+      close.setAttribute('aria-label', `Закрыть вкладку ${tabLabel(tab)}`);
+      close.textContent = '×';
+
+      item.append(activate, close);
+      tabsShell.appendChild(item);
+    });
+  }
+
+  function render() {
+    renderOpenTabs();
+    const hasReport = Boolean(activeTab);
+    launcher.hidden = hasReport;
+    root.hidden = !hasReport;
+
+    document.querySelectorAll('[data-org-report-card]').forEach((card) => {
+      const isActive = card.getAttribute('data-org-report-card') === activeTab;
+      card.classList.toggle('active', isActive);
+      card.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-org-report-open-tab]').forEach((tabEl) => {
+      tabEl.classList.toggle('active', tabEl.getAttribute('data-org-report-open-tab') === activeTab);
+    });
+    document.querySelectorAll('[data-org-report-activate]').forEach((btn) => {
+      btn.setAttribute('aria-selected', btn.getAttribute('data-org-report-activate') === activeTab ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-org-report-panel]').forEach((panel) => {
+      panel.hidden = panel.getAttribute('data-org-report-panel') !== activeTab;
+    });
+    if (activeTab === 'courier-reconcile') renderReconcilePanel();
+    if (activeTab === 'courier-balance') renderCourierBalancePanel();
+    saveState();
+  }
+
+  function openReport(tab) {
+    if (!reportMeta[tab]) return;
+    ensureOpen(tab);
+    activeTab = tab;
+    render();
+  }
+
+  function openReconcile(courierName) {
+    reconcileCourierName = String(courierName || '').trim();
+    resetReconcileFilter();
+    ensureOpen('courier-reconcile');
+    activeTab = 'courier-reconcile';
+    render();
+  }
+
+  homeTab.addEventListener('click', (event) => {
+    event.preventDefault();
+    activeTab = '';
+    render();
+  });
+  document.addEventListener('click', (event) => {
+    const balanceViewButton = event.target.closest('[data-courier-balance-view]');
+    if (balanceViewButton) {
+      courierBalanceView = balanceViewButton.getAttribute('data-courier-balance-view') || 'bars';
+      renderCourierBalancePanel();
+      return;
+    }
+    const limitSave = event.target.closest('[data-courier-limit-save]');
+    if (limitSave) {
+      saveCourierDebtLimits();
+      return;
+    }
+    const card = event.target.closest('[data-org-report-card]');
+    if (card) {
+      openReport(card.getAttribute('data-org-report-card'));
+      return;
+    }
+    const activate = event.target.closest('[data-org-report-activate]');
+    if (activate) {
+      openReport(activate.getAttribute('data-org-report-activate'));
+      return;
+    }
+    const close = event.target.closest('[data-org-report-close-tab]');
+    if (close) {
+      closeTab(close.getAttribute('data-org-report-close-tab'));
+      return;
+    }
+    const resetFilter = event.target.closest('[data-reconcile-reset]');
+    if (resetFilter) {
+      resetReconcileFilter();
+      renderReconcilePanel();
+      return;
+    }
+    const courierButton = event.target.closest('[data-courier-name]');
+    if (courierButton) {
+      openReconcile(courierButton.getAttribute('data-courier-name') || courierButton.textContent.trim());
+    }
+  });
+
+  document.addEventListener('input', (event) => {
+    const limitInput = event.target.closest('[data-courier-limit-input]');
+    if (limitInput) {
+      formatLimitInput(limitInput);
+    }
+  });
+
+  document.addEventListener('change', (event) => {
+    const periodNode = event.target.closest('[data-reconcile-period]');
+    if (periodNode) {
+      setReconcilePreset(periodNode.value);
+      renderReconcilePanel();
+      return;
+    }
+    const fromNode = event.target.closest('[data-reconcile-date-from]');
+    if (fromNode) {
+      reconcileDateFrom = fromNode.value || '';
+      reconcilePeriod = 'custom';
+      renderReconcilePanel();
+      return;
+    }
+    const toNode = event.target.closest('[data-reconcile-date-to]');
+    if (toNode) {
+      reconcileDateTo = toNode.value || '';
+      reconcilePeriod = 'custom';
+      renderReconcilePanel();
+    }
+  });
+
+  restoreState();
+  render();
+})();
+</script>
+{% endblock %}

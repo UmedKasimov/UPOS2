@@ -1,0 +1,1434 @@
+{% extends "base.html" %}
+{% block title %}Отгрузки{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">Отгрузки</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    {% if flash_ok or flash_err or request.query_params.get("err") == "csrf" %}
+      <div class="organizations-flash-group">
+        {% if flash_ok == "shipments_created" %}
+          <div class="flash ok settings-ios-flash">Документ отправлен.</div>
+        {% endif %}
+        {% if flash_ok == "shipment_confirmed" %}
+          <div class="flash ok settings-ios-flash">Документ подтверждён.</div>
+        {% endif %}
+        {% if flash_ok == "shipment_updated" %}
+          <div class="flash ok settings-ios-flash">Документ сохранён.</div>
+        {% endif %}
+        {% if flash_ok == "shipment_deleted" %}
+          <div class="flash ok settings-ios-flash">Документ удалён.</div>
+        {% endif %}
+        {% if flash_ok == "shipment_not_found" %}
+          <div class="flash err settings-ios-flash">Документ не найден.</div>
+        {% endif %}
+        {% if flash_err %}
+          <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+        {% endif %}
+        {% if request.query_params.get("err") == "csrf" %}
+          <div class="flash err settings-ios-flash">Форма устарела. Обновите страницу и повторите.</div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <nav class="general-module-tabs org-shipments-tabs" aria-label="Разделы отгрузок" data-shipment-open-tabs>
+      <button type="button" class="general-module-tab active" data-shipment-home-tab data-shipment-view="home" aria-current="page">Отгрузки</button>
+    </nav>
+
+    <section class="general-report-launcher org-report-launcher org-shipments-launcher" role="tablist" aria-label="Отгрузки организации" data-shipment-launcher>
+      <button type="button" class="general-report-card" role="tab" data-shipment-card="new" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 5h11v14H4z" />
+            <path d="M15 9h3l2 3v7h-5z" />
+            <path d="M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+            <path d="M17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+            <path d="M7 9h5M7 12h4" />
+          </svg>
+        </span>
+        <span>Новые отгрузки</span>
+        <small>Создание отгрузок</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-shipment-card="journal" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M5 4h14v16H5z" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+            <path d="M3 8h2M3 12h2M3 16h2" />
+          </svg>
+        </span>
+        <span>Журнал</span>
+        <small>Отгрузки по дням</small>
+      </button>
+    </section>
+
+    <div class="general-home-shell" data-shipment-panels-root hidden>
+      <section class="org-ops-panel org-shipments-panel" id="shipments-new-panel" data-shipment-panel="new" hidden>
+        <div class="director-section-head">
+          <p class="settings-ios-footnote">{{ selected_organization.name if selected_organization else 'Организация' }}</p>
+          <h2>Новые отгрузки</h2>
+        </div>
+        <form method="post" action="{% if inside_organization %}{{ url_for('home_shipments_create') }}{% else %}{{ url_for('organizations_shipments_create') }}{% endif %}" class="org-ops-table-form">
+          {% include "_csrf_field.html" %}
+          {% if not inside_organization %}
+            <input type="hidden" name="organization_id" value="{{ selected_organization_id }}" />
+          {% endif %}
+          <div class="org-ops-form-toolbar">
+            <input id="shipment-date" type="date" name="shipment_date" value="{{ today }}" aria-label="Дата" required />
+            <button type="submit" class="btn">Создать отгрузки</button>
+          </div>
+          <div class="org-shipments-order-templates" data-shipment-order-templates data-template-storage-key="upos.shipments.orderTemplates.{{ selected_organization_id }}">
+            <div class="org-shipments-order-title">
+              <strong>Шаблон очередности</strong>
+              <span>Применяет только имена сотрудников в нужном порядке</span>
+            </div>
+            <div class="org-shipments-order-controls">
+              <select data-shipment-order-select aria-label="Шаблон очередности"></select>
+              <button type="button" class="btn btn-secondary" data-shipment-order-apply>Применить</button>
+              <input type="text" maxlength="80" placeholder="Название шаблона" data-shipment-order-name />
+              <button type="button" class="btn btn-secondary" data-shipment-order-save>Сохранить</button>
+              <button type="button" class="btn btn-secondary" data-shipment-order-delete>Удалить</button>
+            </div>
+            <div class="org-shipments-order-status" data-shipment-order-status aria-live="polite"></div>
+          </div>
+          <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+            <table class="org-ops-table org-ops-table--shipments-entry" id="shipments-entry-table">
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Сумма</th>
+                  <th>Валюта</th>
+                  <th>Примечание</th>
+                  <th class="org-ops-row-actions-head">Строка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for _ in range(1) %}
+                  <tr>
+                    <td>
+                      <div class="shipment-employee-picker" data-shipment-employee-picker>
+                        <input type="hidden" name="employee_id" data-shipment-employee-id />
+                        <input
+                          type="search"
+                          autocomplete="off"
+                          placeholder="Поиск сотрудника"
+                          data-shipment-employee-search
+                          aria-haspopup="listbox"
+                          aria-expanded="false"
+                        />
+                        <button type="button" class="shipment-employee-toggle" data-shipment-employee-toggle aria-label="Открыть список сотрудников">⌄</button>
+                        <div class="shipment-employee-menu" data-shipment-employee-menu role="listbox" hidden></div>
+                      </div>
+                    </td>
+                    <td><input name="amount" type="text" inputmode="decimal" placeholder="0" data-shipment-amount data-upos-money-format data-upos-money-decimals="0" /></td>
+                    <td>
+                      <select name="currency">
+                        <option value="UZS">UZS</option>
+                        <option value="USD">USD</option>
+                        <option value="RUB">RUB</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </td>
+                    <td><input name="note" type="text" maxlength="1000" placeholder="Акт / комментарий" /></td>
+                    <td class="org-ops-row-actions">
+                      <button type="button" class="org-ops-row-action org-ops-row-action--add" data-add-shipment-row-inline aria-label="Добавить строку">+</button>
+                      <button type="button" class="org-ops-row-action org-ops-row-action--remove" data-remove-shipment-row aria-label="Удалить строку">X</button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </form>
+      </section>
+
+      <section class="org-ops-panel org-shipments-journal org-shipments-panel" id="shipments-journal-panel" data-shipment-panel="journal" hidden>
+        <div class="director-section-head org-shipments-journal-head">
+          <div>
+            <p class="settings-ios-footnote">Журнал</p>
+            <h2>Отгрузки по дням</h2>
+          </div>
+          <div id="shipments-journal-date-filter" class="org-shipments-journal-filter"></div>
+        </div>
+        <div class="org-shipments-journal-tools" data-shipment-journal-tools>
+          <label class="org-shipments-journal-field">
+            <span>Статус</span>
+            <select data-shipment-journal-status>
+              <option value="all">Все статусы</option>
+              <option value="debt">Есть долг</option>
+              <option value="open">Открытые</option>
+              <option value="partial">Частично</option>
+              <option value="paid">Оплачено</option>
+            </select>
+          </label>
+          <label class="org-shipments-journal-field org-shipments-journal-field--search">
+            <span>№ заказа</span>
+            <input type="search" placeholder="Поиск по номеру" data-shipment-journal-search />
+          </label>
+          <label class="org-shipments-journal-field">
+            <span>На странице</span>
+            <select data-shipment-journal-page-size>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+        </div>
+        <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="org-ops-table org-ops-table--shipments-entry org-shipments-journal-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="day">
+                    <span>№ дня</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="date">
+                    <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="number">
+                    <span>№ заказов</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="count">
+                    <span>Отгрузок</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>Доставщики</th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="amount">
+                    <span>Сумма</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="debt">
+                    <span>Долг</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="status">
+                    <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="org-shipments-sort-btn" data-shipment-journal-sort-button="document">
+                    <span>Документ</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th class="org-ops-row-actions-head">Открыть</th>
+              </tr>
+            </thead>
+            <tbody id="shipments-journal-body">
+              {% for day_row in shipment_daily_journal or [] %}
+                <tr
+                  data-shipment-journal-row
+                  data-shipment-journal-date="{{ day_row.date }}"
+                  data-shipment-journal-title="№ {{ day_row.numbers_label or day_row.date }}"
+                  data-shipment-journal-numbers="{{ day_row.numbers_label or '' }}"
+                  data-shipment-journal-total-amount="{{ day_row.total_amount or 0 }}"
+                  data-shipment-journal-debt-amount="{{ day_row.debt_amount or 0 }}"
+                  data-shipment-journal-statuses="{{ (day_row.statuses or [])|join(',') }}"
+                  data-shipment-journal-doc-status="{{ day_row.doc_status or 'new' }}"
+                >
+                  <td><strong>{{ day_row.day_index }}</strong></td>
+                  <td>{{ day_row.date }}</td>
+                  <td>{{ day_row.numbers_label or '—' }}</td>
+                  <td>{{ day_row.count }}</td>
+                  <td>
+                    {% if day_row.couriers %}
+                      {{ day_row.couriers|join(', ') }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% for ccy in day_row.currencies %}
+                      <span class="org-shipments-money-line">{{ ccy.total_label }} {{ ccy.currency }}</span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% for ccy in day_row.currencies %}
+                      <span class="org-shipments-money-line"><strong>{{ ccy.debt_label }} {{ ccy.currency }}</strong></span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% if (day_row.debt_amount or 0) <= 0 %}
+                      <span class="org-shipments-status org-shipments-status--paid">Оплачено</span>
+                    {% elif 'partial' in (day_row.statuses or []) %}
+                      <span class="org-shipments-status org-shipments-status--partial">Частично</span>
+                    {% else %}
+                      <span class="org-shipments-status org-shipments-status--open">Открыто</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="org-shipments-doc-status org-shipments-doc-status--{{ day_row.doc_status or 'new' }}">
+                      {{ day_row.doc_status_label or 'Новый' }}
+                    </span>
+                  </td>
+                  <td class="org-ops-row-actions">
+                    <a
+                      class="org-ops-row-action org-ops-row-action--open"
+                      href="#day-{{ day_row.date }}"
+                      aria-label="Открыть день {{ day_row.date }}"
+                      data-shipment-day-open="{{ day_row.date }}"
+                      data-shipment-day-url="{% if inside_organization %}/shipments/day/{{ day_row.date }}{% else %}/organizations/shipments/day/{{ day_row.date }}?organization_id={{ selected_organization_id }}{% endif %}"
+                      data-shipment-day-title="№ {{ day_row.numbers_label or day_row.date }}"
+                    >↗</a>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="10" class="org-ops-empty">Журнал отгрузок пока пуст.</td>
+                </tr>
+              {% endfor %}
+              <tr id="shipments-journal-filter-empty" hidden>
+                <td colspan="10" class="org-ops-empty">За выбранный период отгрузок нет.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <footer class="org-shipments-journal-footer" data-shipment-journal-footer>
+          <div class="org-shipments-journal-total" data-shipment-journal-total>Сумма: 0 UZS</div>
+          <div class="org-shipments-journal-pages">
+            <span data-shipment-journal-page-info>Стр. 1 / 1</span>
+            <button type="button" class="org-shipments-page-btn" data-shipment-journal-prev aria-label="Предыдущая страница">‹</button>
+            <button type="button" class="org-shipments-page-btn" data-shipment-journal-next aria-label="Следующая страница">›</button>
+          </div>
+        </footer>
+      </section>
+
+      <section class="org-ops-panel org-shipments-day org-shipments-panel" data-shipment-day-panel hidden>
+        <div data-shipment-day-content></div>
+      </section>
+    </div>
+  </div>
+
+  <script type="application/json" id="shipment-employees-data">{{ hr_employees|tojson }}</script>
+  <script type="application/json" id="shipment-rows-data">{{ shipments|tojson }}</script>
+  <script type="application/json" id="shipment-journal-data">{{ shipment_daily_journal|tojson }}</script>
+  <script>
+    (() => {
+      const tabsShell = document.querySelector('[data-shipment-open-tabs]');
+      const homeTab = document.querySelector('[data-shipment-home-tab]');
+      const launcher = document.querySelector('[data-shipment-launcher]');
+      const panelsRoot = document.querySelector('[data-shipment-panels-root]');
+      const dayPanel = document.querySelector('[data-shipment-day-panel]');
+      const dayContent = document.querySelector('[data-shipment-day-content]');
+      const cards = Array.from(document.querySelectorAll('[data-shipment-card]'));
+      const panels = Array.from(document.querySelectorAll('[data-shipment-panel]'));
+      if (!tabsShell || !homeTab || !launcher || !panelsRoot || !cards.length || !panels.length) return;
+      const shipmentInsideOrganization = {{ 'true' if inside_organization else 'false' }};
+      const shipmentSelectedOrganizationId = {{ selected_organization_id|tojson }};
+      const shipmentDayUpdateBase = shipmentInsideOrganization ? '/shipments/day' : '/organizations/shipments/day';
+      const shipmentDayDeleteBase = shipmentInsideOrganization ? '/shipments/day' : '/organizations/shipments/day';
+      const shipmentDeleteBase = shipmentInsideOrganization ? '/shipments/shipment' : '/organizations/shipments/shipment';
+      const shipmentConfirmBase = shipmentInsideOrganization ? '/shipments/shipment' : '/organizations/shipments/shipment';
+      const shipmentCsrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+
+      let shipmentRows = [];
+      try {
+        shipmentRows = JSON.parse(document.getElementById('shipment-rows-data')?.textContent || '[]');
+      } catch (err) {
+        shipmentRows = [];
+      }
+      const meta = {
+        new: { title: 'Новые отгрузки', hash: '#new' },
+        journal: { title: 'Журнал', hash: '#journal' },
+      };
+      const storageKey = 'upos.shipments.openTabs';
+      const openTabs = [];
+      let activeTab = '';
+
+      function normalize(tab) {
+        if (Object.prototype.hasOwnProperty.call(meta, tab)) return tab;
+        if (String(tab || '').startsWith('day:')) return String(tab);
+        if (String(tab || '').startsWith('shipment:')) return String(tab);
+        return '';
+      }
+
+      function ensureOpen(tab) {
+        if (!openTabs.includes(tab)) openTabs.push(tab);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function money(value, currency) {
+        const amount = Number(value || 0);
+        const label = Math.round(amount).toLocaleString('ru-RU');
+        return `${label} ${String(currency || 'UZS').toUpperCase()}`;
+      }
+
+      function dayFromTab(tab) {
+        return String(tab || '').startsWith('day:') ? String(tab).slice(4) : '';
+      }
+
+      function shipmentFromTab(tab) {
+        return String(tab || '').startsWith('shipment:') ? String(tab).slice(9) : '';
+      }
+
+      function shipmentById(id) {
+        return shipmentRows.find((row) => String(row.id || '') === String(id || '')) || null;
+      }
+
+      function dayTitle(day) {
+        const row = Array.from(document.querySelectorAll('[data-shipment-journal-row]'))
+          .find((item) => item.dataset.shipmentJournalDate === day);
+        return row?.dataset.shipmentJournalTitle || `№ ${day}`;
+      }
+
+      function tabTitle(tab) {
+        const day = dayFromTab(tab);
+        if (day) return dayTitle(day);
+        const shipmentId = shipmentFromTab(tab);
+        if (shipmentId) {
+          const row = shipmentById(shipmentId);
+          return `№ ${row?.number || 'отгрузка'}`;
+        }
+        return meta[tab]?.title || tab;
+      }
+
+      function tabHash(tab) {
+        const day = dayFromTab(tab);
+        if (day) return `#day-${day}`;
+        const shipmentId = shipmentFromTab(tab);
+        if (shipmentId) return `#shipment-${shipmentId}`;
+        return meta[tab]?.hash || '';
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({ openTabs, activeTab }));
+        } catch (err) {
+          /* localStorage can be unavailable in private contexts. */
+        }
+      }
+
+      function restoreState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          const savedTabs = Array.isArray(saved.openTabs) ? saved.openTabs.map(normalize).filter(Boolean) : [];
+          savedTabs.forEach(ensureOpen);
+          activeTab = normalize(saved.activeTab);
+          if (activeTab) ensureOpen(activeTab);
+        } catch (err) {
+          activeTab = '';
+        }
+      }
+
+      function syncHash() {
+        if (!window.history?.replaceState) return;
+        const nextUrl = activeTab ? location.pathname + location.search + tabHash(activeTab) : location.pathname + location.search;
+        window.history.replaceState(null, '', nextUrl);
+      }
+
+      function renderOpenTabs() {
+        tabsShell.querySelectorAll('[data-shipment-open-tab]').forEach((node) => node.remove());
+        const homeActive = !activeTab;
+        homeTab.classList.toggle('active', homeActive);
+        homeTab.setAttribute('aria-current', homeActive ? 'page' : 'false');
+        openTabs.forEach((tab) => {
+          const holder = document.createElement('span');
+          holder.className = `general-module-tab general-module-tab--report${activeTab === tab ? ' active' : ''}`;
+          holder.dataset.shipmentOpenTab = tab;
+
+          const activate = document.createElement('button');
+          activate.type = 'button';
+          activate.className = 'general-module-tab-activate';
+          activate.dataset.shipmentActivateTab = tab;
+          activate.textContent = tabTitle(tab);
+
+          const close = document.createElement('button');
+          close.type = 'button';
+          close.className = 'general-module-tab-close';
+          close.dataset.shipmentCloseTab = tab;
+          close.setAttribute('aria-label', `Закрыть ${tabTitle(tab)}`);
+          close.textContent = '×';
+
+          holder.append(activate, close);
+          tabsShell.append(holder);
+        });
+      }
+
+      function render() {
+        renderOpenTabs();
+        const activeDay = dayFromTab(activeTab);
+        const activeShipment = shipmentFromTab(activeTab);
+        launcher.hidden = Boolean(activeTab);
+        panelsRoot.hidden = !activeTab;
+        if (dayPanel) dayPanel.hidden = !activeDay && !activeShipment;
+        cards.forEach((card) => {
+          card.setAttribute('aria-selected', card.dataset.shipmentCard === activeTab ? 'true' : 'false');
+        });
+        panels.forEach((panel) => {
+          panel.hidden = panel.dataset.shipmentPanel !== activeTab;
+        });
+        if (activeShipment) {
+          renderShipmentPanel(activeShipment);
+        } else if (activeDay) {
+          renderDayPanel(activeDay);
+        }
+        syncHash();
+        saveState();
+      }
+
+      function openShipment(tab) {
+        const nextTab = normalize(tab);
+        if (!nextTab) return;
+        ensureOpen(nextTab);
+        activeTab = nextTab;
+        render();
+      }
+
+      function closeShipment(tab) {
+        const index = openTabs.indexOf(tab);
+        if (index >= 0) openTabs.splice(index, 1);
+        if (activeTab === tab) {
+          activeTab = openTabs[index] || openTabs[index - 1] || '';
+        }
+        render();
+      }
+
+      function rowsForDay(day) {
+        return shipmentRows.filter((row) => String(row.shipment_date || '') === day);
+      }
+
+      function buildCourierSummary(rows) {
+        const map = new Map();
+        rows.forEach((row) => {
+          const key = `${row.courier_name || ''}|${row.currency || 'UZS'}`;
+          const item = map.get(key) || {
+            courier_name: row.courier_name || '',
+            currency: row.currency || 'UZS',
+            count: 0,
+            total: 0,
+            paid: 0,
+            debt: 0,
+          };
+          item.count += 1;
+          item.total += Number(row.total_amount || 0);
+          item.paid += Number(row.paid_amount || 0);
+          item.debt += Number(row.debt_amount || 0);
+          map.set(key, item);
+        });
+        return Array.from(map.values()).sort((a, b) => a.courier_name.localeCompare(b.courier_name, 'ru'));
+      }
+
+      function documentStatusForRows(rows) {
+        const confirmed = rows.length > 0 && rows.every((row) => String(row.doc_status || '').toLowerCase() === 'confirmed');
+        return confirmed ? 'confirmed' : 'new';
+      }
+
+      function documentStatusLabel(status) {
+        return String(status || '').toLowerCase() === 'confirmed' ? 'Подтверждён' : 'Новый';
+      }
+
+      function documentStatusBadge(status) {
+        const clean = String(status || '').toLowerCase() === 'confirmed' ? 'confirmed' : 'new';
+        return `<span class="org-shipments-doc-status org-shipments-doc-status--${clean}">${escapeHtml(documentStatusLabel(clean))}</span>`;
+      }
+
+      function shipmentConfirmForm(row) {
+        if (String(row?.doc_status || '').toLowerCase() === 'confirmed') return '';
+        const orgInput = shipmentInsideOrganization ? '' : `<input type="hidden" name="organization_id" value="${escapeHtml(shipmentSelectedOrganizationId || '')}" />`;
+        return `
+          <form method="post" action="${shipmentConfirmBase}/${encodeURIComponent(row?.id || '')}/confirm" class="org-shipments-confirm-form">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(shipmentCsrfToken)}" />
+            ${orgInput}
+            <button type="submit" class="btn org-shipments-confirm-btn">Подтвердить</button>
+          </form>
+        `;
+      }
+
+      function documentDeleteForm(day) {
+        const orgInput = shipmentInsideOrganization ? '' : `<input type="hidden" name="organization_id" value="${escapeHtml(shipmentSelectedOrganizationId || '')}" />`;
+        return `
+          <form method="post" action="${shipmentDayDeleteBase}/${encodeURIComponent(day)}/delete" class="org-shipments-confirm-form" onsubmit="return window.confirm('Удалить документ отгрузки?');">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(shipmentCsrfToken)}" />
+            ${orgInput}
+            <button type="submit" class="btn btn-secondary org-shipments-delete-btn">Удалить документ</button>
+          </form>
+        `;
+      }
+
+      function renderDayPanel(day) {
+        if (!dayContent) return;
+        const rows = rowsForDay(day);
+        const documentStatus = documentStatusForRows(rows);
+        const shipmentRowsHtml = rows.length
+          ? rows.map((row, index) => `<tr>
+                <td><strong>${index + 1}</strong></td>
+                <td>${escapeHtml(row.number)}</td>
+                <td>${escapeHtml(row.shipment_date)}</td>
+                <td>${escapeHtml(row.courier_name || '')}</td>
+                <td>${escapeHtml(money(row.total_amount, row.currency))}</td>
+                <td>${escapeHtml(money(row.paid_amount, row.currency))}</td>
+                <td><strong>${escapeHtml(money(row.debt_amount, row.currency))}</strong></td>
+                <td>${documentStatusBadge(row.doc_status)}</td>
+                <td>${escapeHtml(row.note || '—')}</td>
+                <td class="org-ops-row-actions">
+                  <button
+                    type="button"
+                    class="org-ops-row-action org-ops-row-action--open"
+                    data-shipment-open-shipment="${escapeHtml(row.id || '')}"
+                    aria-label="Открыть отгрузку № ${escapeHtml(row.number || '')}"
+                  >✎</button>
+                </td>
+              </tr>`).join('')
+          : '<tr><td colspan="10" class="org-ops-empty">За этот день отгрузок нет.</td></tr>';
+        dayContent.innerHTML = `
+          <section class="org-ops-panel org-shipments-day">
+            <div class="director-section-head">
+              <p class="settings-ios-footnote">Дневная вкладка</p>
+              <h2>Отгрузки за ${escapeHtml(day)}</h2>
+              <div class="org-shipments-document-actions">
+                <span class="org-shipments-document-status">Статус документа: ${documentStatusBadge(documentStatus)}</span>
+                ${documentDeleteForm(day)}
+              </div>
+            </div>
+            <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+              <table class="org-ops-table org-ops-table--shipments-entry org-shipments-day-table">
+                <thead>
+                  <tr><th>№ дня</th><th>№ заказа</th><th>Дата</th><th>Доставщик</th><th>Сумма</th><th>Оплата</th><th>Долг</th><th>Документ</th><th>Примечание</th><th class="org-ops-row-actions-head">Ручка</th></tr>
+                </thead>
+                <tbody>${shipmentRowsHtml}</tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }
+
+      function currencyOptions(selected) {
+        const clean = String(selected || 'UZS').toUpperCase();
+        return ['UZS', 'USD', 'RUB', 'EUR'].map((ccy) => (
+          `<option value="${ccy}"${ccy === clean ? ' selected' : ''}>${ccy}</option>`
+        )).join('');
+      }
+
+      function renderShipmentPanel(shipmentId) {
+        if (!dayContent) return;
+        const row = shipmentById(shipmentId);
+        if (!row) {
+          dayContent.innerHTML = `
+            <section class="org-ops-panel org-shipments-day">
+              <div class="director-section-head">
+                <p class="settings-ios-footnote">Отгрузка</p>
+                <h2>Отгрузка не найдена</h2>
+              </div>
+              <div class="org-ops-empty">Документ уже удалён или недоступен.</div>
+            </section>
+          `;
+          return;
+        }
+        const item = Array.isArray(row.items) && row.items.length ? row.items[0] : {};
+        const canEdit = String(row.doc_status || '').toLowerCase() !== 'confirmed';
+        const orgInput = shipmentInsideOrganization ? '' : `<input type="hidden" name="organization_id" value="${escapeHtml(shipmentSelectedOrganizationId || '')}" />`;
+        const updateForm = canEdit
+          ? `<form method="post" action="${shipmentDayUpdateBase}/${encodeURIComponent(row.shipment_date || '')}/update" class="org-shipments-edit-form">
+              <input type="hidden" name="csrf_token" value="${escapeHtml(shipmentCsrfToken)}" />
+              ${orgInput}
+              <input type="hidden" name="return_shipment_id" value="${escapeHtml(row.id || '')}" />
+              <input type="hidden" name="shipment_id" value="${escapeHtml(row.id || '')}" />
+              <input type="hidden" name="employee_id" value="${escapeHtml(row.employee_id || '')}" />
+              <input type="hidden" name="product_name" value="${escapeHtml(item.product_name || '')}" />
+              <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+                <table class="org-ops-table org-ops-table--shipments-entry org-shipments-day-table">
+                  <thead>
+                    <tr><th>№ заказа</th><th>Дата</th><th>Доставщик</th><th>Сумма</th><th>Валюта</th><th>Примечание</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>${escapeHtml(row.number || '')}</strong></td>
+                      <td>${escapeHtml(row.shipment_date || '')}</td>
+                      <td><input name="courier_name" type="text" value="${escapeHtml(row.courier_name || '')}" /></td>
+                      <td><input name="amount" type="text" inputmode="decimal" value="${escapeHtml(row.total_amount_label || Math.round(Number(row.total_amount || 0)).toLocaleString('ru-RU'))}" /></td>
+                      <td><select name="currency">${currencyOptions(row.currency)}</select></td>
+                      <td><input name="note" type="text" value="${escapeHtml(row.note || '')}" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="org-shipments-edit-actions">
+                <button type="submit" class="btn org-shipments-confirm-btn">Сохранить изменения</button>
+              </div>
+            </form>`
+          : '<div class="org-ops-empty">Подтверждённую отгрузку нельзя изменить. Можно удалить документ ниже.</div>';
+        const deleteForm = `
+          <form method="post" action="${shipmentDeleteBase}/${encodeURIComponent(row.id || '')}/delete" class="org-shipments-confirm-form" onsubmit="return window.confirm('Удалить эту отгрузку?');">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(shipmentCsrfToken)}" />
+            ${orgInput}
+            <button type="submit" class="btn btn-secondary org-shipments-delete-btn">Удалить документ</button>
+          </form>
+        `;
+        dayContent.innerHTML = `
+          <section class="org-ops-panel org-shipments-day">
+            <div class="director-section-head">
+              <div>
+                <p class="settings-ios-footnote">Отгрузка</p>
+                <h2>Заказ № ${escapeHtml(row.number || '')}</h2>
+              </div>
+              <div class="org-shipments-document-actions">
+                <span class="org-shipments-document-status">Статус документа: ${documentStatusBadge(row.doc_status)}</span>
+                ${shipmentConfirmForm(row)}
+                ${deleteForm}
+              </div>
+            </div>
+            ${updateForm}
+          </section>
+        `;
+      }
+
+      function openShipmentDay(day) {
+        const cleanDay = String(day || '').slice(0, 10);
+        if (!cleanDay) return;
+        const tab = `day:${cleanDay}`;
+        ensureOpen(tab);
+        activeTab = tab;
+        render();
+      }
+
+      function openShipmentOrder(shipmentId) {
+        const cleanId = String(shipmentId || '').trim();
+        if (!cleanId) return;
+        const tab = `shipment:${cleanId}`;
+        ensureOpen(tab);
+        activeTab = tab;
+        render();
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener('click', () => openShipment(card.dataset.shipmentCard));
+      });
+
+      tabsShell.addEventListener('click', (event) => {
+        const home = event.target.closest('[data-shipment-home-tab]');
+        if (home) {
+          activeTab = '';
+          render();
+          return;
+        }
+        const close = event.target.closest('[data-shipment-close-tab]');
+        if (close) {
+          closeShipment(close.dataset.shipmentCloseTab);
+          return;
+        }
+        const activate = event.target.closest('[data-shipment-activate-tab]');
+        if (activate) {
+          activeTab = normalize(activate.dataset.shipmentActivateTab);
+          render();
+        }
+      });
+
+      document.addEventListener('click', (event) => {
+        const shipmentOpen = event.target.closest('[data-shipment-open-shipment]');
+        if (shipmentOpen) {
+          event.preventDefault();
+          openShipmentOrder(shipmentOpen.getAttribute('data-shipment-open-shipment'));
+          return;
+        }
+        const dayOpen = event.target.closest('[data-shipment-day-open]');
+        if (!dayOpen) return;
+        event.preventDefault();
+        openShipmentDay(dayOpen.getAttribute('data-shipment-day-open'));
+      });
+
+      window.addEventListener('hashchange', () => {
+        if (location.hash.startsWith('#day-')) {
+          openShipmentDay(location.hash.slice(5));
+        } else if (location.hash.startsWith('#shipment-')) {
+          openShipmentOrder(location.hash.slice(10));
+        }
+      });
+
+      const dayHash = location.hash.startsWith('#day-') ? location.hash.slice(5) : '';
+      const shipmentHash = location.hash.startsWith('#shipment-') ? location.hash.slice(10) : '';
+      const hashTab = dayHash ? `day:${dayHash}` : shipmentHash ? `shipment:${shipmentHash}` : location.hash === '#journal' ? 'journal' : location.hash === '#new' ? 'new' : '';
+      restoreState();
+      if (hashTab) {
+        ensureOpen(hashTab);
+        activeTab = hashTab;
+      }
+      render();
+    })();
+
+    (() => {
+      const table = document.getElementById('shipments-entry-table');
+      const form = table?.closest('form');
+      if (!table) return;
+      const body = table.querySelector('tbody');
+      const template = body?.querySelector('tr')?.cloneNode(true);
+      let employees = [];
+      try {
+        employees = JSON.parse(document.getElementById('shipment-employees-data')?.textContent || '[]');
+      } catch (err) {
+        employees = [];
+      }
+      const activeEmployees = employees
+        .filter((emp) => emp && emp.status === 'active' && emp.full_name && emp.is_courier)
+        .map((emp) => ({
+          id: String(emp.id || ''),
+          name: String(emp.full_name || '').trim(),
+          position: String(emp.position || '').trim(),
+        }));
+      const activeEmployeeById = new Map(activeEmployees.map((emp) => [emp.id, emp]));
+      const employeeByName = new Map(
+        activeEmployees.map((emp) => [emp.name.toLowerCase(), emp.id])
+      );
+      let openEmployeePicker = null;
+      function getEmployeeMenu(picker) {
+        if (!picker) return null;
+        if (!picker._shipmentEmployeeMenu) {
+          picker._shipmentEmployeeMenu = picker.querySelector('[data-shipment-employee-menu]');
+        }
+        return picker._shipmentEmployeeMenu;
+      }
+      function selectedEmployeeIds(exceptPicker = null) {
+        const ids = new Set();
+        table.querySelectorAll('[data-shipment-employee-picker]').forEach((picker) => {
+          if (picker === exceptPicker) return;
+          const id = String(picker.querySelector('[data-shipment-employee-id]')?.value || '').trim();
+          if (id) ids.add(id);
+        });
+        return ids;
+      }
+      function employeeOptionNode(emp) {
+        const text = document.createElement('span');
+        text.className = 'shipment-employee-option-text';
+        const name = document.createElement('strong');
+        name.textContent = emp.name;
+        text.append(name);
+        if (emp.position) {
+          const meta = document.createElement('small');
+          meta.textContent = emp.position;
+          text.append(meta);
+        }
+        return text;
+      }
+      function positionEmployeeMenu(picker) {
+        const search = picker?.querySelector('[data-shipment-employee-search]');
+        const menu = getEmployeeMenu(picker);
+        if (!search || !menu || menu.hidden) return;
+        const rect = search.getBoundingClientRect();
+        const gap = 2;
+        const viewportGap = 12;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+        const maxBelow = Math.max(120, viewportHeight - rect.bottom - viewportGap - gap);
+        const maxAbove = Math.max(120, rect.top - viewportGap - gap);
+        const openAbove = maxBelow < 150 && maxAbove > maxBelow;
+        const maxHeight = Math.min(260, openAbove ? maxAbove : maxBelow);
+        const width = Math.min(rect.width, viewportWidth - viewportGap * 2);
+        const left = Math.min(Math.max(viewportGap, rect.left), viewportWidth - viewportGap - width);
+        menu.style.left = `${left}px`;
+        menu.style.width = `${width}px`;
+        menu.style.maxHeight = `${maxHeight}px`;
+        menu.style.top = openAbove ? 'auto' : `${rect.bottom + gap}px`;
+        menu.style.bottom = openAbove ? `${viewportHeight - rect.top + gap}px` : 'auto';
+        menu.classList.toggle('is-open-above', openAbove);
+      }
+      function closeEmployeeMenu(picker) {
+        const search = picker?.querySelector('[data-shipment-employee-search]');
+        const menu = getEmployeeMenu(picker);
+        if (menu) menu.hidden = true;
+        if (search) search.setAttribute('aria-expanded', 'false');
+        if (openEmployeePicker === picker) openEmployeePicker = null;
+      }
+      function closeAllEmployeeMenus(exceptPicker = null) {
+        table.querySelectorAll('[data-shipment-employee-picker]').forEach((picker) => {
+          if (picker !== exceptPicker) closeEmployeeMenu(picker);
+        });
+      }
+      function renderEmployeeMenu(picker) {
+        const search = picker?.querySelector('[data-shipment-employee-search]');
+        const menu = getEmployeeMenu(picker);
+        if (!search || !menu) return;
+        const query = String(search.value || '').trim().toLowerCase();
+        const usedIds = selectedEmployeeIds(picker);
+        const rows = activeEmployees.filter((emp) => {
+          if (usedIds.has(emp.id)) return false;
+          return emp.name.toLowerCase().includes(query);
+        });
+        menu.replaceChildren();
+        if (!rows.length) {
+          const empty = document.createElement('div');
+          empty.className = 'shipment-employee-empty';
+          const allUsed = activeEmployees.length > 0 && activeEmployees.every((emp) => usedIds.has(emp.id));
+          empty.textContent = allUsed ? 'Все доставщики уже выбраны' : 'Доставщик не найден';
+          menu.append(empty);
+          positionEmployeeMenu(picker);
+          return;
+        }
+        rows.forEach((emp) => {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'shipment-employee-option';
+          option.dataset.employeeId = emp.id;
+          option.dataset.employeeName = emp.name;
+          option.setAttribute('role', 'option');
+          option.append(employeeOptionNode(emp));
+          menu.append(option);
+        });
+        positionEmployeeMenu(picker);
+      }
+      function openEmployeeMenu(picker) {
+        const search = picker?.querySelector('[data-shipment-employee-search]');
+        const menu = getEmployeeMenu(picker);
+        if (!search || !menu) return;
+        closeAllEmployeeMenus(picker);
+        if (menu.parentElement !== document.body) document.body.append(menu);
+        openEmployeePicker = picker;
+        renderEmployeeMenu(picker);
+        menu.hidden = false;
+        positionEmployeeMenu(picker);
+        search.setAttribute('aria-expanded', 'true');
+      }
+      function selectEmployee(picker, id, name) {
+        const search = picker?.querySelector('[data-shipment-employee-search]');
+        const hidden = picker?.querySelector('[data-shipment-employee-id]');
+        if (!search || !hidden) return;
+        search.value = name || '';
+        hidden.value = id || '';
+        search.classList.toggle('org-ops-employee-selected', Boolean(id));
+        closeEmployeeMenu(picker);
+        renderOpenEmployeeMenus();
+      }
+      function renderOpenEmployeeMenus() {
+        table.querySelectorAll('[data-shipment-employee-picker]').forEach((picker) => {
+          const menu = getEmployeeMenu(picker);
+          if (menu && !menu.hidden) {
+            renderEmployeeMenu(picker);
+            positionEmployeeMenu(picker);
+          }
+        });
+      }
+      function clearRow(row) {
+        row.querySelectorAll('input').forEach((input) => { input.value = ''; });
+        row.querySelectorAll('select').forEach((select) => { select.selectedIndex = 0; });
+        syncEmployee(row);
+        row.querySelectorAll('[data-shipment-employee-picker]').forEach(closeEmployeeMenu);
+      }
+      function shipmentRows() {
+        return Array.from(body?.querySelectorAll('tr') || []);
+      }
+      function addShipmentRow(afterRow = null) {
+        if (!template || !body) return null;
+        const row = template.cloneNode(true);
+        clearRow(row);
+        if (afterRow?.parentElement === body) afterRow.after(row);
+        else body.append(row);
+        return row;
+      }
+      function setRowEmployee(row, emp) {
+        const picker = row?.querySelector('[data-shipment-employee-picker]');
+        const search = picker?.querySelector('[data-shipment-employee-search]');
+        const hidden = picker?.querySelector('[data-shipment-employee-id]');
+        if (!search || !hidden || !emp) return;
+        search.value = emp.name;
+        hidden.value = emp.id;
+        search.classList.add('org-ops-employee-selected');
+        closeEmployeeMenu(picker);
+      }
+      function syncEmployee(row) {
+        const search = row?.querySelector('[data-shipment-employee-search]');
+        const hidden = row?.querySelector('[data-shipment-employee-id]');
+        if (!search || !hidden) return;
+        const picker = row.querySelector('[data-shipment-employee-picker]');
+        const id = employeeByName.get(String(search.value || '').trim().toLowerCase()) || '';
+        const duplicate = Boolean(id) && selectedEmployeeIds(picker).has(id);
+        hidden.value = duplicate ? '' : id;
+        search.classList.toggle('org-ops-employee-selected', Boolean(id) && !duplicate);
+        renderOpenEmployeeMenus();
+      }
+      table.addEventListener('input', (ev) => {
+        const search = ev.target.closest('[data-shipment-employee-search]');
+        const amount = ev.target.closest('[data-shipment-amount]');
+        if (search) {
+          syncEmployee(search.closest('tr'));
+          openEmployeeMenu(search.closest('[data-shipment-employee-picker]'));
+        }
+        if (amount && window.UPOS_AMOUNT) window.UPOS_AMOUNT.formatInputElement(amount, 0);
+      });
+      table.addEventListener('keydown', (ev) => {
+        const amount = ev.target.closest('[data-shipment-amount]');
+        if (!amount || ev.key !== 'Tab') return;
+        const row = amount.closest('tr');
+        const rows = shipmentRows();
+        const index = rows.indexOf(row);
+        if (index === -1) return;
+        let nextRow = ev.shiftKey ? rows[index - 1] : rows[index + 1];
+        if (!nextRow && !ev.shiftKey) nextRow = addShipmentRow(row);
+        const nextAmount = nextRow?.querySelector('[data-shipment-amount]');
+        if (!nextAmount) return;
+        ev.preventDefault();
+        nextAmount.focus();
+        nextAmount.select?.();
+      });
+      table.addEventListener('focusin', (ev) => {
+        const search = ev.target.closest('[data-shipment-employee-search]');
+        if (!search) return;
+        openEmployeeMenu(search.closest('[data-shipment-employee-picker]'));
+      });
+      table.addEventListener('change', (ev) => {
+        const search = ev.target.closest('[data-shipment-employee-search]');
+        if (!search) return;
+        syncEmployee(search.closest('tr'));
+      });
+      body?.querySelectorAll('tr').forEach(syncEmployee);
+      function initShipmentOrderTemplates() {
+        const root = document.querySelector('[data-shipment-order-templates]');
+        if (!root) return;
+        const select = root.querySelector('[data-shipment-order-select]');
+        const nameInput = root.querySelector('[data-shipment-order-name]');
+        const status = root.querySelector('[data-shipment-order-status]');
+        const applyButton = root.querySelector('[data-shipment-order-apply]');
+        const saveButton = root.querySelector('[data-shipment-order-save]');
+        const deleteButton = root.querySelector('[data-shipment-order-delete]');
+        const storageKey = root.dataset.templateStorageKey || 'upos.shipments.orderTemplates';
+        const setStatus = (message, type = '') => {
+          if (!status) return;
+          status.textContent = message || '';
+          status.dataset.status = type;
+        };
+        const safeEmployees = () => activeEmployees.filter((emp) => emp.id && emp.name);
+        const systemTemplates = () => {
+          const byList = safeEmployees();
+          const byName = [...byList].sort((a, b) => a.name.localeCompare(b.name, 'ru', { numeric: true, sensitivity: 'base' }));
+          return [
+            { key: 'system:list', name: 'По списку', ids: byList.map((emp) => emp.id), system: true },
+            { key: 'system:name', name: 'По алфавиту', ids: byName.map((emp) => emp.id), system: true },
+            { key: 'system:reverse', name: 'Обратный порядок', ids: byList.map((emp) => emp.id).reverse(), system: true },
+          ];
+        };
+        const loadSaved = () => {
+          try {
+            const raw = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            if (!Array.isArray(raw)) return [];
+            return raw
+              .map((item) => ({
+                key: String(item.key || `saved:${Date.now()}`),
+                name: String(item.name || '').trim(),
+                ids: Array.isArray(item.ids) ? item.ids.map((id) => String(id || '')).filter(Boolean) : [],
+                system: false,
+              }))
+              .filter((item) => item.name && item.ids.length);
+          } catch (err) {
+            return [];
+          }
+        };
+        const saveSaved = (items) => {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(items));
+            return true;
+          } catch (err) {
+            setStatus('Не удалось сохранить шаблон.', 'err');
+            return false;
+          }
+        };
+        let savedTemplates = loadSaved();
+        const allTemplates = () => [...systemTemplates(), ...savedTemplates];
+        const selectedTemplate = () => allTemplates().find((item) => item.key === select?.value) || allTemplates()[0] || null;
+        const renderSelect = (nextKey = '') => {
+          if (!select) return;
+          const templates = allTemplates();
+          select.replaceChildren();
+          templates.forEach((item) => {
+            const option = document.createElement('option');
+            option.value = item.key;
+            option.textContent = item.name;
+            select.append(option);
+          });
+          select.value = nextKey && templates.some((item) => item.key === nextKey) ? nextKey : (templates[0]?.key || '');
+          const current = selectedTemplate();
+          if (nameInput) nameInput.value = current && !current.system ? current.name : '';
+          if (deleteButton) deleteButton.disabled = !current || current.system;
+        };
+        const applyIds = (ids) => {
+          const used = new Set();
+          const ordered = ids
+            .map((id) => activeEmployeeById.get(String(id || '')))
+            .filter((emp) => emp && !used.has(emp.id) && used.add(emp.id));
+          if (!ordered.length) {
+            setStatus('В шаблоне нет доступных доставщиков.', 'err');
+            return;
+          }
+          let rows = shipmentRows();
+          while (rows.length < ordered.length) {
+            addShipmentRow(rows[rows.length - 1] || null);
+            rows = shipmentRows();
+          }
+          while (rows.length > ordered.length) {
+            rows[rows.length - 1].remove();
+            rows = shipmentRows();
+          }
+          ordered.forEach((emp, index) => setRowEmployee(rows[index], emp));
+          renderOpenEmployeeMenus();
+          setStatus(`Выбрано сотрудников: ${ordered.length}.`, 'ok');
+        };
+        const currentOrderIds = () => {
+          const used = new Set();
+          return shipmentRows()
+            .map((row) => String(row.querySelector('[data-shipment-employee-id]')?.value || '').trim())
+            .filter((id) => id && activeEmployeeById.has(id) && !used.has(id) && used.add(id));
+        };
+        applyButton?.addEventListener('click', () => {
+          const current = selectedTemplate();
+          if (!current) return;
+          applyIds(current.ids);
+        });
+        saveButton?.addEventListener('click', () => {
+          const ids = currentOrderIds();
+          if (!ids.length) {
+            setStatus('Сначала выберите сотрудников в таблице.', 'err');
+            return;
+          }
+          const name = String(nameInput?.value || '').trim() || `Очередность ${savedTemplates.length + 1}`;
+          const selected = selectedTemplate();
+          const existingIndex = selected && !selected.system ? savedTemplates.findIndex((item) => item.key === selected.key) : -1;
+          const item = { key: existingIndex >= 0 ? savedTemplates[existingIndex].key : `saved:${Date.now()}`, name, ids, system: false };
+          if (existingIndex >= 0) savedTemplates.splice(existingIndex, 1, item);
+          else savedTemplates.push(item);
+          if (!saveSaved(savedTemplates)) return;
+          renderSelect(item.key);
+          setStatus('Шаблон очередности сохранён.', 'ok');
+        });
+        deleteButton?.addEventListener('click', () => {
+          const current = selectedTemplate();
+          if (!current || current.system) return;
+          savedTemplates = savedTemplates.filter((item) => item.key !== current.key);
+          if (!saveSaved(savedTemplates)) return;
+          renderSelect();
+          setStatus('Шаблон удалён.', 'ok');
+        });
+        select?.addEventListener('change', () => {
+          const current = selectedTemplate();
+          if (nameInput) nameInput.value = current && !current.system ? current.name : '';
+          if (deleteButton) deleteButton.disabled = !current || current.system;
+          setStatus('');
+        });
+        renderSelect();
+      }
+      initShipmentOrderTemplates();
+      table.addEventListener('click', (ev) => {
+        const addButton = ev.target.closest('[data-add-shipment-row-inline]');
+        const removeButton = ev.target.closest('[data-remove-shipment-row]');
+        const toggleButton = ev.target.closest('[data-shipment-employee-toggle]');
+        if (toggleButton) {
+          const picker = toggleButton.closest('[data-shipment-employee-picker]');
+          const menu = getEmployeeMenu(picker);
+          if (menu?.hidden) openEmployeeMenu(picker);
+          else closeEmployeeMenu(picker);
+          picker?.querySelector('[data-shipment-employee-search]')?.focus();
+          return;
+        }
+        const currentRow = ev.target.closest('tr');
+        if (!currentRow || !body) return;
+        if (addButton) {
+          addShipmentRow(currentRow);
+          return;
+        }
+        if (removeButton) {
+          const rows = body.querySelectorAll('tr');
+          if (rows.length <= 1) {
+            clearRow(currentRow);
+            return;
+          }
+          currentRow.remove();
+          renderOpenEmployeeMenus();
+        }
+      });
+      document.addEventListener('click', (ev) => {
+        const employeeOption = ev.target.closest('[data-employee-id][data-employee-name]');
+        if (employeeOption && openEmployeePicker) {
+          selectEmployee(openEmployeePicker, employeeOption.dataset.employeeId || '', employeeOption.dataset.employeeName || '');
+          return;
+        }
+        if (ev.target.closest('[data-shipment-employee-menu]')) return;
+        if (ev.target.closest('#shipments-entry-table [data-shipment-employee-picker]')) return;
+        closeAllEmployeeMenus();
+      });
+      window.addEventListener('resize', () => {
+        table.querySelectorAll('[data-shipment-employee-picker]').forEach(positionEmployeeMenu);
+      });
+      window.addEventListener('scroll', () => {
+        table.querySelectorAll('[data-shipment-employee-picker]').forEach(positionEmployeeMenu);
+      }, true);
+      form?.addEventListener('submit', () => {
+        form.querySelectorAll('[data-shipment-amount]').forEach((input) => {
+          if (!window.UPOS_AMOUNT) return;
+          input.value = window.UPOS_AMOUNT.stripSeparators(input.value);
+        });
+      });
+
+      function initJournalDateFilter() {
+        const mount = document.getElementById('shipments-journal-date-filter');
+        const journalBody = document.getElementById('shipments-journal-body');
+        const emptyRow = document.getElementById('shipments-journal-filter-empty');
+        if (!mount || !journalBody) return;
+        if (!window.UPOS_DATE_RANGE) {
+          window.setTimeout(initJournalDateFilter, 50);
+          return;
+        }
+        if (mount.dataset.shipmentsJournalDateReady === '1') return;
+        mount.dataset.shipmentsJournalDateReady = '1';
+        const rows = [...journalBody.querySelectorAll('[data-shipment-journal-row]')];
+        const statusSelect = document.querySelector('[data-shipment-journal-status]');
+        const searchInput = document.querySelector('[data-shipment-journal-search]');
+        const sortButtons = [...document.querySelectorAll('[data-shipment-journal-sort-button]')];
+        const pageSizeSelect = document.querySelector('[data-shipment-journal-page-size]');
+        const totalEl = document.querySelector('[data-shipment-journal-total]');
+        const pageInfo = document.querySelector('[data-shipment-journal-page-info]');
+        const prevBtn = document.querySelector('[data-shipment-journal-prev]');
+        const nextBtn = document.querySelector('[data-shipment-journal-next]');
+        let journalData = [];
+        try {
+          journalData = JSON.parse(document.getElementById('shipment-journal-data')?.textContent || '[]');
+        } catch (err) {
+          journalData = [];
+        }
+        const byDate = new Map(journalData.map((item) => [String(item.date || ''), item]));
+        const state = {
+          from: '',
+          to: '',
+          status: 'all',
+          query: '',
+          sort: 'date-desc',
+          page: 1,
+          pageSize: Number(pageSizeSelect?.value || 10),
+        };
+        const numberFloor = (value) => {
+          const match = String(value || '').match(/\d+/);
+          return match ? Number(match[0]) : 0;
+        };
+        const numberCeil = (value) => {
+          const matches = String(value || '').match(/\d+/g);
+          return matches?.length ? Number(matches[matches.length - 1]) : 0;
+        };
+        const moneyLabel = (value, currency) => {
+          const amount = Math.round(Number(value || 0)).toLocaleString('ru-RU');
+          return `${amount} ${String(currency || 'UZS').toUpperCase()}`;
+        };
+        const parseMoneyLines = (cell) => {
+          const lines = [...(cell?.querySelectorAll('.org-shipments-money-line') || [])];
+          return lines.map((line) => {
+            const text = line.textContent.trim();
+            const match = text.match(/^([\d\s.,]+)\s+([A-Za-z]{3})$/);
+            if (!match) return null;
+            return {
+              amount: Number(match[1].replace(/[^\d.-]/g, '')) || 0,
+              currency: match[2].toUpperCase(),
+            };
+          }).filter(Boolean);
+        };
+        const rowMeta = (row) => {
+          const date = String(row.dataset.shipmentJournalDate || '').trim();
+          const data = byDate.get(date) || {};
+          const totalLines = parseMoneyLines(row.children[5]);
+          const debtLines = parseMoneyLines(row.children[6]);
+          const parsedCurrencies = totalLines.map((item) => {
+            const debt = debtLines.find((line) => line.currency === item.currency);
+            return {
+              currency: item.currency,
+              total: item.amount,
+              debt: Number(debt?.amount || 0),
+            };
+          });
+          const dataCurrencies = Array.isArray(data.currencies) ? data.currencies : [];
+          const currencies = dataCurrencies.some((item) => Number(item.total || 0) || Number(item.debt || 0))
+            ? dataCurrencies
+            : parsedCurrencies;
+          const total = Number(row.dataset.shipmentJournalTotalAmount || data.total_amount || 0) || parsedCurrencies.reduce((sum, item) => sum + item.total, 0);
+          const debt = Number(row.dataset.shipmentJournalDebtAmount || data.debt_amount || 0) || parsedCurrencies.reduce((sum, item) => sum + item.debt, 0);
+          let statuses = String(row.dataset.shipmentJournalStatuses || (data.statuses || []).join(',')).split(',').filter(Boolean);
+          if (!statuses.length) statuses = debt > 0 ? ['open'] : ['paid'];
+          const docStatus = String(row.dataset.shipmentJournalDocStatus || data.doc_status || 'new');
+          return {
+            day: Number(row.children[0]?.textContent || data.day_index || 0),
+            date,
+            numbers: String(row.dataset.shipmentJournalNumbers || data.numbers_label || ''),
+            total,
+            debt,
+            statuses,
+            docStatus,
+            currencies,
+            count: Number(data.count || row.children[3]?.textContent || 0),
+          };
+        };
+        const updateRowStatus = (row, meta) => {
+          const badge = row.querySelector('.org-shipments-status');
+          if (!badge) return;
+          badge.classList.remove('org-shipments-status--open', 'org-shipments-status--partial', 'org-shipments-status--paid');
+          if (meta.debt <= 0) {
+            badge.textContent = 'Оплачено';
+            badge.classList.add('org-shipments-status--paid');
+          } else if (meta.statuses.includes('partial')) {
+            badge.textContent = 'Частично';
+            badge.classList.add('org-shipments-status--partial');
+          } else {
+            badge.textContent = 'Открыто';
+            badge.classList.add('org-shipments-status--open');
+          }
+        };
+        const statusMatches = (meta) => {
+          if (state.status === 'all') return true;
+          if (state.status === 'debt') return meta.debt > 0;
+          if (state.status === 'paid') return meta.debt <= 0;
+          return meta.statuses.includes(state.status);
+        };
+        const filteredRows = () => rows.filter((row) => {
+          const meta = rowMeta(row);
+          if (state.from && meta.date < state.from) return false;
+          if (state.to && meta.date > state.to) return false;
+          if (!statusMatches(meta)) return false;
+          const query = state.query.trim().toLowerCase();
+          if (query && !meta.numbers.toLowerCase().includes(query)) return false;
+          return true;
+        });
+        const sortRows = (items) => {
+          const [field, direction] = state.sort.split('-');
+          const sign = direction === 'asc' ? 1 : -1;
+          const statusRank = (meta) => {
+            if (meta.debt <= 0 || meta.statuses.includes('paid')) return 3;
+            if (meta.statuses.includes('partial')) return 2;
+            return 1;
+          };
+          const docRank = (meta) => meta.docStatus === 'confirmed' ? 2 : 1;
+          return [...items].sort((a, b) => {
+            const left = rowMeta(a);
+            const right = rowMeta(b);
+            let value = 0;
+            if (field === 'day') value = left.day - right.day;
+            else if (field === 'date') value = left.date.localeCompare(right.date);
+            else if (field === 'number') value = numberCeil(left.numbers) - numberCeil(right.numbers);
+            else if (field === 'count') value = left.count - right.count;
+            else if (field === 'amount') value = left.total - right.total;
+            else if (field === 'debt') value = left.debt - right.debt;
+            else if (field === 'status') value = statusRank(left) - statusRank(right);
+            else if (field === 'document') value = docRank(left) - docRank(right);
+            return value * sign;
+          });
+        };
+        const updateSortButtons = () => {
+          const [field, direction] = state.sort.split('-');
+          sortButtons.forEach((button) => {
+            const isActive = button.dataset.shipmentJournalSortButton === field;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-sort', isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none');
+            const arrow = button.querySelector('.org-shipments-sort-arrow');
+            if (arrow) arrow.textContent = isActive ? (direction === 'asc' ? '↑' : '↓') : '↕';
+          });
+        };
+        const renderTotals = (items) => {
+          const totals = new Map();
+          items.forEach((row) => {
+            const meta = rowMeta(row);
+            meta.currencies.forEach((currencyRow) => {
+              const currency = String(currencyRow.currency || 'UZS').toUpperCase();
+              const current = totals.get(currency) || { total: 0, debt: 0 };
+              current.total += Number(currencyRow.total || 0);
+              current.debt += Number(currencyRow.debt || 0);
+              totals.set(currency, current);
+            });
+          });
+          if (!totalEl) return;
+          if (!totals.size) {
+            totalEl.textContent = 'Сумма: 0 UZS';
+            return;
+          }
+          totalEl.textContent = [...totals.entries()]
+            .map(([currency, item]) => `Сумма: ${moneyLabel(item.total, currency)} · Долг: ${moneyLabel(item.debt, currency)}`)
+            .join('  |  ');
+        };
+        const applyFilters = () => {
+          const sorted = sortRows(filteredRows());
+          const totalPages = Math.max(1, Math.ceil(sorted.length / state.pageSize));
+          state.page = Math.min(Math.max(1, state.page), totalPages);
+          const start = (state.page - 1) * state.pageSize;
+          const shown = new Set(sorted.slice(start, start + state.pageSize));
+          rows.forEach((row) => {
+            updateRowStatus(row, rowMeta(row));
+            row.hidden = !shown.has(row);
+          });
+          sorted.forEach((row) => journalBody.insertBefore(row, emptyRow || null));
+          if (emptyRow) emptyRow.hidden = sorted.length > 0 || rows.length === 0;
+          renderTotals(sorted);
+          if (pageInfo) {
+            const from = sorted.length ? start + 1 : 0;
+            const to = Math.min(start + state.pageSize, sorted.length);
+            pageInfo.textContent = sorted.length ? `Показано ${from}-${to} из ${sorted.length}` : 'Нет строк';
+          }
+          if (prevBtn) prevBtn.disabled = state.page <= 1;
+          if (nextBtn) nextBtn.disabled = state.page >= totalPages;
+          updateSortButtons();
+        };
+        const picker = window.UPOS_DATE_RANGE.create(mount, {
+          preset: 'custom',
+          date_from: '',
+          date_to: '',
+          onApply: (range) => {
+            picker.setValue({
+              preset: range.preset || 'custom',
+              date_from: range.date_from || '',
+              date_to: range.date_to || range.date_from || '',
+              label: range.label || '',
+            });
+            state.from = String(range.date_from || '').trim();
+            state.to = String(range.date_to || range.date_from || '').trim();
+            state.page = 1;
+            applyFilters();
+          },
+        });
+        statusSelect?.addEventListener('change', () => {
+          state.status = statusSelect.value || 'all';
+          state.page = 1;
+          applyFilters();
+        });
+        searchInput?.addEventListener('input', () => {
+          state.query = searchInput.value || '';
+          state.page = 1;
+          applyFilters();
+        });
+        sortButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const field = button.dataset.shipmentJournalSortButton || 'date';
+            const [currentField, currentDirection] = state.sort.split('-');
+            const nextDirection = currentField === field && currentDirection === 'desc' ? 'asc' : 'desc';
+            state.sort = `${field}-${nextDirection}`;
+            state.page = 1;
+            applyFilters();
+          });
+        });
+        pageSizeSelect?.addEventListener('change', () => {
+          state.pageSize = Number(pageSizeSelect.value || 10);
+          state.page = 1;
+          applyFilters();
+        });
+        prevBtn?.addEventListener('click', () => {
+          state.page = Math.max(1, state.page - 1);
+          applyFilters();
+        });
+        nextBtn?.addEventListener('click', () => {
+          state.page += 1;
+          applyFilters();
+        });
+        applyFilters();
+      }
+
+      initJournalDateFilter();
+    })();
+  </script>
+{% endblock %}

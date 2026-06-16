@@ -1,0 +1,2192 @@
+{% extends "base.html" %}
+{% block title %}HR{% endblock %}
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">HR</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    {% if flash_ok or flash_err or request.query_params.get("err") == "csrf" %}
+      <div class="organizations-flash-group">
+        {% if flash_ok == "employee_created" %}
+          <div class="flash ok settings-ios-flash">Сотрудник добавлен.</div>
+        {% elif flash_ok == "employee_updated" %}
+          <div class="flash ok settings-ios-flash">Сотрудник обновлен.</div>
+        {% elif flash_ok == "employee_dismissed" %}
+          <div class="flash ok settings-ios-flash">Сотрудник уволен.</div>
+        {% elif flash_ok == "employee_restored" %}
+          <div class="flash ok settings-ios-flash">Сотрудник возвращён в активный список.</div>
+        {% elif flash_ok == "employee_deleted" %}
+          <div class="flash ok settings-ios-flash">Сотрудник полностью удалён.</div>
+        {% elif flash_ok == "attendance_saved" %}
+          <div class="flash ok settings-ios-flash">Табель обновлен.</div>
+        {% elif flash_ok == "attendance_report_sent" %}
+          <div class="flash ok settings-ios-flash">Табель сохранён и отправлен начальству в Telegram.</div>
+        {% elif flash_ok == "attendance_report_saved" %}
+          <div class="flash ok settings-ios-flash">Табель сохранён. Telegram-отчёт не отправлен.</div>
+        {% elif flash_ok == "telegram_not_connected" %}
+          <div class="flash ok settings-ios-flash">Табель сохранён. Telegram пока не подключён.</div>
+        {% elif flash_ok == "telegram_no_targets" %}
+          <div class="flash ok settings-ios-flash">Табель сохранён. В Telegram нет получателей для отчёта.</div>
+        {% elif flash_ok == "telegram_failed" %}
+          <div class="flash ok settings-ios-flash">Табель сохранён. Telegram-отчёт не удалось отправить.</div>
+        {% elif flash_ok == "salary_act_saved" %}
+          <div class="flash ok settings-ios-flash">Акт сверки зарплаты сохранён.</div>
+        {% elif flash_ok == "salary_adjustment_saved" %}
+          <div class="flash ok settings-ios-flash">Начисление по зарплате сохранено.</div>
+        {% endif %}
+        {% if flash_err %}
+          <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+        {% endif %}
+        {% if request.query_params.get("err") == "csrf" %}
+          <div class="flash err settings-ios-flash">Форма устарела. Обновите страницу и повторите.</div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% set active_employees = employees | selectattr("status", "equalto", "active") | sort(attribute="full_name") | list %}
+    {% set archived_employees = employees | rejectattr("status", "equalto", "active") | sort(attribute="full_name") | list %}
+
+    <nav class="general-module-tabs org-hr-tabs" aria-label="Разделы HR" data-hr-open-tabs>
+      <button type="button" class="general-module-tab active" data-hr-home-tab data-hr-view="home" aria-current="page">HR</button>
+    </nav>
+
+    <section class="general-report-launcher org-report-launcher org-hr-launcher" role="tablist" aria-label="HR организации" data-hr-launcher>
+      <button type="button" class="general-report-card" role="tab" data-hr-card="staff" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </span>
+        <span>Сотрудники</span>
+        <small>Список и табель</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-hr-card="calendar" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M8 2v4M16 2v4M3 10h18" />
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
+          </svg>
+        </span>
+        <span>Календарь</span>
+        <small>Табель месяца</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-hr-card="salary" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 4h16v16H4z" />
+            <path d="M8 9h8M8 13h5M8 17h8" />
+          </svg>
+        </span>
+        <span>Акт зарплаты</span>
+        <small>Сверка и выплаты</small>
+      </button>
+    </section>
+
+    <div class="general-home-shell org-hr-panels-root" data-hr-panels-root hidden>
+      <section class="org-ops-panel org-hr-staff-frame" id="hr-staff-panel" data-hr-panel="staff" hidden>
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Сотрудники и табель</p>
+            <h2>Список сотрудников</h2>
+          </div>
+        </div>
+        <div class="org-hr-toolbar">
+          <div class="org-hr-toolbar-left">
+            <button type="button" class="btn" data-org-modal-open="hr-employee-create-modal">Добавить сотрудника</button>
+            <button type="button" class="btn btn-secondary org-hr-archive-btn" data-org-modal-open="hr-employee-archive-modal">
+              Архив
+              <span class="org-hr-archive-count">{{ archived_employees|length }}</span>
+            </button>
+            <button type="button" class="btn btn-secondary" data-org-modal-open="hr-salary-adjustment-modal">Начисление</button>
+          </div>
+          <label class="org-hr-staff-search">
+            <span>Поиск</span>
+            <input type="search" placeholder="Сотрудник, должность, паспорт" data-hr-staff-search autocomplete="off" />
+          </label>
+          <form method="get" class="org-ops-inline-form">
+            <label for="attendance-date">Дата</label>
+            <input id="attendance-date" type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()" />
+          </form>
+        </div>
+        <div class="org-ops-table-wrap">
+          <table class="org-ops-table org-hr-table">
+            <thead>
+              <tr>
+                <th>Фото</th>
+                <th>Сотрудник</th>
+                <th>Паспорт</th>
+                <th>Зарплата</th>
+                <th>Акт сверки зарплаты</th>
+                <th>К выплате</th>
+                <th>Статус</th>
+                <th class="org-hr-actions-col">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for emp in active_employees %}
+                {% set day_status = emp.attendance.get(selected_date, '') %}
+                <tr
+                  class="{% if emp.status == 'dismissed' %}is-muted{% endif %}"
+                  data-hr-employee-row
+                  data-employee-id="{{ emp.id }}"
+                  data-first-name="{{ emp.first_name }}"
+                  data-last-name="{{ emp.last_name }}"
+                  data-position-id="{{ emp.position_id }}"
+                  data-position="{{ emp.position }}"
+                  data-passport-series="{{ emp.passport_series }}"
+                  data-passport-number="{{ emp.passport_number }}"
+                  data-monthly-salary="{{ emp.monthly_salary }}"
+                  data-monthly-salary-label="{{ emp.monthly_salary_label }} UZS"
+                  data-full-name="{{ emp.full_name }}"
+                  data-photo-url="{{ emp.photo_url or '' }}"
+                  data-status="{{ emp.status }}"
+                  data-present-days="{{ emp.present_days }}"
+                  data-absent-days="{{ emp.absent_days }}"
+                  data-salary-due="{{ emp.salary_due }}"
+                  data-salary-due-label="{{ emp.salary_due_label }} UZS"
+                  data-salary-bonus-label="{{ emp.salary_bonus_label }} UZS"
+                  data-salary-penalty-label="{{ emp.salary_penalty_label }} UZS"
+                  data-is-courier="{{ 1 if emp.is_courier else 0 }}"
+                  data-hired-at="{{ emp.hired_at }}"
+                >
+                  <td>
+                    {% if emp.photo_url %}
+                      <img class="org-hr-photo" src="{{ emp.photo_url }}" alt="" loading="lazy" />
+                    {% else %}
+                      <span class="org-hr-photo org-hr-photo--empty">{{ (emp.first_name or emp.last_name or '?')[0]|upper }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="org-hr-employee-name-btn"
+                      data-hr-card-open
+                      aria-label="Открыть карточку сотрудника {{ emp.full_name }}"
+                    >
+                      <strong>{{ emp.full_name }}</strong>
+                    </button>
+                    <small>{{ emp.position or 'Без должности' }}</small>
+                    {% if emp.status == 'dismissed' %}
+                      <small>Уволен {{ emp.dismissed_at }}</small>
+                    {% endif %}
+                  </td>
+                  <td>{{ emp.passport_series }} {{ emp.passport_number }}</td>
+                  <td>{{ emp.monthly_salary_label }} UZS</td>
+                  <td>
+                    <strong>{{ emp.salary_due_label }} UZS</strong>
+                    {% if emp.salary_bonus or emp.salary_penalty %}
+                      <small>+{{ emp.salary_bonus_label }} / -{{ emp.salary_penalty_label }} UZS</small>
+                    {% endif %}
+                  </td>
+                  <td><strong>{{ emp.salary_due_label }} UZS</strong></td>
+                  <td>
+                    {% if emp.status == 'active' %}
+                      <form method="post" action="{% if inside_organization %}{{ url_for('home_hr_employee_dismiss', employee_id=emp.id) }}{% else %}{{ url_for('organizations_hr_employee_dismiss', employee_id=emp.id) }}{% endif %}" class="org-hr-dismiss-form">
+                        {% include "_csrf_field.html" %}
+                        <input type="hidden" name="dismissed_at" value="{{ selected_date }}" />
+                        <button type="submit" class="btn btn-secondary btn-sm">Уволить</button>
+                      </form>
+                    {% else %}
+                      <span class="org-hr-pill">Уволен</span>
+                    {% endif %}
+                  </td>
+                  <td class="org-hr-actions-cell">
+                    <button type="button" class="org-hr-edit-btn" data-hr-edit-open title="Редактировать" aria-label="Редактировать сотрудника {{ emp.full_name }}">
+                      <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="8" class="org-ops-empty">Активных сотрудников пока нет.</td></tr>
+              {% endfor %}
+              <tr data-hr-staff-search-empty hidden>
+                <td colspan="8" class="org-ops-empty">Сотрудники не найдены.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-staff-frame org-hr-calendar-panel" id="hr-calendar-panel" data-hr-panel="calendar" hidden>
+        <div class="director-section-head org-hr-calendar-head">
+          <div>
+            <p class="settings-ios-footnote">Табель месяца</p>
+            <h2>Календарь</h2>
+          </div>
+          <div class="org-hr-calendar-toolbar">
+            <button type="button" class="btn btn-secondary btn-sm org-hr-reasons-head-btn" data-org-modal-open="hr-reasons-modal">Список причин</button>
+            <form method="get" class="org-ops-inline-form">
+              <label for="hr-calendar-date">Дата</label>
+              <input id="hr-calendar-date" type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()" />
+            </form>
+          </div>
+        </div>
+        <div class="org-hr-calendar-summary" data-hr-calendar-summary></div>
+        <div class="org-ops-table-wrap org-hr-calendar-wrap">
+          <table class="org-ops-table org-hr-table org-hr-calendar-table">
+            <thead data-hr-calendar-head></thead>
+            <tbody data-hr-calendar-body></tbody>
+          </table>
+        </div>
+        <div class="org-hr-rollcall-shell">
+          <div class="org-hr-rollcall-left">
+            <div class="org-hr-month-board" aria-label="Календарь переклички">
+              <div class="org-hr-calendar-head-actions">
+                <button type="button" class="btn btn-secondary btn-sm" data-hr-calendar-prev aria-label="Предыдущий месяц">‹</button>
+                <strong data-hr-calendar-month-label></strong>
+                <button type="button" class="btn btn-secondary btn-sm" data-hr-calendar-next aria-label="Следующий месяц">›</button>
+              </div>
+              <div class="org-hr-weekdays" aria-hidden="true">
+                <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+              </div>
+              <div class="org-hr-month-days" data-hr-month-days></div>
+            </div>
+            <div class="org-hr-rollcall-picked" data-hr-picked-shell>
+              <div class="org-hr-picked-head">
+                <div>
+                  <p class="settings-ios-footnote">Отмеченные</p>
+                  <h3>Выбранные сотрудники</h3>
+                </div>
+                <div class="org-hr-picked-metrics">
+                  <span data-hr-picked-present>Пришли 0/0 человек</span>
+                  <span data-hr-picked-count>0</span>
+                </div>
+              </div>
+              <div class="org-hr-picked-table-wrap">
+                <table class="org-hr-picked-table">
+                  <thead>
+                    <tr>
+                      <th>Сотрудник</th>
+                      <th>Статус</th>
+                      <th>Причина</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody data-hr-picked-body>
+                    <tr data-hr-picked-empty>
+                      <td colspan="4" class="org-ops-empty">Пока никто не отмечен.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <form
+            method="post"
+            action="{% if inside_organization %}{{ url_for('home_hr_attendance_report') }}{% else %}{{ url_for('organizations_hr_attendance_report') }}{% endif %}"
+            class="org-hr-rollcall-form"
+            data-hr-rollcall-form
+          >
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="work_date" value="{{ selected_date }}" data-hr-rollcall-date />
+            <datalist id="hr-absence-reasons" data-hr-reason-list></datalist>
+            <div class="org-hr-rollcall-title">
+              <div>
+                <p class="settings-ios-footnote">Документ для начальства</p>
+                <h3>Перекличка за <span data-hr-rollcall-date-label>{{ selected_date }}</span></h3>
+              </div>
+              <div class="org-hr-rollcall-stats">
+                <span data-hr-rollcall-present>0 пришли</span>
+                <span data-hr-rollcall-absent>0 не пришли</span>
+              </div>
+            </div>
+            <div class="org-hr-rollcall-filters" data-hr-rollcall-filters>
+              <label class="org-hr-rollcall-search">
+                <span>Поиск</span>
+                <div class="org-hr-rollcall-searchbox">
+                  <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                  <input type="search" placeholder="Поиск по названию" data-hr-rollcall-name-filter />
+                  <button type="button" data-hr-rollcall-name-clear aria-label="Очистить поиск">×</button>
+                  <svg class="org-hr-rollcall-filter-icon" aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 21v-7" />
+                    <path d="M4 10V3" />
+                    <path d="M12 21v-9" />
+                    <path d="M12 8V3" />
+                    <path d="M20 21v-5" />
+                    <path d="M20 12V3" />
+                    <path d="M2 14h4" />
+                    <path d="M10 8h4" />
+                    <path d="M18 16h4" />
+                  </svg>
+                </div>
+              </label>
+              <div class="org-hr-rollcall-position-filter" data-hr-position-filter>
+                <span>Должность</span>
+                <button type="button" class="org-hr-position-trigger" data-hr-position-trigger aria-expanded="false">
+                  <strong data-hr-position-summary>Все должности</strong>
+                  <span class="org-hr-position-clear-marks" data-hr-clear-position-filter role="button" tabindex="0" title="Очистить должности" aria-label="Очистить должности">×</span>
+                  <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                <div class="org-hr-position-menu" data-hr-position-menu hidden>
+                  <label class="org-hr-position-menu-search">
+                    <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.5-3.5" />
+                    </svg>
+                    <input type="search" placeholder="Поиск должности" data-hr-position-search />
+                  </label>
+                  <div class="org-hr-position-options" data-hr-position-options></div>
+                </div>
+              </div>
+            </div>
+            <div class="org-ops-empty org-hr-rollcall-filter-empty" data-hr-rollcall-empty hidden>Сотрудники не найдены.</div>
+            <div class="org-hr-rollcall-list" data-hr-rollcall-list></div>
+            <footer class="org-hr-rollcall-actions">
+              <span>После сохранения отчёт отправится в Telegram, если он подключён в настройках.</span>
+              <button type="submit" class="btn">Сохранить и отправить</button>
+            </footer>
+          </form>
+        </div>
+      </section>
+
+      <dialog class="director-org-modal org-hr-modal" id="hr-reasons-modal">
+        <div class="director-modal-card org-hr-modal-card org-hr-reasons-card">
+          <header class="director-modal-head">
+            <div>
+              <p class="settings-ios-footnote">Перекличка</p>
+              <h2>Причины отсутствия</h2>
+            </div>
+            <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+              ×
+            </button>
+          </header>
+          <div class="org-hr-reasons-tools">
+            <input type="text" data-hr-reason-draft placeholder="Новая причина" />
+            <button type="button" class="btn" data-hr-reason-add>Добавить</button>
+          </div>
+          <div class="org-hr-reasons-list" data-hr-reasons-list></div>
+          <p class="org-hr-reasons-feedback" data-hr-reasons-feedback></p>
+          <footer class="director-modal-actions">
+            <button type="button" class="btn btn-secondary" data-org-modal-close>Закрыть</button>
+          </footer>
+        </div>
+      </dialog>
+
+      <section class="org-ops-panel org-hr-staff-frame org-hr-salary-panel" id="hr-salary-panel" data-hr-panel="salary" hidden>
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Акт сверки зарплаты</p>
+            <h2>Зарплата сотрудников</h2>
+          </div>
+          <form method="get" class="org-ops-inline-form">
+            <label for="hr-salary-date">Дата</label>
+            <input id="hr-salary-date" type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()" />
+          </form>
+        </div>
+        <form
+          method="post"
+          action="{% if inside_organization %}{{ url_for('home_hr_salary_act_save') }}{% else %}{{ url_for('organizations_hr_salary_act_save') }}{% endif %}"
+          class="org-hr-salary-act"
+          data-hr-salary-act-form
+        >
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="work_date" value="{{ selected_date }}" />
+          <div class="org-hr-salary-toolbar">
+            <label class="org-hr-checkline">
+              <input type="checkbox" data-hr-salary-select-all />
+              <span>Выбрать всех</span>
+            </label>
+            <div class="org-hr-salary-total">
+              <span>Выбрано: <strong data-hr-salary-selected>0</strong></span>
+              <span>Итого к выплате: <strong data-hr-salary-total>0 UZS</strong></span>
+            </div>
+            <button type="submit" class="btn">Сохранить акт</button>
+          </div>
+          <div class="org-ops-table-wrap org-hr-salary-table-wrap">
+            <table class="org-ops-table org-hr-table org-hr-salary-table">
+              <thead>
+                <tr>
+                  <th>Выбор</th>
+                  <th>Сотрудник</th>
+                  <th>Должность</th>
+                  <th>Оклад</th>
+                  <th>Пришел</th>
+                  <th>Не пришел</th>
+                  <th>Начисления</th>
+                  <th>Штрафы</th>
+                  <th>Заработал</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for emp in active_employees %}
+                  <tr>
+                    <td>
+                      <input
+                        type="checkbox"
+                        name="employee_id"
+                        value="{{ emp.id }}"
+                        data-hr-salary-check
+                        data-salary-due="{{ emp.salary_due }}"
+                      />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        class="org-hr-salary-name-link"
+                        data-hr-salary-act-open
+                        data-employee-id="{{ emp.id }}"
+                        data-employee-name="{{ emp.full_name }}"
+                        title="Открыть акт сверки зарплаты"
+                      ><strong>{{ emp.full_name }}</strong></button>
+                    </td>
+                    <td>{{ emp.position or 'Без должности' }}</td>
+                    <td>{{ emp.monthly_salary_label }} UZS</td>
+                    <td>{{ emp.present_days }}</td>
+                    <td>{{ emp.absent_days }}</td>
+                    <td>
+                      <strong>{{ emp.salary_bonus_label }} UZS</strong>
+                      {% for item in emp.salary_adjustments if item.type == 'bonus' %}
+                        <small>{{ item.work_date }}: {{ item.amount_label }}{% if item.comment %} - {{ item.comment }}{% endif %}</small>
+                      {% endfor %}
+                    </td>
+                    <td>
+                      <strong>{{ emp.salary_penalty_label }} UZS</strong>
+                      {% for item in emp.salary_adjustments if item.type == 'penalty' %}
+                        <small>{{ item.work_date }}: {{ item.amount_label }}{% if item.comment %} - {{ item.comment }}{% endif %}</small>
+                      {% endfor %}
+                    </td>
+                    <td><strong>{{ emp.salary_due_label }} UZS</strong></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="9" class="org-ops-empty">Активных сотрудников пока нет.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </form>
+      </section>
+      <section class="org-ops-panel org-hr-staff-frame org-hr-salary-detail" id="hr-salary-employee-act-panel" data-hr-panel="salary_act" hidden>
+        <div data-hr-salary-act-detail>
+          <p class="org-ops-empty">Выберите сотрудника в акте зарплаты, чтобы открыть его сверку.</p>
+        </div>
+      </section>
+    </div>
+
+    <dialog class="director-org-modal org-hr-modal" id="hr-salary-adjustment-modal">
+      <form
+        method="post"
+        action="{% if inside_organization %}{{ url_for('home_hr_salary_adjustment_save') }}{% else %}{{ url_for('organizations_hr_salary_adjustment_save') }}{% endif %}"
+        class="director-modal-card org-hr-modal-card org-hr-adjustment-card"
+      >
+        {% include "_csrf_field.html" %}
+        <header class="director-modal-head">
+          <div>
+            <p class="settings-ios-footnote">Зарплата</p>
+            <h2>Начисление или штраф</h2>
+          </div>
+          <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+            ×
+          </button>
+        </header>
+        <div class="org-hr-form">
+          <label class="org-hr-form-wide">
+            <span>Сотрудник</span>
+            <div class="shipment-employee-picker org-hr-employee-picker" data-hr-adjustment-employee-picker>
+              <input type="hidden" name="employee_id" data-hr-adjustment-employee-id />
+              <input
+                type="search"
+                autocomplete="off"
+                placeholder="Поиск сотрудника"
+                required
+                data-hr-adjustment-employee-search
+                aria-haspopup="listbox"
+                aria-expanded="false"
+              />
+              <button type="button" class="shipment-employee-toggle" data-hr-adjustment-employee-toggle aria-label="Открыть список сотрудников">⌄</button>
+              <div class="shipment-employee-menu org-hr-employee-menu" data-hr-adjustment-employee-menu role="listbox" hidden></div>
+            </div>
+          </label>
+          <label>
+            <span>Дата</span>
+            <input name="work_date" type="date" value="{{ selected_date }}" required />
+          </label>
+          <label>
+            <span>Тип</span>
+            <select name="adjustment_type" required>
+              <option value="bonus">Начисление</option>
+              <option value="penalty">Штраф</option>
+            </select>
+          </label>
+          <label>
+            <span>Сумма</span>
+            <input name="amount" type="text" inputmode="decimal" placeholder="0" required data-upos-money-format data-upos-money-decimals="0" />
+          </label>
+          <label class="org-hr-form-wide">
+            <span>Комментарий</span>
+            <textarea name="comment" rows="3" placeholder="Например: премия, опоздание, удержание"></textarea>
+          </label>
+        </div>
+        <footer class="director-modal-actions">
+          <button type="button" class="btn btn-secondary" data-org-modal-close>Отмена</button>
+          <button type="submit" class="btn">Сохранить</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="director-org-modal org-hr-modal org-hr-archive-modal" id="hr-employee-archive-modal">
+      <div class="director-modal-card org-hr-modal-card org-hr-archive-card">
+        <header class="director-modal-head">
+          <div>
+            <p class="settings-ios-footnote">Архив HR</p>
+            <h2>Уволенные сотрудники</h2>
+          </div>
+          <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+            ×
+          </button>
+        </header>
+        <div class="org-hr-archive-body">
+          <div class="org-ops-table-wrap">
+            <table class="org-ops-table org-hr-table org-hr-archive-table">
+              <thead>
+                <tr>
+                  <th>Фото</th>
+                  <th>Сотрудник</th>
+                  <th>Паспорт</th>
+                  <th>Зарплата</th>
+                  <th>К выплате</th>
+                  <th>Дата увольнения</th>
+                  <th class="org-hr-actions-col">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for emp in archived_employees %}
+                  <tr
+                    class="is-muted"
+                    data-hr-employee-row
+                    data-employee-id="{{ emp.id }}"
+                    data-first-name="{{ emp.first_name }}"
+                    data-last-name="{{ emp.last_name }}"
+                    data-position-id="{{ emp.position_id }}"
+                    data-position="{{ emp.position }}"
+                    data-passport-series="{{ emp.passport_series }}"
+                    data-passport-number="{{ emp.passport_number }}"
+                    data-monthly-salary="{{ emp.monthly_salary }}"
+                    data-monthly-salary-label="{{ emp.monthly_salary_label }} UZS"
+                    data-full-name="{{ emp.full_name }}"
+                    data-photo-url="{{ emp.photo_url or '' }}"
+                    data-status="{{ emp.status }}"
+                    data-present-days="{{ emp.present_days }}"
+                    data-absent-days="{{ emp.absent_days }}"
+                    data-salary-due="{{ emp.salary_due }}"
+                    data-salary-due-label="{{ emp.salary_due_label }} UZS"
+                    data-salary-bonus-label="{{ emp.salary_bonus_label }} UZS"
+                    data-salary-penalty-label="{{ emp.salary_penalty_label }} UZS"
+                    data-is-courier="{{ 1 if emp.is_courier else 0 }}"
+                    data-hired-at="{{ emp.hired_at }}"
+                  >
+                    <td>
+                      {% if emp.photo_url %}
+                        <img class="org-hr-photo" src="{{ emp.photo_url }}" alt="" loading="lazy" />
+                      {% else %}
+                        <span class="org-hr-photo org-hr-photo--empty">{{ (emp.first_name or emp.last_name or '?')[0]|upper }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        class="org-hr-employee-name-btn"
+                        data-hr-card-open
+                        aria-label="Открыть карточку сотрудника {{ emp.full_name }}"
+                      >
+                        <strong>{{ emp.full_name }}</strong>
+                      </button>
+                      <small>{{ emp.position or 'Без должности' }}</small>
+                    </td>
+                    <td>{{ emp.passport_series }} {{ emp.passport_number }}</td>
+                    <td>{{ emp.monthly_salary_label }} UZS</td>
+                    <td><strong>{{ emp.salary_due_label }} UZS</strong></td>
+                    <td>
+                      <span class="org-hr-pill">Уволен</span>
+                      <small>{{ emp.dismissed_at or 'Дата не указана' }}</small>
+                    </td>
+                    <td class="org-hr-actions-cell org-hr-archive-actions">
+                      <form method="post" action="{% if inside_organization %}{{ url_for('home_hr_employee_restore', employee_id=emp.id) }}{% else %}{{ url_for('organizations_hr_employee_restore', employee_id=emp.id) }}{% endif %}">
+                        {% include "_csrf_field.html" %}
+                        <button type="submit" class="btn btn-secondary btn-xs">Вернуть</button>
+                      </form>
+                      <form
+                        method="post"
+                        action="{% if inside_organization %}{{ url_for('home_hr_employee_delete', employee_id=emp.id) }}{% else %}{{ url_for('organizations_hr_employee_delete', employee_id=emp.id) }}{% endif %}"
+                        onsubmit="return confirm({{ ('Полностью удалить сотрудника ' ~ emp.full_name ~ '? Это действие нельзя отменить.')|tojson }});"
+                      >
+                        {% include "_csrf_field.html" %}
+                        <button type="submit" class="btn btn-danger-ghost btn-xs">Удалить</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="7" class="org-ops-empty">Уволенных сотрудников пока нет.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <footer class="director-modal-actions">
+          <button type="button" class="btn btn-secondary" data-org-modal-close>Закрыть</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog class="director-org-modal org-hr-modal" id="hr-employee-create-modal">
+      <form method="post" action="{% if inside_organization %}{{ url_for('home_hr_employee_create') }}{% else %}{{ url_for('organizations_hr_employee_create') }}{% endif %}" enctype="multipart/form-data" class="director-modal-card org-hr-modal-card">
+        <header class="director-modal-head">
+          <div>
+            <p class="settings-ios-footnote">Карточка сотрудника</p>
+            <h2>Добавить сотрудника</h2>
+          </div>
+          <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+            ×
+          </button>
+        </header>
+        <div class="org-hr-form">
+          {% include "_csrf_field.html" %}
+          <label>
+            <span>Имя</span>
+            <input name="first_name" type="text" maxlength="120" required />
+          </label>
+          <label>
+            <span>Фамилия</span>
+            <input name="last_name" type="text" maxlength="120" required />
+          </label>
+          <label>
+            <span>Должность</span>
+            <div class="org-position-select" data-position-select data-organization-id="{{ selected_organization_id or user.active_org_id or user.workspace_owner_id or '' }}">
+              <input type="hidden" name="position_id" data-position-id />
+              <input type="hidden" name="position" data-position-name />
+              <button type="button" class="org-position-select-btn" data-position-trigger aria-haspopup="listbox" aria-expanded="false">
+                <span data-position-label>Выберите должность</span>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div class="org-position-menu" data-position-menu hidden>
+                <div class="org-position-options" data-position-options role="listbox" aria-label="Должности">
+                  {% for pos in positions %}
+                    <div class="org-position-row" data-position-row data-id="{{ pos.id }}" data-name="{{ pos.name }}">
+                      <button type="button" class="org-position-option" data-position-option>{{ pos.name }}</button>
+                      <button type="button" class="org-position-action" data-position-edit aria-label="Редактировать должность {{ pos.name }}">✎</button>
+                      <button type="button" class="org-position-action" data-position-delete aria-label="Удалить должность {{ pos.name }}">×</button>
+                    </div>
+                  {% endfor %}
+                </div>
+                <button type="button" class="org-position-add-row" data-position-add-toggle>+ Добавить должность</button>
+                <div class="org-position-inline" data-position-inline hidden>
+                  <span data-position-inline-title>Новая должность:</span>
+                  <div class="org-position-inline-controls">
+                    <input type="text" maxlength="160" placeholder="Введите название..." data-position-input />
+                    <button type="button" class="org-position-save" data-position-save aria-label="Сохранить должность">✓</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </label>
+          <label>
+            <span>Серия паспорта</span>
+            <input name="passport_series" type="text" maxlength="16" />
+          </label>
+          <label>
+            <span>Номер паспорта</span>
+            <input name="passport_number" type="text" maxlength="32" />
+          </label>
+          <label>
+            <span>Зарплата за месяц</span>
+            <input name="monthly_salary" type="text" inputmode="decimal" placeholder="0" data-upos-money-format data-upos-money-decimals="0" />
+          </label>
+          <label>
+            <span>Дата приема</span>
+            <input name="hired_at" type="date" value="{{ selected_date }}" />
+          </label>
+          <label>
+            <span>Фото</span>
+            <input name="photo" type="file" accept="image/*" />
+          </label>
+          <label class="org-hr-checkline org-hr-checkline--wide">
+            <input name="is_courier" type="checkbox" value="1" />
+            <span>Доставщик</span>
+          </label>
+        </div>
+        <footer class="director-modal-actions">
+          <button type="button" class="btn btn-secondary" data-org-modal-close>Отмена</button>
+          <button type="submit" class="btn">Добавить</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="director-org-modal org-hr-modal" id="hr-employee-edit-modal">
+      <form method="post" action="{% if inside_organization %}{{ url_for('home_hr_employee_update') }}{% else %}{{ url_for('organizations_hr_employee_update') }}{% endif %}" enctype="multipart/form-data" class="director-modal-card org-hr-modal-card" id="hr-employee-edit-form">
+        <header class="director-modal-head">
+          <div>
+            <p class="settings-ios-footnote">Карточка сотрудника</p>
+            <h2>Редактировать сотрудника</h2>
+          </div>
+          <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+            ×
+          </button>
+        </header>
+        <div class="org-hr-form">
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="employee_id" data-hr-edit-field="employee_id" />
+          <label>
+            <span>Имя</span>
+            <input name="first_name" type="text" maxlength="120" required data-hr-edit-field="first_name" />
+          </label>
+          <label>
+            <span>Фамилия</span>
+            <input name="last_name" type="text" maxlength="120" required data-hr-edit-field="last_name" />
+          </label>
+          <label>
+            <span>Должность</span>
+            <div class="org-position-select" data-position-select data-organization-id="{{ selected_organization_id or user.active_org_id or user.workspace_owner_id or '' }}">
+              <input type="hidden" name="position_id" data-position-id />
+              <input type="hidden" name="position" data-position-name />
+              <button type="button" class="org-position-select-btn" data-position-trigger aria-haspopup="listbox" aria-expanded="false">
+                <span data-position-label>Выберите должность</span>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div class="org-position-menu" data-position-menu hidden>
+                <div class="org-position-options" data-position-options role="listbox" aria-label="Должности">
+                  {% for pos in positions %}
+                    <div class="org-position-row" data-position-row data-id="{{ pos.id }}" data-name="{{ pos.name }}">
+                      <button type="button" class="org-position-option" data-position-option>{{ pos.name }}</button>
+                      <button type="button" class="org-position-action" data-position-edit aria-label="Редактировать должность {{ pos.name }}">✎</button>
+                      <button type="button" class="org-position-action" data-position-delete aria-label="Удалить должность {{ pos.name }}">×</button>
+                    </div>
+                  {% endfor %}
+                </div>
+                <button type="button" class="org-position-add-row" data-position-add-toggle>+ Добавить должность</button>
+                <div class="org-position-inline" data-position-inline hidden>
+                  <span data-position-inline-title>Новая должность:</span>
+                  <div class="org-position-inline-controls">
+                    <input type="text" maxlength="160" placeholder="Введите название..." data-position-input />
+                    <button type="button" class="org-position-save" data-position-save aria-label="Сохранить должность">✓</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </label>
+          <label>
+            <span>Серия паспорта</span>
+            <input name="passport_series" type="text" maxlength="16" data-hr-edit-field="passport_series" />
+          </label>
+          <label>
+            <span>Номер паспорта</span>
+            <input name="passport_number" type="text" maxlength="32" data-hr-edit-field="passport_number" />
+          </label>
+          <label>
+            <span>Зарплата за месяц</span>
+            <input name="monthly_salary" type="text" inputmode="decimal" placeholder="0" data-hr-edit-field="monthly_salary" data-upos-money-format data-upos-money-decimals="0" />
+          </label>
+          <label>
+            <span>Дата приема</span>
+            <input name="hired_at" type="date" data-hr-edit-field="hired_at" />
+          </label>
+          <label>
+            <span>Фото</span>
+            <input name="photo" type="file" accept="image/*" />
+          </label>
+          <label class="org-hr-checkline org-hr-checkline--wide">
+            <input name="is_courier" type="checkbox" value="1" data-hr-edit-field="is_courier" />
+            <span>Доставщик</span>
+          </label>
+        </div>
+        <footer class="director-modal-actions">
+          <button type="button" class="btn btn-secondary" data-org-modal-close>Отмена</button>
+          <button type="submit" class="btn">Сохранить</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="director-org-modal org-hr-modal" id="hr-employee-card-modal">
+      <section class="director-modal-card org-hr-modal-card org-hr-employee-card" data-hr-card-modal-card>
+        <header class="director-modal-head">
+          <div>
+            <p class="settings-ios-footnote">Карточка сотрудника</p>
+            <h2 data-hr-card-name>Сотрудник</h2>
+          </div>
+          <button type="button" class="director-modal-close" data-hr-card-close aria-label="{{ _('settings.profile.close') }}">
+            ×
+          </button>
+        </header>
+        <div class="org-hr-card-body">
+          <div class="org-hr-card-filter">
+            <label>
+              <span>Период</span>
+              <input type="hidden" value="{{ selected_date }}" data-hr-card-date-from />
+              <input type="hidden" value="{{ selected_date }}" data-hr-card-date-to />
+              <span class="org-hr-card-date-range" data-hr-card-date-range></span>
+            </label>
+            <p data-hr-card-period>{{ selected_date }}</p>
+          </div>
+          <div class="org-hr-card-layout">
+            <div class="org-hr-card-profile">
+              <div class="org-hr-card-person">
+                <div class="org-hr-card-avatar" data-hr-card-avatar></div>
+                <div>
+                  <strong data-hr-card-full-name>Сотрудник</strong>
+                  <span data-hr-card-position>Без должности</span>
+                </div>
+              </div>
+              <div class="org-hr-card-stats">
+                <div>
+                  <span>Дней пришел</span>
+                  <strong data-hr-card-present>0</strong>
+                </div>
+                <div>
+                  <span>Не пришел</span>
+                  <strong data-hr-card-absent>0</strong>
+                </div>
+                <div>
+                  <span>Начислено</span>
+                  <strong data-hr-card-earned>0 UZS</strong>
+                </div>
+                <div>
+                  <span>К выплате</span>
+                  <strong data-hr-card-due>0 UZS</strong>
+                </div>
+              </div>
+              <div class="org-hr-card-details">
+                <div><span>Зарплата</span><strong data-hr-card-salary>0 UZS</strong></div>
+                <div><span>Паспорт</span><strong data-hr-card-passport>—</strong></div>
+                <div><span>Дата приема</span><strong data-hr-card-hired>—</strong></div>
+                <div><span>Статус</span><strong data-hr-card-status>Активный</strong></div>
+                <div><span>Начисления</span><strong data-hr-card-bonus>0 UZS</strong></div>
+                <div><span>Штрафы</span><strong data-hr-card-penalty>0 UZS</strong></div>
+              </div>
+            </div>
+            <section class="org-hr-card-ledger">
+              <h3>Начисления</h3>
+              <div class="org-hr-card-ledger-list" data-hr-card-accruals>
+                <p class="org-ops-empty">Выберите дату, чтобы увидеть начисления.</p>
+              </div>
+            </section>
+            <section class="org-hr-card-ledger">
+              <h3>Оплаты</h3>
+              <div class="org-hr-card-ledger-list" data-hr-card-payments>
+                <p class="org-ops-empty">Выплат за выбранный месяц пока нет.</p>
+              </div>
+            </section>
+          </div>
+          <div class="org-hr-card-balance" data-hr-card-balance>
+            <span>Остаток</span>
+            <strong data-hr-card-balance-text>—</strong>
+          </div>
+          <div class="org-hr-card-state" data-hr-card-state hidden></div>
+        </div>
+        <footer class="director-modal-actions">
+          <button type="button" class="btn btn-secondary" data-hr-card-close>Закрыть</button>
+          <button type="button" class="btn" data-hr-card-edit>Редактировать</button>
+        </footer>
+      </section>
+    </dialog>
+  </div>
+  <script type="application/json" id="hr-calendar-data">
+    {
+      "selectedDate": {{ selected_date|tojson }},
+      "organizationId": {{ (selected_organization_id or user.active_org_id or user.workspace_owner_id or '')|tojson }},
+      "employees": {{ active_employees|tojson }}
+    }
+  </script>
+  <script>
+    (() => {
+      const search = document.querySelector('[data-hr-staff-search]');
+      const rows = Array.from(document.querySelectorAll('[data-hr-employee-row]'));
+      const empty = document.querySelector('[data-hr-staff-search-empty]');
+      if (!search || !rows.length) return;
+
+      const normalize = (value) => String(value || '').trim().toLocaleLowerCase('ru-RU');
+      const haystack = (row) => normalize([
+        row.dataset.fullName,
+        row.dataset.firstName,
+        row.dataset.lastName,
+        row.dataset.position,
+        row.dataset.passportSeries,
+        row.dataset.passportNumber,
+        row.textContent,
+      ].join(' '));
+
+      const rowText = new Map(rows.map((row) => [row, haystack(row)]));
+
+      function applyStaffSearch() {
+        const query = normalize(search.value);
+        let visibleCount = 0;
+        rows.forEach((row) => {
+          const visible = !query || rowText.get(row).includes(query);
+          row.hidden = !visible;
+          if (visible) visibleCount += 1;
+        });
+        if (empty) empty.hidden = !query || visibleCount > 0;
+      }
+
+      search.addEventListener('input', applyStaffSearch);
+      applyStaffSearch();
+    })();
+  </script>
+  <script>
+    (() => {
+      const tabsShell = document.querySelector('[data-hr-open-tabs]');
+      const homeTab = document.querySelector('[data-hr-home-tab]');
+      const launcher = document.querySelector('[data-hr-launcher]');
+      const panelsRoot = document.querySelector('[data-hr-panels-root]');
+      const cards = Array.from(document.querySelectorAll('[data-hr-card]'));
+      const panels = Array.from(document.querySelectorAll('[data-hr-panel]'));
+      const salaryActDetail = document.querySelector('[data-hr-salary-act-detail]');
+      if (!tabsShell || !homeTab || !launcher || !panelsRoot || !cards.length || !panels.length) return;
+
+      const meta = {
+        staff: { title: 'Сотрудники', hash: '#staff' },
+        calendar: { title: 'Календарь', hash: '#calendar' },
+        salary: { title: 'Акт зарплаты', hash: '#salary' },
+        salary_act: { title: 'Акт сотрудника', hash: '#salary-act' },
+      };
+      const storageKey = 'upos.hr.openTabs';
+      const openTabs = [];
+      const salaryActState = {
+        employeeId: '',
+        employeeName: '',
+        loading: false,
+        error: '',
+        act: null,
+      };
+      let activeTab = '';
+
+      const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[char]);
+
+      function tabTitle(tab) {
+        if (tab === 'salary_act' && salaryActState.employeeName) {
+          return `Акт: ${salaryActState.employeeName}`;
+        }
+        return meta[tab]?.title || '';
+      }
+
+      function normalize(tab) {
+        return Object.prototype.hasOwnProperty.call(meta, tab) ? tab : '';
+      }
+
+      function ensureOpen(tab) {
+        if (!openTabs.includes(tab)) openTabs.push(tab);
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            openTabs,
+            activeTab,
+            salaryAct: {
+              employeeId: salaryActState.employeeId,
+              employeeName: salaryActState.employeeName,
+            },
+          }));
+        } catch (err) {
+          /* localStorage can be unavailable in private contexts. */
+        }
+      }
+
+      function restoreState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          if (saved.salaryAct && saved.salaryAct.employeeId) {
+            salaryActState.employeeId = String(saved.salaryAct.employeeId || '');
+            salaryActState.employeeName = String(saved.salaryAct.employeeName || '');
+          }
+          const savedTabs = Array.isArray(saved.openTabs) ? saved.openTabs.map(normalize).filter(Boolean) : [];
+          savedTabs.forEach(ensureOpen);
+          activeTab = normalize(saved.activeTab);
+          if (activeTab) ensureOpen(activeTab);
+        } catch (err) {
+          activeTab = '';
+        }
+      }
+
+      function syncHash() {
+        if (!window.history?.replaceState) return;
+        const nextUrl = activeTab ? location.pathname + location.search + meta[activeTab].hash : location.pathname + location.search;
+        window.history.replaceState(null, '', nextUrl);
+      }
+
+      function renderOpenTabs() {
+        tabsShell.querySelectorAll('[data-hr-open-tab]').forEach((node) => node.remove());
+        const homeActive = !activeTab;
+        homeTab.classList.toggle('active', homeActive);
+        homeTab.setAttribute('aria-current', homeActive ? 'page' : 'false');
+        openTabs.forEach((tab) => {
+          const title = tabTitle(tab);
+          const holder = document.createElement('span');
+          holder.className = `general-module-tab general-module-tab--report${activeTab === tab ? ' active' : ''}`;
+          holder.dataset.hrOpenTab = tab;
+
+          const activate = document.createElement('button');
+          activate.type = 'button';
+          activate.className = 'general-module-tab-activate';
+          activate.dataset.hrActivateTab = tab;
+          activate.textContent = title;
+
+          const close = document.createElement('button');
+          close.type = 'button';
+          close.className = 'general-module-tab-close';
+          close.dataset.hrCloseTab = tab;
+          close.setAttribute('aria-label', `Закрыть ${title}`);
+          close.textContent = '×';
+
+          holder.append(activate, close);
+          tabsShell.append(holder);
+        });
+      }
+
+      function money(label, currency = 'UZS') {
+        const cleanLabel = String(label ?? '0').trim() || '0';
+        const cleanCurrency = String(currency || 'UZS').trim().toUpperCase();
+        return `${cleanLabel} ${cleanCurrency}`;
+      }
+
+      function renderSalaryActDetail() {
+        if (!salaryActDetail) return;
+        if (!salaryActState.employeeId) {
+          salaryActDetail.innerHTML = '<p class="org-ops-empty">Выберите сотрудника в акте зарплаты, чтобы открыть его сверку.</p>';
+          return;
+        }
+        if (salaryActState.loading) {
+          salaryActDetail.innerHTML = '<p class="org-ops-empty">Загружаем акт сверки сотрудника...</p>';
+          return;
+        }
+        if (salaryActState.error) {
+          salaryActDetail.innerHTML = `<p class="org-ops-empty">${escapeHtml(salaryActState.error)}</p>`;
+          return;
+        }
+        const act = salaryActState.act;
+        if (!act) {
+          salaryActDetail.innerHTML = '<p class="org-ops-empty">Акт сотрудника пока не загружен.</p>';
+          return;
+        }
+        const emp = act.employee || {};
+        const adjustments = Array.isArray(emp.salary_adjustments) ? emp.salary_adjustments : [];
+        const payments = Array.isArray(act.payments) ? act.payments : [];
+        const balanceTitle = act.balance_state === 'overpaid' ? 'Переплата' : act.balance_state === 'closed' ? 'Баланс' : 'К выплате';
+        const adjustmentRows = [
+          `<tr>
+            <td><strong>Зарплата по табелю</strong></td>
+            <td>${escapeHtml(act.date_from || '')} - ${escapeHtml(act.date_to || '')}</td>
+            <td><strong>${escapeHtml(money(emp.salary_base_due_label))}</strong></td>
+            <td>Оклад ${escapeHtml(money(emp.monthly_salary_label))}, пришёл ${escapeHtml(emp.present_days || 0)} дней</td>
+          </tr>`,
+          ...adjustments.map((item) => `<tr>
+            <td>${escapeHtml(item.type_label || '')}</td>
+            <td>${escapeHtml(item.work_date || '')}</td>
+            <td>${escapeHtml(money(item.amount_label))}</td>
+            <td>${escapeHtml(item.comment || '—')}</td>
+          </tr>`),
+        ].join('');
+        const paymentRows = payments.length
+          ? payments.map((row) => `<tr>
+              <td><strong>#${escapeHtml(row.number || '')}</strong></td>
+              <td>${escapeHtml(row.created_label || '')}</td>
+              <td><strong>${escapeHtml(money(row.amount_label, row.currency || 'UZS'))}</strong></td>
+              <td>${escapeHtml(row.account || '—')}</td>
+              <td>${escapeHtml(row.note || '—')}</td>
+            </tr>`).join('')
+          : '<tr><td colspan="5" class="org-ops-empty">Выплат по зарплате за выбранный месяц пока нет.</td></tr>';
+
+        salaryActDetail.innerHTML = `
+          <div class="director-section-head">
+            <div>
+              <p class="settings-ios-footnote">Акт сверки зарплаты</p>
+              <h2>${escapeHtml(emp.full_name || salaryActState.employeeName || 'Сотрудник')}</h2>
+              <p class="settings-ios-footnote">${escapeHtml(emp.position || 'Без должности')} · ${escapeHtml(act.date_from || '')} - ${escapeHtml(act.date_to || '')}</p>
+            </div>
+          </div>
+          <div class="org-hr-salary-detail-summary">
+            <div><span>Оклад</span><strong>${escapeHtml(money(emp.monthly_salary_label))}</strong></div>
+            <div><span>Пришёл / не пришёл</span><strong>${escapeHtml(emp.present_days || 0)} / ${escapeHtml(emp.absent_days || 0)}</strong></div>
+            <div><span>Начислено</span><strong>${escapeHtml(money(act.salary_due_label))}</strong></div>
+            <div><span>Выплачено</span><strong>${escapeHtml(money(act.paid_uzs_label))}</strong></div>
+            <div class="org-hr-salary-detail-balance org-hr-salary-detail-balance--${escapeHtml(act.balance_state || 'due')}">
+              <span>${escapeHtml(balanceTitle)}</span>
+              <strong>${escapeHtml(money(act.balance_uzs_label))}</strong>
+            </div>
+          </div>
+          <section class="org-hr-salary-detail-block">
+            <div class="director-section-head">
+              <div>
+                <p class="settings-ios-footnote">Расчёт</p>
+                <h2>Начисления и удержания</h2>
+              </div>
+            </div>
+            <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+              <table class="org-ops-table org-ops-table--shipments-entry">
+                <thead>
+                  <tr><th>Тип</th><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr>
+                </thead>
+                <tbody>${adjustmentRows}</tbody>
+              </table>
+            </div>
+          </section>
+          <section class="org-hr-salary-detail-block">
+            <div class="director-section-head">
+              <div>
+                <p class="settings-ios-footnote">Выплаты</p>
+                <h2>Оплаты сотруднику</h2>
+              </div>
+            </div>
+            <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+              <table class="org-ops-table org-ops-table--shipments-entry">
+                <thead>
+                  <tr><th>№</th><th>Дата</th><th>Сумма</th><th>Счёт списания</th><th>Комментарий</th></tr>
+                </thead>
+                <tbody>${paymentRows}</tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }
+
+      async function loadSalaryAct(employeeId, employeeName) {
+        const requestedId = String(employeeId || '').trim();
+        if (!requestedId) return;
+        salaryActState.employeeId = requestedId;
+        salaryActState.employeeName = String(employeeName || salaryActState.employeeName || '').trim();
+        salaryActState.loading = true;
+        salaryActState.error = '';
+        salaryActState.act = null;
+        render();
+        try {
+          const dateInput = document.getElementById('hr-salary-date');
+          const date = dateInput?.value || new URLSearchParams(location.search).get('date') || '';
+          const url = new URL(`/api/hr/salary-act/${encodeURIComponent(requestedId)}`, location.origin);
+          if (date) url.searchParams.set('date', date);
+          const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.ok || !payload.act) {
+            throw new Error(payload.error || 'salary_act_not_loaded');
+          }
+          if (salaryActState.employeeId !== requestedId) return;
+          salaryActState.act = payload.act;
+          salaryActState.employeeName = payload.act.employee?.full_name || salaryActState.employeeName;
+        } catch (err) {
+          if (salaryActState.employeeId === requestedId) {
+            salaryActState.error = 'Не удалось открыть акт сверки сотрудника.';
+          }
+        } finally {
+          if (salaryActState.employeeId === requestedId) {
+            salaryActState.loading = false;
+            render();
+          }
+        }
+      }
+
+      function render() {
+        renderOpenTabs();
+        launcher.hidden = Boolean(activeTab);
+        panelsRoot.hidden = !activeTab;
+        cards.forEach((card) => {
+          card.setAttribute('aria-selected', card.dataset.hrCard === activeTab ? 'true' : 'false');
+        });
+        panels.forEach((panel) => {
+          panel.hidden = panel.dataset.hrPanel !== activeTab;
+        });
+        if (activeTab === 'salary_act') {
+          renderSalaryActDetail();
+          if (salaryActState.employeeId && !salaryActState.loading && !salaryActState.error && !salaryActState.act) {
+            loadSalaryAct(salaryActState.employeeId, salaryActState.employeeName);
+          }
+        }
+        syncHash();
+        saveState();
+      }
+
+      function openHr(tab) {
+        const nextTab = normalize(tab);
+        if (!nextTab) return;
+        ensureOpen(nextTab);
+        activeTab = nextTab;
+        render();
+      }
+
+      function closeHr(tab) {
+        const index = openTabs.indexOf(tab);
+        if (index >= 0) openTabs.splice(index, 1);
+        if (activeTab === tab) {
+          activeTab = openTabs[index] || openTabs[index - 1] || '';
+        }
+        render();
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener('click', () => openHr(card.dataset.hrCard));
+      });
+
+      document.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-hr-salary-act-open]');
+        if (!trigger) return;
+        event.preventDefault();
+        ensureOpen('salary');
+        ensureOpen('salary_act');
+        activeTab = 'salary_act';
+        loadSalaryAct(trigger.dataset.employeeId, trigger.dataset.employeeName);
+      });
+
+      tabsShell.addEventListener('click', (event) => {
+        if (event.target.closest('[data-hr-home-tab]')) {
+          activeTab = '';
+          render();
+          return;
+        }
+        const close = event.target.closest('[data-hr-close-tab]');
+        if (close) {
+          closeHr(close.dataset.hrCloseTab);
+          return;
+        }
+        const activate = event.target.closest('[data-hr-activate-tab]');
+        if (activate) {
+          activeTab = normalize(activate.dataset.hrActivateTab);
+          render();
+        }
+      });
+
+      function tabFromHash() {
+        return location.hash === '#calendar'
+          ? 'calendar'
+          : location.hash === '#staff'
+            ? 'staff'
+            : location.hash === '#salary'
+              ? 'salary'
+              : location.hash === '#salary-act'
+                ? 'salary_act'
+                : '';
+      }
+
+      const hashTab = tabFromHash();
+      if (hashTab) {
+        openHr(hashTab);
+      } else {
+        restoreState();
+        render();
+      }
+
+      window.addEventListener('hashchange', () => {
+        const nextTab = tabFromHash();
+        if (nextTab) {
+          openHr(nextTab);
+          return;
+        }
+        activeTab = '';
+        render();
+      });
+    })();
+
+    (() => {
+      const dataNode = document.getElementById('hr-calendar-data');
+      const head = document.querySelector('[data-hr-calendar-head]');
+      const body = document.querySelector('[data-hr-calendar-body]');
+      const summary = document.querySelector('[data-hr-calendar-summary]');
+      if (!dataNode || !head || !body || !summary) return;
+      let payload = { selectedDate: '', employees: [] };
+      try {
+        payload = JSON.parse(dataNode.textContent || '{}');
+      } catch (err) {
+        payload = { selectedDate: '', employees: [] };
+      }
+
+      const selected = /^\d{4}-\d{2}-\d{2}$/.test(payload.selectedDate || '') ? payload.selectedDate : new Date().toISOString().slice(0, 10);
+      const [year, month] = selected.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const employees = Array.isArray(payload.employees) ? payload.employees : [];
+      const monthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
+
+      const trHead = document.createElement('tr');
+      const nameHead = document.createElement('th');
+      nameHead.textContent = 'Сотрудник';
+      trHead.append(nameHead);
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const th = document.createElement('th');
+        th.textContent = String(day);
+        trHead.append(th);
+      }
+      head.replaceChildren(trHead);
+
+      let totalPresent = 0;
+      let totalAbsent = 0;
+      const rows = employees.map((emp) => {
+        const tr = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        const name = document.createElement('strong');
+        name.textContent = emp.full_name || 'Без имени';
+        nameCell.append(name);
+        if (emp.position) {
+          const position = document.createElement('small');
+          position.textContent = emp.position;
+          nameCell.append(position);
+        }
+        tr.append(nameCell);
+        const attendance = emp.attendance || {};
+        for (let day = 1; day <= daysInMonth; day += 1) {
+          const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const status = attendance[date] || '';
+          const td = document.createElement('td');
+          td.className = status ? `org-hr-calendar-day is-${status}` : 'org-hr-calendar-day';
+          td.textContent = status === 'present' ? 'П' : status === 'absent' ? 'Н' : '';
+          td.title = status === 'present' ? 'Пришёл' : status === 'absent' ? 'Не пришёл' : 'Нет отметки';
+          if (status === 'present') totalPresent += 1;
+          if (status === 'absent') totalAbsent += 1;
+          tr.append(td);
+        }
+        return tr;
+      });
+
+      if (rows.length) {
+        body.replaceChildren(...rows);
+      } else {
+        const empty = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = daysInMonth + 1;
+        td.className = 'org-ops-empty';
+        td.textContent = 'Активных сотрудников пока нет.';
+        empty.append(td);
+        body.replaceChildren(empty);
+      }
+
+      summary.textContent = `${monthLabel}: сотрудников ${employees.length}, пришёл ${totalPresent}, не пришёл ${totalAbsent}`;
+    })();
+
+    (() => {
+      const modal = document.getElementById('hr-salary-adjustment-modal');
+      const picker = modal?.querySelector('[data-hr-adjustment-employee-picker]');
+      const search = picker?.querySelector('[data-hr-adjustment-employee-search]');
+      const hidden = picker?.querySelector('[data-hr-adjustment-employee-id]');
+      const menu = picker?.querySelector('[data-hr-adjustment-employee-menu]');
+      const form = modal?.querySelector('form');
+      const dataNode = document.getElementById('hr-calendar-data');
+      if (!modal || !picker || !search || !hidden || !menu || !dataNode) return;
+
+      let employees = [];
+      try {
+        const payload = JSON.parse(dataNode.textContent || '{}');
+        employees = Array.isArray(payload.employees) ? payload.employees : [];
+      } catch (err) {
+        employees = [];
+      }
+      const activeEmployees = employees
+        .filter((emp) => emp && emp.status === 'active' && emp.full_name)
+        .map((emp) => ({
+          id: String(emp.id || ''),
+          name: String(emp.full_name || '').trim(),
+          position: String(emp.position || '').trim(),
+        }));
+      const employeeByName = new Map(activeEmployees.map((emp) => [emp.name.toLocaleLowerCase('ru-RU'), emp]));
+
+      function optionNode(emp) {
+        const text = document.createElement('span');
+        text.className = 'shipment-employee-option-text';
+        const name = document.createElement('strong');
+        name.textContent = emp.name;
+        text.append(name);
+        if (emp.position) {
+          const meta = document.createElement('small');
+          meta.textContent = emp.position;
+          text.append(meta);
+        }
+        return text;
+      }
+
+      function positionMenu() {
+        if (menu.hidden) return;
+        const rect = search.getBoundingClientRect();
+        const gap = 2;
+        const viewportGap = 12;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+        const maxBelow = Math.max(120, viewportHeight - rect.bottom - viewportGap - gap);
+        const maxAbove = Math.max(120, rect.top - viewportGap - gap);
+        const openAbove = maxBelow < 150 && maxAbove > maxBelow;
+        const maxHeight = Math.min(260, openAbove ? maxAbove : maxBelow);
+        const width = Math.min(rect.width, viewportWidth - viewportGap * 2);
+        const left = Math.min(Math.max(viewportGap, rect.left), viewportWidth - viewportGap - width);
+        menu.style.left = `${left}px`;
+        menu.style.width = `${width}px`;
+        menu.style.maxHeight = `${maxHeight}px`;
+        menu.style.top = openAbove ? 'auto' : `${rect.bottom + gap}px`;
+        menu.style.bottom = openAbove ? `${viewportHeight - rect.top + gap}px` : 'auto';
+        menu.classList.toggle('is-open-above', openAbove);
+      }
+
+      function renderMenu() {
+        const query = String(search.value || '').trim().toLocaleLowerCase('ru-RU');
+        const rows = activeEmployees.filter((emp) => {
+          const haystack = `${emp.name} ${emp.position}`.toLocaleLowerCase('ru-RU');
+          return haystack.includes(query);
+        });
+        menu.replaceChildren();
+        if (!rows.length) {
+          const empty = document.createElement('div');
+          empty.className = 'shipment-employee-empty';
+          empty.textContent = 'Сотрудник не найден';
+          menu.append(empty);
+          positionMenu();
+          return;
+        }
+        rows.forEach((emp) => {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'shipment-employee-option';
+          option.dataset.hrEmployeeId = emp.id;
+          option.dataset.hrEmployeeName = emp.name;
+          option.setAttribute('role', 'option');
+          option.append(optionNode(emp));
+          menu.append(option);
+        });
+        positionMenu();
+      }
+
+      function openMenu() {
+        menu.hidden = false;
+        search.setAttribute('aria-expanded', 'true');
+        renderMenu();
+        positionMenu();
+      }
+
+      function closeMenu() {
+        menu.hidden = true;
+        search.setAttribute('aria-expanded', 'false');
+      }
+
+      function selectEmployee(id, name) {
+        hidden.value = id || '';
+        search.value = name || '';
+        search.classList.toggle('org-ops-employee-selected', Boolean(id));
+        closeMenu();
+      }
+
+      function syncEmployee() {
+        const exact = employeeByName.get(String(search.value || '').trim().toLocaleLowerCase('ru-RU'));
+        hidden.value = exact ? exact.id : '';
+        search.classList.toggle('org-ops-employee-selected', Boolean(exact));
+      }
+
+      search.addEventListener('input', () => {
+        syncEmployee();
+        openMenu();
+      });
+      search.addEventListener('focus', openMenu);
+      search.addEventListener('change', syncEmployee);
+      picker.querySelector('[data-hr-adjustment-employee-toggle]')?.addEventListener('click', () => {
+        if (menu.hidden) openMenu();
+        else closeMenu();
+        search.focus();
+      });
+      menu.addEventListener('click', (event) => {
+        const option = event.target.closest('[data-hr-employee-id][data-hr-employee-name]');
+        if (!option) return;
+        selectEmployee(option.dataset.hrEmployeeId || '', option.dataset.hrEmployeeName || '');
+      });
+      document.addEventListener('click', (event) => {
+        if (picker.contains(event.target) || menu.contains(event.target)) return;
+        closeMenu();
+      });
+      window.addEventListener('resize', positionMenu);
+      window.addEventListener('scroll', positionMenu, true);
+      modal.addEventListener('close', () => closeMenu());
+      form?.addEventListener('submit', (event) => {
+        syncEmployee();
+        if (!hidden.value) {
+          event.preventDefault();
+          search.setCustomValidity('Выберите сотрудника из списка');
+          search.reportValidity();
+          search.setCustomValidity('');
+          search.focus();
+          openMenu();
+        }
+      });
+    })();
+
+    (() => {
+      const dataNode = document.getElementById('hr-calendar-data');
+      const daysRoot = document.querySelector('[data-hr-month-days]');
+      const monthLabel = document.querySelector('[data-hr-calendar-month-label]');
+      const rollcallList = document.querySelector('[data-hr-rollcall-list]');
+      const dateInput = document.querySelector('[data-hr-rollcall-date]');
+      const dateLabel = document.querySelector('[data-hr-rollcall-date-label]');
+      const presentLabel = document.querySelector('[data-hr-rollcall-present]');
+      const absentLabel = document.querySelector('[data-hr-rollcall-absent]');
+      const reasonList = document.querySelector('[data-hr-reason-list]');
+      const reasonRowsRoot = document.querySelector('[data-hr-reasons-list]');
+      const reasonDraftInput = document.querySelector('[data-hr-reason-draft]');
+      const reasonAddBtn = document.querySelector('[data-hr-reason-add]');
+      const reasonFeedback = document.querySelector('[data-hr-reasons-feedback]');
+      const reasonsModal = document.getElementById('hr-reasons-modal');
+      const reasonsOpenBtn = document.querySelector('[data-org-modal-open="hr-reasons-modal"]');
+      const nameFilterInput = document.querySelector('[data-hr-rollcall-name-filter]');
+      const nameFilterClear = document.querySelector('[data-hr-rollcall-name-clear]');
+      const positionFilterRoot = document.querySelector('[data-hr-position-filter]');
+      const positionTrigger = document.querySelector('[data-hr-position-trigger]');
+      const clearPositionFilterBtn = document.querySelector('[data-hr-clear-position-filter]');
+      const positionSummary = document.querySelector('[data-hr-position-summary]');
+      const positionMenu = document.querySelector('[data-hr-position-menu]');
+      const positionSearchInput = document.querySelector('[data-hr-position-search]');
+      const positionOptionsRoot = document.querySelector('[data-hr-position-options]');
+      const rollcallEmpty = document.querySelector('[data-hr-rollcall-empty]');
+      const pickedBody = document.querySelector('[data-hr-picked-body]');
+      const pickedCount = document.querySelector('[data-hr-picked-count]');
+      const pickedPresent = document.querySelector('[data-hr-picked-present]');
+      if (!dataNode || !daysRoot || !monthLabel || !rollcallList || !dateInput || !dateLabel) return;
+
+      let payload = { selectedDate: '', employees: [] };
+      try {
+        payload = JSON.parse(dataNode.textContent || '{}');
+      } catch (err) {
+        payload = { selectedDate: '', employees: [] };
+      }
+      const employees = Array.isArray(payload.employees) ? payload.employees : [];
+      const today = new Date();
+      let selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(payload.selectedDate || '') ? payload.selectedDate : today.toISOString().slice(0, 10);
+      let [viewYear, viewMonth] = selectedDate.split('-').map(Number);
+      let pickedIds = new Set();
+      const normalizeFilterText = (value) => String(value || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU');
+      const positionFallback = 'Не указана';
+      const positions = Array.from(new Set(employees.map((emp) => String(emp.position || '').trim() || positionFallback))).sort((a, b) => a.localeCompare(b, 'ru-RU'));
+      let selectedPositions = new Set(positions);
+      let positionSearch = '';
+      const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+      const reasonDefaults = ['Больничный', 'Отпуск', 'Выходной', 'Семейные обстоятельства', 'Командировка', 'Опоздал', 'Без связи'];
+      const reasonStorageKey = 'upos.hr.absenceReasons';
+      const reasonStorageReadyKey = 'upos.hr.absenceReasons.ready';
+      const reasonStorageReady = localStorage.getItem(reasonStorageReadyKey) === '1';
+      const savedReasons = (() => {
+        try {
+          const raw = localStorage.getItem(reasonStorageKey) || '[]';
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+          return [];
+        }
+      })();
+      let reasons = Array.from(new Set([...(reasonStorageReady ? [] : reasonDefaults), ...savedReasons].map((item) => String(item || '').trim()).filter(Boolean)));
+
+      function dateKeyFromDate(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      }
+
+      const todayKey = dateKeyFromDate(today);
+
+      function hasAttendanceOn(dateKey) {
+        return employees.some((emp) => {
+          const attendance = emp.attendance || {};
+          return Boolean(attendance[dateKey]);
+        });
+      }
+
+      function saveReasons() {
+        try {
+          localStorage.setItem(reasonStorageKey, JSON.stringify(reasons));
+          localStorage.setItem(reasonStorageReadyKey, '1');
+        } catch (err) {}
+      }
+
+      function renderReasonList() {
+        if (!reasonList) return;
+        reasonList.replaceChildren(...reasons.map((reason) => {
+          const option = document.createElement('option');
+          option.value = reason;
+          return option;
+        }));
+      }
+
+      function labelDate(dateKey) {
+        const parts = String(dateKey || '').split('-');
+        return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : dateKey;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[ch]);
+      }
+
+      function showReasonFeedback(message, kind = 'ok') {
+        if (!reasonFeedback) return;
+        reasonFeedback.textContent = message || '';
+        reasonFeedback.dataset.state = kind;
+        if (message) {
+          window.clearTimeout(showReasonFeedback.timer);
+          showReasonFeedback.timer = window.setTimeout(() => {
+            reasonFeedback.textContent = '';
+            reasonFeedback.dataset.state = '';
+          }, 1800);
+        }
+      }
+
+      function normalizeReason(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim();
+      }
+
+      function syncReasonInputs(oldValue, newValue) {
+        rollcallList.querySelectorAll('[data-hr-row-note]').forEach((input) => {
+          if (normalizeReason(input.value) === oldValue) input.value = newValue;
+        });
+      }
+
+      function renderReasonManager() {
+        if (!reasonRowsRoot) return;
+        if (!reasons.length) {
+          const empty = document.createElement('div');
+          empty.className = 'org-ops-empty';
+          empty.textContent = 'Причин пока нет.';
+          reasonRowsRoot.replaceChildren(empty);
+          return;
+        }
+        const tableWrap = document.createElement('div');
+        tableWrap.className = 'org-ops-table-wrap org-hr-reasons-table-wrap';
+
+        const table = document.createElement('table');
+        table.className = 'org-ops-table org-ops-table--shipments-entry org-hr-reasons-table';
+
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        const reasonHead = document.createElement('th');
+        reasonHead.textContent = 'Причина';
+        const actionHead = document.createElement('th');
+        actionHead.className = 'org-ops-row-actions-head';
+        actionHead.textContent = 'Действия';
+        headRow.append(reasonHead, actionHead);
+        thead.append(headRow);
+
+        const tbody = document.createElement('tbody');
+        const rows = reasons.map((reason, index) => {
+          const row = document.createElement('tr');
+          row.className = 'org-hr-reason-row';
+
+          const reasonCell = document.createElement('td');
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = reason;
+          reasonCell.append(input);
+          input.setAttribute('aria-label', 'Причина отсутствия');
+
+          const actionCell = document.createElement('td');
+          actionCell.className = 'org-ops-row-actions org-hr-reason-actions';
+          const saveBtn = document.createElement('button');
+          saveBtn.type = 'button';
+          saveBtn.className = 'btn btn-secondary btn-sm';
+          saveBtn.textContent = 'Редактировать';
+          saveBtn.addEventListener('click', () => {
+            const next = normalizeReason(input.value);
+            if (!next) {
+              showReasonFeedback('Введите название причины.', 'error');
+              return;
+            }
+            const duplicateIndex = reasons.findIndex((item, itemIndex) => itemIndex !== index && item.toLocaleLowerCase('ru-RU') === next.toLocaleLowerCase('ru-RU'));
+            if (duplicateIndex !== -1) {
+              showReasonFeedback('Такая причина уже есть.', 'error');
+              return;
+            }
+            const old = reasons[index];
+            reasons[index] = next;
+            saveReasons();
+            renderReasonList();
+            syncReasonInputs(old, next);
+            renderReasonManager();
+            showReasonFeedback('Причина сохранена.');
+          });
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.className = 'org-hr-reason-delete';
+          deleteBtn.textContent = '×';
+          deleteBtn.title = 'Удалить';
+          deleteBtn.setAttribute('aria-label', 'Удалить причину');
+          deleteBtn.addEventListener('click', () => {
+            const confirmed = window.confirm('Удаление причины может привести к потере информации. Удалить причину?');
+            if (!confirmed) return;
+            const [removed] = reasons.splice(index, 1);
+            saveReasons();
+            renderReasonList();
+            rollcallList.querySelectorAll('[data-hr-row-note]').forEach((noteInput) => {
+              if (normalizeReason(noteInput.value) === removed) noteInput.value = '';
+            });
+            renderReasonManager();
+            showReasonFeedback('Причина удалена.');
+          });
+
+          actionCell.append(saveBtn, deleteBtn);
+          row.append(reasonCell, actionCell);
+          return row;
+        });
+        tbody.append(...rows);
+        table.append(thead, tbody);
+        tableWrap.append(table);
+        reasonRowsRoot.replaceChildren(tableWrap);
+      }
+
+      function updatePositionSummary() {
+        if (!positionSummary) return;
+        if (!positions.length || selectedPositions.size === positions.length) {
+          positionSummary.textContent = 'Все должности';
+        } else if (selectedPositions.size === 0) {
+          positionSummary.textContent = '0 выбрано';
+        } else if (selectedPositions.size === 1) {
+          positionSummary.textContent = Array.from(selectedPositions)[0];
+        } else {
+          positionSummary.textContent = `${selectedPositions.size} выбрано`;
+        }
+      }
+
+      function renderPositionOptions() {
+        if (!positionOptionsRoot) return;
+        const needle = normalizeFilterText(positionSearch);
+        const visiblePositions = positions.filter((position) => normalizeFilterText(position).includes(needle));
+        if (!visiblePositions.length) {
+          const empty = document.createElement('div');
+          empty.className = 'org-ops-empty';
+          empty.textContent = 'Должности не найдены.';
+          positionOptionsRoot.replaceChildren(empty);
+          updatePositionSummary();
+          return;
+        }
+        const selectAllRow = document.createElement('label');
+        selectAllRow.className = 'org-hr-position-option org-hr-position-option--all';
+        const selectAllCheck = document.createElement('input');
+        selectAllCheck.type = 'checkbox';
+        selectAllCheck.checked = positions.length > 0 && selectedPositions.size === positions.length;
+        selectAllCheck.addEventListener('change', () => {
+          selectedPositions = selectAllCheck.checked ? new Set(positions) : new Set();
+          renderPositionOptions();
+          updatePositionSummary();
+          applyRollcallFilters();
+        });
+        const selectAllName = document.createElement('span');
+        selectAllName.textContent = 'Выбрать все';
+        selectAllRow.append(selectAllCheck, selectAllName);
+        const rows = visiblePositions.map((position) => {
+          const row = document.createElement('label');
+          row.className = 'org-hr-position-option';
+          const check = document.createElement('input');
+          check.type = 'checkbox';
+          check.checked = selectedPositions.has(position);
+          check.addEventListener('change', () => {
+            if (check.checked) {
+              selectedPositions.add(position);
+            } else {
+              selectedPositions.delete(position);
+            }
+            updatePositionSummary();
+            applyRollcallFilters();
+          });
+          const name = document.createElement('span');
+          name.textContent = position;
+          row.append(check, name);
+          return row;
+        });
+        positionOptionsRoot.replaceChildren(selectAllRow, ...rows);
+        updatePositionSummary();
+      }
+
+      function closePositionMenu() {
+        if (!positionMenu || !positionTrigger) return;
+        positionMenu.hidden = true;
+        positionTrigger.setAttribute('aria-expanded', 'false');
+      }
+
+      function togglePositionMenu() {
+        if (!positionMenu || !positionTrigger) return;
+        const nextOpen = positionMenu.hidden;
+        positionMenu.hidden = !nextOpen;
+        positionTrigger.setAttribute('aria-expanded', String(nextOpen));
+        if (nextOpen) {
+          renderPositionOptions();
+          positionSearchInput?.focus();
+        }
+      }
+
+      function applyRollcallFilters() {
+        const nameNeedle = normalizeFilterText(nameFilterInput?.value || '');
+        let visibleCount = 0;
+        rollcallList.querySelectorAll('[data-hr-rollcall-row]').forEach((row) => {
+          const name = normalizeFilterText(row.dataset.hrPersonName || '');
+          const position = row.dataset.hrPersonPosition || positionFallback;
+          const isPicked = pickedIds.has(row.dataset.hrPersonId || '');
+          const matchesName = !nameNeedle || name.includes(nameNeedle);
+          const matchesPosition = selectedPositions.has(position);
+          const visible = !isPicked && matchesName && matchesPosition;
+          row.hidden = !visible;
+          if (visible) visibleCount += 1;
+        });
+        if (rollcallEmpty) {
+          rollcallEmpty.textContent = pickedIds.size >= employees.length ? 'Все сотрудники отмечены.' : 'Сотрудники не найдены.';
+          rollcallEmpty.hidden = visibleCount !== 0 || !employees.length;
+        }
+        updateStats();
+      }
+
+      function updateStats() {
+        let present = 0;
+        let absent = 0;
+        rollcallList.querySelectorAll('[data-hr-rollcall-row]').forEach((row) => {
+          const isPicked = pickedIds.has(row.dataset.hrPersonId || '');
+          const employeeInput = row.querySelector('input[name="employee_id"]');
+          const presentInput = row.querySelector('input[value="present"]');
+          const absentInput = row.querySelector('input[value="absent"]');
+          const note = row.querySelector('[data-hr-row-note]');
+          if (employeeInput) employeeInput.disabled = !isPicked;
+          if (presentInput && presentInput.checked) {
+            if (isPicked) present += 1;
+            if (note) {
+              note.disabled = true;
+              note.required = false;
+            }
+          } else {
+            if (isPicked) absent += 1;
+            if (note) {
+              note.disabled = !isPicked;
+              note.required = false;
+            }
+          }
+          if (!isPicked && !presentInput?.checked && !absentInput?.checked && note) note.disabled = true;
+        });
+        if (presentLabel) presentLabel.textContent = `${present} пришли`;
+        if (absentLabel) absentLabel.textContent = `${absent} не пришли`;
+      }
+
+      function statusText(row) {
+        return row.querySelector('input[value="present"]')?.checked ? 'Пришёл' : 'Не пришёл';
+      }
+
+      function reasonSelectOptions(selectedValue) {
+        const normalizedSelected = normalizeReason(selectedValue);
+        const optionValues = Array.from(new Set([normalizedSelected, ...reasons].filter(Boolean)));
+        return [
+          '<option value="">Причина отсутствия</option>',
+          ...optionValues.map((reason) => `<option value="${escapeHtml(reason)}" ${reason === normalizedSelected ? 'selected' : ''}>${escapeHtml(reason)}</option>`),
+        ].join('');
+      }
+
+      function clearPositionFilter() {
+        selectedPositions = new Set();
+        renderPositionOptions();
+        updatePositionSummary();
+        applyRollcallFilters();
+      }
+
+      function renderPickedRows() {
+        if (!pickedBody) return;
+        const pickedRows = [...rollcallList.querySelectorAll('[data-hr-rollcall-row]')]
+          .filter((row) => pickedIds.has(row.dataset.hrPersonId || ''));
+        const pickedPresentCount = pickedRows.filter((row) => row.querySelector('input[value="present"]')?.checked).length;
+        if (pickedCount) pickedCount.textContent = String(pickedRows.length);
+        if (pickedPresent) pickedPresent.textContent = `Пришли ${pickedPresentCount}/${pickedRows.length} человек`;
+        if (!pickedRows.length) {
+          const empty = document.createElement('tr');
+          empty.dataset.hrPickedEmpty = '1';
+          empty.innerHTML = '<td colspan="4" class="org-ops-empty">Пока никто не отмечен.</td>';
+          pickedBody.replaceChildren(empty);
+          return;
+        }
+        const rows = pickedRows.map((sourceRow) => {
+          const row = document.createElement('tr');
+          const note = sourceRow.querySelector('[data-hr-row-note]');
+          const person = sourceRow.querySelector('.org-hr-rollcall-person');
+          const isPresent = sourceRow.querySelector('input[value="present"]')?.checked;
+          row.dataset.hrPickedPersonId = sourceRow.dataset.hrPersonId || '';
+          row.className = isPresent ? 'is-present' : 'is-absent';
+          row.innerHTML = `
+            <td>
+              <strong>${escapeHtml(person?.querySelector('strong')?.textContent || 'Без имени')}</strong>
+              <small>${escapeHtml(person?.querySelector('small')?.textContent || 'Без должности')}</small>
+            </td>
+            <td><span class="org-hr-picked-status">${statusText(sourceRow)}</span></td>
+            <td>
+              ${isPresent ? '<span class="org-hr-picked-no-reason">—</span>' : `<select class="org-hr-picked-reason-select">${reasonSelectOptions(note?.value || '')}</select>`}
+            </td>
+            <td><button type="button" class="org-hr-picked-remove" aria-label="Вернуть сотрудника">×</button></td>
+          `;
+          const mirrorNote = row.querySelector('select');
+          mirrorNote?.addEventListener('change', () => {
+            if (note) note.value = mirrorNote.value;
+          });
+          row.querySelector('.org-hr-picked-remove')?.addEventListener('click', () => {
+            pickedIds.delete(sourceRow.dataset.hrPersonId || '');
+            sourceRow.querySelectorAll('input[type="radio"]').forEach((radio) => {
+              radio.checked = false;
+            });
+            applyRollcallFilters();
+            renderPickedRows();
+            updateStats();
+          });
+          return row;
+        });
+        pickedBody.replaceChildren(...rows);
+      }
+
+      function renderRollcall() {
+        dateInput.value = selectedDate;
+        dateLabel.textContent = labelDate(selectedDate);
+        pickedIds = new Set();
+        if (!employees.length) {
+          const empty = document.createElement('div');
+          empty.className = 'org-ops-empty';
+          empty.textContent = 'Активных сотрудников пока нет.';
+          rollcallList.replaceChildren(empty);
+          renderPickedRows();
+          updateStats();
+          return;
+        }
+        const rows = employees.map((emp, index) => {
+          const eid = String(emp.id || '');
+          const attendance = emp.attendance || {};
+          const notes = emp.attendance_notes || {};
+          const hasSavedStatus = Object.prototype.hasOwnProperty.call(attendance, selectedDate);
+          const status = hasSavedStatus ? attendance[selectedDate] : '';
+          const note = notes[selectedDate] || '';
+          if (hasSavedStatus) pickedIds.add(eid);
+          const safeId = escapeHtml(eid);
+          const row = document.createElement('div');
+          row.className = 'org-hr-rollcall-row';
+          row.dataset.hrRollcallRow = '1';
+          row.dataset.hrPersonId = eid;
+          row.dataset.hrPersonName = `${emp.full_name || ''} ${emp.position || ''}`;
+          row.dataset.hrPersonPosition = String(emp.position || '').trim() || positionFallback;
+          row.innerHTML = `
+            <input type="hidden" name="employee_id" value="${safeId}" ${hasSavedStatus ? '' : 'disabled'}>
+            <div class="org-hr-rollcall-person">
+              <strong>${escapeHtml(emp.full_name || 'Без имени')}</strong>
+              <small>${escapeHtml(emp.position || 'Без должности')}</small>
+            </div>
+            <label class="org-hr-radio-pill is-present">
+              <input type="radio" name="status_${safeId}" value="present" ${status === 'present' ? 'checked' : ''}>
+              Пришёл
+            </label>
+            <label class="org-hr-radio-pill is-absent">
+              <input type="radio" name="status_${safeId}" value="absent" ${status === 'absent' ? 'checked' : ''}>
+              Не пришёл
+            </label>
+            <input class="org-hr-reason-input" type="text" name="note_${safeId}" list="hr-absence-reasons" value="${escapeHtml(note)}" placeholder="Причина отсутствия" data-hr-row-note>
+          `;
+          row.querySelectorAll('input[type="radio"]').forEach((radio) => radio.addEventListener('change', () => {
+            const shouldFocusReason = radio.value === 'absent';
+            pickedIds.add(eid);
+            applyRollcallFilters();
+            renderPickedRows();
+            if (shouldFocusReason) {
+              const pickedRow = [...pickedBody.querySelectorAll('[data-hr-picked-person-id]')]
+                .find((item) => item.dataset.hrPickedPersonId === eid);
+              pickedRow?.querySelector('input:not([disabled])')?.focus();
+            }
+            updateStats();
+          }));
+          return row;
+        });
+        rollcallList.replaceChildren(...rows);
+        renderPickedRows();
+        applyRollcallFilters();
+        updateStats();
+      }
+
+      function renderCalendar() {
+        monthLabel.textContent = `${monthNames[viewMonth - 1]} ${viewYear}`;
+        const first = new Date(viewYear, viewMonth - 1, 1);
+        const offset = (first.getDay() + 6) % 7;
+        const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+        const cells = [];
+        for (let i = 0; i < offset; i += 1) {
+          const cell = document.createElement('span');
+          cell.className = 'org-hr-month-day is-empty';
+          cells.push(cell);
+        }
+        for (let day = 1; day <= daysInMonth; day += 1) {
+          const dateKey = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          const isMarked = hasAttendanceOn(dateKey);
+          const classes = ['org-hr-month-day'];
+          if (dateKey === selectedDate) classes.push('is-selected');
+          if (dateKey < todayKey) classes.push('is-past');
+          if (isMarked) classes.push('is-marked');
+          btn.className = classes.join(' ');
+          const dayText = document.createElement('span');
+          dayText.textContent = String(day);
+          btn.append(dayText);
+          if (isMarked) {
+            const mark = document.createElement('span');
+            mark.className = 'org-hr-month-day-check';
+            mark.textContent = '✓';
+            btn.append(mark);
+          } else if (dateKey < todayKey) {
+            const mark = document.createElement('span');
+            mark.className = 'org-hr-month-day-missing';
+            mark.textContent = 'x';
+            btn.append(mark);
+          }
+          btn.dataset.hrDate = dateKey;
+          btn.addEventListener('click', () => {
+            selectedDate = dateKey;
+            renderCalendar();
+            renderRollcall();
+          });
+          cells.push(btn);
+        }
+        daysRoot.replaceChildren(...cells);
+      }
+
+      document.querySelector('[data-hr-calendar-prev]')?.addEventListener('click', () => {
+        viewMonth -= 1;
+        if (viewMonth < 1) {
+          viewMonth = 12;
+          viewYear -= 1;
+        }
+        renderCalendar();
+      });
+      document.querySelector('[data-hr-calendar-next]')?.addEventListener('click', () => {
+        viewMonth += 1;
+        if (viewMonth > 12) {
+          viewMonth = 1;
+          viewYear += 1;
+        }
+        renderCalendar();
+      });
+      reasonAddBtn?.addEventListener('click', () => {
+        const value = normalizeReason(reasonDraftInput?.value || '');
+        if (!value) return;
+        if (reasons.some((reason) => reason.toLocaleLowerCase('ru-RU') === value.toLocaleLowerCase('ru-RU'))) {
+          showReasonFeedback('Такая причина уже есть.', 'error');
+          return;
+        }
+        reasons.push(value);
+        saveReasons();
+        renderReasonList();
+        renderReasonManager();
+        if (reasonDraftInput) reasonDraftInput.value = '';
+        showReasonFeedback('Причина добавлена.');
+      });
+      reasonDraftInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          reasonAddBtn?.click();
+        }
+      });
+      reasonsOpenBtn?.addEventListener('click', () => {
+        renderReasonManager();
+        if (typeof reasonsModal?.showModal === 'function') {
+          reasonsModal.showModal();
+        } else {
+          reasonsModal?.setAttribute('open', '');
+        }
+        reasonDraftInput?.focus();
+      });
+      reasonsModal?.addEventListener('click', (event) => {
+        if (event.target === reasonsModal) reasonsModal.close();
+      });
+      reasonsModal?.querySelectorAll('[data-org-modal-close]').forEach((button) => {
+        button.addEventListener('click', () => reasonsModal.close());
+      });
+      nameFilterInput?.addEventListener('input', applyRollcallFilters);
+      nameFilterClear?.addEventListener('click', () => {
+        if (nameFilterInput) {
+          nameFilterInput.value = '';
+          nameFilterInput.focus();
+        }
+        applyRollcallFilters();
+      });
+      positionTrigger?.addEventListener('click', togglePositionMenu);
+      clearPositionFilterBtn?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        clearPositionFilter();
+      });
+      clearPositionFilterBtn?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearPositionFilter();
+      });
+      positionSearchInput?.addEventListener('input', () => {
+        positionSearch = positionSearchInput.value || '';
+        renderPositionOptions();
+      });
+      document.addEventListener('click', (event) => {
+        if (positionFilterRoot && !positionFilterRoot.contains(event.target)) {
+          closePositionMenu();
+        }
+      });
+
+      renderReasonList();
+      renderReasonManager();
+      renderPositionOptions();
+      renderCalendar();
+      renderRollcall();
+    })();
+
+    (() => {
+      const form = document.querySelector('[data-hr-salary-act-form]');
+      if (!form) return;
+      const checks = Array.from(form.querySelectorAll('[data-hr-salary-check]'));
+      const selectAll = form.querySelector('[data-hr-salary-select-all]');
+      const selectedNode = form.querySelector('[data-hr-salary-selected]');
+      const totalNode = form.querySelector('[data-hr-salary-total]');
+
+      function formatAmount(value) {
+        const amount = Math.round(Number(value || 0));
+        return `${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} UZS`;
+      }
+
+      function updateSalaryTotal() {
+        let count = 0;
+        let total = 0;
+        checks.forEach((check) => {
+          if (!check.checked) return;
+          count += 1;
+          total += Number(check.dataset.salaryDue || 0);
+        });
+        if (selectedNode) selectedNode.textContent = String(count);
+        if (totalNode) totalNode.textContent = formatAmount(total);
+        if (selectAll) {
+          selectAll.checked = Boolean(checks.length && checks.every((check) => check.checked));
+          selectAll.indeterminate = checks.some((check) => check.checked) && !selectAll.checked;
+        }
+      }
+
+      checks.forEach((check) => check.addEventListener('change', updateSalaryTotal));
+      selectAll?.addEventListener('change', () => {
+        checks.forEach((check) => {
+          check.checked = selectAll.checked;
+        });
+        updateSalaryTotal();
+      });
+      updateSalaryTotal();
+    })();
+  </script>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', path='organizations-page.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', path='hr-positions.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='hr-employees.js') }}?v=7" defer></script>
+{% endblock %}

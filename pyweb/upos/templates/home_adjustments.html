@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Корректировки{% endblock %}
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <style>
+    .adjustments-root .general-module-tabs {
+      align-items: stretch;
+      min-height: 2.84rem;
+      padding: 0.45rem 0.55rem 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-gutter: stable;
+    }
+
+    .adjustments-root .general-module-tab {
+      min-height: 2.18rem;
+      height: 2.18rem;
+    }
+
+    .adjustments-root .general-module-tab--report {
+      min-width: 8.4rem;
+    }
+
+    .adjustments-root .general-module-tab-activate,
+    .adjustments-root .general-module-tab-close {
+      min-height: 2.18rem;
+    }
+
+    .adjustments-root .general-module-sync {
+      width: 2.18rem;
+      min-width: 2.18rem;
+      min-height: 2.18rem;
+      height: 2.18rem;
+      margin-left: auto;
+      align-self: stretch;
+    }
+
+    .adjustments-root .org-ops-table-wrap {
+      overflow-x: auto;
+    }
+
+    .adjustments-root .adjustments-table {
+      min-width: 860px;
+    }
+
+    .adjustments-root .adjustments-table th,
+    .adjustments-root .adjustments-table td {
+      height: 3.32rem;
+    }
+
+    .adjustments-root .adjustments-table .upos-table-column-control-cell {
+      background: var(--card);
+      border-left: 1px solid var(--workbench-line);
+    }
+
+    .adjustments-root .adjustments-table thead .upos-table-column-control-cell {
+      background: var(--workbench-muted-surface);
+    }
+  </style>
+{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">Корректировки</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root adjustments-root">
+    <nav class="general-module-tabs org-hr-tabs" aria-label="Разделы корректировок" data-adjustments-open-tabs>
+      <button type="button" class="general-module-tab active" data-adjustments-home-tab data-adjustments-view="home" aria-current="page">Корректировки</button>
+      <button type="button" class="general-module-sync" data-adjustments-sync title="Синхронизировать" aria-label="Синхронизировать">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 0 1 14.7-7" />
+          <path d="M17.7 5H13" />
+          <path d="M17.7 5v4.7" />
+          <path d="M21 12a9 9 0 0 1-14.7 7" />
+          <path d="M6.3 19H11" />
+          <path d="M6.3 19v-4.7" />
+        </svg>
+      </button>
+    </nav>
+
+    <section class="general-report-launcher org-report-launcher org-hr-launcher" role="tablist" aria-label="Корректировки организации" data-adjustments-launcher>
+      <button type="button" class="general-report-card" role="tab" data-adjustments-card="employees" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </span>
+        <span>Сотрудники</span>
+        <small>Доступы и данные</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-adjustments-card="accounts" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 2v20" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+        <span>Счета</span>
+        <small>Остатки и валюты</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-adjustments-card="couriers" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M10 17h4V5H3v12h3" />
+            <path d="M14 17h1a2 2 0 1 0 4 0h1v-5l-3-4h-3" />
+            <circle cx="8" cy="17" r="2" />
+            <circle cx="17" cy="17" r="2" />
+          </svg>
+        </span>
+        <span>Доставщики</span>
+        <small>Расчёты и долги</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-adjustments-card="suppliers" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M3 7h18" />
+            <path d="M6 7v13" />
+            <path d="M18 7v13" />
+            <path d="M8 3h8l2 4H6z" />
+            <path d="M8 12h8" />
+          </svg>
+        </span>
+        <span>Поставщики</span>
+        <small>Сверки и оплаты</small>
+      </button>
+    </section>
+
+    <div class="general-home-shell org-hr-panels-root" data-adjustments-panels-root hidden>
+      <section class="org-ops-panel org-hr-staff-frame adjustments-panel" id="adjustments-employees-panel" data-adjustments-panel="employees" hidden>
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Корректировки</p>
+            <h2>Сотрудники</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap">
+          <table class="org-ops-table adjustments-table">
+            <thead>
+              <tr>
+                <th>Сотрудник</th>
+                <th>Текущая сумма</th>
+                <th>Новая сумма</th>
+                <th>Комментарий</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody data-adjustments-table="employees"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-staff-frame adjustments-panel" id="adjustments-accounts-panel" data-adjustments-panel="accounts" hidden>
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Корректировки</p>
+            <h2>Счета</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap">
+          <table class="org-ops-table adjustments-table">
+            <thead>
+              <tr>
+                <th>Счёт</th>
+                <th>Валюта</th>
+                <th>Текущий остаток</th>
+                <th>Новый остаток</th>
+                <th>Комментарий</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody data-adjustments-table="accounts"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-staff-frame adjustments-panel" id="adjustments-couriers-panel" data-adjustments-panel="couriers" hidden>
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Корректировки</p>
+            <h2>Доставщики</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap">
+          <table class="org-ops-table adjustments-table">
+            <thead>
+              <tr>
+                <th>Доставщик</th>
+                <th>Валюта</th>
+                <th>Текущая сумма</th>
+                <th>Новая сумма</th>
+                <th>Комментарий</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody data-adjustments-table="couriers"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-staff-frame adjustments-panel" id="adjustments-suppliers-panel" data-adjustments-panel="suppliers" hidden>
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Корректировки</p>
+            <h2>Поставщики</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap">
+          <table class="org-ops-table adjustments-table">
+            <thead>
+              <tr>
+                <th>Поставщик</th>
+                <th>Валюта</th>
+                <th>Текущая сумма</th>
+                <th>Новая сумма</th>
+                <th>Комментарий</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody data-adjustments-table="suppliers"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-staff-frame adjustments-history-panel">
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Фиксация</p>
+            <h2>История корректировок</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap">
+          <table class="org-ops-table adjustments-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Раздел</th>
+                <th>Объект</th>
+                <th>Было</th>
+                <th>Стало</th>
+                <th>Разница</th>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody data-adjustments-history></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <script id="adjustments-bootstrap-json" type="application/json">{{ adjustments_bootstrap_json | safe }}</script>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='adjustments-page.js') }}?v=1" defer></script>
+{% endblock %}

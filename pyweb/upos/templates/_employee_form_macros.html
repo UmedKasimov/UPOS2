@@ -1,0 +1,367 @@
+{% macro pwd_eye(show_label, hide_label) %}
+  <button
+    type="button"
+    class="pwd-toggle"
+    aria-label="{{ show_label }}"
+    aria-pressed="false"
+    data-label-show="{{ show_label }}"
+    data-label-hide="{{ hide_label }}"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  </button>
+{% endmacro %}
+
+{% macro employee_role_options(selected, roles) %}
+  {% for role in roles %}
+    <option value="{{ role.id }}" data-role-permissions='{{ (role.permissions or {}) | tojson }}' {% if selected == role.id %}selected{% endif %}>{{ role.name }}</option>
+  {% endfor %}
+{% endmacro %}
+
+{% macro employee_access_fields(prefix, e, organizations, access_accounts, is_new) %}
+  {% set org_field = 'new_organization_ids' if is_new else 'edit_organization_ids' %}
+  {% set account_field = 'new_account_ids' if is_new else 'edit_account_ids' %}
+  {% set selected_orgs = e.organization_ids if e and e.organization_ids else [] %}
+  {% set selected_accounts = e.account_ids if e and e.account_ids else [] %}
+  <div class="settings-profile-field employees-access-field">
+    <span class="settings-profile-field-label">Организации</span>
+    <details class="employees-access-dropdown" data-access-dropdown>
+      <summary>
+        <span data-access-summary data-empty="Выберите организации">Выберите организации</span>
+        <svg class="employees-access-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="employees-access-menu employees-access-menu--orgs">
+        <div class="employees-access-table-head employees-access-table-head--orgs">
+          <span></span>
+          <span>Организация</span>
+        </div>
+        {% for org in organizations %}
+          {% set checked = (org.id in selected_orgs) or (is_new and org.is_default) %}
+          <label class="employees-access-check employees-access-check--org">
+            <input type="checkbox" name="{{ org_field }}" value="{{ org.id }}" data-access-label="{{ org.name }}" {% if checked %}checked{% endif %} />
+            <span>{{ org.name }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+  <div class="settings-profile-field employees-access-field employees-access-field--wide">
+    <span class="settings-profile-field-label">Видимые счета</span>
+    <details class="employees-access-dropdown employees-access-dropdown--accounts" data-access-dropdown>
+      <summary>
+        <span data-access-summary data-empty="Выберите счета">Выберите счета</span>
+        <svg class="employees-access-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="employees-access-menu employees-access-menu--accounts">
+        <div class="employees-access-table-head employees-access-table-head--accounts">
+          <span></span>
+          <span>Счёт</span>
+          <span>Закреплены</span>
+        </div>
+        {% for group in access_accounts %}
+          <div class="employees-access-account-group" data-account-group data-organization-id="{{ group.organization.id }}">
+            <span class="employees-access-org-name">{{ group.organization.name }}</span>
+            {% if group.accounts %}
+              <div class="employees-access-list employees-access-list--accounts">
+                {% for account in group.accounts %}
+                  <label class="employees-access-check employees-access-check--account">
+                    <input type="checkbox" name="{{ account_field }}" value="{{ account.id }}" data-org-id="{{ group.organization.id }}" data-access-label="{{ account.label }}" {% if account.id in selected_accounts %}checked{% endif %} />
+                    <span class="employees-access-account-title">{{ account.label }}</span>
+                    <span class="employees-access-assignees-cell">
+                      {% if account.access_employee_names %}
+                        {% for name in account.access_employee_names %}
+                          <span class="employees-access-assignee">{{ name }}</span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="employees-access-muted">—</span>
+                      {% endif %}
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="employees-access-empty">Нет счетов</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <p class="employees-access-empty employees-access-filter-empty" data-account-empty hidden>Сначала выберите организацию</p>
+      </div>
+    </details>
+  </div>
+{% endmacro %}
+
+{% macro employee_role_permissions(prefix, permission_labels, button_permission_labels={}) %}
+  {% if permission_labels %}
+    {% set fallback_button_permission_labels = {
+      'kassa': {
+        'create': 'Добавить операцию',
+        'edit': 'Редактировать',
+        'delete': 'Удалить',
+        'confirm': 'Подтвердить',
+        'transfer': 'Перевод',
+        'sms_report': 'SMS отчёт',
+        'export': 'Экспорт',
+        'columns': 'Колонки'
+      },
+      'schet': {
+        'create': 'Добавить счёт',
+        'edit': 'Редактировать счёт',
+        'delete': 'Удалить счёт',
+        'balance': 'Изменить баланс',
+        'template': 'Шаблоны'
+      },
+      'reports': {
+        'debts': 'Долги доставщиков',
+        'balance': 'Баланс доставщиков',
+        'act': 'Акт сверки',
+        'shipments': 'Отгрузки',
+        'journal': 'Журнал отгрузок',
+        'export': 'Экспорт'
+      },
+      'adjustments': {
+        'employees': 'Сотрудники',
+        'accounts': 'Счета',
+        'couriers': 'Доставщики',
+        'suppliers': 'Поставщики',
+        'save': 'Сохранить'
+      },
+      'shipments': {
+        'create': 'Создать отгрузки',
+        'save': 'Сохранить изменения',
+        'confirm': 'Подтвердить',
+        'delete': 'Удалить документ',
+        'templates': 'Шаблоны',
+        'open': 'Открыть документ'
+      },
+      'hr': {
+        'create': 'Добавить сотрудника',
+        'edit': 'Редактировать сотрудника',
+        'dismiss': 'Уволить',
+        'restore': 'Восстановить',
+        'delete': 'Удалить',
+        'attendance': 'Табель',
+        'attendance_report': 'Отчёт табеля',
+        'salary_act': 'Акт зарплаты',
+        'salary_adjustment': 'Корректировка зарплаты'
+      },
+      'employees': {
+        'create': 'Добавить сотрудника',
+        'edit': 'Редактировать сотрудника',
+        'reset_password': 'Сбросить пароль',
+        'delete': 'Удалить доступ',
+        'devices': 'Устройства'
+      },
+      'settings': {
+        'profile': 'Профиль',
+        'preferences': 'Настройки интерфейса',
+        'integrations': 'Интеграции',
+        'telegram': 'Telegram',
+        'roles': 'Роли'
+      },
+      'dictionary': {
+        'currency': 'Валюты',
+        'category_create': 'Добавить категорию',
+        'category_edit': 'Редактировать категорию',
+        'category_delete': 'Удалить категорию',
+        'subcategory': 'Подкатегории'
+      }
+    } %}
+    {% set action_source = button_permission_labels if button_permission_labels else fallback_button_permission_labels %}
+    <div class="settings-profile-field employees-role-permissions-field" data-role-permissions-panel>
+      <div class="employees-role-permissions-head">
+        <span class="settings-profile-field-label">Права доступа</span>
+        <span class="employees-role-permissions-note">Для выбранной роли</span>
+      </div>
+      <label class="employees-role-permission-check employees-role-permissions-all">
+        <input type="checkbox" data-role-permission-all checked />
+        <span>Все функции</span>
+      </label>
+      <details class="employees-permission-dropdown employees-permission-dropdown--main" open>
+        <summary class="employees-permission-dropdown-summary">
+          <span>Основные разделы</span>
+          <small data-role-main-summary>0 выбрано</small>
+          <svg class="employees-permission-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="employees-role-permissions-grid employees-permission-dropdown-menu">
+          {% for key, label in permission_labels.items() %}
+            {% set action_labels = action_source.get(key, {}) %}
+            {% if action_labels %}
+              <details class="employees-role-permission-group employees-role-action-dropdown" data-role-permission-group="{{ key }}">
+                <summary class="employees-role-permission-check employees-role-permission-summary">
+                  <input type="checkbox" data-role-permission-toggle="{{ key }}" />
+                  <span>{{ label }}</span>
+                  <small data-role-button-count>0 из 0</small>
+                  <svg class="employees-permission-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="employees-button-permissions-list" data-role-button-group="{{ key }}">
+                  {% for action_key, action_label in action_labels.items() %}
+                    <label class="employees-button-permission-check">
+                      <input
+                        type="checkbox"
+                        data-role-button-permission-toggle="{{ key }}:{{ action_key }}"
+                        data-role-button-section="{{ key }}"
+                        data-role-button-action="{{ action_key }}"
+                      />
+                      <span>{{ action_label }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </details>
+            {% else %}
+              <div class="employees-role-permission-group" data-role-permission-group="{{ key }}">
+                <label class="employees-role-permission-check">
+                  <input type="checkbox" data-role-permission-toggle="{{ key }}" />
+                  <span>{{ label }}</span>
+                </label>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </details>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro employee_category_permissions(prefix, categories) %}
+  {% if categories %}
+    <div class="settings-profile-field employees-category-access-field settings-profile-field--full" data-role-category-panel>
+      <div class="employees-role-permissions-head">
+        <span class="settings-profile-field-label">Категории и подкатегории</span>
+        <span class="employees-role-permissions-note">Что видит выбранная роль</span>
+      </div>
+      <label class="employees-role-permission-check employees-category-access-all">
+        <input type="checkbox" data-role-category-all checked />
+        <span>Все категории и подкатегории</span>
+      </label>
+      <div class="employees-category-access-list">
+        {% for ctype, label in [('income', 'Приходы'), ('expense', 'Расходы'), ('transfer', 'Переводы')] %}
+          <details class="employees-permission-dropdown employees-permission-dropdown--inner employees-category-access-type" data-role-category-type open>
+            <summary class="employees-permission-dropdown-summary">
+              <span>{{ label }}</span>
+              <small data-role-category-type-summary>0 выбрано</small>
+              <svg class="employees-permission-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+            <div class="employees-permission-dropdown-menu">
+            {% for cat in categories if cat.type == ctype %}
+              <div class="employees-category-access-row" data-role-category-row="{{ cat.id }}">
+                <label class="employees-role-permission-check">
+                  <input type="checkbox" data-role-category-toggle="{{ cat.id }}" data-role-category-name="{{ cat.name }}" checked />
+                  <span>{{ cat.name }}</span>
+                </label>
+                {% if cat.subcategories %}
+                  <details class="employees-category-subcat-dropdown">
+                    <summary class="employees-category-subcat-summary">
+                      <span>Подкатегории</span>
+                      <small data-role-subcategory-summary>0 выбрано</small>
+                      <svg class="employees-permission-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="employees-category-access-subcats">
+                      {% for subcat in cat.subcategories %}
+                        <label class="employees-category-subcat-check">
+                          <input type="checkbox" data-role-subcategory-toggle data-role-subcategory-category="{{ cat.id }}" value="{{ subcat }}" checked />
+                          <span>{{ subcat }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+                  </details>
+                {% endif %}
+              </div>
+            {% else %}
+              <p class="employees-category-access-empty">Нет категорий</p>
+            {% endfor %}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro employee_form_fields(prefix, e, labels, roles, organizations, access_accounts, is_new, permission_labels={}, categories=[], button_permission_labels={}) %}
+  <div class="settings-profile-form-grid employees-form-layout">
+    <div class="employees-form-main">
+      <div class="settings-profile-field employees-profile-field--login">
+        <label class="settings-profile-field-label" for="{{ prefix }}-login">{{ _('employees.login') }}</label>
+        <input
+          id="{{ prefix }}-login"
+          class="settings-profile-input"
+          name="{% if is_new %}new_username{% else %}edit_username{% endif %}"
+          type="text"
+          required
+          value="{{ e.username if e else '' }}"
+          autocomplete="off"
+        />
+      </div>
+      <input type="hidden" name="{% if is_new %}new_email{% else %}edit_email{% endif %}" value="" />
+      <div class="settings-profile-field employees-profile-field--position">
+        <label class="settings-profile-field-label" for="{{ prefix }}-position">{{ _('employees.position') }}</label>
+        <input
+          id="{{ prefix }}-position"
+          class="settings-profile-input"
+          name="{% if is_new %}new_position{% else %}edit_position{% endif %}"
+          type="text"
+          value="{{ e.position if e else '' }}"
+          maxlength="160"
+        />
+      </div>
+      {{ employee_access_fields(prefix, e, organizations, access_accounts, is_new) }}
+      <div class="settings-profile-field employees-profile-field--name">
+        <label class="settings-profile-field-label" for="{{ prefix }}-name">{{ _('employees.name') }}</label>
+        <input
+          id="{{ prefix }}-name"
+          class="settings-profile-input"
+          name="{% if is_new %}new_name{% else %}edit_name{% endif %}"
+          type="text"
+          value="{{ e.name if e else '' }}"
+        />
+      </div>
+      <div class="settings-profile-field employees-profile-field--role">
+        <label class="settings-profile-field-label" for="{{ prefix }}-role">{{ _('employees.role') }}</label>
+        <span class="settings-select-wrap employees-role-select-wrap">
+          <select
+            id="{{ prefix }}-role"
+            class="employees-role-select"
+            name="{% if is_new %}new_employee_role_id{% else %}edit_employee_role_id{% endif %}"
+          >
+            {{ employee_role_options((e.employee_role_id if e else (roles[1].id if roles|length > 1 else (roles[0].id if roles else ''))), roles) }}
+          </select>
+          <svg class="settings-select-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        </span>
+      </div>
+      <div class="settings-profile-field employees-password-field">
+        <label class="settings-profile-field-label" for="{{ prefix }}-pw">
+          {{ _('employees.password') }}
+        </label>
+        <div class="pwd-wrap settings-profile-pwd-wrap">
+          <input
+            id="{{ prefix }}-pw"
+            name="{% if is_new %}new_password{% else %}edit_password{% endif %}"
+            class="pwd-input settings-profile-input"
+            type="password"
+            {% if is_new %}required minlength="8"{% endif %}
+            autocomplete="new-password"
+            placeholder="{{ '' if is_new else _('employees.pw_keep') }}"
+          />
+          {{ pwd_eye(_('pwd.show'), _('pwd.hide')) }}
+        </div>
+      </div>
+      {% if is_new %}
+        <label class="settings-profile-field employees-wallet-create">
+          <span class="settings-profile-field-label">Личный кошелёк</span>
+          <span class="employees-wallet-create-row">
+            <input type="checkbox" name="create_personal_wallet" value="1" />
+            <span>Создать личный кошелёк сразу</span>
+          </span>
+        </label>
+      {% endif %}
+    </div>
+    <div class="employees-form-permissions">
+      {{ employee_role_permissions(prefix, permission_labels, button_permission_labels) }}
+      {{ employee_category_permissions(prefix, categories) }}
+    </div>
+  </div>
+{% endmacro %}

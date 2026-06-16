@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}{{ _('schet.title_page') }}{% endblock %}
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
+  <link rel="stylesheet" href="{{ url_for('static', path='schet-page.css') }}?v=33" />
+{% endblock %}
+{% block page_header %}
+  <div class="schet-header-line">
+    <div>
+      <h1 class="page-title schet-page-title">{{ _('schet.title_short') }}</h1>
+    </div>
+    <div class="schet-toolbar schet-header-actions" aria-label="{{ _('schet.actions_aria') }}">
+      <button type="button" class="btn schet-btn" id="schet-open-editor">
+        <span class="schet-btn-ic" aria-hidden="true">вњЋ</span>
+        {{ _('schet.adjust') }}
+      </button>
+    </div>
+  </div>
+{% endblock %}
+{% block main %}
+  <script id="schet-bootstrap-json" type="application/json">{{ schet_bootstrap_json | safe }}</script>
+  <div id="schet-root" class="schet-root">
+    <div class="schet-status" id="schet-status" aria-live="polite"></div>
+
+    <section class="schet-empty" id="schet-empty" hidden>
+      <div class="schet-empty-card">
+        <div class="schet-empty-visual" aria-hidden="true">
+          <div class="schet-empty-core">₿ $ € лв</div>
+        </div>
+        <h2 class="schet-empty-title">{{ _('schet.empty.title') }}</h2>
+        <p class="schet-empty-text">
+          {{ _('schet.empty.text') }}
+        </p>
+        <button type="button" class="btn schet-btn-lg" id="schet-empty-cta">
+          {{ _('schet.empty.cta') }}
+        </button>
+      </div>
+    </section>
+
+    <section class="schet-overview-total schet-total-card" id="schet-total-card" hidden>
+      <div class="schet-total-inner">
+        <div>
+          <div class="schet-total-hint" id="schet-fx-hint"></div>
+        </div>
+        <div class="schet-total-controls">
+          <label class="schet-select-wrap">
+            <span class="schet-select-cap">{{ _('schet.total_currency') }}</span>
+            <select id="schet-display-ccy" class="schet-select" data-ccy-enhance></select>
+          </label>
+        </div>
+      </div>
+      <div class="schet-movement-toolbar" aria-label="{{ _('schet.movement_period_aria') }}">
+        <div id="schet-period-picker"></div>
+      </div>
+      <div class="schet-total-value-wrap">
+        <div class="schet-total-value" id="schet-total-value" aria-live="polite">—</div>
+        <div class="schet-total-change" id="schet-total-change" hidden></div>
+        <p class="schet-total-verbal" id="schet-total-verbal" hidden></p>
+      </div>
+    </section>
+
+    <div class="schet-bento-grid">
+      <section class="schet-overview-shell" id="schet-overview-shell" hidden>
+        <div class="schet-overview-body" id="schet-pockets" aria-label="{{ _('schet.overview_title') }}"></div>
+      </section>
+
+      <section class="schet-charts" id="schet-charts" hidden>
+        <div class="schet-chart-head">
+          <h2 class="schet-chart-title">{{ _('schet.chart_title') }}</h2>
+          <div class="schet-seg" role="tablist" aria-label="{{ _('schet.chart_type_aria') }}">
+            <button type="button" class="schet-seg-btn active" data-pocket-chart="doughnut">{{ _('schet.chart_doughnut') }}</button>
+            <button type="button" class="schet-seg-btn" data-pocket-chart="bar">{{ _('schet.chart_bar') }}</button>
+          </div>
+        </div>
+        <div class="schet-chart-grid">
+          <article class="schet-chart-panel">
+            <h3 class="schet-chart-panel-title">{{ _('schet.chart_by_pockets') }}</h3>
+            <p class="schet-chart-panel-hint">{{ _('schet.chart_by_pockets_hint') }}</p>
+            <div class="schet-chart-canvas-wrap">
+              <canvas id="schet-chart-pockets" aria-label="{{ _('schet.chart_pockets_aria') }}"></canvas>
+            </div>
+          </article>
+          <article class="schet-chart-panel">
+            <h3 class="schet-chart-panel-title">{{ _('schet.chart_by_currency') }}</h3>
+            <p class="schet-chart-panel-hint">{{ _('schet.chart_by_currency_hint') }} <span data-display-ccy-placeholder>USD</span></p>
+            <div class="schet-chart-canvas-wrap">
+              <canvas id="schet-chart-ccy" aria-label="{{ _('schet.chart_currency_aria') }}"></canvas>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <dialog class="schet-dialog" id="schet-tpl-dialog" aria-labelledby="schet-tpl-dialog-title">
+    <div class="schet-dialog-surface">
+      <header class="schet-dialog-head">
+        <h2 id="schet-tpl-dialog-title" class="schet-dialog-title">{{ _('schet.tpl_dialog_title') }}</h2>
+        <button type="button" class="schet-dialog-close" id="schet-tpl-close" aria-label="{{ _('schet.close') }}">×</button>
+      </header>
+      <div class="schet-dialog-body">
+        <p class="schet-dialog-intro schet-tpl-intro" id="schet-tpl-intro">{{ _('schet.pick_type') }}</p>
+        <div class="schet-tpl-region">
+          <h3 class="schet-tpl-region-title">{{ _('schet.tpl_region_uz') }}</h3>
+          <div class="schet-tpl-grid" id="schet-tpl-uz"></div>
+        </div>
+        <div class="schet-tpl-region">
+          <h3 class="schet-tpl-region-title">{{ _('schet.tpl_region_intl') }}</h3>
+          <div class="schet-tpl-grid" id="schet-tpl-intl"></div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="schet-dialog schet-editor-dialog" id="schet-editor-dialog" aria-labelledby="schet-editor-title">
+    <div class="schet-dialog-surface schet-editor-surface">
+      <header class="schet-dialog-head schet-editor-head">
+        <div>
+          <h2 id="schet-editor-title" class="schet-dialog-title">{{ _('schet.editor_title') }}</h2>
+          <p class="schet-editor-sub">{{ _('schet.editor_sub') }}</p>
+        </div>
+        <button type="button" class="schet-dialog-close" id="schet-editor-close" aria-label="{{ _('schet.close') }}">×</button>
+      </header>
+      <div class="schet-editor-scroll">
+        <div id="schet-editor-body" class="schet-editor-body"></div>
+      </div>
+      <footer class="schet-editor-foot">
+        <button type="button" class="btn btn-secondary" id="schet-editor-cancel">{{ _('schet.cancel') }}</button>
+        <button type="button" class="btn" id="schet-editor-save">{{ _('schet.save') }}</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="schet-dialog schet-confirm-dialog" id="schet-confirm-dialog" aria-labelledby="schet-confirm-title">
+    <div class="schet-dialog-surface schet-confirm-surface">
+      <header class="schet-dialog-head">
+        <h2 id="schet-confirm-title" class="schet-dialog-title">{{ _('schet.confirm_title') }}</h2>
+        <button type="button" class="schet-dialog-close" id="schet-confirm-close" aria-label="{{ _('schet.close') }}">×</button>
+      </header>
+      <div class="schet-dialog-body">
+        <p class="schet-confirm-text" id="schet-confirm-text">{{ _('schet.confirm_text') }}</p>
+      </div>
+      <footer class="schet-confirm-foot">
+        <button type="button" class="btn btn-secondary" id="schet-confirm-cancel">{{ _('schet.cancel') }}</button>
+        <button type="button" class="btn btn-danger" id="schet-confirm-yes" disabled>{{ _('schet.confirm_yes_count', seconds=5) }}</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="schet-detail-dialog" id="schet-detail-dialog" aria-labelledby="schet-detail-title">
+    <aside class="schet-detail-surface">
+      <header class="schet-detail-head">
+        <h2 id="schet-detail-title" class="schet-detail-title">
+          Детализация остатков: <span id="schet-detail-name"></span>
+        </h2>
+        <button type="button" class="schet-detail-close" id="schet-detail-close" aria-label="{{ _('schet.close') }}">×</button>
+      </header>
+      <div class="schet-detail-body" id="schet-detail-body"></div>
+    </aside>
+  </dialog>
+{% endblock %}
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
+  <script src="{{ url_for('static', path='date-range-picker.js') }}?v=10"></script>
+  <script src="{{ url_for('static', path='schet-page.js') }}?v=41" defer></script>
+{% endblock %}

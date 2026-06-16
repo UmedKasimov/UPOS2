@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% import "_employee_form_macros.html" as employee_forms with context %}
+
+{% block title %}Пользователи{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">Пользователи</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--fluid director-org-workspace general-management-users-page">
+    <nav class="general-module-tabs settings-module-tabs" aria-label="{{ _('nav.general_sections') }}">
+      <a class="general-module-tab" href="{{ url_for('organizations_settings_get') }}" data-org-settings-home-tab>Настройки</a>
+    </nav>
+
+    {% if flash_ok or flash_err %}
+      <div class="employees-flash-group">
+        {% if flash_ok == "created" %}
+          <div class="flash ok settings-ios-flash">{{ _('employees.flash.created') }}</div>
+        {% elif flash_ok == "deleted" %}
+          <div class="flash ok settings-ios-flash">{{ _('employees.flash.deleted') }}</div>
+        {% elif flash_ok == "updated" %}
+          <div class="flash ok settings-ios-flash">{{ _('employees.flash.updated') }}</div>
+        {% elif flash_ok == "frozen" %}
+          <div class="flash ok settings-ios-flash">Доступ заморожен</div>
+        {% elif flash_ok == "unfrozen" %}
+          <div class="flash ok settings-ios-flash">Доступ разморожен</div>
+        {% endif %}
+        {% if flash_err %}
+          <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <section class="settings-ios-group settings-employees-table-card" aria-labelledby="general-users-table-title">
+      <div class="settings-employees-table-head">
+        <div>
+          <p class="settings-ios-footnote" id="general-users-table-title">Таблица пользователей</p>
+          <h2 class="settings-employees-title">{{ employees | length }} сотрудников</h2>
+        </div>
+        <button type="button" class="btn btn-secondary settings-employees-small-add" data-employee-add-open>Добавить</button>
+      </div>
+      <div class="settings-employees-table-wrap">
+        <table class="settings-employees-table">
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Сотрудник</th>
+              <th>Логин</th>
+              <th>Роль</th>
+              <th>Организации</th>
+              <th>Счета</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if employees %}
+              {% for e in employees %}
+              <tr
+                class="settings-employee-row"
+                data-employee-id="{{ e.id }}"
+                data-username="{{ e.username }}"
+                data-name="{{ e.name }}"
+                data-position="{{ e.position }}"
+                data-staff-role="{{ e.staff_role }}"
+                data-employee-role-id="{{ e.employee_role_id }}"
+                data-organization-ids="{{ (e.organization_ids or []) | join(',') }}"
+                data-account-ids="{{ (e.account_ids or []) | join(',') }}"
+                data-is-frozen="{{ '1' if e.is_frozen else '0' }}"
+                data-role-label="{{ e.employee_role_name or staff_role_labels.get(e.staff_role, e.staff_role) }}"
+              >
+                <td class="settings-employee-index">{{ loop.index }}</td>
+                <td>
+                  <div class="settings-employee-person">
+                    <span class="settings-employee-avatar">{{ (e.name or e.username)[0]|upper }}</span>
+                    <span>
+                      <strong>{{ e.name or e.username }}</strong>
+                      <small>{{ e.position or "—" }}</small>
+                    </span>
+                  </div>
+                </td>
+                <td class="settings-employee-login-cell">
+                  <span>{{ e.username }}</span>
+                </td>
+                <td>{{ e.employee_role_name or staff_role_labels.get(e.staff_role, e.staff_role) }}</td>
+                <td>
+                  {% if e.organizations %}
+                    <details class="settings-employee-row-dropdown">
+                      <summary>
+                        <span>{{ e.organizations | length }} организаций</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                      </summary>
+                      <div class="settings-employee-row-menu">
+                        {% for org in e.organizations %}
+                          <span>{{ org.name }}</span>
+                        {% endfor %}
+                      </div>
+                    </details>
+                  {% else %}
+                    <span class="settings-employee-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if e.wallets %}
+                    <details class="settings-employee-row-dropdown">
+                      <summary>
+                        <span>{{ e.wallets | length }} счетов</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                      </summary>
+                      <div class="settings-employee-row-menu">
+                        {% for wallet in e.wallets %}
+                          <span>{{ wallet.label }}</span>
+                        {% endfor %}
+                      </div>
+                    </details>
+                  {% else %}
+                    <span class="settings-employee-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="settings-employee-actions">
+                    <button type="button" class="employee-card-icon-btn" data-employee-edit-open title="{{ _('employees.edit') }}" aria-label="{{ _('employees.edit') }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                    </button>
+                    <button type="button" class="employee-card-icon-btn" data-employee-reset-password title="Сбросить пароль" aria-label="Сбросить пароль">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 7a5 5 0 1 0 1.4 4.6L22 6l-3-3-5.6 5.6"/><path d="M9 12h.01"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" class="settings-employees-empty">Пока нет сотрудников. Нажмите «Добавить».</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <dialog class="settings-profile-modal" id="employee-add-dialog" aria-labelledby="employee-add-title" aria-modal="true">
+      <div class="settings-profile-modal-surface">
+        <header class="settings-profile-modal-head">
+          <div class="settings-profile-modal-head-text">
+            <h2 id="employee-add-title" class="settings-profile-modal-title">{{ _('employees.add_title') }}</h2>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-employee-add-close aria-label="{{ _('employees.close') }}">×</button>
+        </header>
+        <div class="settings-profile-modal-scroll">
+          <div class="settings-profile-modal-body">
+            <form method="post" action="{{ url_for('employees_create') }}" id="employee-add-form">
+              {% include "_csrf_field.html" %}
+              <input type="hidden" name="return_to_settings" value="organizations" />
+              {{ employee_forms.employee_form_fields('emp-add', none, staff_role_labels, employee_roles, organizations_for_access, access_accounts, true, role_permission_labels, categories, role_button_permission_labels) }}
+            </form>
+          </div>
+        </div>
+        <footer class="settings-profile-modal-foot">
+          <button type="submit" class="btn" form="employee-add-form">{{ _('employees.add') }}</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog class="settings-profile-modal" id="employee-edit-dialog" aria-labelledby="employee-edit-title" aria-modal="true">
+      <div class="settings-profile-modal-surface">
+        <header class="settings-profile-modal-head">
+          <div class="settings-profile-modal-head-text">
+            <h2 id="employee-edit-title" class="settings-profile-modal-title">{{ _('employees.edit_title') }}</h2>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-employee-edit-close aria-label="{{ _('employees.close') }}">×</button>
+        </header>
+        <div class="settings-profile-modal-scroll">
+          <div class="settings-profile-modal-body">
+            <form method="post" action="{{ url_for('employees_update') }}" id="employee-edit-form">
+              {% include "_csrf_field.html" %}
+              <input type="hidden" name="return_to_settings" value="organizations" />
+              <input type="hidden" name="edit_old_username" id="employee-edit-old-username" value="" />
+              {{ employee_forms.employee_form_fields('emp-edit', none, staff_role_labels, employee_roles, organizations_for_access, access_accounts, false, role_permission_labels, categories, role_button_permission_labels) }}
+            </form>
+            <form
+              method="post"
+              action="{{ url_for('employees_freeze') }}"
+              class="employees-modal-freeze"
+              id="employee-freeze-form"
+            >
+              {% include "_csrf_field.html" %}
+              <input type="hidden" name="return_to_settings" value="organizations" />
+              <input type="hidden" name="employee_username" id="employee-freeze-username" value="" />
+              <input type="hidden" name="freeze_action" value="freeze" />
+            </form>
+            <form
+              method="post"
+              action="{{ url_for('employees_freeze') }}"
+              class="employees-modal-freeze"
+              id="employee-unfreeze-form"
+            >
+              {% include "_csrf_field.html" %}
+              <input type="hidden" name="return_to_settings" value="organizations" />
+              <input type="hidden" name="employee_username" id="employee-unfreeze-username" value="" />
+              <input type="hidden" name="freeze_action" value="unfreeze" />
+            </form>
+            <form
+              method="post"
+              action="{{ url_for('employees_delete') }}"
+              class="employees-modal-delete"
+              id="employee-delete-form"
+              onsubmit="return window.employeeConfirmDelete && window.employeeConfirmDelete();"
+            >
+              {% include "_csrf_field.html" %}
+              <input type="hidden" name="return_to_settings" value="organizations" />
+              <input type="hidden" name="del_username" id="employee-delete-username" value="" />
+            </form>
+          </div>
+        </div>
+        <footer class="settings-profile-modal-foot">
+          <div class="employees-modal-access-actions">
+            <button type="submit" class="btn btn-secondary" form="employee-freeze-form" data-employee-freeze-submit>Заморозить</button>
+            <button type="submit" class="btn btn-secondary" form="employee-unfreeze-form" data-employee-unfreeze-submit hidden>Разморозить</button>
+            <button type="submit" class="btn btn-danger-ghost" form="employee-delete-form">{{ _('employees.delete_access') }}</button>
+          </div>
+          <button type="submit" class="btn" form="employee-edit-form">{{ _('employees.save') }}</button>
+        </footer>
+      </div>
+    </dialog>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
+    window.orgSettingsTabs = {
+      baseUrl: {{ url_for('organizations_settings_get') | string | tojson }},
+      homeUrl: {{ url_for('organizations_settings_get') | string | tojson }},
+      currentTab: "users",
+      restoreActive: false,
+      labels: {
+        general: {{ _('settings.tab.general') | tojson }},
+        users: "Пользователи",
+        dictionary: {{ _('settings.tab.dictionary') | tojson }},
+        integrations: {{ _('settings.tab.integrations') | tojson }},
+        telegram: {{ _('settings.tab.telegram') | tojson }}
+      },
+      urls: {
+        users: {{ url_for('organizations_users_get') | string | tojson }}
+      }
+    };
+  </script>
+  <script src="{{ url_for('static', path='org-settings-tabs.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
+{% endblock %}

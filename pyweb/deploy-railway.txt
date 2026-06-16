@@ -1,0 +1,67 @@
+Railway — чеклист деплоя UPOS FINANCE (pyweb)
+
+1. Репозиторий
+   • Подключите GitHub-репозиторий к Railway (New Project → Deploy from GitHub).
+
+2. Корень сервиса — выберите ОДИН вариант
+   А) Рекомендуется: Root Directory ОСТАВИТЬ ПУСТЫМ (корень Git-репозитория).
+      Сборка идёт через корневой Dockerfile + railway.toml в корне — копируется pyweb/upos.
+   Б) Альтернатива: Root Directory = pyweb — тогда pyweb/Dockerfile и pyweb/railway.toml.
+      Не смешивать: при пустом корне используются файлы из п.А.
+
+3. Переменные (Variables), минимум
+   • AUTH_SECRET — случайная строка (openssl rand -base64 32).
+   • AUTH_URL — публичный URL вида https://<имя>.up.railway.app (или ваш домен).
+   • ADMIN_BASIC_USER, ADMIN_BASIC_PASSWORD — чтобы создать первого администратора, если данных ещё нет.
+   • Обязательна строка подключения к PostgreSQL для веб-сервиса — см. п. 3a.
+
+3a. Как добавить базу данных (если DATABASE_URL не появился сам)
+
+   Способ А (правильный на Railway): ссылаться на переменные плагина Postgres
+   • Откройте сервис веб-приложения (не базу!) → вкладка Variables.
+   • New variable → вкладка / опция Variable reference / Reference variable (название в UI может чуть отличаться).
+   • Выберите ваш сервис PostgreSQL в этом же проекте.
+   • Добавьте ссылку на переменную `DATABASE_URL` (имя на веб-сервисе тоже `DATABASE_URL`).
+     Так приложение ходит в БД по внутренней сети Railway.
+
+   Если нужной строки не видно: Postgres → Variables — проверьте, что есть internal URL с
+   суффиксом `railway.internal` (это то, что нужно для `DATABASE_URL`).
+
+   Способ Б: скопировать `DATABASE_URL` или `DATABASE_PUBLIC_URL` со вкладки Variables у Postgres
+     и добавить эту переменную вручную на веб-сервис (`DATABASE_URL` или `DATABASE_PUBLIC_URL`).
+
+   Способ В: на веб-сервис добавить все `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`
+     теми же значениями, что в Variables Postgres — приложение само соберёт строку подключения.
+
+4. База данных
+   • Подключите PostgreSQL к сервису приложения в Railway (оба сервиса в одном проекте).
+   • У веб-сервиса должен быть `DATABASE_URL` / `DATABASE_PUBLIC_URL` или набор PG* (см. п. 3a).
+   • Таблицы users, workspace_settings, treasuries, global_settings создаются при старте (create_all).
+   • Передеплой не удаляет таблицы и не делает truncate: возможны только недостающие таблицы/столбцы
+     (ALTER ADD COLUMN IF NOT EXISTS).
+   • UPOS_DATA_DIR / volume больше не нужны для основного хранения данных.
+
+5. Сборка
+   • Если корень репо пустой на Railway: Dockerfile и railway.toml в корне проекта на GitHub.
+   • Если Root Directory=pyweb: pyweb/Dockerfile, образ Python 3.11, uvicorn, переменная PORT задаёт Railway.
+
+6. Проверка
+   • После деплоя откройте https://…/health — должно быть {"ok":true} (этот endpoint не проверяет БД).
+   • Откройте https://…/health/db — {"ok":true} и массив "tables" содержит users, workspace_settings,
+     treasuries, global_settings при правильном подключении приложения к той же Postgres.
+     Если ok:false или таблиц нет — см. пункт 6b.
+   • Откройте корень приложения → редирект на вход.
+
+6b. Таблицы в Railway «пустые» в интерфейсе
+   • Откройте https://…/health/db: поле `database` должно совпасть с БД вашего приложения (часто `railway`).
+     В UI Postgres иногда показывается другая база или до первого DDL не обновился список — сверьтесь через Query:
+     SELECT current_database(); и SELECT tablename FROM pg_tables WHERE schemaname = 'public';
+   • В логах веб-сервиса после старта должна быть строка PostgreSQL DDL с именем базы и списком таблиц.
+   • Вручную (если DDL не смог выполниться при старте): в Postgres → Query вставьте текст из файла
+     репозитория `pyweb/upos/schema_postgres.sql`.
+   • В контейнере приложения: `python -m upos.ensure_pg_schema` (с теми же env, что у веб-процесса).
+
+7. Импорт старых JSON (если требуется)
+   • Локально положите старые файлы в pyweb/data.
+   • Укажите DATABASE_PUBLIC_URL в .env.local или pyweb/.env.
+   • Запустите: cd pyweb && python -m upos.migrate_json_to_postgres --overwrite

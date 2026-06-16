@@ -1,0 +1,2158 @@
+/* ——— Счёт: песочница капитала ——— */
+
+/* Шапка «Счёт»: на широких экранах контент шёл до 72rem — кнопка не доходила до правого края */
+.page-header-inner:has(.schet-header-line) {
+  max-width: none;
+  width: 100%;
+}
+
+.schet-header-line {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.schet-header-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .schet-header-line {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .schet-header-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .schet-toolbar {
+    width: 100%;
+  }
+}
+
+.schet-page-title {
+  margin-bottom: 0;
+}
+
+.schet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.schet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.schet-btn-ic {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.schet-btn-lg {
+  padding: 0.65rem 1.25rem;
+  font-weight: 600;
+}
+
+.schet-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 2rem;
+}
+
+.schet-status {
+  min-height: 1.25rem;
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+}
+
+.schet-status[data-variant="ok"] {
+  color: oklch(0.55 0.14 165);
+}
+
+.schet-status[data-variant="err"] {
+  color: var(--destructive);
+}
+
+html.dark .schet-status[data-variant="ok"] {
+  color: oklch(0.72 0.13 165);
+}
+
+.schet-empty-card {
+  border-radius: var(--radius-xl);
+  border: 1px dashed var(--border);
+  background: color-mix(in oklch, var(--card), transparent 50%);
+  padding: 3rem 1.75rem;
+  text-align: center;
+  width: 100%;
+}
+
+.schet-empty-visual {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto 1.25rem;
+}
+
+.schet-empty-core {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: var(--text-lg);
+  letter-spacing: 0.02em;
+}
+
+.schet-empty-title {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.schet-empty-text {
+  margin: 0 0 1.25rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-md);
+  line-height: 1.55;
+}
+
+/* Bento Grid */
+.schet-bento-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.schet-overview-shell {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.schet-overview-head {
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.schet-overview-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.schet-overview-hint {
+  margin: 0.28rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
+/* Карточки мест: компактный список (List View) */
+.schet-overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  overflow: auto;
+}
+
+.schet-list-item {
+  padding: 0;
+  position: relative;
+  cursor: default;
+  user-select: text;
+  -webkit-user-select: text;
+  background: var(--card);
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.75fr) minmax(38rem, 1.65fr);
+  align-items: center;
+  gap: 0;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.schet-list-item:hover {
+  background: color-mix(in oklch, var(--muted), transparent 76%);
+}
+
+.schet-overview-body .schet-list-item:last-child {
+  border-bottom: 0;
+}
+
+.schet-list-item:focus-within {
+  outline: 1px solid color-mix(in oklch, var(--primary), transparent 42%);
+  outline-offset: -1px;
+}
+
+html.dark .schet-list-item:hover {
+  background: color-mix(in oklch, var(--muted), transparent 50%);
+}
+
+html.dark .schet-list-item:focus-within {
+  outline-color: var(--primary);
+}
+
+.schet-list-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 4rem;
+  padding: 0.65rem 1rem;
+  border-right: 1px solid var(--border);
+}
+
+.schet-list-center {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.25rem;
+  justify-self: end;
+  width: 100%;
+  min-width: 38rem;
+}
+
+.schet-ccy-breakdown {
+  display: grid;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.schet-ccy-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.35rem;
+  justify-content: end;
+  min-height: 4rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--text-md);
+  font-weight: 720;
+  color: var(--foreground);
+  box-shadow: none;
+  transition: background 0.14s ease, box-shadow 0.14s ease;
+}
+
+.schet-ccy-line[data-detail-currency] {
+  cursor: pointer;
+}
+
+.schet-ccy-line[data-detail-currency]:hover,
+.schet-ccy-line[data-detail-currency]:focus-visible {
+  background: color-mix(in oklch, var(--primary), transparent 91%);
+  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--primary), transparent 35%);
+  outline: none;
+}
+
+.schet-ccy-line--empty {
+  visibility: visible;
+  pointer-events: none;
+}
+
+.schet-ccy-line--empty .schet-ccy-line-main {
+  min-height: 1rem;
+}
+
+.schet-ccy-line--total {
+  background: transparent;
+  font-weight: 720;
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 44%);
+}
+
+.schet-ccy-line-main {
+  display: inline-flex;
+  align-items: baseline;
+  justify-self: end;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.schet-ccy-line-amt .schet-num-join {
+  gap: 0.08em 0.38em;
+}
+
+.schet-ccy-line-ccy {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.schet-ccy-delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.1rem;
+  justify-self: end;
+  margin-left: 0;
+  font-size: var(--text-xs);
+  line-height: 1.1;
+  font-weight: 780;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.schet-ccy-delta .schet-num-join {
+  gap: 0.04em 0.24em;
+}
+
+.schet-ccy-delta-code {
+  margin-left: 0.1rem;
+  font-size: var(--text-xs);
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.schet-ccy-delta--positive {
+  color: oklch(0.48 0.15 155);
+}
+
+.schet-ccy-delta--negative {
+  color: oklch(0.55 0.18 28);
+}
+
+html.dark .schet-ccy-delta--positive {
+  color: oklch(0.72 0.14 155);
+}
+
+html.dark .schet-ccy-delta--negative {
+  color: oklch(0.72 0.15 28);
+}
+
+.schet-pocket-sum-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.schet-pocket-sum-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+.schet-pocket-sum-label strong {
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.schet-list-right .schet-pocket-sum {
+  margin-left: 0;
+  padding-left: 0;
+  font-size: var(--text-md);
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.schet-change {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.28rem 0.48rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 42%);
+  background: color-mix(in oklch, var(--muted), transparent 72%);
+  color: var(--muted-foreground);
+  font-feature-settings: "tnum", "lnum";
+}
+
+.schet-change > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.16rem;
+  font-size: var(--text-sm);
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.schet-change--compact {
+  align-items: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.schet-change--compact > span {
+  font-size: var(--text-xs);
+}
+
+.schet-change small {
+  font-size: var(--text-xs);
+  line-height: 1.15;
+  color: color-mix(in oklch, currentColor, var(--muted-foreground) 42%);
+}
+
+.schet-change-ccy {
+  margin-left: 0.12rem;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.schet-change--positive {
+  color: oklch(0.48 0.15 155);
+}
+
+.schet-change--negative {
+  color: oklch(0.55 0.18 28);
+}
+
+html.dark .schet-change--positive {
+  color: oklch(0.72 0.14 155);
+}
+
+html.dark .schet-change--negative {
+  color: oklch(0.72 0.15 28);
+}
+
+.schet-ccy-tag {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 50%);
+}
+
+.schet-ccy-tag.is-empty {
+  font-style: italic;
+  font-weight: 400;
+  background: transparent;
+  border-color: transparent;
+}
+
+.schet-list-right {
+  display: none;
+}
+
+.schet-list-total-item {
+  margin-top: 0;
+  cursor: default;
+  background: var(--card);
+}
+
+.schet-list-total-item:hover {
+  background: var(--card);
+}
+
+.schet-list-total-item .schet-ccy-line {
+  font-size: calc(var(--text-md) + 1px);
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 44%);
+}
+
+.schet-list-total-item .schet-ccy-line-amt {
+  font-weight: 780;
+}
+
+.schet-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 2.55rem;
+  background: color-mix(in oklch, var(--muted), transparent 58%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.schet-list-header:hover {
+  background: color-mix(in oklch, var(--muted), transparent 58%);
+}
+
+.schet-list-header .schet-list-left,
+.schet-list-header .schet-ccy-head-cell {
+  min-height: 2.55rem;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+
+.schet-list-header .schet-list-right,
+.schet-list-total-item .schet-list-right {
+  display: none;
+}
+
+.schet-ccy-head-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 2.55rem;
+  padding: 0.45rem 0.8rem;
+  border-right: 1px solid var(--border);
+}
+
+.schet-pocket-icon--total {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.schet-list-edit-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.schet-list-item:hover .schet-list-edit-btn,
+.schet-list-item:focus-within .schet-list-edit-btn {
+  opacity: 1;
+}
+
+.schet-list-edit-btn:hover {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+@media (max-width: 600px) {
+  .schet-list-item {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+  .schet-list-center {
+    align-items: flex-start;
+    justify-content: flex-start;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+    padding-left: 3.25rem; /* align with text */
+  }
+  .schet-ccy-breakdown {
+    grid-template-columns: 1fr !important;
+    align-items: stretch;
+  }
+
+  .schet-ccy-line--empty {
+    display: none;
+  }
+  .schet-ccy-line {
+    width: 100%;
+  }
+  .schet-pocket-sum-stack {
+    align-items: flex-start;
+  }
+  .schet-change--compact {
+    align-items: flex-start;
+  }
+  .schet-list-right {
+    display: none;
+  }
+  .schet-list-edit-btn {
+    opacity: 1;
+  }
+}
+
+.schet-detail-dialog {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.schet-detail-dialog::backdrop {
+  background: color-mix(in oklch, #111827, transparent 38%);
+}
+
+.schet-detail-surface {
+  width: min(58rem, 54vw);
+  height: 100vh;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  box-shadow: -24px 0 48px color-mix(in oklch, #0f172a, transparent 78%);
+}
+
+.schet-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.25rem;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 74%);
+}
+
+.schet-detail-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.schet-detail-title span {
+  color: var(--muted-foreground);
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.schet-detail-close {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--muted), transparent 22%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.schet-detail-close:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.schet-detail-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.55rem 1rem 1.2rem;
+}
+
+.schet-detail-state {
+  padding: 1.35rem 0.75rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-base);
+}
+
+.schet-detail-filter-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-bottom: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.schet-detail-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.schet-detail-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.schet-detail-filter-toggle:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 35%);
+  color: var(--primary);
+}
+
+.schet-detail-filter-summary {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.schet-detail-filter-panel {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.45fr) minmax(14rem, 1fr);
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 86%);
+}
+
+.schet-detail-filter-panel[hidden] {
+  display: none !important;
+}
+
+.schet-detail-filter-presets {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+}
+
+.schet-detail-filter-preset {
+  min-height: 2.05rem;
+  padding: 0 0.65rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.schet-detail-filter-preset:hover {
+  background: var(--muted);
+}
+
+.schet-detail-filter-preset.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 650;
+}
+
+.schet-detail-filter-custom {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  align-content: start;
+}
+
+.schet-detail-filter-custom label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.schet-detail-filter-custom input {
+  width: 100%;
+  height: 2.25rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 0 0.65rem;
+}
+
+.schet-detail-filter-apply,
+.schet-detail-filter-close {
+  min-height: 2.25rem;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.schet-detail-filter-apply {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.schet-detail-filter-close {
+  border: 1px solid var(--input);
+  background: var(--control-bg);
+  color: var(--foreground);
+}
+
+.schet-detail-currency-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.schet-detail-currency-section {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+}
+
+.schet-detail-currency-title {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 78%);
+  color: var(--foreground);
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.schet-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-base);
+}
+
+.schet-detail-table th,
+.schet-detail-table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.schet-detail-table th:first-child,
+.schet-detail-table td:first-child {
+  border-left: 0;
+}
+
+.schet-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 650;
+  text-align: left;
+}
+
+.schet-detail-table th:nth-child(2),
+.schet-detail-table th:nth-child(3),
+.schet-detail-table td:nth-child(2),
+.schet-detail-table td:nth-child(3) {
+  text-align: right;
+}
+
+.schet-detail-tx-title {
+  display: inline-flex;
+  width: fit-content;
+  color: var(--primary);
+  font-weight: 650;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.schet-detail-tx-title:hover,
+.schet-detail-tx-title:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  outline: none;
+}
+
+.schet-detail-tx-date {
+  margin-top: 0.12rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.schet-detail-amount {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.schet-detail-amount--positive {
+  color: oklch(0.48 0.15 155);
+}
+
+.schet-detail-amount--negative {
+  color: oklch(0.55 0.18 28);
+}
+
+.schet-detail-balance {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.schet-detail-ccy {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: currentColor;
+}
+
+.schet-detail-total-row td {
+  background: color-mix(in oklch, var(--muted), transparent 80%);
+  font-weight: 650;
+}
+
+.schet-detail-empty-cell {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 980px) {
+  .schet-detail-surface {
+    width: min(42rem, 88vw);
+  }
+}
+
+@media (max-width: 640px) {
+  .schet-detail-surface {
+    width: 100vw;
+  }
+
+  .schet-detail-table {
+    font-size: var(--text-sm);
+  }
+
+  .schet-detail-table th,
+  .schet-detail-table td {
+    padding: 0.5rem 0.45rem;
+  }
+
+  .schet-detail-filter-panel,
+  .schet-detail-filter-custom {
+    grid-template-columns: 1fr;
+  }
+
+  .schet-detail-filter-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .schet-detail-filter-summary {
+    white-space: normal;
+  }
+}
+
+.schet-num-join {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.12em 0.52em;
+  font-feature-settings: "tnum", "lnum";
+}
+
+.schet-num-grp {
+  font-weight: inherit;
+  letter-spacing: -0.02em;
+}
+
+.schet-num-dec {
+  font-weight: inherit;
+  opacity: 0.92;
+}
+
+.schet-num-dot {
+  opacity: 0.55;
+  margin-right: 0.06em;
+}
+
+.schet-num-neg {
+  margin-right: 0.12em;
+  opacity: 0.85;
+}
+
+.schet-total-value-wrap {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem 0.85rem;
+}
+
+.schet-total-value {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em 0.28em;
+  font-feature-settings: "tnum", "lnum";
+}
+
+/* Плотнее, «как обычное число»: без раздувания между сотнями/тысячами */
+.schet-total-value .schet-num-join {
+  gap: 0.06em 0.18em;
+}
+
+.schet-view-nominal .schet-num-join {
+  gap: 0.12em 0.42em;
+}
+
+.schet-total-suffix {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  vertical-align: super;
+  margin-left: 0.15em;
+}
+
+.schet-category-foot .schet-total-suffix {
+  font-size: var(--text-xs);
+  margin-left: 0.28em;
+  vertical-align: 0.08em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+
+.schet-total-verbal {
+  flex-basis: 100%;
+  margin: 0.55rem 0 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--muted-foreground);
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.schet-total-verbal::before {
+  content: "≈\00a0";
+  opacity: 0.65;
+  font-weight: 600;
+}
+
+.schet-view-note-static {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  padding: 0.2rem 0 0.1rem;
+  margin: 0 0 0.4rem;
+  padding-left: 0.4rem;
+  border-left: 2px solid color-mix(in oklch, var(--primary), transparent 82%);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.schet-view-note-static.is-empty {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.schet-view-note-static.is-empty::before {
+  content: "Заметка не заполнена";
+}
+
+.schet-pocket {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.schet-pocket::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary), transparent 15%),
+    color-mix(in oklch, var(--brand-accent), transparent 35%)
+  );
+  border-radius: 3px 0 0 3px;
+  opacity: 0.9;
+}
+
+.schet-pocket-head {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding-left: 0.35rem;
+}
+
+.schet-pocket-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--accent), transparent 20%);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.schet-pocket-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.schet-pocket-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.schet-pocket-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.schet-pocket-label {
+  font-weight: 650;
+  font-size: var(--text-md);
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+}
+
+.schet-pocket-label:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.schet-pocket-badge {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+}
+
+.schet-pocket-owner-badge {
+  display: inline-block;
+  margin-top: 0.2rem;
+  margin-left: 0.25rem;
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.72);
+  color: #1d4ed8;
+  font-size: var(--text-xs);
+  font-weight: 550;
+  line-height: 1.2;
+  padding: 0.12rem 0.45rem;
+}
+
+.schet-pocket-owner-badge.is-common {
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted), transparent 40%);
+  border-color: var(--border);
+}
+
+.schet-pocket-access-badge {
+  display: inline-block;
+  margin-top: 0.2rem;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 65%);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  line-height: 1.2;
+  padding: 0.12rem 0.45rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schet-pocket-titles .schet-view-note-static.schet-list-note {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  padding: 0.12rem 0 0 0.32rem;
+  max-width: min(26rem, 100%);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.schet-pocket-note {
+  width: 100%;
+  min-height: 2.5rem;
+  resize: vertical;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--input);
+  background: var(--control-bg);
+  color: var(--control-fg);
+}
+
+.schet-pocket-hint {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.schet-view-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 650;
+  line-height: 1.25;
+  padding-left: 0.15rem;
+}
+
+.schet-view-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-feature-settings: "tnum", "lnum";
+}
+
+.schet-view-ledger th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.28rem 0.45rem 0.28rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.schet-view-ledger td {
+  padding: 0.32rem 0.45rem 0.32rem 0.3rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  vertical-align: top;
+}
+
+.schet-view-ledger tr:last-child td {
+  border-bottom: none;
+}
+
+.schet-view-ccy {
+  font-weight: 650;
+  width: 4rem;
+  white-space: nowrap;
+}
+
+.schet-view-nominal {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.schet-view-compact {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  text-align: right;
+}
+
+.schet-category-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.45rem;
+  margin-top: auto;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 55%);
+}
+
+.schet-category-foot .schet-pocket-sum {
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-base);
+}
+
+.schet-category-foot .schet-pocket-sum .schet-num-join {
+  font-weight: 700;
+  color: var(--primary);
+  gap: 0.06em 0.18em;
+}
+
+.schet-editor-dialog.schet-dialog {
+  margin: 0;
+  margin-left: auto;
+  max-width: 32rem;
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+}
+
+.schet-editor-dialog.schet-dialog[open] {
+  animation: schetDrawerSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.schet-editor-dialog.schet-dialog.is-closing {
+  animation: schetDrawerSlideOut 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes schetDrawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes schetDrawerSlideOut {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.schet-editor-surface.schet-dialog-surface {
+  max-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+}
+
+.schet-editor-sub {
+  display: none;
+}
+
+.schet-editor-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.schet-editor-body {
+  padding: 1rem 1.15rem 1.25rem;
+}
+
+.schet-editor-intro {
+  margin: 0 0 0.85rem;
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+  line-height: 1.45;
+}
+
+.schet-editor-intro--pick {
+  margin-bottom: 0.35rem;
+}
+
+.schet-editor-pick-actions {
+  margin-top: 0.5rem;
+}
+
+.schet-editor-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10.5rem), 1fr));
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.schet-editor-pick-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.55rem;
+  padding: 1rem 0.65rem 1.05rem;
+  margin: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 15%);
+  background: color-mix(in oklch, var(--card), var(--muted) 30%);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+}
+
+.schet-editor-pick-tile:hover {
+  background: color-mix(in oklch, var(--card), var(--primary) 10%);
+  border-color: color-mix(in oklch, var(--primary), transparent 50%);
+  box-shadow: var(--shadow-sm);
+}
+
+.schet-editor-pick-tile:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.schet-editor-pick-tile:active {
+  transform: scale(0.98);
+}
+
+.schet-editor-pick-ic {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.schet-editor-pick-ic svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.schet-editor-pick-text {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.schet-editor-pick-title {
+  display: block;
+  font-weight: 650;
+  font-size: var(--text-base);
+  line-height: 1.28;
+  word-break: break-word;
+}
+
+.schet-editor-pick-sub {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+  line-height: 1.3;
+}
+
+.schet-editor-pick-footer {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+}
+
+.schet-editor-single-head {
+  margin-bottom: 0.75rem;
+}
+
+.schet-editor-back-btn {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+.schet-editor-back-btn:hover {
+  background: color-mix(in oklch, var(--muted), var(--foreground) 5%);
+  color: var(--foreground);
+  transform: translateX(-2px);
+}
+
+.schet-editor-pockets--single {
+  max-width: 40rem;
+}
+
+.schet-editor-toolbar {
+  margin-bottom: 1rem;
+}
+
+.schet-editor-pockets {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.schet-editor-pocket {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background), var(--card) 35%);
+  padding: 0.9rem 1rem;
+}
+
+.schet-editor-pocket-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.schet-owner-field {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0 0 0.65rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.schet-owner-select {
+  width: 100%;
+  min-height: 2.35rem;
+  border: 1px solid var(--input);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 500;
+  padding: 0.45rem 0.65rem;
+}
+
+.schet-editor-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.85rem 1.1rem;
+  background: color-mix(in oklch, var(--muted), transparent 88%);
+  border-radius: 0;
+}
+
+.schet-tpl-intro {
+  margin-bottom: 0.85rem;
+}
+
+.schet-pocket-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+/* Редактор: селект валют — кастомный и широкий; сетка 5.5rem ломала вёрстку (наложение на поле суммы). */
+.schet-editor-pocket .schet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+}
+
+.schet-editor-pocket .schet-row > .upos-ccy-select {
+  flex: 0 1 10rem;
+  min-width: min(10rem, 100%);
+  max-width: 100%;
+}
+
+.schet-editor-pocket .schet-row .schet-amt {
+  flex: 1 1 11rem;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.schet-editor-pocket .schet-row .schet-row-del {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+@media (max-width: 520px) {
+  .schet-editor-pocket .schet-row > .upos-ccy-select,
+  .schet-editor-pocket .schet-row .schet-amt {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .schet-editor-pocket .schet-row .schet-row-del {
+    align-self: flex-end;
+    margin-inline-start: 0;
+  }
+}
+
+.schet-row input[type="text"],
+.schet-row input[type="number"],
+.schet-row select {
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--text-base);
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--input);
+  background: var(--control-bg);
+  color: var(--control-fg);
+}
+
+.schet-editor-pocket .schet-row .upos-ccy-select-btn {
+  min-height: 2.35rem;
+}
+
+.schet-editor-pocket .schet-row.is-invalid .upos-ccy-select-btn {
+  border-color: var(--destructive) !important;
+  box-shadow: 0 0 0 1px var(--destructive) !important;
+}
+
+.schet-row-ccy {
+  font-weight: 600;
+}
+
+.schet-editor-pocket .schet-row-compact {
+  flex-basis: 100%;
+  width: 100%;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  padding-left: 0.1rem;
+}
+
+.schet-row-del {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: var(--radius);
+  line-height: 1;
+}
+
+.schet-row-del:hover {
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive), transparent 92%);
+}
+
+.schet-pocket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-left: 0.35rem;
+}
+
+.schet-pocket-actions .btn,
+.schet-pocket-actions .btn-secondary,
+.schet-pocket-actions .btn-danger-ghost {
+  font-size: var(--text-sm);
+  padding: 0.35rem 0.6rem;
+}
+
+.schet-pocket-sum {
+  margin-left: auto;
+  padding-left: 0.35rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.schet-pocket-sum strong {
+  color: var(--foreground);
+  font-weight: 650;
+}
+
+.schet-total-card {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  padding: 1.35rem 1.5rem;
+}
+
+/* Итог внутри одной оболочки с сеткой — только тонкий разделитель, без второй «карточки» */
+.schet-overview-total.schet-total-card {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  border-top: 1px solid var(--border);
+  padding: 1rem 1.25rem 1.15rem;
+  background: var(--card);
+}
+
+.schet-overview-total .schet-total-inner {
+  gap: 0.65rem;
+}
+
+.schet-overview-total .schet-total-value-wrap {
+  margin-top: 0.55rem;
+}
+
+.schet-total-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.schet-movement-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+  padding: 0.55rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--muted), transparent 82%);
+}
+
+#schet-period-picker {
+  min-width: 0;
+}
+
+.schet-total-label {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.schet-total-hint {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  margin-top: 0.25rem;
+}
+
+.schet-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.schet-select-cap {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.schet-select {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.35rem 1.75rem 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  min-width: 5rem;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.schet-total-sub {
+  margin-top: 0.35rem;
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .schet-movement-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  #schet-period-picker {
+    width: 100%;
+  }
+}
+
+.schet-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0;
+  width: 100%;
+}
+
+.schet-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.schet-chart-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.schet-seg {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  padding: 2px;
+}
+
+.schet-seg-btn {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.schet-seg-btn.active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.schet-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.schet-chart-panel {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.85rem 0.95rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.schet-chart-panel-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 650;
+}
+
+.schet-chart-panel-hint {
+  margin: 0.15rem 0 0.55rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.schet-chart-canvas-wrap {
+  position: relative;
+  height: 18rem;
+}
+
+@media (max-width: 900px) {
+  .schet-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schet-chart-canvas-wrap {
+    height: 15rem;
+  }
+}
+
+.schet-dialog {
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xl);
+  max-width: min(44rem, 94vw);
+  width: 100%;
+  background: transparent;
+  box-shadow: none;
+}
+
+.schet-dialog::backdrop {
+  background: oklch(0.2 0.04 264 / 55%);
+  backdrop-filter: blur(4px);
+}
+
+.schet-dialog-surface {
+  background: var(--card);
+  color: var(--card-foreground);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.schet-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.schet-dialog-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.schet-dialog-close {
+  border: none;
+  background: var(--muted);
+  color: var(--foreground);
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.schet-dialog-body {
+  padding: 1rem 1.1rem 1.25rem;
+  overflow: auto;
+}
+
+.schet-dialog-intro {
+  margin: 0 0 1rem;
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+}
+
+.schet-tpl-region {
+  margin-bottom: 1.25rem;
+}
+
+.schet-tpl-region-title {
+  margin: 0 0 0.6rem;
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted-foreground);
+}
+
+.schet-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 0.65rem;
+}
+
+.schet-tpl-card {
+  text-align: left;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--background);
+  padding: 0.75rem 0.85rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.schet-tpl-card:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 40%);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.schet-tpl-card:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.schet-tpl-ic {
+  flex-shrink: 0;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--accent), transparent 20%);
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+}
+
+.schet-tpl-ic svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.schet-tpl-card-title {
+  font-weight: 650;
+  font-size: var(--text-base);
+  margin: 0;
+}
+
+.schet-tpl-card-sub {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  margin: 0.15rem 0 0;
+  line-height: 1.35;
+}
+
+/* Confirmation Dialog */
+.schet-confirm-surface {
+  max-width: 400px;
+}
+.schet-confirm-text {
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--foreground);
+}
+.schet-confirm-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 70%);
+}
+.btn-danger {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+.btn-danger:hover {
+  background: color-mix(in oklch, var(--destructive), black 10%);
+}
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-danger-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: color-mix(in oklch, var(--destructive), transparent 94%);
+  color: var(--destructive);
+  border: 1px solid color-mix(in oklch, var(--destructive), transparent 85%);
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger-ghost:hover {
+  background: var(--destructive);
+  color: white;
+  border-color: var(--destructive);
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--destructive), transparent 75%);
+}
+
+.btn-danger-ghost:active {
+  transform: scale(0.96);
+}
+
+/* Workbench standard finish for account balances. */
+.schet-root {
+  gap: 0.85rem;
+  font-size: var(--text-base);
+}
+
+.schet-overview-shell,
+.schet-empty-card,
+.schet-detail-surface {
+  border-color: var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius, var(--radius-xl));
+  background:
+    linear-gradient(180deg, color-mix(in oklch, white, transparent 16%), transparent 70%),
+    var(--card);
+  box-shadow: var(--workbench-shadow, var(--shadow-md));
+}
+
+.schet-overview-body,
+.schet-list-item {
+  background: var(--card);
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.schet-list-header {
+  min-height: var(--workbench-table-head-height, 41px);
+  background: var(--workbench-muted-surface, color-mix(in oklch, var(--muted), transparent 58%));
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.schet-list-header .schet-list-left,
+.schet-list-header .schet-ccy-head-cell {
+  min-height: var(--workbench-table-head-height, 41px);
+}
+
+.schet-list-left,
+.schet-ccy-line {
+  min-height: var(--workbench-table-row-height, 64px);
+  border-color: var(--workbench-line, var(--border));
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+
+.schet-ccy-line,
+.schet-ccy-line-main,
+.schet-ccy-line-amt,
+.schet-pocket-sum {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.schet-ccy-line-amt,
+.schet-list-total-item .schet-ccy-line-amt {
+  font-size: var(--text-md);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.schet-btn,
+.schet-list-edit-btn,
+.schet-tpl-card,
+.btn-danger-ghost {
+  border-radius: var(--workbench-radius-sm, var(--radius));
+}

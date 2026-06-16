@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block title %}{{ _('employees.title_page') }}{% endblock %}
+
+{% macro pwd_eye(show_label, hide_label) %}
+  <button
+    type="button"
+    class="pwd-toggle"
+    aria-label="{{ show_label }}"
+    aria-pressed="false"
+    data-label-show="{{ show_label }}"
+    data-label-hide="{{ hide_label }}"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  </button>
+{% endmacro %}
+
+{% macro staff_role_options(selected, labels) %}
+  {% for key, label in labels.items() %}
+    <option value="{{ key }}" {% if selected == key %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+{% endmacro %}
+
+{% macro employee_role_options(selected, roles) %}
+  {% for role in roles %}
+    <option value="{{ role.id }}" {% if selected == role.id %}selected{% endif %}>{{ role.name }}</option>
+  {% endfor %}
+{% endmacro %}
+
+{% macro employee_access_fields(prefix, e, organizations, access_accounts, is_new) %}
+  {% set org_field = 'new_organization_ids' if is_new else 'edit_organization_ids' %}
+  {% set account_field = 'new_account_ids' if is_new else 'edit_account_ids' %}
+  {% set selected_orgs = e.organization_ids if e and e.organization_ids else [] %}
+  {% set selected_accounts = e.account_ids if e and e.account_ids else [] %}
+  <div class="settings-profile-field employees-access-field">
+    <span class="settings-profile-field-label">Организации</span>
+    <div class="employees-access-list">
+      {% for org in organizations %}
+        {% set checked = (org.id in selected_orgs) or (is_new and org.is_default) %}
+        <label class="employees-access-check">
+          <input type="checkbox" name="{{ org_field }}" value="{{ org.id }}" {% if checked %}checked{% endif %} />
+          <span>{{ org.name }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="settings-profile-field employees-access-field employees-access-field--wide">
+    <span class="settings-profile-field-label">Видимые счета</span>
+    <div class="employees-access-account-groups">
+      {% for group in access_accounts %}
+        <div class="employees-access-account-group">
+          <span class="employees-access-org-name">{{ group.organization.name }}</span>
+          {% if group.accounts %}
+            <div class="employees-access-table-head employees-access-table-head--accounts">
+              <span></span>
+              <span>Счёт</span>
+              <span>Закреплены</span>
+            </div>
+            <div class="employees-access-list employees-access-list--accounts">
+              {% for account in group.accounts %}
+                <label class="employees-access-check employees-access-check--account">
+                  <input type="checkbox" name="{{ account_field }}" value="{{ account.id }}" {% if account.id in selected_accounts %}checked{% endif %} />
+                  <span class="employees-access-account-title">{{ account.label }}</span>
+                  <span class="employees-access-assignees-cell">
+                    {% if account.access_employee_names %}
+                      {% for name in account.access_employee_names %}
+                        <span class="employees-access-assignee">{{ name }}</span>
+                      {% endfor %}
+                    {% else %}
+                      <span class="employees-access-muted">—</span>
+                    {% endif %}
+                  </span>
+                </label>
+              {% endfor %}
+            </div>
+          {% else %}
+            <span class="employees-access-empty">Нет счетов</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro employee_form_fields(prefix, e, labels, roles, organizations, access_accounts, is_new) %}
+  <div class="settings-profile-form-grid">
+    <div class="settings-profile-field">
+      <label class="settings-profile-field-label" for="{{ prefix }}-login">{{ _('employees.login') }}</label>
+      <input
+        id="{{ prefix }}-login"
+        class="settings-profile-input"
+        name="{% if is_new %}new_username{% else %}edit_username{% endif %}"
+        type="text"
+        required
+        value="{{ e.username if e else '' }}"
+        autocomplete="off"
+      />
+    </div>
+    <div class="settings-profile-field">
+      <label class="settings-profile-field-label" for="{{ prefix }}-email">{{ _('employees.email') }}</label>
+      <input
+        id="{{ prefix }}-email"
+        class="settings-profile-input"
+        name="{% if is_new %}new_email{% else %}edit_email{% endif %}"
+        type="email"
+        required
+        value="{{ e.email if e else '' }}"
+        autocomplete="email"
+        placeholder="name@company.ru"
+      />
+    </div>
+    <div class="settings-profile-field">
+      <label class="settings-profile-field-label" for="{{ prefix }}-name">{{ _('employees.name') }}</label>
+      <input
+        id="{{ prefix }}-name"
+        class="settings-profile-input"
+        name="{% if is_new %}new_name{% else %}edit_name{% endif %}"
+        type="text"
+        value="{{ e.name if e else '' }}"
+      />
+    </div>
+    <div class="settings-profile-field">
+      <label class="settings-profile-field-label" for="{{ prefix }}-position">{{ _('employees.position') }}</label>
+      <input
+        id="{{ prefix }}-position"
+        class="settings-profile-input"
+        name="{% if is_new %}new_position{% else %}edit_position{% endif %}"
+        type="text"
+        value="{{ e.position if e else '' }}"
+        maxlength="160"
+      />
+    </div>
+    <div class="settings-profile-field">
+      <label class="settings-profile-field-label" for="{{ prefix }}-role">{{ _('employees.role') }}</label>
+      <span class="settings-select-wrap employees-role-select-wrap">
+        <select
+          id="{{ prefix }}-role"
+          class="employees-role-select"
+          name="{% if is_new %}new_employee_role_id{% else %}edit_employee_role_id{% endif %}"
+        >
+          {{ employee_role_options((e.employee_role_id if e else (roles[1].id if roles|length > 1 else (roles[0].id if roles else ''))), roles) }}
+        </select>
+        <svg class="settings-select-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </span>
+    </div>
+    <div class="settings-profile-field">
+      <label class="settings-profile-field-label" for="{{ prefix }}-pw">
+        {{ _('employees.password') if is_new else _('employees.new_password') }}
+      </label>
+      <div class="pwd-wrap settings-profile-pwd-wrap">
+        <input
+          id="{{ prefix }}-pw"
+          name="{% if is_new %}new_password{% else %}edit_password{% endif %}"
+          class="pwd-input settings-profile-input"
+          type="password"
+          {% if is_new %}required minlength="8"{% endif %}
+          autocomplete="new-password"
+          placeholder="{{ '' if is_new else _('employees.pw_keep') }}"
+        />
+        {{ pwd_eye(_('pwd.show'), _('pwd.hide')) }}
+      </div>
+    </div>
+    {{ employee_access_fields(prefix, e, organizations, access_accounts, is_new) }}
+    {% if is_new %}
+      <label class="settings-profile-field employees-wallet-create">
+        <span class="settings-profile-field-label">Личный кошелёк</span>
+        <span class="employees-wallet-create-row">
+          <input type="checkbox" name="create_personal_wallet" value="1" />
+          <span>Создать личный кошелёк сразу</span>
+        </span>
+      </label>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% block page_header %}
+  <h1 class="page-title settings-ios-page-title">{{ _('employees.title') }}</h1>
+{% endblock %}
+{% block main %}
+  <div class="employees-page-wrap">
+    <div class="employees-main-surface">
+      {% if flash_ok or flash_err %}
+        <div class="employees-flash-group">
+          {% if flash_ok == "created" %}
+            <div class="flash ok settings-ios-flash">{{ _('employees.flash.created') }}</div>
+          {% elif flash_ok == "deleted" %}
+            <div class="flash ok settings-ios-flash">{{ _('employees.flash.deleted') }}</div>
+          {% elif flash_ok == "updated" %}
+            <div class="flash ok settings-ios-flash">{{ _('employees.flash.updated') }}</div>
+          {% elif flash_ok == "frozen" %}
+            <div class="flash ok settings-ios-flash">Доступ заморожен</div>
+          {% elif flash_ok == "unfrozen" %}
+            <div class="flash ok settings-ios-flash">Доступ разморожен</div>
+          {% endif %}
+          {% if flash_err %}
+            <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="employees-stack">
+        <section class="settings-ios-group" aria-labelledby="emp-new-cap">
+          <div class="employees-section-head">
+            <p id="emp-new-cap" class="settings-ios-footnote">{{ _('employees.new') }}</p>
+            <button type="button" class="btn employees-add-btn" data-employee-add-open>{{ _('employees.add') }}</button>
+          </div>
+        </section>
+
+        <section class="settings-ios-group" aria-labelledby="emp-list-cap">
+          <p id="emp-list-cap" class="settings-ios-footnote">{{ _('employees.team') }}</p>
+          <div class="employees-cards-stack">
+            {% if employees %}
+              {% for e in employees %}
+                <article
+                  class="employee-card"
+                  data-employee-id="{{ e.id }}"
+                  data-username="{{ e.username }}"
+                  data-email="{{ e.email }}"
+                  data-name="{{ e.name }}"
+                  data-position="{{ e.position }}"
+                  data-staff-role="{{ e.staff_role }}"
+                  data-employee-role-id="{{ e.employee_role_id }}"
+                  data-organization-ids="{{ (e.organization_ids or []) | join(',') }}"
+                  data-account-ids="{{ (e.account_ids or []) | join(',') }}"
+                  data-is-frozen="{{ '1' if e.is_frozen else '0' }}"
+                  data-role-label="{{ e.employee_role_name or staff_role_labels.get(e.staff_role, e.staff_role) }}"
+                >
+                  <div class="employee-card-avatar" aria-hidden="true">{{ (e.name or e.username)[0]|upper }}</div>
+                  <div class="employee-card-body">
+                    <div class="employee-card-row">
+                      <h3 class="employee-card-name">{{ e.name or e.username }}</h3>
+                      <span class="employee-card-role">{{ e.employee_role_name or staff_role_labels.get(e.staff_role, e.staff_role) }}</span>
+                    </div>
+                    <p class="employee-card-meta">
+                      <span class="employee-card-meta-item">{{ e.username }}</span>
+                      <span class="employee-card-meta-sep" aria-hidden="true">·</span>
+                      <span class="employee-card-meta-item employee-card-meta-email">{{ e.email }}</span>
+                      {% if e.position %}
+                        <span class="employee-card-meta-sep" aria-hidden="true">·</span>
+                        <span class="employee-card-meta-item">{{ e.position }}</span>
+                      {% endif %}
+                    </p>
+                    {% if e.organizations %}
+                      <div class="employee-wallets">
+                        {% for org in e.organizations %}
+                          <span class="employee-wallet-chip">{{ org.name }}</span>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                    {% if e.wallets %}
+                      <div class="employee-wallets">
+                        {% for wallet in e.wallets %}
+                          <span class="employee-wallet-chip">{{ wallet.label }}</span>
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <p class="employee-wallets-empty">Кошельки не прикреплены</p>
+                    {% endif %}
+                  </div>
+                  <div class="employee-card-actions">
+                    <button
+                      type="button"
+                      class="employee-card-icon-btn"
+                      data-employee-edit-open
+                      aria-label="{{ _('employees.edit') }}"
+                      title="{{ _('employees.edit') }}"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="employee-card-icon-btn"
+                      data-employee-devices-open
+                      aria-label="{{ _('employees.devices.open') }}"
+                      title="{{ _('employees.devices.open') }}"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 20h8M12 18v2"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="employee-card-icon-btn"
+                      data-employee-reset-password
+                      aria-label="Сбросить пароль"
+                      title="Сбросить пароль"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M15 7a5 5 0 1 0 1.4 4.6L22 6l-3-3-5.6 5.6"/><path d="M9 12h.01"/>
+                      </svg>
+                    </button>
+                  </div>
+                </article>
+              {% endfor %}
+            {% else %}
+              <p class="employees-empty">{{ _('employees.empty') }}</p>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <dialog class="settings-profile-modal" id="employee-add-dialog" aria-labelledby="employee-add-title" aria-modal="true">
+    <div class="settings-profile-modal-surface">
+      <header class="settings-profile-modal-head">
+        <div class="settings-profile-modal-head-text">
+          <h2 id="employee-add-title" class="settings-profile-modal-title">{{ _('employees.add_title') }}</h2>
+        </div>
+        <button type="button" class="settings-profile-modal-close" data-employee-add-close aria-label="{{ _('employees.close') }}">×</button>
+      </header>
+      <div class="settings-profile-modal-scroll">
+        <div class="settings-profile-modal-body">
+          <form method="post" action="{{ url_for('employees_create') }}" id="employee-add-form">
+            {% include "_csrf_field.html" %}
+            {{ employee_form_fields('emp-add', none, staff_role_labels, employee_roles, organizations_for_access, access_accounts, true) }}
+          </form>
+        </div>
+      </div>
+      <footer class="settings-profile-modal-foot">
+        <button type="submit" class="btn" form="employee-add-form">{{ _('employees.add') }}</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="settings-profile-modal" id="employee-edit-dialog" aria-labelledby="employee-edit-title" aria-modal="true">
+    <div class="settings-profile-modal-surface">
+      <header class="settings-profile-modal-head">
+        <div class="settings-profile-modal-head-text">
+          <h2 id="employee-edit-title" class="settings-profile-modal-title">{{ _('employees.edit_title') }}</h2>
+        </div>
+        <button type="button" class="settings-profile-modal-close" data-employee-edit-close aria-label="{{ _('employees.close') }}">×</button>
+      </header>
+      <div class="settings-profile-modal-scroll">
+        <div class="settings-profile-modal-body">
+          <form method="post" action="{{ url_for('employees_update') }}" id="employee-edit-form">
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="edit_old_username" id="employee-edit-old-username" value="" />
+            {{ employee_form_fields('emp-edit', none, staff_role_labels, employee_roles, organizations_for_access, access_accounts, false) }}
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('employees_freeze') }}"
+            class="employees-modal-freeze"
+            id="employee-freeze-form"
+          >
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="employee_username" id="employee-freeze-username" value="" />
+            <input type="hidden" name="freeze_action" value="freeze" />
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('employees_freeze') }}"
+            class="employees-modal-freeze"
+            id="employee-unfreeze-form"
+          >
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="employee_username" id="employee-unfreeze-username" value="" />
+            <input type="hidden" name="freeze_action" value="unfreeze" />
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('employees_delete') }}"
+            class="employees-modal-delete"
+            id="employee-delete-form"
+            onsubmit="return window.employeeConfirmDelete && window.employeeConfirmDelete();"
+          >
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="del_username" id="employee-delete-username" value="" />
+          </form>
+        </div>
+      </div>
+      <footer class="settings-profile-modal-foot">
+        <div class="employees-modal-access-actions">
+          <button type="submit" class="btn btn-secondary" form="employee-freeze-form" data-employee-freeze-submit>Заморозить</button>
+          <button type="submit" class="btn btn-secondary" form="employee-unfreeze-form" data-employee-unfreeze-submit hidden>Разморозить</button>
+          <button type="submit" class="btn btn-danger-ghost" form="employee-delete-form">{{ _('employees.delete_access') }}</button>
+        </div>
+        <button type="submit" class="btn" form="employee-edit-form">{{ _('employees.save') }}</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="settings-devices-modal" id="employee-devices-dialog" aria-labelledby="employee-devices-title" aria-modal="true">
+    <div class="settings-devices-modal-surface">
+      <header class="settings-devices-modal-head">
+        <div>
+          <h2
+            id="employee-devices-title"
+            class="settings-devices-modal-title"
+            data-default-title="{{ _('employees.devices.title') }}"
+          >{{ _('employees.devices.title') }}</h2>
+          <p class="settings-devices-modal-sub">{{ _('employees.devices.subtitle') }}</p>
+        </div>
+        <button type="button" class="settings-devices-modal-close" data-employee-devices-close aria-label="{{ _('employees.close') }}">×</button>
+      </header>
+      <div class="settings-devices-modal-body" data-employee-devices-list aria-live="polite"></div>
+    </div>
+  </dialog>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    window.employeeDevicesTitleTemplate = {{ _('employees.devices.title_named', name='{name}') | tojson }};
+    window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
+  </script>
+  <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
+{% endblock %}

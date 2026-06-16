@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Акт сверки зарплаты{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">HR</span>
+    <h1 class="page-title settings-ios-page-title">Акт сверки зарплаты</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  {% set emp = act.employee %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    <div class="general-home-shell">
+      <section class="org-ops-panel org-hr-salary-detail">
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Сотрудник</p>
+            <h2>{{ emp.full_name }}</h2>
+            <p class="settings-ios-footnote">{{ emp.position or 'Без должности' }} · {{ act.date_from }} — {{ act.date_to }}</p>
+          </div>
+          <a class="btn btn-secondary" href="{% if inside_organization %}/hr?date={{ act.date }}#salary{% else %}/organizations/hr?date={{ act.date }}#salary{% endif %}">Назад</a>
+        </div>
+
+        <div class="org-hr-salary-detail-summary">
+          <div>
+            <span>Оклад</span>
+            <strong>{{ emp.monthly_salary_label }} UZS</strong>
+          </div>
+          <div>
+            <span>Пришёл / не пришёл</span>
+            <strong>{{ emp.present_days }} / {{ emp.absent_days }}</strong>
+          </div>
+          <div>
+            <span>Начислено</span>
+            <strong>{{ act.salary_due_label }} UZS</strong>
+          </div>
+          <div>
+            <span>Выплачено</span>
+            <strong>{{ act.paid_uzs_label }} UZS</strong>
+          </div>
+          <div class="org-hr-salary-detail-balance org-hr-salary-detail-balance--{{ act.balance_state }}">
+            <span>{% if act.balance_state == 'overpaid' %}Переплата{% elif act.balance_state == 'closed' %}Баланс{% else %}К выплате{% endif %}</span>
+            <strong>{{ act.balance_uzs_label }} UZS</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-salary-detail">
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Расчёт</p>
+            <h2>Начисления и удержания</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="org-ops-table org-ops-table--shipments-entry">
+            <thead>
+              <tr>
+                <th>Тип</th>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Зарплата по табелю</strong></td>
+                <td>{{ act.date_from }} — {{ act.date_to }}</td>
+                <td><strong>{{ emp.salary_base_due_label }} UZS</strong></td>
+                <td>Оклад {{ emp.monthly_salary_label }} UZS, пришёл {{ emp.present_days }} дней</td>
+              </tr>
+              {% for item in emp.salary_adjustments %}
+                <tr>
+                  <td>{{ item.type_label }}</td>
+                  <td>{{ item.work_date }}</td>
+                  <td>{{ item.amount_label }} UZS</td>
+                  <td>{{ item.comment or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="org-ops-panel org-hr-salary-detail">
+        <div class="director-section-head">
+          <div>
+            <p class="settings-ios-footnote">Выплаты</p>
+            <h2>Оплаты сотруднику</h2>
+          </div>
+        </div>
+        <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="org-ops-table org-ops-table--shipments-entry">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>Счёт списания</th>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in act.payments %}
+                <tr>
+                  <td><strong>#{{ row.number }}</strong></td>
+                  <td>{{ row.created_label }}</td>
+                  <td><strong>{{ row.amount_label }} {{ row.currency }}</strong></td>
+                  <td>{{ row.account }}</td>
+                  <td>{{ row.note or '—' }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="org-ops-empty">Выплат по зарплате за выбранный месяц пока нет.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

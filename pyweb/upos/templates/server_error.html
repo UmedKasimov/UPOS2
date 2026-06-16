@@ -1,0 +1,11 @@
+{% extends "layout_error.html" %}
+{% block page_title %}{{ _('server_error.heading') }}{% endblock %}
+{% block error_card %}
+  <div class="auth-card-head">
+    <h1 class="auth-card-title">{{ _('server_error.heading') }}</h1>
+    <p class="auth-card-desc">{{ _('server_error.desc') }}</p>
+  </div>
+  <p class="error-card-actions">
+    <a href="/">{{ _('server_error.home') }}</a>
+  </p>
+{% endblock %}

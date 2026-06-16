@@ -1,0 +1,360 @@
+{% import "brand_macros.html" as brand %}
+<!DOCTYPE html>
+<html lang="{{ html_lang | default('ru') }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#141d2e" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v=4" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.png') }}?v=4" type="image/png" sizes="48x48" />
+    <title>Биллинг · UPOS FINANCE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=67" />
+  </head>
+  <body data-theme="light">
+    <main class="billing-page">
+      <header class="billing-topbar">
+        <div class="auth-brand-lockup">
+          {{ brand.octopus_svg("octBillingDash", 56) }}
+          <div class="auth-brand-titles">
+            <div class="auth-brand-title-row">
+              <span class="auth-brand-upos">UPOS</span>
+              <span class="auth-brand-fin">BILLING</span>
+            </div>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('billing_logout') }}">
+          {% include "_csrf_field.html" %}
+          <button type="submit" class="btn btn-secondary">Выйти</button>
+        </form>
+      </header>
+
+      <section class="billing-title">
+        <h1>Биллинг</h1>
+        <p>Root-панель создания клиентских аккаунтов</p>
+      </section>
+
+      {% if error %}
+        <div class="flash err">{{ error }}</div>
+      {% endif %}
+
+      {% if ok == "name" %}
+        <div class="flash ok">Название аккаунта сохранено.</div>
+      {% endif %}
+
+      {% if ok == "transactions-cleared" and detail and detail.clear_result %}
+        <div class="flash ok">
+          Транзакции очищены: {{ detail.clear_result.transactions }} операций.
+        </div>
+      {% endif %}
+
+      {% if ok == "database-cleared" and detail and detail.clear_result %}
+        <div class="flash ok">
+          База аккаунта очищена. Аккаунт для входа сохранён.
+        </div>
+      {% endif %}
+
+      {% if ok == "database-imported" and detail and detail.restore_result %}
+        <div class="flash ok">
+          База восстановлена из бэкапа: {{ detail.restore_result.rows }} строк.
+        </div>
+      {% endif %}
+
+      {% if created %}
+        <div class="flash ok">
+          Клиент создан. ID для входа: <strong>{{ created.account_id or created.id }}</strong>
+        </div>
+      {% endif %}
+
+      <div class="billing-grid">
+        <section class="card card-tight">
+          <h2 class="section-label">Новый клиент</h2>
+          <form class="mini-form" method="post" action="{{ url_for('billing_create') }}">
+            {% include "_csrf_field.html" %}
+            <label for="billing-login">Логин клиента</label>
+            <input id="billing-login" name="username" type="text" autocomplete="off" required />
+
+            <label for="billing-password">Пароль клиента</label>
+            <div class="pwd-wrap">
+              <input
+                id="billing-password"
+                name="password"
+                class="pwd-input"
+                type="password"
+                minlength="8"
+                autocomplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                class="pwd-toggle"
+                aria-label="{{ _('pwd.show') }}"
+                aria-pressed="false"
+                data-label-show="{{ _('pwd.show') }}"
+                data-label-hide="{{ _('pwd.hide') }}"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+
+            <label for="billing-name">Название / имя клиента</label>
+            <input id="billing-name" name="name" type="text" autocomplete="off" />
+
+            <label for="billing-email">Email</label>
+            <input id="billing-email" name="email" type="email" autocomplete="off" />
+
+            <div class="mini-form-actions">
+              <button type="submit" class="btn btn-xs">Создать аккаунт</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card card-tight">
+          <h2 class="section-label">Клиенты</h2>
+          {% if clients %}
+            <div class="billing-client-list">
+              {% for client in clients %}
+                <div class="billing-client-row">
+                  <form class="billing-client-edit" method="post" action="{{ url_for('billing_update_name') }}">
+                    {% include "_csrf_field.html" %}
+                    <input type="hidden" name="account_id" value="{{ client.id }}" />
+                    <label for="client-name-{{ client.id }}">Название аккаунта</label>
+                    <div class="billing-client-edit-line">
+                      <input
+                        id="client-name-{{ client.id }}"
+                        name="name"
+                        type="text"
+                        value="{{ client.name or client.username }}"
+                        autocomplete="off"
+                      />
+                      <button type="submit" class="btn btn-xs">Сохранить</button>
+                    </div>
+                    <span>{{ client.username }}</span>
+                  </form>
+                  <code>{{ client.account_id or client.id }}</code>
+                  <a class="btn btn-xs btn-secondary billing-client-info-btn" href="{{ url_for('billing_page') }}?detail={{ client.account_id or client.id }}">Данные</a>
+                  <small>{{ client.workspace_path }}</small>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="empty-hint">Клиентских аккаунтов пока нет.</p>
+          {% endif %}
+        </section>
+      </div>
+
+      {% if detail %}
+        <div class="billing-modal-backdrop" role="presentation">
+          <section class="billing-modal" role="dialog" aria-modal="true" aria-labelledby="billing-detail-title">
+            <div class="billing-modal-head">
+              <div>
+                <p class="section-label">Данные аккаунта</p>
+                <h2 id="billing-detail-title">{{ detail.client.name }}</h2>
+              </div>
+              <a class="btn btn-xs btn-secondary" href="{{ url_for('billing_page') }}">Закрыть</a>
+            </div>
+
+            {% if detail.temp_password %}
+              <div class="billing-password-toast" role="status">Пароль сохранён</div>
+              <div class="flash ok">
+                Новый пароль: <strong>{{ detail.temp_password }}</strong>
+              </div>
+            {% endif %}
+
+            <div class="billing-detail-grid">
+              <div class="billing-detail-card">
+                <span>ID аккаунта</span>
+                <strong>{{ detail.client.account_id }}</strong>
+              </div>
+              <div class="billing-detail-card">
+                <span>Логин</span>
+                <strong>{{ detail.client.username }}</strong>
+              </div>
+              <div class="billing-detail-card">
+                <span>Email</span>
+                <strong>{{ detail.client.email or "—" }}</strong>
+              </div>
+              <div class="billing-detail-card">
+                <span>Последний вход</span>
+                <strong>{{ detail.last_seen_at or "Пока не входили" }}</strong>
+              </div>
+            </div>
+
+            <section class="billing-detail-section">
+              <div class="billing-detail-section-head">
+                <h3>Пароль</h3>
+              </div>
+              <form class="billing-password-form" method="post" action="{{ url_for('billing_reset_password') }}">
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="account_id" value="{{ detail.client.id }}" />
+                <input type="hidden" name="manual_password" value="" data-billing-manual-password />
+                <label for="billing-detail-password">Новый пароль</label>
+                <div class="billing-password-line">
+                  <div class="pwd-wrap">
+                    <input
+                      id="billing-detail-password"
+                      name="new_password"
+                      class="pwd-input"
+                      type="password"
+                      minlength="8"
+                      autocomplete="new-password"
+                      placeholder="Впишите пароль или оставьте пустым"
+                    />
+                    <button
+                      type="button"
+                      class="pwd-toggle"
+                      aria-label="{{ _('pwd.show') }}"
+                      aria-pressed="false"
+                      data-label-show="{{ _('pwd.show') }}"
+                      data-label-hide="{{ _('pwd.hide') }}"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  </div>
+                  <button type="submit" class="btn btn-xs">Сохранить пароль</button>
+                </div>
+              </form>
+              <p class="billing-detail-muted">
+                Старый пароль не показывается: он хранится только в зашифрованном виде. Впишите новый пароль и сохраните; если оставить поле пустым, система сгенерирует пароль.
+              </p>
+            </section>
+
+            <section class="billing-detail-section">
+              <h3>Пользователи</h3>
+              <div class="billing-detail-users">
+                {% for u in detail.users %}
+                  <div class="billing-detail-user-row">
+                    <div>
+                      <strong>{{ u.name }}</strong>
+                      <span>{{ u.username }}{% if u.is_owner %} · владелец{% endif %}</span>
+                    </div>
+                    <span>{{ u.email or "—" }}</span>
+                    <span>{{ u.last_seen_at or "нет входов" }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </section>
+
+            <section class="billing-detail-section">
+              <h3>Память данных</h3>
+              <div class="billing-detail-grid">
+                <div class="billing-detail-card">
+                  <span>Всего</span>
+                  <strong>{{ detail.total_size }}</strong>
+                </div>
+                <div class="billing-detail-card">
+                  <span>База данных</span>
+                  <strong>{{ detail.db_size }}</strong>
+                </div>
+                <div class="billing-detail-card">
+                  <span>Папка клиента</span>
+                  <strong>{{ detail.folder_size }}</strong>
+                </div>
+              </div>
+              <p class="billing-detail-muted">{{ detail.workspace_path }}</p>
+            </section>
+
+            <section class="billing-detail-section">
+              <div class="billing-detail-section-head">
+                <div>
+                  <h3>Бэкап базы</h3>
+                  <p class="billing-detail-muted">
+                    Скачайте полный JSON-бэкап базы аккаунта или восстановите его обратно. Файл содержит рабочие данные аккаунта и чувствительные настройки.
+                  </p>
+                </div>
+              </div>
+              <form method="post" action="{{ url_for('billing_export_database') }}">
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="account_id" value="{{ detail.client.account_id }}" />
+                <button type="submit" class="btn btn-secondary">Скачать базу</button>
+              </form>
+              <form
+                class="mini-form"
+                method="post"
+                action="{{ url_for('billing_import_database') }}"
+                enctype="multipart/form-data"
+                onsubmit="return confirm('Восстановить базу из выбранного файла? Текущие рабочие данные этого аккаунта будут заменены.');"
+              >
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="account_id" value="{{ detail.client.account_id }}" />
+                <label for="billing-backup-file">Файл бэкапа</label>
+                <input id="billing-backup-file" name="backup_file" type="file" accept="application/json,.json" required />
+                <label for="billing-import-root-login">Root-логин биллинга</label>
+                <input id="billing-import-root-login" name="root_login" type="text" autocomplete="off" required />
+                <label for="billing-import-root-password">Root-пароль биллинга</label>
+                <input id="billing-import-root-password" name="root_password" type="password" autocomplete="off" required />
+                <button type="submit" class="btn btn-danger-ghost">Вставить базу из файла</button>
+              </form>
+            </section>
+
+            <section class="billing-detail-section">
+              <div class="billing-detail-section-head">
+                <div>
+                  <h3>Очистка транзакций</h3>
+                  <p class="billing-detail-muted">
+                    Удалит доходы, расходы, переводы и обнулит остатки счетов. Счета, сотрудники, категории, роли и настройки останутся.
+                  </p>
+                </div>
+              </div>
+              <form
+                method="post"
+                action="{{ url_for('billing_clear_transactions') }}"
+                onsubmit="return confirm('Очистить все транзакции этого аккаунта? Счета, сотрудники, категории и настройки останутся.');"
+              >
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="account_id" value="{{ detail.client.account_id }}" />
+                <button type="submit" class="btn btn-danger-ghost">Очистить все транзакции</button>
+              </form>
+            </section>
+
+            <section class="billing-detail-section">
+              <div class="billing-detail-section-head">
+                <div>
+                  <h3>Полная очистка базы</h3>
+                  <p class="billing-detail-muted">
+                    Удалит организации, счета, категории, сотрудников, роли, настройки, интеграции и операции этого аккаунта. Сам аккаунт клиента останется.
+                  </p>
+                </div>
+              </div>
+              <form
+                class="mini-form"
+                method="post"
+                action="{{ url_for('billing_clear_database') }}"
+                onsubmit="return confirm('Полностью очистить базу этого аккаунта? Сам аккаунт клиента останется, но рабочие данные будут удалены.');"
+              >
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="account_id" value="{{ detail.client.account_id }}" />
+                <label for="billing-root-login">Root-логин биллинга</label>
+                <input id="billing-root-login" name="root_login" type="text" autocomplete="off" required />
+                <label for="billing-root-password">Root-пароль биллинга</label>
+                <input id="billing-root-password" name="root_password" type="password" autocomplete="off" required />
+                <button type="submit" class="btn btn-danger-ghost">Полностью очистить базу</button>
+              </form>
+            </section>
+          </section>
+        </div>
+      {% endif %}
+    </main>
+    <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
+    <script>
+      document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!form || !form.classList || !form.classList.contains("billing-password-form")) return;
+        var input = form.querySelector("#billing-detail-password");
+        var mirror = form.querySelector("[data-billing-manual-password]");
+        if (input && mirror) mirror.value = input.value || "";
+      });
+    </script>
+  </body>
+</html>

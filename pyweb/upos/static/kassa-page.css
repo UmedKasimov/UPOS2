@@ -1,0 +1,3001 @@
+/* ——— Касса: таблица транзакций ——— */
+
+.page-header-inner:has(.kassa-header-line) {
+  max-width: none;
+  width: 100%;
+}
+
+.kassa-header-line {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+/* Скрытые блоки сумм: надёжно скрываем даже при сильном display в родителях */
+.kassa-money-panel[hidden],
+.kassa-transfer-money[hidden],
+.kassa-sms-menu[hidden],
+.kassa-columns-menu[hidden] {
+  display: none !important;
+}
+
+#kassa-row-courier-payment[hidden],
+#kassa-row-salary-employee[hidden] {
+  display: none !important;
+}
+
+.kassa-page-title {
+  margin-bottom: 0;
+}
+
+.kassa-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.kassa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  padding: 0 0.85rem;
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.kassa-btn-ic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kassa-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.kassa-status {
+  min-height: 1.25rem;
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+}
+
+.kassa-status[data-variant="ok"] {
+  color: oklch(0.55 0.14 165);
+}
+
+.kassa-status[data-variant="err"] {
+  color: var(--destructive);
+}
+
+.kassa-pending-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.kassa-pending-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.kassa-pending-head h2 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.kassa-pending-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.kassa-pending-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--background), var(--muted) 18%);
+  padding: 0.7rem;
+}
+
+.kassa-pending-title {
+  margin: 0 0 0.2rem;
+  font-weight: 600;
+}
+
+.kassa-pending-meta {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.kassa-pending-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.kassa-pending-actions .btn,
+.kassa-pending-actions .btn-secondary {
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.kassa-transfer-confirm-warning {
+  color: #b45309;
+  font-weight: 550;
+}
+
+html.dark .kassa-status[data-variant="ok"] {
+  color: oklch(0.72 0.13 165);
+}
+
+/* Фильтры */
+.kassa-filters-shell {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.kassa-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.kassa-filters-row-top {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(10rem, 14rem) auto;
+  align-items: center;
+}
+
+@media (max-width: 820px) {
+  .kassa-filters-row-top {
+    grid-template-columns: 1fr;
+  }
+
+  .kassa-panel-actions,
+  .kassa-sms-menu-wrap,
+  .kassa-columns-menu-wrap {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .kassa-panel-actions .kassa-btn,
+  .kassa-sms-toggle,
+  .kassa-columns-toggle {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+.kassa-panel-actions {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.kassa-filter-group {
+  display: flex;
+  align-items: center;
+  position: relative;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  transition: all 0.2s ease;
+}
+
+.kassa-filter-group:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary), transparent 80%);
+}
+
+.kassa-filter-icon {
+  display: flex;
+  align-items: center;
+  padding-left: 0.75rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.kassa-search-group {
+  width: 100%;
+  flex: 1;
+  min-width: 200px;
+}
+
+.kassa-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.kassa-filter-input,
+.kassa-filter-select {
+  height: 2.15rem;
+  border: none !important;
+  background: transparent !important;
+  color: var(--control-fg);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 0 0.75rem;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.kassa-filter-group--dates .kassa-filter-input {
+  padding-left: 0.5rem;
+  width: 7.5rem;
+}
+
+.kassa-filter-date-range {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.kassa-filter-date-range--button-only .upos-date-summary {
+  display: none;
+}
+
+.kassa-filter-date-native {
+  position: absolute !important;
+  width: 1px !important;
+  min-width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.kassa-filter-group--select select {
+  padding-right: 2rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 5 3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+}
+
+.kassa-filter-group--multi {
+  min-width: 10.5rem;
+  isolation: isolate;
+  z-index: 1;
+}
+
+.kassa-filter-group--multi:has(.kassa-multi-filter-menu:not([hidden])) {
+  z-index: 140;
+}
+
+.kassa-filter-group--multi.has-value {
+  border-color: color-mix(in oklch, var(--primary), var(--input) 35%);
+}
+
+.kassa-multi-filter-btn {
+  width: 100%;
+  min-width: 10.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.kassa-multi-filter-btn::after {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  opacity: 0.75;
+  flex: 0 0 auto;
+}
+
+.kassa-multi-filter-menu[hidden] {
+  display: none !important;
+}
+
+.kassa-multi-filter-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 150;
+  width: max(100%, 15rem);
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.35rem;
+  border: 1px solid color-mix(in oklch, var(--primary), var(--border) 72%);
+  border-radius: var(--radius-md);
+  background: #fff;
+  background: color-mix(in oklch, var(--card), white 8%);
+  color: var(--popover-foreground);
+  box-shadow: 0 18px 42px rgb(15 23 42 / 0.18), var(--shadow-lg);
+  backdrop-filter: blur(12px) saturate(1.12);
+  -webkit-backdrop-filter: blur(12px) saturate(1.12);
+}
+
+html.dark .kassa-multi-filter-menu {
+  background: color-mix(in oklch, var(--card), black 8%);
+}
+
+.kassa-multi-filter-clear,
+.kassa-multi-filter-option {
+  width: 100%;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.38rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kassa-multi-filter-clear:hover,
+.kassa-multi-filter-option:hover,
+.kassa-multi-filter-option:has(input:focus-visible) {
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.kassa-multi-filter-option input {
+  position: static;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin: 0;
+  opacity: 1;
+  pointer-events: auto;
+  accent-color: var(--primary);
+}
+
+.kassa-multi-filter-check {
+  width: 1rem;
+  min-width: 1rem;
+  color: transparent;
+  font-weight: 700;
+  text-align: center;
+}
+
+.kassa-multi-filter-clear.is-checked .kassa-multi-filter-check,
+.kassa-multi-filter-option.is-checked .kassa-multi-filter-check {
+  color: var(--primary);
+}
+
+.kassa-multi-filter-option .kassa-multi-filter-check {
+  display: none;
+}
+
+.kassa-multi-filter-option.is-checked {
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+  color: var(--foreground);
+}
+
+.kassa-multi-filter-option-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kassa-multi-filter-empty {
+  padding: 0.55rem 0.6rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.kassa-filter-group--status {
+  min-width: 12rem;
+}
+
+.kassa-filter-group--currency {
+  min-width: 9rem;
+}
+
+.kassa-search-group .kassa-filter-input {
+  width: 100%;
+  padding-left: 2.25rem;
+}
+
+.kassa-filter-date-sep {
+  margin: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+
+.kassa-sms-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.kassa-sms-toggle {
+  height: 2.15rem;
+  padding: 0 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.kassa-sms-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  z-index: 35;
+  display: grid;
+  gap: 0.65rem;
+  width: 20rem;
+  max-width: min(20rem, calc(100vw - 1.5rem));
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+}
+
+.kassa-sms-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.kassa-sms-field .kassa-filter-input {
+  width: 100%;
+  border: 1px solid var(--input) !important;
+  border-radius: var(--radius-md);
+  background: var(--control-bg) !important;
+}
+
+.kassa-sms-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.45rem;
+}
+
+.kassa-sms-action {
+  width: 100%;
+  min-height: 2.2rem;
+  justify-content: center;
+  font-size: var(--text-sm);
+}
+
+.kassa-sms-action-muted {
+  padding-inline: 0.75rem;
+}
+
+.kassa-columns-toggle {
+  margin-left: auto;
+  height: 2.15rem;
+  padding: 0 0.75rem;
+  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.kassa-columns-menu-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.kassa-columns-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 20rem;
+  max-width: min(20rem, calc(100vw - 1.5rem));
+  max-height: min(72vh, 28rem);
+  padding: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.kassa-columns-menu.is-flipped {
+  top: auto;
+  bottom: calc(100% + 0.45rem);
+}
+
+.kassa-columns-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+}
+
+.kassa-columns-menu-heading {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.kassa-columns-menu-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.kassa-columns-quick-btn {
+  border: none;
+  background: transparent;
+  padding: 0.15rem 0.25rem;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.kassa-columns-quick-btn:hover {
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.kassa-columns-quick-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 80%);
+}
+
+.kassa-columns-menu-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.4rem 0.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kassa-columns-menu-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.15rem 0.45rem;
+}
+
+.kassa-columns-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.kassa-columns-menu-item:hover {
+  background: color-mix(in oklch, var(--muted), transparent 40%);
+}
+
+.kassa-columns-menu-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kassa-columns-menu input[type="checkbox"] {
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+.kassa-columns-menu-foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem 0.65rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  background: color-mix(in oklch, var(--muted), transparent 72%);
+}
+
+.kassa-columns-menu-title {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kassa-columns-template-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.kassa-columns-template-select {
+  width: 100%;
+}
+
+.kassa-columns-template-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.kassa-columns-template-actions .kassa-columns-template-btn {
+  flex: 1;
+  min-height: 2rem;
+  font-size: var(--text-sm);
+}
+
+.kassa-data-panel {
+  background: var(--card);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 40%);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--foreground), transparent 92%),
+    0 0 0 1px color-mix(in oklch, var(--border), transparent 40%);
+  overflow: hidden;
+}
+
+.kassa-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.kassa-overview-card {
+  min-height: 8.5rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 30%);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--foreground), transparent 93%),
+    0 0 0 1px color-mix(in oklch, var(--border), transparent 55%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.kassa-overview-card--balance {
+  border-color: color-mix(in oklch, var(--primary), transparent 50%);
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+}
+
+.kassa-overview-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 1.4rem;
+}
+
+.kassa-overview-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+
+.kassa-overview-values {
+  min-width: 0;
+}
+
+.kassa-overview-values .kassa-ccy-chips {
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.45rem;
+}
+
+.kassa-overview-values .kassa-ccy-chip {
+  width: 100%;
+  min-height: 2.05rem;
+  background: color-mix(in oklch, var(--muted), transparent 62%);
+}
+
+@media (max-width: 1250px) {
+  .kassa-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .kassa-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kassa-table-footer {
+  padding: 0.75rem 0.95rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  background: color-mix(in oklch, var(--muted), transparent 72%);
+}
+
+.kassa-pagination-info {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  line-height: 1.4;
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.kassa-pagination-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  width: 100%;
+}
+
+.kassa-pagination-toolbar .kassa-pagination-nav {
+  flex: 0 0 auto;
+  margin-inline: auto;
+}
+
+.kassa-pagination-toolbar .kassa-pagination-size {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.kassa-pagination-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kassa-page-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  padding: 0;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.kassa-page-nav-btn:hover:not(:disabled) {
+  border-color: color-mix(in oklch, var(--primary), transparent 58%);
+  background: color-mix(in oklch, var(--control-bg), var(--primary) 6%);
+}
+
+.kassa-page-nav-btn:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklch, var(--primary), transparent 30%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 82%);
+}
+
+.kassa-page-nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kassa-page-indicator {
+  min-width: 5.5rem;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.kassa-pagination-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.kassa-pagination-size-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.kassa-page-size-group {
+  min-width: 5.5rem;
+}
+
+.kassa-page-size-select {
+  min-width: 5.5rem;
+  padding-left: 0.65rem !important;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kassa-columns-template-wrap {
+  width: 100%;
+}
+
+.kassa-columns-template-name {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.32rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 8px;
+  background: var(--control-bg);
+  color: var(--control-fg);
+  font: inherit;
+  font-size: var(--text-base);
+}
+
+.kassa-columns-template-name:focus {
+  outline: none;
+  border-color: color-mix(in oklch, var(--primary), transparent 30%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 82%);
+}
+
+.kassa-columns-template-btn {
+  flex: 1;
+  justify-content: center;
+  min-height: 2.15rem;
+}
+
+/* Таблица */
+.kassa-table-wrapper {
+  max-height: clamp(28rem, 52vh, 38rem);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.kassa-table {
+  --kassa-cell-border: color-mix(in oklch, var(--border), transparent 38%);
+  --kassa-header-border: color-mix(in oklch, var(--border), transparent 18%);
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+
+.kassa-table th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: color-mix(in oklch, var(--muted), transparent 55%);
+  padding: 0.65rem 0.8rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  border: 1px solid var(--kassa-cell-border);
+  border-bottom-color: var(--kassa-header-border);
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.kassa-table th[draggable="true"] { cursor: grab; }
+
+.kassa-table th.is-dragging {
+  opacity: 0.55;
+}
+
+.kassa-table th.is-drop-target {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.kassa-th-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: calc(100% - 0.6rem);
+  min-width: 0;
+}
+
+.kassa-th-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.kassa-sort-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--muted), transparent 25%);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.kassa-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -0.25rem;
+  z-index: 7;
+  width: 0.55rem;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.kassa-col-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  left: 50%;
+  width: 2px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.kassa-col-resizer:hover::after,
+.kassa-col-resizer:focus-visible::after,
+.kassa-table.is-column-resizing .kassa-col-resizer::after {
+  background: color-mix(in oklch, var(--primary), transparent 18%);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary), transparent 86%);
+}
+
+body.kassa-column-resizing {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+body.kassa-column-resizing * {
+  cursor: col-resize !important;
+}
+
+.kassa-col-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.kassa-col-filter-btn:hover,
+.kassa-col-filter-btn.is-filtered {
+  background: color-mix(in oklch, var(--primary), transparent 86%);
+  color: var(--primary);
+}
+
+.kassa-column-filter-panel {
+  position: fixed;
+  z-index: 80;
+  width: min(15.5rem, calc(100vw - 1.5rem));
+  padding: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--card);
+  box-shadow: 0 12px 26px color-mix(in oklch, var(--foreground), transparent 90%);
+}
+
+.kassa-column-filter-title {
+  margin-bottom: 0.45rem;
+  font-weight: 700;
+  font-size: var(--text-base);
+  color: var(--foreground);
+}
+
+.kassa-column-filter-panel input,
+.kassa-column-filter-panel select {
+  width: 100%;
+  height: 2.35rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-sm);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  padding: 0 0.65rem;
+}
+
+.kassa-column-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.kassa-table td {
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--kassa-cell-border);
+  color: var(--foreground);
+  vertical-align: middle;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kassa-table tbody tr:hover td {
+  background: color-mix(in oklch, var(--muted), transparent 70%);
+}
+
+.kassa-table tbody tr.kassa-table-summary-row td {
+  background: color-mix(in oklch, var(--muted), transparent 48%);
+  border-top-color: color-mix(in oklch, var(--border), transparent 12%);
+  font-weight: 700;
+}
+
+.kassa-table tbody tr.kassa-table-summary-row:hover td {
+  background: color-mix(in oklch, var(--muted), transparent 42%);
+}
+
+.kassa-table-summary-row--balance td {
+  background: color-mix(in oklch, var(--primary), transparent 90%) !important;
+}
+
+.kassa-table-summary-title-cell {
+  color: var(--muted-foreground);
+}
+
+.kassa-table-summary-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.kassa-table .kassa-table-summary-amount {
+  white-space: normal;
+  overflow: visible;
+}
+
+.kassa-table-summary-amount .kassa-ccy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.35rem;
+}
+
+.kassa-table-summary-amount .kassa-ccy-chip {
+  min-height: 1.8rem;
+  min-width: 7.6rem;
+  background: var(--card);
+}
+
+.kassa-table.hide-client .kassa-col-client,
+.kassa-table.hide-client td[data-col="client"],
+.kassa-table.hide-employee .kassa-col-employee,
+.kassa-table.hide-employee td[data-col="employee"],
+.kassa-table.hide-from .kassa-col-from,
+.kassa-table.hide-from td[data-col="from"],
+.kassa-table.hide-to .kassa-col-to,
+.kassa-table.hide-to td[data-col="to"],
+.kassa-table.hide-type .kassa-col-type,
+.kassa-table.hide-type td[data-col="type"],
+.kassa-table.hide-confirmed .kassa-col-confirmed,
+.kassa-table.hide-confirmed td[data-col="confirmed"],
+.kassa-table.hide-category .kassa-col-category,
+.kassa-table.hide-category td[data-col="category"],
+.kassa-table.hide-assets .kassa-col-assets,
+.kassa-table.hide-assets td[data-col="assets"],
+.kassa-table.hide-supplier .kassa-col-supplier,
+.kassa-table.hide-supplier td[data-col="supplier"],
+.kassa-table.hide-supplier-balance .kassa-col-supplier-balance,
+.kassa-table.hide-supplier-balance td[data-col="supplier-balance"],
+.kassa-table.hide-author .kassa-col-author,
+.kassa-table.hide-author td[data-col="author"],
+.kassa-table.hide-branch .kassa-col-branch,
+.kassa-table.hide-branch td[data-col="branch"],
+.kassa-table.hide-note .kassa-col-note,
+.kassa-table.hide-note td[data-col="note"] {
+  display: none;
+}
+
+.kassa-col-amount {
+  font-weight: 600;
+  font-feature-settings: "tnum";
+}
+
+.kassa-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.kassa-type-income {
+  background: color-mix(in oklch, oklch(0.6 0.15 150), transparent 85%);
+  color: oklch(0.45 0.15 150);
+}
+
+html.dark .kassa-type-income {
+  color: oklch(0.7 0.15 150);
+}
+
+.kassa-type-expense {
+  background: color-mix(in oklch, var(--destructive), transparent 85%);
+  color: var(--destructive);
+}
+
+.kassa-type-transfer {
+  background: color-mix(in oklch, var(--primary), transparent 85%);
+  color: var(--primary);
+}
+
+.kassa-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kassa-status-chip--confirmed {
+  border-color: color-mix(in oklch, oklch(0.55 0.14 150), transparent 55%);
+  background: color-mix(in oklch, oklch(0.62 0.15 150), transparent 88%);
+  color: oklch(0.42 0.15 150);
+}
+
+html.dark .kassa-status-chip--confirmed {
+  color: oklch(0.72 0.15 150);
+}
+
+.kassa-status-chip--draft {
+  border-color: color-mix(in oklch, var(--muted-foreground), transparent 70%);
+  background: color-mix(in oklch, var(--muted), transparent 20%);
+  color: var(--muted-foreground);
+}
+
+.kassa-status-chip--pending {
+  border-color: color-mix(in oklch, var(--primary), transparent 55%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+  color: var(--primary);
+}
+
+.kassa-status-chip--rejected {
+  border-color: color-mix(in oklch, var(--destructive), transparent 55%);
+  background: color-mix(in oklch, var(--destructive), transparent 88%);
+  color: var(--destructive);
+}
+
+.kassa-status-select {
+  min-width: 8.6rem;
+  max-width: 100%;
+  min-height: 1.95rem;
+  padding: 0.18rem 1.8rem 0.18rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kassa-status-select:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.kassa-status-select--confirmed {
+  border-color: color-mix(in oklch, oklch(0.55 0.14 150), transparent 55%);
+  background-color: color-mix(in oklch, oklch(0.62 0.15 150), transparent 88%);
+  color: oklch(0.42 0.15 150);
+}
+
+html.dark .kassa-status-select--confirmed {
+  color: oklch(0.72 0.15 150);
+}
+
+.kassa-status-select--draft {
+  border-color: color-mix(in oklch, var(--muted-foreground), transparent 70%);
+  background-color: color-mix(in oklch, var(--muted), transparent 20%);
+  color: var(--muted-foreground);
+}
+
+.kassa-status-select--pending {
+  border-color: color-mix(in oklch, var(--primary), transparent 55%);
+  background-color: color-mix(in oklch, var(--primary), transparent 88%);
+  color: var(--primary);
+}
+
+.kassa-status-select--rejected {
+  border-color: color-mix(in oklch, var(--destructive), transparent 55%);
+  background-color: color-mix(in oklch, var(--destructive), transparent 88%);
+  color: var(--destructive);
+}
+
+.kassa-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kassa-action-btn:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.kassa-action-btn.delete:hover {
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive), transparent 90%);
+}
+
+.kassa-action-btn.confirm:hover {
+  color: oklch(0.45 0.15 150);
+  background: color-mix(in oklch, oklch(0.62 0.15 150), transparent 88%);
+}
+
+.kassa-action-btn.draft:hover {
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+/* Футер с итогами */
+.kassa-ccy-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.8rem, 1fr));
+  gap: 0.5rem;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.kassa-ccy-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding: 0.22rem 0.42rem 0.22rem 0.28rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--muted), transparent 50%);
+  border: 1px solid var(--border);
+  line-height: 1.12;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 2rem;
+}
+
+.kassa-ccy-chip .upos-ccy-ic-wrap {
+  flex-shrink: 0;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.kassa-ccy-chip-amt {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 800;
+  font-feature-settings: 'tnum';
+  font-size: var(--text-md);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.kassa-ccy-chip-code {
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.kassa-ccy-chip--negative .kassa-ccy-chip-amt {
+  color: var(--destructive);
+}
+
+.kassa-summary-empty {
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--muted-foreground);
+}
+
+/* Платежный диалог */
+.kassa-payment-dialog.kassa-dialog {
+  padding: 0;
+  border: none;
+  border-radius: 1.25rem;
+  width: min(42rem, calc(100vw - 2rem));
+  max-width: min(42rem, calc(100vw - 2rem));
+  background: transparent;
+  box-shadow: none;
+}
+
+.kassa-payment-dialog.kassa-dialog::backdrop {
+  background: oklch(0.1 0.02 260 / 45%);
+  backdrop-filter: blur(12px);
+}
+
+.kassa-payment-dialog.kassa-dialog[open] {
+  animation: kassaModalIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.kassa-payment-dialog.kassa-dialog.is-closing {
+  animation: kassaModalOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes kassaModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes kassaModalOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+}
+
+.kassa-editor-surface.kassa-dialog-surface {
+  background: color-mix(in oklch, var(--card), transparent 3%);
+  backdrop-filter: blur(24px);
+  color: var(--card-foreground);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  border-radius: 1.25rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 30%);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px color-mix(in oklch, var(--foreground), transparent 96%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kassa-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.15rem 1.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.kassa-dialog-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.kassa-dialog-close {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.kassa-dialog-close:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.kassa-transfer-queue-btn {
+  position: relative;
+}
+
+.kassa-queue-count {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  margin-left: 0.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--destructive);
+  color: var(--destructive-foreground, #fff);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kassa-transfer-queue-dialog.kassa-dialog {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  width: calc(100vw - 3rem);
+  max-width: none;
+  height: calc(100vh - 3rem);
+  max-height: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.kassa-transfer-queue-dialog.kassa-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.kassa-transfer-queue-surface.kassa-dialog-surface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.28);
+}
+
+.kassa-transfer-queue-surface .kassa-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.kassa-transfer-queue-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 45%);
+}
+
+.kassa-transfer-queue-tools p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-base);
+  line-height: 1.45;
+}
+
+.kassa-transfer-queue-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.kassa-transfer-queue-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.kassa-transfer-queue-table th,
+.kassa-transfer-queue-table td {
+  padding: 0.75rem 0.85rem;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  font-size: var(--text-base);
+}
+
+.kassa-transfer-queue-table th:last-child,
+.kassa-transfer-queue-table td:last-child {
+  border-right: none;
+}
+
+.kassa-transfer-queue-table tr:last-child td {
+  border-bottom: none;
+}
+
+.kassa-transfer-queue-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kassa-transfer-queue-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kassa-transfer-queue-target {
+  width: 100%;
+  min-width: 13rem;
+  height: 2.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 0 0.75rem;
+  font: inherit;
+}
+
+.kassa-transfer-queue-target:disabled {
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+
+.kassa-transfer-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.kassa-transfer-queue-action {
+  min-height: 2.25rem;
+  padding-inline: 0.85rem;
+}
+
+.kassa-transfer-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  background: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kassa-transfer-status-pill--pending {
+  color: #8a4b00;
+  border-color: #f6c36f;
+  background: #fff6de;
+}
+
+.kassa-transfer-status-pill--rejected {
+  color: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive), transparent 55%);
+  background: color-mix(in oklch, var(--destructive), transparent 92%);
+}
+
+.kassa-transfer-queue-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+.kassa-editor-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.35rem;
+}
+
+.kassa-form {
+  --kassa-field-height: 2.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.kassa-payment-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: color-mix(in oklch, var(--control-bg), transparent 30%);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 50%);
+  margin-bottom: 1.5rem;
+}
+
+.kassa-payment-tab {
+  flex: 1;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: none;
+}
+
+.kassa-payment-tab:hover:not(.active) {
+  background: color-mix(in oklch, var(--muted), transparent 40%);
+  color: var(--foreground);
+}
+
+.kassa-payment-tab.active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.kassa-payment-tab[data-payment-type="income"].active {
+  color: oklch(0.55 0.15 150);
+}
+
+html.dark .kassa-payment-tab[data-payment-type="income"].active {
+  color: oklch(0.7 0.15 150);
+}
+
+.kassa-payment-tab[data-payment-type="expense"].active {
+  color: var(--destructive);
+}
+
+.kassa-payment-tab[data-payment-type="transfer"].active {
+  color: var(--primary);
+}
+
+.kassa-form-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.kassa-form-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.kassa-form-row:has(> .kassa-form-group:only-child) > .kassa-form-group {
+  flex-basis: 100%;
+}
+
+.kassa-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.kassa-form-group label {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.kassa-form-group input[type="text"],
+.kassa-form-group input[type="search"],
+.kassa-form-group input[type="number"],
+.kassa-form-group input[type="datetime-local"],
+.kassa-form-group select {
+  width: 100%;
+  max-width: none;
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklch, var(--input), transparent 20%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--control-bg), transparent 40%);
+  color: var(--control-fg);
+  padding: 0 0.85rem;
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: 1.2;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.kassa-form-group select {
+  appearance: auto;
+}
+
+.kassa-form-group textarea {
+  width: 100%;
+  max-width: none;
+  min-height: calc(var(--kassa-field-height) * 1.8);
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklch, var(--input), transparent 20%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--control-bg), transparent 40%);
+  color: var(--control-fg);
+  padding: 0.68rem 0.85rem;
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: 1.35;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  resize: vertical;
+}
+
+.kassa-form-group input:focus,
+.kassa-form-group select:focus,
+.kassa-form-group textarea:focus {
+  outline: none;
+  background: var(--card);
+  border-color: color-mix(in oklch, var(--primary), transparent 30%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 85%), 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.kassa-salary-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10.5rem, 0.34fr);
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.kassa-salary-employee-combo,
+.kassa-salary-position-filter {
+  position: relative;
+}
+
+.kassa-salary-picker-btn {
+  width: 100%;
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklch, var(--input), transparent 20%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--control-bg), transparent 40%);
+  color: var(--control-fg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0 0.85rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kassa-salary-picker-btn > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kassa-salary-picker-btn:hover,
+.kassa-salary-picker-btn[aria-expanded="true"] {
+  border-color: color-mix(in oklch, var(--primary), transparent 45%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.kassa-salary-picker-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.kassa-salary-menu {
+  position: absolute;
+  z-index: 55;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.4rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: 0 18px 45px color-mix(in oklch, var(--foreground), transparent 88%);
+}
+
+.kassa-salary-position-menu {
+  min-width: 14rem;
+}
+
+.kassa-salary-employee-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card);
+  padding-bottom: 0.35rem;
+}
+
+.kassa-salary-employee-search input[type="search"] {
+  padding-right: 2.5rem;
+}
+
+.kassa-salary-position-menu input[type="search"] {
+  width: 100%;
+  height: 2.4rem;
+  margin-bottom: 0.35rem;
+  border: 1px solid color-mix(in oklch, var(--input), transparent 20%);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--control-bg), transparent 40%);
+  color: var(--foreground);
+  padding: 0 0.65rem;
+  font: inherit;
+}
+
+.kassa-salary-employee-search input[type="search"]::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.kassa-salary-employee-search button {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kassa-salary-employee-search button:hover {
+  background: color-mix(in oklch, var(--muted), transparent 30%);
+  color: var(--foreground);
+}
+
+.kassa-salary-employee-options,
+.kassa-salary-position-options {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.kassa-salary-employee-option {
+  width: 100%;
+  min-height: 3rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.kassa-salary-employee-option:hover,
+.kassa-salary-employee-option.is-selected {
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.kassa-salary-employee-option strong {
+  font-weight: 800;
+}
+
+.kassa-salary-employee-option span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.kassa-salary-position-option {
+  min-height: 2.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.kassa-salary-position-option:hover {
+  background: color-mix(in oklch, var(--primary), transparent 92%);
+}
+
+.kassa-salary-position-option input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+}
+
+.kassa-salary-empty {
+  padding: 0.8rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .kassa-salary-picker-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kassa-category-picker {
+  position: relative;
+}
+
+.kassa-category-picker > select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kassa-category-btn {
+  width: 100%;
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  padding: 0 0.85rem;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.kassa-form-group .upos-ccy-select-btn {
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  padding: 0 0.85rem;
+}
+
+.kassa-category-btn svg {
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+
+.kassa-category-btn:hover,
+.kassa-category-btn[aria-expanded="true"] {
+  border-color: color-mix(in oklch, var(--primary), transparent 45%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.kassa-category-panel {
+  position: absolute;
+  z-index: 45;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  max-height: 17rem;
+  overflow: auto;
+  padding: 0.35rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: 0 18px 45px color-mix(in oklch, var(--foreground), transparent 88%);
+}
+
+.kassa-category-option {
+  width: 100%;
+  min-height: 2.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kassa-category-option:hover,
+.kassa-category-option.is-active {
+  background: color-mix(in oklch, var(--muted), transparent 55%);
+}
+
+.kassa-category-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.55rem;
+  font-weight: 800;
+}
+
+.kassa-category-dot--income {
+  background: color-mix(in oklch, oklch(0.62 0.16 150), transparent 84%);
+  color: oklch(0.46 0.15 150);
+}
+
+.kassa-category-dot--expense {
+  background: color-mix(in oklch, var(--destructive), transparent 86%);
+  color: var(--destructive);
+}
+
+.kassa-checkbox-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.15rem 0;
+}
+
+.kassa-checkbox-group input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--primary);
+}
+
+.kassa-checkbox-group label {
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.kassa-editor-hint {
+  margin: 0.35rem 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--muted-foreground);
+}
+
+.kassa-editor-hint--muted {
+  opacity: 0.92;
+}
+
+.kassa-salary-employee-hint {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 78%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+  color: var(--foreground);
+}
+
+.kassa-salary-employee-hint strong {
+  font-weight: 800;
+}
+
+.kassa-salary-employee-hint small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.kassa-editor-hint[data-variant='err'],
+#kassa-editor-balance-hint[data-variant='err'] {
+  color: var(--destructive);
+}
+
+.kassa-hint-money {
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.kassa-editor-hint[data-variant='err'] .kassa-hint-money,
+#kassa-editor-balance-hint[data-variant='err'] .kassa-hint-money {
+  color: var(--destructive);
+}
+
+.kassa-form-group--amount-block {
+  margin-bottom: 0.5rem;
+}
+
+.kassa-split-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.35rem;
+}
+
+.kassa-split-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.kassa-split-actions[hidden],
+.kassa-split-lines[hidden] {
+  display: none;
+}
+
+.kassa-split-add {
+  min-height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px dashed color-mix(in oklch, var(--primary), transparent 38%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+  color: var(--primary);
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.kassa-split-add span {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), transparent 84%);
+  line-height: 1;
+}
+
+.kassa-split-add:hover {
+  border-style: solid;
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.kassa-split-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.kassa-split-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--muted), transparent 88%);
+}
+
+.kassa-split-block:has(.upos-ccy-select.is-open) {
+  z-index: 10;
+}
+
+.kassa-split-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.1rem;
+}
+
+.kassa-split-block-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--muted-foreground);
+  letter-spacing: 0.01em;
+}
+
+.kassa-split-block .kassa-form-group {
+  margin: 0;
+}
+
+.kassa-split-remove {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid color-mix(in oklch, var(--destructive), transparent 72%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--destructive), transparent 94%);
+  color: var(--destructive);
+  font: inherit;
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kassa-split-remove:hover {
+  background: color-mix(in oklch, var(--destructive), transparent 88%);
+}
+
+.kassa-split-block .upos-ccy-select-btn {
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  padding: 0 0.85rem;
+}
+
+.kassa-editor-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.05rem 1.35rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+.kassa-editor-foot .btn {
+  min-height: 2.75rem;
+  min-width: 9rem;
+}
+
+/* Перевод денег: две стороны и конвертация */
+.kassa-transfer-money {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.kassa-transfer-kind {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  padding: 0.28rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--muted), transparent 82%);
+}
+
+.kassa-transfer-kind-option {
+  min-height: 2.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--muted-foreground);
+  font-size: var(--text-base);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.kassa-transfer-kind-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kassa-transfer-kind-option:has(input:checked) {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.kassa-transfer-kind-option:hover {
+  color: var(--foreground);
+}
+
+.kassa-transfer-split {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+@media (max-width: 560px) {
+  .kassa-transfer-split {
+    grid-template-columns: 1fr;
+  }
+
+  .kassa-transfer-arrow {
+    justify-self: center;
+    padding-top: 0 !important;
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .kassa-payment-dialog.kassa-dialog {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .kassa-editor-surface.kassa-dialog-surface {
+    min-height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .kassa-editor-foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .kassa-editor-foot .btn {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .kassa-editor-head,
+  .kassa-editor-scroll {
+    padding-left: max(1.35rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1.35rem, env(safe-area-inset-right, 0px));
+  }
+
+  .kassa-editor-head {
+    padding-top: calc(1.15rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+.kassa-transfer-card {
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 88%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kassa-transfer-card-head {
+  margin-bottom: 0.1rem;
+}
+
+.kassa-transfer-badge {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.kassa-transfer-badge--out {
+  background: color-mix(in oklch, var(--destructive), transparent 82%);
+  color: var(--destructive);
+}
+
+.kassa-transfer-badge--in {
+  background: color-mix(in oklch, oklch(0.56 0.15 150), transparent 78%);
+  color: oklch(0.38 0.14 150);
+}
+
+html.dark .kassa-transfer-badge--in {
+  color: oklch(0.76 0.12 150);
+}
+
+.kassa-transfer-card-lead {
+  margin: 0 0 0.4rem;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.kassa-transfer-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 2.5rem;
+  color: var(--muted-foreground);
+  opacity: 0.55;
+}
+
+.kassa-transfer-convert-panel {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px dashed color-mix(in oklch, var(--primary), transparent 50%);
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+}
+
+.kassa-transfer-convert-title {
+  margin: 0 0 0.35rem;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.kassa-transfer-rate-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+}
+
+.kassa-transfer-rate-row label {
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.kassa-transfer-rate-input {
+  flex: 1;
+  min-width: 10rem;
+  max-width: 16rem;
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  padding: 0 0.85rem;
+  font-family: inherit;
+  font-size: var(--text-md);
+}
+
+.kassa-transfer-card input[type='text'],
+.kassa-transfer-card input[type='number'],
+.kassa-transfer-card select {
+  width: 100%;
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+}
+
+.kassa-transfer-card .upos-ccy-select-btn {
+  height: var(--kassa-field-height);
+  min-height: var(--kassa-field-height);
+  box-sizing: border-box;
+  padding: 0 0.85rem;
+}
+
+/* Переход из общей кассы: подсветка строки по ?tx= */
+.kassa-table tbody tr[data-tx-id].kassa-row-highlight {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+  animation: kassa-highlight-pulse 1.4s ease-out 2;
+}
+
+@keyframes kassa-highlight-pulse {
+  from {
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+/* Cash ledger: match the account table visual rhythm. */
+.kassa-root {
+  gap: 0.9rem;
+}
+
+.kassa-filters-shell {
+  border-color: var(--border);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, white, transparent 12%), transparent 66%),
+    var(--card);
+  box-shadow: var(--shadow-md);
+}
+
+.kassa-filter-group,
+.kassa-columns-toggle,
+.kassa-btn,
+.kassa-page-nav-btn,
+.kassa-page-size-group {
+  border-radius: var(--radius);
+}
+
+.kassa-filter-group {
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 38%) inset;
+}
+
+.kassa-data-panel {
+  border-color: var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.kassa-table-wrapper {
+  max-height: clamp(30rem, 58vh, 43rem);
+  background: var(--card);
+}
+
+.kassa-table {
+  --kassa-cell-border: var(--border);
+  --kassa-header-border: var(--border);
+  border-collapse: collapse;
+  background: var(--card);
+  font-size: var(--text-sm);
+  font-feature-settings: "tnum", "lnum";
+}
+
+.kassa-table th {
+  height: 2.55rem;
+  padding: 0.45rem 0.8rem;
+  background: color-mix(in oklch, var(--muted), transparent 58%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kassa-table td {
+  height: 4rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--card);
+  border-color: var(--border);
+  font-size: var(--text-sm);
+}
+
+.kassa-table tbody tr:hover td {
+  background: color-mix(in oklch, var(--muted), transparent 76%);
+}
+
+.kassa-table th[data-col="amount"],
+.kassa-table td[data-col="amount"],
+.kassa-table th[data-col="supplier-balance"],
+.kassa-table td[data-col="supplier-balance"] {
+  text-align: right;
+}
+
+.kassa-table td[data-col="number"],
+.kassa-table td[data-col="date"] {
+  color: color-mix(in oklch, var(--foreground), var(--muted-foreground) 12%);
+}
+
+.kassa-col-amount {
+  color: var(--foreground);
+  font-size: var(--text-md);
+  font-weight: 800;
+}
+
+.kassa-th-inner {
+  width: 100%;
+}
+
+.kassa-th-label {
+  text-align: inherit;
+}
+
+.kassa-sort-mark {
+  background: color-mix(in oklch, var(--primary), transparent 91%);
+  color: var(--primary);
+}
+
+.kassa-status-select {
+  min-height: 2.05rem;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.kassa-table-footer {
+  border-top-color: var(--border);
+  background: var(--card);
+}
+
+.kassa-overview-grid {
+  --kassa-overview-cell-border: color-mix(in oklch, var(--border), var(--primary) 10%);
+  gap: 0;
+  margin-top: 0.9rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+}
+
+.kassa-overview-card {
+  min-height: 5.1rem;
+  padding: 0.82rem 1rem;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: none;
+  gap: 0.48rem;
+}
+
+.kassa-overview-card:last-child {
+  border-right: 0;
+}
+
+.kassa-overview-card--balance {
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary), transparent 44%);
+}
+
+.kassa-overview-card-head {
+  min-height: 1rem;
+}
+
+.kassa-overview-title {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.kassa-overview-values {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 2.3rem;
+}
+
+.kassa-overview-values .kassa-ccy-chips {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.kassa-overview-values .kassa-ccy-chip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(2.35rem, auto);
+  align-items: stretch;
+  column-gap: 0.5rem;
+  width: 100%;
+  min-height: 1.42rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--kassa-overview-cell-border);
+  border-radius: 0;
+  background: transparent;
+  justify-content: normal;
+  box-sizing: border-box;
+}
+
+.kassa-overview-values .kassa-ccy-chip .upos-ccy-ic-wrap {
+  display: none;
+}
+
+.kassa-overview-values .kassa-ccy-chip-amt {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: 850;
+}
+
+.kassa-overview-values .kassa-ccy-chip-code {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 2.35rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid color-mix(in oklch, var(--border), transparent 42%);
+  text-align: right;
+}
+
+.kassa-overview-values .kassa-summary-empty {
+  margin-left: auto;
+}
+
+@media (max-width: 1250px) {
+  .kassa-overview-card:nth-child(2) {
+    border-right: 0;
+  }
+
+  .kassa-overview-card:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 760px) {
+  .kassa-overview-card {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kassa-overview-card:last-child {
+    border-bottom: 0;
+  }
+}
+
+/* Workbench standard finish for cash operations. */
+.kassa-root {
+  gap: 0.85rem;
+  font-size: var(--text-base);
+}
+
+.kassa-filters-shell,
+.kassa-data-panel,
+.kassa-overview-grid {
+  border-color: var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius, var(--radius-xl));
+  background:
+    linear-gradient(180deg, color-mix(in oklch, white, transparent 16%), transparent 70%),
+    var(--card);
+  box-shadow: var(--workbench-shadow, var(--shadow-md));
+}
+
+.kassa-filter-group,
+.kassa-filter-select,
+.kassa-filter-input,
+.kassa-btn,
+.kassa-columns-toggle,
+.kassa-page-nav-btn,
+.kassa-page-size-select,
+.kassa-status-select {
+  min-height: var(--workbench-field-height, 36px);
+  border-radius: var(--workbench-radius-sm, var(--radius));
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0;
+}
+
+.kassa-table {
+  border-collapse: collapse;
+  font-size: var(--text-base);
+  line-height: 1.32;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.kassa-table th {
+  height: var(--workbench-table-head-height, 41px);
+  background: var(--workbench-muted-surface, color-mix(in oklch, var(--muted), transparent 58%));
+  font-size: var(--text-xs);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.kassa-table td {
+  height: var(--workbench-table-row-height, 64px);
+  font-size: var(--text-base);
+}
+
+.kassa-col-amount,
+.kassa-overview-values .kassa-ccy-chip-amt {
+  font-size: var(--text-md);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.kassa-overview-title {
+  letter-spacing: 0;
+}
+
+.kassa-overview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.72rem 0.85rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+  background: var(--card);
+}
+
+.kassa-overview-toolbar-title {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 820;
+}
+
+.kassa-overview-currency-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.kassa-overview-currency-select {
+  min-height: var(--workbench-field-height, 36px);
+  min-width: 5.6rem;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-sm, var(--radius));
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.kassa-overview-card--balance {
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: none;
+}
+
+.kassa-summary-stack {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.kassa-summary-original {
+  display: block;
+  min-width: 0;
+}
+
+.kassa-summary-stack--income .kassa-summary-original .kassa-ccy-chip-amt {
+  color: #15803d;
+}
+
+.kassa-summary-stack--expense .kassa-summary-original .kassa-ccy-chip-amt {
+  color: #dc2626;
+}
+
+.kassa-summary-stack--transfer .kassa-summary-original .kassa-ccy-chip-amt {
+  color: #2563eb;
+}
+
+.kassa-summary-total {
+  display: grid;
+  grid-template-columns: minmax(3.6rem, auto) minmax(0, 1fr) minmax(2.35rem, auto);
+  align-items: center;
+  width: 100%;
+  min-height: 2rem;
+  column-gap: 0.5rem;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.kassa-summary-total-label {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 780;
+}
+
+.kassa-summary-total-amt {
+  min-width: 0;
+  text-align: right;
+  font-size: var(--text-lg);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.kassa-summary-total-code {
+  min-width: 2.35rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid color-mix(in oklch, var(--border), transparent 42%);
+  color: var(--muted-foreground);
+  text-align: right;
+  font-size: var(--text-xs);
+  font-weight: 850;
+}
+
+.kassa-summary-total--income .kassa-summary-total-amt {
+  color: #15803d;
+}
+
+.kassa-summary-total--expense .kassa-summary-total-amt {
+  color: #dc2626;
+}
+
+.kassa-summary-total--transfer .kassa-summary-total-amt {
+  color: #2563eb;
+}
+
+.kassa-summary-total--balance .kassa-summary-total-amt {
+  color: var(--foreground);
+}
+
+.kassa-courier-details {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 60%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+}
+
+.kassa-courier-details[hidden] {
+  display: none;
+}
+
+.kassa-courier-details-head strong {
+  display: block;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.kassa-courier-details-head span {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.kassa-courier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.kassa-courier-grid label {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.kassa-courier-grid-wide {
+  grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 8.75rem);
+}
+
+.kassa-courier-grid-wide > span {
+  grid-column: 1 / -1;
+}
+
+.kassa-courier-grid input,
+.kassa-courier-grid select {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-sm, var(--radius));
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.kassa-courier-grid select {
+  color: var(--foreground);
+}
+
+.kassa-courier-result {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.kassa-courier-result [data-tone="plus"] {
+  color: #15803d;
+}
+
+.kassa-courier-result [data-tone="minus"] {
+  color: #dc2626;
+}
+
+.kassa-col-courier-summary {
+  min-width: 12rem;
+}
+
+@media (max-width: 720px) {
+  .kassa-courier-grid,
+  .kassa-courier-result {
+    grid-template-columns: 1fr;
+  }
+
+  .kassa-courier-grid-wide {
+    grid-template-columns: 1fr;
+  }
+}

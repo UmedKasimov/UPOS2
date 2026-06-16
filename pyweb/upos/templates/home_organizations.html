@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}{{ _('general.organizations.title_page') }}{% endblock %}
+
+{% macro org_mark(org) %}
+  <span class="org-card-mark" aria-hidden="true">{{ (org.name or _('workspace.default_name'))[0]|upper }}</span>
+{% endmacro %}
+
+{% macro integration_stack(org) %}
+  <div class="org-card-integrations" aria-label="{{ _('general.integrations_aria') }}">
+    {% for integration in org.integrations %}
+      <span
+        class="org-card-integration {{ 'is-active' if integration.active else 'is-muted' }}"
+        title="{{ integration.label }}{% if integration.active %}: {{ _('general.integration.connected') }}{% else %}: {{ _('general.integration.disconnected') }}{% endif %}"
+      >
+        <img src="{{ url_for('static', path=integration.icon) }}" alt="" loading="lazy" />
+      </span>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro money_chips(chips, empty_text='0') %}
+  <div class="org-balance-chips">
+    {% for chip in chips %}
+      <span class="org-balance-chip">{{ chip.label }}</span>
+    {% else %}
+      <span class="org-balance-chip org-balance-chip--empty">{{ empty_text }}</span>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro money_table(chips, empty_text='0') %}
+  <div class="org-balance-table-wrap">
+    <table class="org-balance-table">
+      <tbody>
+        {% for chip in chips[:6] %}
+          <tr>
+            <td class="org-balance-table-amount" colspan="2">
+              <span class="org-balance-table-value">{{ chip.amount_label or chip.label }}</span>
+              {% if chip.amount_label %}
+                <span class="org-balance-table-currency">{{ chip.currency }}</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr class="org-balance-table-empty">
+            <td colspan="2">{{ empty_text }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
+
+{% macro organization_form(kind, org=None) %}
+  <form
+    method="post"
+    action="{% if kind == 'create' %}{{ url_for('organizations_create') }}{% else %}{{ url_for('organizations_update', organization_id=org.id) }}{% endif %}"
+    class="director-modal-form"
+  >
+    {% include "_csrf_field.html" %}
+    <label for="{{ kind }}-organization-name{% if org %}-{{ org.id }}{% endif %}">
+      <span>{{ _('general.org.form.name') }}</span>
+      <input
+        id="{{ kind }}-organization-name{% if org %}-{{ org.id }}{% endif %}"
+        name="{% if kind == 'create' %}organization_name{% else %}edit_organization_name{% endif %}"
+        type="text"
+        value="{{ org.name if org else '' }}"
+        maxlength="160"
+        placeholder="{{ _('general.org.form.name_ph') }}"
+        required
+      />
+    </label>
+    <label for="{{ kind }}-organization-note{% if org %}-{{ org.id }}{% endif %}">
+      <span>{{ _('general.org.form.note') }}</span>
+      <textarea
+        id="{{ kind }}-organization-note{% if org %}-{{ org.id }}{% endif %}"
+        name="{% if kind == 'create' %}organization_note{% else %}edit_organization_note{% endif %}"
+        rows="3"
+        maxlength="1000"
+        placeholder="{{ _('general.org.form.note_ph') }}"
+      >{{ org.note if org else '' }}</textarea>
+    </label>
+    <div class="director-modal-actions">
+      <button type="button" class="btn btn-secondary" data-org-modal-close>{{ _('settings.profile.cancel') }}</button>
+      <button type="submit" class="btn">{% if kind == 'create' %}{{ _('general.org.form.create') }}{% else %}{{ _('general.org.form.save') }}{% endif %}</button>
+    </div>
+  </form>
+{% endmacro %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">{{ _('general.organizations.title') }}</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace director-org-workspace">
+    {% if flash_ok or flash_err or request.query_params.get("err") == "csrf" %}
+      <div class="organizations-flash-group">
+        {% if flash_ok == "created" %}
+          <div class="flash ok settings-ios-flash">{{ _('general.flash.org_created') }}</div>
+        {% elif flash_ok == "updated" %}
+          <div class="flash ok settings-ios-flash">{{ _('general.flash.org_updated') }}</div>
+        {% endif %}
+        {% if flash_err %}
+          <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="general-home-shell">
+      <section class="director-capital-hero" aria-labelledby="director-capital-title">
+        <div class="director-capital-main">
+          <div class="director-capital-copy">
+            <p class="settings-ios-footnote">{{ _('general.capital.title') }}</p>
+            <h2 id="director-capital-title">{{ general_stats.total_display_label }}</h2>
+            <span>{{ _('general.capital.display_in_currency', currency=general_stats.total_display_currency) }}</span>
+          </div>
+          <form method="get" class="director-currency-form" aria-label="{{ _('general.display_currency') }}">
+            <label for="director-display-currency">{{ _('general.currency') }}</label>
+            <select id="director-display-currency" name="display_currency" onchange="this.form.submit()">
+              {% for option in general_stats.currency_options %}
+                <option value="{{ option.code }}" {% if option.selected %}selected{% endif %}>{{ option.code }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+        <div class="director-capital-breakdown">
+          <span class="director-card-label">{{ _('general.actual_balances') }}</span>
+          {{ money_table(general_stats.total_balance_chips, _('general.no_balances')) }}
+        </div>
+        <div class="director-capital-signals" aria-label="{{ _('general.metrics_aria') }}">
+          <article>
+            <small>{{ _('general.net_month') }}</small>
+            {{ money_chips(general_stats.month_net_chips, '0') }}
+          </article>
+          <article>
+            <small>{{ _('general.organizations') }}</small>
+            <strong>{{ general_stats.organization_count }}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="director-org-directory director-org-directory--focused" aria-labelledby="org-list-title">
+        <div class="director-section-head director-section-head--with-action">
+          <div>
+            <p id="org-list-title" class="settings-ios-footnote">{{ _('general.org.list_kicker') }}</p>
+            <h2>{{ _('general.org.list_title') }}</h2>
+          </div>
+          <div class="director-section-actions">
+            <span class="organizations-count">{{ organizations|length }}</span>
+            <button type="button" class="btn director-create-inline-btn" data-org-modal-open="org-create-modal">
+              <span aria-hidden="true">+</span>
+              {{ _('general.organization') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="organizations-card-grid director-org-grid director-org-grid--focused">
+          {% for org in organizations %}
+            <article class="organization-card director-org-card director-org-card--focused {% if org.id == organization_active_id %}organization-card--selected{% endif %}">
+              <button
+                type="button"
+                class="director-org-icon-btn"
+                data-org-modal-open="org-edit-{{ org.id }}"
+                aria-label="{{ _('general.edit_aria', name=org.name) }}"
+                title="{{ _('settings.profile.edit') }}"
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+              <header class="director-org-card-top">
+                {{ org_mark(org) }}
+                <div class="org-card-main">
+                  <span class="org-card-name">{{ org.name }}</span>
+                </div>
+              </header>
+
+              <div class="director-org-snapshot">
+                <div class="director-org-data-block">
+                  <span class="director-card-label">{{ _('general.balances') }}</span>
+                  {{ money_table(org.balance_chips, _('general.no_balances')) }}
+                </div>
+                <div class="director-org-data-block">
+                  <span class="director-card-label">{{ _('general.net_month') }}</span>
+                  {{ money_chips(org.month_net_chips, '0') }}
+                </div>
+              </div>
+
+              <div class="director-org-card-actions director-org-history-actions">
+                <a class="btn btn-secondary btn-sm director-history-btn director-history-btn--all" href="{{ url_for('organizations_open_kassa') }}?organization_id={{ org.id }}">История прихода и расхода</a>
+              </div>
+            </article>
+          {% else %}
+            <div class="organizations-empty">{{ _('general.org.empty') }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <dialog class="director-org-modal" id="org-create-modal">
+      <div class="director-modal-card">
+        <header class="director-modal-head">
+          <div>
+            <p class="settings-ios-footnote">{{ _('general.org.new') }}</p>
+            <h2>{{ _('general.org.create_title') }}</h2>
+          </div>
+          <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </header>
+        {{ organization_form('create') }}
+      </div>
+    </dialog>
+
+    {% for org in organizations %}
+      <dialog class="director-org-modal" id="org-edit-{{ org.id }}">
+        <div class="director-modal-card">
+          <header class="director-modal-head">
+            <div>
+              <p class="settings-ios-footnote">{{ _('general.org.editing') }}</p>
+              <h2>{{ org.name }}</h2>
+            </div>
+            <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </header>
+          {{ organization_form('edit', org) }}
+        </div>
+      </dialog>
+    {% endfor %}
+  </div>
+
+  <script src="{{ url_for('static', path='organizations-page.js') }}?v=1" defer></script>
+{% endblock %}

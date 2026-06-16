@@ -1,0 +1,37 @@
+{% import "brand_macros.html" as brand %}
+<!DOCTYPE html>
+<html lang="{{ html_lang | default('ru') }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#141d2e" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v=4" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.png') }}?v=4" type="image/png" sizes="48x48" />
+    <title>{% block page_title %}{{ _('layout.error') }}{% endblock %} · UPOS FINANCE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=65" />
+  </head>
+  <body data-theme="{{ body_theme | default('light') }}">
+    <div class="auth-page">
+      <div class="auth-shell">
+        <div class="auth-brand-lockup">
+          {{ brand.octopus_svg(error_octopus_id | default("octErr"), error_octopus_size | default(48)) }}
+          <div class="auth-brand-titles">
+            <div class="auth-brand-title-row">
+              <span class="auth-brand-upos">UPOS</span>
+              <span class="auth-brand-fin">FINANCE</span>
+            </div>
+          </div>
+        </div>
+        <div class="auth-card">
+          {% block error_card %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

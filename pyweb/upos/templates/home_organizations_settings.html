@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ _('general.mode') }}</span>
+    <h1 class="page-title settings-ios-page-title">Настройки</h1>
+  </div>
+{% endblock %}
+
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=23" />
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--fluid director-org-workspace general-management-settings-page">
+    <nav class="general-module-tabs settings-module-tabs" aria-label="{{ _('nav.general_sections') }}">
+      <a class="general-module-tab active" href="{{ url_for('organizations_settings_get') }}" aria-current="page" data-org-settings-home-tab>Настройки</a>
+    </nav>
+
+    <section class="general-report-launcher general-settings-launcher" aria-label="Разделы настроек">
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=general" data-org-settings-launch-tab="general">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h4"/><path d="M12 7h8"/><circle cx="10" cy="7" r="2"/><path d="M4 17h9"/><path d="M17 17h3"/><circle cx="15" cy="17" r="2"/><path d="M4 12h2"/><path d="M10 12h10"/><circle cx="8" cy="12" r="2"/></svg>
+        </span>
+        <span>Основное</span>
+        <small>Параметры системы</small>
+      </a>
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_users_get') }}" data-org-settings-launch-tab="users">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M18 8l1.2 1.2L22 6.4"/><path d="M18.5 14.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/><path d="M18.5 16v3"/></svg>
+        </span>
+        <span>Пользователи</span>
+        <small>Сотрудники и доступы</small>
+      </a>
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=dictionary" data-org-settings-launch-tab="dictionary">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 0-4-4Z"/><path d="M5 4v16"/><path d="M9 8h6"/><path d="M9 12h5"/><path d="M19 8h1a2 2 0 0 1 2 2v10h-3"/></svg>
+        </span>
+        <span>Справочники</span>
+        <small>Данные и роли</small>
+      </a>
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=integrations" data-org-settings-launch-tab="integrations">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/><path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/><path d="M8 16l8-8"/></svg>
+        </span>
+        <span>Интеграции</span>
+        <small>Подключения сервисов</small>
+      </a>
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=telegram" data-org-settings-launch-tab="telegram">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M22 3 9.5 15.5"/><path d="m22 3-7 18-5.5-5.5L3 13Z"/><path d="m9.5 15.5 4 4"/></svg>
+        </span>
+        <span>Telegram уведомление</span>
+        <small>Бот и уведомления</small>
+      </a>
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=telegram#telegram-limits" data-org-settings-launch-tab="telegram">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V6Z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+        </span>
+        <span>Ограничение</span>
+        <small>Лимиты прихода и расхода</small>
+      </a>
+    </section>
+
+    {% if flash_err %}
+      <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    window.orgSettingsTabs = {
+      baseUrl: {{ url_for('organizations_settings_get') | string | tojson }},
+      homeUrl: {{ url_for('organizations_settings_get') | string | tojson }},
+      restoreActive: true,
+      labels: {
+        general: {{ _('settings.tab.general') | tojson }},
+        users: "Пользователи",
+        dictionary: {{ _('settings.tab.dictionary') | tojson }},
+        integrations: {{ _('settings.tab.integrations') | tojson }},
+        telegram: {{ _('settings.tab.telegram') | tojson }}
+      },
+      urls: {
+        users: {{ url_for('organizations_users_get') | string | tojson }}
+      }
+    };
+  </script>
+  <script src="{{ url_for('static', path='org-settings-tabs.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='org-settings-launcher.js') }}?v=2" defer></script>
+{% endblock %}

@@ -1,0 +1,582 @@
+{% extends "base.html" %}
+{% block title %}{{ _('kassa.title_page') }}{% endblock %}
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='kassa-page.css') }}?v=58" />
+{% endblock %}
+{% block page_header %}
+  <div class="kassa-header-line">
+    <div>
+      <h1 class="page-title kassa-page-title">{{ _('kassa.title') }}</h1>
+    </div>
+  </div>
+{% endblock %}
+{% block main %}
+  <div class="kassa-root" id="kassa-root" data-workspace-timezone="{{ workspace_timezone | default('Asia/Tashkent') | e }}" data-active-org-id="{{ ((user.get('active_org_id') if user else '') or '') | e }}">
+    <div class="kassa-status" id="kassa-status" aria-live="polite"></div>
+
+    <section class="kassa-pending-panel" id="kassa-pending-panel" hidden>
+      <div class="kassa-pending-head">
+        <h2>Ожидают подтверждения</h2>
+      </div>
+      <div class="kassa-pending-list" id="kassa-pending-list"></div>
+    </section>
+
+    <div class="kassa-filters-shell">
+      <div class="kassa-filters-row kassa-filters-row-top">
+        <div class="kassa-filter-group kassa-search-group">
+          <div class="kassa-filter-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+          <input type="text" id="kassa-filter-search" class="kassa-filter-input" placeholder="{{ _('kassa.search_ph') }}" autocomplete="off" />
+        </div>
+        <div class="kassa-filter-group kassa-filter-group--multi" data-kassa-multi-filter="category">
+          <div class="kassa-filter-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9v6l4 3v-9l8-9z"/></svg>
+          </div>
+          <button type="button" id="kassa-filter-category" class="kassa-filter-select kassa-multi-filter-btn" data-multi-filter-button aria-haspopup="listbox" aria-expanded="false">
+            <span data-multi-filter-label>{{ _('kassa.filter.category') }}</span>
+          </button>
+          <div class="kassa-multi-filter-menu" data-multi-filter-menu hidden></div>
+        </div>
+        <div class="kassa-toolbar kassa-panel-actions" aria-label="{{ _('kassa.columns_aria') }}">
+          <button type="button" class="btn btn-secondary kassa-btn kassa-transfer-queue-btn" id="kassa-transfer-queue">
+            <span class="kassa-btn-ic" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h12a4 4 0 0 1 0 8H8"/><path d="m16 21 4-4-4-4"/><path d="M20 17H8a4 4 0 0 1 0-8h8"/></svg>
+            </span>
+            Перемещения
+            <span class="kassa-queue-count" id="kassa-transfer-queue-count" hidden>0</span>
+          </button>
+          <button type="button" class="btn btn-secondary kassa-btn" id="kassa-export">
+            <span class="kassa-btn-ic" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            </span>
+            {{ _('kassa.export') }}
+          </button>
+          <button type="button" class="btn kassa-btn" id="kassa-create-new">
+            <span class="kassa-btn-ic" aria-hidden="true">+</span>
+            {{ _('kassa.create') }}
+          </button>
+        </div>
+      </div>
+      
+      <div class="kassa-filters-row kassa-filters-row-bottom">
+        <div class="kassa-filter-group kassa-filter-group--dates">
+          <span id="kassa-filter-date-range" class="kassa-filter-date-range kassa-filter-date-range--button-only"></span>
+          <input type="date" lang="en-GB" id="kassa-filter-date-start" class="kassa-filter-input kassa-filter-date kassa-filter-date-native" aria-label="{{ _('kassa.date_from') }}" data-upos-native-date />
+          <input type="date" lang="en-GB" id="kassa-filter-date-end" class="kassa-filter-input kassa-filter-date kassa-filter-date-native" aria-label="{{ _('kassa.date_to') }}" data-upos-native-date />
+        </div>
+
+        <div class="kassa-filter-group kassa-filter-group--multi" data-kassa-multi-filter="type">
+          <div class="kassa-filter-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9v6l4 3v-9l8-9z"/></svg>
+          </div>
+          <button type="button" id="kassa-filter-type" class="kassa-filter-select kassa-multi-filter-btn" data-multi-filter-button aria-haspopup="listbox" aria-expanded="false">
+            <span data-multi-filter-label>{{ _('kassa.filter.type') }}</span>
+          </button>
+          <div class="kassa-multi-filter-menu" data-multi-filter-menu hidden></div>
+        </div>
+
+        <div class="kassa-filter-group kassa-filter-group--multi" data-kassa-multi-filter="supplier">
+          <button type="button" id="kassa-filter-supplier" class="kassa-filter-select kassa-multi-filter-btn" data-multi-filter-button aria-haspopup="listbox" aria-expanded="false">
+            <span data-multi-filter-label>{{ _('kassa.filter.supplier') }}</span>
+          </button>
+          <div class="kassa-multi-filter-menu" data-multi-filter-menu hidden></div>
+        </div>
+
+        <div class="kassa-filter-group kassa-filter-group--multi" data-kassa-multi-filter="pocket">
+          <button type="button" id="kassa-filter-pocket" class="kassa-filter-select kassa-multi-filter-btn" data-multi-filter-button aria-haspopup="listbox" aria-expanded="false">
+            <span data-multi-filter-label>{{ _('kassa.filter.pocket') }}</span>
+          </button>
+          <div class="kassa-multi-filter-menu" data-multi-filter-menu hidden></div>
+        </div>
+
+        <div class="kassa-filter-group kassa-filter-group--multi kassa-filter-group--currency" data-kassa-multi-filter="currency">
+          <button type="button" id="kassa-filter-currency" class="kassa-filter-select kassa-multi-filter-btn" data-multi-filter-button aria-haspopup="listbox" aria-expanded="false">
+            <span data-multi-filter-label>Валюта</span>
+          </button>
+          <div class="kassa-multi-filter-menu" data-multi-filter-menu hidden></div>
+        </div>
+
+        <div class="kassa-filter-group kassa-filter-group--multi kassa-filter-group--status" data-kassa-multi-filter="status">
+          <div class="kassa-filter-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <button type="button" id="kassa-filter-status" class="kassa-filter-select kassa-multi-filter-btn" data-multi-filter-button aria-haspopup="listbox" aria-expanded="false">
+            <span data-multi-filter-label>Все статусы</span>
+          </button>
+          <div class="kassa-multi-filter-menu" data-multi-filter-menu hidden></div>
+        </div>
+
+        <div class="kassa-sms-menu-wrap">
+          <button type="button" class="btn-secondary kassa-sms-toggle" id="kassa-sms-toggle" aria-haspopup="true" aria-expanded="false">
+            смс
+          </button>
+          <div class="kassa-sms-menu" id="kassa-sms-menu" hidden>
+            <label class="kassa-sms-field">
+              <span>Дата отчёта</span>
+              <input type="date" id="kassa-sms-date" class="kassa-filter-input" data-upos-native-date />
+            </label>
+            <div class="kassa-sms-actions">
+              <button type="button" class="btn btn-secondary kassa-sms-action" id="kassa-sms-daily-couriers">
+                Доходы/расходы + доставщики
+              </button>
+              <button type="button" class="btn btn-secondary kassa-sms-action" id="kassa-sms-daily-expenses">
+                Отчёт по расходам
+              </button>
+              <button type="button" class="btn btn-secondary kassa-sms-action" id="kassa-sms-daily-transfers">
+                Отчёт по перемещениям
+              </button>
+              <button type="button" class="btn-secondary kassa-sms-action kassa-sms-action-muted" id="kassa-sms-today">
+                Сегодня
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kassa-columns-menu-wrap">
+          <button type="button" class="btn-secondary kassa-columns-toggle" id="kassa-columns-toggle" aria-haspopup="true" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="9" x2="9" y1="3" y2="21"/></svg>
+            {{ _('kassa.columns_toggle') }}
+          </button>
+          <div class="kassa-columns-menu" id="kassa-columns-menu" hidden>
+            <header class="kassa-columns-menu-head">
+              <span class="kassa-columns-menu-heading">{{ _('kassa.columns.menu_title') }}</span>
+              <div class="kassa-columns-menu-quick">
+                <button type="button" class="kassa-columns-quick-btn" data-columns-show-all>{{ _('kassa.columns.show_all') }}</button>
+                <button type="button" class="kassa-columns-quick-btn" data-columns-reset>{{ _('kassa.columns.reset') }}</button>
+              </div>
+            </header>
+            <div class="kassa-columns-menu-body">
+              <div class="kassa-columns-menu-toggles" data-kassa-column-toggles></div>
+            </div>
+            <footer class="kassa-columns-menu-foot">
+              <p class="kassa-columns-menu-title">{{ _('kassa.columns.template') }}</p>
+              <div class="kassa-columns-template-row">
+                <div class="settings-select-wrap kassa-columns-template-wrap">
+                  <select id="kassa-column-template" class="settings-compact-select kassa-columns-template-select">
+                    <option value="">{{ _('kassa.columns.template_all') }}</option>
+                  </select>
+                  <svg class="settings-select-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+                <input type="text" id="kassa-column-template-name" class="kassa-columns-template-name" placeholder="{{ _('kassa.columns.template_name_ph') }}" autocomplete="off" />
+              </div>
+              <div class="kassa-columns-template-actions">
+                <button type="button" class="btn-secondary kassa-btn kassa-columns-template-btn" id="kassa-column-template-save">{{ _('kassa.columns.save_template') }}</button>
+                <button type="button" class="btn-secondary kassa-btn kassa-columns-template-btn" id="kassa-column-template-delete">{{ _('kassa.columns.delete_template') }}</button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="kassa-data-panel">
+    <div class="kassa-table-wrapper">
+      <table class="kassa-table" id="kassa-table">
+        <thead>
+          <tr>
+            <th class="kassa-col-number">{{ _('kassa.col.number') }}</th>
+            <th class="kassa-col-amount">{{ _('kassa.col.amount') }}</th>
+            <th class="kassa-col-date">{{ _('kassa.col.date') }}</th>
+            <th class="kassa-col-client">{{ _('kassa.col.client') }}</th>
+            <th class="kassa-col-employee">{{ _('kassa.col.employee') }}</th>
+            <th class="kassa-col-from">{{ _('kassa.col.from') }}</th>
+            <th class="kassa-col-to">{{ _('kassa.col.to') }}</th>
+            <th class="kassa-col-type">{{ _('kassa.col.type') }}</th>
+            <th class="kassa-col-confirmed">Статус</th>
+            <th class="kassa-col-category">{{ _('kassa.col.category') }}</th>
+            <th class="kassa-col-assets">{{ _('kassa.col.assets') }}</th>
+            <th class="kassa-col-supplier">{{ _('kassa.col.supplier') }}</th>
+            <th class="kassa-col-courier-summary">Расчёт доставщика</th>
+            <th class="kassa-col-supplier-balance">{{ _('kassa.col.supplier_balance') }}</th>
+            <th class="kassa-col-author">{{ _('kassa.col.author') }}</th>
+            <th class="kassa-col-branch">{{ _('kassa.col.branch') }}</th>
+            <th class="kassa-col-note">{{ _('kassa.col.note') }}</th>
+            <th class="kassa-col-actions">{{ _('kassa.col.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody id="kassa-table-body">
+          <!-- Rows will be rendered here via JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="kassa-table-footer" id="kassa-pagination" aria-label="{{ _('kassa.pagination.aria') }}">
+      <div class="kassa-pagination-toolbar">
+        <p class="kassa-pagination-info" id="kassa-pagination-info"></p>
+        <div class="kassa-pagination-nav">
+          <button type="button" class="kassa-page-nav-btn" id="kassa-page-prev" aria-label="{{ _('kassa.pagination.prev') }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <span class="kassa-page-indicator" id="kassa-page-indicator">—</span>
+          <button type="button" class="kassa-page-nav-btn" id="kassa-page-next" aria-label="{{ _('kassa.pagination.next') }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+    </footer>
+    <div class="kassa-overview-toolbar">
+      <span class="kassa-overview-toolbar-title">Итоги в одной валюте</span>
+      <label class="kassa-overview-currency-control" for="kassa-summary-currency">
+        <span>Валюта</span>
+        <select id="kassa-summary-currency" class="kassa-overview-currency-select" aria-label="Валюта итогов">
+          <option value="UZS">UZS</option>
+          <option value="USD">USD</option>
+          <option value="RUB">RUB</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </label>
+    </div>
+    </section>
+
+    <section class="kassa-overview-grid" aria-label="Сводка кассы">
+      <article class="kassa-overview-card">
+        <header class="kassa-overview-card-head">
+          <span class="kassa-overview-title">Приходы</span>
+        </header>
+        <div class="kassa-overview-values" id="kassa-summary-income">
+          <span class="kassa-summary-empty">—</span>
+        </div>
+      </article>
+      <article class="kassa-overview-card">
+        <header class="kassa-overview-card-head">
+          <span class="kassa-overview-title">Расходы</span>
+        </header>
+        <div class="kassa-overview-values" id="kassa-summary-expense">
+          <span class="kassa-summary-empty">—</span>
+        </div>
+      </article>
+      <article class="kassa-overview-card">
+        <header class="kassa-overview-card-head">
+          <span class="kassa-overview-title">Переводы</span>
+        </header>
+        <div class="kassa-overview-values" id="kassa-summary-transfer">
+          <span class="kassa-summary-empty">—</span>
+        </div>
+      </article>
+      <article class="kassa-overview-card kassa-overview-card--balance">
+        <header class="kassa-overview-card-head">
+          <span class="kassa-overview-title">Сколько осталось</span>
+        </header>
+        <div class="kassa-overview-values" id="kassa-summary-balance">
+          <span class="kassa-summary-empty">—</span>
+        </div>
+      </article>
+    </section>
+
+  </div>
+
+  <dialog class="kassa-dialog kassa-payment-dialog" id="kassa-editor-dialog" aria-labelledby="kassa-editor-title">
+    <div class="kassa-dialog-surface kassa-editor-surface">
+      <header class="kassa-dialog-head kassa-editor-head">
+        <div>
+          <h2 id="kassa-editor-title" class="kassa-dialog-title">{{ _('kassa.dialog.new') }}</h2>
+        </div>
+        <button type="button" class="kassa-dialog-close" id="kassa-editor-close" aria-label="{{ _('kassa.dialog.close') }}">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="kassa-editor-scroll">
+        <div id="kassa-editor-body" class="kassa-editor-body">
+          <form id="kassa-form" class="kassa-form">
+            <input type="hidden" id="kassa-field-type" name="type" value="expense" />
+            <div class="kassa-payment-tabs" role="tablist" aria-label="{{ _('kassa.tabs_aria') }}">
+              <button type="button" class="kassa-payment-tab" data-payment-type="income">{{ _('kassa.type.income') }}</button>
+              <button type="button" class="kassa-payment-tab active" data-payment-type="expense">{{ _('kassa.type.expense') }}</button>
+              <button type="button" class="kassa-payment-tab" data-payment-type="transfer">{{ _('kassa.transfer_money') }}</button>
+            </div>
+
+            <div class="kassa-form-group" id="kassa-row-category">
+              <label for="kassa-field-category">{{ _('kassa.f.cat') }}</label>
+              <select id="kassa-field-category" name="category">
+                <option value="">{{ _('kassa.f.cat') }}</option>
+              </select>
+            </div>
+
+            <div class="kassa-form-group" id="kassa-row-courier-payment" hidden>
+              <label for="kassa-field-courier-payment">Доставщик</label>
+              <select id="kassa-field-courier-payment" name="courier_name">
+                <option value="">Выберите доставщика</option>
+              </select>
+              <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-courier-debt-hint" hidden></p>
+            </div>
+
+            <div class="kassa-courier-details" id="kassa-row-courier-details" hidden>
+              <div class="kassa-courier-details-head">
+                <div>
+                  <strong>Поступление денег от доставщика</strong>
+                  <span>Таблица как в Excel для акта сверки</span>
+                </div>
+              </div>
+              <div class="kassa-courier-grid">
+                <label class="kassa-courier-grid-wide"><span>Принято на перечисление</span><input type="text" inputmode="decimal" data-courier-field="transfer" placeholder="0" /><select data-courier-account="transfer_account_id"><option value="">Счёт перечисления</option></select></label>
+                <label><span>Возврат товара</span><input type="text" inputmode="decimal" data-courier-field="return_goods" placeholder="0" /></label>
+                <label><span>Скидки на товары</span><input type="text" inputmode="decimal" data-courier-field="discount" placeholder="0" /></label>
+                <label class="kassa-courier-grid-wide"><span>Продано на терминал</span><input type="text" inputmode="decimal" data-courier-field="terminal" placeholder="0" /><select data-courier-account="terminal_account_id"><option value="">Счёт терминала</option></select></label>
+                <label><span>Долги</span><input type="text" inputmode="decimal" data-courier-field="current_debt" placeholder="0" /></label>
+                <label><span>Старый долг привезено</span><input type="text" inputmode="decimal" data-courier-field="old_debt" placeholder="0" /></label>
+                <label><span>Расходы</span><input type="text" inputmode="decimal" data-courier-field="expense" placeholder="0" /></label>
+                <label><span>Тип расходов</span><input type="text" data-courier-field="expense_type" placeholder="Например: топливо, обед" /></label>
+                <label class="kassa-courier-grid-wide"><span>Наличные факт</span><input type="text" inputmode="decimal" data-courier-field="cash" placeholder="0" /><select data-courier-account="cash_account_id"><option value="">Счёт наличных</option></select></label>
+              </div>
+              <div class="kassa-courier-result" id="kassa-courier-result">
+                <span>Отгружено по акту: 0</span>
+                <span>Ожидаемая наличка: 0</span>
+                <strong>Разница: 0</strong>
+              </div>
+            </div>
+
+            <div class="kassa-form-group kassa-salary-employee-row" id="kassa-row-salary-employee" hidden>
+              <label for="kassa-field-salary-employee">Сотрудник</label>
+              <div class="kassa-salary-picker-row">
+                <div class="kassa-salary-employee-combo" id="kassa-salary-employee-combo">
+                  <button
+                    type="button"
+                    class="kassa-salary-picker-btn"
+                    id="kassa-salary-employee-button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                  >
+                    <span id="kassa-salary-employee-button-label">Выберите сотрудника</span>
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <div class="kassa-salary-menu" id="kassa-salary-employee-menu" hidden>
+                    <div class="kassa-salary-employee-search">
+                      <input
+                        type="search"
+                        id="kassa-field-salary-employee-search"
+                        placeholder="Поиск сотрудника"
+                        autocomplete="off"
+                      />
+                      <button type="button" id="kassa-field-salary-employee-clear" aria-label="Очистить поиск" hidden>×</button>
+                    </div>
+                    <div class="kassa-salary-employee-options" id="kassa-salary-employee-options" role="listbox"></div>
+                  </div>
+                </div>
+                <div class="kassa-salary-position-filter" id="kassa-salary-position-filter">
+                  <button
+                    type="button"
+                    class="kassa-salary-picker-btn kassa-salary-position-btn"
+                    id="kassa-salary-position-button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                  >
+                    <span id="kassa-salary-position-label">Все должности</span>
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <div class="kassa-salary-menu kassa-salary-position-menu" id="kassa-salary-position-menu" hidden>
+                    <input
+                      type="search"
+                      id="kassa-salary-position-search"
+                      placeholder="Поиск должности"
+                      autocomplete="off"
+                    />
+                    <div class="kassa-salary-position-options" id="kassa-salary-position-options"></div>
+                  </div>
+                </div>
+              </div>
+              <select id="kassa-field-salary-employee" name="hr_employee_id" class="kassa-salary-native-select" hidden>
+                <option value="">Выберите сотрудника</option>
+              </select>
+              <p class="kassa-editor-hint kassa-salary-employee-hint" id="kassa-salary-employee-hint" hidden></p>
+            </div>
+
+            <div class="kassa-form-group kassa-checkbox-group">
+              <input type="checkbox" id="kassa-field-confirmed" name="is_confirmed" checked />
+              <label for="kassa-field-confirmed">{{ _('kassa.f.confirmed') }}</label>
+            </div>
+
+            <div class="kassa-form-group">
+              <label for="kassa-field-date">{{ _('kassa.f.created') }}</label>
+              <p class="kassa-editor-hint kassa-editor-hint--muted" style="margin: -0.25rem 0 0.5rem">
+                {{ _('kassa.hint.tz') }}
+              </p>
+              <input type="datetime-local" id="kassa-field-date" name="created_at" required />
+            </div>
+
+            <div class="kassa-form-row" id="kassa-row-from-pocket" style="display: none;">
+              <div class="kassa-form-group">
+                <label for="kassa-field-from-pocket">{{ _('kassa.f.from_pocket') }}</label>
+                <select id="kassa-field-from-pocket" name="from_pocket_id">
+                  <option value="">{{ _('kassa.select_pocket') }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="kassa-form-row" id="kassa-row-to-pocket">
+              <div class="kassa-form-group">
+                <label for="kassa-field-to-pocket" id="kassa-label-to-pocket">{{ _('kassa.f.to_pocket') }}</label>
+                <select id="kassa-field-to-pocket" name="to_pocket_id">
+                  <option value="">{{ _('kassa.select_pocket') }}</option>
+                </select>
+                <p class="kassa-editor-hint kassa-transfer-confirm-warning" id="kassa-transfer-confirm-warning" hidden>
+                  Перевод потребует подтверждения получателем.
+                </p>
+              </div>
+            </div>
+
+            <div id="kassa-simple-money" class="kassa-money-panel">
+              <div class="kassa-form-group" id="kassa-row-currency">
+                <label for="kassa-field-currency">{{ _('kassa.f.currency') }}</label>
+                <select id="kassa-field-currency" name="currency" data-ccy-enhance required disabled>
+                  <option value="">{{ _('kassa.select_first_pocket') }}</option>
+                </select>
+                <p class="kassa-editor-hint" id="kassa-editor-currency-hint" hidden></p>
+              </div>
+
+              <div class="kassa-form-group kassa-form-group--amount kassa-form-group--amount-block">
+                <label for="kassa-field-amount">{{ _('kassa.f.amount') }}</label>
+                <input type="text" inputmode="decimal" name="amount" autocomplete="off" id="kassa-field-amount" required placeholder="0" />
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-amount-scale-hint" hidden></p>
+                <p class="kassa-editor-hint" id="kassa-editor-balance-hint" hidden></p>
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-fx-hint" hidden></p>
+              </div>
+
+              <div class="kassa-split-zone" id="kassa-simple-split-zone">
+                <div class="kassa-split-actions" id="kassa-simple-split-actions">
+                  <button type="button" class="kassa-split-add" id="kassa-simple-split-add">
+                    <span aria-hidden="true">+</span>
+                    {{ _('kassa.split.add') }}
+                  </button>
+                </div>
+                <div class="kassa-split-lines" id="kassa-simple-split-lines" hidden></div>
+              </div>
+            </div>
+
+            <div id="kassa-transfer-money" class="kassa-transfer-money" hidden>
+              <div class="kassa-transfer-kind" role="radiogroup" aria-label="{{ _('kassa.transfer_kind') }}">
+                <label class="kassa-transfer-kind-option">
+                  <input type="radio" name="transfer_kind" value="transfer" checked />
+                  <span>{{ _('kassa.transfer_kind.transfer') }}</span>
+                </label>
+                <label class="kassa-transfer-kind-option">
+                  <input type="radio" name="transfer_kind" value="cashout" />
+                  <span>{{ _('kassa.transfer_kind.cashout') }}</span>
+                </label>
+              </div>
+
+              <div class="kassa-transfer-split">
+                <div class="kassa-transfer-card">
+                  <div class="kassa-transfer-card-head">
+                    <span class="kassa-transfer-badge kassa-transfer-badge--out">{{ _('kassa.badge.debit') }}</span>
+                  </div>
+                  <p class="kassa-transfer-card-lead">{{ _('kassa.transfer.lead_out') }}</p>
+                  <label for="kassa-field-debit-currency">{{ _('kassa.f.debit_ccy') }}</label>
+                  <select id="kassa-field-debit-currency" name="currency" data-ccy-enhance required disabled>
+                    <option value="">{{ _('kassa.select_debit_pocket') }}</option>
+                  </select>
+                  <p class="kassa-editor-hint" id="kassa-editor-debit-ccy-hint" hidden></p>
+                  <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-debit-pocket-available" hidden></p>
+                  <label for="kassa-field-debit-amount">{{ _('kassa.f.debit_amt') }}</label>
+                  <input type="text" inputmode="decimal" name="amount" autocomplete="off" id="kassa-field-debit-amount" required disabled placeholder="0" />
+                  <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-debit-scale-hint" hidden></p>
+                  <p class="kassa-editor-hint" id="kassa-editor-debit-balance-hint" hidden></p>
+                </div>
+                <div class="kassa-transfer-arrow" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </div>
+                <div class="kassa-transfer-card">
+                  <div class="kassa-transfer-card-head">
+                    <span class="kassa-transfer-badge kassa-transfer-badge--in">{{ _('kassa.badge.credit') }}</span>
+                  </div>
+                  <p class="kassa-transfer-card-lead">{{ _('kassa.transfer.lead_in') }}</p>
+                  <label for="kassa-field-credit-currency">{{ _('kassa.f.credit_ccy') }}</label>
+                  <select id="kassa-field-credit-currency" name="transfer_credit_currency" data-ccy-enhance required disabled>
+                    <option value="">{{ _('kassa.select_credit_pocket') }}</option>
+                  </select>
+                  <p class="kassa-editor-hint" id="kassa-editor-credit-ccy-hint" hidden></p>
+                  <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-credit-pocket-available" hidden></p>
+                  <label for="kassa-field-credit-amount">{{ _('kassa.f.credit_amt') }}</label>
+                  <input type="text" inputmode="decimal" name="transfer_credit_amount" autocomplete="off" id="kassa-field-credit-amount" required disabled placeholder="0" />
+                  <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-credit-scale-hint" hidden></p>
+                  <p class="kassa-editor-hint" id="kassa-editor-credit-foot-hint" hidden></p>
+                </div>
+              </div>
+
+              <div id="kassa-transfer-convert-panel" class="kassa-transfer-convert-panel" hidden>
+                <p class="kassa-transfer-convert-title">{{ _('kassa.convert_title') }}</p>
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-transfer-market-hint"></p>
+                <div class="kassa-transfer-rate-row">
+                  <label for="kassa-field-transfer-rate" id="kassa-transfer-rate-label">{{ _('kassa.f.rate') }}</label>
+                  <input type="text" inputmode="decimal" autocomplete="off" id="kassa-field-transfer-rate" class="kassa-transfer-rate-input" placeholder="—" />
+                </div>
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-transfer-rate-scale-hint" hidden></p>
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-transfer-rate-explainer"></p>
+              </div>
+
+              <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-transfer-fx-footnote" hidden></p>
+
+              <div class="kassa-transfer-commission-row" id="kassa-transfer-commission-row">
+                <label for="kassa-field-transfer-commission">{{ _('kassa.f.transfer_commission_accounting') }}</label>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  id="kassa-field-transfer-commission"
+                  placeholder="0"
+                  disabled
+                />
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-commission-hint">
+                  {{ _('kassa.commission_hint') }}
+                </p>
+                <p class="kassa-editor-hint kassa-editor-hint--muted" id="kassa-editor-commission-scale-hint" hidden></p>
+              </div>
+            </div>
+
+            <input type="hidden" id="kassa-field-client" name="client" value="" />
+            <input type="hidden" id="kassa-field-supplier" name="supplier" value="" />
+            <input type="hidden" id="kassa-field-branch" name="branch" value="" />
+
+            <div class="kassa-form-group">
+              <label for="kassa-field-note">{{ _('kassa.f.note') }}</label>
+              <textarea id="kassa-field-note" name="note" rows="3" placeholder="{{ _('kassa.ph.note') }}"></textarea>
+            </div>
+            
+            <input type="hidden" id="kassa-field-id" name="id" value="" />
+          </form>
+        </div>
+      </div>
+      <footer class="kassa-editor-foot">
+        <button type="button" class="btn btn-secondary" id="kassa-editor-cancel">{{ _('kassa.editor.cancel') }}</button>
+        <button type="button" class="btn" id="kassa-editor-save">{{ _('kassa.editor.save') }}</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="kassa-dialog kassa-transfer-queue-dialog" id="kassa-transfer-queue-dialog" aria-labelledby="kassa-transfer-queue-title">
+    <div class="kassa-dialog-surface kassa-transfer-queue-surface">
+      <header class="kassa-dialog-head">
+        <h2 id="kassa-transfer-queue-title" class="kassa-dialog-title">Очередь перемещений</h2>
+        <button type="button" class="kassa-dialog-close" id="kassa-transfer-queue-close" aria-label="Закрыть">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="kassa-transfer-queue-tools">
+        <p>Входящие переводы можно принять на выбранную кассу или отклонить. Отклонённые исходящие можно отправить повторно.</p>
+        <button type="button" class="btn btn-secondary kassa-btn" id="kassa-transfer-queue-refresh">Обновить</button>
+      </div>
+      <div class="kassa-transfer-queue-scroll">
+        <table class="kassa-transfer-queue-table">
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Дата</th>
+              <th>Откуда</th>
+              <th>Куда</th>
+              <th>Сумма</th>
+              <th>Статус</th>
+              <th>Касса зачисления</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="kassa-transfer-queue-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </dialog>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
+  <script src="{{ url_for('static', path='kassa-page.js') }}?v=72" defer></script>
+{% endblock %}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Smartup">
+  <rect width="64" height="64" rx="14" fill="#ffffff"/>
+  <path fill="#16a34a" d="M32 9c12.7 0 23 10.3 23 23S44.7 55 32 55 9 44.7 9 32 19.3 9 32 9Zm0 8c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15Z"/>
+  <path fill="#16a34a" d="M25 25h7.4l3.8 10.1L40 25h6.8l-7.4 19h-6.1l-4.6-11.4L24.1 44H18l-7.4-19h7l3.7 10.1L25 25Z"/>
+</svg>

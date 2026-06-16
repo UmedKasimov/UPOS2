@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+{% endblock %}
+
+{% block main %}
+  {% set active_settings_tab = settings_default_tab | default('general') %}
+  {% set active_settings_label = 'Основное' %}
+  {% if active_settings_tab == 'dictionary' %}
+    {% set active_settings_label = 'Справочники' %}
+  {% elif active_settings_tab == 'integrations' %}
+    {% set active_settings_label = 'Интеграции' %}
+  {% elif active_settings_tab == 'telegram' %}
+    {% set active_settings_label = 'Telegram уведомление' %}
+  {% endif %}
+
+  <div class="organizations-page-wrap organizations-page-wrap--fluid director-org-workspace general-management-settings-page org-settings-panel-page">
+    <nav class="general-module-tabs settings-module-tabs" aria-label="Разделы настроек">
+      <a class="general-module-tab" href="{{ url_for('organizations_settings_get') }}" data-org-settings-home-tab>Настройки</a>
+      <span
+        class="general-module-tab general-module-tab--report active"
+        data-org-settings-open-tab="{{ active_settings_tab }}"
+      >
+        <a
+          class="general-module-tab-activate"
+          href="{{ url_for('organizations_settings_get') }}?tab={{ active_settings_tab }}"
+          aria-current="page"
+        >{{ active_settings_label }}</a>
+        <a
+          class="general-module-tab-close"
+          href="{{ url_for('organizations_settings_get') }}"
+          aria-label="Закрыть {{ active_settings_label }}"
+        >×</a>
+      </span>
+    </nav>
+
+    <div class="settings-page-wrap org-settings-panel-surface">
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="active_settings_tab" id="settings-active-tab-input" value="{{ active_settings_tab }}" />
+      <div class="settings-pref-toast" data-settings-pref-toast role="status" aria-live="polite"></div>
+
+      {% if request.query_params.get("saved") == "1" %}
+        <div class="flash ok settings-ios-flash">{{ _('flash.saved') }}</div>
+      {% endif %}
+      {% if flash_err %}
+        <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+      {% endif %}
+
+      {% if active_settings_tab == 'general' %}
+        {% set locale_sel = settings.locale | default('ru') %}
+        {% set theme_sel = settings.theme | default('light') %}
+        {% set locale_defs = [
+          ('ru', 'settings-flag--ru', _('settings.lang.ru')),
+          ('en', 'settings-flag--gb', _('settings.lang.en')),
+          ('uz', 'settings-flag--uz', _('settings.lang.uz'))
+        ] %}
+        {% set locale_current = namespace(flag='settings-flag--ru', label=_('settings.lang.ru')) %}
+        {% for code, flag_class, label in locale_defs %}
+          {% if locale_sel == code %}
+            {% set locale_current.flag = flag_class %}
+            {% set locale_current.label = label %}
+          {% endif %}
+        {% endfor %}
+
+        <section class="settings-ios-group settings-business-panel settings-business-panel--wide settings-pref-card org-settings-direct-panel" data-settings-general aria-label="Основные параметры">
+          <div class="settings-pref-list">
+            <div class="settings-pref-row">
+              <label class="settings-pref-label" for="locale_select_button">
+                <span class="settings-pref-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>
+                </span>
+                <span class="settings-pref-title">{{ _('settings.language') }}</span>
+              </label>
+              <div class="settings-pref-control settings-pref-control--select settings-pref-control--language">
+                <div class="settings-lang-select" data-lang-dropdown>
+                  <input type="hidden" name="locale" value="{{ locale_sel }}" data-lang-input />
+                  <button id="locale_select_button" type="button" class="settings-lang-trigger" aria-haspopup="listbox" aria-expanded="false" data-lang-trigger>
+                    <span class="settings-flag {{ locale_current.flag }}" aria-hidden="true" data-lang-current-flag></span>
+                    <span class="settings-lang-current" data-lang-current>{{ locale_current.label }}</span>
+                    <svg class="settings-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="settings-lang-menu" role="listbox" aria-label="{{ _('settings.language') }}" hidden data-lang-menu>
+                    {% for code, flag_class, label in locale_defs %}
+                    <button type="button" class="settings-lang-option" role="option" data-lang-option data-value="{{ code }}" data-label="{{ label }}" data-flag-class="{{ flag_class }}" aria-selected="{% if locale_sel == code %}true{% else %}false{% endif %}">
+                      <span class="settings-flag {{ flag_class }}" aria-hidden="true"></span>
+                      <span>{{ label }}</span>
+                    </button>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-pref-row">
+              <div class="settings-pref-label" id="cap-appearance">
+                <span class="settings-pref-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 5.8 2 10.5S6.5 19 12 19h1.2a2.3 2.3 0 0 0 1.6-4l-.3-.3a2.1 2.1 0 0 1 1.5-3.6H18c2.2 0 4-1.8 4-4 0-2.8-4.5-5.1-10-5.1Z"/></svg>
+                </span>
+                <span class="settings-pref-title">{{ _('settings.theme') }}</span>
+              </div>
+              <div class="settings-pref-control">
+                <div class="theme-picker-compact theme-picker-ios settings-theme-picker-compact" role="radiogroup" aria-labelledby="cap-appearance">
+                  <label class="theme-chip"><input type="radio" name="theme" value="light" {% if theme_sel == "light" %}checked{% endif %} /><span class="theme-chip-face">{{ _('settings.theme.light') }}</span></label>
+                  <label class="theme-chip"><input type="radio" name="theme" value="dark" {% if theme_sel == "dark" %}checked{% endif %} /><span class="theme-chip-face">{{ _('settings.theme.dark') }}</span></label>
+                  <label class="theme-chip"><input type="radio" name="theme" value="emerald" {% if theme_sel == "emerald" %}checked{% endif %} /><span class="theme-chip-face">{{ _('settings.theme.emerald') }}</span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-pref-row">
+              <label class="settings-pref-label" for="workspace_timezone">
+                <span class="settings-pref-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </span>
+                <span class="settings-pref-title">{{ _('settings.tz') }}</span>
+              </label>
+              <div class="settings-pref-control settings-pref-control--select settings-pref-control--timezone">
+                <span class="settings-select-wrap settings-select-wrap--wide">
+                  <select id="workspace_timezone" name="workspace_timezone" class="settings-ios-select settings-compact-select">
+                    {% for group in timezone_groups %}
+                    <optgroup label="{{ group.label }}">
+                      {% for zone, zlabel in group.options %}
+                      <option value="{{ zone }}" {% if zone == settings_timezone_selected and not settings_timezone_extra %}selected{% endif %}>{{ zlabel }}</option>
+                      {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                    {% if settings_timezone_extra %}
+                    <option value="{{ settings_timezone_extra }}" selected>{{ _('settings.tz_current') }}: {{ settings_timezone_extra }}</option>
+                    {% endif %}
+                  </select>
+                  <svg class="settings-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      {% elif active_settings_tab == 'dictionary' %}
+        <section class="settings-ios-group settings-dict-section org-settings-direct-panel">
+          <div class="settings-dict-head">
+            <p class="settings-ios-footnote">{{ _('settings.dict.ccy') }}</p>
+          </div>
+          <div class="settings-ios-plate settings-ios-plate--flush">
+            <div class="dict-ccy-compact" data-ccy-compact>
+              <div class="dict-ccy-chips" data-ccy-active-chips aria-live="polite"></div>
+              <button type="button" class="btn btn-secondary btn-sm dict-ccy-edit-btn" data-ccy-edit-open>{{ _('settings.dict.ccy_edit') }}</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-ios-group settings-dict-section">
+          <div class="settings-dict-head">
+            <p class="settings-ios-footnote">{{ _('settings.dict.cats') }}</p>
+          </div>
+          <div class="settings-ios-plate settings-ios-plate--list">
+            {% for ctype, label, desc in [('income', _('settings.cat.income'), _('settings.cat.income_desc')), ('expense', _('settings.cat.expense'), _('settings.cat.expense_desc')), ('transfer', _('settings.cat.transfer'), _('settings.cat.transfer_desc'))] %}
+            <button type="button" class="integr-row-card cat-row-card" data-cat-open="{{ ctype }}">
+              <span class="cat-type-icon cat-type-icon--{{ ctype }}" aria-hidden="true">{% if ctype == 'income' %}+{% elif ctype == 'expense' %}−{% else %}↔{% endif %}</span>
+              <span class="cat-type-main">
+                <span class="cat-type-label">{{ label }}</span>
+                <span class="cat-type-desc">{{ desc }}</span>
+              </span>
+              <span class="cat-type-count" data-cat-type-count="{{ ctype }}">{{ categories | selectattr("type", "equalto", ctype) | list | length }}</span>
+              <span class="integr-card-chevron integr-card-chevron--ios" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+            </button>
+            {% endfor %}
+          </div>
+        </section>
+
+        {% set all_ccy = settings.available_currencies | default(["UZS", "USD", "RUB", "EUR", "KZT", "GBP", "CNY", "AED", "TRY", "CHF", "JPY", "KRW"], true) %}
+        <dialog class="settings-profile-modal" id="settings-ccy-dialog" aria-labelledby="settings-ccy-dialog-title" aria-modal="true">
+          <div class="settings-profile-modal-surface">
+            <header class="settings-profile-modal-head">
+              <div class="settings-profile-modal-head-text">
+                <h2 id="settings-ccy-dialog-title" class="settings-profile-modal-title">{{ _('settings.dict.ccy') }}</h2>
+                <p class="settings-profile-modal-sub">Добавляйте новые валюты и скрывайте лишние из рабочих списков.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-ccy-modal-close aria-label="{{ _('settings.profile.close') }}">×</button>
+            </header>
+            <div class="settings-profile-modal-scroll">
+              <div class="settings-profile-modal-body">
+                <div class="ccy-visibility-grid" data-ccy-grid>
+                  {% for code in all_ccy %}
+                  <label class="ccy-check-item" data-ccy-item="{{ code }}">
+                    <input type="hidden" name="available_currencies" value="{{ code }}" data-ccy-available="{{ code }}" />
+                    <input type="checkbox" name="enabled_currencies" value="{{ code }}" {% if code in settings.enabled_currencies %}checked{% endif %} />
+                    <span class="ccy-check-box"></span>
+                    <span class="ccy-check-icon" data-ccy-icon="{{ code }}" aria-hidden="true"></span>
+                    <span class="ccy-check-text">{{ code }}</span>
+                    <span class="ccy-check-sub" data-ccy-symbol="{{ code }}"></span>
+                  </label>
+                  {% endfor %}
+                </div>
+                <div class="ccy-add-panel">
+                  <label class="ccy-add-label" for="settings-ccy-add-input">Добавить валюту</label>
+                  <div class="ccy-add-row">
+                    <input id="settings-ccy-add-input" class="settings-profile-input ccy-add-input" type="text" maxlength="3" autocomplete="off" spellcheck="false" placeholder="Например: TJS" data-ccy-add-input />
+                    <button type="button" class="btn btn-secondary btn-sm ccy-add-btn" data-ccy-add-btn>+ Валюта</button>
+                  </div>
+                  <p class="ccy-add-status" data-ccy-add-status hidden></p>
+                </div>
+              </div>
+            </div>
+            <footer class="settings-profile-modal-foot">
+              <button type="button" class="btn" data-ccy-save>{{ _('settings.dict.ccy_save') }}</button>
+            </footer>
+          </div>
+        </dialog>
+
+        <dialog class="settings-profile-modal settings-cat-modal" id="settings-cat-dialog" aria-labelledby="settings-cat-dialog-title" aria-modal="true">
+          <div class="settings-profile-modal-surface">
+            <header class="settings-profile-modal-head">
+              <div class="settings-profile-modal-head-text">
+                <h2 id="settings-cat-dialog-title" class="settings-profile-modal-title" data-cat-modal-title>{{ _('settings.cat.income') }}</h2>
+                <p class="settings-profile-modal-sub" data-cat-modal-desc>{{ _('settings.cat.income_desc') }}</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-cat-modal-close aria-label="{{ _('settings.profile.close') }}">×</button>
+            </header>
+            <div class="settings-profile-modal-scroll">
+              <div class="settings-profile-modal-body">
+                {% for ctype, label in [('income', _('settings.cat.income')), ('expense', _('settings.cat.expense')), ('transfer', _('settings.cat.transfer'))] %}
+                <div class="settings-cat-form-panel" data-cat-form="{{ ctype }}" hidden>
+                  <div class="settings-cat-list" data-cat-type="{{ ctype }}">
+                    {% for cat in categories if cat.type == ctype %}
+                    <div class="settings-cat-row" data-cat-id="{{ cat.id }}" data-cat-protected="{{ 1 if cat.protected else 0 }}">
+                      <div class="settings-cat-main-row">
+                      <button type="button" class="settings-cat-icon settings-cat-subcat-toggle settings-cat-icon--{{ ctype }}" data-cat-subcat-toggle="{{ cat.id }}" aria-expanded="false" aria-label="Показать подкатегории">+</button>
+                      <input type="text" class="settings-cat-name-input" value="{{ cat.name }}" data-cat-name="{{ cat.id }}" aria-label="{{ _('settings.cat.name_aria') }}" {% if cat.protected %}disabled title="Категория используется в отчётах"{% endif %} />
+                      <div class="settings-cat-actions">
+                        <button type="button" class="btn-cat-save" aria-label="{{ _('settings.cat.save_aria') }}" data-cat-save="{{ cat.id }}" data-cat-type="{{ ctype }}" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                        <button type="button" class="btn-cat-del" aria-label="{{ _('settings.cat.del_aria') }}" data-cat-del="{{ cat.id }}" {% if cat.protected %}disabled title="Категория используется в отчётах"{% endif %}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                      </div>
+                      </div>
+                      <div class="settings-cat-subcats" data-cat-subcats="{{ cat.id }}" hidden>
+                        <div class="settings-cat-subcat-list" data-cat-subcat-list="{{ cat.id }}">
+                          {% for subcat in cat.subcategories %}
+                            <span class="settings-cat-subcat-chip" data-cat-subcat="{{ subcat }}">
+                              <span>{{ subcat }}</span>
+                              <button type="button" data-cat-subcat-del="{{ cat.id }}" data-cat-subcat-name="{{ subcat }}" aria-label="Удалить подкатегорию">×</button>
+                            </span>
+                          {% endfor %}
+                        </div>
+                        <div class="settings-cat-subcat-add">
+                          <input type="text" class="settings-cat-subcat-input" placeholder="Новая подкатегория..." data-cat-subcat-input="{{ cat.id }}" />
+                          <button type="button" class="btn btn-secondary btn-sm" data-cat-subcat-add="{{ cat.id }}">Добавить</button>
+                        </div>
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  <div class="settings-cat-add-row">
+                    <input type="text" class="settings-cat-input" placeholder="{{ _('settings.cat.add_placeholder') }}" data-cat-add-input="{{ ctype }}" />
+                    <button type="button" class="btn btn-secondary btn-sm" data-cat-add-btn="{{ ctype }}">{{ _('settings.cat.add') }}</button>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </dialog>
+      {% elif active_settings_tab == 'integrations' %}
+        <section class="settings-ios-group org-settings-direct-panel" aria-label="{{ _('settings.integrations_aria') }}">
+          <div class="settings-ios-plate settings-ios-plate--list">
+            {% for provider in integration_providers %}
+              {% set provider_int = settings.integrations.get(provider.key, {}) %}
+              <button type="button" class="integr-row-card" data-integr-open="{{ provider.key }}" aria-label="{{ provider.label }}">
+                <img class="integr-card-logo {{ provider.logo_class }}" src="{{ url_for('static', path=provider.logo_path) }}" alt="" loading="lazy" />
+                <span class="integr-card-title">{{ provider.label }}</span>
+                <span class="integr-row-card-trail">
+                  <span class="integr-status-pill" data-integr-status="{{ provider.key }}" {% if not provider_int.connection_checked_at %}hidden{% endif %}>
+                    {{ provider_int.connection_message or _('settings.integrations.not_configured') }}
+                  </span>
+                  <span class="integr-card-chevron integr-card-chevron--ios" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+                </span>
+              </button>
+            {% endfor %}
+          </div>
+
+          <dialog class="settings-profile-modal settings-integr-modal" id="settings-integr-dialog" aria-labelledby="settings-integr-dialog-title" aria-modal="true">
+            <div class="settings-profile-modal-surface">
+              <header class="settings-profile-modal-head">
+                <div class="settings-profile-modal-head-text settings-integr-modal-head">
+                  <img class="integr-card-logo integr-card-logo--modal" data-integr-modal-logo hidden alt="" />
+                  <h2 id="settings-integr-dialog-title" class="settings-profile-modal-title" data-integr-modal-title>Интеграция</h2>
+                </div>
+                <button type="button" class="settings-profile-modal-close" data-integr-modal-close aria-label="{{ _('settings.profile.close') }}">×</button>
+              </header>
+              <div class="settings-profile-modal-scroll">
+                <div class="settings-profile-modal-body">
+                  <div class="integr-card-body" data-integr-form="greenwhite" hidden>
+                    <label for="greenwhite_base_url">{{ _('settings.api_base_url') }}</label><input id="greenwhite_base_url" type="url" value="{{ settings.integrations.greenwhite.base_url }}" />
+                    <label for="greenwhite_username">{{ _('settings.gw_login') }}</label><input id="greenwhite_username" type="text" value="{{ settings.integrations.greenwhite.username }}" autocomplete="off" />
+                    <label for="greenwhite_password">{{ _('settings.gw_password') }}</label><input id="greenwhite_password" type="password" value="{{ settings.integrations.greenwhite.password }}" autocomplete="new-password" />
+                    <label for="greenwhite_project_code">{{ _('settings.gw_project_code') }}</label><input id="greenwhite_project_code" type="text" value="{{ settings.integrations.greenwhite.project_code or 'trade' }}" />
+                    <label for="greenwhite_filial_id">{{ _('settings.gw_filial_id') }}</label><input id="greenwhite_filial_id" type="text" value="{{ settings.integrations.greenwhite.filial_id or settings.integrations.greenwhite.organization_id }}" />
+                    <label for="greenwhite_filial_code">{{ _('settings.gw_filial_code') }}</label><input id="greenwhite_filial_code" type="text" value="{{ settings.integrations.greenwhite.filial_code }}" />
+                    <label for="greenwhite_sync_days">{{ _('settings.gw_sync_days') }}</label><input id="greenwhite_sync_days" type="number" min="1" max="7" value="{{ settings.integrations.greenwhite.sync_days or 7 }}" />
+                    <label class="integr-check-row" for="greenwhite_sync_enabled"><input id="greenwhite_sync_enabled" type="checkbox" {% if settings.integrations.greenwhite.sync_enabled %}checked{% endif %} />{{ _('settings.gw_sync_enabled') }}</label>
+                    <button type="button" class="btn btn-secondary btn-sm" data-greenwhite-test>{{ _('settings.integrations.test') }}</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-greenwhite-sync>{{ _('settings.gw_sync_now') }}</button>
+                    <p class="integr-sync-status" data-greenwhite-status></p>
+                  </div>
+                  <div class="integr-card-body" data-integr-form="onec" hidden>
+                    <label for="onec_base_url">{{ _('settings.onec_base') }}</label><input id="onec_base_url" type="url" value="{{ settings.integrations.onec.base_url }}" />
+                    <label for="onec_username">{{ _('settings.onec_user') }}</label><input id="onec_username" type="text" value="{{ settings.integrations.onec.username }}" />
+                    <label for="onec_password">{{ _('settings.gw_password') }}</label><input id="onec_password" type="password" value="{{ settings.integrations.onec.password }}" autocomplete="new-password" />
+                  </div>
+                  <div class="integr-card-body" data-integr-form="yespos" hidden>
+                    <label for="yespos_api_base_url">{{ _('settings.api_base_url') }}</label><input id="yespos_api_base_url" type="url" value="{{ settings.integrations.yespos.api_base_url }}" />
+                    <label for="yespos_api_key">{{ _('settings.api_key') }}</label><input id="yespos_api_key" type="password" value="{{ settings.integrations.yespos.api_key }}" autocomplete="new-password" />
+                  </div>
+                  <div class="integr-card-body" data-integr-form="ibox" hidden>
+                    <label for="ibox_api_url">{{ _('settings.api_url') }}</label><input id="ibox_api_url" type="url" value="{{ settings.integrations.ibox.api_url }}" />
+                    <label for="ibox_api_key">{{ _('settings.api_key') }}</label><input id="ibox_api_key" type="password" value="{{ settings.integrations.ibox.api_key }}" autocomplete="new-password" />
+                    <label for="ibox_terminal_id">{{ _('settings.terminal_id') }}</label><input id="ibox_terminal_id" type="text" value="{{ settings.integrations.ibox.terminal_id }}" />
+                  </div>
+                  <div class="integr-card-body" data-integr-form="clopos" hidden>
+                    <label for="clopos_api_base_url">{{ _('settings.api_base_url') }}</label><input id="clopos_api_base_url" type="url" value="{{ settings.integrations.clopos.api_base_url }}" />
+                    <label for="clopos_client_id">{{ _('settings.client_id') }}</label><input id="clopos_client_id" type="text" value="{{ settings.integrations.clopos.client_id }}" />
+                    <label for="clopos_client_secret">{{ _('settings.client_secret') }}</label><input id="clopos_client_secret" type="password" value="{{ settings.integrations.clopos.client_secret }}" autocomplete="new-password" />
+                    <label for="clopos_brand">{{ _('settings.brand') }}</label><input id="clopos_brand" type="text" value="{{ settings.integrations.clopos.brand }}" />
+                    <label for="clopos_integrator_id">{{ _('settings.integrator_id') }}</label><input id="clopos_integrator_id" type="text" value="{{ settings.integrations.clopos.integrator_id }}" />
+                    <label for="clopos_venue_id">{{ _('settings.venue_id_optional') }}</label><input id="clopos_venue_id" type="text" value="{{ settings.integrations.clopos.venue_id }}" />
+                  </div>
+                </div>
+              </div>
+              <footer class="settings-profile-modal-foot">
+                <button type="button" class="btn" data-integr-save>{{ _('settings.integrations.save_modal') }}</button>
+              </footer>
+            </div>
+          </dialog>
+        </section>
+      {% elif active_settings_tab == 'telegram' %}
+        <div class="tg-settings org-settings-direct-panel" id="panel-telegram" data-telegram-settings data-can-manage="{{ '1' if telegram_can_manage | default(false) else '0' }}" data-can-approve="{{ '1' if telegram_can_approve | default(false) else '0' }}" data-tg-eager>
+          <section class="settings-ios-group settings-business-panel settings-business-panel--wide" aria-labelledby="cap-telegram-tab">
+            <div class="tg-hero-row">
+              <div>
+                <p id="cap-telegram-tab" class="settings-ios-footnote">{{ _('settings.telegram') }}</p>
+                <p class="settings-business-meta">{{ _('settings.general.telegram_meta') }}</p>
+              </div>
+              <div class="tg-status-pill" data-tg-connection-pill>—</div>
+            </div>
+            {% if telegram_organizations | default([]) %}
+            <div class="tg-org-picker">
+              <label class="settings-ios-field-label" for="tg-organization-select">Организация</label>
+              <span class="settings-select-wrap settings-select-wrap--wide">
+                <select id="tg-organization-select" class="settings-ios-select settings-compact-select" data-tg-organization-select>
+                  {% for org in telegram_organizations %}
+                    <option value="{{ org.id }}" {% if org.id == telegram_selected_organization_id %}selected{% endif %}>{{ org.name }}</option>
+                  {% endfor %}
+                </select>
+                <svg class="settings-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+              <p class="settings-business-note">Выберите организацию, чтобы настроить ее бот, Telegram-группы, уведомления и отчеты.</p>
+            </div>
+            {% endif %}
+            <div class="tg-status" data-tg-status role="status"></div>
+            <div class="settings-ios-plate settings-ios-plate--field settings-ios-plate--flush tg-connect-plate" data-tg-connect-plate>
+              <label class="settings-ios-field-label" for="tg-token-input">{{ _('settings.tg_token') }}</label>
+              <div class="pwd-wrap settings-token-wrap settings-ios-token-wrap">
+                <input id="tg-token-input" class="pwd-input js-tg-token-input" type="password" placeholder="123456789:AAHe..." autocomplete="new-password" {% if not telegram_can_manage %}disabled{% endif %} />
+                <button type="button" class="pwd-toggle" aria-label="{{ _('pwd.show_token') }}" aria-pressed="false" data-label-show="{{ _('pwd.show_token') }}" data-label-hide="{{ _('pwd.hide_token') }}">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              {% if telegram_can_manage %}
+              <div class="tg-connect-actions">
+                <button type="button" class="btn btn-secondary btn-sm" data-tg-verify>{{ _('settings.tg.verify') }}</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-tg-disconnect hidden>{{ _('settings.tg.disconnect') }}</button>
+              </div>
+              {% endif %}
+              <p class="settings-business-note tg-token-saved" data-tg-token-saved hidden></p>
+            </div>
+            <div class="tg-connected-hub" data-tg-connected-hub hidden>
+              <div class="tg-hub-card">
+                <div class="tg-hub-main">
+                  <div class="tg-hub-avatar" aria-hidden="true"><span class="tg-hub-avatar-letter" data-tg-hub-avatar>T</span></div>
+                  <div class="tg-hub-copy">
+                    <p class="tg-hub-name" data-tg-bot-name></p>
+                    <p class="tg-hub-meta">@<span data-tg-bot-username></span> · ID <span data-tg-bot-id></span></p>
+                  </div>
+                </div>
+                <div class="tg-hub-activity" data-tg-hub-activity><span class="tg-activity-dot" data-tg-activity-dot aria-hidden="true"></span><span class="tg-activity-text" data-tg-activity-text></span></div>
+                <p class="tg-hub-last-sent" data-tg-last-sent></p>
+              </div>
+              <p class="tg-webhook-banner" data-tg-webhook-banner hidden></p>
+            </div>
+            <div class="tg-bot-card" data-tg-bot-card hidden aria-hidden="true"></div>
+            <p class="settings-business-note tg-webhook-hint" data-tg-webhook-hint hidden aria-hidden="true"></p>
+          </section>
+          <section class="tg-rules-shell settings-ios-group" data-tg-routing-shell aria-label="Telegram уведомления и отчёты">
+            <nav class="tg-rules-tabs" aria-label="Раздел Telegram настроек">
+              <button type="button" class="tg-rules-tab active" data-tg-rules-tab="notifications">Уведомления</button>
+              <button type="button" class="tg-rules-tab" data-tg-rules-tab="reports">Отчеты</button>
+              <button type="button" class="tg-rules-tab" data-tg-rules-tab="limits">Ограничение</button>
+            </nav>
+            <div class="tg-rules-content">
+              <div class="tg-rules-panel" data-tg-rules-panel="notifications">
+                <div class="tg-rule" data-tg-route-key="income">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Приход</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="courier_payment">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Оплата от доставщиков</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="expense">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Расход</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="transaction_deleted">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Удаление транзакции</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="transfer">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Переводы</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="hr_attendance">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Табель</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+              </div>
+              <div class="tg-rules-panel" data-tg-rules-panel="reports" hidden>
+                <div class="tg-report-note">
+                  <strong>Отчеты по кнопкам Telegram</strong>
+                  <span>Подключите отчеты и выберите группу. Кнопка «Остатки кассы» в Telegram отправит актуальные остатки по счетам.</span>
+                </div>
+                <div class="tg-rule" data-tg-route-key="daily">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Кассовый отчет</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="balance">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Остатки кассы</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+              </div>
+              <div class="tg-rules-panel" id="telegram-limits" data-tg-rules-panel="limits" hidden>
+                <div class="tg-limit-card">
+                  <div class="tg-limit-card-head">
+                    <div>
+                      <strong>Ограничение суммы операций</strong>
+                      <span>Приходы и расходы выше лимита уйдут начальству на подтверждение в Telegram.</span>
+                    </div>
+                    <label class="tg-route-check tg-limit-main-toggle">
+                      <input type="checkbox" data-tg-limit-enabled {% if not telegram_can_manage %}disabled{% endif %} />
+                      <span>Включить</span>
+                    </label>
+                  </div>
+                  <div class="tg-limit-grid">
+                    <label class="tg-limit-field">
+                      <span>Лимит прихода</span>
+                      <input type="text" inputmode="decimal" data-tg-limit-income-amount placeholder="1 000 000" {% if not telegram_can_manage %}disabled{% endif %} />
+                    </label>
+                    <label class="tg-route-check tg-limit-check">
+                      <input type="checkbox" data-tg-limit-income-enabled checked {% if not telegram_can_manage %}disabled{% endif %} />
+                      <span>Проверять приход</span>
+                    </label>
+                    <label class="tg-limit-field">
+                      <span>Лимит расхода</span>
+                      <input type="text" inputmode="decimal" data-tg-limit-expense-amount placeholder="1 000 000" {% if not telegram_can_manage %}disabled{% endif %} />
+                    </label>
+                    <label class="tg-route-check tg-limit-check">
+                      <input type="checkbox" data-tg-limit-expense-enabled checked {% if not telegram_can_manage %}disabled{% endif %} />
+                      <span>Проверять расход</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="tg-rule" data-tg-route-key="limits">
+                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Ограничение</span><span class="tg-rule-chevron">⌄</span></button>
+                  <div class="tg-rule-body" hidden></div>
+                </div>
+              </div>
+              <div class="tg-rules-foot">
+                <span class="tg-prefs-status" data-tg-prefs-status hidden role="status"></span>
+                <button type="button" class="btn btn-sm" data-tg-prefs-save>Сохранить</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    window.orgSettingsTabs = {
+      baseUrl: {{ url_for('organizations_settings_get') | string | tojson }},
+      homeUrl: {{ url_for('organizations_settings_get') | string | tojson }},
+      currentTab: {{ settings_default_tab | default('general') | tojson }},
+      labels: {
+        general: "Основное",
+        users: "Пользователи",
+        dictionary: "Справочники",
+        integrations: "Интеграции",
+        telegram: "Telegram уведомление"
+      },
+      urls: {
+        users: {{ url_for('organizations_users_get') | string | tojson }}
+      }
+    };
+  </script>
+  <script src="{{ url_for('static', path='org-settings-tabs.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=25" defer></script>
+  {% if settings_default_tab | default('general') == 'telegram' %}
+    <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=10" />
+    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=20" defer></script>
+  {% endif %}
+{% endblock %}
