@@ -26,6 +26,24 @@
     return Array.from(new Set(items.filter(Boolean)));
   }
 
+  function resolveTabId(source) {
+    return normalize(
+      source?.dataset.workspaceTabId ||
+        source?.dataset.workspaceCard ||
+        source?.dataset.workspaceTrigger ||
+        source?.dataset.workspaceOpenTab
+    );
+  }
+
+  function resolveViewId(source, fallback = "") {
+    return normalize(
+      source?.dataset.workspaceViewId ||
+        source?.dataset.workspaceCard ||
+        source?.dataset.workspaceTrigger ||
+        fallback
+    );
+  }
+
   function createController(root) {
     const key = normalize(root.dataset.workspaceKey);
     const tabsShell = root.querySelector("[data-workspace-open-tabs]");
@@ -45,12 +63,9 @@
     }
 
     function registerMeta(source) {
-      const tabId = normalize(
-        source.dataset.workspaceCard ||
-          source.dataset.workspaceTrigger ||
-          source.dataset.workspaceOpenTab
-      );
+      const tabId = resolveTabId(source);
       if (!tabId) return "";
+      const viewId = resolveViewId(source, tabId);
       const title =
         normalize(source.dataset.workspaceTabTitle) ||
         normalize(source.dataset.workspaceTitle) ||
@@ -59,7 +74,7 @@
       const href = normalize(
         source.dataset.workspaceTabHref || source.dataset.workspaceSyncUrl || source.getAttribute("href") || ""
       );
-      tabMeta.set(tabId, { id: tabId, title: title || tabId, hash, href });
+      tabMeta.set(tabId, { id: tabId, viewId, title: title || tabId, hash, href });
       return tabId;
     }
 
@@ -83,7 +98,18 @@
       return url.pathname === window.location.pathname && url.search === window.location.search;
     }
 
-    function tabFromHash() {
+    function tabFromLocation() {
+      for (const tabId of tabMeta.keys()) {
+        const url = tabUrl(tabId);
+        if (!url) continue;
+        if (
+          url.pathname === window.location.pathname &&
+          url.search === window.location.search &&
+          normalize(url.hash) === normalize(window.location.hash)
+        ) {
+          return tabId;
+        }
+      }
       const hash = normalize(window.location.hash).replace(/^#/, "");
       if (!hash) return "";
       for (const [tabId, meta] of tabMeta.entries()) {
@@ -108,7 +134,7 @@
       openTabs = unique(saved.openTabs.filter((tabId) => tabMeta.has(tabId)));
       const storedActive = tabMeta.has(saved.activeTab) ? saved.activeTab : "";
       const defaultTab = normalize(root.dataset.workspaceDefaultTab);
-      const hashTab = tabFromHash();
+      const hashTab = tabFromLocation();
 
       if (hashTab) {
         activeTab = hashTab;
@@ -142,7 +168,7 @@
     }
 
     function renderViews() {
-      const currentView = activeTab || "home";
+      const currentView = activeTab ? tabMeta.get(activeTab)?.viewId || activeTab : "home";
       if (launcher) launcher.hidden = Boolean(activeTab);
       viewNodes.forEach((node) => {
         const views = splitViews(node.dataset.workspaceView);
@@ -150,7 +176,7 @@
       });
       root.querySelectorAll("[data-workspace-card]").forEach((card) => {
         const cardId = normalize(card.dataset.workspaceCard);
-        const isActive = Boolean(activeTab) && cardId === activeTab;
+        const isActive = Boolean(activeTab) && cardId === currentView;
         card.classList.toggle("active", isActive);
         if (isActive) {
           card.setAttribute("aria-current", "page");
@@ -271,7 +297,7 @@
 
         const trigger = event.target.closest("[data-workspace-card], [data-workspace-trigger]");
         if (!trigger || !root.contains(trigger)) return;
-        const tabId = normalize(trigger.dataset.workspaceCard || trigger.dataset.workspaceTrigger);
+        const tabId = resolveTabId(trigger);
         if (!tabId) return;
         event.preventDefault();
         handleTrigger(trigger, tabId);
