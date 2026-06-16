@@ -1391,6 +1391,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 750;
 }
 
+.messenger-telegram-token {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.35rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), white 90%);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+
 .messenger-telegram-head [data-variant="ok"],
 .social-telegram-head [data-variant="ok"] {
   background: color-mix(in oklch, #20a36a, white 86%);
@@ -1682,6 +1694,305 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
     border-right: 0;
     border-bottom: 1px solid var(--workbench-line, var(--border));
     max-height: 19rem;
+  }
+}
+
+.messenger-inbox-workspace,
+.messenger-workspace-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.messenger-inbox-shell,
+.messenger-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(19rem, 0.46fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.messenger-inbox-shell {
+  min-height: clamp(32rem, 66vh, 54rem);
+}
+
+.messenger-dialog-list-panel,
+.messenger-dialog-chat-panel,
+.messenger-telegram-settings-grid > *,
+.messenger-workspace-grid > * {
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 7px;
+  background: var(--card);
+  box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
+}
+
+.messenger-dialog-list-panel,
+.messenger-dialog-chat-panel {
+  min-height: clamp(32rem, 66vh, 54rem);
+  overflow: hidden;
+}
+
+.messenger-dialog-list-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.messenger-dialog-list-head,
+.messenger-dialog-chat-top,
+.messenger-dialog-composer,
+.messenger-telegram-settings-grid header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.messenger-dialog-list-head small {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.55rem;
+  min-height: 1.55rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), white 84%);
+  color: var(--primary);
+  font-weight: 850;
+}
+
+.messenger-dialog-list {
+  display: grid;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.messenger-dialog-item {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+  min-height: 4.6rem;
+  padding: 0.7rem 0.9rem;
+  border: 0;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.messenger-dialog-item:hover,
+.messenger-dialog-item.active {
+  background: color-mix(in oklch, var(--primary), white 88%);
+}
+
+.messenger-dialog-channel {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #2ea3f2, #1d74d8);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.messenger-dialog-item strong,
+.messenger-dialog-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messenger-dialog-item small,
+.messenger-dialog-item em,
+.messenger-empty {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.messenger-dialog-item em {
+  font-style: normal;
+  font-weight: 750;
+}
+
+.messenger-dialog-chat-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.messenger-dialog-chat-top h3 {
+  margin: 0;
+}
+
+.messenger-dialog-chat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.72rem;
+  overflow-y: auto;
+  padding: 1rem;
+  background: color-mix(in oklch, var(--background), var(--primary) 2%);
+}
+
+.messenger-thread-message {
+  display: grid;
+  gap: 0.22rem;
+  max-width: min(42rem, 78%);
+  padding: 0.72rem 0.85rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 0.55rem;
+  background: var(--card);
+}
+
+.messenger-thread-message strong {
+  font-size: var(--text-xs);
+}
+
+.messenger-thread-message span {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.messenger-thread-message--out {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--primary), white 84%);
+  border-color: color-mix(in oklch, var(--primary), white 62%);
+}
+
+.messenger-thread-message--system {
+  max-width: 100%;
+  background: color-mix(in oklch, var(--muted), transparent 40%);
+}
+
+.messenger-dialog-composer {
+  align-items: stretch;
+  border-top: 1px solid var(--workbench-line, var(--border));
+  border-bottom: 0;
+}
+
+.messenger-dialog-composer textarea,
+.messenger-telegram-settings-grid textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.25rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: var(--radius);
+  background: var(--control-bg, var(--background));
+  color: var(--foreground);
+  font: inherit;
+}
+
+.messenger-dialog-composer-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.messenger-empty {
+  padding: 1rem;
+  line-height: 1.5;
+}
+
+.messenger-telegram-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.8fr) minmax(0, 1.2fr);
+  gap: 1rem;
+}
+
+.messenger-telegram-settings-grid form {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.messenger-telegram-settings-grid form > label:not(.business-module-check) {
+  display: grid;
+  gap: 0.38rem;
+  padding: 0 1rem;
+}
+
+.messenger-telegram-settings-grid form > label span {
+  font-size: var(--text-xs);
+  font-weight: 750;
+  color: var(--muted-foreground);
+}
+
+.messenger-telegram-settings-grid .business-module-check {
+  margin: 0 1rem;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  padding: 0;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.telephony-incoming-popup {
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in oklch, var(--primary), white 55%);
+  border-radius: 7px;
+  background: linear-gradient(180deg, color-mix(in oklch, var(--primary), white 88%), var(--card));
+  box-shadow: 0 18px 42px rgb(15 23 42 / 0.18);
+}
+
+.telephony-incoming-popup[hidden] {
+  display: none;
+}
+
+.telephony-incoming-popup div {
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+}
+
+.telephony-incoming-popup small,
+.telephony-incoming-popup span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.telephony-incoming-popup strong,
+.telephony-incoming-popup span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .messenger-inbox-shell,
+  .messenger-workspace-grid,
+  .messenger-telegram-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .messenger-dialog-list-panel,
+  .messenger-dialog-chat-panel {
+    min-height: 24rem;
+  }
+
+  .messenger-dialog-composer,
+  .messenger-dialog-composer-actions {
+    flex-direction: column;
   }
 }
 
@@ -2132,6 +2443,83 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: linear-gradient(180deg, transparent, var(--card) 24%);
 }
 
+.telephony-layout {
+  grid-template-columns: 1fr;
+}
+
+.telephony-integrations-grid {
+  display: grid;
+  grid-template-columns: minmax(20rem, 0.8fr) minmax(0, 1.2fr);
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.telephony-sip-form,
+.telephony-provider-table {
+  min-width: 0;
+}
+
+.telephony-provider-table .inline-form {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-profile-modal.telephony-dialog {
+  padding: 0;
+}
+
+.telephony-dialog .telephony-dialog-surface {
+  max-width: min(58rem, calc(100vw - 2rem));
+}
+
+.warehouse-stock-critical td {
+  background: color-mix(in srgb, #ef4444 10%, var(--card));
+}
+
+.warehouse-operation-dialog {
+  padding: 0;
+}
+
+.warehouse-operation-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.warehouse-operation-choice {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 8.5rem;
+  align-content: center;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  color: var(--text);
+  text-decoration: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--card)), var(--card));
+}
+
+.warehouse-operation-choice strong {
+  font-size: 1rem;
+}
+
+.warehouse-operation-choice span {
+  color: var(--muted-text);
+  line-height: 1.35;
+}
+
+.business-module-check {
+  align-items: center;
+  grid-template-columns: auto auto;
+  justify-content: start;
+}
+
+.business-module-check input {
+  width: 1rem;
+  height: 1rem;
+}
+
 @media (max-width: 980px) {
   .client-card-header,
   .client-card-grid,
@@ -2155,6 +2543,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
   .crm-pipeline-head--filters {
     align-items: stretch;
+  }
+
+  .telephony-integrations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-operation-choices {
+    grid-template-columns: 1fr;
+  }
+
+  .telephony-provider-table .inline-form {
+    justify-content: flex-start;
   }
 
   .crm-stage-settings--compact,
@@ -2259,6 +2659,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-top: 1px solid var(--border);
 }
 
+.product-form-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .product-line-grid {
   display: grid;
   gap: 0.55rem;
@@ -2275,6 +2682,41 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .product-line-grid--stock {
   grid-template-columns: 1fr 6rem 7rem 9rem;
+}
+
+.product-line-grid--variation {
+  grid-template-columns: minmax(8rem, 0.65fr) minmax(12rem, 1fr) auto;
+  align-items: center;
+}
+
+.product-variation-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.product-purchase-table {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.product-purchase-row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(10rem, 1fr) 7rem 7rem minmax(10rem, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.product-purchase-row--head {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.product-purchase-row .btn,
+.product-line-grid--variation .btn {
+  min-width: 2.25rem;
+  padding-inline: 0.55rem;
 }
 
 .products-dictionaries {
@@ -2359,8 +2801,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   .product-line-grid--price,
   .product-line-grid--barcode,
   .product-line-grid--stock,
+  .product-line-grid--variation,
+  .product-purchase-row,
   .sales-line-grid {
     grid-template-columns: 1fr;
+  }
+
+  .product-purchase-row--head {
+    display: none;
   }
 }
 

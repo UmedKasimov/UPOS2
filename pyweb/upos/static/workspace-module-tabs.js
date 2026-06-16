@@ -99,6 +99,15 @@
     }
 
     function tabFromLocation() {
+      const hash = normalize(window.location.hash).replace(/^#/, "");
+      const aliasMap = {
+        telephony: {
+          providers: "integrations",
+        },
+      };
+      const aliasTab = aliasMap[key]?.[hash];
+      if (aliasTab && tabMeta.has(aliasTab)) return aliasTab;
+      if (hash && tabMeta.has(hash)) return hash;
       for (const tabId of tabMeta.keys()) {
         const url = tabUrl(tabId);
         if (!url) continue;
@@ -110,7 +119,6 @@
           return tabId;
         }
       }
-      const hash = normalize(window.location.hash).replace(/^#/, "");
       if (!hash) return "";
       for (const [tabId, meta] of tabMeta.entries()) {
         if (meta.hash === hash) return tabId;
@@ -135,6 +143,7 @@
       const storedActive = tabMeta.has(saved.activeTab) ? saved.activeTab : "";
       const defaultTab = normalize(root.dataset.workspaceDefaultTab);
       const hashTab = tabFromLocation();
+      const hasLocationHash = Boolean(normalize(window.location.hash).replace(/^#/, ""));
 
       if (hashTab) {
         activeTab = hashTab;
@@ -144,6 +153,10 @@
       if (defaultTab && tabMeta.has(defaultTab)) {
         activeTab = defaultTab;
         ensureOpen(defaultTab);
+        return;
+      }
+      if (!hasLocationHash) {
+        activeTab = "";
         return;
       }
       if (storedActive) {
@@ -315,6 +328,21 @@
         if (!activateButton) return;
         event.preventDefault();
         openTab(normalize(activateButton.dataset.workspaceActivateTab), { navigate: true });
+      });
+
+      window.addEventListener("hashchange", () => {
+        const nextTab = tabFromLocation();
+        const hasHash = Boolean(normalize(window.location.hash).replace(/^#/, ""));
+        if (nextTab) {
+          ensureOpen(nextTab);
+          activeTab = nextTab;
+          saveState();
+          render();
+        } else if (!hasHash) {
+          activeTab = "";
+          saveState();
+          render();
+        }
       });
     }
 

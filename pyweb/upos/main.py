@@ -5,7 +5,9 @@ import json
 import logging
 import io
 import os
+import re
 import secrets
+import socket
 import uuid
 from decimal import Decimal
 from datetime import datetime, timezone
@@ -2998,7 +3000,7 @@ def create_app() -> FastAPI:
                 "launcher": [
                     {"id": "calls", "title": "Звонки", "subtitle": "Журнал и статусы", "icon": "phone"},
                     {"id": "numbers", "title": "Номера", "subtitle": "Линии и сотрудники", "icon": "numbers"},
-                    {"id": "providers", "title": "Интеграции", "subtitle": "АТС и SIP", "icon": "adjustment"},
+                    {"id": "integrations", "title": "Интеграции", "subtitle": "АТС и SIP", "icon": "adjustment"},
                 ],
                 "filters": ["Поиск", "Провайдер", "Ответственный", "Статус"],
                 "columns": ["Клиент", "Номер", "Направление", "Ответственный", "Статус"],
@@ -3478,6 +3480,24 @@ def create_app() -> FastAPI:
         prices = data.get("prices") if isinstance(data.get("prices"), list) else []
         stocks = data.get("stocks") if isinstance(data.get("stocks"), list) else []
         purchase_history = data.get("purchase_history") if isinstance(data.get("purchase_history"), list) else []
+        raw_variations = data.get("variations") if isinstance(data.get("variations"), list) else []
+        variations: list[dict[str, Any]] = []
+        for item in raw_variations:
+            if not isinstance(item, dict):
+                continue
+            values = item.get("values")
+            if isinstance(values, list):
+                values_text = ", ".join(str(part).strip() for part in values if str(part).strip())
+            else:
+                values_text = str(values or "").strip()
+                values = [part.strip() for part in re.split(r"[\n,;]+", values_text) if part.strip()]
+            variations.append(
+                {
+                    "attribute": str(item.get("attribute") or "").strip(),
+                    "values": values,
+                    "values_text": values_text,
+                }
+            )
         qty = Decimal("0")
         for item in stocks:
             if not isinstance(item, dict):
@@ -3527,6 +3547,7 @@ def create_app() -> FastAPI:
             "stocks": stocks,
             "purchase_history": purchase_history,
             "purchase_history_json": json.dumps(purchase_history, ensure_ascii=False, indent=2) if purchase_history else "",
+            "variations": variations,
             "quantity": str(qty.normalize() if qty else 0),
             "sale_price": sale_price,
             "sale_currency": sale_currency,
@@ -3577,6 +3598,49 @@ def create_app() -> FastAPI:
             if warehouse or quantity or price or date:
                 stocks.append({"warehouse": warehouse or "Основной склад", "quantity": quantity, "price": price, "date": date})
 
+        purchase_history: list[dict[str, str]] = []
+        purchase_dates = list(form.getlist("purchase_date"))
+        purchase_warehouses = list(form.getlist("purchase_warehouse"))
+        purchase_quantities = list(form.getlist("purchase_quantity"))
+        purchase_prices = list(form.getlist("purchase_price"))
+        purchase_suppliers = list(form.getlist("purchase_supplier"))
+        purchase_total = max(
+            len(purchase_dates),
+            len(purchase_warehouses),
+            len(purchase_quantities),
+            len(purchase_prices),
+            len(purchase_suppliers),
+            0,
+        )
+        for idx in range(purchase_total):
+            date = str(purchase_dates[idx] if idx < len(purchase_dates) else "").strip()
+            warehouse = str(purchase_warehouses[idx] if idx < len(purchase_warehouses) else "").strip()
+            quantity = str(purchase_quantities[idx] if idx < len(purchase_quantities) else "").strip()
+            price = str(purchase_prices[idx] if idx < len(purchase_prices) else "").strip()
+            supplier = str(purchase_suppliers[idx] if idx < len(purchase_suppliers) else "").strip()
+            if date or warehouse or quantity or price or supplier:
+                purchase_history.append(
+                    {
+                        "date": date,
+                        "warehouse": warehouse or "Основной склад",
+                        "quantity": quantity,
+                        "price": price,
+                        "supplier": supplier,
+                    }
+                )
+        if not purchase_history:
+            purchase_history = _product_json_rows(form.get("purchase_history_json"))
+
+        variations: list[dict[str, Any]] = []
+        variation_attributes = list(form.getlist("variation_attribute"))
+        variation_values = list(form.getlist("variation_values"))
+        for idx in range(max(len(variation_attributes), len(variation_values), 0)):
+            attribute = str(variation_attributes[idx] if idx < len(variation_attributes) else "").strip()
+            raw_values = str(variation_values[idx] if idx < len(variation_values) else "").strip()
+            values = [part.strip() for part in re.split(r"[\n,;]+", raw_values) if part.strip()]
+            if attribute or values:
+                variations.append({"attribute": attribute, "values": values})
+
         data = {
             "kind": val("kind", "product"),
             "category": val("category"),
@@ -3596,7 +3660,8 @@ def create_app() -> FastAPI:
             "photo_url": val("photo_url"),
             "prices": prices,
             "stocks": stocks,
-            "purchase_history": _product_json_rows(form.get("purchase_history_json")),
+            "purchase_history": purchase_history,
+            "variations": variations,
         }
         return data
 
@@ -3661,6 +3726,45 @@ def create_app() -> FastAPI:
             found = session.get(Product, edit)
             if found and found.workspace_owner_id == workspace_owner_id:
                 edit_product = _product_data(found)
+        price_lists: dict[str, dict[str, Any]] = {}
+        for product in products:
+            for price in product["prices"]:
+                if not isinstance(price, dict):
+                    continue
+                name = str(price.get("name") or "Продажная цена").strip() or "Продажная цена"
+                key = name.lower()
+                entry = price_lists.setdefault(
+                    key,
+                    {
+                        "name": name,
+                        "type": "Продажная",
+                        "currency": str(price.get("currency") or product.get("sale_currency") or "UZS").upper(),
+                        "default_value": str(price.get("price") or ""),
+                        "product_count": 0,
+                    },
+                )
+                entry["product_count"] += 1
+                if price.get("price") and not entry.get("default_value"):
+                    entry["default_value"] = str(price.get("price") or "")
+                lowered = name.lower()
+                if "скид" in lowered:
+                    entry["type"] = "Скидочная"
+                elif "приход" in lowered or "закуп" in lowered:
+                    entry["type"] = "Приходная"
+        if not price_lists:
+            for name, kind in (
+                ("Продажная цена", "Продажная"),
+                ("Скидочная цена", "Скидочная"),
+                ("Приходная цена", "Приходная"),
+                ("Стандартная цена", "Продажная"),
+            ):
+                price_lists[name.lower()] = {
+                    "name": name,
+                    "type": kind,
+                    "currency": "UZS",
+                    "default_value": "",
+                    "product_count": 0,
+                }
         options = {
             "categories": sorted({p["category"] for p in products if p["category"]}),
             "groups": sorted({p["group"] for p in products if p["group"]}),
@@ -3674,6 +3778,7 @@ def create_app() -> FastAPI:
                     if isinstance(price, dict) and price.get("name")
                 }
             ),
+            "price_lists": sorted(price_lists.values(), key=lambda item: str(item.get("name") or "")),
         }
         return products, edit_product, options
 
@@ -4675,6 +4780,7 @@ def create_app() -> FastAPI:
             "to_warehouse": str(form.get("to_warehouse") or "").strip() or "Основной склад",
             "product": str(form.get("product") or "").strip(),
             "price": str(form.get("price") or "").strip(),
+            "responsible": str(form.get("responsible") or "").strip(),
             "note": str(form.get("note") or "").strip(),
             "quantity": str(quantity.normalize() if quantity else "0"),
         }
@@ -4696,6 +4802,7 @@ def create_app() -> FastAPI:
             "quantity": str(quantity.normalize() if quantity else "0"),
             "amount": _sales_money_label(row.amount),
             "currency": row.currency,
+            "responsible": str(data.get("responsible") or ""),
             "note": str(data.get("note") or ""),
         }
 
@@ -4713,6 +4820,7 @@ def create_app() -> FastAPI:
             "due_date": str(form.get("due_date") or "").strip(),
             "stage": str(form.get("stage") or "").strip(),
             "stage_id": str(form.get("stage_id") or "").strip(),
+            "related_deal_id": str(form.get("related_deal_id") or "").strip(),
             "lead_source": str(form.get("lead_source") or form.get("contact_type") or "").strip(),
             "contact_type": str(form.get("contact_type") or "").strip(),
             "chat_ref": str(form.get("chat_ref") or "").strip(),
@@ -4735,6 +4843,7 @@ def create_app() -> FastAPI:
             "due_date": row.due_date or str(data.get("due_date") or ""),
             "stage": str(data.get("stage") or ""),
             "stage_id": str(data.get("stage_id") or ""),
+            "related_deal_id": str(data.get("related_deal_id") or ""),
             "lead_source": str(data.get("lead_source") or ""),
             "contact_type": str(data.get("contact_type") or ""),
             "chat_ref": str(data.get("chat_ref") or ""),
@@ -4933,6 +5042,30 @@ def create_app() -> FastAPI:
                 }
             )
 
+        telephony_calls_raw = load_workspace_settings(workspace_owner_id).get("telephony_calls")
+        telephony_calls = telephony_calls_raw if isinstance(telephony_calls_raw, list) else []
+        calls: list[dict[str, Any]] = []
+        for raw_call in telephony_calls:
+            if not isinstance(raw_call, dict):
+                continue
+            call_client = str(raw_call.get("client") or "").strip()
+            call_phone_digits = digits(raw_call.get("phone"))
+            if (
+                matches_client_name(call_client)
+                or (phone_digits and call_phone_digits and call_phone_digits.endswith(phone_digits[-9:]))
+            ):
+                calls.append(
+                    {
+                        "started_at": str(raw_call.get("started_at") or raw_call.get("created_at") or ""),
+                        "phone": str(raw_call.get("phone") or ""),
+                        "direction_label": _telephony_direction_label(str(raw_call.get("direction") or "")),
+                        "status_label": _telephony_status_label("call", str(raw_call.get("status") or "")),
+                        "responsible": str(raw_call.get("responsible") or ""),
+                        "comment": str(raw_call.get("comment") or raw_call.get("note") or ""),
+                    }
+                )
+        calls.sort(key=lambda item: item["started_at"], reverse=True)
+
         total_sales = sum(
             (_sales_decimal(item.amount) for item in matched_sale_rows if _json_object(item.data).get("doc_type") != "return"),
             Decimal("0"),
@@ -4951,6 +5084,7 @@ def create_app() -> FastAPI:
                 "orders": orders[:12],
                 "sales": sales[:12],
                 "returns": returns[:12],
+                "calls": calls[:5],
                 "tasks": tasks[:12],
                 "deals": deals[:12],
                 "correspondence": correspondence[:12],
@@ -4963,10 +5097,76 @@ def create_app() -> FastAPI:
                     "orders_count": len(orders),
                     "tasks_count": len(tasks),
                     "messages_count": len(conversations) + len(correspondence),
+                    "calls_count": len(calls),
                 },
             }
         )
         return client
+
+    def _supplier_card_context(
+        session: Any,
+        workspace_owner_id: str,
+        supplier_id: str,
+        *,
+        balance_by_id: dict[str, Decimal],
+        balance_by_name: dict[str, Decimal],
+        last_date_by_id: dict[str, str],
+        last_date_by_name: dict[str, str],
+    ) -> dict[str, Any] | None:
+        row = session.get(Counterparty, supplier_id)
+        if not row or row.workspace_owner_id != workspace_owner_id:
+            return None
+        _, has_supplier = _counterparty_role_flags(row.kind)
+        if not has_supplier:
+            return None
+        supplier = _counterparty_view_data(
+            row,
+            balance_by_id=balance_by_id,
+            balance_by_name=balance_by_name,
+            last_date_by_id=last_date_by_id,
+            last_date_by_name=last_date_by_name,
+        )
+        names = {
+            str(supplier.get("name") or "").strip().lower(),
+            str(supplier.get("official_name") or "").strip().lower(),
+        }
+        names.discard("")
+        purchase_rows = list(
+            session.execute(
+                select(PurchaseDocument)
+                .where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
+                .order_by(PurchaseDocument.updated_at.desc())
+            ).scalars()
+        )
+        purchases: list[dict[str, Any]] = []
+        payables: list[dict[str, Any]] = []
+        total_amount = Decimal("0")
+        total_paid = Decimal("0")
+        for purchase_row in purchase_rows:
+            data = _json_object(purchase_row.data)
+            counterparty_id = str(data.get("counterparty_id") or purchase_row.counterparty_id or "").strip()
+            supplier_name = str(data.get("supplier") or "").strip().lower()
+            if counterparty_id != supplier_id and supplier_name not in names:
+                continue
+            item = _purchase_document_data(purchase_row)
+            purchases.append(item)
+            total_amount += _sales_decimal(purchase_row.amount)
+            total_paid += _sales_decimal(data.get("paid_amount"))
+            if _sales_decimal(item.get("debt_amount")) > 0:
+                payables.append(item)
+        supplier.update(
+            {
+                "purchases": purchases[:10],
+                "payables": payables[:10],
+                "summary": {
+                    "purchases": _sales_money_label(total_amount),
+                    "paid": _sales_money_label(total_paid),
+                    "payable": supplier["balance"],
+                    "purchase_count": len(purchases),
+                },
+            }
+        )
+        return supplier
 
     def _module_flash_error(request: Request) -> str:
         return request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else "")
@@ -4978,6 +5178,8 @@ def create_app() -> FastAPI:
         warehouse: str = "",
         product: str = "",
         op_type: str = "all",
+        critical: str = "",
+        op: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -4988,12 +5190,17 @@ def create_app() -> FastAPI:
             "warehouse": warehouse.strip(),
             "product": product.strip(),
             "op_type": op_type.strip() or "all",
+            "critical": "1" if str(critical or "").strip() == "1" else "",
         }
+        operation_preset = str(op or "").strip()
+        if operation_preset not in {"in", "out", "transfer"}:
+            operation_preset = ""
         q_clean = filters["q"].lower()
         warehouse_records: list[dict[str, Any]] = []
         warehouse_stocks: list[dict[str, Any]] = []
         warehouse_operations: list[dict[str, Any]] = []
         product_names: list[str] = []
+        warehouse_stock_total = Decimal("0")
         with session_scope() as session:
             warehouse_rows = list(
                 session.execute(
@@ -5021,14 +5228,25 @@ def create_app() -> FastAPI:
             for product_row in product_rows:
                 item = _product_data(product_row)
                 for stock in item["stocks"]:
+                    quantity_value = _sales_decimal(stock.get("quantity"))
+                    cost_value = _sales_decimal(stock.get("price"))
+                    min_stock_value = _sales_decimal(item["min_stock"])
+                    stock_total_value = quantity_value * cost_value
+                    is_critical = bool(min_stock_value > 0 and quantity_value <= min_stock_value)
                     stock_row = {
                         "product": item["name"],
                         "warehouse": str(stock.get("warehouse") or "Основной склад"),
-                        "quantity": str(stock.get("quantity") or "0"),
+                        "quantity": str(quantity_value.normalize() if quantity_value else "0"),
+                        "quantity_value": quantity_value,
                         "unit": item["unit"],
                         "category": item["category"],
                         "status": item["status"],
                         "min_stock": item["min_stock"],
+                        "cost": _sales_money_label(cost_value),
+                        "cost_value": cost_value,
+                        "stock_total": _sales_money_label(stock_total_value),
+                        "stock_total_value": stock_total_value,
+                        "is_critical": is_critical,
                     }
                     hay = " ".join([stock_row["product"], stock_row["warehouse"], stock_row["category"]]).lower()
                     if q_clean and q_clean not in hay:
@@ -5037,7 +5255,10 @@ def create_app() -> FastAPI:
                         continue
                     if filters["product"] and stock_row["product"] != filters["product"]:
                         continue
+                    if filters["critical"] == "1" and not is_critical:
+                        continue
                     warehouse_stocks.append(stock_row)
+                    warehouse_stock_total += stock_total_value
             for row in operation_rows:
                 item = _warehouse_operation_data(row)
                 hay = " ".join([item["number"], item["product"], item["warehouse"], item["from_warehouse"], item["to_warehouse"], item["note"]]).lower()
@@ -5064,7 +5285,9 @@ def create_app() -> FastAPI:
             warehouse_options=warehouse_options,
             warehouse_records=warehouse_records,
             warehouse_stocks=warehouse_stocks,
+            warehouse_stock_total=_sales_money_label(warehouse_stock_total),
             warehouse_operations=warehouse_operations,
+            warehouse_operation_preset=operation_preset,
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
@@ -5247,6 +5470,65 @@ def create_app() -> FastAPI:
         selected_client_card: dict[str, Any] | None = None
         with session_scope() as session:
             balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
+            settings_payload = load_workspace_settings(wid)
+            raw_calls = settings_payload.get("telephony_calls") if isinstance(settings_payload.get("telephony_calls"), list) else []
+            crm_rows_for_contact = list(
+                session.execute(
+                    select(CrmRecord)
+                    .where(CrmRecord.workspace_owner_id == wid)
+                    .order_by(CrmRecord.updated_at.desc())
+                ).scalars()
+            )
+            telegram_subscribers_for_contact = list(
+                session.execute(
+                    select(TelegramSubscriber)
+                    .where(TelegramSubscriber.workspace_owner_id == wid)
+                    .order_by(TelegramSubscriber.requested_at.desc())
+                ).scalars()
+            )
+
+            def digits(value: Any) -> str:
+                return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+            def bump_date(current: str, candidate: Any) -> str:
+                raw = str(candidate or "").strip()
+                if not raw:
+                    return current
+                return raw if raw > current else current
+
+            def client_last_contact(row: Counterparty, item: dict[str, Any]) -> str:
+                names = {
+                    str(item.get("name") or "").strip().lower(),
+                    str(item.get("official_name") or "").strip().lower(),
+                }
+                names.discard("")
+                best = str(item.get("last_date") or "")
+                phone_digits = digits(item.get("phone"))
+                telegram_key = str(item.get("telegram") or "").lstrip("@").lower()
+                for call in raw_calls:
+                    if not isinstance(call, dict):
+                        continue
+                    call_client = str(call.get("client") or "").strip().lower()
+                    call_phone = digits(call.get("phone"))
+                    if call_client in names or (phone_digits and call_phone and call_phone.endswith(phone_digits[-9:])):
+                        best = bump_date(best, call.get("started_at") or call.get("created_at"))
+                for crm_row in crm_rows_for_contact:
+                    data = _json_object(crm_row.data)
+                    crm_client = str(data.get("client") or "").strip().lower()
+                    if crm_row.counterparty_id == row.id or crm_client in names:
+                        best = bump_date(best, data.get("date") or data.get("due_date") or crm_row.updated_at.isoformat())
+                for subscriber in telegram_subscribers_for_contact:
+                    username = str(subscriber.username or "").lstrip("@").lower()
+                    sub_phone = digits(subscriber.phone)
+                    display_name = str(subscriber.display_name or "").strip().lower()
+                    if (
+                        (telegram_key and username == telegram_key)
+                        or (phone_digits and sub_phone and sub_phone.endswith(phone_digits[-9:]))
+                        or (display_name and display_name in names)
+                    ):
+                        best = bump_date(best, subscriber.requested_at.isoformat() if subscriber.requested_at else "")
+                return best
+
             selected_client_id = client.strip()
             if selected_client_id:
                 selected_client_card = _client_card_context(
@@ -5289,10 +5571,28 @@ def create_app() -> FastAPI:
                 if filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
                 clients_records.append(item)
+                item["last_contact"] = client_last_contact(row, item)
                 route_key = item["route"] or "Без маршрута"
-                summary = route_map.setdefault(route_key, {"route": route_key, "territory": item["territory"] or "-", "count": 0, "balance_value": Decimal("0")})
+                extra = _counterparty_extra(row)
+                summary = route_map.setdefault(
+                    route_key,
+                    {
+                        "route": route_key,
+                        "territory": item["territory"] or "-",
+                        "count": 0,
+                        "balance_value": Decimal("0"),
+                        "clients": [],
+                        "days": set(),
+                        "agents": set(),
+                    },
+                )
                 summary["count"] += 1
                 summary["balance_value"] += item["balance_value"]
+                summary["clients"].append(item["name"])
+                if extra.get("route_day"):
+                    summary["days"].add(str(extra.get("route_day")))
+                if extra.get("route_agent"):
+                    summary["agents"].add(str(extra.get("route_agent")))
                 if item["balance_value"] != 0:
                     client_balances.append(item)
             client_routes = [
@@ -5301,6 +5601,9 @@ def create_app() -> FastAPI:
                     "territory": value["territory"],
                     "count": value["count"],
                     "balance": _sales_money_label(value["balance_value"]),
+                    "clients": ", ".join(value["clients"][:8]),
+                    "day": ", ".join(sorted(value["days"])) or "-",
+                    "agent": ", ".join(sorted(value["agents"])) or "-",
                 }
                 for key, value in sorted(route_map.items())
             ]
@@ -5309,6 +5612,7 @@ def create_app() -> FastAPI:
             "territories": sorted({item["territory"] for item in clients_records if item["territory"]}),
             "categories": sorted({item["category"] for item in clients_records if item["category"]}),
             "routes": sorted({item["route"] for item in clients_records if item["route"]}),
+            "clients": sorted({item["name"] for item in clients_records if item["name"]}),
         }
         return tpl(
             request,
@@ -5379,12 +5683,39 @@ def create_app() -> FastAPI:
                     session.delete(row)
         return RedirectResponse(url="/clients?msg=deleted#clients", status_code=302)
 
+    @app.post("/clients/routes/save", name="clients_route_save")
+    async def clients_route_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/clients?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        client_name = str(form.get("client") or "").strip()
+        route_name = str(form.get("route") or "").strip()
+        if not client_name or not route_name:
+            return RedirectResponse(url="/clients?error=" + quote("Клиент и маршрут обязательны") + "#routes", status_code=302)
+        with session_scope() as session:
+            row = _resolve_counterparty(session, wid, name=client_name, role="client")
+            if row is None:
+                return RedirectResponse(url="/clients?error=" + quote("Клиент не найден") + "#routes", status_code=302)
+            extra = _counterparty_extra(row)
+            extra["route"] = route_name
+            extra["territory"] = str(form.get("territory") or extra.get("territory") or "").strip()
+            extra["route_day"] = str(form.get("route_day") or "").strip()
+            extra["route_agent"] = str(form.get("route_agent") or "").strip()
+            extra["status"] = str(extra.get("status") or "active")
+            row.data = extra
+        return RedirectResponse(url="/clients?msg=saved#routes", status_code=302)
+
     @app.get("/suppliers", response_class=HTMLResponse, name="suppliers_get")
     def suppliers_get(
         request: Request,
         q: str = "",
         status: str = "all",
         category: str = "",
+        supplier: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -5399,10 +5730,22 @@ def create_app() -> FastAPI:
         supplier_records: list[dict[str, Any]] = []
         supplier_purchases: list[dict[str, Any]] = []
         supplier_payables: list[dict[str, Any]] = []
+        selected_supplier_card: dict[str, Any] | None = None
         product_names: list[str] = []
         warehouse_names: list[str] = []
         with session_scope() as session:
             balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _purchase_rollup_maps(session, wid)
+            selected_supplier_id = supplier.strip()
+            if selected_supplier_id:
+                selected_supplier_card = _supplier_card_context(
+                    session,
+                    wid,
+                    selected_supplier_id,
+                    balance_by_id=balance_by_id,
+                    balance_by_name=balance_by_name,
+                    last_date_by_id=last_date_by_id,
+                    last_date_by_name=last_date_by_name,
+                )
             counterparties = list(
                 session.execute(
                     select(Counterparty)
@@ -5477,6 +5820,7 @@ def create_app() -> FastAPI:
             supplier_records=supplier_records,
             supplier_purchases=supplier_purchases,
             supplier_payables=supplier_payables,
+            selected_supplier_card=selected_supplier_card,
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
@@ -5621,6 +5965,8 @@ def create_app() -> FastAPI:
         client: str = "",
         responsible: str = "",
         status: str = "all",
+        date_from: str = "",
+        date_to: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -5631,9 +5977,12 @@ def create_app() -> FastAPI:
             "client": client.strip(),
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
+            "date_from": date_from.strip(),
+            "date_to": date_to.strip(),
         }
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
+        crm_history_records: list[dict[str, Any]] = []
         crm_options = {"clients": [], "responsibles": []}
         crm_stages = _crm_workspace_stages(wid)
         crm_stage_map = {stage["id"]: {**stage, "records": [], "total_value": Decimal("0"), "total": "0"} for stage in crm_stages}
@@ -5701,11 +6050,23 @@ def create_app() -> FastAPI:
                     .order_by(CrmRecord.updated_at.desc())
                 ).scalars()
             )
+            all_deal_options = [
+                {
+                    "id": row.id,
+                    "title": row.title,
+                    "client": str(_json_object(row.data).get("client") or ""),
+                }
+                for row in rows
+                if row.item_type == "deal"
+            ]
+            deal_options = [item for item in all_deal_options if next((row.status for row in rows if row.id == item["id"]), "") not in {"won", "lost", "done"}]
+            deal_title_by_id = {item["id"]: item["title"] for item in all_deal_options}
             for row in rows:
                 item = _crm_record_data(row)
                 stage = _crm_stage_for_value(item["stage_id"] or item["stage"], crm_stages)
                 item["stage_id"] = stage["id"]
                 item["stage"] = stage["title"]
+                item["related_deal_title"] = deal_title_by_id.get(item["related_deal_id"], "")
                 if not item["lead_source"]:
                     item["lead_source"] = item["contact_type"] or "Ручной ввод"
                 counterparty = counterparty_by_id.get(str(item.get("counterparty_id") or ""))
@@ -5733,13 +6094,23 @@ def create_app() -> FastAPI:
                     continue
                 if filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
+                if item["item_type"] == "history":
+                    history_date = str(item.get("date") or item.get("due_date") or "")
+                    if filters["date_from"] and history_date and history_date < filters["date_from"]:
+                        continue
+                    if filters["date_to"] and history_date and history_date > filters["date_to"]:
+                        continue
                 crm_records.append(item)
+                if item["item_type"] == "history":
+                    crm_history_records.append(item)
+                    continue
                 column = crm_stage_map.get(item["stage_id"]) or crm_stage_map[crm_stages[0]["id"]]
                 column["records"].append(item)
                 column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
             crm_options = {
                 "clients": sorted({row.name for row in counterparty_rows if row.name} | {item["client"] for item in crm_records if item["client"]}),
                 "responsibles": sorted({item["responsible"] for item in crm_records if item["responsible"]} | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())),
+                "deals": deal_options,
             }
         crm_kanban_columns = []
         for stage in crm_stages:
@@ -5755,6 +6126,7 @@ def create_app() -> FastAPI:
             crm_filters=filters,
             crm_options=crm_options,
             crm_records=crm_records,
+            crm_history_records=crm_history_records,
             crm_pipeline_stages=crm_stages,
             crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
             crm_kanban_columns=crm_kanban_columns,
@@ -5763,6 +6135,324 @@ def create_app() -> FastAPI:
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
+
+    TELEPHONY_CALL_STATUS = {
+        "answered": "Отвечен",
+        "missed": "Пропущен",
+        "planned": "Запланирован",
+        "blocked": "Заблокирован",
+    }
+    TELEPHONY_NUMBER_STATUS = {
+        "active": "Активен",
+        "paused": "Пауза",
+        "offline": "Отключен",
+    }
+    TELEPHONY_PROVIDER_STATUS = {
+        "online": "Онлайн",
+        "offline": "Оффлайн",
+        "testing": "Проверяется",
+        "draft": "Черновик",
+    }
+
+    def _telephony_settings_payload(workspace_owner_id: str) -> dict[str, Any]:
+        data = load_workspace_settings(workspace_owner_id)
+        for key in ("telephony_calls", "telephony_numbers", "telephony_providers"):
+            if not isinstance(data.get(key), list):
+                data[key] = []
+        return data
+
+    def _telephony_user_name(request: Request) -> str:
+        user = request.session.get("user") or {}
+        return str(user.get("name") or user.get("login") or "").strip()
+
+    def _telephony_status_label(kind: str, value: str) -> str:
+        clean = str(value or "").strip()
+        if kind == "call":
+            return TELEPHONY_CALL_STATUS.get(clean, clean or "-")
+        if kind == "number":
+            return TELEPHONY_NUMBER_STATUS.get(clean, clean or "-")
+        return TELEPHONY_PROVIDER_STATUS.get(clean, clean or "-")
+
+    def _telephony_direction_label(value: str) -> str:
+        return {"incoming": "Входящий", "outgoing": "Исходящий"}.get(str(value or "").strip(), value or "-")
+
+    def _telephony_rows_with_labels(rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["status_label"] = _telephony_status_label(kind, str(item.get("status") or ""))
+            if kind == "call":
+                item["direction_label"] = _telephony_direction_label(str(item.get("direction") or ""))
+            out.append(item)
+        return out
+
+    def _telephony_filter_rows(
+        rows: list[dict[str, Any]],
+        filters: dict[str, str],
+        *,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        q = filters.get("q", "").casefold()
+        provider = filters.get("provider", "").casefold()
+        responsible = filters.get("responsible", "").casefold()
+        status = filters.get("status", "all")
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            haystack = " ".join(str(row.get(key) or "") for key in row.keys()).casefold()
+            if q and q not in haystack:
+                continue
+            if provider and provider not in haystack:
+                continue
+            if responsible and responsible not in str(row.get("responsible") or "").casefold():
+                continue
+            if status and status != "all" and str(row.get("status") or "") != status:
+                continue
+            result.append(row)
+        if kind == "call":
+            result.sort(key=lambda item: str(item.get("started_at") or item.get("created_at") or ""), reverse=True)
+        return result
+
+    def _telephony_client_options(workspace_owner_id: str) -> list[str]:
+        with session_scope() as session:
+            rows = session.execute(
+                select(Counterparty)
+                .where(
+                    Counterparty.workspace_owner_id == workspace_owner_id,
+                    Counterparty.kind.in_(["client", "both"]),
+                )
+                .order_by(Counterparty.name.asc())
+            ).scalars()
+            return [row.name for row in rows if row.name]
+
+    def _telephony_save_item(workspace_owner_id: str, key: str, item: dict[str, Any]) -> None:
+        data = _telephony_settings_payload(workspace_owner_id)
+        items = data.get(key)
+        if not isinstance(items, list):
+            items = []
+        if not item.get("id"):
+            item["id"] = str(uuid.uuid4())
+        item["created_at"] = item.get("created_at") or datetime.now(timezone.utc).isoformat()
+        items.insert(0, item)
+        data[key] = items[:500]
+        save_workspace_settings(workspace_owner_id, data)
+
+    def _telephony_update_provider_test(workspace_owner_id: str, provider_id: str) -> tuple[str, str]:
+        data = _telephony_settings_payload(workspace_owner_id)
+        providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        target = next((item for item in providers if str(item.get("id")) == str(provider_id)), None)
+        if not target:
+            return "offline", "Провайдер не найден"
+        host = str(target.get("host") or target.get("endpoint") or "").strip()
+        transport = str(target.get("transport") or "UDP").strip().upper()
+        try:
+            port = int(str(target.get("port") or "5060").strip())
+        except ValueError:
+            port = 5060
+        status = "offline"
+        message = "Не указан SIP-сервер"
+        if host:
+            try:
+                if transport in {"TCP", "TLS"}:
+                    with socket.create_connection((host, port), timeout=3):
+                        pass
+                    message = f"{transport} соединение с {host}:{port} установлено"
+                else:
+                    probe = (
+                        f"REGISTER sip:{host} SIP/2.0\r\n"
+                        f"Via: SIP/2.0/UDP upos.local;branch=z9hG4bK{uuid.uuid4().hex[:8]}\r\n"
+                        f"From: <sip:{target.get('login') or 'upos'}@{host}>\r\n"
+                        f"To: <sip:{target.get('login') or 'upos'}@{host}>\r\n"
+                        f"Call-ID: {uuid.uuid4().hex}@upos\r\n"
+                        "CSeq: 1 REGISTER\r\n"
+                        "Max-Forwards: 70\r\n"
+                        "Content-Length: 0\r\n\r\n"
+                    )
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                        sock.settimeout(3)
+                        sock.sendto(probe.encode("utf-8"), (host, port))
+                    message = f"Тест REGISTER отправлен на {host}:{port}"
+                status = "online"
+            except OSError as exc:
+                message = str(exc) or "SIP-сервер не отвечает"
+        target["status"] = status
+        target["last_test_message"] = message
+        target["last_test_at"] = datetime.now(timezone.utc).isoformat()
+        data["telephony_providers"] = providers
+        save_workspace_settings(workspace_owner_id, data)
+        return status, message
+
+    def _messenger_settings_payload(workspace_owner_id: str) -> dict[str, Any]:
+        data = load_workspace_settings(workspace_owner_id)
+        for key in ("messenger_campaigns", "messenger_templates"):
+            if not isinstance(data.get(key), list):
+                data[key] = []
+        if not isinstance(data.get("messenger_auto_reply"), dict):
+            data["messenger_auto_reply"] = {
+                "enabled": False,
+                "greeting": "Здравствуйте, мы получили ваше сообщение и скоро ответим.",
+            }
+        return data
+
+    def _messenger_status_label(value: str) -> str:
+        return {
+            "active": "Активный",
+            "waiting": "Ожидает",
+            "paused": "Пауза",
+            "archived": "Архив",
+            "draft": "Черновик",
+            "scheduled": "Запланирована",
+            "sent": "Отправлена",
+        }.get(str(value or ""), str(value or "") or "-")
+
+    def _messenger_client_options(workspace_owner_id: str) -> list[str]:
+        with session_scope() as session:
+            rows = session.execute(
+                select(Counterparty)
+                .where(Counterparty.workspace_owner_id == workspace_owner_id)
+                .order_by(Counterparty.name.asc())
+            ).scalars().all()
+        names = []
+        for row in rows:
+            has_client, _ = _counterparty_role_flags(row.kind)
+            if has_client and row.name:
+                names.append(row.name)
+        return names
+
+    def _messenger_match_client(
+        clients: list[Counterparty],
+        *,
+        phone: str = "",
+        username: str = "",
+        display_name: str = "",
+    ) -> Counterparty | None:
+        clean_phone = re.sub(r"\D+", "", str(phone or ""))
+        clean_username = str(username or "").lstrip("@").lower()
+        clean_name = str(display_name or "").strip().lower()
+        for client in clients:
+            extra = _counterparty_extra(client)
+            client_phone = re.sub(r"\D+", "", str(client.phone or extra.get("phone") or ""))
+            client_telegram = str(extra.get("telegram") or extra.get("telegram_username") or "").lstrip("@").lower()
+            if clean_phone and client_phone and clean_phone.endswith(client_phone[-9:]):
+                return client
+            if clean_username and client_telegram and clean_username == client_telegram:
+                return client
+            if clean_name and client.name.strip().lower() == clean_name:
+                return client
+        return None
+
+    def _messenger_threads_from_sources(workspace_owner_id: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        with session_scope() as session:
+            clients = session.execute(
+                select(Counterparty)
+                .where(Counterparty.workspace_owner_id == workspace_owner_id)
+                .order_by(Counterparty.name.asc())
+            ).scalars().all()
+            subscribers = session.execute(
+                select(TelegramSubscriber)
+                .where(TelegramSubscriber.workspace_owner_id == workspace_owner_id)
+                .order_by(TelegramSubscriber.requested_at.desc())
+            ).scalars().all()
+            chats = session.execute(
+                select(TelegramChat)
+                .where(TelegramChat.workspace_owner_id == workspace_owner_id)
+                .order_by(TelegramChat.last_seen_at.desc())
+            ).scalars().all()
+
+        seen_chat_ids: set[str] = set()
+        for sub in subscribers:
+            title = str(sub.display_name or sub.username or sub.phone or sub.telegram_user_id or "Telegram").strip()
+            username = str(sub.username or "").strip()
+            client = _messenger_match_client(
+                clients,
+                phone=str(sub.phone or ""),
+                username=username,
+                display_name=title,
+            )
+            status_value = "active" if str(sub.status or "") == "approved" else "waiting"
+            rows.append(
+                {
+                    "id": f"telegram-sub-{sub.id}",
+                    "channel": "Telegram",
+                    "contact": client.name if client else title,
+                    "client": client.name if client else "",
+                    "topic": ("@" + username) if username else str(sub.phone or "Заявка Telegram"),
+                    "last_message": "Клиент ожидает ответа" if status_value == "waiting" else "Telegram-чат готов к работе",
+                    "responsible": "",
+                    "status": status_value,
+                    "status_label": _messenger_status_label(status_value),
+                    "updated_at": sub.decided_at or sub.requested_at,
+                    "messages": [
+                        {"author": title, "text": "Контакт Telegram синхронизирован с клиентской базой.", "kind": "in"},
+                        {"author": "UPOS", "text": "Можно прикрепить диалог к клиенту CRM и отвечать из центра сообщений.", "kind": "system"},
+                    ],
+                }
+            )
+            seen_chat_ids.add(str(sub.chat_id))
+
+        for chat in chats:
+            if str(chat.chat_id) in seen_chat_ids:
+                continue
+            status_value = "active" if chat.is_enabled else "waiting"
+            rows.append(
+                {
+                    "id": f"telegram-chat-{chat.id}",
+                    "channel": "Telegram",
+                    "contact": str(chat.title or chat.chat_id or "Telegram"),
+                    "client": "",
+                    "topic": str(chat.chat_type or "chat"),
+                    "last_message": "Чат найден ботом. Включите его для ручных сообщений.",
+                    "responsible": "",
+                    "status": status_value,
+                    "status_label": _messenger_status_label(status_value),
+                    "updated_at": chat.last_seen_at,
+                    "messages": [
+                        {"author": "Telegram", "text": "Чат доступен после обновления списка чатов.", "kind": "system"},
+                    ],
+                }
+            )
+
+        rows.sort(key=lambda item: item.get("updated_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        return rows
+
+    def _messenger_filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[dict[str, Any]]:
+        q = str(filters.get("q") or "").strip().lower()
+        channel = str(filters.get("channel") or "").strip().lower()
+        responsible = str(filters.get("responsible") or "").strip().lower()
+        status = str(filters.get("status") or "all").strip().lower() or "all"
+        result = []
+        for row in rows:
+            haystack = " ".join(
+                str(row.get(key) or "") for key in ("channel", "contact", "client", "topic", "last_message", "title", "name")
+            ).lower()
+            if q and q not in haystack:
+                continue
+            if channel and channel not in str(row.get("channel") or "").lower():
+                continue
+            if responsible and responsible not in str(row.get("responsible") or "").lower():
+                continue
+            if status != "all" and status != str(row.get("status") or "").lower():
+                continue
+            result.append(row)
+        return result
+
+    def _messenger_save_item(workspace_owner_id: str, key: str, item: dict[str, Any]) -> None:
+        data = _messenger_settings_payload(workspace_owner_id)
+        rows = data.get(key) if isinstance(data.get(key), list) else []
+        now = datetime.now(timezone.utc).isoformat()
+        item = dict(item)
+        item["id"] = item.get("id") or str(uuid.uuid4())
+        item["created_at"] = item.get("created_at") or now
+        item["updated_at"] = now
+        item["status_label"] = _messenger_status_label(str(item.get("status") or ""))
+        data[key] = [item] + [row for row in rows if str(row.get("id") or "") != item["id"]]
+        save_workspace_settings(workspace_owner_id, data)
+
+    def _messenger_delete_item(workspace_owner_id: str, key: str, item_id: str) -> None:
+        data = _messenger_settings_payload(workspace_owner_id)
+        rows = data.get(key) if isinstance(data.get(key), list) else []
+        data[key] = [row for row in rows if str(row.get("id") or "") != str(item_id or "")]
+        save_workspace_settings(workspace_owner_id, data)
 
     @app.get("/telephony", response_class=HTMLResponse, name="telephony_get")
     def telephony_get(
@@ -5782,9 +6472,30 @@ def create_app() -> FastAPI:
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
         }
-        user = request.session.get("user") or {}
-        provider_options = ["SIP", "АТС", "Telegram Call", "WhatsApp Call"]
-        responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
+        user_name = _telephony_user_name(request)
+        data = _telephony_settings_payload(wid)
+        providers = _telephony_rows_with_labels(list(data.get("telephony_providers") or []), "provider")
+        numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
+        calls = _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call")
+        provider_options = sorted(
+            {
+                "SIP",
+                "АТС",
+                "Telegram Call",
+                "WhatsApp Call",
+                *(str(item.get("name") or "").strip() for item in providers),
+            }
+            - {""}
+        )
+        responsible_options = sorted(
+            {
+                user_name,
+                *(str(item.get("responsible") or "").strip() for item in calls + numbers),
+                *(str(item.get("employee") or "").strip() for item in numbers),
+            }
+            - {""}
+        )
+        client_options = _telephony_client_options(wid)
         return tpl(
             request,
             "home_business_module.html",
@@ -5795,13 +6506,158 @@ def create_app() -> FastAPI:
             telephony_options={
                 "providers": provider_options,
                 "responsibles": responsible_options,
+                "clients": client_options,
             },
-            telephony_calls=[],
-            telephony_numbers=[],
-            telephony_providers=[],
+            telephony_calls=_telephony_filter_rows(calls, filters, kind="call"),
+            telephony_numbers=_telephony_filter_rows(numbers, filters, kind="number"),
+            telephony_providers=_telephony_filter_rows(providers, filters, kind="provider"),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
+
+    @app.post("/telephony/calls/save", name="telephony_call_save")
+    async def telephony_call_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#calls", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        client = str(form.get("client") or "").strip()
+        phone = str(form.get("phone") or "").strip()
+        if not client or not phone:
+            return RedirectResponse(url="/telephony?error=" + quote("Клиент и номер телефона обязательны") + "#calls", status_code=302)
+        _telephony_save_item(
+            wid,
+            "telephony_calls",
+            {
+                "client": client,
+                "phone": phone,
+                "direction": str(form.get("direction") or "outgoing").strip(),
+                "started_at": str(form.get("started_at") or datetime.now(timezone.utc).isoformat()).strip(),
+                "responsible": str(form.get("responsible") or _telephony_user_name(request)).strip(),
+                "status": str(form.get("status") or "planned").strip(),
+                "note": str(form.get("note") or "").strip(),
+            },
+        )
+        return RedirectResponse(url="/telephony?msg=saved#calls", status_code=302)
+
+    @app.post("/telephony/numbers/save", name="telephony_number_save")
+    async def telephony_number_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#numbers", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        number = str(form.get("number") or "").strip()
+        if not number:
+            return RedirectResponse(url="/telephony?error=" + quote("Номер телефона обязателен") + "#numbers", status_code=302)
+        _telephony_save_item(
+            wid,
+            "telephony_numbers",
+            {
+                "number": number,
+                "provider": str(form.get("provider") or "SIP").strip(),
+                "employee": str(form.get("employee") or "").strip(),
+                "responsible": str(form.get("employee") or "").strip(),
+                "mode": str(form.get("mode") or "Рабочие часы").strip(),
+                "forwarding": str(form.get("forwarding") or "").strip(),
+                "status": "active",
+            },
+        )
+        return RedirectResponse(url="/telephony?msg=saved#numbers", status_code=302)
+
+    @app.post("/telephony/providers/save", name="telephony_provider_save")
+    async def telephony_provider_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#integrations", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        name = str(form.get("name") or "").strip()
+        host = str(form.get("host") or "").strip()
+        login = str(form.get("login") or "").strip()
+        if not name or not host or not login:
+            return RedirectResponse(url="/telephony?error=" + quote("Название, SIP-сервер и логин обязательны") + "#integrations", status_code=302)
+        _telephony_save_item(
+            wid,
+            "telephony_providers",
+            {
+                "name": name,
+                "kind": "SIP",
+                "host": host,
+                "port": str(form.get("port") or "5060").strip() or "5060",
+                "endpoint": f"{host}:{str(form.get('port') or '5060').strip() or '5060'}",
+                "login": login,
+                "account": login,
+                "password": str(form.get("password") or "").strip(),
+                "codec": str(form.get("codec") or "G711").strip(),
+                "transport": str(form.get("transport") or "UDP").strip(),
+                "employee": str(form.get("employee") or "").strip(),
+                "status": "draft",
+                "note": str(form.get("note") or "").strip(),
+            },
+        )
+        return RedirectResponse(url="/telephony?msg=saved#integrations", status_code=302)
+
+    @app.post("/telephony/providers/test", name="telephony_provider_test")
+    async def telephony_provider_test(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#integrations", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        status_value, message = _telephony_update_provider_test(wid, str(form.get("provider_id") or ""))
+        key = "saved" if status_value == "online" else "sip_test_failed"
+        return RedirectResponse(url=f"/telephony?msg={quote(key)}&note={quote(message)}#integrations", status_code=302)
+
+    @app.post("/api/telephony/incoming-call", name="telephony_incoming_call_api")
+    async def telephony_incoming_call_api(request: Request):
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        user = request.session.get("user") or {}
+        wid = str(payload.get("workspace_owner_id") or user.get("workspace_owner_id") or user.get("user_id") or "").strip()
+        if not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=401)
+        raw_phone = str(payload.get("phone") or payload.get("from") or payload.get("caller") or "").strip()
+        clean_phone = re.sub(r"\D+", "", raw_phone)
+        client_name = str(payload.get("client") or "").strip()
+        with session_scope() as session:
+            if not client_name and clean_phone:
+                clients = session.execute(
+                    select(Counterparty)
+                    .where(Counterparty.workspace_owner_id == wid)
+                    .order_by(Counterparty.updated_at.desc())
+                ).scalars().all()
+                for client in clients:
+                    extra = _counterparty_extra(client)
+                    client_phone = re.sub(r"\D+", "", str(client.phone or extra.get("phone") or ""))
+                    if client_phone and clean_phone.endswith(client_phone[-9:]):
+                        client_name = client.name
+                        break
+        call_item = {
+            "client": client_name or "Неизвестный клиент",
+            "phone": raw_phone,
+            "direction": "incoming",
+            "started_at": str(payload.get("started_at") or datetime.now(timezone.utc).isoformat()[:16]),
+            "responsible": str(payload.get("responsible") or "").strip(),
+            "status": str(payload.get("status") or "missed").strip() or "missed",
+            "note": str(payload.get("note") or "Входящий webhook").strip(),
+            "source": "webhook",
+        }
+        _telephony_save_item(wid, "telephony_calls", call_item)
+        call_item["direction_label"] = _telephony_direction_label(call_item["direction"])
+        call_item["status_label"] = _telephony_status_label("call", call_item["status"])
+        return JSONResponse({"ok": True, "call": call_item, "client": client_name})
 
     @app.get("/messengers", response_class=HTMLResponse, name="messengers_get")
     def messengers_get(
@@ -5824,6 +6680,17 @@ def create_app() -> FastAPI:
         user = request.session.get("user") or {}
         channel_options = ["Telegram", "WhatsApp", "Instagram", "Facebook Messenger", "SMS"]
         responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
+        data = _messenger_settings_payload(wid)
+        threads = _messenger_filter_rows(_messenger_threads_from_sources(wid), filters)
+        campaigns = _messenger_filter_rows(
+            [dict(row, status_label=_messenger_status_label(str(row.get("status") or ""))) for row in data.get("messenger_campaigns") or []],
+            filters,
+        )
+        templates_rows = _messenger_filter_rows(
+            [dict(row, status_label=_messenger_status_label(str(row.get("status") or "active"))) for row in data.get("messenger_templates") or []],
+            filters,
+        )
+        auto_reply = data.get("messenger_auto_reply") if isinstance(data.get("messenger_auto_reply"), dict) else {}
         return tpl(
             request,
             "home_business_module.html",
@@ -5834,13 +6701,137 @@ def create_app() -> FastAPI:
             messenger_options={
                 "channels": channel_options,
                 "responsibles": responsible_options,
+                "clients": _messenger_client_options(wid),
             },
-            messenger_threads=[],
-            messenger_campaigns=[],
-            messenger_templates=[],
+            messenger_threads=threads,
+            messenger_campaigns=campaigns,
+            messenger_templates=templates_rows,
+            messenger_auto_reply=auto_reply,
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
+
+    @app.post("/messengers/campaigns/save", name="messenger_campaign_save")
+    async def messenger_campaign_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/messengers?err=csrf#campaigns", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        title = str(form.get("title") or "").strip()
+        if not title:
+            return RedirectResponse(url="/messengers?error=" + quote("Название кампании обязательно") + "#campaigns", status_code=302)
+        status_value = str(form.get("action") or "draft").strip()
+        status_value = "scheduled" if status_value == "launch" else "draft"
+        _messenger_save_item(
+            wid,
+            "messenger_campaigns",
+            {
+                "title": title,
+                "channel": str(form.get("channel") or "Telegram").strip(),
+                "segment": str(form.get("segment") or "").strip(),
+                "template": str(form.get("template") or "").strip(),
+                "message": str(form.get("message") or "").strip(),
+                "run_at": str(form.get("run_at") or "").strip(),
+                "status": status_value,
+                "note": str(form.get("note") or "").strip(),
+            },
+        )
+        return RedirectResponse(url="/messengers?msg=saved#campaigns", status_code=302)
+
+    @app.post("/messengers/templates/save", name="messenger_template_save")
+    async def messenger_template_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/messengers?err=csrf#templates", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        title = str(form.get("title") or "").strip()
+        text_value = str(form.get("text") or "").strip()
+        if not title or not text_value:
+            return RedirectResponse(url="/messengers?error=" + quote("Название и текст шаблона обязательны") + "#templates", status_code=302)
+        _messenger_save_item(
+            wid,
+            "messenger_templates",
+            {
+                "title": title,
+                "channel": str(form.get("channel") or "Telegram").strip(),
+                "scenario": str(form.get("scenario") or "reply").strip(),
+                "text": text_value,
+                "preview": text_value[:120],
+                "status": str(form.get("status") or "active").strip() or "active",
+            },
+        )
+        return RedirectResponse(url="/messengers?msg=saved#templates", status_code=302)
+
+    @app.post("/messengers/templates/{template_id}/delete", name="messenger_template_delete")
+    async def messenger_template_delete(request: Request, template_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/messengers?err=csrf#templates", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        _messenger_delete_item(wid, "messenger_templates", template_id)
+        return RedirectResponse(url="/messengers?msg=deleted#templates", status_code=302)
+
+    @app.post("/messengers/auto-reply/save", name="messenger_auto_reply_save")
+    async def messenger_auto_reply_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/messengers?err=csrf#telegram", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        data = _messenger_settings_payload(wid)
+        data["messenger_auto_reply"] = {
+            "enabled": str(form.get("auto_reply_enabled") or "") == "1",
+            "greeting": str(form.get("greeting") or "").strip(),
+        }
+        save_workspace_settings(wid, data)
+        return RedirectResponse(url="/messengers?msg=saved#telegram", status_code=302)
+
+    @app.get("/products/catalog")
+    def products_catalog_redirect():
+        return RedirectResponse(url="/products#catalog", status_code=302)
+
+    @app.get("/products/pricelists")
+    def products_pricelists_redirect():
+        return RedirectResponse(url="/products#price-types", status_code=302)
+
+    @app.get("/warehouse/stocks")
+    def warehouse_stocks_redirect():
+        return RedirectResponse(url="/warehouse#stocks", status_code=302)
+
+    @app.get("/warehouse/movements")
+    def warehouse_movements_redirect():
+        return RedirectResponse(url="/warehouse#adjustments", status_code=302)
+
+    @app.get("/warehouse/transfers")
+    def warehouse_transfers_redirect():
+        return RedirectResponse(url="/warehouse#transfers", status_code=302)
+
+    @app.get("/clients/routes")
+    def clients_routes_redirect():
+        return RedirectResponse(url="/clients#routes", status_code=302)
+
+    @app.get("/crm/history")
+    def crm_history_redirect():
+        return RedirectResponse(url="/crm#history", status_code=302)
+
+    @app.get("/telephony/integrations")
+    def telephony_integrations_redirect():
+        return RedirectResponse(url="/telephony#integrations", status_code=302)
+
+    @app.get("/messengers/telegram")
+    def messengers_telegram_redirect():
+        return RedirectResponse(url="/messengers#telegram", status_code=302)
 
     @app.post("/crm/save", name="crm_save")
     async def crm_save(request: Request):
@@ -6119,6 +7110,35 @@ def create_app() -> FastAPI:
         delivery_shipments: list[dict[str, Any]] = []
         delivery_payments: list[dict[str, Any]] = []
         delivery_shipment_totals: dict[str, Any] = {"currencies": []}
+        business_reports: dict[str, Any] = {
+            "sales": {"summary": {}, "top_clients": [], "top_products": [], "days": []},
+            "stock": {"summary": {}, "rows": []},
+            "receivables": {"summary": {}, "rows": []},
+            "calls": {"summary": {}, "rows": []},
+        }
+
+        def _report_date(data: dict[str, Any], created_at: Any) -> str:
+            raw = str(data.get("date") or data.get("created_at") or "").strip()
+            if raw:
+                return raw[:10]
+            try:
+                return created_at.date().isoformat()
+            except Exception:
+                return ""
+
+        def _report_in_period(date_value: str) -> bool:
+            clean = str(date_value or "")[:10]
+            date_from = str(report_period.get("date_from") or "")
+            date_to = str(report_period.get("date_to") or "")
+            if date_from and clean and clean < date_from:
+                return False
+            if date_to and clean and clean > date_to:
+                return False
+            return True
+
+        def _report_money(raw: Any, currency: str = "UZS") -> str:
+            return f"{_sales_money_label(raw)} {str(currency or 'UZS').upper()}"
+
         if valid_workspace_owner_id(wid):
             try:
                 recompute_delivery_debts(wid)
@@ -6134,6 +7154,218 @@ def create_app() -> FastAPI:
                 delivery_shipment_totals = shipment_totals(wid)
             except Exception:
                 logger.exception("[upos] delivery debts failed for reports; wid=%s", wid)
+            try:
+                with session_scope() as session:
+                    sales_rows = session.execute(
+                        select(SaleDocument)
+                        .where(SaleDocument.workspace_owner_id == wid)
+                        .order_by(SaleDocument.created_at.desc())
+                    ).scalars().all()
+                    operations = session.execute(
+                        select(WarehouseOperation)
+                        .where(WarehouseOperation.workspace_owner_id == wid)
+                        .order_by(WarehouseOperation.created_at.desc())
+                    ).scalars().all()
+                    products = session.execute(
+                        select(Product)
+                        .where(Product.workspace_owner_id == wid)
+                        .order_by(Product.name.asc())
+                    ).scalars().all()
+                    crm_rows = session.execute(
+                        select(CrmRecord)
+                        .where(CrmRecord.workspace_owner_id == wid)
+                        .order_by(CrmRecord.created_at.desc())
+                    ).scalars().all()
+
+                sale_docs = []
+                top_clients: dict[str, Decimal] = {}
+                top_products: dict[str, Decimal] = {}
+                day_totals: dict[str, Decimal] = {}
+                receivables: dict[str, dict[str, Any]] = {}
+                for row in sales_rows:
+                    data = _json_object(row.data)
+                    doc_date = _report_date(data, row.created_at)
+                    if not _report_in_period(doc_date):
+                        continue
+                    doc_type = str(data.get("doc_type") or "sale")
+                    if doc_type == "return":
+                        continue
+                    amount = _sales_decimal(row.amount)
+                    currency = str(row.currency or data.get("currency") or "UZS").upper()
+                    client = str(data.get("client") or "Без клиента").strip() or "Без клиента"
+                    sale_docs.append(row)
+                    top_clients[client] = top_clients.get(client, Decimal("0")) + amount
+                    day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount
+                    for line in data.get("lines") if isinstance(data.get("lines"), list) else []:
+                        product_name = str(line.get("product") or "Без товара").strip() or "Без товара"
+                        top_products[product_name] = top_products.get(product_name, Decimal("0")) + _sales_decimal(line.get("quantity"))
+                    paid_amount = _sales_decimal(data.get("paid_amount"))
+                    debt_amount = amount - paid_amount
+                    if debt_amount > 0:
+                        rec = receivables.setdefault(
+                            client,
+                            {
+                                "client": client,
+                                "debt": Decimal("0"),
+                                "currency": currency,
+                                "last_payment": str(data.get("paid_at") or data.get("payment_date") or ""),
+                                "last_sale_date": doc_date,
+                            },
+                        )
+                        rec["debt"] += debt_amount
+                        rec["last_sale_date"] = max(str(rec.get("last_sale_date") or ""), doc_date)
+
+                sales_total = sum((top_clients.values()), Decimal("0"))
+                max_day = max((float(value) for value in day_totals.values()), default=0.0)
+                business_reports["sales"] = {
+                    "summary": {
+                        "period": report_data["period_label"],
+                        "amount": _report_money(sales_total, primary_currency),
+                        "count": len(sale_docs),
+                    },
+                    "top_clients": [
+                        {"name": name, "amount": _report_money(amount, primary_currency)}
+                        for name, amount in sorted(top_clients.items(), key=lambda item: item[1], reverse=True)[:10]
+                    ],
+                    "top_products": [
+                        {"name": name, "quantity": _sales_money_label(quantity)}
+                        for name, quantity in sorted(top_products.items(), key=lambda item: item[1], reverse=True)[:10]
+                    ],
+                    "days": [
+                        {
+                            "date": date,
+                            "amount": _report_money(amount, primary_currency),
+                            "bar_width": 0 if max_day <= 0 else max(4, round(float(amount) / max_day * 100)),
+                        }
+                        for date, amount in sorted(day_totals.items())
+                    ],
+                }
+
+                stock_movements: dict[str, dict[str, Any]] = {}
+                for product in products:
+                    data = _json_object(product.data)
+                    current_qty = Decimal("0")
+                    for item in data.get("stocks") if isinstance(data.get("stocks"), list) else []:
+                        current_qty += _sales_decimal(item.get("quantity"))
+                    cost = _sales_decimal(data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price"))
+                    stock_movements[product.name] = {
+                        "product": product.name,
+                        "incoming": Decimal("0"),
+                        "outgoing": Decimal("0"),
+                        "begin": current_qty,
+                        "end": current_qty,
+                        "cost": cost,
+                        "currency": str(data.get("currency") or "UZS").upper(),
+                    }
+                for op in operations:
+                    data = _json_object(op.data)
+                    op_date = _report_date(data, op.created_at)
+                    if not _report_in_period(op_date):
+                        continue
+                    product_name = str(data.get("product") or data.get("product_name") or "")
+                    if not product_name and op.product_id:
+                        matched = next((product.name for product in products if product.id == op.product_id), "")
+                        product_name = matched
+                    product_name = product_name or "Без товара"
+                    row = stock_movements.setdefault(
+                        product_name,
+                        {
+                            "product": product_name,
+                            "incoming": Decimal("0"),
+                            "outgoing": Decimal("0"),
+                            "begin": Decimal("0"),
+                            "end": Decimal("0"),
+                            "cost": _sales_decimal(op.amount),
+                            "currency": str(op.currency or "UZS").upper(),
+                        },
+                    )
+                    quantity = _sales_decimal(op.quantity)
+                    kind = str(op.operation_type or data.get("operation_type") or "").lower()
+                    if kind in {"incoming", "in", "receipt", "purchase"}:
+                        row["incoming"] += quantity
+                        row["begin"] -= quantity
+                    elif kind in {"outgoing", "out", "writeoff", "sale"}:
+                        row["outgoing"] += quantity
+                        row["begin"] += quantity
+                    if op.amount:
+                        row["cost"] = _sales_decimal(op.amount)
+                stock_rows = []
+                stock_total = Decimal("0")
+                for row in stock_movements.values():
+                    total = _sales_decimal(row.get("end")) * _sales_decimal(row.get("cost"))
+                    stock_total += total
+                    stock_rows.append(
+                        {
+                            "product": row["product"],
+                            "begin": _sales_money_label(row.get("begin")),
+                            "incoming": _sales_money_label(row.get("incoming")),
+                            "outgoing": _sales_money_label(row.get("outgoing")),
+                            "end": _sales_money_label(row.get("end")),
+                            "cost": _report_money(row.get("cost"), row.get("currency")),
+                            "total": _report_money(total, row.get("currency")),
+                        }
+                    )
+                business_reports["stock"] = {
+                    "summary": {"items": len(stock_rows), "total": _report_money(stock_total, primary_currency)},
+                    "rows": stock_rows[:50],
+                }
+
+                today = datetime.now(timezone.utc).date()
+                receivable_rows = []
+                receivable_total = Decimal("0")
+                for row in receivables.values():
+                    debt = _sales_decimal(row.get("debt"))
+                    receivable_total += debt
+                    last_date = str(row.get("last_sale_date") or "")
+                    try:
+                        overdue_days = max(0, (today - datetime.fromisoformat(last_date).date()).days)
+                    except Exception:
+                        overdue_days = 0
+                    receivable_rows.append(
+                        {
+                            "client": row["client"],
+                            "debt": _report_money(debt, row.get("currency")),
+                            "last_payment": row.get("last_payment") or "-",
+                            "overdue_days": overdue_days,
+                        }
+                    )
+                receivable_rows.sort(key=lambda item: item["overdue_days"], reverse=True)
+                business_reports["receivables"] = {
+                    "summary": {"clients": len(receivable_rows), "total": _report_money(receivable_total, primary_currency)},
+                    "rows": receivable_rows[:50],
+                }
+
+                settings_payload = _telephony_settings_payload(wid)
+                calls = settings_payload.get("telephony_calls") if isinstance(settings_payload.get("telephony_calls"), list) else []
+                period_calls = [call for call in calls if _report_in_period(str(call.get("started_at") or call.get("created_at") or "")[:10])]
+                answered = [call for call in period_calls if str(call.get("status") or "") == "answered"]
+                missed = [call for call in period_calls if str(call.get("status") or "") == "missed"]
+                call_deals = [
+                    row
+                    for row in crm_rows
+                    if "звон" in str(_json_object(row.data).get("lead_source") or _json_object(row.data).get("contact_type") or "").lower()
+                ]
+                conversion = 0 if not period_calls else round(len(call_deals) / len(period_calls) * 100)
+                business_reports["calls"] = {
+                    "summary": {
+                        "total": len(period_calls),
+                        "answered": len(answered),
+                        "missed": len(missed),
+                        "conversion": conversion,
+                    },
+                    "rows": [
+                        {
+                            "client": str(call.get("client") or "-"),
+                            "phone": str(call.get("phone") or "-"),
+                            "status": _telephony_status_label("call", str(call.get("status") or "")),
+                            "responsible": str(call.get("responsible") or "-"),
+                            "date": str(call.get("started_at") or call.get("created_at") or "")[:16],
+                        }
+                        for call in period_calls[:20]
+                    ],
+                }
+            except Exception:
+                logger.exception("[upos] business reports failed; wid=%s", wid)
         return tpl(
             request,
             "home_reports.html",
@@ -6147,6 +7379,7 @@ def create_app() -> FastAPI:
             delivery_payments=delivery_payments,
             delivery_shipment_totals=delivery_shipment_totals,
             courier_debt_limits=courier_debt_limits,
+            business_reports=business_reports,
         )
 
     @app.get("/adjustments", response_class=HTMLResponse, name="home_adjustments")

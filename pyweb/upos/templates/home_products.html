@@ -4,6 +4,8 @@
 {% set current = edit_product or {} %}
 {% set prices = current.prices if current and current.prices else [{"name": "Продажная цена", "price": "", "currency": "UZS"}] %}
 {% set stocks = current.stocks if current and current.stocks else [{"warehouse": "Основной склад", "quantity": "", "price": "", "date": ""}] %}
+{% set purchase_history = current.purchase_history if current and current.purchase_history else [{"date": "", "warehouse": "Основной склад", "quantity": "", "price": "", "supplier": ""}] %}
+{% set variations = current.variations if current and current.variations else [{"attribute": "Размер", "values": []}, {"attribute": "Цвет", "values": []}] %}
 {% set products_default_tab = ('product-' ~ edit_product.id) if edit_product else '' %}
 
 {% block page_header %}
@@ -15,7 +17,7 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=3" defer></script>
 {% endblock %}
 
 {% block main %}
@@ -213,6 +215,21 @@
                     <span>Название</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
+                <th data-column-label="Артикул" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="sku">
+                    <span>Артикул</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Штрихкод" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="barcode">
+                    <span>Штрихкод</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Единица хранения" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="unit">
+                    <span>Ед. хранения</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="На складе" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="quantity">
                     <span>На складе</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -243,6 +260,9 @@
                 <tr
                   data-product-row
                   data-sort-name="{{ (product.name or '')|lower }}"
+                  data-sort-sku="{{ (product.sku or '')|lower }}"
+                  data-sort-barcode="{{ (product.barcode or '')|lower }}"
+                  data-sort-unit="{{ (product.unit or '')|lower }}"
                   data-sort-quantity="{{ product.quantity or 0 }}"
                   data-sort-price="{{ product.sale_price or 0 }}"
                   data-sort-category="{{ (product.category or '')|lower }}"
@@ -282,6 +302,9 @@
                       </a>
                     </div>
                   </td>
+                  <td>{{ product.sku or "-" }}</td>
+                  <td>{{ product.barcode or "-" }}</td>
+                  <td>{{ product.unit or "-" }}</td>
                   <td>{{ product.quantity }} {{ product.unit }}</td>
                   <td>
                     {% if product.sale_price %}{{ product.sale_price }} {{ product.sale_currency }}{% else %}-{% endif %}
@@ -308,7 +331,7 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="7">Пока нет товаров. Создайте первый товар справа.</td>
+                  <td colspan="10">Пока нет товаров. Создайте первый товар справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -380,13 +403,60 @@
             </div>
           </section>
 
+          <section class="product-form-section product-variations-section" data-product-variations>
+            <div class="product-form-section-head">
+              <h3>Характеристики товара коллекции</h3>
+              <button class="btn btn-secondary btn-sm" type="button" data-products-add-variation-row>+ Атрибут</button>
+            </div>
+            <div class="product-variation-list" data-products-variation-list>
+              {% for variation in variations %}
+                <div class="product-line-grid product-line-grid--variation" data-products-variation-row>
+                  <input name="variation_attribute" value="{{ variation.attribute or '' }}" placeholder="Размер / Цвет / Материал" />
+                  <input name="variation_values" value="{{ variation.values_text or '' }}" placeholder="S, M, L или Красный, Чёрный" />
+                  <button type="button" class="btn btn-secondary" data-products-remove-line>×</button>
+                </div>
+              {% endfor %}
+            </div>
+            <p class="product-form-hint">Для коллекций укажите атрибуты и значения через запятую. Система сохранит их как структуру для будущих вариаций.</p>
+          </section>
+
           <section class="product-form-section">
-            <h3>Фото и история</h3>
+            <h3>Фото</h3>
             <div class="product-form-grid">
               <label class="wide"><span>Фото URL</span><input name="photo_url" type="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
-              <label class="wide"><span>История приходов JSON</span><textarea name="purchase_history_json" rows="6" placeholder='[{"date":"2026-06-16","warehouse":"Основной склад","quantity":"10","price":"50000","supplier":"Foxid"}]'>{{ current.purchase_history_json or '' }}</textarea></label>
             </div>
-            <p class="product-form-hint">Для анализа можно хранить историю приходов, закупочную цену, количество и ссылку на фото из внешней системы.</p>
+            <p class="product-form-hint">Фото можно использовать для каталога и анализа данных из внешней системы.</p>
+          </section>
+
+          <section class="product-form-section">
+            <div class="product-form-section-head">
+              <h3>История приходов</h3>
+              <button class="btn btn-secondary btn-sm" type="button" data-products-add-purchase-row>+ Добавить строку</button>
+            </div>
+            <div class="product-purchase-table" data-products-purchase-table>
+              <div class="product-purchase-row product-purchase-row--head">
+                <span>Дата</span>
+                <span>Склад</span>
+                <span>Количество</span>
+                <span>Цена</span>
+                <span>Поставщик</span>
+                <span></span>
+              </div>
+              <div data-products-purchase-list>
+                {% for row in purchase_history %}
+                  <div class="product-purchase-row" data-products-purchase-row>
+                    <input name="purchase_date" type="date" value="{{ row.date or '' }}" />
+                    <input name="purchase_warehouse" value="{{ row.warehouse or 'Основной склад' }}" placeholder="Склад" />
+                    <input name="purchase_quantity" value="{{ row.quantity or '' }}" placeholder="К-во" inputmode="decimal" />
+                    <input name="purchase_price" value="{{ row.price or '' }}" placeholder="Цена" inputmode="decimal" />
+                    <input name="purchase_supplier" value="{{ row.supplier or '' }}" placeholder="Поставщик" />
+                    <button type="button" class="btn btn-secondary" data-products-remove-line>×</button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+            <input type="hidden" name="purchase_history_json" value="{{ current.purchase_history_json or '' }}" />
+            <p class="product-form-hint">История приходов хранит закупочную цену, количество и поставщика без ручного JSON.</p>
           </section>
 
           <section class="product-form-section">
@@ -412,13 +482,32 @@
     <section class="products-dictionaries" data-workspace-view="price_types folders" hidden>
       <article id="price-types" data-workspace-view="price_types" hidden>
         <h2>Прайс-листы</h2>
-        <p>Используются внутри карточки товара: продажная цена, скидочная цена, приходная цена, стандартная цена.</p>
-        <div class="products-chip-row">
-          {% for item in product_options.price_types %}
-            <span>{{ item }}</span>
-          {% else %}
-            <span>Продажная цена</span><span>Скидочная цена</span><span>Приходная цена</span><span>Стандартная цена</span>
-          {% endfor %}
+        <p>Прайс-листы используются в карточках товаров и позволяют хранить продажные, скидочные и приходные цены.</p>
+        <div class="products-table-wrap">
+          <table class="products-table" data-upos-column-controls>
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Тип</th>
+                <th>Валюта</th>
+                <th>Значение по умолчанию</th>
+                <th>Товаров</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in product_options.price_lists %}
+                <tr>
+                  <td><strong>{{ item.name }}</strong></td>
+                  <td>{{ item.type }}</td>
+                  <td>{{ item.currency }}</td>
+                  <td>{{ item.default_value or "-" }}</td>
+                  <td>{{ item.product_count }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5">Прайс-листы пока не настроены. Добавьте цену в карточке товара.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </article>
       <article id="folders" data-workspace-view="folders" hidden>

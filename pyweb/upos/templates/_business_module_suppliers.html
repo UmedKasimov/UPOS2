@@ -36,7 +36,7 @@
       </div>
     </header>
     <div class="products-table-wrap">
-      <table class="products-table">
+      <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
             <th>Название</th>
@@ -50,7 +50,22 @@
         <tbody>
           {% for supplier in supplier_records %}
             <tr>
-              <td><strong>{{ supplier.name }}</strong><small>{{ supplier.official_name }}</small></td>
+              {% set supplier_tab_href = url_for('suppliers_get') ~ '?supplier=' ~ supplier.id %}
+              <td>
+                <a
+                  class="client-open-link product-cell-meta"
+                  href="{{ supplier_tab_href }}#supplier-card"
+                  data-workspace-trigger="profile"
+                  data-workspace-tab-id="supplier-{{ supplier.id }}"
+                  data-workspace-view-id="profile"
+                  data-workspace-tab-title="{{ supplier.name }}"
+                  data-workspace-tab-hash="supplier-card"
+                  data-workspace-tab-href="{{ supplier_tab_href }}"
+                >
+                  <strong>{{ supplier.name }}</strong>
+                  <small>{{ supplier.official_name or supplier.category or "Поставщик" }}</small>
+                </a>
+              </td>
               <td>{{ supplier.balance }} UZS</td>
               <td>{{ supplier.last_date or "-" }}</td>
               <td>{{ supplier.phone or "-" }}</td>
@@ -106,7 +121,7 @@
       </div>
     </header>
     <div class="products-table-wrap">
-      <table class="products-table">
+      <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
             <th>№</th>
@@ -194,11 +209,128 @@
   </aside>
 </div>
 
+{% if selected_supplier_card %}
+  {% set selected_supplier_href = url_for('suppliers_get') ~ '?supplier=' ~ selected_supplier_card.id %}
+  <span
+    hidden
+    data-workspace-trigger="profile"
+    data-workspace-tab-id="supplier-{{ selected_supplier_card.id }}"
+    data-workspace-view-id="profile"
+    data-workspace-tab-title="{{ selected_supplier_card.name }}"
+    data-workspace-tab-hash="supplier-card"
+    data-workspace-tab-href="{{ selected_supplier_href }}"
+  ></span>
+
+  <section class="client-card-shell" id="supplier-card" data-workspace-view="profile" hidden>
+    <header class="client-card-header">
+      <div>
+        <span class="client-card-kicker">Карточка поставщика</span>
+        <h2>{{ selected_supplier_card.name }}</h2>
+        <p>{{ selected_supplier_card.official_name or selected_supplier_card.category or "Поставщик и закупки" }}</p>
+      </div>
+      <div class="client-card-actions">
+        <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}#purchases">Закупки</a>
+        <a class="btn" href="{{ url_for('suppliers_get') }}#payables">Кредиторка</a>
+      </div>
+    </header>
+
+    <div class="client-card-metrics" aria-label="Ключевые показатели поставщика">
+      <div>
+        <span>Кредиторка</span>
+        <strong>{{ selected_supplier_card.summary.payable }} UZS</strong>
+      </div>
+      <div>
+        <span>Закупки</span>
+        <strong>{{ selected_supplier_card.summary.purchases }} UZS</strong>
+      </div>
+      <div>
+        <span>Оплачено</span>
+        <strong>{{ selected_supplier_card.summary.paid }} UZS</strong>
+      </div>
+      <div>
+        <span>Документов</span>
+        <strong>{{ selected_supplier_card.summary.purchase_count }}</strong>
+      </div>
+    </div>
+
+    <div class="client-card-grid client-card-grid--even">
+      <article class="client-card-panel">
+        <header>
+          <div>
+            <h3>История закупок</h3>
+            <span>Последние документы прихода</span>
+          </div>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Склад</th>
+                <th>Сумма</th>
+                <th>Долг</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_supplier_card.purchases %}
+                <tr>
+                  <td>{{ row.number }}</td>
+                  <td>{{ row.date or "-" }}</td>
+                  <td>{{ row.warehouse or "-" }}</td>
+                  <td>{{ row.amount }} {{ row.currency }}</td>
+                  <td>{{ row.debt_amount }} {{ row.currency }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5">Закупок по поставщику пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="client-card-panel">
+        <header>
+          <div>
+            <h3>Кредиторка</h3>
+            <span>Открытые долги перед поставщиком</span>
+          </div>
+          <strong>{{ selected_supplier_card.summary.payable }} UZS</strong>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Документ</th>
+                <th>Дата</th>
+                <th>Оплачено</th>
+                <th>Долг</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_supplier_card.payables %}
+                <tr>
+                  <td>{{ row.number }}</td>
+                  <td>{{ row.date or "-" }}</td>
+                  <td>{{ row.paid_amount }} {{ row.currency }}</td>
+                  <td>{{ row.debt_amount }} {{ row.currency }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4">Открытых долгов по поставщику пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+{% endif %}
+
 <section class="products-dictionaries" data-workspace-view="payables" hidden>
   <article data-workspace-view="payables" hidden>
     <h2>Кредиторка</h2>
     <div class="products-table-wrap">
-      <table class="products-table">
+      <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
             <th>Документ</th>

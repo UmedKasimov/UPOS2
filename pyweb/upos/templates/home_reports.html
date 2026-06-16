@@ -43,6 +43,34 @@
         <span>Баланс доставщиков</span>
         <small>Дебет / кредит</small>
       </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="sales-overview" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-3 3 2 5-7"/><path d="M18 7h1v1"/></svg>
+        </span>
+        <span>Продажи</span>
+        <small>Сумма, клиенты, товары</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="stock-movement" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 13h10"/><path d="m8 17-3-3 3-3"/><path d="m16 11 3 3-3 3"/></svg>
+        </span>
+        <span>Движение по складу</span>
+        <small>Приходы, списания, остатки</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="receivables" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M17 16h3"/></svg>
+        </span>
+        <span>Дебиторская задолженность</span>
+        <small>Долги клиентов</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="calls-conversion" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/><path d="M14 3h7v7"/><path d="m21 3-9 9"/></svg>
+        </span>
+        <span>Звонки и конверсия</span>
+        <small>Ответы и сделки</small>
+      </button>
     </section>
 
     <div class="reports-root general-reports-root org-reports-root" data-org-reports-root hidden>
@@ -173,6 +201,178 @@
         </div>
       </section>
 
+      <section class="reports-panel" id="report-sales-overview" data-org-report-panel="sales-overview" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Продажи</p>
+            <h2>Продажи за период</h2>
+            <p>{{ business_reports.sales.summary.period }} · документов: {{ business_reports.sales.summary.count or 0 }}</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.sales.summary.amount or "0 UZS" }}</b> сумма продаж</span>
+          </div>
+        </header>
+        <div class="reports-analysis-grid">
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Топ-10 клиентов</h3><p>По сумме продаж</p></div></div>
+            <div class="reports-category-list">
+              {% for row in business_reports.sales.top_clients %}
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}</span><strong>{{ row.amount }}</strong></div></div>
+              {% else %}
+                <div class="reports-empty-state">Продаж за период пока нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Топ-10 товаров</h3><p>По количеству</p></div></div>
+            <div class="reports-category-list">
+              {% for row in business_reports.sales.top_products %}
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}</span><strong>{{ row.quantity }}</strong></div></div>
+              {% else %}
+                <div class="reports-empty-state">Товарных строк пока нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+        <article class="reports-flow">
+          <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>График по дням</h3><p>Сумма продаж</p></div></div>
+          <div class="reports-category-list">
+            {% for row in business_reports.sales.days %}
+              <div class="reports-category-row">
+                <div class="reports-category-main"><span>{{ row.date }}</span><strong>{{ row.amount }}</strong></div>
+                <div class="reports-category-meta"><div class="reports-bar-track"><span style="width: {{ row.bar_width }}%"></span></div></div>
+              </div>
+            {% else %}
+              <div class="reports-empty-state">Нет данных для графика.</div>
+            {% endfor %}
+          </div>
+        </article>
+      </section>
+
+      <section class="reports-panel" id="report-stock-movement" data-org-report-panel="stock-movement" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Склад</p>
+            <h2>Движение по складу</h2>
+            <p>Приходы, списания и остатки по каждому товару.</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.stock.summary.total or "0 UZS" }}</b> сумма остатков</span>
+          </div>
+        </header>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>Товар</th>
+                <th>Начало</th>
+                <th>Приход</th>
+                <th>Списание</th>
+                <th>Конец</th>
+                <th>Себестоимость</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.stock.rows %}
+                <tr>
+                  <td>{{ row.product }}</td>
+                  <td>{{ row.begin }}</td>
+                  <td>{{ row.incoming }}</td>
+                  <td>{{ row.outgoing }}</td>
+                  <td>{{ row.end }}</td>
+                  <td>{{ row.cost }}</td>
+                  <td><strong>{{ row.total }}</strong></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7" class="reports-empty-cell">Складских движений пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-receivables" data-org-report-panel="receivables" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Дебиторка</p>
+            <h2>Дебиторская задолженность</h2>
+            <p>Клиенты с долгом и сроком просрочки.</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.receivables.summary.total or "0 UZS" }}</b> долг · {{ business_reports.receivables.summary.clients or 0 }} клиентов</span>
+          </div>
+        </header>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>Клиент</th>
+                <th>Сумма долга</th>
+                <th>Последняя оплата</th>
+                <th>Дней просрочки</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.receivables.rows %}
+                <tr>
+                  <td>{{ row.client }}</td>
+                  <td><strong>{{ row.debt }}</strong></td>
+                  <td>{{ row.last_payment }}</td>
+                  <td>{{ row.overdue_days }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" class="reports-empty-cell">Долгов клиентов пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-calls-conversion" data-org-report-panel="calls-conversion" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Телефония</p>
+            <h2>Звонки и конверсия</h2>
+            <p>Отвеченные, пропущенные и связь звонков со сделками CRM.</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.calls.summary.conversion or 0 }}%</b> звонок → сделка</span>
+          </div>
+        </header>
+        <div class="reports-analysis-grid">
+          <article class="reports-balance-card"><span>Всего звонков</span><strong>{{ business_reports.calls.summary.total or 0 }}</strong></article>
+          <article class="reports-balance-card"><span>Отвеченные</span><strong>{{ business_reports.calls.summary.answered or 0 }}</strong></article>
+          <article class="reports-balance-card"><span>Пропущенные</span><strong>{{ business_reports.calls.summary.missed or 0 }}</strong></article>
+        </div>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Клиент</th>
+                <th>Телефон</th>
+                <th>Ответственный</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.calls.rows %}
+                <tr>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.client }}</td>
+                  <td>{{ row.phone }}</td>
+                  <td>{{ row.responsible }}</td>
+                  <td>{{ row.status }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5" class="reports-empty-cell">Звонков за период пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="reports-panel" id="report-courier-reconcile" data-org-report-panel="courier-reconcile" hidden>
         <header class="reports-panel-head">
           <div>
@@ -246,6 +446,10 @@
     'courier-debts': 'Долги доставщиков',
     'courier-balance': 'Баланс доставщиков',
     'delivery-shipments': 'Отгрузки',
+    'sales-overview': 'Продажи',
+    'stock-movement': 'Движение по складу',
+    'receivables': 'Дебиторка',
+    'calls-conversion': 'Звонки',
   };
   reportMeta['courier-reconcile'] = 'Акт сверки';
   const openTabs = [];

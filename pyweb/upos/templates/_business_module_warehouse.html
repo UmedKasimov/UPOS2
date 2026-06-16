@@ -3,7 +3,7 @@
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
     <h2 id="business-module-title">{{ module.heading }}</h2>
   </div>
-  <button type="button" class="btn" disabled>{{ module.action }}</button>
+  <button type="button" class="btn" data-warehouse-open-operation>{{ module.action }}</button>
 </div>
 
 <form class="business-module-filters" method="get" action="{{ url_for('warehouse_get') }}" data-workspace-view="stocks transfers adjustments" hidden>
@@ -19,6 +19,10 @@
       <option value="adjustment" {% if warehouse_filters.op_type == 'adjustment' %}selected{% endif %}>Корректировка</option>
       <option value="transfer" {% if warehouse_filters.op_type == 'transfer' %}selected{% endif %}>Перемещение</option>
     </select>
+  </label>
+  <label class="business-module-check">
+    <span>Только критичные</span>
+    <input type="checkbox" name="critical" value="1" {% if warehouse_filters.critical == '1' %}checked{% endif %} />
   </label>
   <button class="btn btn-secondary" type="submit">Применить</button>
   <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Очистить</a>
@@ -40,7 +44,7 @@
       </div>
     </header>
     <div class="products-table-wrap">
-      <table class="products-table">
+      <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
             <th>Товар</th>
@@ -49,22 +53,32 @@
             <th>Ед.</th>
             <th>Категория</th>
             <th>Мин. остаток</th>
+            <th>Себестоимость</th>
+            <th>Сумма</th>
           </tr>
         </thead>
         <tbody>
           {% for row in warehouse_stocks %}
-            <tr>
+            <tr class="{% if row.is_critical %}warehouse-stock-critical{% endif %}">
               <td>{{ row.product }}</td>
               <td>{{ row.warehouse }}</td>
               <td>{{ row.quantity }}</td>
               <td>{{ row.unit }}</td>
               <td>{{ row.category or "-" }}</td>
               <td>{{ row.min_stock or "-" }}</td>
+              <td>{{ row.cost }}</td>
+              <td>{{ row.stock_total }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="6">Остатков пока нет.</td></tr>
+            <tr><td colspan="8">Остатков пока нет.</td></tr>
           {% endfor %}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7">Итого по складу</td>
+            <td>{{ warehouse_stock_total }}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </article>
@@ -99,7 +113,7 @@
       </div>
     </header>
     <div class="products-table-wrap">
-      <table class="products-table">
+      <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
             <th>№</th>
@@ -108,6 +122,7 @@
             <th>Маршрут</th>
             <th>Товар</th>
             <th>Количество</th>
+            <th>Ответственный</th>
             <th></th>
           </tr>
         </thead>
@@ -126,6 +141,7 @@
               </td>
               <td>{{ row.product or "-" }}</td>
               <td>{{ row.quantity }}</td>
+              <td>{{ row.responsible or "-" }}</td>
               <td class="products-row-actions">
                 <form method="post" action="{{ url_for('warehouse_operation_delete', operation_id=row.id) }}">
                   {% include "_csrf_field.html" %}
@@ -134,7 +150,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="7">Складских операций пока нет.</td></tr>
+            <tr><td colspan="8">Складских операций пока нет.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -158,6 +174,7 @@
         <label><span>На склад*</span><input name="to_warehouse" list="warehouse-name-list" required /></label>
         <label><span>Количество*</span><input name="quantity" inputmode="decimal" required /></label>
         <label><span>Цена</span><input name="price" inputmode="decimal" /></label>
+        <label><span>Ответственный</span><input name="responsible" value="{{ user.name if user else '' }}" /></label>
         <label class="wide"><span>Комментарий</span><input name="note" /></label>
       </div>
       <div class="product-form-actions">
@@ -178,12 +195,20 @@
       {% include "_csrf_field.html" %}
       <div class="product-form-grid">
         <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
-        <label><span>Тип*</span><select name="operation_type"><option value="in">Приход</option><option value="out">Списание</option><option value="adjustment">Корректировка</option></select></label>
+        <label>
+          <span>Тип*</span>
+          <select name="operation_type">
+            <option value="in" {% if warehouse_operation_preset == 'in' %}selected{% endif %}>Приход</option>
+            <option value="out" {% if warehouse_operation_preset == 'out' %}selected{% endif %}>Списание</option>
+            <option value="adjustment" {% if warehouse_operation_preset not in ['in', 'out'] %}selected{% endif %}>Корректировка</option>
+          </select>
+        </label>
         <label><span>Склад*</span><input name="warehouse" list="warehouse-name-list" value="Основной склад" required /></label>
         <label><span>Товар*</span><input name="product" list="warehouse-product-list" required /></label>
         <label><span>Количество*</span><input name="quantity" inputmode="decimal" required /></label>
         <label><span>Цена</span><input name="price" inputmode="decimal" /></label>
         <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
+        <label><span>Ответственный</span><input name="responsible" value="{{ user.name if user else '' }}" /></label>
         <label class="wide"><span>Комментарий</span><input name="note" /></label>
       </div>
       <div class="product-form-actions">
@@ -193,3 +218,29 @@
     </form>
   </aside>
 </div>
+
+<dialog class="settings-profile-modal warehouse-operation-dialog" id="warehouse-operation-dialog">
+  <div class="settings-profile-modal-card telephony-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div>
+        <p>Складская операция</p>
+        <h2>Выберите тип операции</h2>
+      </div>
+      <button type="button" class="settings-profile-close" data-warehouse-close-operation aria-label="Закрыть">×</button>
+    </header>
+    <div class="warehouse-operation-choices">
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=in#adjustments" data-warehouse-operation-link>
+        <strong>Приход</strong>
+        <span>Поступление товара от поставщика на склад.</span>
+      </a>
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=out#adjustments" data-warehouse-operation-link>
+        <strong>Списание</strong>
+        <span>Брак, потери, недостачи и ручное уменьшение остатка.</span>
+      </a>
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=transfer#transfers" data-warehouse-operation-link>
+        <strong>Перемещение</strong>
+        <span>Перевод товара между складами с ответственным и датой.</span>
+      </a>
+    </div>
+  </div>
+</dialog>

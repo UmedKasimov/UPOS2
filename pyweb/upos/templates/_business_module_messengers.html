@@ -1,12 +1,15 @@
-<div class="business-module-toolbar" data-workspace-view="inbox campaigns templates" hidden>
-  <div>
-    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
-    <h2 id="business-module-title">{{ module.heading }}</h2>
-  </div>
-  <button type="button" class="btn" disabled>{{ module.action }}</button>
-</div>
+<datalist id="messenger-channel-list">
+  {% for item in messenger_options.channels %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="messenger-responsible-list">
+  {% for item in messenger_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
+</datalist>
+<datalist id="messenger-client-list">
+  {% for item in messenger_options.clients %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<script type="application/json" data-messenger-thread-json>{{ messenger_threads|tojson }}</script>
 
-<form class="business-module-filters" method="get" action="{{ url_for('messengers_get') }}" data-workspace-view="inbox campaigns templates" hidden>
+<form class="business-module-filters" method="get" action="{{ url_for('messengers_get') }}" data-workspace-view="inbox" hidden>
   <label><span>Поиск</span><input name="q" value="{{ messenger_filters.q }}" placeholder="Клиент, чат, шаблон" /></label>
   <label>
     <span>Канал</span>
@@ -27,15 +30,60 @@
     </select>
   </label>
   <button class="btn btn-secondary" type="submit">Применить</button>
-  <a class="btn btn-secondary" href="{{ url_for('messengers_get') }}">Очистить</a>
+  <a class="btn btn-secondary" href="{{ url_for('messengers_get') }}#inbox">Очистить</a>
 </form>
 
-<datalist id="messenger-channel-list">
-  {% for item in messenger_options.channels %}<option value="{{ item }}">{% endfor %}
-</datalist>
-<datalist id="messenger-responsible-list">
-  {% for item in messenger_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
-</datalist>
+<section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox hidden>
+  <header class="business-module-toolbar">
+    <div>
+      <p class="settings-ios-footnote">Чаты, обращения и клиенты</p>
+      <h2>Центр сообщений</h2>
+    </div>
+    <button type="button" class="btn" data-messenger-compose>+ Сообщение</button>
+  </header>
+  <div class="messenger-inbox-shell">
+    <aside class="messenger-dialog-list-panel" aria-label="Диалоги">
+      <div class="messenger-dialog-list-head">
+        <strong>Диалоги</strong>
+        <small>{{ messenger_threads|length }}</small>
+      </div>
+      <div class="messenger-dialog-list" data-messenger-thread-list>
+        {% for row in messenger_threads %}
+          <button type="button" class="messenger-dialog-item" data-messenger-thread-id="{{ row.id }}">
+            <span class="messenger-dialog-channel">{{ row.channel[:2] }}</span>
+            <span>
+              <strong>{{ row.contact }}</strong>
+              <small>{{ row.topic or row.last_message or row.channel }}</small>
+            </span>
+            <em>{{ row.status_label }}</em>
+          </button>
+        {% else %}
+          <div class="messenger-empty">Диалогов пока нет. Здесь появятся Telegram, WhatsApp и другие каналы.</div>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <section class="messenger-dialog-chat-panel" aria-label="Рабочий чат">
+      <div class="messenger-dialog-chat-top">
+        <div>
+          <p class="settings-ios-footnote" data-messenger-thread-meta>Выберите диалог слева</p>
+          <h3 data-messenger-thread-title>Диалог</h3>
+        </div>
+        <button type="button" class="btn btn-secondary" data-messenger-attach-client>Прикрепить к клиенту CRM</button>
+      </div>
+      <div class="messenger-dialog-chat-body" data-messenger-thread-messages>
+        <div class="messenger-empty">История сообщений откроется после выбора диалога.</div>
+      </div>
+      <div class="messenger-dialog-composer">
+        <textarea rows="3" placeholder="Напишите сообщение клиенту..." data-messenger-compose-text></textarea>
+        <div class="messenger-dialog-composer-actions">
+          <button type="button" class="btn btn-secondary" data-messenger-template-button>Шаблон</button>
+          <button type="button" class="btn" data-messenger-send-button>Отправить</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
 
 <section class="messenger-telegram-workspace" data-workspace-view="telegram" data-messenger-telegram hidden>
   <header class="messenger-telegram-head">
@@ -43,23 +91,24 @@
       <p class="settings-ios-footnote">Telegram</p>
       <h2>Управление чатами</h2>
       <span data-messenger-tg-status>Проверяем подключение...</span>
+      <small class="messenger-telegram-token" data-messenger-tg-token>@Uposchatbot · токен скрыт</small>
     </div>
     <div class="messenger-telegram-actions">
       <a class="btn btn-secondary" href="{{ url_for('settings_get') }}?tab=social">Привязка</a>
-      <button type="button" class="btn btn-secondary" data-messenger-tg-refresh>Обновить чаты</button>
-      <button type="button" class="btn" data-messenger-tg-repair>Починить webhook</button>
+      <button type="button" class="btn btn-secondary" data-messenger-tg-refresh>Обновить список чатов</button>
+      <button type="button" class="btn" data-messenger-tg-repair>Переподключить</button>
     </div>
   </header>
 
   <div class="messenger-telegram-shell">
     <aside class="messenger-telegram-list-panel" aria-label="Telegram чаты">
       <div class="messenger-telegram-panel-title">
-        <strong>Чаты Telegram</strong>
+        <strong>Активные чаты</strong>
         <small data-messenger-tg-count>0</small>
       </div>
       <div class="messenger-telegram-list" data-messenger-tg-chat-list></div>
       <div class="messenger-telegram-empty" data-messenger-tg-empty hidden>
-        Чатов пока нет. Подключите бота, добавьте его в группу и нажмите «Обновить чаты».
+        Чатов пока нет. Подключите бота, добавьте его в группу и нажмите «Обновить список чатов».
       </div>
     </aside>
 
@@ -88,68 +137,54 @@
     </section>
   </div>
 
-  <section class="messenger-telegram-subscribers">
-    <header>
-      <div>
-        <p class="settings-ios-footnote">Доступы</p>
-        <h3>Заявки и подписчики</h3>
+  <section class="messenger-telegram-settings-grid">
+    <form class="messenger-telegram-subscribers" method="post" action="{{ url_for('messenger_auto_reply_save') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <header>
+        <div>
+          <p class="settings-ios-footnote">Автоответ</p>
+          <h3>Настройки приветствия</h3>
+        </div>
+        <button class="btn btn-secondary" type="submit">Сохранить</button>
+      </header>
+      <label class="business-module-check">
+        <input type="checkbox" name="auto_reply_enabled" value="1" {% if messenger_auto_reply.enabled %}checked{% endif %} />
+        <span>Включить автоответ для новых Telegram-обращений</span>
+      </label>
+      <label>
+        <span>Текст приветствия</span>
+        <textarea name="greeting" rows="3">{{ messenger_auto_reply.greeting or "" }}</textarea>
+      </label>
+    </form>
+
+    <section class="messenger-telegram-subscribers">
+      <header>
+        <div>
+          <p class="settings-ios-footnote">Доступы</p>
+          <h3>Заявки и подписчики</h3>
+        </div>
+      </header>
+      <div class="products-table-wrap">
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>Контакт</th>
+              <th>Username</th>
+              <th>Статус</th>
+              <th>Дата</th>
+            </tr>
+          </thead>
+          <tbody data-messenger-tg-subscribers>
+            <tr><td colspan="4">Данные Telegram загружаются...</td></tr>
+          </tbody>
+        </table>
       </div>
-    </header>
-    <div class="products-table-wrap">
-      <table class="products-table">
-        <thead>
-          <tr>
-            <th>Контакт</th>
-            <th>Username</th>
-            <th>Статус</th>
-            <th>Дата</th>
-          </tr>
-        </thead>
-        <tbody data-messenger-tg-subscribers>
-          <tr><td colspan="4">Данные Telegram загружаются...</td></tr>
-        </tbody>
-      </table>
-    </div>
+    </section>
   </section>
 </section>
 
-<div class="products-layout" data-workspace-view="inbox campaigns templates" hidden>
-  <article class="products-list-panel" data-workspace-view="inbox" hidden>
-    <header class="products-panel-head">
-      <div>
-        <h2>Диалоги</h2>
-        <span>Всего: {{ messenger_threads|length }}</span>
-      </div>
-    </header>
-    <div class="products-table-wrap">
-      <table class="products-table">
-        <thead>
-          <tr>
-            <th>Канал</th>
-            <th>Контакт</th>
-            <th>Последнее сообщение</th>
-            <th>Ответственный</th>
-            <th>Статус</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in messenger_threads %}
-            <tr>
-              <td>{{ row.channel }}</td>
-              <td><strong>{{ row.contact }}</strong><small>{{ row.topic or row.channel }}</small></td>
-              <td>{{ row.last_message or "-" }}</td>
-              <td>{{ row.responsible or "-" }}</td>
-              <td>{{ row.status_label or row.status or "-" }}</td>
-            </tr>
-          {% else %}
-            <tr><td colspan="5">Диалогов пока нет. Здесь появятся чаты из Telegram, WhatsApp и других каналов.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </article>
-
-  <article class="products-list-panel" data-workspace-view="campaigns" hidden>
+<section class="messenger-workspace-grid" data-workspace-view="campaigns" hidden>
+  <article class="products-list-panel">
     <header class="products-panel-head">
       <div>
         <h2>Рассылки</h2>
@@ -170,21 +205,47 @@
         <tbody>
           {% for row in messenger_campaigns %}
             <tr>
-              <td><strong>{{ row.title }}</strong><small>{{ row.note or row.segment }}</small></td>
+              <td><strong>{{ row.title }}</strong><small>{{ row.note or row.message or row.segment }}</small></td>
               <td>{{ row.channel }}</td>
               <td>{{ row.segment or "-" }}</td>
               <td>{{ row.run_at or "-" }}</td>
               <td>{{ row.status_label or row.status or "-" }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5">Рассылок пока нет. Здесь будут кампании по сегментам клиентов и сделок.</td></tr>
+            <tr><td colspan="5">Рассылок пока нет. Создайте первую кампанию справа.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </article>
 
-  <article class="products-list-panel" data-workspace-view="templates" hidden>
+  <aside class="products-form-card">
+    <header>
+      <div>
+        <h2>Новая рассылка</h2>
+        <span>Сегменты и шаблоны сообщений</span>
+      </div>
+    </header>
+    <form class="products-form" method="post" action="{{ url_for('messenger_campaign_save') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label><span>Название кампании*</span><input name="title" required /></label>
+      <div class="products-form-grid products-form-grid--two">
+        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>WhatsApp</option></select></label>
+        <label><span>Сегмент получателей</span><select name="segment"><option>Все клиенты</option><option>По маршруту</option><option>По категории</option><option>Вручную</option></select></label>
+      </div>
+      <label><span>Шаблон сообщения</span><textarea name="message" rows="4" placeholder="Здравствуйте, {{ '{{name}}' }}. Ваш баланс: {{ '{{balance}}' }}"></textarea></label>
+      <label><span>Дата и время запуска</span><input type="datetime-local" name="run_at" /></label>
+      <label><span>Комментарий</span><input name="note" /></label>
+      <div class="products-form-actions">
+        <button class="btn" name="action" value="launch" type="submit">Запустить</button>
+        <button class="btn btn-secondary" name="action" value="draft" type="submit">Сохранить черновик</button>
+      </div>
+    </form>
+  </aside>
+</section>
+
+<section class="messenger-workspace-grid" data-workspace-view="templates" hidden>
+  <article class="products-list-panel">
     <header class="products-panel-head">
       <div>
         <h2>Шаблоны</h2>
@@ -197,25 +258,52 @@
           <tr>
             <th>Название</th>
             <th>Канал</th>
-            <th>Сценарий</th>
-            <th>Обновлено</th>
-            <th>Статус</th>
+            <th>Тип</th>
+            <th>Текст</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for row in messenger_templates %}
             <tr>
-              <td><strong>{{ row.title }}</strong><small>{{ row.preview or row.channel }}</small></td>
+              <td><strong>{{ row.title }}</strong><small>{{ row.status_label or row.status }}</small></td>
               <td>{{ row.channel }}</td>
               <td>{{ row.scenario or "-" }}</td>
-              <td>{{ row.updated_at or "-" }}</td>
-              <td>{{ row.status_label or row.status or "-" }}</td>
+              <td>{{ row.preview or row.text or "-" }}</td>
+              <td>
+                <form method="post" action="{{ url_for('messenger_template_delete', template_id=row.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <button class="link-button" type="submit">Удалить</button>
+                </form>
+              </td>
             </tr>
           {% else %}
-            <tr><td colspan="5">Шаблонов пока нет. Здесь будут заготовки сообщений и сценарии ответов.</td></tr>
+            <tr><td colspan="5">Шаблонов пока нет. Добавьте быстрые ответы и тексты рассылок справа.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </article>
-</div>
+
+  <aside class="products-form-card">
+    <header>
+      <div>
+        <h2>Новый шаблон</h2>
+        <span>Переменные: {{ '{{name}}' }}, {{ '{{balance}}' }}</span>
+      </div>
+    </header>
+    <form class="products-form" method="post" action="{{ url_for('messenger_template_save') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label><span>Название*</span><input name="title" required /></label>
+      <div class="products-form-grid products-form-grid--two">
+        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>WhatsApp</option><option>Instagram</option></select></label>
+        <label><span>Тип</span><select name="scenario"><option value="greeting">Приветствие</option><option value="reminder">Напоминание</option><option value="campaign">Рассылка</option><option value="reply">Ответ</option></select></label>
+      </div>
+      <label><span>Текст*</span><textarea name="text" rows="6" required></textarea></label>
+      <label><span>Статус</span><select name="status"><option value="active">Активный</option><option value="paused">Пауза</option><option value="archived">Архив</option></select></label>
+      <div class="products-form-actions">
+        <button class="btn" type="submit">Сохранить шаблон</button>
+      </div>
+    </form>
+  </aside>
+</section>

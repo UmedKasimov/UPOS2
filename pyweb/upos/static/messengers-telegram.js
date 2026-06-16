@@ -51,6 +51,7 @@
 
   function boot(root) {
     var statusEl = root.querySelector("[data-messenger-tg-status]");
+    var tokenEl = root.querySelector("[data-messenger-tg-token]");
     var refreshBtn = root.querySelector("[data-messenger-tg-refresh]");
     var repairBtn = root.querySelector("[data-messenger-tg-repair]");
     var listEl = root.querySelector("[data-messenger-tg-chat-list]");
@@ -90,6 +91,10 @@
       var cfg = snapshot.config || {};
       state.connected = !!snapshot.connected;
       state.canManage = !!snapshot.can_manage;
+      if (tokenEl) {
+        var tokenLabel = cfg.bot_username ? "@" + cfg.bot_username : cfg.bot_first_name || "@Uposchatbot";
+        tokenEl.textContent = tokenLabel + " · токен скрыт";
+      }
       if (!statusEl) return;
       if (!state.connected) {
         statusEl.textContent = "Telegram не подключен. Укажите токен в соцсетях.";
@@ -242,13 +247,13 @@
 
     if (repairBtn) {
       repairBtn.addEventListener("click", function () {
-        setBusy(repairBtn, true, "Проверяем...");
+        setBusy(repairBtn, true, "Переподключаем...");
         api("POST", "/api/telegram/webhook/repair")
           .then(function () {
             return load();
           })
           .catch(function (err) {
-            alert(err.message || "Не удалось обновить webhook");
+            alert(err.message || "Не удалось переподключить Telegram");
           })
           .finally(function () {
             setBusy(repairBtn, false);

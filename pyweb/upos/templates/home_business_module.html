@@ -2,9 +2,14 @@
 {% block title %}{{ module.title }}{% endblock %}
 {% block extra_head %}
   {% if active == "messengers" %}
-    <script src="{{ url_for('static', path='messengers-telegram.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='messengers.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='messengers-telegram.js') }}?v=2" defer></script>
   {% elif active == "crm" %}
     <script src="{{ url_for('static', path='crm-kanban.js') }}?v=2" defer></script>
+  {% elif active == "telephony" %}
+    <script src="{{ url_for('static', path='telephony.js') }}?v=2" defer></script>
+  {% elif active == "warehouse" %}
+    <script src="{{ url_for('static', path='warehouse.js') }}?v=1" defer></script>
   {% endif %}
 {% endblock %}
 
@@ -28,6 +33,8 @@
 {% set module_views = module_views_ns.value %}
 {% if active == "clients" and selected_client_card %}
   {% set module_stack_views = module_views ~ " profile" %}
+{% elif active == "suppliers" and selected_supplier_card %}
+  {% set module_stack_views = module_views ~ " profile" %}
 {% else %}
   {% set module_stack_views = module_views %}
 {% endif %}
@@ -47,6 +54,7 @@
     data-workspace-key="{{ active }}"
     data-workspace-home-href="{{ module_home_url }}"
     {% if active == "clients" and selected_client_card %}data-workspace-default-tab="client-{{ selected_client_card.id }}"{% endif %}
+    {% if active == "suppliers" and selected_supplier_card %}data-workspace-default-tab="supplier-{{ selected_supplier_card.id }}"{% endif %}
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Изменения сохранены.</div>

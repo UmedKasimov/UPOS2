@@ -111,8 +111,8 @@
         <span>Всего: {{ crm_records|length }}</span>
       </div>
     </header>
-    <div class="products-table-wrap">
-      <table class="products-table">
+        <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
             <th>Название</th>
@@ -120,6 +120,7 @@
             <th>Клиент</th>
             <th>Источник</th>
             <th>Этап</th>
+            <th>Сделка</th>
             <th>Ответственный</th>
             <th>Сумма</th>
             <th>Статус</th>
@@ -127,8 +128,8 @@
           </tr>
         </thead>
         <tbody>
-          {% for row in crm_records %}
-            <tr {% if row.item_type == 'task' %}data-workspace-view="tasks"{% elif row.item_type == 'deal' %}data-workspace-view="deals"{% else %}data-workspace-view="history"{% endif %}>
+          {% for row in crm_records if row.item_type != 'history' %}
+            <tr {% if row.item_type == 'task' %}data-workspace-view="tasks"{% else %}data-workspace-view="deals"{% endif %}>
               <td><strong>{{ row.title }}</strong><small>{{ row.note or row.chat_label or row.contact_type or row.item_type_label }}</small></td>
               <td>{{ row.item_type_label }}</td>
               <td>
@@ -140,6 +141,7 @@
               </td>
               <td>{{ row.lead_source or "-" }}</td>
               <td>{{ row.stage or "-" }}</td>
+              <td>{{ row.related_deal_title or "-" }}</td>
               <td>{{ row.responsible or "-" }}</td>
               <td>{{ row.kanban_amount or row.amount }} {{ row.order_currency or row.currency }}</td>
               <td>{{ row.status_label }}</td>
@@ -151,7 +153,51 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="9">CRM-записей пока нет.</td></tr>
+            <tr><td colspan="10">CRM-записей пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="history" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Журнал контактов</h2>
+        <span>Всего: {{ crm_history_records|length }}</span>
+      </div>
+    </header>
+    <form class="business-module-filters crm-history-filters" method="get" action="{{ url_for('crm_get') }}#history">
+      <label><span>Дата с</span><input name="date_from" type="date" value="{{ crm_filters.date_from }}" /></label>
+      <label><span>Дата по</span><input name="date_to" type="date" value="{{ crm_filters.date_to }}" /></label>
+      <label><span>Клиент</span><input name="client" list="crm-client-list" value="{{ crm_filters.client }}" placeholder="Клиент" /></label>
+      <button class="btn btn-secondary" type="submit">Применить</button>
+      <a class="btn btn-secondary" href="{{ url_for('crm_get') }}#history">Очистить</a>
+    </form>
+    <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Клиент</th>
+            <th>Тип контакта</th>
+            <th>Ответственный</th>
+            <th>Результат</th>
+            <th>Следующий шаг</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in crm_history_records %}
+            <tr>
+              <td>{{ row.date or "-" }}</td>
+              <td>{{ row.client or "-" }}</td>
+              <td>{{ row.contact_type or row.lead_source or "-" }}</td>
+              <td>{{ row.responsible or "-" }}</td>
+              <td>{{ row.note or row.status_label }}</td>
+              <td>{{ row.due_date or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">История контактов пока пустая.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -183,6 +229,7 @@
           <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ user.name if user else '' }}" /></label>
           <label><span>Источник лида</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
           <label><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
+          <label><span>Связать со сделкой</span><select name="related_deal_id"><option value="">Не выбрано</option>{% for item in crm_options.deals %}<option value="{{ item.id }}">{{ item.title }}{% if item.client %} · {{ item.client }}{% endif %}</option>{% endfor %}</select></label>
           <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
           <label><span>Привязка чата</span><input name="chat_ref" placeholder="@username, ссылка или chat id" /></label>
           <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>

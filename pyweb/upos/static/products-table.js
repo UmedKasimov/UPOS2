@@ -50,6 +50,12 @@
         return parseNumber(row.dataset.sortQuantity);
       case "price":
         return parseNumber(row.dataset.sortPrice);
+      case "sku":
+        return normalizeText(row.dataset.sortSku);
+      case "barcode":
+        return normalizeText(row.dataset.sortBarcode);
+      case "unit":
+        return normalizeText(row.dataset.sortUnit);
       case "category":
         return normalizeText(row.dataset.sortCategory);
       case "status":
@@ -230,9 +236,82 @@
     root.querySelectorAll(TABLE_SELECTOR).forEach(initTable);
   }
 
+  function purchaseRowTemplate() {
+    const row = document.createElement("div");
+    row.className = "product-purchase-row";
+    row.dataset.productsPurchaseRow = "1";
+    row.innerHTML = `
+      <input name="purchase_date" type="date" />
+      <input name="purchase_warehouse" value="Основной склад" placeholder="Склад" />
+      <input name="purchase_quantity" placeholder="К-во" inputmode="decimal" />
+      <input name="purchase_price" placeholder="Цена" inputmode="decimal" />
+      <input name="purchase_supplier" placeholder="Поставщик" />
+      <button type="button" class="btn btn-secondary" data-products-remove-line>×</button>
+    `;
+    return row;
+  }
+
+  function variationRowTemplate() {
+    const row = document.createElement("div");
+    row.className = "product-line-grid product-line-grid--variation";
+    row.dataset.productsVariationRow = "1";
+    row.innerHTML = `
+      <input name="variation_attribute" placeholder="Размер / Цвет / Материал" />
+      <input name="variation_values" placeholder="S, M, L или Красный, Чёрный" />
+      <button type="button" class="btn btn-secondary" data-products-remove-line>×</button>
+    `;
+    return row;
+  }
+
+  function syncVariationVisibility(form) {
+    const section = form.querySelector("[data-product-variations]");
+    if (!section) return;
+    const selected = form.querySelector('input[name="kind"]:checked')?.value || "product";
+    section.hidden = selected !== "collection";
+  }
+
+  function initProductForms(root = document) {
+    root.querySelectorAll(".product-form").forEach((form) => {
+      if (form.dataset.productsFormReady === "1") return;
+      form.dataset.productsFormReady = "1";
+      syncVariationVisibility(form);
+      form.addEventListener("change", (event) => {
+        if (event.target.matches('input[name="kind"]')) syncVariationVisibility(form);
+      });
+      form.addEventListener("click", (event) => {
+        const addPurchase = event.target.closest("[data-products-add-purchase-row]");
+        if (addPurchase && form.contains(addPurchase)) {
+          event.preventDefault();
+          const list = form.querySelector("[data-products-purchase-list]");
+          if (list) list.append(purchaseRowTemplate());
+          return;
+        }
+        const addVariation = event.target.closest("[data-products-add-variation-row]");
+        if (addVariation && form.contains(addVariation)) {
+          event.preventDefault();
+          const list = form.querySelector("[data-products-variation-list]");
+          if (list) list.append(variationRowTemplate());
+          return;
+        }
+        const removeLine = event.target.closest("[data-products-remove-line]");
+        if (removeLine && form.contains(removeLine)) {
+          event.preventDefault();
+          const row = removeLine.closest("[data-products-purchase-row], [data-products-variation-row]");
+          const list = row?.parentElement;
+          if (row && list && list.children.length > 1) row.remove();
+          else if (row) row.querySelectorAll("input").forEach((input) => (input.value = ""));
+        }
+      });
+    });
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => initAll(), { once: true });
+    document.addEventListener("DOMContentLoaded", () => {
+      initAll();
+      initProductForms();
+    }, { once: true });
   } else {
     initAll();
+    initProductForms();
   }
 })();

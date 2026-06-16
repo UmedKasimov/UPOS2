@@ -1,12 +1,12 @@
-<div class="business-module-toolbar" data-workspace-view="calls numbers providers" hidden>
+<div class="business-module-toolbar" data-workspace-view="calls numbers integrations" hidden>
   <div>
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
     <h2 id="business-module-title">{{ module.heading }}</h2>
   </div>
-  <button type="button" class="btn" disabled>{{ module.action }}</button>
+  <button type="button" class="btn" data-telephony-open-call>{{ module.action }}</button>
 </div>
 
-<form class="business-module-filters" method="get" action="{{ url_for('telephony_get') }}" data-workspace-view="calls numbers providers" hidden>
+<form class="business-module-filters" method="get" action="{{ url_for('telephony_get') }}" data-workspace-view="calls numbers integrations" hidden>
   <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Клиент, номер, сотрудник" /></label>
   <label>
     <span>Провайдер</span>
@@ -36,14 +36,18 @@
 <datalist id="telephony-responsible-list">
   {% for item in telephony_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
 </datalist>
+<datalist id="telephony-client-list">
+  {% for item in telephony_options.clients %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
+</datalist>
 
-<div class="products-layout" data-workspace-view="calls numbers providers" hidden>
+<div class="products-layout telephony-layout" data-workspace-view="calls numbers integrations" hidden>
   <article class="products-list-panel" data-workspace-view="calls" hidden>
     <header class="products-panel-head">
       <div>
         <h2>Журнал звонков</h2>
         <span>Всего: {{ telephony_calls|length }}</span>
       </div>
+      <button type="button" class="btn" data-telephony-open-call>+ Звонок</button>
     </header>
     <div class="products-table-wrap">
       <table class="products-table">
@@ -52,6 +56,7 @@
             <th>Клиент</th>
             <th>Номер</th>
             <th>Направление</th>
+            <th>Дата и время</th>
             <th>Ответственный</th>
             <th>Статус</th>
           </tr>
@@ -59,14 +64,15 @@
         <tbody>
           {% for row in telephony_calls %}
             <tr>
-              <td><strong>{{ row.client }}</strong><small>{{ row.note or row.started_at }}</small></td>
+              <td><strong>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
               <td>{{ row.phone }}</td>
-              <td>{{ row.direction }}</td>
+              <td>{{ row.direction_label or row.direction }}</td>
+              <td>{{ row.started_at or "-" }}</td>
               <td>{{ row.responsible or "-" }}</td>
               <td>{{ row.status_label or row.status or "-" }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5">Звонков пока нет. Здесь появится история входящих, исходящих и пропущенных звонков.</td></tr>
+            <tr><td colspan="6">Звонков пока нет. Нажмите «+ Звонок», чтобы добавить входящий, исходящий или запланированный контакт.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -79,65 +85,190 @@
         <h2>Номера</h2>
         <span>Всего: {{ telephony_numbers|length }}</span>
       </div>
+      <button type="button" class="btn" data-telephony-open-number>+ Номер</button>
     </header>
     <div class="products-table-wrap">
       <table class="products-table">
         <thead>
           <tr>
             <th>Номер</th>
-            <th>Линия</th>
-            <th>Ответственный</th>
+            <th>Провайдер</th>
+            <th>Сотрудник</th>
             <th>Режим</th>
+            <th>Переадресация</th>
             <th>Статус</th>
           </tr>
         </thead>
         <tbody>
           {% for row in telephony_numbers %}
             <tr>
-              <td><strong>{{ row.number }}</strong><small>{{ row.label or row.provider }}</small></td>
-              <td>{{ row.line or "-" }}</td>
-              <td>{{ row.responsible or "-" }}</td>
+              <td><strong>{{ row.number }}</strong><small>{{ row.label or row.line or "-" }}</small></td>
+              <td>{{ row.provider or "-" }}</td>
+              <td>{{ row.employee or row.responsible or "-" }}</td>
               <td>{{ row.mode or "-" }}</td>
+              <td>{{ row.forwarding or "-" }}</td>
               <td>{{ row.status_label or row.status or "-" }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5">Номера пока не подключены. Здесь будут линии, сотрудники и правила маршрутизации.</td></tr>
+            <tr><td colspan="6">Номера пока не подключены. Добавьте SIP/АТС-номер и привяжите его к сотруднику.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </article>
 
-  <article class="products-list-panel" data-workspace-view="providers" hidden>
+  <article class="products-list-panel telephony-integrations-panel" data-workspace-view="integrations" hidden>
     <header class="products-panel-head">
       <div>
-        <h2>Интеграции телефонии</h2>
+        <h2>Интеграции АТС и SIP</h2>
         <span>Всего: {{ telephony_providers|length }}</span>
       </div>
     </header>
-    <div class="products-table-wrap">
-      <table class="products-table">
-        <thead>
-          <tr>
-            <th>Провайдер</th>
-            <th>Тип</th>
-            <th>Адрес</th>
-            <th>Статус</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in telephony_providers %}
+
+    <div class="telephony-integrations-grid">
+      <form method="post" action="{{ url_for('telephony_provider_save') }}" class="product-form telephony-sip-form">
+        {% include "_csrf_field.html" %}
+        <div class="product-form-grid">
+          <label><span>Название*</span><input name="name" required placeholder="U-POS SIP" /></label>
+          <label><span>SIP-сервер*</span><input name="host" required placeholder="sip.example.com" /></label>
+          <label><span>Порт</span><input name="port" inputmode="numeric" value="5060" /></label>
+          <label><span>Логин*</span><input name="login" required autocomplete="username" /></label>
+          <label><span>Пароль</span><input name="password" type="password" autocomplete="new-password" /></label>
+          <label>
+            <span>Кодек</span>
+            <select name="codec">
+              <option value="G711">G711</option>
+              <option value="G729">G729</option>
+              <option value="Opus">Opus</option>
+            </select>
+          </label>
+          <label>
+            <span>Транспорт</span>
+            <select name="transport">
+              <option value="UDP">UDP</option>
+              <option value="TCP">TCP</option>
+              <option value="TLS">TLS</option>
+            </select>
+          </label>
+          <label><span>Сотрудник по умолчанию</span><input name="employee" list="telephony-responsible-list" /></label>
+          <label class="wide"><span>Комментарий</span><input name="note" placeholder="Номер, правила маршрутизации, часы работы" /></label>
+        </div>
+        <div class="product-form-actions">
+          <button class="btn" type="submit">Сохранить SIP</button>
+        </div>
+      </form>
+
+      <div class="products-table-wrap telephony-provider-table">
+        <table class="products-table">
+          <thead>
             <tr>
-              <td><strong>{{ row.name }}</strong><small>{{ row.note or row.account }}</small></td>
-              <td>{{ row.kind }}</td>
-              <td>{{ row.endpoint or "-" }}</td>
-              <td>{{ row.status_label or row.status or "-" }}</td>
+              <th>Провайдер</th>
+              <th>Адрес</th>
+              <th>Кодек</th>
+              <th>Сотрудник</th>
+              <th>Статус</th>
+              <th></th>
             </tr>
-          {% else %}
-            <tr><td colspan="4">Интеграции пока не настроены. Здесь будут SIP, АТС и внешние сервисы звонков.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in telephony_providers %}
+              <tr>
+                <td><strong>{{ row.name }}</strong><small>{{ row.login or row.account or row.note }}</small></td>
+                <td>{{ row.endpoint or row.host or "-" }}</td>
+                <td>{{ row.codec or "-" }} / {{ row.transport or "UDP" }}</td>
+                <td>{{ row.employee or "-" }}</td>
+                <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.last_test_message or "" }}</small></td>
+                <td>
+                  <form method="post" action="{{ url_for('telephony_provider_test') }}" class="inline-form">
+                    {% include "_csrf_field.html" %}
+                    <input type="hidden" name="provider_id" value="{{ row.id }}" />
+                    <button class="btn btn-secondary" type="submit">Проверить соединение</button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки и webhooks.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </article>
 </div>
+
+<dialog class="settings-profile-modal telephony-dialog" id="telephony-call-dialog" aria-labelledby="telephony-call-title">
+  <div class="settings-profile-modal-surface telephony-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="telephony-call-title" class="settings-profile-modal-title">Новый звонок</h2>
+        <p class="settings-profile-modal-sub">Журнал входящих, исходящих и запланированных контактов.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll">
+      <form method="post" action="{{ url_for('telephony_call_save') }}" class="product-form">
+        {% include "_csrf_field.html" %}
+        <div class="product-form-grid">
+          <label><span>Клиент*</span><input name="client" list="telephony-client-list" required /></label>
+          <label><span>Номер телефона*</span><input name="phone" required placeholder="+998 ..." /></label>
+          <label>
+            <span>Направление</span>
+            <select name="direction">
+              <option value="incoming">Входящий</option>
+              <option value="outgoing" selected>Исходящий</option>
+            </select>
+          </label>
+          <label><span>Дата и время</span><input name="started_at" type="datetime-local" /></label>
+          <label><span>Ответственный</span><input name="responsible" list="telephony-responsible-list" value="{{ user.name if user else '' }}" /></label>
+          <label>
+            <span>Статус</span>
+            <select name="status">
+              <option value="answered">Отвечен</option>
+              <option value="missed">Пропущен</option>
+              <option value="planned" selected>Запланирован</option>
+            </select>
+          </label>
+          <label class="wide"><span>Комментарий</span><input name="note" /></label>
+        </div>
+        <div class="product-form-actions">
+          <button class="btn" type="submit">Сохранить звонок</button>
+          <button class="btn btn-secondary" type="button" data-telephony-close-dialog>Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal telephony-dialog" id="telephony-number-dialog" aria-labelledby="telephony-number-title">
+  <div class="settings-profile-modal-surface telephony-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="telephony-number-title" class="settings-profile-modal-title">Новый номер</h2>
+        <p class="settings-profile-modal-sub">Привязка SIP/АТС-линии к сотруднику и правилам маршрутизации.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll">
+      <form method="post" action="{{ url_for('telephony_number_save') }}" class="product-form">
+        {% include "_csrf_field.html" %}
+        <div class="product-form-grid">
+          <label><span>Номер телефона*</span><input name="number" required placeholder="+998 ..." /></label>
+          <label><span>Провайдер</span><input name="provider" list="telephony-provider-list" placeholder="SIP / АТС" /></label>
+          <label><span>Сотрудник</span><input name="employee" list="telephony-responsible-list" /></label>
+          <label>
+            <span>Режим</span>
+            <select name="mode">
+              <option value="Рабочие часы">Рабочие часы</option>
+              <option value="Всегда">Всегда</option>
+            </select>
+          </label>
+          <label class="wide"><span>Переадресация при недоступности</span><input name="forwarding" placeholder="+998 ... или другой сотрудник" /></label>
+        </div>
+        <div class="product-form-actions">
+          <button class="btn" type="submit">Сохранить номер</button>
+          <button class="btn btn-secondary" type="button" data-telephony-close-dialog>Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</dialog>
