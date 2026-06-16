@@ -8802,6 +8802,18 @@ def create_app() -> FastAPI:
         else:
             data = load_workspace_settings("")
             categories = []
+        social_links = data.get("social_links") if isinstance(data.get("social_links"), dict) else {}
+        data["social_links"] = {
+            "primary_channel": str(social_links.get("primary_channel") or "").strip(),
+            "instagram_url": str(social_links.get("instagram_url") or "").strip(),
+            "facebook_url": str(social_links.get("facebook_url") or "").strip(),
+            "telegram_url": str(social_links.get("telegram_url") or "").strip(),
+            "whatsapp_phone": str(social_links.get("whatsapp_phone") or "").strip(),
+            "youtube_url": str(social_links.get("youtube_url") or "").strip(),
+            "tiktok_url": str(social_links.get("tiktok_url") or "").strip(),
+            "website_url": str(social_links.get("website_url") or "").strip(),
+            "note": str(social_links.get("note") or "").strip(),
+        }
         tab_raw = (request.query_params.get("tab") or "").strip().lower()
         settings_can_manage_employees = _can_manage_employees(u)
         settings_can_manage_config = bool((not u.get("is_employee")) or _has_permission(u, "settings"))
@@ -8818,7 +8830,7 @@ def create_app() -> FastAPI:
             if default_allowed_tab not in allowed_tabs:
                 default_allowed_tab = "employees"
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations"})
+            allowed_tabs.update({"telegram", "integrations", "social"})
         if settings_can_manage_dictionary:
             allowed_tabs.add("dictionary")
             if default_allowed_tab not in allowed_tabs:
@@ -9017,7 +9029,7 @@ def create_app() -> FastAPI:
         if settings_can_manage_employees:
             allowed_tabs.add("employees")
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations", "dictionary"})
+            allowed_tabs.update({"telegram", "integrations", "social", "dictionary"})
         if settings_can_manage_roles:
             allowed_tabs.add("roles")
         tab = active_settings_tab.strip().lower() if active_settings_tab.strip().lower() in allowed_tabs else "general"
@@ -9315,6 +9327,37 @@ def create_app() -> FastAPI:
         if connection:
             out["connection"] = connection
         return out
+
+    @app.post("/api/settings/social-links")
+    async def api_settings_social_links(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _role_permissions_owner_id(request)
+        if err:
+            return err
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        raw_links = body.get("social_links") if isinstance(body.get("social_links"), dict) else {}
+        data = load_workspace_settings(wid)
+        data["social_links"] = {
+            "primary_channel": str(raw_links.get("primary_channel") or "").strip(),
+            "instagram_url": str(raw_links.get("instagram_url") or "").strip(),
+            "facebook_url": str(raw_links.get("facebook_url") or "").strip(),
+            "telegram_url": str(raw_links.get("telegram_url") or "").strip(),
+            "whatsapp_phone": str(raw_links.get("whatsapp_phone") or "").strip(),
+            "youtube_url": str(raw_links.get("youtube_url") or "").strip(),
+            "tiktok_url": str(raw_links.get("tiktok_url") or "").strip(),
+            "website_url": str(raw_links.get("website_url") or "").strip(),
+            "note": str(raw_links.get("note") or "").strip(),
+        }
+        _save_workspace_settings_from_user(request, data)
+        return {"ok": True, "social_links": data["social_links"]}
 
     @app.post("/api/settings/account")
     async def api_settings_account(request: Request):

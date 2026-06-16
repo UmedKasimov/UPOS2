@@ -458,6 +458,63 @@
     }
   }
 
+  function initSocialSettings() {
+    var panel = document.querySelector("[data-settings-social]");
+    if (!panel) return;
+    var saveBtn = panel.querySelector("[data-social-save]");
+    var status = panel.querySelector("[data-social-status]");
+    if (!saveBtn) return;
+
+    function setStatus(message, variant) {
+      if (!status) return;
+      status.hidden = !message;
+      status.textContent = message || "";
+      if (variant) status.setAttribute("data-variant", variant);
+      else status.removeAttribute("data-variant");
+    }
+
+    function collect() {
+      var out = {};
+      panel.querySelectorAll("[data-social-field]").forEach(function (field) {
+        var key = field.getAttribute("data-social-field") || "";
+        if (!key) return;
+        out[key] = (field.value || "").trim();
+      });
+      return out;
+    }
+
+    saveBtn.addEventListener("click", function () {
+      var originalLabel = saveBtn.textContent;
+      saveBtn.disabled = true;
+      setStatus("Сохраняем...", "");
+      fetch("/api/settings/social-links", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken(),
+        },
+        body: JSON.stringify({ social_links: collect() }),
+      })
+        .then(function (res) {
+          return res.json().then(function (body) {
+            if (!res.ok || !body.ok) throw new Error(body.error || t("settings.js.save_err"));
+            return body;
+          });
+        })
+        .then(function () {
+          setStatus("Соцсети сохранены", "ok");
+          showPrefToast();
+        })
+        .catch(function (err) {
+          setStatus(err.message || t("settings.js.save_err"), "err");
+        })
+        .finally(function () {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalLabel;
+        });
+    });
+  }
+
   var PW_RULES = [
     {
       key: "settings.profile.pw_tip.length",
@@ -1434,6 +1491,7 @@
     initLanguageDropdowns();
     initPreferencesAutoSave();
     initIntegrationModals();
+    initSocialSettings();
     initProfileEditor();
     initCurrencyVisibility();
     initRolePermissions();
