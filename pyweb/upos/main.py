@@ -3409,6 +3409,70 @@ def create_app() -> FastAPI:
             "planned": "Запланировано",
         }.get(str(status or ""), "Новый")
 
+    CRM_DEFAULT_STAGES = (
+        {"id": "leads", "title": "Лиды", "hint": "Сайт, Instagram, Telegram"},
+        {"id": "qualification", "title": "Квалификация", "hint": "Проверка потребности"},
+        {"id": "negotiation", "title": "Переговоры", "hint": "Контакт и предложение"},
+        {"id": "invoice", "title": "Счёт", "hint": "Заказ, счёт, ожидание оплаты"},
+        {"id": "won", "title": "Успешно", "hint": "Сделка закрыта"},
+        {"id": "lost", "title": "Потеряно", "hint": "Отказ или пауза"},
+    )
+    CRM_LEAD_SOURCES = ("Сайт", "Instagram", "Telegram", "WhatsApp", "Facebook", "Звонок", "Ручной ввод")
+
+    def _crm_stage_slug(value: str, fallback: str = "stage") -> str:
+        base = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(value or "").strip())
+        base = "-".join(part for part in base.split("-") if part)
+        return (base or fallback)[:80]
+
+    def _crm_clean_stages(raw: Any) -> list[dict[str, str]]:
+        source = raw if isinstance(raw, list) else []
+        stages: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for index, item in enumerate(source, start=1):
+            if isinstance(item, dict):
+                title = str(item.get("title") or item.get("name") or "").strip()
+                stage_id = str(item.get("id") or "").strip()
+                hint = str(item.get("hint") or "").strip()
+            else:
+                title = str(item or "").strip()
+                stage_id = ""
+                hint = ""
+            if not title:
+                continue
+            stage_id = _crm_stage_slug(stage_id or title, f"stage-{index}")
+            if stage_id in seen:
+                stage_id = f"{stage_id}-{index}"
+            seen.add(stage_id)
+            stages.append({"id": stage_id, "title": title[:80], "hint": hint[:120]})
+        return stages or [dict(item) for item in CRM_DEFAULT_STAGES]
+
+    def _crm_workspace_stages(workspace_owner_id: str) -> list[dict[str, str]]:
+        data = load_workspace_settings(workspace_owner_id)
+        return _crm_clean_stages(data.get("crm_pipeline_stages"))
+
+    def _crm_stage_lookup(stages: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+        lookup: dict[str, dict[str, str]] = {}
+        for stage in stages:
+            lookup[str(stage["id"]).lower()] = stage
+            lookup[str(stage["title"]).lower()] = stage
+        return lookup
+
+    def _crm_stage_for_value(value: Any, stages: list[dict[str, str]]) -> dict[str, str]:
+        lookup = _crm_stage_lookup(stages)
+        raw = str(value or "").strip().lower()
+        if raw in lookup:
+            return lookup[raw]
+        return stages[0] if stages else dict(CRM_DEFAULT_STAGES[0])
+
+    def _crm_apply_stage(data: dict[str, Any], stages: list[dict[str, str]], raw_stage: Any = "") -> dict[str, str]:
+        stage = _crm_stage_for_value(raw_stage or data.get("stage_id") or data.get("stage"), stages)
+        data["stage_id"] = stage["id"]
+        data["stage"] = stage["title"]
+        return stage
+
+    def _crm_stage_lines(stages: list[dict[str, str]]) -> str:
+        return "\n".join(stage["title"] for stage in stages)
+
     def _product_data(row: Product) -> dict[str, Any]:
         data = row.data if isinstance(row.data, dict) else {}
         prices = data.get("prices") if isinstance(data.get("prices"), list) else []
@@ -4648,7 +4712,10 @@ def create_app() -> FastAPI:
             "date": str(form.get("date") or "").strip(),
             "due_date": str(form.get("due_date") or "").strip(),
             "stage": str(form.get("stage") or "").strip(),
+            "stage_id": str(form.get("stage_id") or "").strip(),
+            "lead_source": str(form.get("lead_source") or form.get("contact_type") or "").strip(),
             "contact_type": str(form.get("contact_type") or "").strip(),
+            "chat_ref": str(form.get("chat_ref") or "").strip(),
             "note": str(form.get("note") or "").strip(),
         }
         return data, amount, currency
@@ -4667,10 +4734,15 @@ def create_app() -> FastAPI:
             "date": str(data.get("date") or ""),
             "due_date": row.due_date or str(data.get("due_date") or ""),
             "stage": str(data.get("stage") or ""),
+            "stage_id": str(data.get("stage_id") or ""),
+            "lead_source": str(data.get("lead_source") or ""),
             "contact_type": str(data.get("contact_type") or ""),
+            "chat_ref": str(data.get("chat_ref") or ""),
             "note": str(data.get("note") or ""),
             "amount": _sales_money_label(row.amount),
+            "amount_value": _sales_decimal(row.amount),
             "currency": row.currency,
+            "counterparty_id": row.counterparty_id or "",
         }
 
     def _client_card_context(
@@ -5563,7 +5635,65 @@ def create_app() -> FastAPI:
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
         crm_options = {"clients": [], "responsibles": []}
+        crm_stages = _crm_workspace_stages(wid)
+        crm_stage_map = {stage["id"]: {**stage, "records": [], "total_value": Decimal("0"), "total": "0"} for stage in crm_stages}
         with session_scope() as session:
+            counterparty_rows = list(
+                session.execute(
+                    select(Counterparty)
+                    .where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind.in_(["client", "both"]),
+                    )
+                    .order_by(Counterparty.name.asc())
+                ).scalars()
+            )
+            counterparty_by_id = {row.id: row for row in counterparty_rows}
+            counterparty_by_name = {row.name.strip().lower(): row for row in counterparty_rows if row.name}
+            sale_by_key: dict[str, dict[str, Any]] = {}
+            for sale_row in session.execute(
+                select(SaleDocument)
+                .where(SaleDocument.workspace_owner_id == wid)
+                .order_by(SaleDocument.updated_at.desc())
+            ).scalars():
+                sale_data = _json_object(sale_row.data)
+                sale_item = _sales_document_data(sale_row)
+                sale_item["amount_value"] = _sales_decimal(sale_row.amount)
+                keys = {
+                    str(sale_data.get("counterparty_id") or sale_row.counterparty_id or "").strip(),
+                    str(sale_data.get("client") or "").strip().lower(),
+                }
+                for key in keys:
+                    if key and key not in sale_by_key:
+                        sale_by_key[key] = sale_item
+            subscribers = list(
+                session.execute(
+                    select(TelegramSubscriber)
+                    .where(TelegramSubscriber.workspace_owner_id == wid)
+                    .order_by(TelegramSubscriber.requested_at.desc())
+                ).scalars()
+            )
+
+            def digits(value: Any) -> str:
+                return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+            def chat_for_counterparty(counterparty: Counterparty | None) -> str:
+                if counterparty is None:
+                    return ""
+                extra = _counterparty_extra(counterparty)
+                telegram = str(extra.get("telegram") or "").lstrip("@").lower()
+                phone_digits = digits(counterparty.phone)
+                name_key = str(counterparty.name or "").strip().lower()
+                for subscriber in subscribers:
+                    if telegram and str(subscriber.username or "").lstrip("@").lower() == telegram:
+                        return f"Telegram @{subscriber.username}" if subscriber.username else "Telegram"
+                    sub_phone = digits(subscriber.phone)
+                    if phone_digits and sub_phone and sub_phone.endswith(phone_digits[-9:]):
+                        return f"Telegram {subscriber.display_name or subscriber.phone}".strip()
+                    if name_key and str(subscriber.display_name or "").strip().lower() == name_key:
+                        return f"Telegram {subscriber.display_name}".strip()
+                return str(extra.get("telegram") or "")
+
             rows = list(
                 session.execute(
                     select(CrmRecord)
@@ -5573,6 +5703,27 @@ def create_app() -> FastAPI:
             )
             for row in rows:
                 item = _crm_record_data(row)
+                stage = _crm_stage_for_value(item["stage_id"] or item["stage"], crm_stages)
+                item["stage_id"] = stage["id"]
+                item["stage"] = stage["title"]
+                if not item["lead_source"]:
+                    item["lead_source"] = item["contact_type"] or "Ручной ввод"
+                counterparty = counterparty_by_id.get(str(item.get("counterparty_id") or ""))
+                if counterparty is None and item["client"]:
+                    counterparty = counterparty_by_name.get(item["client"].strip().lower())
+                if counterparty is not None:
+                    item["client_id"] = counterparty.id
+                    item["client_href"] = f"/clients?client={counterparty.id}#client-card"
+                else:
+                    item["client_id"] = ""
+                    item["client_href"] = ""
+                linked_sale = sale_by_key.get(str(item.get("counterparty_id") or "")) or sale_by_key.get(str(item["client"] or "").strip().lower())
+                item["order_number"] = str(linked_sale.get("number") or "") if linked_sale else ""
+                item["order_amount"] = str(linked_sale.get("amount") or "") if linked_sale else ""
+                item["order_currency"] = str(linked_sale.get("currency") or item["currency"] or "UZS") if linked_sale else item["currency"]
+                item["kanban_amount"] = item["amount"] if item["amount_value"] else item["order_amount"]
+                item["kanban_amount_value"] = item["amount_value"] if item["amount_value"] else (linked_sale.get("amount_value") if linked_sale else Decimal("0"))
+                item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
                 hay = " ".join([item["title"], item["client"], item["responsible"], item["status_label"], item["stage"], item["note"]]).lower()
                 if q_clean and q_clean not in hay:
                     continue
@@ -5583,10 +5734,18 @@ def create_app() -> FastAPI:
                 if filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
                 crm_records.append(item)
+                column = crm_stage_map.get(item["stage_id"]) or crm_stage_map[crm_stages[0]["id"]]
+                column["records"].append(item)
+                column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
             crm_options = {
-                "clients": sorted({item["client"] for item in crm_records if item["client"]}),
+                "clients": sorted({row.name for row in counterparty_rows if row.name} | {item["client"] for item in crm_records if item["client"]}),
                 "responsibles": sorted({item["responsible"] for item in crm_records if item["responsible"]} | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())),
             }
+        crm_kanban_columns = []
+        for stage in crm_stages:
+            column = crm_stage_map[stage["id"]]
+            column["total"] = _sales_money_label(column["total_value"])
+            crm_kanban_columns.append(column)
         return tpl(
             request,
             "home_business_module.html",
@@ -5596,6 +5755,10 @@ def create_app() -> FastAPI:
             crm_filters=filters,
             crm_options=crm_options,
             crm_records=crm_records,
+            crm_pipeline_stages=crm_stages,
+            crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
+            crm_kanban_columns=crm_kanban_columns,
+            crm_lead_sources=list(CRM_LEAD_SOURCES),
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
@@ -5692,6 +5855,8 @@ def create_app() -> FastAPI:
         if not title:
             return RedirectResponse(url="/crm?error=" + quote("Название записи обязательно") + "#tasks", status_code=302)
         data, amount, currency = _crm_record_payload(form)
+        stages = _crm_workspace_stages(wid)
+        _crm_apply_stage(data, stages)
         with session_scope() as session:
             counterparty_id = None
             if data["client"]:
@@ -5712,6 +5877,49 @@ def create_app() -> FastAPI:
             session.add(row)
         target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
         return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
+
+    @app.post("/crm/stages/save", name="crm_stages_save")
+    async def crm_stages_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/crm?err=csrf#deals", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        raw_lines = str(form.get("stages") or "").splitlines()
+        stages = _crm_clean_stages(raw_lines)
+        data = load_workspace_settings(wid)
+        data["crm_pipeline_stages"] = stages
+        save_workspace_settings(wid, data)
+        return RedirectResponse(url="/crm?msg=saved#deals", status_code=302)
+
+    @app.post("/crm/{record_id}/stage", name="crm_stage_update")
+    async def crm_stage_update(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        stage_id = str(form.get("stage_id") or "").strip()
+        stages = _crm_workspace_stages(wid)
+        stage = _crm_stage_for_value(stage_id, stages)
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            data = _json_object(row.data).copy()
+            _crm_apply_stage(data, stages, stage["id"])
+            row.data = data
+            if stage["id"] == "won":
+                row.status = "won"
+            elif stage["id"] == "lost":
+                row.status = "lost"
+            elif row.status == "new":
+                row.status = "in_progress"
+        return JSONResponse({"ok": True, "stage": stage})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
     async def crm_delete(request: Request, record_id: str):

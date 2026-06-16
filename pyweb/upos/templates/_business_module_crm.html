@@ -33,6 +33,83 @@
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
 </datalist>
 
+<section class="crm-pipeline-shell" data-workspace-view="tasks deals" hidden>
+  <header class="crm-pipeline-head">
+    <div>
+      <span class="settings-ios-footnote">Канбан-воронка</span>
+      <h2>CRM воронка</h2>
+    </div>
+    <form method="post" action="{{ url_for('crm_stages_save') }}" class="crm-stage-settings">
+      {% include "_csrf_field.html" %}
+      <label>
+        <span>Этапы</span>
+        <textarea name="stages" rows="2">{{ crm_pipeline_stage_lines }}</textarea>
+      </label>
+      <button class="btn btn-secondary" type="submit">Сохранить этапы</button>
+    </form>
+  </header>
+
+  <div
+    class="crm-kanban"
+    data-crm-kanban
+    data-crm-csrf="{{ csrf_token }}"
+    data-crm-stage-url-template="/crm/__record__/stage"
+  >
+    {% for column in crm_kanban_columns %}
+      <section class="crm-kanban-column" data-crm-stage-id="{{ column.id }}">
+        <header>
+          <div>
+            <h3>{{ column.title }}</h3>
+            <span>{{ column.hint }}</span>
+          </div>
+          <strong>{{ column.records|length }}</strong>
+        </header>
+        <div class="crm-kanban-column-total">{{ column.total }} UZS</div>
+        <div class="crm-kanban-dropzone" data-crm-dropzone>
+          {% for row in column.records %}
+            <article class="crm-kanban-card" draggable="true" data-crm-record-id="{{ row.id }}">
+              <div class="crm-kanban-card-top">
+                <strong>{{ row.title }}</strong>
+                <span>{{ row.item_type_label }}</span>
+              </div>
+              <div class="crm-kanban-card-meta">
+                <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
+                <span>{{ row.status_label }}</span>
+              </div>
+              {% if row.client %}
+                {% if row.client_href %}
+                  <a class="crm-kanban-client" href="{{ row.client_href }}">{{ row.client }}</a>
+                {% else %}
+                  <span class="crm-kanban-client">{{ row.client }}</span>
+                {% endif %}
+              {% endif %}
+              <div class="crm-kanban-card-money">
+                {% if row.kanban_amount %}
+                  <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+                {% else %}
+                  <span>Сумма не указана</span>
+                {% endif %}
+                {% if row.order_number %}<small>Заказ {{ row.order_number }}</small>{% endif %}
+              </div>
+              {% if row.chat_label %}
+                <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
+              {% endif %}
+              {% if row.responsible or row.due_date %}
+                <footer>
+                  <span>{{ row.responsible or "Без ответственного" }}</span>
+                  <span>{{ row.due_date or row.date or "-" }}</span>
+                </footer>
+              {% endif %}
+            </article>
+          {% else %}
+            <div class="crm-kanban-empty">Перетащите карточку сюда</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+</section>
+
 <div class="products-layout" data-workspace-view="tasks deals history" hidden>
   <article class="products-list-panel" data-workspace-view="tasks deals history" hidden>
     <header class="products-panel-head">
@@ -48,22 +125,30 @@
             <th>Название</th>
             <th>Тип</th>
             <th>Клиент</th>
+            <th>Источник</th>
+            <th>Этап</th>
             <th>Ответственный</th>
-            <th>Срок</th>
+            <th>Сумма</th>
             <th>Статус</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for row in crm_records %}
-            {% if (row.item_type == 'task' and active == 'crm') or true %}
-            {% endif %}
             <tr {% if row.item_type == 'task' %}data-workspace-view="tasks"{% elif row.item_type == 'deal' %}data-workspace-view="deals"{% else %}data-workspace-view="history"{% endif %}>
-              <td><strong>{{ row.title }}</strong><small>{{ row.note or row.stage or row.contact_type or row.item_type_label }}</small></td>
+              <td><strong>{{ row.title }}</strong><small>{{ row.note or row.chat_label or row.contact_type or row.item_type_label }}</small></td>
               <td>{{ row.item_type_label }}</td>
-              <td>{{ row.client or "-" }}</td>
+              <td>
+                {% if row.client_href %}
+                  <a href="{{ row.client_href }}">{{ row.client }}</a>
+                {% else %}
+                  {{ row.client or "-" }}
+                {% endif %}
+              </td>
+              <td>{{ row.lead_source or "-" }}</td>
+              <td>{{ row.stage or "-" }}</td>
               <td>{{ row.responsible or "-" }}</td>
-              <td>{{ row.due_date or row.date or "-" }}</td>
+              <td>{{ row.kanban_amount or row.amount }} {{ row.order_currency or row.currency }}</td>
               <td>{{ row.status_label }}</td>
               <td class="products-row-actions">
                 <form method="post" action="{{ url_for('crm_delete', record_id=row.id) }}">
@@ -73,7 +158,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="7">CRM-записей пока нет.</td></tr>
+            <tr><td colspan="9">CRM-записей пока нет.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -98,10 +183,12 @@
         <label class="wide"><span>Название*</span><input name="title" required /></label>
         <label><span>Клиент</span><input name="client" list="crm-client-list" /></label>
         <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ user.name if user else '' }}" /></label>
+        <label><span>Источник лида</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+        <label><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
+        <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
+        <label><span>Привязка чата</span><input name="chat_ref" placeholder="@username, ссылка или chat id" /></label>
         <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
         <label><span>Срок</span><input name="due_date" type="date" value="{{ today }}" /></label>
-        <label><span>Этап</span><input name="stage" placeholder="Лид, переговоры, счёт" /></label>
-        <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
         <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option></select></label>
         <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
         <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
