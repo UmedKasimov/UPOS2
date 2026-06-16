@@ -1,0 +1,116 @@
+<div class="business-module-toolbar" data-workspace-view="tasks deals history" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" disabled>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('crm_get') }}" data-workspace-view="tasks deals history" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" placeholder="Задача, клиент, ответственный" /></label>
+  <label><span>Клиент</span><input name="client" list="crm-client-list" value="{{ crm_filters.client }}" placeholder="Клиент" /></label>
+  <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ crm_filters.responsible }}" placeholder="Ответственный" /></label>
+  <label>
+    <span>Статус</span>
+    <select name="status">
+      <option value="all" {% if crm_filters.status == 'all' %}selected{% endif %}>Все</option>
+      <option value="new" {% if crm_filters.status == 'new' %}selected{% endif %}>Новый</option>
+      <option value="in_progress" {% if crm_filters.status == 'in_progress' %}selected{% endif %}>В работе</option>
+      <option value="planned" {% if crm_filters.status == 'planned' %}selected{% endif %}>Запланировано</option>
+      <option value="done" {% if crm_filters.status == 'done' %}selected{% endif %}>Завершено</option>
+      <option value="won" {% if crm_filters.status == 'won' %}selected{% endif %}>Успешно</option>
+      <option value="lost" {% if crm_filters.status == 'lost' %}selected{% endif %}>Потеряно</option>
+    </select>
+  </label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Очистить</a>
+</form>
+
+<datalist id="crm-client-list">
+  {% for item in crm_options.clients %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="crm-responsible-list">
+  {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
+</datalist>
+
+<div class="products-layout" data-workspace-view="tasks deals history" hidden>
+  <article class="products-list-panel" data-workspace-view="tasks deals history" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Задачи и сделки</h2>
+        <span>Всего: {{ crm_records|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Тип</th>
+            <th>Клиент</th>
+            <th>Ответственный</th>
+            <th>Срок</th>
+            <th>Статус</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in crm_records %}
+            {% if (row.item_type == 'task' and active == 'crm') or true %}
+            {% endif %}
+            <tr {% if row.item_type == 'task' %}data-workspace-view="tasks"{% elif row.item_type == 'deal' %}data-workspace-view="deals"{% else %}data-workspace-view="history"{% endif %}>
+              <td><strong>{{ row.title }}</strong><small>{{ row.note or row.stage or row.contact_type or row.item_type_label }}</small></td>
+              <td>{{ row.item_type_label }}</td>
+              <td>{{ row.client or "-" }}</td>
+              <td>{{ row.responsible or "-" }}</td>
+              <td>{{ row.due_date or row.date or "-" }}</td>
+              <td>{{ row.status_label }}</td>
+              <td class="products-row-actions">
+                <form method="post" action="{{ url_for('crm_delete', record_id=row.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">CRM-записей пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="tasks deals history" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Новая запись</h2>
+        <span>Задача, сделка или история контакта</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('crm_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-kind-toggle">
+        <label><input type="radio" name="item_type" value="task" checked /> Задача</label>
+        <label><input type="radio" name="item_type" value="deal" /> Сделка</label>
+        <label><input type="radio" name="item_type" value="history" /> История</label>
+      </div>
+      <div class="product-form-grid">
+        <label class="wide"><span>Название*</span><input name="title" required /></label>
+        <label><span>Клиент</span><input name="client" list="crm-client-list" /></label>
+        <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ user.name if user else '' }}" /></label>
+        <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+        <label><span>Срок</span><input name="due_date" type="date" value="{{ today }}" /></label>
+        <label><span>Этап</span><input name="stage" placeholder="Лид, переговоры, счёт" /></label>
+        <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
+        <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option></select></label>
+        <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
+        <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить запись</button>
+        <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+</div>

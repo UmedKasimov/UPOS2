@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Продажи{% endblock %}
+
+{% set sales_default_tab = 'order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else '')) %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">Торговый контур</span>
+    <h1 class="page-title settings-ios-page-title">Продажи</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <section
+    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root sales-workspace products-workspace workspace-module-root workspace-module-root--sales"
+    data-workspace-tabs
+    data-workspace-key="sales"
+    data-workspace-default-tab="{{ sales_default_tab }}"
+    data-workspace-home-href="{{ url_for('sales_get') }}"
+  >
+    {% if flash_ok == "saved" %}
+      <div class="flash ok settings-ios-flash">Документ продажи сохранён.</div>
+    {% elif flash_ok == "deleted" %}
+      <div class="flash ok settings-ios-flash">Документ продажи удалён.</div>
+    {% endif %}
+    {% if flash_err %}
+      <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+    {% endif %}
+
+    <nav class="general-module-tabs workbench-open-tabs sales-open-tabs" aria-label="Открытые вкладки продаж" data-workspace-open-tabs>
+      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Продажи</button>
+    </nav>
+
+    <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher>
+      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="Новая продажа" data-workspace-tab-hash="sales-form">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M5 5h14v14H5z" />
+            <path d="M8 9h8M8 13h5" />
+            <path d="M17 17h3M18.5 15.5v3" />
+          </svg>
+        </span>
+        <span>Новая продажа</span>
+        <small>Счёт, заказ или реализация</small>
+      </a>
+      <a class="general-report-card" href="#sales-journal" data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M5 4h14v16H5z" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+            <path d="M3 8h2M3 12h2M3 16h2" />
+          </svg>
+        </span>
+        <span>Журнал</span>
+        <small>Продажи по документам</small>
+      </a>
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=order#order" data-workspace-card="order" data-workspace-tab-title="Заказы" data-workspace-tab-hash="order" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=order">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+            <path d="M9 8h6M9 12h6" />
+          </svg>
+        </span>
+        <span>Заказы</span>
+        <small>Резерв и ожидание оплаты</small>
+      </a>
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=return#return" data-workspace-card="return" data-workspace-tab-title="Возвраты" data-workspace-tab-hash="return" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=return">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 14 4 9l5-5" />
+            <path d="M4 9h10a6 6 0 1 1 0 12H8" />
+          </svg>
+        </span>
+        <span>Возвраты</span>
+        <small>Возврат товара клиентом</small>
+      </a>
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?status=debt#debt" data-workspace-card="debt" data-workspace-tab-title="Долги" data-workspace-tab-hash="debt" data-workspace-tab-href="{{ url_for('sales_get') }}?status=debt">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3v18" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+        <span>Долги</span>
+        <small>Неполная оплата и остаток</small>
+      </a>
+    </section>
+
+    <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
+    <form class="products-filter-bar sales-filter-bar" method="get" action="{{ url_for('sales_get') }}" data-workspace-view="journal order return debt" hidden>
+      <label>
+        <span>Поиск</span>
+        <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
+      </label>
+      <label>
+        <span>Тип документа</span>
+        <select name="doc_type">
+          <option value="all" {% if sales_filters.doc_type == 'all' %}selected{% endif %}>Все</option>
+          <option value="sale" {% if sales_filters.doc_type == 'sale' %}selected{% endif %}>Продажа</option>
+          <option value="order" {% if sales_filters.doc_type == 'order' %}selected{% endif %}>Заказ</option>
+          <option value="return" {% if sales_filters.doc_type == 'return' %}selected{% endif %}>Возврат</option>
+        </select>
+      </label>
+      <label>
+        <span>Клиент</span>
+        <input name="client" list="sales-client-list" value="{{ sales_filters.client }}" />
+      </label>
+      <label>
+        <span>Статус</span>
+        <select name="status">
+          <option value="all" {% if sales_filters.status == 'all' %}selected{% endif %}>Все</option>
+          <option value="new" {% if sales_filters.status == 'new' %}selected{% endif %}>Новый</option>
+          <option value="reserved" {% if sales_filters.status == 'reserved' %}selected{% endif %}>Резерв</option>
+          <option value="paid" {% if sales_filters.status == 'paid' %}selected{% endif %}>Оплачен</option>
+          <option value="partial" {% if sales_filters.status == 'partial' %}selected{% endif %}>Частично</option>
+          <option value="debt" {% if sales_filters.status == 'debt' %}selected{% endif %}>Долг</option>
+          <option value="return" {% if sales_filters.status == 'return' %}selected{% endif %}>Возврат</option>
+        </select>
+      </label>
+      <button class="btn btn-secondary" type="submit">Применить</button>
+      <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Очистить</a>
+    </form>
+
+    <datalist id="sales-client-list">
+      {% for item in sales_options.clients %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="sales-warehouse-list">
+      {% for item in sales_options.warehouses %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="sales-product-list">
+      {% for item in sales_options.products %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+
+    <div class="sales-layout products-layout">
+      <article class="products-list-panel" id="sales-journal" data-workspace-view="journal order return debt" hidden>
+        <header class="products-panel-head">
+          <div>
+            <h2>Журнал продаж</h2>
+            <span>Всего: {{ sales|length }}</span>
+          </div>
+          <a class="btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="Новая продажа" data-workspace-tab-hash="sales-form">+ Продажа</a>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table sales-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Тип</th>
+                <th>Клиент</th>
+                <th>Склад</th>
+                <th>Сумма</th>
+                <th>Оплата</th>
+                <th>Статус</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sale in sales %}
+                <tr>
+                  <td><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
+                  <td>{{ sale.date or "-" }}</td>
+                  <td>{{ sale.doc_type_label }}</td>
+                  <td>{{ sale.client or "-" }}</td>
+                  <td>{{ sale.warehouse or "-" }}</td>
+                  <td>{{ sale.amount }} {{ sale.currency }}</td>
+                  <td><span>{{ sale.paid_amount }} {{ sale.currency }}</span><small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small></td>
+                  <td><span class="sales-status sales-status--{{ sale.status }}">{{ sale.status_label }}</span></td>
+                  <td class="products-row-actions">
+                    <form method="post" action="{{ url_for('sales_delete', sale_id=sale.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <button type="submit">Удалить</button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="9">Пока нет продаж. Создайте первую продажу справа.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <aside class="product-form-panel" id="sales-form" data-workspace-view="new" hidden>
+        <header class="products-panel-head">
+          <div>
+            <h2>Новая продажа</h2>
+            <span>Логика продаж как в ibox</span>
+          </div>
+        </header>
+        <form method="post" action="{{ url_for('sales_save') }}" class="product-form sales-form">
+          {% include "_csrf_field.html" %}
+
+          <div class="product-kind-toggle">
+            <label><input type="radio" name="doc_type" value="sale" checked /> Продажа</label>
+            <label><input type="radio" name="doc_type" value="order" /> Заказ</label>
+            <label><input type="radio" name="doc_type" value="return" /> Возврат</label>
+          </div>
+
+          <div class="product-form-grid">
+            <label><span>Номер</span><input name="number" placeholder="Авто" /></label>
+            <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+            <label class="wide"><span>Клиент*</span><input name="client" list="sales-client-list" required placeholder="Выберите или введите клиента" /></label>
+            <label><span>Склад</span><input name="warehouse" list="sales-warehouse-list" value="Основной склад" /></label>
+            <label><span>Ответственный</span><input name="manager" value="{{ user.name if user else '' }}" /></label>
+            <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+            <label><span>Статус</span>
+              <select name="status">
+                <option value="">Авто</option>
+                <option value="new">Новый</option>
+                <option value="reserved">Резерв</option>
+                <option value="paid">Оплачен</option>
+                <option value="partial">Частично</option>
+                <option value="debt">Долг</option>
+                <option value="return">Возврат</option>
+              </select>
+            </label>
+          </div>
+
+          <section class="product-form-section">
+            <h3>Позиции</h3>
+            <div class="sales-line-grid">
+              <input name="line_product" list="sales-product-list" placeholder="Товар или услуга" />
+              <input name="line_quantity" placeholder="К-во" inputmode="decimal" />
+              <input name="line_price" placeholder="Цена" inputmode="decimal" />
+              <input name="line_discount" placeholder="Скидка" inputmode="decimal" />
+            </div>
+            <div class="sales-line-grid">
+              <input name="line_product" list="sales-product-list" placeholder="Товар или услуга" />
+              <input name="line_quantity" placeholder="К-во" inputmode="decimal" />
+              <input name="line_price" placeholder="Цена" inputmode="decimal" />
+              <input name="line_discount" placeholder="Скидка" inputmode="decimal" />
+            </div>
+            <p class="product-form-hint">Сумма считается по строкам. Если нужно, можно указать итог вручную ниже.</p>
+          </section>
+
+          <section class="product-form-section">
+            <h3>Оплата</h3>
+            <div class="product-form-grid">
+              <label><span>Итог вручную</span><input name="amount" placeholder="Если отличается от строк" inputmode="decimal" /></label>
+              <label><span>Оплачено</span><input name="paid_amount" inputmode="decimal" /></label>
+              <label><span>Тип оплаты</span><select name="payment_type"><option value="">Не выбрано</option><option>Наличные</option><option>Карта</option><option>Перечисление</option><option>Долг</option></select></label>
+              <label><span>Комментарий</span><input name="note" /></label>
+            </div>
+          </section>
+
+          <div class="product-form-actions">
+            <button class="btn" type="submit">Сохранить продажу</button>
+            <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
+          </div>
+        </form>
+      </aside>
+    </div>
+
+    <section class="products-dictionaries sales-logic" data-workspace-view="new journal order return debt" hidden>
+      <article>
+        <h2>Логика продаж</h2>
+        <p>Продажа хранит клиента, склад, ответственного, строки товаров, сумму, оплату и долг. Заказ можно держать в резерве, возврат выделяется отдельным типом документа.</p>
+      </article>
+      <article>
+        <h2>Связи</h2>
+        <p>Дальше этот документ можно связать со складом, клиентским балансом, кассой и отчётами без изменения дизайна UPOS.</p>
+      </article>
+    </section>
+    </div>
+  </section>
+{% endblock %}

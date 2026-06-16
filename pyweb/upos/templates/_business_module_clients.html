@@ -1,0 +1,169 @@
+<div class="business-module-toolbar" data-workspace-view="clients routes balances" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" disabled>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('clients_get') }}" data-workspace-view="clients routes balances" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ client_filters.q }}" placeholder="Клиент, телефон, категория" /></label>
+  <label><span>Территория</span><input name="territory" list="client-territory-list" value="{{ client_filters.territory }}" placeholder="Территория" /></label>
+  <label><span>Категория</span><input name="category" list="client-category-list" value="{{ client_filters.category }}" placeholder="Категория" /></label>
+  <label><span>Маршрут</span><input name="route" list="client-route-list" value="{{ client_filters.route }}" placeholder="Маршрут" /></label>
+  <label>
+    <span>Статус</span>
+    <select name="status">
+      <option value="all" {% if client_filters.status == 'all' %}selected{% endif %}>Все</option>
+      <option value="active" {% if client_filters.status == 'active' %}selected{% endif %}>Активный</option>
+      <option value="inactive" {% if client_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
+    </select>
+  </label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('clients_get') }}">Очистить</a>
+</form>
+
+<datalist id="client-territory-list">
+  {% for item in client_options.territories %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="client-category-list">
+  {% for item in client_options.categories %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="client-route-list">
+  {% for item in client_options.routes %}<option value="{{ item }}">{% endfor %}
+</datalist>
+
+<div class="products-layout" data-workspace-view="clients" hidden>
+  <article class="products-list-panel" data-workspace-view="clients" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>База клиентов</h2>
+        <span>Всего: {{ clients_records|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Официальное название</th>
+            <th>Баланс</th>
+            <th>Последняя отгрузка</th>
+            <th>Телефон</th>
+            <th>Категория</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for client in clients_records %}
+            <tr>
+              <td><strong>{{ client.name }}</strong><small>{{ client.route or client.territory or "Без маршрута" }}</small></td>
+              <td>{{ client.official_name }}</td>
+              <td>{{ client.balance }} UZS</td>
+              <td>{{ client.last_date or "-" }}</td>
+              <td>{{ client.phone or "-" }}</td>
+              <td>{{ client.category or "-" }}</td>
+              <td class="products-row-actions">
+                <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">Клиенты пока не добавлены.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="clients" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Создание</h2>
+        <span>Карточка клиента как в ibox</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('clients_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label class="wide"><span>Название клиента*</span><input name="name" required /></label>
+        <label><span>Официальное название</span><input name="official_name" /></label>
+        <label><span>Телефон</span><input name="phone" /></label>
+        <label><span>ИНН</span><input name="tax_id" /></label>
+        <label><span>Территория</span><input name="territory" list="client-territory-list" /></label>
+        <label><span>Категория</span><input name="category" list="client-category-list" /></label>
+        <label><span>Маршрут</span><input name="route" list="client-route-list" /></label>
+        <label><span>Telegram</span><input name="telegram" /></label>
+        <label><span>Email</span><input name="email" /></label>
+        <label><span>Адрес</span><input name="address" /></label>
+        <label><span>Статус</span><select name="status"><option value="active">Активный</option><option value="inactive">Неактивный</option></select></label>
+        <label><span>Также поставщик</span><select name="is_supplier"><option value="0">Нет</option><option value="1">Да</option></select></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить клиента</button>
+        <a class="btn btn-secondary" href="{{ url_for('clients_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+</div>
+
+<section class="products-dictionaries" data-workspace-view="routes balances" hidden>
+  <article data-workspace-view="routes" hidden>
+    <h2>Маршруты</h2>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Маршрут</th>
+            <th>Территория</th>
+            <th>Клиентов</th>
+            <th>Баланс</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in client_routes %}
+            <tr>
+              <td>{{ row.route }}</td>
+              <td>{{ row.territory }}</td>
+              <td>{{ row.count }}</td>
+              <td>{{ row.balance }} UZS</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">Маршруты пока не заданы.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article data-workspace-view="balances" hidden>
+    <h2>Балансы</h2>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Клиент</th>
+            <th>Телефон</th>
+            <th>Последняя отгрузка</th>
+            <th>Баланс</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in client_balances %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.phone or "-" }}</td>
+              <td>{{ row.last_date or "-" }}</td>
+              <td>{{ row.balance }} UZS</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">Задолженностей и авансов пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>

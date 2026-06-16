@@ -460,6 +460,7 @@ class Counterparty(Base):
     phone: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
     external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
     external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -722,6 +723,43 @@ class PurchaseDocument(Base):
     branch_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
     external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
     external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WarehouseOperation(Base):
+    __tablename__ = "warehouse_operations"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "number", name="uq_warehouse_operations_workspace_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    operation_type: Mapped[str] = mapped_column(String(24), nullable=False, default="adjustment", server_default=text("'adjustment'"))
+    warehouse_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    product_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    quantity: Mapped[object] = mapped_column(Numeric(18, 3), nullable=False, default=0, server_default=text("0"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CrmRecord(Base):
+    __tablename__ = "crm_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_type: Mapped[str] = mapped_column(String(24), nullable=False, default="task", server_default=text("'task'"))
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="new", server_default=text("'new'"))
+    due_date: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
     data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

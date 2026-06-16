@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ module.title }}{% endblock %}
+
+{% if active == "warehouse" %}
+  {% set module_home_url = url_for('warehouse_get') %}
+{% elif active == "clients" %}
+  {% set module_home_url = url_for('clients_get') %}
+{% elif active == "suppliers" %}
+  {% set module_home_url = url_for('suppliers_get') %}
+{% else %}
+  {% set module_home_url = url_for('crm_get') %}
+{% endif %}
+{% set module_views_ns = namespace(value='') %}
+{% for item in module.launcher %}
+  {% set module_views_ns.value = module_views_ns.value ~ (' ' if module_views_ns.value else '') ~ item.id %}
+{% endfor %}
+{% set module_views = module_views_ns.value %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ module.kicker }}</span>
+    <h1 class="page-title settings-ios-page-title">{{ module.title }}</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <section
+    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root business-module-shell workspace-module-root workspace-module-root--{{ active }}"
+    aria-labelledby="business-module-title"
+    data-workspace-tabs
+    data-workspace-key="{{ active }}"
+    data-workspace-home-href="{{ module_home_url }}"
+  >
+    {% if flash_ok == "saved" %}
+      <div class="flash ok settings-ios-flash">Изменения сохранены.</div>
+    {% elif flash_ok == "deleted" %}
+      <div class="flash ok settings-ios-flash">Запись удалена.</div>
+    {% endif %}
+    {% if flash_err %}
+      <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+    {% endif %}
+
+    <nav class="general-module-tabs workbench-open-tabs business-module-tabs" aria-label="Открытые вкладки {{ module.title }}" data-workspace-open-tabs>
+      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">{{ module.title }}</button>
+    </nav>
+
+    <section class="general-report-launcher workbench-launcher business-module-launcher" aria-label="Разделы {{ module.title }}" data-workspace-launcher>
+      {% for item in module.launcher %}
+        <a class="general-report-card" href="#{{ item.id }}" data-workspace-card="{{ item.id }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            {% if item.icon == "warehouse" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M3 21V8l9-5 9 5v13" /><path d="M13 13h4v8H7v-8h4" /><path d="M7 8h10" /></svg>
+            {% elif item.icon == "transfer" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M7 7h13" /><path d="m16 3 4 4-4 4" /><path d="M17 17H4" /><path d="m8 13-4 4 4 4" /></svg>
+            {% elif item.icon == "adjustment" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v18" /><path d="M5 8h14" /><path d="M7 16h10" /><path d="m8 5-3 3 3 3" /><path d="m16 13 3 3-3 3" /></svg>
+            {% elif item.icon == "clients" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>
+            {% elif item.icon == "route" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 6h5a4 4 0 0 1 0 8H7a3 3 0 0 0 0 6h13" /><circle cx="4" cy="6" r="2" /><circle cx="20" cy="20" r="2" /></svg>
+            {% elif item.icon == "balance" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v18" /><path d="M5 7h14" /><path d="M6 7l-3 6h6z" /><path d="M18 7l-3 6h6z" /><path d="M8 21h8" /></svg>
+            {% elif item.icon == "suppliers" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M16 3h5v5" /><path d="M21 3 10 14" /><path d="M14 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9" /></svg>
+            {% elif item.icon == "purchase" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
+            {% elif item.icon == "tasks" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+            {% elif item.icon == "deals" %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18" /><path d="M7 15h3v3H7z" /><path d="M14 7h3v11h-3z" /><path d="M7 8h3v4H7z" /></svg>
+            {% else %}
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" /></svg>
+            {% endif %}
+          </span>
+          <span>{{ item.title }}</span>
+          <small>{{ item.subtitle }}</small>
+        </a>
+      {% endfor %}
+    </section>
+
+    <div class="workspace-module-stack" data-workspace-view="{{ module_views }}" hidden>
+      {% if active == "warehouse" %}
+        {% include "_business_module_warehouse.html" %}
+      {% elif active == "clients" %}
+        {% include "_business_module_clients.html" %}
+      {% elif active == "suppliers" %}
+        {% include "_business_module_suppliers.html" %}
+      {% else %}
+        {% include "_business_module_crm.html" %}
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

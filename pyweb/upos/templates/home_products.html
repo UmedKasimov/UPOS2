@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Товары{% endblock %}
+
+{% set current = edit_product or {} %}
+{% set prices = current.prices if current and current.prices else [{"name": "Продажная цена", "price": "", "currency": "UZS"}] %}
+{% set stocks = current.stocks if current and current.stocks else [{"warehouse": "Основной склад", "quantity": "", "price": "", "date": ""}] %}
+{% set products_default_tab = 'create' if edit_product else '' %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">Торговый контур</span>
+    <h1 class="page-title settings-ios-page-title">Товары</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <section
+    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root products-workspace workspace-module-root workspace-module-root--products"
+    data-workspace-tabs
+    data-workspace-key="products"
+    data-workspace-default-tab="{{ products_default_tab }}"
+    data-workspace-home-href="{{ url_for('products_get') }}"
+  >
+    {% if flash_ok == "saved" %}
+      <div class="flash ok settings-ios-flash">Товар сохранён.</div>
+    {% elif flash_ok == "deleted" %}
+      <div class="flash ok settings-ios-flash">Товар удалён.</div>
+    {% endif %}
+    {% if flash_err %}
+      <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+    {% endif %}
+
+    <nav class="general-module-tabs workbench-open-tabs products-open-tabs" aria-label="Открытые вкладки товаров" data-workspace-open-tabs>
+      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Товары</button>
+    </nav>
+
+    <section class="general-report-launcher workbench-launcher products-launcher" aria-label="Разделы товаров" data-workspace-launcher>
+      <a class="general-report-card {{ 'active' if product_filters.kind == 'product' else '' }}" href="{{ url_for('products_get') }}#catalog" data-workspace-card="catalog" data-workspace-tab-title="Каталог и остатки" data-workspace-tab-hash="catalog" data-workspace-tab-href="{{ url_for('products_get') }}" {% if product_filters.kind == 'product' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+            <path d="m3.3 7 8.7 5 8.7-5" />
+            <path d="M12 22V12" />
+          </svg>
+        </span>
+        <span>Товары</span>
+        <small>Каталог и остатки</small>
+      </a>
+      <a class="general-report-card {{ 'active' if product_filters.kind == 'service' else '' }}" href="{{ url_for('products_get') }}?kind=service#service" data-workspace-card="service" data-workspace-tab-title="Услуги" data-workspace-tab-hash="service" data-workspace-tab-href="{{ url_for('products_get') }}?kind=service" {% if product_filters.kind == 'service' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3v18" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+        <span>Услуги</span>
+        <small>Работы без склада</small>
+      </a>
+      <a class="general-report-card" href="#price-types" data-workspace-card="price_types" data-workspace-tab-title="Прайс-листы" data-workspace-tab-hash="price-types">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 5h16v14H4z" />
+            <path d="M8 9h8M8 13h5" />
+            <path d="M17 14h3v5h-3z" />
+          </svg>
+        </span>
+        <span>Прайс-листы</span>
+        <small>Продажные цены</small>
+      </a>
+      <a class="general-report-card" href="#folders" data-workspace-card="folders" data-workspace-tab-title="Папки" data-workspace-tab-hash="folders">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          </svg>
+        </span>
+        <span>Папки</span>
+        <small>Группировка каталога</small>
+      </a>
+    </section>
+
+    <div class="workspace-module-stack" data-workspace-view="catalog service create price_types folders" hidden>
+    <form class="products-filter-bar" method="get" action="{{ url_for('products_get') }}" data-workspace-view="catalog service" hidden>
+      <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+      <label>
+        <span>Поиск</span>
+        <input name="q" type="search" value="{{ product_filters.q }}" placeholder="Название, артикул, штрихкод" />
+      </label>
+      <label>
+        <span>Категория</span>
+        <input name="category" list="product-category-list" value="{{ product_filters.category }}" />
+      </label>
+      <label>
+        <span>Группа</span>
+        <input name="group" list="product-group-list" value="{{ product_filters.group }}" />
+      </label>
+      <label>
+        <span>Бренд</span>
+        <input name="brand" list="product-brand-list" value="{{ product_filters.brand }}" />
+      </label>
+      <label>
+        <span>Статус</span>
+        <select name="status">
+          <option value="active" {% if product_filters.status == 'active' %}selected{% endif %}>Активный</option>
+          <option value="inactive" {% if product_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
+          <option value="all" {% if product_filters.status == 'all' %}selected{% endif %}>Все</option>
+        </select>
+      </label>
+      <button class="btn btn-secondary" type="submit">Применить</button>
+      <a class="btn btn-secondary" href="{{ url_for('products_get') }}">Очистить</a>
+    </form>
+
+    <datalist id="product-category-list">
+      {% for item in product_options.categories %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="product-group-list">
+      {% for item in product_options.groups %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="product-brand-list">
+      {% for item in product_options.brands %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="product-folder-list">
+      {% for item in product_options.folders %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+
+    <div class="products-layout">
+      <article class="products-list-panel" data-workspace-view="catalog service" hidden>
+        <header class="products-panel-head">
+          <div>
+            <h2>{% if product_filters.kind == 'service' %}Услуги{% else %}Товары{% endif %}</h2>
+            <span>Всего: {{ products|length }}</span>
+          </div>
+          <a class="btn" href="{{ url_for('products_get') }}?kind={{ product_filters.kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
+            {% if product_filters.kind == 'service' %}+ Услуга{% else %}+ Товар{% endif %}
+          </a>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>На складе</th>
+                <th>Цена продажи</th>
+                <th>Категория</th>
+                <th>Статус</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for product in products %}
+                <tr>
+                  <td>
+                    <strong>{{ product.name }}</strong>
+                    <small>{{ product.sku or product.barcode or "Без артикула" }}</small>
+                  </td>
+                  <td>{{ product.quantity }} {{ product.unit }}</td>
+                  <td>
+                    {% if product.sale_price %}{{ product.sale_price }} {{ product.sale_currency }}{% else %}-{% endif %}
+                    {% if product.prices|length > 1 %}<small>Все ({{ product.prices|length }})</small>{% endif %}
+                  </td>
+                  <td>{{ product.category or "-" }}</td>
+                  <td>{{ "Активный" if product.status == "active" else "Неактивный" }}</td>
+                  <td class="products-row-actions">
+                    <a href="{{ url_for('products_get') }}?edit={{ product.id }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="Редактирование" data-workspace-tab-hash="product-form">Изменить</a>
+                    <form method="post" action="{{ url_for('products_delete', product_id=product.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <button type="submit">Удалить</button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="6">Пока нет товаров. Создайте первый товар справа.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <aside class="product-form-panel" id="product-form" data-workspace-view="create" hidden>
+        <header class="products-panel-head">
+          <div>
+            <h2>{% if edit_product %}Редактирование{% else %}Создание{% endif %}</h2>
+            <span>Логика товаров как в ibox</span>
+          </div>
+        </header>
+        <form method="post" action="{{ url_for('products_save') }}" class="product-form">
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="product_id" value="{{ current.id or '' }}" />
+
+          <div class="product-kind-toggle">
+            <label><input type="radio" name="kind" value="product" {% if (current.kind or product_filters.kind) != 'service' %}checked{% endif %} /> Простой товар</label>
+            <label><input type="radio" name="kind" value="collection" {% if current.kind == 'collection' %}checked{% endif %} /> Товар коллекции</label>
+            <label><input type="radio" name="kind" value="service" {% if (current.kind or product_filters.kind) == 'service' %}checked{% endif %} /> Услуга</label>
+          </div>
+
+          <div class="product-form-grid">
+            <label class="wide"><span>Название товара*</span><input name="name" required value="{{ current.name or '' }}" /></label>
+            <label><span>Категория</span><input name="category" list="product-category-list" value="{{ current.category or '' }}" /></label>
+            <label><span>Папка</span><input name="folder" list="product-folder-list" value="{{ current.folder or '' }}" /></label>
+            <label><span>Единица хранения*</span><input name="unit" value="{{ current.unit or 'Штука' }}" required /></label>
+            <label><span>Артикул</span><input name="sku" value="{{ current.sku or '' }}" /></label>
+            <label><span>Вторая единица</span><input name="second_unit" value="{{ current.second_unit or '' }}" /></label>
+            <label><span>Группа</span><input name="group" list="product-group-list" value="{{ current.group or '' }}" /></label>
+            <label><span>Бренд</span><input name="brand" list="product-brand-list" value="{{ current.brand or '' }}" /></label>
+            <label><span>Статус</span><select name="status"><option value="active" {% if current.status != 'inactive' %}selected{% endif %}>Активный</option><option value="inactive" {% if current.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
+          </div>
+
+          <section class="product-form-section">
+            <h3>Цены</h3>
+            {% for price in prices %}
+              <div class="product-line-grid product-line-grid--price">
+                <input name="price_name" value="{{ price.name or 'Продажная цена' }}" placeholder="Прайс-лист" />
+                <input name="price_value" value="{{ price.price or '' }}" placeholder="Цена" inputmode="decimal" />
+                <input name="price_currency" value="{{ price.currency or 'UZS' }}" maxlength="3" />
+              </div>
+            {% endfor %}
+            <p class="product-form-hint">Поддерживаются несколько прайс-листов: продажная, скидочная, приходная и стандартная цена.</p>
+          </section>
+
+          <section class="product-form-section">
+            <h3>Начальный остаток</h3>
+            {% for stock in stocks %}
+              <div class="product-line-grid product-line-grid--stock">
+                <input name="stock_warehouse" value="{{ stock.warehouse or 'Основной склад' }}" placeholder="Склад" />
+                <input name="stock_quantity" value="{{ stock.quantity or '' }}" placeholder="К-во" inputmode="decimal" />
+                <input name="stock_price" value="{{ stock.price or '' }}" placeholder="Цена" inputmode="decimal" />
+                <input name="stock_date" value="{{ stock.date or '' }}" placeholder="Дата" type="date" />
+              </div>
+            {% endfor %}
+          </section>
+
+          <section class="product-form-section">
+            <h3>Штрихкод</h3>
+            <div class="product-line-grid product-line-grid--barcode">
+              <input name="barcode" value="{{ current.barcode or '' }}" placeholder="Штрихкод" />
+              <select name="barcode_type">
+                <option value="EAN13" {% if current.barcode_type != 'CODE128' %}selected{% endif %}>EAN13</option>
+                <option value="CODE128" {% if current.barcode_type == 'CODE128' %}selected{% endif %}>CODE128</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="product-form-section">
+            <h3>Дополнительно</h3>
+            <div class="product-form-grid">
+              <label><span>Партийный учёт</span><select name="batch_tracking"><option value="0" {% if not current.batch_tracking %}selected{% endif %}>Нет</option><option value="1" {% if current.batch_tracking %}selected{% endif %}>Да</option></select></label>
+              <label><span>Упаковки</span><input name="packages" value="{{ current.packages or '' }}" /></label>
+              <label><span>Минимальный остаток</span><input name="min_stock" value="{{ current.min_stock or '' }}" inputmode="decimal" /></label>
+              <label><span>Характеристики</span><input name="characteristics" value="{{ current.characteristics or '' }}" /></label>
+              <label><span>Классификация</span><input name="classification" value="{{ current.classification or '' }}" /></label>
+              <label><span>Владелец данных</span><input name="owner" value="{{ current.owner or '' }}" /></label>
+            </div>
+          </section>
+
+          <div class="product-form-actions">
+            <button class="btn" type="submit">Сохранить</button>
+            <a class="btn btn-secondary" href="{{ url_for('products_get') }}">Отмена</a>
+          </div>
+        </form>
+      </aside>
+    </div>
+
+    <section class="products-dictionaries" data-workspace-view="price_types folders" hidden>
+      <article id="price-types" data-workspace-view="price_types" hidden>
+        <h2>Прайс-листы</h2>
+        <p>Используются внутри карточки товара: продажная цена, скидочная цена, приходная цена, стандартная цена.</p>
+        <div class="products-chip-row">
+          {% for item in product_options.price_types %}
+            <span>{{ item }}</span>
+          {% else %}
+            <span>Продажная цена</span><span>Скидочная цена</span><span>Приходная цена</span><span>Стандартная цена</span>
+          {% endfor %}
+        </div>
+      </article>
+      <article id="folders" data-workspace-view="folders" hidden>
+        <h2>Папки</h2>
+        <p>Папки помогают группировать номенклатуру без изменения категории.</p>
+        <div class="products-chip-row">
+          {% for item in product_options.folders %}
+            <span>{{ item }}</span>
+          {% else %}
+            <span>Основная папка</span>
+          {% endfor %}
+        </div>
+      </article>
+    </section>
+    </div>
+  </section>
+{% endblock %}

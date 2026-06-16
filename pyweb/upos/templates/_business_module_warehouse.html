@@ -1,0 +1,195 @@
+<div class="business-module-toolbar" data-workspace-view="stocks transfers adjustments" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" disabled>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('warehouse_get') }}" data-workspace-view="stocks transfers adjustments" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ warehouse_filters.q }}" placeholder="Товар, склад, документ" /></label>
+  <label><span>Склад</span><input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Склад" /></label>
+  <label><span>Товар</span><input name="product" list="warehouse-product-list" value="{{ warehouse_filters.product }}" placeholder="Товар" /></label>
+  <label>
+    <span>Тип операции</span>
+    <select name="op_type">
+      <option value="all" {% if warehouse_filters.op_type == 'all' %}selected{% endif %}>Все</option>
+      <option value="in" {% if warehouse_filters.op_type == 'in' %}selected{% endif %}>Приход</option>
+      <option value="out" {% if warehouse_filters.op_type == 'out' %}selected{% endif %}>Списание</option>
+      <option value="adjustment" {% if warehouse_filters.op_type == 'adjustment' %}selected{% endif %}>Корректировка</option>
+      <option value="transfer" {% if warehouse_filters.op_type == 'transfer' %}selected{% endif %}>Перемещение</option>
+    </select>
+  </label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Очистить</a>
+</form>
+
+<datalist id="warehouse-name-list">
+  {% for item in warehouse_options.warehouses %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="warehouse-product-list">
+  {% for item in warehouse_options.products %}<option value="{{ item }}">{% endfor %}
+</datalist>
+
+<div class="products-layout" data-workspace-view="stocks transfers adjustments" hidden>
+  <article class="products-list-panel" data-workspace-view="stocks" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Остатки</h2>
+        <span>Позиций: {{ warehouse_stocks|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Товар</th>
+            <th>Склад</th>
+            <th>Количество</th>
+            <th>Ед.</th>
+            <th>Категория</th>
+            <th>Мин. остаток</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in warehouse_stocks %}
+            <tr>
+              <td>{{ row.product }}</td>
+              <td>{{ row.warehouse }}</td>
+              <td>{{ row.quantity }}</td>
+              <td>{{ row.unit }}</td>
+              <td>{{ row.category or "-" }}</td>
+              <td>{{ row.min_stock or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">Остатков пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="stocks" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Новый склад</h2>
+        <span>Точка хранения и ответственный</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label class="wide"><span>Название склада*</span><input name="name" required /></label>
+        <label><span>Ответственный</span><input name="manager" /></label>
+        <label><span>Статус</span><select name="status"><option value="active">Активный</option><option value="inactive">Неактивный</option></select></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить склад</button>
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+
+  <article class="products-list-panel" data-workspace-view="transfers adjustments" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Журнал операций</h2>
+        <span>Всего: {{ warehouse_operations|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Дата</th>
+            <th>Тип</th>
+            <th>Маршрут</th>
+            <th>Товар</th>
+            <th>Количество</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in warehouse_operations %}
+            <tr>
+              <td><strong>{{ row.number }}</strong><small>{{ row.note or row.operation_label }}</small></td>
+              <td>{{ row.date or "-" }}</td>
+              <td>{{ row.operation_label }}</td>
+              <td>
+                {% if row.operation_type == 'transfer' %}
+                  {{ row.from_warehouse or "-" }} → {{ row.to_warehouse or "-" }}
+                {% else %}
+                  {{ row.warehouse or "-" }}
+                {% endif %}
+              </td>
+              <td>{{ row.product or "-" }}</td>
+              <td>{{ row.quantity }}</td>
+              <td class="products-row-actions">
+                <form method="post" action="{{ url_for('warehouse_operation_delete', operation_id=row.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">Складских операций пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="transfers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Перемещение</h2>
+        <span>Между складами</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_operation_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="operation_type" value="transfer" />
+      <div class="product-form-grid">
+        <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+        <label><span>Товар*</span><input name="product" list="warehouse-product-list" required /></label>
+        <label><span>Со склада*</span><input name="from_warehouse" list="warehouse-name-list" value="Основной склад" required /></label>
+        <label><span>На склад*</span><input name="to_warehouse" list="warehouse-name-list" required /></label>
+        <label><span>Количество*</span><input name="quantity" inputmode="decimal" required /></label>
+        <label><span>Цена</span><input name="price" inputmode="decimal" /></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить перемещение</button>
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+
+  <aside class="product-form-panel" data-workspace-view="adjustments" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Корректировка</h2>
+        <span>Приход или списание</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_operation_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+        <label><span>Тип*</span><select name="operation_type"><option value="in">Приход</option><option value="out">Списание</option><option value="adjustment">Корректировка</option></select></label>
+        <label><span>Склад*</span><input name="warehouse" list="warehouse-name-list" value="Основной склад" required /></label>
+        <label><span>Товар*</span><input name="product" list="warehouse-product-list" required /></label>
+        <label><span>Количество*</span><input name="quantity" inputmode="decimal" required /></label>
+        <label><span>Цена</span><input name="price" inputmode="decimal" /></label>
+        <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить операцию</button>
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+</div>

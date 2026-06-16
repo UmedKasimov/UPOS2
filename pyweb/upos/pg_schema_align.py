@@ -107,6 +107,7 @@ _MANUAL_MISSING_COL_TYPE: dict[tuple[str, str], str] = {
     ("counterparties", "phone"): "VARCHAR(64) NOT NULL DEFAULT ''",
     ("counterparties", "external_source"): "VARCHAR(40) NOT NULL DEFAULT ''",
     ("counterparties", "external_id"): "VARCHAR(180) NOT NULL DEFAULT ''",
+    ("counterparties", "data"): "JSONB NOT NULL DEFAULT '{}'::jsonb",
     ("branches", "workspace_owner_id"): (
         "VARCHAR(36) NOT NULL REFERENCES users (id) ON DELETE CASCADE"
     ),

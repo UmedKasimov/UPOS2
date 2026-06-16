@@ -1,0 +1,229 @@
+<div class="business-module-toolbar" data-workspace-view="suppliers purchases payables" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" disabled>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('suppliers_get') }}" data-workspace-view="suppliers purchases payables" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ supplier_filters.q }}" placeholder="Поставщик, склад, документ" /></label>
+  <label><span>Статус</span><select name="status"><option value="all" {% if supplier_filters.status == 'all' %}selected{% endif %}>Все</option><option value="active" {% if supplier_filters.status == 'active' %}selected{% endif %}>Активный</option><option value="inactive" {% if supplier_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
+  <label><span>Категория</span><input name="category" list="supplier-category-list" value="{{ supplier_filters.category }}" placeholder="Категория" /></label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}">Очистить</a>
+</form>
+
+<datalist id="supplier-category-list">
+  {% for item in supplier_options.categories %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="supplier-name-list">
+  {% for item in supplier_options.suppliers %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="supplier-product-list">
+  {% for item in supplier_options.products %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="supplier-warehouse-list">
+  {% for item in supplier_options.warehouses %}<option value="{{ item }}">{% endfor %}
+</datalist>
+
+<div class="products-layout" data-workspace-view="suppliers purchases" hidden>
+  <article class="products-list-panel" data-workspace-view="suppliers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>База поставщиков</h2>
+        <span>Всего: {{ supplier_records|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Баланс</th>
+            <th>Последний документ</th>
+            <th>Телефон</th>
+            <th>Категория</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for supplier in supplier_records %}
+            <tr>
+              <td><strong>{{ supplier.name }}</strong><small>{{ supplier.official_name }}</small></td>
+              <td>{{ supplier.balance }} UZS</td>
+              <td>{{ supplier.last_date or "-" }}</td>
+              <td>{{ supplier.phone or "-" }}</td>
+              <td>{{ supplier.category or "-" }}</td>
+              <td class="products-row-actions">
+                <form method="post" action="{{ url_for('suppliers_delete', counterparty_id=supplier.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">Поставщики пока не добавлены.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="suppliers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Создание</h2>
+        <span>Карточка поставщика как в ibox</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('suppliers_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label class="wide"><span>Название поставщика*</span><input name="name" required /></label>
+        <label><span>Официальное название</span><input name="official_name" /></label>
+        <label><span>Телефон</span><input name="phone" /></label>
+        <label><span>ИНН</span><input name="tax_id" /></label>
+        <label><span>Категория</span><input name="category" list="supplier-category-list" /></label>
+        <label><span>Email</span><input name="email" /></label>
+        <label><span>Адрес</span><input name="address" /></label>
+        <label><span>Статус</span><select name="status"><option value="active">Активный</option><option value="inactive">Неактивный</option></select></label>
+        <label><span>Также клиент</span><select name="is_client"><option value="0">Нет</option><option value="1">Да</option></select></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить поставщика</button>
+        <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+
+  <article class="products-list-panel" data-workspace-view="purchases" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Закупки</h2>
+        <span>Всего: {{ supplier_purchases|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Дата</th>
+            <th>Поставщик</th>
+            <th>Склад</th>
+            <th>Сумма</th>
+            <th>Долг</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in supplier_purchases %}
+            <tr>
+              <td><strong>{{ doc.number }}</strong><small>{{ doc.status_label }}</small></td>
+              <td>{{ doc.date or "-" }}</td>
+              <td>{{ doc.supplier or "-" }}</td>
+              <td>{{ doc.warehouse or "-" }}</td>
+              <td>{{ doc.amount }} {{ doc.currency }}</td>
+              <td>{{ doc.debt_amount }} {{ doc.currency }}</td>
+              <td class="products-row-actions">
+                <form method="post" action="{{ url_for('suppliers_purchase_delete', purchase_id=doc.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">Документов закупки пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="purchases" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Новая закупка</h2>
+        <span>Приход товара и долг поставщику</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('suppliers_purchase_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label><span>Номер</span><input name="number" placeholder="Авто" /></label>
+        <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+        <label class="wide"><span>Поставщик*</span><input name="supplier" list="supplier-name-list" required /></label>
+        <label><span>Склад</span><input name="warehouse" list="supplier-warehouse-list" value="Основной склад" /></label>
+        <label><span>Статус</span><select name="status"><option value="">Авто</option><option value="new">Новый</option><option value="partial">Частично</option><option value="paid">Оплачен</option></select></label>
+        <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+      </div>
+
+      <section class="product-form-section">
+        <h3>Позиции</h3>
+        <div class="sales-line-grid">
+          <input name="line_product" list="supplier-product-list" placeholder="Товар" />
+          <input name="line_quantity" placeholder="К-во" inputmode="decimal" />
+          <input name="line_price" placeholder="Цена" inputmode="decimal" />
+          <span></span>
+        </div>
+        <div class="sales-line-grid">
+          <input name="line_product" list="supplier-product-list" placeholder="Товар" />
+          <input name="line_quantity" placeholder="К-во" inputmode="decimal" />
+          <input name="line_price" placeholder="Цена" inputmode="decimal" />
+          <span></span>
+        </div>
+      </section>
+
+      <section class="product-form-section">
+        <h3>Оплата</h3>
+        <div class="product-form-grid">
+          <label><span>Итог вручную</span><input name="amount" inputmode="decimal" /></label>
+          <label><span>Оплачено</span><input name="paid_amount" inputmode="decimal" /></label>
+          <label><span>Тип оплаты</span><select name="payment_type"><option value="">Не выбрано</option><option>Наличные</option><option>Карта</option><option>Перечисление</option></select></label>
+          <label><span>Комментарий</span><input name="note" /></label>
+        </div>
+      </section>
+
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить закупку</button>
+        <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+</div>
+
+<section class="products-dictionaries" data-workspace-view="payables" hidden>
+  <article data-workspace-view="payables" hidden>
+    <h2>Кредиторка</h2>
+    <div class="products-table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Документ</th>
+            <th>Поставщик</th>
+            <th>Дата</th>
+            <th>Сумма</th>
+            <th>Оплачено</th>
+            <th>Долг</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in supplier_payables %}
+            <tr>
+              <td>{{ doc.number }}</td>
+              <td>{{ doc.supplier or "-" }}</td>
+              <td>{{ doc.date or "-" }}</td>
+              <td>{{ doc.amount }} {{ doc.currency }}</td>
+              <td>{{ doc.paid_amount }} {{ doc.currency }}</td>
+              <td>{{ doc.debt_amount }} {{ doc.currency }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">Открытых долгов перед поставщиками пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>

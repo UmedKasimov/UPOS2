@@ -3,6 +3,8 @@
     const tab = button.closest('.general-module-tab--report');
     if (!tab) return '';
     const candidates = [
+      tab.dataset.workspaceHash,
+      tab.dataset.workspaceOpenTab,
       tab.dataset.hrOpenTab,
       tab.dataset.shipmentOpenTab,
       tab.dataset.orgSettingsOpenTab,
@@ -18,6 +20,14 @@
     button.disabled = true;
     button.classList.add('is-syncing');
     button.setAttribute('aria-label', '\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f');
+
+    const workspaceUrl = button.closest('.general-module-tab--report')?.dataset.workspaceSyncUrl;
+    if (workspaceUrl) {
+      const target = new URL(workspaceUrl, window.location.href);
+      target.searchParams.set('t', String(Date.now()));
+      window.location.assign(target.toString());
+      return;
+    }
 
     const url = new URL(window.location.href);
     url.searchParams.set('t', String(Date.now()));

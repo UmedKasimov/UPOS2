@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=129" />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=130" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -154,12 +154,19 @@
                 </div>
               </div>
             {% else %}
-              {% set home_nav_active = active == 'home_account' or active == 'home_kassa' or active == 'home_reports' or active == 'home_adjustments' or active == 'home_shipments' or active == 'home_hr' or active == 'settings' %}
-              <div class="nav-folder nav-folder--pinned{% if home_nav_active %} nav-folder--active-branch{% endif %}">
-                <div class="nav-folder-row">
-                  <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                  <span class="nav-folder-label nav-label">{{ _('nav.home') }}</span>
-                </div>
+              <a href="{{ url_for('sales_get') }}" class="nav-link {{ 'active' if active == 'sales' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                <span class="nav-label">Продажи</span>
+              </a>
+              {% set home_nav_active = active == 'home_account' or active == 'home_kassa' or active == 'home_adjustments' or active == 'home_shipments' or active == 'home_hr' %}
+              <details class="nav-folder{% if home_nav_active %} nav-folder--active-branch{% endif %}" {% if home_nav_active %}open{% endif %}>
+                <summary class="nav-folder-summary">
+                  <div class="nav-folder-row">
+                    <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span class="nav-folder-label nav-label">Финансы</span>
+                    <svg class="nav-folder-chevron" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </summary>
                 <div class="nav-folder-panel" role="group" aria-label="{{ _('nav.home_sections') }}">
                   {% set emp_perms = user.get('employee_permissions') or {} %}
                   {% if not user.get('is_employee') or emp_perms.get('schet') %}
@@ -172,12 +179,6 @@
                   <a href="{{ url_for('home_kassa') }}" class="nav-sublink {{ 'active' if active == 'home_kassa' else '' }}" title="{{ _('nav.kassa') }}">
                     <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg></span>
                     <span class="nav-label">{{ _('nav.kassa') }}</span>
-                  </a>
-                  {% endif %}
-                  {% if not user.get('is_employee') or emp_perms.get('reports') %}
-                  <a href="{{ url_for('home_reports') }}" class="nav-sublink {{ 'active' if active == 'home_reports' else '' }}" title="{{ _('nav.reports') }}">
-                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
-                    <span class="nav-label">{{ _('nav.reports') }}</span>
                   </a>
                   {% endif %}
                   {% if not user.get('is_employee') or emp_perms.get('adjustments') %}
@@ -198,14 +199,40 @@
                     <span class="nav-label">HR</span>
                   </a>
                   {% endif %}
-                  {% if not user.get('is_employee') or emp_perms.get('settings') or emp_perms.get('dictionary') %}
-                  <a href="{% if user.get('is_employee') and not emp_perms.get('settings') and emp_perms.get('dictionary') %}{{ url_for('settings_get') }}?tab=dictionary{% else %}{{ url_for('settings_get') }}{% endif %}" class="nav-sublink {{ 'active' if active == 'settings' else '' }}" title="{{ _('nav.settings') }}">
-                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
-                    <span class="nav-label">{{ _('nav.settings') }}</span>
-                  </a>
-                  {% endif %}
                 </div>
-              </div>
+              </details>
+              <a href="{{ url_for('products_get') }}" class="nav-link {{ 'active' if active == 'products' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                <span class="nav-label">Товары</span>
+              </a>
+              <a href="{{ url_for('warehouse_get') }}" class="nav-link {{ 'active' if active == 'warehouse' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M13 13h4v8H7v-8h4"/><path d="M7 8h10"/></svg>
+                <span class="nav-label">Склад</span>
+              </a>
+              <a href="{{ url_for('clients_get') }}" class="nav-link {{ 'active' if active == 'clients' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                <span class="nav-label">Клиенты</span>
+              </a>
+              <a href="{{ url_for('suppliers_get') }}" class="nav-link {{ 'active' if active == 'suppliers' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3 10 14"/><path d="M14 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9"/></svg>
+                <span class="nav-label">Поставщики</span>
+              </a>
+              <a href="{{ url_for('crm_get') }}" class="nav-link {{ 'active' if active == 'crm' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15h3v3H7z"/><path d="M14 7h3v11h-3z"/><path d="M7 8h3v4H7z"/></svg>
+                <span class="nav-label">CRM</span>
+              </a>
+              {% if not user.get('is_employee') or emp_perms.get('reports') %}
+              <a href="{{ url_for('home_reports') }}" class="nav-link {{ 'active' if active == 'home_reports' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                <span class="nav-label">{{ _('nav.reports') }}</span>
+              </a>
+              {% endif %}
+              {% if not user.get('is_employee') or emp_perms.get('settings') or emp_perms.get('dictionary') %}
+              <a href="{% if user.get('is_employee') and not emp_perms.get('settings') and emp_perms.get('dictionary') %}{{ url_for('settings_get') }}?tab=dictionary{% else %}{{ url_for('settings_get') }}{% endif %}" class="nav-link {{ 'active' if active == 'settings' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span class="nav-label">{{ _('nav.settings') }}</span>
+              </a>
+              {% endif %}
             {% endif %}
           {% endif %}
         </nav>
@@ -282,9 +309,10 @@
       window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
     </script>
     <script src="{{ url_for('static', path='theme.js') }}"></script>
-    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=4" defer></script>
     <script src="{{ url_for('static', path='layout-sidebar.js') }}" defer></script>
-    <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=6" defer></script>
+    <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=4" defer></script>
+    <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=7" defer></script>
     <script src="{{ url_for('static', path='table-column-controls.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=10"></script>

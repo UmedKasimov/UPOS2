@@ -29,7 +29,21 @@ from starlette.middleware.sessions import SessionMiddleware
 from upos.config import get_settings
 from upos.csrf import csrf_matches_session, ensure_csrf_token, rotate_csrf_token
 from upos.db import get_engine, init_db, list_public_tables, session_scope, startup_timings_ms
-from upos.db_models import EmployeeAccountAccess, FinanceAccount, FinanceCategory, Transaction, User, UserAuthSession
+from upos.db_models import (
+    Counterparty,
+    CrmRecord,
+    EmployeeAccountAccess,
+    FinanceAccount,
+    FinanceCategory,
+    Product,
+    PurchaseDocument,
+    SaleDocument,
+    Transaction,
+    User,
+    UserAuthSession,
+    Warehouse,
+    WarehouseOperation,
+)
 from upos.billing_maintenance import (
     clear_workspace_database,
     clear_workspace_transactions,
@@ -185,6 +199,8 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.auto_reload = True
+templates.env.cache = {}
 CLIENT_WORKSPACES_DIR = BASE_DIR.parent / "client_workspaces"
 
 
@@ -2852,6 +2868,2003 @@ def create_app() -> FastAPI:
             active="home_kassa",
             workspace_timezone=workspace_timezone,
         )
+
+    def _business_module_context(key: str) -> dict[str, Any]:
+        modules: dict[str, dict[str, Any]] = {
+            "products": {
+                "title": "Товары",
+                "kicker": "Торговый контур",
+                "subtitle": "Номенклатура, цены, штрихкоды и остатки",
+                "heading": "Каталог товаров",
+                "action": "+ Товар",
+                "filters": ["Поиск", "Категория", "Группа", "Бренд", "Статус"],
+                "columns": ["Название", "На складе", "Цена продажи", "Штрихкод", "Статус"],
+                "list_title": "Список товаров",
+                "status": "Каркас",
+                "empty": "Здесь будет список товаров с логикой создания как в ibox.",
+                "logic": [
+                    "Создание простого товара и товара-коллекции.",
+                    "Категория, папка, единицы хранения, артикул и изображение.",
+                    "Несколько прайс-листов и продажных цен.",
+                    "Начальные остатки по складам, партиям и датам.",
+                    "Штрихкоды, упаковки, минимальные остатки и характеристики.",
+                ],
+            },
+            "warehouse": {
+                "title": "Склад",
+                "kicker": "Остатки и движение",
+                "subtitle": "Склады, перемещения, корректировки и списания",
+                "heading": "Складской учет",
+                "action": "+ Операция",
+                "launcher": [
+                    {"id": "stocks", "title": "Остатки", "subtitle": "Товары по складам", "icon": "warehouse"},
+                    {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
+                    {"id": "adjustments", "title": "Корректировки", "subtitle": "Приход и списание", "icon": "adjustment"},
+                ],
+                "filters": ["Поиск", "Склад", "Товар", "Дата", "Тип операции"],
+                "columns": ["Документ", "Дата", "Склад", "Товар", "Количество", "Статус"],
+                "list_title": "Складские документы",
+                "status": "Каркас",
+                "empty": "Здесь будут остатки, перемещения и корректировки как в ibox.",
+                "logic": [
+                    "Остатки товаров по каждому складу.",
+                    "Приход, расход, перемещение и корректировка склада.",
+                    "Списание остатков при продаже или отгрузке.",
+                    "История движений по товару и складу.",
+                    "Контроль минимального остатка.",
+                ],
+            },
+            "clients": {
+                "title": "Клиенты",
+                "kicker": "CRM и продажи",
+                "subtitle": "Клиенты, контакты, категории, маршруты и балансы",
+                "heading": "База клиентов",
+                "action": "+ Клиент",
+                "launcher": [
+                    {"id": "clients", "title": "Клиенты", "subtitle": "База контрагентов", "icon": "clients"},
+                    {"id": "routes", "title": "Маршруты", "subtitle": "Территории и график", "icon": "route"},
+                    {"id": "balances", "title": "Балансы", "subtitle": "Долги и оплаты", "icon": "balance"},
+                ],
+                "filters": ["Поиск", "Территория", "Категория", "Маршрут", "Статус"],
+                "columns": ["Название", "Официальное название", "Баланс", "Последняя отгрузка", "Телефон", "Категория"],
+                "list_title": "Список клиентов",
+                "status": "Каркас",
+                "empty": "Здесь будет клиентская база с балансами и связями с продажами.",
+                "logic": [
+                    "Карточка клиента с контактами, телефоном и Telegram.",
+                    "Категории, территории, маршруты и статус активности.",
+                    "Баланс клиента и история оплат/отгрузок.",
+                    "Связь клиента с заказами, сделками и задачами CRM.",
+                    "Один контрагент может быть клиентом и поставщиком.",
+                ],
+            },
+            "suppliers": {
+                "title": "Поставщики",
+                "kicker": "Закупки и кредиторка",
+                "subtitle": "Поставщики, категории, балансы и закупки",
+                "heading": "База поставщиков",
+                "action": "+ Поставщик",
+                "launcher": [
+                    {"id": "suppliers", "title": "Поставщики", "subtitle": "База контрагентов", "icon": "suppliers"},
+                    {"id": "purchases", "title": "Закупки", "subtitle": "Документы прихода", "icon": "purchase"},
+                    {"id": "payables", "title": "Кредиторка", "subtitle": "Балансы и оплаты", "icon": "balance"},
+                ],
+                "filters": ["Поиск", "Статус", "Категория"],
+                "columns": ["Название", "Баланс", "Создал", "Дата создания", "Категория"],
+                "list_title": "Список поставщиков",
+                "status": "Каркас",
+                "empty": "Здесь будет база поставщиков с логикой закупок как в ibox.",
+                "logic": [
+                    "Карточка поставщика с категорией и статусом.",
+                    "Баланс и кредиторская задолженность.",
+                    "Связь с закупками, оплатами и возвратами поставщику.",
+                    "История документов по каждому поставщику.",
+                    "Общий контрагент может совмещать роли клиента и поставщика.",
+                ],
+            },
+            "crm": {
+                "title": "CRM",
+                "kicker": "Задачи и сделки",
+                "subtitle": "Контроль клиентов, ответственных и этапов сделки",
+                "heading": "CRM-центр",
+                "action": "+ Сделка",
+                "launcher": [
+                    {"id": "tasks", "title": "Задачи", "subtitle": "Сроки и исполнители", "icon": "tasks"},
+                    {"id": "deals", "title": "Сделки", "subtitle": "Клиенты и этапы", "icon": "deals"},
+                    {"id": "history", "title": "История", "subtitle": "Контакты и звонки", "icon": "history"},
+                ],
+                "filters": ["Клиент", "Ответственный", "Статус", "Срок", "Тип задачи"],
+                "columns": ["Название", "Клиент", "Ответственный", "Срок", "Статус"],
+                "list_title": "Задачи и сделки",
+                "status": "Каркас",
+                "empty": "Здесь будут задачи и сделки, связанные с клиентами и продажами.",
+                "logic": [
+                    "Задачи со сроком, исполнителем, типом и статусом.",
+                    "Сделки с клиентом, ответственным и этапом.",
+                    "Связь CRM с клиентской карточкой и заказом.",
+                    "Фильтры по статусу, сроку и ответственному.",
+                    "История взаимодействий по клиенту.",
+                ],
+            },
+        }
+        return modules[key]
+
+    def _product_workspace_owner(request: Request) -> tuple[str | None, RedirectResponse | None]:
+        u = request.session.get("user") or {}
+        if u.get("role") == "admin":
+            return None, RedirectResponse(url="/admin", status_code=302)
+        wid = str(u.get("workspace_owner_id") or u.get("user_id") or "").strip()
+        if not valid_workspace_owner_id(wid):
+            return None, RedirectResponse(url="/auth", status_code=302)
+        return wid, None
+
+    def _json_object(raw: Any) -> dict[str, Any]:
+        return raw if isinstance(raw, dict) else {}
+
+    def _entity_slug(value: str) -> str:
+        base = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(value or "").strip())
+        base = "-".join(part for part in base.split("-") if part)
+        return base[:150] or str(uuid.uuid4())
+
+    def _counterparty_role_flags(kind: str) -> tuple[bool, bool]:
+        normalized = str(kind or "").strip().lower()
+        return normalized in {"client", "both"}, normalized in {"supplier", "both"}
+
+    def _counterparty_kind_from_flags(is_client: bool, is_supplier: bool) -> str:
+        if is_client and is_supplier:
+            return "both"
+        if is_supplier:
+            return "supplier"
+        return "client"
+
+    def _manual_counterparty_external_id(name: str, tax_id: str = "") -> str:
+        suffix = _entity_slug(tax_id or name)
+        return f"manual:{suffix}"[:180]
+
+    def _manual_warehouse_external_id(name: str) -> str:
+        return f"manual:{_entity_slug(name)}"[:180]
+
+    def _counterparty_extra(row: Counterparty) -> dict[str, Any]:
+        return _json_object(getattr(row, "data", {}))
+
+    def _resolve_counterparty(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        counterparty_id: str = "",
+        name: str = "",
+        role: str = "client",
+    ) -> Counterparty | None:
+        row = session.get(Counterparty, counterparty_id) if counterparty_id else None
+        if row and row.workspace_owner_id == workspace_owner_id:
+            return row
+        clean_name = str(name or "").strip()
+        if not clean_name:
+            return None
+        manual_ext = _manual_counterparty_external_id(clean_name)
+        row = session.execute(
+            select(Counterparty).where(
+                Counterparty.workspace_owner_id == workspace_owner_id,
+                or_(
+                    func.lower(Counterparty.name) == clean_name.lower(),
+                    Counterparty.external_id == manual_ext,
+                ),
+            )
+        ).scalars().first()
+        if row is None:
+            return None
+        wants_client = role in {"client", "both"}
+        wants_supplier = role in {"supplier", "both"}
+        has_client, has_supplier = _counterparty_role_flags(row.kind)
+        row.kind = _counterparty_kind_from_flags(has_client or wants_client, has_supplier or wants_supplier)
+        return row
+
+    def _ensure_counterparty(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        counterparty_id: str = "",
+        name: str,
+        role: str,
+        phone: str = "",
+        tax_id: str = "",
+        data: dict[str, Any] | None = None,
+    ) -> Counterparty:
+        clean_name = str(name or "").strip()
+        if not clean_name:
+            raise ValueError("Counterparty name is required")
+        row = _resolve_counterparty(
+            session,
+            workspace_owner_id,
+            counterparty_id=counterparty_id,
+            name=clean_name,
+            role=role,
+        )
+        wants_client = role in {"client", "both"}
+        wants_supplier = role in {"supplier", "both"}
+        extra = dict(data or {})
+        if row is None:
+            row = Counterparty(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=workspace_owner_id,
+                kind=_counterparty_kind_from_flags(wants_client, wants_supplier),
+                name=clean_name,
+                phone=phone[:64],
+                tax_id=tax_id[:64],
+                external_source="manual",
+                external_id=_manual_counterparty_external_id(clean_name, tax_id),
+                data=extra,
+            )
+            session.add(row)
+            session.flush()
+            return row
+        has_client, has_supplier = _counterparty_role_flags(row.kind)
+        row.kind = _counterparty_kind_from_flags(has_client or wants_client, has_supplier or wants_supplier)
+        row.name = clean_name
+        row.phone = phone[:64] or row.phone
+        row.tax_id = tax_id[:64] or row.tax_id
+        current_extra = _counterparty_extra(row)
+        current_extra.update({k: v for k, v in extra.items() if v not in (None, "")})
+        current_extra["is_client"] = row.kind in {"client", "both"}
+        current_extra["is_supplier"] = row.kind in {"supplier", "both"}
+        row.data = current_extra
+        row.external_source = row.external_source or "manual"
+        row.external_id = row.external_id or _manual_counterparty_external_id(clean_name, tax_id)
+        return row
+
+    def _drop_counterparty_role(row: Counterparty, role: str) -> bool:
+        has_client, has_supplier = _counterparty_role_flags(row.kind)
+        if role == "client":
+            has_client = False
+        elif role == "supplier":
+            has_supplier = False
+        remaining = has_client or has_supplier
+        if not remaining:
+            return False
+        row.kind = _counterparty_kind_from_flags(has_client, has_supplier)
+        extra = _counterparty_extra(row)
+        extra["is_client"] = has_client
+        extra["is_supplier"] = has_supplier
+        row.data = extra
+        return True
+
+    def _resolve_product_row(session: Any, workspace_owner_id: str, raw_value: str) -> Product | None:
+        value = str(raw_value or "").strip()
+        if not value:
+            return None
+        row = session.get(Product, value)
+        if row and row.workspace_owner_id == workspace_owner_id:
+            return row
+        lowered = value.lower()
+        return session.execute(
+            select(Product).where(
+                Product.workspace_owner_id == workspace_owner_id,
+                or_(
+                    func.lower(Product.name) == lowered,
+                    func.lower(Product.sku) == lowered,
+                    func.lower(Product.barcode) == lowered,
+                ),
+            )
+        ).scalars().first()
+
+    def _resolve_warehouse(session: Any, workspace_owner_id: str, raw_value: str) -> Warehouse | None:
+        value = str(raw_value or "").strip()
+        if not value:
+            return None
+        row = session.get(Warehouse, value)
+        if row and row.workspace_owner_id == workspace_owner_id:
+            return row
+        lowered = value.lower()
+        return session.execute(
+            select(Warehouse).where(
+                Warehouse.workspace_owner_id == workspace_owner_id,
+                or_(
+                    func.lower(Warehouse.name) == lowered,
+                    Warehouse.external_id == _manual_warehouse_external_id(value),
+                ),
+            )
+        ).scalars().first()
+
+    def _ensure_warehouse(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        warehouse_id: str = "",
+        name: str,
+        data: dict[str, Any] | None = None,
+    ) -> Warehouse:
+        clean_name = str(name or "").strip()
+        if not clean_name:
+            raise ValueError("Warehouse name is required")
+        row = _resolve_warehouse(session, workspace_owner_id, warehouse_id or clean_name)
+        if row is None:
+            row = Warehouse(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=workspace_owner_id,
+                name=clean_name,
+                external_source="manual",
+                external_id=_manual_warehouse_external_id(clean_name),
+                data=dict(data or {}),
+            )
+            session.add(row)
+            session.flush()
+            return row
+        row.name = clean_name
+        merged = _json_object(row.data)
+        merged.update({k: v for k, v in dict(data or {}).items() if v not in (None, "")})
+        row.data = merged
+        row.external_source = row.external_source or "manual"
+        row.external_id = row.external_id or _manual_warehouse_external_id(clean_name)
+        return row
+
+    def _product_uses_stock(row: Product | None) -> bool:
+        if row is None:
+            return False
+        kind = str(_json_object(row.data).get("kind") or "product")
+        return kind != "service"
+
+    def _product_stocks(row: Product) -> list[dict[str, Any]]:
+        raw = _json_object(row.data).get("stocks")
+        return [dict(item) for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+
+    def _product_available_in_warehouse(row: Product, warehouse_name: str) -> Decimal:
+        clean_name = str(warehouse_name or "").strip().lower()
+        total = Decimal("0")
+        for stock in _product_stocks(row):
+            stock_name = str(stock.get("warehouse") or "").strip().lower()
+            if clean_name and stock_name != clean_name:
+                continue
+            total += _sales_decimal(stock.get("quantity"))
+        return total
+
+    def _write_product_stocks(row: Product, stocks: list[dict[str, Any]]) -> None:
+        data = dict(_json_object(row.data))
+        data["stocks"] = stocks
+        row.data = data
+
+    def _apply_product_stock_change(
+        row: Product,
+        warehouse_name: str,
+        delta: Decimal,
+        *,
+        price: str = "",
+        op_date: str = "",
+    ) -> None:
+        if not delta:
+            return
+        clean_name = str(warehouse_name or "").strip() or "Основной склад"
+        stocks = _product_stocks(row)
+        matches = [
+            stock for stock in stocks
+            if str(stock.get("warehouse") or "").strip().lower() == clean_name.lower()
+        ]
+        if delta < 0:
+            required = abs(delta)
+            available = sum((_sales_decimal(stock.get("quantity")) for stock in matches), Decimal("0"))
+            if available < required:
+                raise ValueError(f"Недостаточно остатка по товару {row.name}")
+            remaining = required
+            for stock in matches:
+                current = _sales_decimal(stock.get("quantity"))
+                if current <= 0:
+                    continue
+                take = current if current <= remaining else remaining
+                stock["quantity"] = str((current - take).normalize() if current - take else "0")
+                remaining -= take
+                if remaining <= 0:
+                    break
+        else:
+            target = matches[0] if matches else None
+            if target is None:
+                target = {
+                    "warehouse": clean_name,
+                    "quantity": "0",
+                    "price": "",
+                    "date": "",
+                }
+                stocks.append(target)
+            current = _sales_decimal(target.get("quantity"))
+            target["warehouse"] = clean_name
+            target["quantity"] = str((current + delta).normalize() if current + delta else "0")
+            if price:
+                target["price"] = str(price)
+            if op_date:
+                target["date"] = str(op_date)
+        _write_product_stocks(row, stocks)
+
+    def _sync_product_lines(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        warehouse_name: str,
+        lines: list[dict[str, Any]],
+        delta_sign: int,
+        op_date: str = "",
+    ) -> list[dict[str, Any]]:
+        resolved_lines: list[dict[str, Any]] = []
+        managed_rows: list[tuple[Product, dict[str, Any], Decimal]] = []
+        required_by_product: dict[str, Decimal] = {}
+        for raw_line in lines:
+            line = dict(raw_line)
+            quantity = _sales_decimal(line.get("quantity"))
+            if quantity <= 0:
+                resolved_lines.append(line)
+                continue
+            product_row = None
+            product_id = str(line.get("product_id") or "").strip()
+            if product_id:
+                row = session.get(Product, product_id)
+                if row and row.workspace_owner_id == workspace_owner_id:
+                    product_row = row
+            if product_row is None:
+                product_row = _resolve_product_row(session, workspace_owner_id, str(line.get("product") or ""))
+            if product_row is not None:
+                line["product_id"] = product_row.id
+                line["product"] = product_row.name
+                line["unit"] = str(_json_object(product_row.data).get("unit") or "Штука")
+                if _product_uses_stock(product_row):
+                    managed_rows.append((product_row, line, quantity))
+                    if delta_sign < 0:
+                        required_by_product[product_row.id] = required_by_product.get(product_row.id, Decimal("0")) + quantity
+            resolved_lines.append(line)
+        if delta_sign < 0:
+            for product_row, _, _ in managed_rows:
+                required = required_by_product.get(product_row.id, Decimal("0"))
+                if required <= 0:
+                    continue
+                available = _product_available_in_warehouse(product_row, warehouse_name)
+                if available < required:
+                    raise ValueError(f"Недостаточно остатка для товара {product_row.name} на складе {warehouse_name}")
+                required_by_product[product_row.id] = Decimal("0")
+        for product_row, line, quantity in managed_rows:
+            _apply_product_stock_change(
+                product_row,
+                warehouse_name,
+                Decimal(delta_sign) * quantity,
+                price=str(line.get("price") or ""),
+                op_date=op_date,
+            )
+        return resolved_lines
+
+    def _sales_signed_balance(item: dict[str, Any]) -> Decimal:
+        doc_type = str(item.get("doc_type") or "sale")
+        amount = _sales_decimal(item.get("amount"))
+        paid = _sales_decimal(item.get("paid_amount"))
+        sign = Decimal("-1") if doc_type == "return" else Decimal("1")
+        return sign * (amount - paid)
+
+    def _warehouse_operation_type_label(operation_type: str) -> str:
+        return {
+            "in": "Приход",
+            "out": "Списание",
+            "adjustment": "Корректировка",
+            "transfer": "Перемещение",
+        }.get(str(operation_type or ""), "Операция")
+
+    def _crm_type_label(item_type: str) -> str:
+        return {
+            "task": "Задача",
+            "deal": "Сделка",
+            "history": "История",
+        }.get(str(item_type or ""), "CRM")
+
+    def _crm_status_label(status: str) -> str:
+        return {
+            "new": "Новый",
+            "in_progress": "В работе",
+            "won": "Успешно",
+            "lost": "Потеряно",
+            "done": "Завершено",
+            "planned": "Запланировано",
+        }.get(str(status or ""), "Новый")
+
+    def _product_data(row: Product) -> dict[str, Any]:
+        data = row.data if isinstance(row.data, dict) else {}
+        prices = data.get("prices") if isinstance(data.get("prices"), list) else []
+        stocks = data.get("stocks") if isinstance(data.get("stocks"), list) else []
+        qty = Decimal("0")
+        for item in stocks:
+            if not isinstance(item, dict):
+                continue
+            try:
+                qty += Decimal(str(item.get("quantity") or "0"))
+            except Exception:
+                pass
+        sale_price = ""
+        sale_currency = "UZS"
+        if prices and isinstance(prices[0], dict):
+            sale_price = str(prices[0].get("price") or "")
+            sale_currency = str(prices[0].get("currency") or "UZS").upper()
+        return {
+            "id": row.id,
+            "name": row.name,
+            "sku": row.sku,
+            "barcode": row.barcode,
+            "kind": str(data.get("kind") or "product"),
+            "category": str(data.get("category") or ""),
+            "folder": str(data.get("folder") or ""),
+            "group": str(data.get("group") or ""),
+            "brand": str(data.get("brand") or ""),
+            "unit": str(data.get("unit") or "Штука"),
+            "second_unit": str(data.get("second_unit") or ""),
+            "status": str(data.get("status") or "active"),
+            "barcode_type": str(data.get("barcode_type") or "EAN13"),
+            "batch_tracking": bool(data.get("batch_tracking")),
+            "packages": str(data.get("packages") or ""),
+            "min_stock": str(data.get("min_stock") or ""),
+            "characteristics": str(data.get("characteristics") or ""),
+            "classification": str(data.get("classification") or ""),
+            "owner": str(data.get("owner") or ""),
+            "prices": prices,
+            "stocks": stocks,
+            "quantity": str(qty.normalize() if qty else 0),
+            "sale_price": sale_price,
+            "sale_currency": sale_currency,
+            "updated_at": row.updated_at,
+        }
+
+    def _product_form_payload(form: Any) -> dict[str, Any]:
+        def val(name: str, default: str = "") -> str:
+            return str(form.get(name) or default).strip()
+
+        prices: list[dict[str, str]] = []
+        price_names = list(form.getlist("price_name"))
+        price_values = list(form.getlist("price_value"))
+        price_currencies = list(form.getlist("price_currency"))
+        for idx in range(max(len(price_names), len(price_values), len(price_currencies), 1)):
+            name = str(price_names[idx] if idx < len(price_names) else "").strip() or "Продажная цена"
+            price = str(price_values[idx] if idx < len(price_values) else "").strip()
+            currency = str(price_currencies[idx] if idx < len(price_currencies) else "UZS").strip().upper() or "UZS"
+            if name or price:
+                prices.append({"name": name, "price": price, "currency": currency})
+
+        stocks: list[dict[str, str]] = []
+        warehouses = list(form.getlist("stock_warehouse"))
+        quantities = list(form.getlist("stock_quantity"))
+        stock_prices = list(form.getlist("stock_price"))
+        stock_dates = list(form.getlist("stock_date"))
+        for idx in range(max(len(warehouses), len(quantities), len(stock_prices), len(stock_dates), 1)):
+            warehouse = str(warehouses[idx] if idx < len(warehouses) else "").strip()
+            quantity = str(quantities[idx] if idx < len(quantities) else "").strip()
+            price = str(stock_prices[idx] if idx < len(stock_prices) else "").strip()
+            date = str(stock_dates[idx] if idx < len(stock_dates) else "").strip()
+            if warehouse or quantity or price or date:
+                stocks.append({"warehouse": warehouse or "Основной склад", "quantity": quantity, "price": price, "date": date})
+
+        data = {
+            "kind": val("kind", "product"),
+            "category": val("category"),
+            "folder": val("folder"),
+            "group": val("group"),
+            "brand": val("brand"),
+            "unit": val("unit", "Штука"),
+            "second_unit": val("second_unit"),
+            "status": val("status", "active"),
+            "barcode_type": val("barcode_type", "EAN13"),
+            "batch_tracking": val("batch_tracking") == "1",
+            "packages": val("packages"),
+            "min_stock": val("min_stock"),
+            "characteristics": val("characteristics"),
+            "classification": val("classification"),
+            "owner": val("owner"),
+            "prices": prices,
+            "stocks": stocks,
+        }
+        return data
+
+    @app.get("/products", response_class=HTMLResponse, name="products_get")
+    def products_get(
+        request: Request,
+        q: str = "",
+        category: str = "",
+        group: str = "",
+        brand: str = "",
+        status: str = "active",
+        kind: str = "product",
+        edit: str = "",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        q_clean = q.strip().lower()
+        filters = {
+            "q": q.strip(),
+            "category": category.strip(),
+            "group": group.strip(),
+            "brand": brand.strip(),
+            "status": status.strip() or "all",
+            "kind": kind.strip() or "product",
+        }
+        products: list[dict[str, Any]] = []
+        edit_product = None
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid)
+                    .order_by(Product.updated_at.desc())
+                ).scalars()
+            )
+            for row in rows:
+                item = _product_data(row)
+                if filters["kind"] != "all" and item["kind"] != filters["kind"]:
+                    continue
+                if filters["status"] != "all" and item["status"] != filters["status"]:
+                    continue
+                if filters["category"] and item["category"] != filters["category"]:
+                    continue
+                if filters["group"] and item["group"] != filters["group"]:
+                    continue
+                if filters["brand"] and item["brand"] != filters["brand"]:
+                    continue
+                hay = " ".join([item["name"], item["sku"], item["barcode"], item["category"], item["brand"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                products.append(item)
+                if edit and row.id == edit:
+                    edit_product = item
+            if edit and edit_product is None:
+                found = session.get(Product, edit)
+                if found and found.workspace_owner_id == wid:
+                    edit_product = _product_data(found)
+
+        options = {
+            "categories": sorted({p["category"] for p in products if p["category"]}),
+            "groups": sorted({p["group"] for p in products if p["group"]}),
+            "brands": sorted({p["brand"] for p in products if p["brand"]}),
+            "folders": sorted({p["folder"] for p in products if p["folder"]}),
+            "price_types": sorted({str(price.get("name") or "") for p in products for price in p["prices"] if isinstance(price, dict) and price.get("name")}),
+        }
+        return tpl(
+            request,
+            "home_products.html",
+            variant="user",
+            active="products",
+            products=products,
+            product_filters=filters,
+            product_options=options,
+            edit_product=edit_product,
+            flash_ok=request.query_params.get("msg"),
+            flash_err=request.query_params.get("error"),
+        )
+
+    @app.post("/products/save", name="products_save")
+    async def products_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        product_id = str(form.get("product_id") or "").strip()
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/products?error=" + quote("Название товара обязательно"), status_code=302)
+        sku = str(form.get("sku") or "").strip()
+        barcode = str(form.get("barcode") or "").strip()
+        data = _product_form_payload(form)
+        with session_scope() as session:
+            row = session.get(Product, product_id) if product_id else None
+            if row and row.workspace_owner_id != wid:
+                return RedirectResponse(url="/products?error=" + quote("Товар не найден"), status_code=302)
+            if row is None:
+                product_id = str(uuid.uuid4())
+                row = Product(
+                    id=product_id,
+                    workspace_owner_id=wid,
+                    name=name,
+                    sku=sku,
+                    barcode=barcode,
+                    external_source="local",
+                    external_id=product_id,
+                    data=data,
+                )
+                session.add(row)
+            else:
+                row.name = name
+                row.sku = sku
+                row.barcode = barcode
+                row.external_source = row.external_source or "local"
+                row.external_id = row.external_id or row.id
+                row.data = data
+        return RedirectResponse(url="/products?msg=saved", status_code=302)
+
+    @app.post("/products/{product_id}/delete", name="products_delete")
+    async def products_delete(request: Request, product_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(Product, product_id)
+            if row and row.workspace_owner_id == wid:
+                session.delete(row)
+        return RedirectResponse(url="/products?msg=deleted", status_code=302)
+
+    def _sales_decimal(raw: Any) -> Decimal:
+        value = str(raw or "").strip().replace(" ", "").replace(",", ".")
+        if not value:
+            return Decimal("0")
+        try:
+            return Decimal(value)
+        except Exception:
+            return Decimal("0")
+
+    def _sales_money_label(raw: Any) -> str:
+        amount = _sales_decimal(raw)
+        if amount == amount.to_integral():
+            return f"{int(amount):,}".replace(",", " ")
+        return f"{amount:,.2f}".replace(",", " ").rstrip("0").rstrip(".")
+
+    def _sales_status_label(status: str) -> str:
+        return {
+            "new": "Новый",
+            "reserved": "Резерв",
+            "paid": "Оплачен",
+            "partial": "Частично",
+            "debt": "Долг",
+            "return": "Возврат",
+        }.get(status or "", "Новый")
+
+    def _sales_doc_type_label(doc_type: str) -> str:
+        return {
+            "sale": "Продажа",
+            "order": "Заказ",
+            "return": "Возврат",
+        }.get(doc_type or "", "Продажа")
+
+    def _sales_document_data(row: SaleDocument) -> dict[str, Any]:
+        data = row.data if isinstance(row.data, dict) else {}
+        paid_amount = _sales_decimal(data.get("paid_amount"))
+        debt_amount = _sales_decimal(row.amount) - paid_amount
+        doc_type = str(data.get("doc_type") or "sale")
+        status = str(data.get("status") or ("return" if doc_type == "return" else "new"))
+        return {
+            "id": row.id,
+            "number": row.number,
+            "date": str(data.get("date") or ""),
+            "doc_type": doc_type,
+            "doc_type_label": _sales_doc_type_label(doc_type),
+            "client": str(data.get("client") or ""),
+            "warehouse": str(data.get("warehouse") or ""),
+            "amount": _sales_money_label(row.amount),
+            "currency": row.currency,
+            "paid_amount": _sales_money_label(paid_amount),
+            "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
+            "payment_type": str(data.get("payment_type") or ""),
+            "status": status,
+            "status_label": _sales_status_label(status),
+            "manager": str(data.get("manager") or ""),
+            "note": str(data.get("note") or ""),
+            "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
+            "updated_at": row.updated_at,
+        }
+
+    def _sales_document_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
+        doc_type = str(form.get("doc_type") or "sale").strip()
+        if doc_type not in {"sale", "order", "return"}:
+            doc_type = "sale"
+        currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+        products = list(form.getlist("line_product"))
+        quantities = list(form.getlist("line_quantity"))
+        prices = list(form.getlist("line_price"))
+        discounts = list(form.getlist("line_discount"))
+        lines: list[dict[str, str]] = []
+        total = Decimal("0")
+        for idx in range(max(len(products), len(quantities), len(prices), len(discounts), 1)):
+            product = str(products[idx] if idx < len(products) else "").strip()
+            quantity = _sales_decimal(quantities[idx] if idx < len(quantities) else "")
+            price = _sales_decimal(prices[idx] if idx < len(prices) else "")
+            discount = _sales_decimal(discounts[idx] if idx < len(discounts) else "")
+            line_total = (quantity * price) - discount
+            if product or quantity or price or discount:
+                total += line_total
+                lines.append(
+                    {
+                        "product": product,
+                        "quantity": str(quantity.normalize() if quantity else ""),
+                        "price": str(price.normalize() if price else ""),
+                        "discount": str(discount.normalize() if discount else ""),
+                        "total": str(line_total.normalize() if line_total else "0"),
+                    }
+                )
+        manual_amount = _sales_decimal(form.get("amount"))
+        amount = manual_amount if manual_amount else total
+        paid_amount = _sales_decimal(form.get("paid_amount"))
+        status = str(form.get("status") or "").strip()
+        if not status:
+            if doc_type == "return":
+                status = "return"
+            elif paid_amount and paid_amount >= amount:
+                status = "paid"
+            elif paid_amount:
+                status = "partial"
+            else:
+                status = "new"
+        data = {
+            "doc_type": doc_type,
+            "date": str(form.get("date") or "").strip(),
+            "client": str(form.get("client") or "").strip(),
+            "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
+            "status": status,
+            "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
+            "payment_type": str(form.get("payment_type") or "").strip(),
+            "manager": str(form.get("manager") or "").strip(),
+            "note": str(form.get("note") or "").strip(),
+            "lines": lines,
+        }
+        return data, amount, currency
+
+    @app.get("/sales", response_class=HTMLResponse, name="sales_get")
+    def sales_get(
+        request: Request,
+        q: str = "",
+        doc_type: str = "all",
+        status: str = "all",
+        client: str = "",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        q_clean = q.strip().lower()
+        filters = {
+            "q": q.strip(),
+            "doc_type": doc_type.strip() or "all",
+            "status": status.strip() or "all",
+            "client": client.strip(),
+        }
+        sales: list[dict[str, Any]] = []
+        product_names: list[str] = []
+        clients: list[str] = []
+        warehouses: list[str] = []
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(SaleDocument)
+                    .where(SaleDocument.workspace_owner_id == wid)
+                    .order_by(SaleDocument.updated_at.desc())
+                ).scalars()
+            )
+            for row in rows:
+                item = _sales_document_data(row)
+                if filters["doc_type"] != "all" and item["doc_type"] != filters["doc_type"]:
+                    continue
+                if filters["status"] != "all" and item["status"] != filters["status"]:
+                    continue
+                if filters["client"] and item["client"] != filters["client"]:
+                    continue
+                hay = " ".join([item["number"], item["client"], item["warehouse"], item["status_label"], item["doc_type_label"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                sales.append(item)
+            product_names = [
+                str(row.name)
+                for row in session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid)
+                    .order_by(Product.name.asc())
+                ).scalars()
+            ]
+            clients = [
+                str(row.name)
+                for row in session.execute(
+                    select(Counterparty)
+                    .where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind.in_(["client", "both"]),
+                    )
+                    .order_by(Counterparty.name.asc())
+                ).scalars()
+            ]
+            warehouses = [
+                str(row.name)
+                for row in session.execute(
+                    select(Warehouse)
+                    .where(Warehouse.workspace_owner_id == wid)
+                    .order_by(Warehouse.name.asc())
+                ).scalars()
+            ]
+        clients = sorted({item for item in [*clients, *[sale["client"] for sale in sales if sale["client"]]] if item})
+        warehouses = sorted({item for item in [*warehouses, *[sale["warehouse"] for sale in sales if sale["warehouse"]]] if item}) or ["Основной склад"]
+        return tpl(
+            request,
+            "home_sales.html",
+            variant="user",
+            active="sales",
+            sales=sales,
+            sales_filters=filters,
+            sales_options={
+                "clients": clients,
+                "warehouses": warehouses,
+                "products": product_names,
+            },
+            today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
+        )
+
+    @app.post("/sales/save", name="sales_save")
+    async def sales_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/sales?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        data, amount, currency = _sales_document_payload(form)
+        if not data["client"]:
+            return RedirectResponse(url="/sales?error=" + quote("Клиент обязателен"), status_code=302)
+        with session_scope() as session:
+            try:
+                client_row = _ensure_counterparty(
+                    session,
+                    wid,
+                    name=data["client"],
+                    role="client",
+                )
+                warehouse_row = _ensure_warehouse(
+                    session,
+                    wid,
+                    name=data["warehouse"],
+                )
+                delta_sign = -1 if data["doc_type"] == "sale" else 1 if data["doc_type"] == "return" else 0
+                data["lines"] = _sync_product_lines(
+                    session,
+                    wid,
+                    warehouse_name=warehouse_row.name,
+                    lines=list(data.get("lines") or []),
+                    delta_sign=delta_sign,
+                    op_date=str(data.get("date") or ""),
+                )
+                data["warehouse_id"] = warehouse_row.id
+                data["counterparty_id"] = client_row.id
+            except ValueError as exc:
+                return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-form", status_code=302)
+            count = session.execute(
+                select(func.count(SaleDocument.id)).where(SaleDocument.workspace_owner_id == wid)
+            ).scalar_one()
+            number = str(form.get("number") or "").strip()
+            if not number:
+                prefix = {"sale": "S", "order": "O", "return": "R"}.get(data["doc_type"], "S")
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+                number = f"{prefix}-{stamp}-{int(count) + 1:03d}"
+            doc_id = str(uuid.uuid4())
+            row = SaleDocument(
+                id=doc_id,
+                workspace_owner_id=wid,
+                number=number,
+                amount=amount,
+                currency=currency,
+                counterparty_id=client_row.id,
+                external_source="local",
+                external_id=doc_id,
+                data=data,
+            )
+            session.add(row)
+        return RedirectResponse(url="/sales?msg=saved#sales-form", status_code=302)
+
+    @app.post("/sales/{sale_id}/delete", name="sales_delete")
+    async def sales_delete(request: Request, sale_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/sales?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(SaleDocument, sale_id)
+            if row and row.workspace_owner_id == wid:
+                data = _json_object(row.data)
+                doc_type = str(data.get("doc_type") or "sale")
+                delta_sign = 1 if doc_type == "sale" else -1 if doc_type == "return" else 0
+                try:
+                    _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=str(data.get("warehouse") or "Основной склад"),
+                        lines=list(data.get("lines") or []),
+                        delta_sign=delta_sign,
+                        op_date=str(data.get("date") or ""),
+                    )
+                except ValueError as exc:
+                    return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-journal", status_code=302)
+                session.delete(row)
+        return RedirectResponse(url="/sales?msg=deleted#sales-journal", status_code=302)
+
+    def _purchase_status_label(status: str) -> str:
+        return {
+            "new": "Новый",
+            "partial": "Частично",
+            "paid": "Оплачен",
+            "debt": "Долг",
+        }.get(str(status or ""), "Новый")
+
+    def _purchase_document_data(row: PurchaseDocument) -> dict[str, Any]:
+        data = _json_object(row.data)
+        paid_amount = _sales_decimal(data.get("paid_amount"))
+        debt_amount = _sales_decimal(row.amount) - paid_amount
+        return {
+            "id": row.id,
+            "number": row.number,
+            "date": str(data.get("date") or ""),
+            "supplier": str(data.get("supplier") or ""),
+            "warehouse": str(data.get("warehouse") or ""),
+            "amount": _sales_money_label(row.amount),
+            "currency": row.currency,
+            "paid_amount": _sales_money_label(paid_amount),
+            "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
+            "status": str(data.get("status") or "new"),
+            "status_label": _purchase_status_label(str(data.get("status") or "new")),
+            "payment_type": str(data.get("payment_type") or ""),
+            "note": str(data.get("note") or ""),
+            "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
+            "updated_at": row.updated_at,
+        }
+
+    def _purchase_document_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
+        currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+        products = list(form.getlist("line_product"))
+        quantities = list(form.getlist("line_quantity"))
+        prices = list(form.getlist("line_price"))
+        lines: list[dict[str, str]] = []
+        total = Decimal("0")
+        for idx in range(max(len(products), len(quantities), len(prices), 1)):
+            product = str(products[idx] if idx < len(products) else "").strip()
+            quantity = _sales_decimal(quantities[idx] if idx < len(quantities) else "")
+            price = _sales_decimal(prices[idx] if idx < len(prices) else "")
+            line_total = quantity * price
+            if product or quantity or price:
+                total += line_total
+                lines.append(
+                    {
+                        "product": product,
+                        "quantity": str(quantity.normalize() if quantity else ""),
+                        "price": str(price.normalize() if price else ""),
+                        "total": str(line_total.normalize() if line_total else "0"),
+                    }
+                )
+        manual_amount = _sales_decimal(form.get("amount"))
+        amount = manual_amount if manual_amount else total
+        paid_amount = _sales_decimal(form.get("paid_amount"))
+        status = str(form.get("status") or "").strip()
+        if not status:
+            status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "new"
+        data = {
+            "date": str(form.get("date") or "").strip(),
+            "supplier": str(form.get("supplier") or "").strip(),
+            "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
+            "status": status,
+            "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
+            "payment_type": str(form.get("payment_type") or "").strip(),
+            "note": str(form.get("note") or "").strip(),
+            "lines": lines,
+        }
+        return data, amount, currency
+
+    def _sales_rollup_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, str], dict[str, str]]:
+        balance_by_id: dict[str, Decimal] = {}
+        balance_by_name: dict[str, Decimal] = {}
+        last_date_by_id: dict[str, str] = {}
+        last_date_by_name: dict[str, str] = {}
+        rows = session.execute(
+            select(SaleDocument)
+            .where(SaleDocument.workspace_owner_id == workspace_owner_id)
+            .order_by(SaleDocument.updated_at.desc())
+        ).scalars()
+        for row in rows:
+            data = _json_object(row.data)
+            doc_type = str(data.get("doc_type") or "sale")
+            signed = Decimal("-1") if doc_type == "return" else Decimal("1")
+            balance = signed * (_sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount")))
+            name = str(data.get("client") or "").strip()
+            counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
+            doc_date = str(data.get("date") or "")
+            if counterparty_id:
+                balance_by_id[counterparty_id] = balance_by_id.get(counterparty_id, Decimal("0")) + balance
+                if doc_date and doc_date >= last_date_by_id.get(counterparty_id, ""):
+                    last_date_by_id[counterparty_id] = doc_date
+            if name:
+                lowered = name.lower()
+                balance_by_name[lowered] = balance_by_name.get(lowered, Decimal("0")) + balance
+                if doc_date and doc_date >= last_date_by_name.get(lowered, ""):
+                    last_date_by_name[lowered] = doc_date
+        return balance_by_id, balance_by_name, last_date_by_id, last_date_by_name
+
+    def _purchase_rollup_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, str], dict[str, str]]:
+        balance_by_id: dict[str, Decimal] = {}
+        balance_by_name: dict[str, Decimal] = {}
+        last_date_by_id: dict[str, str] = {}
+        last_date_by_name: dict[str, str] = {}
+        rows = session.execute(
+            select(PurchaseDocument)
+            .where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
+            .order_by(PurchaseDocument.updated_at.desc())
+        ).scalars()
+        for row in rows:
+            data = _json_object(row.data)
+            balance = _sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount"))
+            name = str(data.get("supplier") or "").strip()
+            counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
+            doc_date = str(data.get("date") or "")
+            if counterparty_id:
+                balance_by_id[counterparty_id] = balance_by_id.get(counterparty_id, Decimal("0")) + balance
+                if doc_date and doc_date >= last_date_by_id.get(counterparty_id, ""):
+                    last_date_by_id[counterparty_id] = doc_date
+            if name:
+                lowered = name.lower()
+                balance_by_name[lowered] = balance_by_name.get(lowered, Decimal("0")) + balance
+                if doc_date and doc_date >= last_date_by_name.get(lowered, ""):
+                    last_date_by_name[lowered] = doc_date
+        return balance_by_id, balance_by_name, last_date_by_id, last_date_by_name
+
+    def _counterparty_view_data(
+        row: Counterparty,
+        *,
+        balance_by_id: dict[str, Decimal],
+        balance_by_name: dict[str, Decimal],
+        last_date_by_id: dict[str, str],
+        last_date_by_name: dict[str, str],
+    ) -> dict[str, Any]:
+        extra = _counterparty_extra(row)
+        balance = balance_by_id.get(row.id, balance_by_name.get(row.name.lower(), Decimal("0")))
+        last_date = last_date_by_id.get(row.id) or last_date_by_name.get(row.name.lower(), "")
+        has_client, has_supplier = _counterparty_role_flags(row.kind)
+        return {
+            "id": row.id,
+            "name": row.name,
+            "official_name": str(extra.get("official_name") or row.name),
+            "phone": row.phone,
+            "tax_id": row.tax_id,
+            "territory": str(extra.get("territory") or ""),
+            "category": str(extra.get("category") or ""),
+            "route": str(extra.get("route") or ""),
+            "status": str(extra.get("status") or "active"),
+            "telegram": str(extra.get("telegram") or ""),
+            "note": str(extra.get("note") or ""),
+            "email": str(extra.get("email") or ""),
+            "address": str(extra.get("address") or ""),
+            "balance_value": balance,
+            "balance": _sales_money_label(balance),
+            "last_date": last_date,
+            "is_client": has_client,
+            "is_supplier": has_supplier,
+        }
+
+    def _warehouse_view_data(row: Warehouse) -> dict[str, Any]:
+        data = _json_object(row.data)
+        return {
+            "id": row.id,
+            "name": row.name,
+            "manager": str(data.get("manager") or ""),
+            "status": str(data.get("status") or "active"),
+            "note": str(data.get("note") or ""),
+        }
+
+    def _warehouse_operation_payload(form: Any) -> tuple[dict[str, Any], Decimal]:
+        operation_type = str(form.get("operation_type") or "adjustment").strip()
+        if operation_type not in {"in", "out", "adjustment", "transfer"}:
+            operation_type = "adjustment"
+        quantity = _sales_decimal(form.get("quantity"))
+        amount = _sales_decimal(form.get("amount"))
+        data = {
+            "date": str(form.get("date") or "").strip(),
+            "operation_type": operation_type,
+            "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
+            "from_warehouse": str(form.get("from_warehouse") or "").strip() or "Основной склад",
+            "to_warehouse": str(form.get("to_warehouse") or "").strip() or "Основной склад",
+            "product": str(form.get("product") or "").strip(),
+            "price": str(form.get("price") or "").strip(),
+            "note": str(form.get("note") or "").strip(),
+            "quantity": str(quantity.normalize() if quantity else "0"),
+        }
+        return data, amount
+
+    def _warehouse_operation_data(row: WarehouseOperation) -> dict[str, Any]:
+        data = _json_object(row.data)
+        quantity = _sales_decimal(row.quantity)
+        return {
+            "id": row.id,
+            "number": row.number,
+            "date": str(data.get("date") or ""),
+            "operation_type": str(row.operation_type or data.get("operation_type") or "adjustment"),
+            "operation_label": _warehouse_operation_type_label(str(row.operation_type or data.get("operation_type") or "adjustment")),
+            "warehouse": str(data.get("warehouse") or ""),
+            "from_warehouse": str(data.get("from_warehouse") or ""),
+            "to_warehouse": str(data.get("to_warehouse") or ""),
+            "product": str(data.get("product") or ""),
+            "quantity": str(quantity.normalize() if quantity else "0"),
+            "amount": _sales_money_label(row.amount),
+            "currency": row.currency,
+            "note": str(data.get("note") or ""),
+        }
+
+    def _crm_record_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
+        item_type = str(form.get("item_type") or "task").strip()
+        if item_type not in {"task", "deal", "history"}:
+            item_type = "task"
+        amount = _sales_decimal(form.get("amount"))
+        currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+        data = {
+            "item_type": item_type,
+            "client": str(form.get("client") or "").strip(),
+            "responsible": str(form.get("responsible") or "").strip(),
+            "date": str(form.get("date") or "").strip(),
+            "due_date": str(form.get("due_date") or "").strip(),
+            "stage": str(form.get("stage") or "").strip(),
+            "contact_type": str(form.get("contact_type") or "").strip(),
+            "note": str(form.get("note") or "").strip(),
+        }
+        return data, amount, currency
+
+    def _crm_record_data(row: CrmRecord) -> dict[str, Any]:
+        data = _json_object(row.data)
+        return {
+            "id": row.id,
+            "title": row.title,
+            "item_type": row.item_type,
+            "item_type_label": _crm_type_label(row.item_type),
+            "status": row.status,
+            "status_label": _crm_status_label(row.status),
+            "client": str(data.get("client") or ""),
+            "responsible": str(data.get("responsible") or ""),
+            "date": str(data.get("date") or ""),
+            "due_date": row.due_date or str(data.get("due_date") or ""),
+            "stage": str(data.get("stage") or ""),
+            "contact_type": str(data.get("contact_type") or ""),
+            "note": str(data.get("note") or ""),
+            "amount": _sales_money_label(row.amount),
+            "currency": row.currency,
+        }
+
+    def _module_flash_error(request: Request) -> str:
+        return request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else "")
+
+    @app.get("/warehouse", response_class=HTMLResponse, name="warehouse_get")
+    def warehouse_get(
+        request: Request,
+        q: str = "",
+        warehouse: str = "",
+        product: str = "",
+        op_type: str = "all",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "warehouse": warehouse.strip(),
+            "product": product.strip(),
+            "op_type": op_type.strip() or "all",
+        }
+        q_clean = filters["q"].lower()
+        warehouse_records: list[dict[str, Any]] = []
+        warehouse_stocks: list[dict[str, Any]] = []
+        warehouse_operations: list[dict[str, Any]] = []
+        product_names: list[str] = []
+        with session_scope() as session:
+            warehouse_rows = list(
+                session.execute(
+                    select(Warehouse)
+                    .where(Warehouse.workspace_owner_id == wid)
+                    .order_by(Warehouse.name.asc())
+                ).scalars()
+            )
+            product_rows = list(
+                session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid)
+                    .order_by(Product.name.asc())
+                ).scalars()
+            )
+            operation_rows = list(
+                session.execute(
+                    select(WarehouseOperation)
+                    .where(WarehouseOperation.workspace_owner_id == wid)
+                    .order_by(WarehouseOperation.updated_at.desc())
+                ).scalars()
+            )
+            warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
+            product_names = [str(row.name) for row in product_rows]
+            for product_row in product_rows:
+                item = _product_data(product_row)
+                for stock in item["stocks"]:
+                    stock_row = {
+                        "product": item["name"],
+                        "warehouse": str(stock.get("warehouse") or "Основной склад"),
+                        "quantity": str(stock.get("quantity") or "0"),
+                        "unit": item["unit"],
+                        "category": item["category"],
+                        "status": item["status"],
+                        "min_stock": item["min_stock"],
+                    }
+                    hay = " ".join([stock_row["product"], stock_row["warehouse"], stock_row["category"]]).lower()
+                    if q_clean and q_clean not in hay:
+                        continue
+                    if filters["warehouse"] and stock_row["warehouse"] != filters["warehouse"]:
+                        continue
+                    if filters["product"] and stock_row["product"] != filters["product"]:
+                        continue
+                    warehouse_stocks.append(stock_row)
+            for row in operation_rows:
+                item = _warehouse_operation_data(row)
+                hay = " ".join([item["number"], item["product"], item["warehouse"], item["from_warehouse"], item["to_warehouse"], item["note"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                if filters["warehouse"] and filters["warehouse"] not in {item["warehouse"], item["from_warehouse"], item["to_warehouse"]}:
+                    continue
+                if filters["product"] and item["product"] != filters["product"]:
+                    continue
+                if filters["op_type"] != "all" and item["operation_type"] != filters["op_type"]:
+                    continue
+                warehouse_operations.append(item)
+        warehouse_options = {
+            "warehouses": [item["name"] for item in warehouse_records] or ["Основной склад"],
+            "products": product_names,
+        }
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="warehouse",
+            module=_business_module_context("warehouse"),
+            warehouse_filters=filters,
+            warehouse_options=warehouse_options,
+            warehouse_records=warehouse_records,
+            warehouse_stocks=warehouse_stocks,
+            warehouse_operations=warehouse_operations,
+            today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.post("/warehouse/save", name="warehouse_save")
+    async def warehouse_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/warehouse?error=" + quote("Название склада обязательно") + "#stocks", status_code=302)
+        with session_scope() as session:
+            _ensure_warehouse(
+                session,
+                wid,
+                name=name,
+                data={
+                    "manager": str(form.get("manager") or "").strip(),
+                    "status": str(form.get("status") or "active").strip(),
+                    "note": str(form.get("note") or "").strip(),
+                },
+            )
+        return RedirectResponse(url="/warehouse?msg=saved#stocks", status_code=302)
+
+    @app.post("/warehouse/operations/save", name="warehouse_operation_save")
+    async def warehouse_operation_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        data, amount = _warehouse_operation_payload(form)
+        if not data["product"]:
+            return RedirectResponse(url="/warehouse?error=" + quote("Товар обязателен") + "#adjustments", status_code=302)
+        quantity = _sales_decimal(data.get("quantity"))
+        if quantity <= 0:
+            return RedirectResponse(url="/warehouse?error=" + quote("Количество должно быть больше нуля") + "#adjustments", status_code=302)
+        with session_scope() as session:
+            product_row = _resolve_product_row(session, wid, data["product"])
+            if product_row is None:
+                return RedirectResponse(url="/warehouse?error=" + quote("Товар не найден") + "#adjustments", status_code=302)
+            target_hash = "transfers" if data["operation_type"] == "transfer" else "adjustments"
+            try:
+                if data["operation_type"] == "transfer":
+                    from_row = _ensure_warehouse(session, wid, name=data["from_warehouse"])
+                    to_row = _ensure_warehouse(session, wid, name=data["to_warehouse"])
+                    if from_row.name == to_row.name:
+                        return RedirectResponse(url="/warehouse?error=" + quote("Склады перемещения должны отличаться") + "#transfers", status_code=302)
+                    _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=from_row.name,
+                        lines=[{"product": product_row.name, "product_id": product_row.id, "quantity": data["quantity"], "price": data["price"]}],
+                        delta_sign=-1,
+                        op_date=str(data.get("date") or ""),
+                    )
+                    _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=to_row.name,
+                        lines=[{"product": product_row.name, "product_id": product_row.id, "quantity": data["quantity"], "price": data["price"]}],
+                        delta_sign=1,
+                        op_date=str(data.get("date") or ""),
+                    )
+                    data["warehouse_id"] = from_row.id
+                else:
+                    warehouse_row = _ensure_warehouse(session, wid, name=data["warehouse"])
+                    delta_sign = 1 if data["operation_type"] in {"in", "adjustment"} else -1
+                    _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=warehouse_row.name,
+                        lines=[{"product": product_row.name, "product_id": product_row.id, "quantity": data["quantity"], "price": data["price"]}],
+                        delta_sign=delta_sign,
+                        op_date=str(data.get("date") or ""),
+                    )
+                    data["warehouse_id"] = warehouse_row.id
+            except ValueError as exc:
+                return RedirectResponse(url="/warehouse?error=" + quote(str(exc)) + f"#{target_hash}", status_code=302)
+            count = session.execute(
+                select(func.count(WarehouseOperation.id)).where(WarehouseOperation.workspace_owner_id == wid)
+            ).scalar_one()
+            number = f"W-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{int(count) + 1:03d}"
+            row = WarehouseOperation(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=wid,
+                number=number,
+                operation_type=data["operation_type"],
+                warehouse_id=str(data.get("warehouse_id") or "") or None,
+                product_id=product_row.id,
+                quantity=quantity,
+                amount=amount,
+                currency="UZS",
+                data=data,
+            )
+            session.add(row)
+        return RedirectResponse(url=f"/warehouse?msg=saved#{target_hash}", status_code=302)
+
+    @app.post("/warehouse/operations/{operation_id}/delete", name="warehouse_operation_delete")
+    async def warehouse_operation_delete(request: Request, operation_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(WarehouseOperation, operation_id)
+            if row and row.workspace_owner_id == wid:
+                data = _json_object(row.data)
+                quantity = _sales_decimal(row.quantity)
+                target_hash = "transfers" if row.operation_type == "transfer" else "adjustments"
+                try:
+                    if row.operation_type == "transfer":
+                        _sync_product_lines(
+                            session,
+                            wid,
+                            warehouse_name=str(data.get("to_warehouse") or ""),
+                            lines=[{"product": data.get("product"), "product_id": row.product_id, "quantity": str(quantity), "price": data.get("price")}],
+                            delta_sign=-1,
+                            op_date=str(data.get("date") or ""),
+                        )
+                        _sync_product_lines(
+                            session,
+                            wid,
+                            warehouse_name=str(data.get("from_warehouse") or ""),
+                            lines=[{"product": data.get("product"), "product_id": row.product_id, "quantity": str(quantity), "price": data.get("price")}],
+                            delta_sign=1,
+                            op_date=str(data.get("date") or ""),
+                        )
+                    else:
+                        _sync_product_lines(
+                            session,
+                            wid,
+                            warehouse_name=str(data.get("warehouse") or ""),
+                            lines=[{"product": data.get("product"), "product_id": row.product_id, "quantity": str(quantity), "price": data.get("price")}],
+                            delta_sign=-1 if row.operation_type in {"in", "adjustment"} else 1,
+                            op_date=str(data.get("date") or ""),
+                        )
+                except ValueError as exc:
+                    return RedirectResponse(url="/warehouse?error=" + quote(str(exc)) + f"#{target_hash}", status_code=302)
+                session.delete(row)
+                return RedirectResponse(url=f"/warehouse?msg=deleted#{target_hash}", status_code=302)
+        return RedirectResponse(url="/warehouse?msg=deleted#adjustments", status_code=302)
+
+    @app.get("/clients", response_class=HTMLResponse, name="clients_get")
+    def clients_get(
+        request: Request,
+        q: str = "",
+        territory: str = "",
+        category: str = "",
+        route: str = "",
+        status: str = "all",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "territory": territory.strip(),
+            "category": category.strip(),
+            "route": route.strip(),
+            "status": status.strip() or "all",
+        }
+        q_clean = filters["q"].lower()
+        clients_records: list[dict[str, Any]] = []
+        client_routes: list[dict[str, Any]] = []
+        client_balances: list[dict[str, Any]] = []
+        with session_scope() as session:
+            balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
+            rows = list(
+                session.execute(
+                    select(Counterparty)
+                    .where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind.in_(["client", "both"]),
+                    )
+                    .order_by(Counterparty.updated_at.desc())
+                ).scalars()
+            )
+            route_map: dict[str, dict[str, Any]] = {}
+            for row in rows:
+                item = _counterparty_view_data(
+                    row,
+                    balance_by_id=balance_by_id,
+                    balance_by_name=balance_by_name,
+                    last_date_by_id=last_date_by_id,
+                    last_date_by_name=last_date_by_name,
+                )
+                hay = " ".join([item["name"], item["official_name"], item["phone"], item["category"], item["territory"], item["route"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                if filters["territory"] and item["territory"] != filters["territory"]:
+                    continue
+                if filters["category"] and item["category"] != filters["category"]:
+                    continue
+                if filters["route"] and item["route"] != filters["route"]:
+                    continue
+                if filters["status"] != "all" and item["status"] != filters["status"]:
+                    continue
+                clients_records.append(item)
+                route_key = item["route"] or "Без маршрута"
+                summary = route_map.setdefault(route_key, {"route": route_key, "territory": item["territory"] or "-", "count": 0, "balance_value": Decimal("0")})
+                summary["count"] += 1
+                summary["balance_value"] += item["balance_value"]
+                if item["balance_value"] != 0:
+                    client_balances.append(item)
+            client_routes = [
+                {
+                    "route": key,
+                    "territory": value["territory"],
+                    "count": value["count"],
+                    "balance": _sales_money_label(value["balance_value"]),
+                }
+                for key, value in sorted(route_map.items())
+            ]
+            client_balances.sort(key=lambda item: abs(item["balance_value"]), reverse=True)
+        client_options = {
+            "territories": sorted({item["territory"] for item in clients_records if item["territory"]}),
+            "categories": sorted({item["category"] for item in clients_records if item["category"]}),
+            "routes": sorted({item["route"] for item in clients_records if item["route"]}),
+        }
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="clients",
+            module=_business_module_context("clients"),
+            client_filters=filters,
+            client_options=client_options,
+            clients_records=clients_records,
+            client_routes=client_routes,
+            client_balances=client_balances,
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.post("/clients/save", name="clients_save")
+    async def clients_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/clients?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/clients?error=" + quote("Название клиента обязательно") + "#clients", status_code=302)
+        is_supplier = str(form.get("is_supplier") or "").strip() == "1"
+        with session_scope() as session:
+            _ensure_counterparty(
+                session,
+                wid,
+                name=name,
+                role="both" if is_supplier else "client",
+                phone=str(form.get("phone") or "").strip(),
+                tax_id=str(form.get("tax_id") or "").strip(),
+                data={
+                    "official_name": str(form.get("official_name") or "").strip(),
+                    "territory": str(form.get("territory") or "").strip(),
+                    "category": str(form.get("category") or "").strip(),
+                    "route": str(form.get("route") or "").strip(),
+                    "status": str(form.get("status") or "active").strip(),
+                    "telegram": str(form.get("telegram") or "").strip(),
+                    "note": str(form.get("note") or "").strip(),
+                    "email": str(form.get("email") or "").strip(),
+                    "address": str(form.get("address") or "").strip(),
+                    "is_client": True,
+                    "is_supplier": is_supplier,
+                },
+            )
+        return RedirectResponse(url="/clients?msg=saved#clients", status_code=302)
+
+    @app.post("/clients/{counterparty_id}/delete", name="clients_delete")
+    async def clients_delete(request: Request, counterparty_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/clients?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(Counterparty, counterparty_id)
+            if row and row.workspace_owner_id == wid:
+                if not _drop_counterparty_role(row, "client"):
+                    session.delete(row)
+        return RedirectResponse(url="/clients?msg=deleted#clients", status_code=302)
+
+    @app.get("/suppliers", response_class=HTMLResponse, name="suppliers_get")
+    def suppliers_get(
+        request: Request,
+        q: str = "",
+        status: str = "all",
+        category: str = "",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "status": status.strip() or "all",
+            "category": category.strip(),
+        }
+        q_clean = filters["q"].lower()
+        supplier_records: list[dict[str, Any]] = []
+        supplier_purchases: list[dict[str, Any]] = []
+        supplier_payables: list[dict[str, Any]] = []
+        product_names: list[str] = []
+        warehouse_names: list[str] = []
+        with session_scope() as session:
+            balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _purchase_rollup_maps(session, wid)
+            counterparties = list(
+                session.execute(
+                    select(Counterparty)
+                    .where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind.in_(["supplier", "both"]),
+                    )
+                    .order_by(Counterparty.updated_at.desc())
+                ).scalars()
+            )
+            for row in counterparties:
+                item = _counterparty_view_data(
+                    row,
+                    balance_by_id=balance_by_id,
+                    balance_by_name=balance_by_name,
+                    last_date_by_id=last_date_by_id,
+                    last_date_by_name=last_date_by_name,
+                )
+                hay = " ".join([item["name"], item["official_name"], item["phone"], item["category"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                if filters["status"] != "all" and item["status"] != filters["status"]:
+                    continue
+                if filters["category"] and item["category"] != filters["category"]:
+                    continue
+                supplier_records.append(item)
+            purchase_rows = list(
+                session.execute(
+                    select(PurchaseDocument)
+                    .where(PurchaseDocument.workspace_owner_id == wid)
+                    .order_by(PurchaseDocument.updated_at.desc())
+                ).scalars()
+            )
+            for row in purchase_rows:
+                item = _purchase_document_data(row)
+                hay = " ".join([item["number"], item["supplier"], item["warehouse"], item["status_label"], item["note"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                supplier_purchases.append(item)
+                if _sales_decimal(item["debt_amount"]) > 0:
+                    supplier_payables.append(item)
+            product_names = [
+                str(row.name)
+                for row in session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid)
+                    .order_by(Product.name.asc())
+                ).scalars()
+            ]
+            warehouse_names = [
+                str(row.name)
+                for row in session.execute(
+                    select(Warehouse)
+                    .where(Warehouse.workspace_owner_id == wid)
+                    .order_by(Warehouse.name.asc())
+                ).scalars()
+            ]
+        supplier_options = {
+            "categories": sorted({item["category"] for item in supplier_records if item["category"]}),
+            "suppliers": sorted({item["name"] for item in supplier_records if item["name"]}),
+            "products": product_names,
+            "warehouses": warehouse_names or ["Основной склад"],
+        }
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="suppliers",
+            module=_business_module_context("suppliers"),
+            supplier_filters=filters,
+            supplier_options=supplier_options,
+            supplier_records=supplier_records,
+            supplier_purchases=supplier_purchases,
+            supplier_payables=supplier_payables,
+            today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.post("/suppliers/save", name="suppliers_save")
+    async def suppliers_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/suppliers?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/suppliers?error=" + quote("Название поставщика обязательно") + "#suppliers", status_code=302)
+        is_client = str(form.get("is_client") or "").strip() == "1"
+        with session_scope() as session:
+            _ensure_counterparty(
+                session,
+                wid,
+                name=name,
+                role="both" if is_client else "supplier",
+                phone=str(form.get("phone") or "").strip(),
+                tax_id=str(form.get("tax_id") or "").strip(),
+                data={
+                    "official_name": str(form.get("official_name") or "").strip(),
+                    "category": str(form.get("category") or "").strip(),
+                    "status": str(form.get("status") or "active").strip(),
+                    "note": str(form.get("note") or "").strip(),
+                    "email": str(form.get("email") or "").strip(),
+                    "address": str(form.get("address") or "").strip(),
+                    "is_client": is_client,
+                    "is_supplier": True,
+                },
+            )
+        return RedirectResponse(url="/suppliers?msg=saved#suppliers", status_code=302)
+
+    @app.post("/suppliers/{counterparty_id}/delete", name="suppliers_delete")
+    async def suppliers_delete(request: Request, counterparty_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/suppliers?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(Counterparty, counterparty_id)
+            if row and row.workspace_owner_id == wid:
+                if not _drop_counterparty_role(row, "supplier"):
+                    session.delete(row)
+        return RedirectResponse(url="/suppliers?msg=deleted#suppliers", status_code=302)
+
+    @app.post("/suppliers/purchases/save", name="suppliers_purchase_save")
+    async def suppliers_purchase_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/suppliers?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        data, amount, currency = _purchase_document_payload(form)
+        if not data["supplier"]:
+            return RedirectResponse(url="/suppliers?error=" + quote("Поставщик обязателен") + "#purchases", status_code=302)
+        with session_scope() as session:
+            try:
+                supplier_row = _ensure_counterparty(
+                    session,
+                    wid,
+                    name=data["supplier"],
+                    role="supplier",
+                )
+                warehouse_row = _ensure_warehouse(
+                    session,
+                    wid,
+                    name=data["warehouse"],
+                )
+                data["lines"] = _sync_product_lines(
+                    session,
+                    wid,
+                    warehouse_name=warehouse_row.name,
+                    lines=list(data.get("lines") or []),
+                    delta_sign=1,
+                    op_date=str(data.get("date") or ""),
+                )
+                data["warehouse_id"] = warehouse_row.id
+                data["counterparty_id"] = supplier_row.id
+            except ValueError as exc:
+                return RedirectResponse(url="/suppliers?error=" + quote(str(exc)) + "#purchases", status_code=302)
+            count = session.execute(
+                select(func.count(PurchaseDocument.id)).where(PurchaseDocument.workspace_owner_id == wid)
+            ).scalar_one()
+            number = str(form.get("number") or "").strip() or f"P-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{int(count) + 1:03d}"
+            row = PurchaseDocument(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=wid,
+                number=number,
+                amount=amount,
+                currency=currency,
+                counterparty_id=supplier_row.id,
+                external_source="local",
+                external_id=str(uuid.uuid4()),
+                data=data,
+            )
+            session.add(row)
+        return RedirectResponse(url="/suppliers?msg=saved#purchases", status_code=302)
+
+    @app.post("/suppliers/purchases/{purchase_id}/delete", name="suppliers_purchase_delete")
+    async def suppliers_purchase_delete(request: Request, purchase_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/suppliers?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(PurchaseDocument, purchase_id)
+            if row and row.workspace_owner_id == wid:
+                data = _json_object(row.data)
+                try:
+                    _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=str(data.get("warehouse") or "Основной склад"),
+                        lines=list(data.get("lines") or []),
+                        delta_sign=-1,
+                        op_date=str(data.get("date") or ""),
+                    )
+                except ValueError as exc:
+                    return RedirectResponse(url="/suppliers?error=" + quote(str(exc)) + "#purchases", status_code=302)
+                session.delete(row)
+        return RedirectResponse(url="/suppliers?msg=deleted#purchases", status_code=302)
+
+    @app.get("/crm", response_class=HTMLResponse, name="crm_get")
+    def crm_get(
+        request: Request,
+        q: str = "",
+        client: str = "",
+        responsible: str = "",
+        status: str = "all",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        filters = {
+            "q": q.strip(),
+            "client": client.strip(),
+            "responsible": responsible.strip(),
+            "status": status.strip() or "all",
+        }
+        q_clean = filters["q"].lower()
+        crm_records: list[dict[str, Any]] = []
+        crm_options = {"clients": [], "responsibles": []}
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(CrmRecord)
+                    .where(CrmRecord.workspace_owner_id == wid)
+                    .order_by(CrmRecord.updated_at.desc())
+                ).scalars()
+            )
+            for row in rows:
+                item = _crm_record_data(row)
+                hay = " ".join([item["title"], item["client"], item["responsible"], item["status_label"], item["stage"], item["note"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                if filters["client"] and item["client"] != filters["client"]:
+                    continue
+                if filters["responsible"] and item["responsible"] != filters["responsible"]:
+                    continue
+                if filters["status"] != "all" and item["status"] != filters["status"]:
+                    continue
+                crm_records.append(item)
+            crm_options = {
+                "clients": sorted({item["client"] for item in crm_records if item["client"]}),
+                "responsibles": sorted({item["responsible"] for item in crm_records if item["responsible"]} | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())),
+            }
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active="crm",
+            module=_business_module_context("crm"),
+            crm_filters=filters,
+            crm_options=crm_options,
+            crm_records=crm_records,
+            today=datetime.now(timezone.utc).date().isoformat(),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=_module_flash_error(request),
+        )
+
+    @app.post("/crm/save", name="crm_save")
+    async def crm_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        title = str(form.get("title") or "").strip()
+        if not title:
+            return RedirectResponse(url="/crm?error=" + quote("Название записи обязательно") + "#tasks", status_code=302)
+        data, amount, currency = _crm_record_payload(form)
+        with session_scope() as session:
+            counterparty_id = None
+            if data["client"]:
+                counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
+                counterparty_id = counterparty.id if counterparty else None
+            row = CrmRecord(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=wid,
+                item_type=str(data.get("item_type") or "task"),
+                title=title,
+                counterparty_id=counterparty_id,
+                status=str(form.get("status") or "new").strip() or "new",
+                due_date=str(data.get("due_date") or ""),
+                amount=amount,
+                currency=currency,
+                data=data,
+            )
+            session.add(row)
+        target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
+        return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
+
+    @app.post("/crm/{record_id}/delete", name="crm_delete")
+    async def crm_delete(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if row and row.workspace_owner_id == wid:
+                target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(row.item_type, "tasks")
+                session.delete(row)
+                return RedirectResponse(url=f"/crm?msg=deleted#{target_hash}", status_code=302)
+        return RedirectResponse(url="/crm?msg=deleted#tasks", status_code=302)
 
     @app.get("/reports", response_class=HTMLResponse)
     def home_reports(request: Request):
