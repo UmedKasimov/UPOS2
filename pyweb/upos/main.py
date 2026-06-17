@@ -6436,6 +6436,20 @@ def create_app() -> FastAPI:
             result.append(row)
         return result
 
+    def _messenger_channel_key(value: str) -> str:
+        channel = str(value or "").strip().lower()
+        if "telegram" in channel:
+            return "Telegram"
+        if "instagram" in channel:
+            return "Instagram"
+        if "whatsapp" in channel or "whatsap" in channel:
+            return "WhatsApp"
+        if "facebook" in channel:
+            return "Facebook"
+        if "site" in channel or "сайт" in channel or "web" in channel:
+            return "Сайт"
+        return str(value or "").strip()
+
     def _messenger_save_item(workspace_owner_id: str, key: str, item: dict[str, Any]) -> None:
         data = _messenger_settings_payload(workspace_owner_id)
         rows = data.get(key) if isinstance(data.get(key), list) else []
@@ -6681,7 +6695,14 @@ def create_app() -> FastAPI:
         channel_options = ["Telegram", "Instagram", "WhatsApp", "Facebook", "Сайт"]
         responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
         data = _messenger_settings_payload(wid)
-        threads = _messenger_filter_rows(_messenger_threads_from_sources(wid), filters)
+        all_threads = _messenger_threads_from_sources(wid)
+        channel_message_counts: dict[str, int] = {}
+        for item in all_threads:
+            key = _messenger_channel_key(str(item.get("channel") or ""))
+            message_count = len(item.get("messages") or [])
+            if key:
+                channel_message_counts[key] = channel_message_counts.get(key, 0) + message_count
+        threads = _messenger_filter_rows(all_threads, filters)
         campaigns = _messenger_filter_rows(
             [dict(row, status_label=_messenger_status_label(str(row.get("status") or ""))) for row in data.get("messenger_campaigns") or []],
             filters,
@@ -6704,6 +6725,7 @@ def create_app() -> FastAPI:
                 "responsibles": responsible_options,
                 "clients": _messenger_client_options(wid),
             },
+            messenger_channel_message_counts=channel_message_counts,
             messenger_threads=threads,
             messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,

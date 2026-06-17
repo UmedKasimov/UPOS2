@@ -978,6 +978,25 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   z-index: 1;
 }
 
+.messenger-channel-tab b,
+.messenger-dialog-side b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding: 0 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), white 78%);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.messenger-channel-tab b {
+  margin-left: 0.5rem;
+}
+
 .messenger-channel-tab:hover::before,
 .messenger-channel-tab.active::before {
   border-color: color-mix(in oklch, var(--primary), black 4%);
@@ -990,6 +1009,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-channel-tab:hover,
 .messenger-channel-tab.active {
   color: white;
+}
+
+.messenger-channel-tab:hover b,
+.messenger-channel-tab.active b {
+  background: rgb(255 255 255 / 0.92);
+  color: var(--primary);
 }
 
 .business-module-grid {
@@ -1820,6 +1845,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-bottom: 1px solid var(--workbench-line, var(--border));
 }
 
+.messenger-dialog-list-head {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.messenger-dialog-list-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .messenger-dialog-list-head small {
   display: inline-grid;
   place-items: center;
@@ -1830,6 +1867,28 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in oklch, var(--primary), white 84%);
   color: var(--primary);
   font-weight: 850;
+}
+
+.messenger-dialog-search {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.messenger-dialog-search span {
+  font-size: var(--text-xs);
+  font-weight: 750;
+  color: var(--muted-foreground);
+}
+
+.messenger-dialog-search input {
+  min-height: 2.35rem;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: var(--radius);
+  background: var(--control-bg, var(--background));
+  color: var(--foreground);
+  font: inherit;
 }
 
 .messenger-dialog-list {
@@ -1889,6 +1948,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-dialog-item em {
   font-style: normal;
   font-weight: 750;
+}
+
+.messenger-dialog-side {
+  display: grid;
+  justify-items: end;
+  gap: 0.34rem;
 }
 
 .messenger-dialog-chat-panel {

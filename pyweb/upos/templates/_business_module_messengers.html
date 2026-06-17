@@ -10,6 +10,7 @@
 <script type="application/json" data-messenger-thread-json>{{ messenger_threads_json|safe }}</script>
 
 {% set active_messenger_channel = messenger_filters.channel or 'Telegram' %}
+{% set messenger_channel_message_counts = messenger_channel_message_counts|default({}) %}
 {% set messenger_channel_tabs = [
   {'label': 'Телеграм', 'value': 'Telegram'},
   {'label': 'Инстаграм', 'value': 'Instagram'},
@@ -20,9 +21,13 @@
 
 <form class="business-module-filters messenger-channel-filter-form" method="get" action="{{ url_for('messengers_get') }}#inbox" data-workspace-view="inbox" data-messenger-channel-form hidden>
   <input type="hidden" name="channel" value="{{ active_messenger_channel }}" data-messenger-channel-input />
+  <input type="hidden" name="q" value="" />
+  <input type="hidden" name="responsible" value="" />
+  <input type="hidden" name="status" value="all" />
   <nav class="messenger-channel-tabs" aria-label="Каналы диалогов">
     {% for tab in messenger_channel_tabs %}
       {% set is_active_channel = active_messenger_channel|lower == tab.value|lower %}
+      {% set tab_message_count = messenger_channel_message_counts.get(tab.value, 0) %}
       <button
         type="button"
         class="messenger-channel-tab{% if is_active_channel %} active{% endif %}"
@@ -30,55 +35,52 @@
         aria-pressed="{{ 'true' if is_active_channel else 'false' }}"
       >
         <span>{{ tab.label }}</span>
+        {% if tab_message_count %}
+          <b>{{ tab_message_count }}</b>
+        {% endif %}
       </button>
     {% endfor %}
   </nav>
-  <label><span>Поиск</span><input name="q" value="{{ messenger_filters.q }}" placeholder="Клиент, чат, шаблон" /></label>
-  <label>
-    <span>Ответственный</span>
-    <input name="responsible" list="messenger-responsible-list" value="{{ messenger_filters.responsible }}" placeholder="Ответственный" />
-  </label>
-  <label>
-    <span>Статус</span>
-    <select name="status">
-      <option value="all" {% if messenger_filters.status == 'all' %}selected{% endif %}>Все</option>
-      <option value="active" {% if messenger_filters.status == 'active' %}selected{% endif %}>Активный</option>
-      <option value="waiting" {% if messenger_filters.status == 'waiting' %}selected{% endif %}>Ожидает</option>
-      <option value="paused" {% if messenger_filters.status == 'paused' %}selected{% endif %}>Пауза</option>
-      <option value="archived" {% if messenger_filters.status == 'archived' %}selected{% endif %}>Архив</option>
-    </select>
-  </label>
-  <button class="btn btn-secondary" type="submit">Применить</button>
-  <a class="btn btn-secondary" href="{{ url_for('messengers_get') }}#inbox">Очистить</a>
 </form>
 
 <section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox hidden>
-  <header class="business-module-toolbar">
-    <div>
-      <p class="settings-ios-footnote">Чаты, обращения и клиенты</p>
-      <h2>Центр сообщений</h2>
-    </div>
-    <button type="button" class="btn" data-messenger-compose>+ Сообщение</button>
-  </header>
   <div class="messenger-inbox-shell">
     <aside class="messenger-dialog-list-panel" aria-label="Диалоги">
       <div class="messenger-dialog-list-head">
-        <strong>Диалоги</strong>
-        <small>{{ messenger_threads|length }}</small>
+        <div class="messenger-dialog-list-title">
+          <strong>Диалоги</strong>
+          <small data-messenger-dialog-visible-count>{{ messenger_threads|length }}</small>
+        </div>
+        <label class="messenger-dialog-search">
+          <span>Поиск по диалогам</span>
+          <input type="search" placeholder="Поиск диалога" data-messenger-dialog-search />
+        </label>
       </div>
       <div class="messenger-dialog-list" data-messenger-thread-list>
         {% for row in messenger_threads %}
-          <button type="button" class="messenger-dialog-item" data-messenger-thread-id="{{ row.id }}">
+          {% set row_message_count = row.messages|length %}
+          <button
+            type="button"
+            class="messenger-dialog-item"
+            data-messenger-thread-id="{{ row.id }}"
+            data-messenger-search="{{ (row.contact ~ ' ' ~ row.topic ~ ' ' ~ row.channel ~ ' ' ~ row.status_label ~ ' ' ~ row.last_message)|e }}"
+          >
             <span class="messenger-dialog-channel">{{ row.channel[:2] }}</span>
             <span>
               <strong>{{ row.contact }}</strong>
               <small>{{ row.topic or row.last_message or row.channel }}</small>
             </span>
-            <em>{{ row.status_label }}</em>
+            <span class="messenger-dialog-side">
+              <em>{{ row.status_label }}</em>
+              {% if row_message_count %}
+                <b>{{ row_message_count }}</b>
+              {% endif %}
+            </span>
           </button>
         {% else %}
           <div class="messenger-empty">Диалогов пока нет. Здесь появятся Telegram, WhatsApp и другие каналы.</div>
         {% endfor %}
+        <div class="messenger-empty" data-messenger-dialog-search-empty hidden>Диалогов не найдено.</div>
       </div>
     </aside>
 

@@ -118,6 +118,32 @@
         renderMessages(root, current);
       });
     }
+
+    var dialogSearch = root.querySelector("[data-messenger-dialog-search]");
+    var visibleCount = root.querySelector("[data-messenger-dialog-visible-count]");
+    var searchEmpty = root.querySelector("[data-messenger-dialog-search-empty]");
+    if (dialogSearch) {
+      dialogSearch.addEventListener("input", function () {
+        var query = String(dialogSearch.value || "").trim().toLowerCase();
+        var firstVisible = null;
+        var visible = 0;
+        root.querySelectorAll("[data-messenger-thread-id]").forEach(function (item) {
+          var haystack = String(item.getAttribute("data-messenger-search") || item.textContent || "").toLowerCase();
+          var match = !query || haystack.indexOf(query) !== -1;
+          item.hidden = !match;
+          if (match) {
+            visible += 1;
+            if (!firstVisible) firstVisible = item;
+          }
+        });
+        if (visibleCount) visibleCount.textContent = String(visible);
+        if (searchEmpty) searchEmpty.hidden = visible > 0;
+        var active = root.querySelector("[data-messenger-thread-id].active");
+        if (query && active && active.hidden && firstVisible) {
+          selectThread(root, byId[String(firstVisible.getAttribute("data-messenger-thread-id"))]);
+        }
+      });
+    }
   }
 
   function initChannelTabs() {
