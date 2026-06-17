@@ -6803,6 +6803,7 @@ def create_app() -> FastAPI:
         )
         auto_reply = data.get("messenger_auto_reply") if isinstance(data.get("messenger_auto_reply"), dict) else {}
         threads_json = json.dumps(threads, ensure_ascii=False, default=str).replace("</", "<\\/")
+        templates_json = json.dumps(templates_rows, ensure_ascii=False, default=str).replace("</", "<\\/")
         return tpl(
             request,
             "home_business_module.html",
@@ -6820,6 +6821,7 @@ def create_app() -> FastAPI:
             messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,
             messenger_templates=templates_rows,
+            messenger_templates_json=templates_json,
             messenger_auto_reply=auto_reply,
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),

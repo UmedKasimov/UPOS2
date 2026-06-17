@@ -18,6 +18,21 @@
     }
   }
 
+  function readTemplates() {
+    var script = document.querySelector("[data-messenger-template-json]");
+    if (!script) return [];
+    try {
+      var rows = JSON.parse(script.textContent || "[]");
+      return Array.isArray(rows) ? rows : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function channelKey(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
   function renderMessages(panel, thread) {
     var box = panel.querySelector("[data-messenger-thread-messages]");
     if (!box) return;
@@ -85,13 +100,18 @@
 
   function boot(root) {
     var threads = readThreads(root);
+    var templates = readTemplates();
     var byId = {};
     threads.forEach(function (thread) {
       byId[String(thread.id)] = thread;
     });
+    function currentThread() {
+      return byId[String(root.dataset.selectedThreadId || "")];
+    }
     root.querySelectorAll("[data-messenger-thread-id]").forEach(function (item) {
       item.addEventListener("click", function () {
         selectThread(root, byId[String(item.getAttribute("data-messenger-thread-id"))]);
+        renderTemplatePicker();
       });
     });
     if (threads.length) selectThread(root, threads[0]);
@@ -99,7 +119,7 @@
     var sendToCrm = root.querySelector("[data-messenger-attach-client]");
     if (sendToCrm) {
       sendToCrm.addEventListener("click", function () {
-        var current = byId[String(root.dataset.selectedThreadId || "")];
+        var current = currentThread();
         if (!current) return;
         window.location.assign(crmUrlForThread(current));
       });
@@ -109,13 +129,61 @@
     var send = root.querySelector("[data-messenger-send-button]");
     if (text && send) {
       send.addEventListener("click", function () {
-        var current = byId[String(root.dataset.selectedThreadId || "")];
+        var current = currentThread();
         var value = String(text.value || "").trim();
         if (!current || !value) return;
         current.messages = Array.isArray(current.messages) ? current.messages : [];
         current.messages.push({ author: "Вы", text: value, kind: "out" });
         text.value = "";
         renderMessages(root, current);
+      });
+    }
+
+    var templateButton = root.querySelector("[data-messenger-template-button]");
+    var templatePicker = root.querySelector("[data-messenger-template-picker]");
+    function renderTemplatePicker() {
+      if (!templatePicker || !text) return;
+      var current = currentThread();
+      var activeChannel = channelKey(current && current.channel);
+      var scopedTemplates = activeChannel
+        ? templates.filter(function (template) {
+            return channelKey(template.channel) === activeChannel;
+          })
+        : templates.slice();
+      if (!scopedTemplates.length) scopedTemplates = templates.slice();
+      templatePicker.innerHTML = "";
+      if (scopedTemplates.length) {
+        scopedTemplates.forEach(function (template) {
+          var item = document.createElement("button");
+          item.type = "button";
+          item.className = "messenger-template-choice";
+          item.innerHTML =
+            "<strong>" +
+            escapeHtml(template.title || "Шаблон") +
+            "</strong><small>" +
+            escapeHtml(template.preview || template.text || "") +
+            "</small>";
+          item.addEventListener("click", function () {
+            text.value = template.text || template.preview || "";
+            templatePicker.hidden = true;
+            text.focus();
+          });
+          templatePicker.appendChild(item);
+        });
+      } else {
+        templatePicker.innerHTML = '<div class="messenger-empty">Для этого канала пока нет шаблонов.</div>';
+      }
+    }
+    if (templateButton && templatePicker && text) {
+      renderTemplatePicker();
+      templateButton.addEventListener("click", function () {
+        renderTemplatePicker();
+        templatePicker.hidden = !templatePicker.hidden;
+      });
+      document.addEventListener("click", function (event) {
+        if (templatePicker.hidden) return;
+        if (templatePicker.contains(event.target) || templateButton.contains(event.target)) return;
+        templatePicker.hidden = true;
       });
     }
 

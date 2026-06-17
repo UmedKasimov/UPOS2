@@ -8,6 +8,7 @@
   {% for item in messenger_options.clients %}<option value="{{ item }}">{% endfor %}
 </datalist>
 <script type="application/json" data-messenger-thread-json>{{ messenger_threads_json|safe }}</script>
+<script type="application/json" data-messenger-template-json>{{ messenger_templates_json|default('[]')|safe }}</script>
 
 {% set active_messenger_channel = messenger_filters.channel or 'Telegram' %}
 {% set messenger_channel_message_counts = messenger_channel_message_counts|default({}) %}
@@ -102,6 +103,7 @@
       </div>
       <div class="messenger-dialog-composer">
         <textarea rows="3" placeholder="Напишите сообщение клиенту..." data-messenger-compose-text></textarea>
+        <div class="messenger-template-picker" data-messenger-template-picker hidden></div>
         <div class="messenger-dialog-composer-actions">
           <button type="button" class="btn btn-secondary" data-messenger-template-button>Шаблон</button>
           <button type="button" class="btn" data-messenger-send-button>Отправить</button>
@@ -256,7 +258,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label><span>Название кампании*</span><input name="title" required /></label>
       <div class="products-form-grid products-form-grid--two">
-        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>WhatsApp</option></select></label>
+        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>Instagram</option><option>WhatsApp</option><option>Facebook</option><option>Сайт</option></select></label>
         <label><span>Сегмент получателей</span><select name="segment"><option>Все клиенты</option><option>По маршруту</option><option>По категории</option><option>Вручную</option></select></label>
       </div>
       <label><span>Шаблон сообщения</span><textarea name="message" rows="4" placeholder="Здравствуйте, {{ '{{name}}' }}. Ваш баланс: {{ '{{balance}}' }}"></textarea></label>
@@ -322,7 +324,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label><span>Название*</span><input name="title" required /></label>
       <div class="products-form-grid products-form-grid--two">
-        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>WhatsApp</option><option>Instagram</option></select></label>
+        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>Instagram</option><option>WhatsApp</option><option>Facebook</option><option>Сайт</option></select></label>
         <label><span>Тип</span><select name="scenario"><option value="greeting">Приветствие</option><option value="reminder">Напоминание</option><option value="campaign">Рассылка</option><option value="reply">Ответ</option></select></label>
       </div>
       <label><span>Текст*</span><textarea name="text" rows="6" required></textarea></label>
