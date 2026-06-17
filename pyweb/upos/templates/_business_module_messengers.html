@@ -11,6 +11,9 @@
 
 {% set active_messenger_channel = messenger_filters.channel or 'Telegram' %}
 {% set messenger_channel_message_counts = messenger_channel_message_counts|default({}) %}
+{% set messenger_auto_reply = messenger_auto_reply|default({}) %}
+{% set messenger_campaigns = messenger_campaigns|default([]) %}
+{% set messenger_templates = messenger_templates|default([]) %}
 {% set messenger_channel_tabs = [
   {'label': 'Телеграм', 'value': 'Telegram'},
   {'label': 'Инстаграм', 'value': 'Instagram'},
@@ -159,7 +162,7 @@
   </div>
 
   <section class="messenger-telegram-settings-grid">
-    <form class="messenger-telegram-subscribers" method="post" action="{{ url_for('messenger_auto_reply_save') }}">
+    <form class="messenger-telegram-subscribers" method="post" action="/messengers/auto-reply/save">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <header>
         <div>
@@ -247,7 +250,7 @@
         <span>Сегменты и шаблоны сообщений</span>
       </div>
     </header>
-    <form class="products-form" method="post" action="{{ url_for('messenger_campaign_save') }}">
+    <form class="products-form" method="post" action="/messengers/campaigns/save">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label><span>Название кампании*</span><input name="title" required /></label>
       <div class="products-form-grid products-form-grid--two">
@@ -292,7 +295,7 @@
               <td>{{ row.scenario or "-" }}</td>
               <td>{{ row.preview or row.text or "-" }}</td>
               <td>
-                <form method="post" action="{{ url_for('messenger_template_delete', template_id=row.id) }}">
+                <form method="post" action="/messengers/templates/{{ row.id }}/delete">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                   <button class="link-button" type="submit">Удалить</button>
                 </form>
@@ -313,7 +316,7 @@
         <span>Переменные: {{ '{{name}}' }}, {{ '{{balance}}' }}</span>
       </div>
     </header>
-    <form class="products-form" method="post" action="{{ url_for('messenger_template_save') }}">
+    <form class="products-form" method="post" action="/messengers/templates/save">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label><span>Название*</span><input name="title" required /></label>
       <div class="products-form-grid products-form-grid--two">
