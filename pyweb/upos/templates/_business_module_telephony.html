@@ -1,3 +1,9 @@
+{% set telephony_filters = telephony_filters|default({'q': '', 'provider': '', 'responsible': '', 'status': 'all'}) %}
+{% set telephony_options = telephony_options|default({'providers': [], 'responsibles': [], 'clients': []}) %}
+{% set telephony_calls = telephony_calls|default([]) %}
+{% set telephony_numbers = telephony_numbers|default([]) %}
+{% set telephony_providers = telephony_providers|default([]) %}
+
 <div class="business-module-toolbar" data-workspace-view="calls numbers integrations" hidden>
   <div>
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
@@ -6,7 +12,7 @@
   <button type="button" class="btn" data-telephony-open-call>{{ module.action }}</button>
 </div>
 
-<form class="business-module-filters" method="get" action="{{ url_for('telephony_get') }}" data-workspace-view="calls numbers integrations" hidden>
+<form class="business-module-filters" method="get" action="/telephony" data-workspace-view="calls numbers integrations" hidden>
   <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Клиент, номер, сотрудник" /></label>
   <label>
     <span>Провайдер</span>
@@ -27,7 +33,7 @@
     </select>
   </label>
   <button class="btn btn-secondary" type="submit">Применить</button>
-  <a class="btn btn-secondary" href="{{ url_for('telephony_get') }}">Очистить</a>
+  <a class="btn btn-secondary" href="/telephony">Очистить</a>
 </form>
 
 <datalist id="telephony-provider-list">
@@ -126,7 +132,7 @@
     </header>
 
     <div class="telephony-integrations-grid">
-      <form method="post" action="{{ url_for('telephony_provider_save') }}" class="product-form telephony-sip-form">
+      <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form">
         {% include "_csrf_field.html" %}
         <div class="product-form-grid">
           <label><span>Название*</span><input name="name" required placeholder="U-POS SIP" /></label>
@@ -179,7 +185,7 @@
                 <td>{{ row.employee or "-" }}</td>
                 <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.last_test_message or "" }}</small></td>
                 <td>
-                  <form method="post" action="{{ url_for('telephony_provider_test') }}" class="inline-form">
+                  <form method="post" action="/telephony/providers/test" class="inline-form">
                     {% include "_csrf_field.html" %}
                     <input type="hidden" name="provider_id" value="{{ row.id }}" />
                     <button class="btn btn-secondary" type="submit">Проверить соединение</button>
@@ -206,7 +212,7 @@
       <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
     </header>
     <div class="settings-profile-modal-scroll">
-      <form method="post" action="{{ url_for('telephony_call_save') }}" class="product-form">
+      <form method="post" action="/telephony/calls/save" class="product-form">
         {% include "_csrf_field.html" %}
         <div class="product-form-grid">
           <label><span>Клиент*</span><input name="client" list="telephony-client-list" required /></label>
@@ -249,7 +255,7 @@
       <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
     </header>
     <div class="settings-profile-modal-scroll">
-      <form method="post" action="{{ url_for('telephony_number_save') }}" class="product-form">
+      <form method="post" action="/telephony/numbers/save" class="product-form">
         {% include "_csrf_field.html" %}
         <div class="product-form-grid">
           <label><span>Номер телефона*</span><input name="number" required placeholder="+998 ..." /></label>
