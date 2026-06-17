@@ -15,11 +15,11 @@
 {% set messenger_campaigns = messenger_campaigns|default([]) %}
 {% set messenger_templates = messenger_templates|default([]) %}
 {% set messenger_channel_tabs = [
-  {'label': 'Телеграм', 'value': 'Telegram'},
-  {'label': 'Инстаграм', 'value': 'Instagram'},
-  {'label': 'WhatsApp', 'value': 'WhatsApp'},
-  {'label': 'Facebook', 'value': 'Facebook'},
-  {'label': 'Сайт', 'value': 'Сайт'},
+  {'label': 'Телеграм', 'value': 'Telegram', 'brand': 'telegram', 'logo': 'TG'},
+  {'label': 'Инстаграм', 'value': 'Instagram', 'brand': 'instagram', 'logo': 'IG'},
+  {'label': 'WhatsApp', 'value': 'WhatsApp', 'brand': 'whatsapp', 'logo': 'WA'},
+  {'label': 'Facebook', 'value': 'Facebook', 'brand': 'facebook', 'logo': 'f'},
+  {'label': 'Сайт', 'value': 'Сайт', 'brand': 'site', 'logo': 'WWW'},
 ] %}
 
 <form class="business-module-filters messenger-channel-filter-form" method="get" action="{{ url_for('messengers_get') }}#inbox" data-workspace-view="inbox" data-messenger-channel-form hidden>
@@ -34,10 +34,12 @@
       <button
         type="button"
         class="messenger-channel-tab{% if is_active_channel %} active{% endif %}"
+        data-channel-brand="{{ tab.brand }}"
         data-messenger-channel-choice="{{ tab.value }}"
         aria-pressed="{{ 'true' if is_active_channel else 'false' }}"
       >
-        <span>{{ tab.label }}</span>
+        <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
+        <span class="messenger-channel-label">{{ tab.label }}</span>
         {% if tab_message_count %}
           <b>{{ tab_message_count }}</b>
         {% endif %}

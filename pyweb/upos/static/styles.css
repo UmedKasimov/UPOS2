@@ -940,17 +940,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .messenger-channel-tab {
+  --channel-brand: var(--primary);
+  --channel-brand-strong: var(--primary);
+  --channel-brand-soft: color-mix(in oklch, var(--primary), white 88%);
   position: relative;
   isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 8.2rem;
+  gap: 0.5rem;
+  min-width: 9.35rem;
   min-height: 2.22rem;
-  padding: 0.3rem 1rem 0.42rem;
+  padding: 0.3rem 0.86rem 0.42rem;
   border: 0;
   background: transparent;
-  color: color-mix(in oklch, var(--foreground), var(--primary) 22%);
+  color: color-mix(in oklch, var(--foreground), var(--channel-brand) 24%);
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 800;
@@ -959,23 +963,82 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   letter-spacing: 0;
 }
 
+.messenger-channel-tab[data-channel-brand="telegram"] {
+  --channel-brand: #229ed9;
+  --channel-brand-strong: #0b76b7;
+  --channel-brand-soft: #e4f5fe;
+}
+
+.messenger-channel-tab[data-channel-brand="instagram"] {
+  --channel-brand: #e1306c;
+  --channel-brand-strong: #833ab4;
+  --channel-brand-soft: #fff0f6;
+}
+
+.messenger-channel-tab[data-channel-brand="whatsapp"] {
+  --channel-brand: #25d366;
+  --channel-brand-strong: #128c7e;
+  --channel-brand-soft: #e7f9ef;
+}
+
+.messenger-channel-tab[data-channel-brand="facebook"] {
+  --channel-brand: #1877f2;
+  --channel-brand-strong: #0b5ecf;
+  --channel-brand-soft: #e8f1ff;
+}
+
+.messenger-channel-tab[data-channel-brand="site"] {
+  --channel-brand: #64748b;
+  --channel-brand-strong: #1e293b;
+  --channel-brand-soft: #eef2f7;
+}
+
 .messenger-channel-tab::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  border: 1px solid color-mix(in oklch, var(--primary), white 63%);
-  border-bottom-color: color-mix(in oklch, var(--primary), white 72%);
+  border: 1px solid color-mix(in oklch, var(--channel-brand), white 58%);
+  border-bottom-color: color-mix(in oklch, var(--channel-brand), white 72%);
   border-radius: 6px 6px 0 0;
-  background: color-mix(in oklch, var(--primary), white 88%);
+  background: var(--channel-brand-soft);
   box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 35%) inset;
   transform: skewX(18deg);
   transform-origin: bottom left;
 }
 
-.messenger-channel-tab span {
+.messenger-channel-label,
+.messenger-channel-logo {
   position: relative;
   z-index: 1;
+}
+
+.messenger-channel-logo {
+  display: inline-grid;
+  place-items: center;
+  width: 1.44rem;
+  height: 1.44rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  color: var(--channel-brand-strong);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.72) inset,
+    0 0 0 1px rgb(255 255 255 / 0.5);
+  font-size: 0.58rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.messenger-channel-tab[data-channel-brand="facebook"] .messenger-channel-logo {
+  font-family: Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.messenger-channel-tab[data-channel-brand="site"] .messenger-channel-logo {
+  width: 1.9rem;
+  border-radius: 999px;
+  font-size: 0.5rem;
 }
 
 .messenger-channel-tab b,
@@ -986,8 +1049,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 1.45rem;
   padding: 0 0.42rem;
   border-radius: 999px;
-  background: color-mix(in oklch, var(--primary), white 78%);
-  color: var(--primary);
+  background: color-mix(in oklch, var(--channel-brand, var(--primary)), white 78%);
+  color: var(--channel-brand-strong, var(--primary));
   font-size: 0.72rem;
   font-weight: 900;
   line-height: 1;
@@ -999,11 +1062,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-channel-tab:hover::before,
 .messenger-channel-tab.active::before {
-  border-color: color-mix(in oklch, var(--primary), black 4%);
-  background: linear-gradient(180deg, color-mix(in oklch, var(--primary), white 16%), var(--primary));
+  border-color: color-mix(in oklch, var(--channel-brand), black 4%);
+  background: linear-gradient(180deg, color-mix(in oklch, var(--channel-brand), white 15%), var(--channel-brand-strong));
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 45%) inset,
-    0 10px 16px color-mix(in oklch, var(--primary), transparent 78%);
+    0 10px 16px color-mix(in oklch, var(--channel-brand), transparent 78%);
 }
 
 .messenger-channel-tab:hover,
@@ -1014,7 +1077,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-channel-tab:hover b,
 .messenger-channel-tab.active b {
   background: rgb(255 255 255 / 0.92);
-  color: var(--primary);
+  color: var(--channel-brand-strong);
 }
 
 .business-module-grid {
