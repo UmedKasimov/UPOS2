@@ -1380,6 +1380,102 @@
                       <button type="button" class="btn btn-secondary" data-social-tg-disconnect>Отключить</button>
                     </div>
                   </div>
+                  <div class="social-telegram-card">
+                    <div class="social-telegram-head">
+                      <div>
+                        <p class="settings-ios-footnote">Instagram</p>
+                        <h3>Direct и комментарии</h3>
+                      </div>
+                      <a class="btn btn-secondary" href="/messengers?channel=Instagram#inbox">Открыть чаты</a>
+                    </div>
+                    <div class="social-telegram-grid">
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Business ID</span>
+                        <input class="settings-profile-input" type="text" value="{{ settings.social_links.instagram_business_id|default('') }}" placeholder="1784..." data-social-field="instagram_business_id" />
+                      </label>
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Access token</span>
+                        <input class="settings-profile-input js-anti-autofill" type="password" autocomplete="new-password" value="{{ settings.social_links.instagram_access_token|default('') }}" placeholder="EAAB..." data-social-field="instagram_access_token" />
+                      </label>
+                    </div>
+                    <div class="social-telegram-summary">
+                      <span>Канал появится во вкладке «Инстаграм»</span>
+                      <small>После сохранения диалоги можно отправлять в CRM и привязывать к клиентам.</small>
+                    </div>
+                  </div>
+                  <div class="social-telegram-card">
+                    <div class="social-telegram-head">
+                      <div>
+                        <p class="settings-ios-footnote">WhatsApp</p>
+                        <h3>Business чаты</h3>
+                      </div>
+                      <a class="btn btn-secondary" href="/messengers?channel=WhatsApp#inbox">Открыть чаты</a>
+                    </div>
+                    <div class="social-telegram-grid">
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Business ID</span>
+                        <input class="settings-profile-input" type="text" value="{{ settings.social_links.whatsapp_business_id|default('') }}" placeholder="WABA ID" data-social-field="whatsapp_business_id" />
+                      </label>
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">API token</span>
+                        <input class="settings-profile-input js-anti-autofill" type="password" autocomplete="new-password" value="{{ settings.social_links.whatsapp_access_token|default('') }}" placeholder="Bearer token" data-social-field="whatsapp_access_token" />
+                      </label>
+                    </div>
+                    <div class="social-telegram-summary">
+                      <span>Используется номер WhatsApp из поля выше</span>
+                      <small>При совпадении телефона обращение будет связываться с клиентской базой.</small>
+                    </div>
+                  </div>
+                  <div class="social-telegram-card">
+                    <div class="social-telegram-head">
+                      <div>
+                        <p class="settings-ios-footnote">Facebook</p>
+                        <h3>Messenger страницы</h3>
+                      </div>
+                      <a class="btn btn-secondary" href="/messengers?channel=Facebook#inbox">Открыть чаты</a>
+                    </div>
+                    <div class="social-telegram-grid">
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Page ID</span>
+                        <input class="settings-profile-input" type="text" value="{{ settings.social_links.facebook_page_id|default('') }}" placeholder="ID страницы" data-social-field="facebook_page_id" />
+                      </label>
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Page access token</span>
+                        <input class="settings-profile-input js-anti-autofill" type="password" autocomplete="new-password" value="{{ settings.social_links.facebook_access_token|default('') }}" placeholder="EAAB..." data-social-field="facebook_access_token" />
+                      </label>
+                    </div>
+                    <div class="social-telegram-summary">
+                      <span>Канал появится во вкладке «Facebook»</span>
+                      <small>Новые обращения можно будет вести рядом с Telegram и WhatsApp.</small>
+                    </div>
+                  </div>
+                  <div class="social-telegram-card">
+                    <div class="social-telegram-head">
+                      <div>
+                        <p class="settings-ios-footnote">Сайт чат</p>
+                        <h3>Виджет для сайта</h3>
+                      </div>
+                      <a class="btn btn-secondary" href="/messengers?channel=%D0%A1%D0%B0%D0%B9%D1%82#inbox">Открыть чаты</a>
+                    </div>
+                    <label class="business-module-check">
+                      <input type="checkbox" data-social-field="site_chat_enabled" {% if settings.social_links.site_chat_enabled %}checked{% endif %} />
+                      <span>Включить приём заявок с сайта</span>
+                    </label>
+                    <div class="social-telegram-grid">
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">ID виджета</span>
+                        <input class="settings-profile-input" type="text" value="{{ settings.social_links.site_chat_widget_id|default('') }}" placeholder="upos-site-chat" data-social-field="site_chat_widget_id" />
+                      </label>
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Приветствие</span>
+                        <input class="settings-profile-input" type="text" value="{{ settings.social_links.site_chat_greeting|default('') }}" placeholder="Здравствуйте, чем помочь?" data-social-field="site_chat_greeting" />
+                      </label>
+                    </div>
+                    <div class="social-telegram-summary">
+                      <span>Диалоги сайта будут во вкладке «Сайт»</span>
+                      <small>Адрес сайта берётся из поля «Сайт» выше, виджет можно связать с CRM.</small>
+                    </div>
+                  </div>
                   <div class="settings-integrations-save-row">
                     <span class="settings-business-note">Эти привязки можно использовать в CRM, карточке клиента и разделе Месенджеры.</span>
                     <span class="integr-status-pill" data-social-status hidden></span>

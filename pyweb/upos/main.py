@@ -6412,6 +6412,96 @@ def create_app() -> FastAPI:
                 }
             )
 
+        social_data = load_workspace_settings(workspace_owner_id).get("social_links")
+        social_links = social_data if isinstance(social_data, dict) else {}
+
+        def _social_value(*keys: str) -> str:
+            for key in keys:
+                value = str(social_links.get(key) or "").strip()
+                if value:
+                    return value
+            return ""
+
+        def _social_enabled(*keys: str) -> bool:
+            return any(_social_value(key) for key in keys)
+
+        social_thread_specs = [
+            {
+                "channel": "Instagram",
+                "contact": _social_value("instagram_business_id", "instagram_url") or "Instagram Direct",
+                "topic": _social_value("instagram_url") or "Direct и комментарии",
+                "configured": _social_enabled("instagram_url", "instagram_business_id", "instagram_access_token"),
+            },
+            {
+                "channel": "WhatsApp",
+                "contact": _social_value("whatsapp_phone", "whatsapp_business_id") or "WhatsApp Business",
+                "topic": _social_value("whatsapp_phone") or "Чаты WhatsApp",
+                "configured": _social_enabled("whatsapp_phone", "whatsapp_business_id", "whatsapp_access_token"),
+                "phone": _social_value("whatsapp_phone"),
+            },
+            {
+                "channel": "Facebook",
+                "contact": _social_value("facebook_page_id", "facebook_url") or "Facebook Page",
+                "topic": _social_value("facebook_url") or "Messenger страницы",
+                "configured": _social_enabled("facebook_url", "facebook_page_id", "facebook_access_token"),
+            },
+            {
+                "channel": "Сайт",
+                "contact": _social_value("site_chat_widget_id", "website_url") or "Сайт чат",
+                "topic": _social_value("website_url") or "Виджет сайта",
+                "configured": _social_enabled("website_url", "site_chat_widget_id", "site_chat_greeting", "site_chat_enabled"),
+            },
+        ]
+
+        for spec in social_thread_specs:
+            channel = str(spec["channel"])
+            channel_slug = {
+                "Instagram": "instagram",
+                "WhatsApp": "whatsapp",
+                "Facebook": "facebook",
+                "Сайт": "site",
+            }.get(channel, _messenger_channel_key(channel).lower())
+            configured = bool(spec.get("configured"))
+            client = _messenger_match_client(
+                clients,
+                phone=str(spec.get("phone") or ""),
+                username=str(spec.get("contact") or ""),
+                display_name=str(spec.get("contact") or ""),
+            )
+            messages = []
+            if configured:
+                messages = [
+                    {
+                        "author": str(spec.get("contact") or channel),
+                        "text": f"Канал {channel} привязан к UPOS и готов принимать обращения.",
+                        "kind": "in",
+                    },
+                    {
+                        "author": "UPOS",
+                        "text": "Диалог можно отправить в CRM, связать с клиентом и продолжить переписку из центра сообщений.",
+                        "kind": "system",
+                    },
+                ]
+            rows.append(
+                {
+                    "id": f"{channel_slug}-integration",
+                    "channel": channel,
+                    "contact": client.name if client else str(spec.get("contact") or channel),
+                    "client": client.name if client else "",
+                    "topic": str(spec.get("topic") or channel),
+                    "last_message": (
+                        f"{channel} подключен к центру сообщений"
+                        if configured
+                        else f"Подключите {channel} в Настройки -> Соцсети"
+                    ),
+                    "responsible": "",
+                    "status": "active" if configured else "waiting",
+                    "status_label": _messenger_status_label("active" if configured else "waiting"),
+                    "updated_at": datetime.now(timezone.utc),
+                    "messages": messages,
+                }
+            )
+
         rows.sort(key=lambda item: item.get("updated_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         return rows
 
@@ -10573,12 +10663,21 @@ def create_app() -> FastAPI:
         data["social_links"] = {
             "primary_channel": str(social_links.get("primary_channel") or "").strip(),
             "instagram_url": str(social_links.get("instagram_url") or "").strip(),
+            "instagram_business_id": str(social_links.get("instagram_business_id") or "").strip(),
+            "instagram_access_token": str(social_links.get("instagram_access_token") or "").strip(),
             "facebook_url": str(social_links.get("facebook_url") or "").strip(),
+            "facebook_page_id": str(social_links.get("facebook_page_id") or "").strip(),
+            "facebook_access_token": str(social_links.get("facebook_access_token") or "").strip(),
             "telegram_url": str(social_links.get("telegram_url") or "").strip(),
             "whatsapp_phone": str(social_links.get("whatsapp_phone") or "").strip(),
+            "whatsapp_business_id": str(social_links.get("whatsapp_business_id") or "").strip(),
+            "whatsapp_access_token": str(social_links.get("whatsapp_access_token") or "").strip(),
             "youtube_url": str(social_links.get("youtube_url") or "").strip(),
             "tiktok_url": str(social_links.get("tiktok_url") or "").strip(),
             "website_url": str(social_links.get("website_url") or "").strip(),
+            "site_chat_enabled": str(social_links.get("site_chat_enabled") or "").strip(),
+            "site_chat_widget_id": str(social_links.get("site_chat_widget_id") or "").strip(),
+            "site_chat_greeting": str(social_links.get("site_chat_greeting") or "").strip(),
             "note": str(social_links.get("note") or "").strip(),
         }
         tab_raw = (request.query_params.get("tab") or "").strip().lower()
@@ -11115,12 +11214,21 @@ def create_app() -> FastAPI:
         data["social_links"] = {
             "primary_channel": str(raw_links.get("primary_channel") or "").strip(),
             "instagram_url": str(raw_links.get("instagram_url") or "").strip(),
+            "instagram_business_id": str(raw_links.get("instagram_business_id") or "").strip(),
+            "instagram_access_token": str(raw_links.get("instagram_access_token") or "").strip(),
             "facebook_url": str(raw_links.get("facebook_url") or "").strip(),
+            "facebook_page_id": str(raw_links.get("facebook_page_id") or "").strip(),
+            "facebook_access_token": str(raw_links.get("facebook_access_token") or "").strip(),
             "telegram_url": str(raw_links.get("telegram_url") or "").strip(),
             "whatsapp_phone": str(raw_links.get("whatsapp_phone") or "").strip(),
+            "whatsapp_business_id": str(raw_links.get("whatsapp_business_id") or "").strip(),
+            "whatsapp_access_token": str(raw_links.get("whatsapp_access_token") or "").strip(),
             "youtube_url": str(raw_links.get("youtube_url") or "").strip(),
             "tiktok_url": str(raw_links.get("tiktok_url") or "").strip(),
             "website_url": str(raw_links.get("website_url") or "").strip(),
+            "site_chat_enabled": "1" if str(raw_links.get("site_chat_enabled") or "").strip() in {"1", "true", "on", "yes"} else "",
+            "site_chat_widget_id": str(raw_links.get("site_chat_widget_id") or "").strip(),
+            "site_chat_greeting": str(raw_links.get("site_chat_greeting") or "").strip(),
             "note": str(raw_links.get("note") or "").strip(),
         }
         _save_workspace_settings_from_user(request, data)

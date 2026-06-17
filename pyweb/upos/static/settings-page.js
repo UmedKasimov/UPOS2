@@ -478,7 +478,11 @@
       panel.querySelectorAll("[data-social-field]").forEach(function (field) {
         var key = field.getAttribute("data-social-field") || "";
         if (!key) return;
-        out[key] = (field.value || "").trim();
+        if (field.type === "checkbox") {
+          out[key] = field.checked ? "1" : "";
+        } else {
+          out[key] = (field.value || "").trim();
+        }
       });
       return out;
     }
