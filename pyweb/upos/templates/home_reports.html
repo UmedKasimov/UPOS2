@@ -16,6 +16,26 @@
 {% endblock %}
 
 {% block main %}
+  {% set business_reports = business_reports|default({
+    'sales': {
+      'summary': {'period': '', 'count': 0, 'amount': '0 UZS'},
+      'top_clients': [],
+      'top_products': [],
+      'days': []
+    },
+    'stock': {
+      'summary': {'items': 0, 'total': '0 UZS'},
+      'rows': []
+    },
+    'receivables': {
+      'summary': {'clients': 0, 'total': '0 UZS'},
+      'rows': []
+    },
+    'calls': {
+      'summary': {'total': 0, 'answered': 0, 'missed': 0, 'conversion': 0},
+      'rows': []
+    }
+  }) %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root org-reports-page">
     <nav class="general-module-tabs" aria-label="{{ _('nav.home_sections') }}" data-org-report-open-tabs>
       <a class="general-module-tab active" href="{{ url_for('home_reports') }}" aria-current="page" data-org-report-home-tab>{{ _('nav.reports') }}</a>

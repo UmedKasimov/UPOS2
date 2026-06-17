@@ -372,7 +372,7 @@
 <section class="products-dictionaries" data-workspace-view="routes balances" hidden>
   <article data-workspace-view="routes" hidden>
     <h2>Маршруты</h2>
-    <form method="post" action="{{ url_for('clients_route_save') }}" class="product-form client-route-form">
+    <form method="post" action="/clients/routes/save" class="product-form client-route-form">
       {% include "_csrf_field.html" %}
       <div class="product-form-grid">
         <label><span>Клиент*</span><input name="client" list="client-name-list" required /></label>
