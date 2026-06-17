@@ -62,6 +62,27 @@
     root.dataset.selectedThreadId = thread.id || "";
   }
 
+  function crmUrlForThread(thread) {
+    var client = thread.client || thread.contact || "";
+    var channel = thread.channel || "Telegram";
+    var topic = thread.topic || thread.last_message || "";
+    var title = "Сделка: " + (client || "новый клиент");
+    var note = "Диалог из мессенджера";
+    if (topic) note += ": " + topic;
+
+    var params = new URLSearchParams();
+    params.set("crm_open", "deal");
+    params.set("crm_title", title);
+    params.set("crm_client", client);
+    params.set("crm_stage", "leads");
+    params.set("crm_status", "new");
+    params.set("crm_source", channel);
+    params.set("crm_contact_type", channel === "Telegram" ? "Чат Telegram" : "Чат");
+    params.set("crm_chat_ref", thread.username || thread.topic || thread.id || "");
+    params.set("crm_note", note);
+    return "/crm?" + params.toString() + "#tasks";
+  }
+
   function boot(root) {
     var threads = readThreads(root);
     var byId = {};
@@ -74,6 +95,15 @@
       });
     });
     if (threads.length) selectThread(root, threads[0]);
+
+    var sendToCrm = root.querySelector("[data-messenger-attach-client]");
+    if (sendToCrm) {
+      sendToCrm.addEventListener("click", function () {
+        var current = byId[String(root.dataset.selectedThreadId || "")];
+        if (!current) return;
+        window.location.assign(crmUrlForThread(current));
+      });
+    }
 
     var text = root.querySelector("[data-messenger-compose-text]");
     var send = root.querySelector("[data-messenger-send-button]");

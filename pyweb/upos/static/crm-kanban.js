@@ -75,6 +75,7 @@
   function initDialog() {
     const dialog = document.getElementById("crm-record-dialog");
     if (!dialog) return;
+    const form = dialog.querySelector("form");
 
     const setKind = (kind) => {
       if (!kind) return;
@@ -108,6 +109,53 @@
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) closeDialog();
     });
+
+    const setField = (name, value) => {
+      if (!form || value == null || value === "") return;
+      const field = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      if (!field) return;
+      field.value = value;
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    const setSelectByValueOrText = (name, value, textNeedle) => {
+      if (!form) return;
+      const select = form.querySelector(`select[name="${CSS.escape(name)}"]`);
+      if (!select) {
+        setField(name, value);
+        return;
+      }
+      const normalizedValue = String(value || "").toLowerCase();
+      const normalizedText = String(textNeedle || value || "").toLowerCase();
+      const match = Array.from(select.options).find((option) => {
+        return (
+          String(option.value || "").toLowerCase() === normalizedValue ||
+          String(option.textContent || "").toLowerCase().includes(normalizedText)
+        );
+      });
+      if (match) {
+        select.value = match.value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    };
+
+    const openFromMessenger = () => {
+      const params = new URLSearchParams(window.location.search || "");
+      if (params.get("crm_open") !== "deal") return;
+      setKind("deal");
+      setField("title", params.get("crm_title") || "Сделка из мессенджера");
+      setField("client", params.get("crm_client") || "");
+      setField("contact_type", params.get("crm_contact_type") || "Чат Telegram");
+      setField("chat_ref", params.get("crm_chat_ref") || "");
+      setField("note", params.get("crm_note") || "Создано из диалога мессенджера");
+      setSelectByValueOrText("lead_source", params.get("crm_source") || "Telegram", params.get("crm_source") || "Telegram");
+      setSelectByValueOrText("stage_id", params.get("crm_stage") || "leads", "лид");
+      setSelectByValueOrText("status", params.get("crm_status") || "new", "нов");
+      openDialog("deal");
+    };
+
+    openFromMessenger();
   }
 
   function init() {
