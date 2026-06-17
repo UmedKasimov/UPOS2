@@ -9,12 +9,31 @@
 </datalist>
 <script type="application/json" data-messenger-thread-json>{{ messenger_threads_json|safe }}</script>
 
-<form class="business-module-filters" method="get" action="{{ url_for('messengers_get') }}" data-workspace-view="inbox" hidden>
+{% set active_messenger_channel = messenger_filters.channel or 'Telegram' %}
+{% set messenger_channel_tabs = [
+  {'label': 'Телеграм', 'value': 'Telegram'},
+  {'label': 'Инстаграм', 'value': 'Instagram'},
+  {'label': 'WhatsApp', 'value': 'WhatsApp'},
+  {'label': 'Facebook', 'value': 'Facebook'},
+  {'label': 'Сайт', 'value': 'Сайт'},
+] %}
+
+<form class="business-module-filters messenger-channel-filter-form" method="get" action="{{ url_for('messengers_get') }}#inbox" data-workspace-view="inbox" data-messenger-channel-form hidden>
+  <input type="hidden" name="channel" value="{{ active_messenger_channel }}" data-messenger-channel-input />
+  <nav class="messenger-channel-tabs" aria-label="Каналы диалогов">
+    {% for tab in messenger_channel_tabs %}
+      {% set is_active_channel = active_messenger_channel|lower == tab.value|lower %}
+      <button
+        type="button"
+        class="messenger-channel-tab{% if is_active_channel %} active{% endif %}"
+        data-messenger-channel-choice="{{ tab.value }}"
+        aria-pressed="{{ 'true' if is_active_channel else 'false' }}"
+      >
+        <span>{{ tab.label }}</span>
+      </button>
+    {% endfor %}
+  </nav>
   <label><span>Поиск</span><input name="q" value="{{ messenger_filters.q }}" placeholder="Клиент, чат, шаблон" /></label>
-  <label>
-    <span>Канал</span>
-    <input name="channel" list="messenger-channel-list" value="{{ messenger_filters.channel }}" placeholder="Telegram" />
-  </label>
   <label>
     <span>Ответственный</span>
     <input name="responsible" list="messenger-responsible-list" value="{{ messenger_filters.responsible }}" placeholder="Ответственный" />

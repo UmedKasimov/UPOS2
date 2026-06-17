@@ -120,8 +120,30 @@
     }
   }
 
+  function initChannelTabs() {
+    document.querySelectorAll("[data-messenger-channel-form]").forEach(function (form) {
+      var input = form.querySelector("[data-messenger-channel-input]");
+      form.querySelectorAll("[data-messenger-channel-choice]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          if (input) input.value = button.getAttribute("data-messenger-channel-choice") || "";
+          form.querySelectorAll("[data-messenger-channel-choice]").forEach(function (item) {
+            var active = item === button;
+            item.classList.toggle("active", active);
+            item.setAttribute("aria-pressed", active ? "true" : "false");
+          });
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          } else {
+            form.submit();
+          }
+        });
+      });
+    });
+  }
+
   function start() {
     document.querySelectorAll("[data-messenger-inbox]").forEach(boot);
+    initChannelTabs();
   }
 
   if (document.readyState === "loading") {

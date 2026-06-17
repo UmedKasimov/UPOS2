@@ -920,6 +920,78 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--foreground);
 }
 
+.messenger-channel-filter-form {
+  align-items: end;
+}
+
+.messenger-channel-tabs {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.34rem;
+  min-height: 3.05rem;
+  padding: 0.54rem 0.64rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 7px) var(--workbench-radius-sm, 7px) 0 0;
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), white 93%), color-mix(in oklch, var(--background), var(--primary) 4%));
+}
+
+.messenger-channel-tab {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 8.2rem;
+  min-height: 2.22rem;
+  padding: 0.3rem 1rem 0.42rem;
+  border: 0;
+  background: transparent;
+  color: color-mix(in oklch, var(--foreground), var(--primary) 22%);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  letter-spacing: 0;
+}
+
+.messenger-channel-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid color-mix(in oklch, var(--primary), white 63%);
+  border-bottom-color: color-mix(in oklch, var(--primary), white 72%);
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in oklch, var(--primary), white 88%);
+  box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 35%) inset;
+  transform: skewX(18deg);
+  transform-origin: bottom left;
+}
+
+.messenger-channel-tab span {
+  position: relative;
+  z-index: 1;
+}
+
+.messenger-channel-tab:hover::before,
+.messenger-channel-tab.active::before {
+  border-color: color-mix(in oklch, var(--primary), black 4%);
+  background: linear-gradient(180deg, color-mix(in oklch, var(--primary), white 16%), var(--primary));
+  box-shadow:
+    0 1px 0 color-mix(in oklch, white, transparent 45%) inset,
+    0 10px 16px color-mix(in oklch, var(--primary), transparent 78%);
+}
+
+.messenger-channel-tab:hover,
+.messenger-channel-tab.active {
+  color: white;
+}
+
 .business-module-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);

@@ -6673,12 +6673,12 @@ def create_app() -> FastAPI:
         assert wid is not None
         filters = {
             "q": q.strip(),
-            "channel": channel.strip(),
+            "channel": channel.strip() or "Telegram",
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
         }
         user = request.session.get("user") or {}
-        channel_options = ["Telegram", "WhatsApp", "Instagram", "Facebook Messenger", "SMS"]
+        channel_options = ["Telegram", "Instagram", "WhatsApp", "Facebook", "Сайт"]
         responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
         data = _messenger_settings_payload(wid)
         threads = _messenger_filter_rows(_messenger_threads_from_sources(wid), filters)
