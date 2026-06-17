@@ -7,7 +7,7 @@
 <datalist id="messenger-client-list">
   {% for item in messenger_options.clients %}<option value="{{ item }}">{% endfor %}
 </datalist>
-<script type="application/json" data-messenger-thread-json>{{ messenger_threads|tojson }}</script>
+<script type="application/json" data-messenger-thread-json>{{ messenger_threads_json|safe }}</script>
 
 <form class="business-module-filters" method="get" action="{{ url_for('messengers_get') }}" data-workspace-view="inbox" hidden>
   <label><span>Поиск</span><input name="q" value="{{ messenger_filters.q }}" placeholder="Клиент, чат, шаблон" /></label>

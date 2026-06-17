@@ -6691,6 +6691,7 @@ def create_app() -> FastAPI:
             filters,
         )
         auto_reply = data.get("messenger_auto_reply") if isinstance(data.get("messenger_auto_reply"), dict) else {}
+        threads_json = json.dumps(threads, ensure_ascii=False, default=str).replace("</", "<\\/")
         return tpl(
             request,
             "home_business_module.html",
@@ -6704,6 +6705,7 @@ def create_app() -> FastAPI:
                 "clients": _messenger_client_options(wid),
             },
             messenger_threads=threads,
+            messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,
             messenger_templates=templates_rows,
             messenger_auto_reply=auto_reply,
