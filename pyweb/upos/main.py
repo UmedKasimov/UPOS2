@@ -3022,7 +3022,6 @@ def create_app() -> FastAPI:
                 "action": "+ Сообщение",
                 "launcher": [
                     {"id": "inbox", "title": "Диалоги", "subtitle": "Чаты и обращения", "icon": "chat"},
-                    {"id": "telegram", "title": "Telegram", "subtitle": "Управление чатами", "icon": "telegram"},
                     {"id": "campaigns", "title": "Рассылки", "subtitle": "Кампании и сегменты", "icon": "broadcast"},
                     {"id": "templates", "title": "Шаблоны", "subtitle": "Тексты и сценарии", "icon": "template"},
                 ],
