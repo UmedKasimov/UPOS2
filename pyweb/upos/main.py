@@ -6469,9 +6469,15 @@ def create_app() -> FastAPI:
         social_thread_specs = [
             {
                 "channel": "Instagram",
-                "contact": _social_value("instagram_business_id", "instagram_url") or "Instagram Direct",
-                "topic": _social_value("instagram_url") or "Direct и комментарии",
-                "configured": _social_enabled("instagram_url", "instagram_business_id", "instagram_access_token"),
+                "contact": _social_value("instagram_login", "instagram_business_id", "instagram_url") or "Instagram Direct",
+                "topic": _social_value("instagram_url", "instagram_login") or "Direct и комментарии",
+                "configured": _social_enabled(
+                    "instagram_url",
+                    "instagram_business_id",
+                    "instagram_access_token",
+                    "instagram_login",
+                    "instagram_password",
+                ),
             },
             {
                 "channel": "WhatsApp",
@@ -10715,6 +10721,8 @@ def create_app() -> FastAPI:
             "instagram_url": str(social_links.get("instagram_url") or "").strip(),
             "instagram_business_id": str(social_links.get("instagram_business_id") or "").strip(),
             "instagram_access_token": str(social_links.get("instagram_access_token") or "").strip(),
+            "instagram_login": str(social_links.get("instagram_login") or "").strip(),
+            "instagram_password": str(social_links.get("instagram_password") or "").strip(),
             "facebook_url": str(social_links.get("facebook_url") or "").strip(),
             "facebook_page_id": str(social_links.get("facebook_page_id") or "").strip(),
             "facebook_access_token": str(social_links.get("facebook_access_token") or "").strip(),
@@ -11266,6 +11274,8 @@ def create_app() -> FastAPI:
             "instagram_url": str(raw_links.get("instagram_url") or "").strip(),
             "instagram_business_id": str(raw_links.get("instagram_business_id") or "").strip(),
             "instagram_access_token": str(raw_links.get("instagram_access_token") or "").strip(),
+            "instagram_login": str(raw_links.get("instagram_login") or "").strip(),
+            "instagram_password": str(raw_links.get("instagram_password") or "").strip(),
             "facebook_url": str(raw_links.get("facebook_url") or "").strip(),
             "facebook_page_id": str(raw_links.get("facebook_page_id") or "").strip(),
             "facebook_access_token": str(raw_links.get("facebook_access_token") or "").strip(),

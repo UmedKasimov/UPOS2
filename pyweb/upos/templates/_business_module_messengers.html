@@ -22,6 +22,19 @@
   {'label': 'Facebook', 'value': 'Facebook', 'brand': 'facebook', 'logo': 'f'},
   {'label': 'Сайт', 'value': 'Сайт', 'brand': 'site', 'logo': 'WWW'},
 ] %}
+{% set messenger_channel_profiles = [
+  {'label': 'Телеграм', 'value': 'Telegram', 'brand': 'telegram', 'logo': 'TG', 'title': 'Telegram Business', 'subtitle': 'Личные обращения, группы и заявки из Telegram', 'status': 'Канал подключен к клиентской базе'},
+  {'label': 'Инстаграм', 'value': 'Instagram', 'brand': 'instagram', 'logo': 'IG', 'title': 'Instagram Direct', 'subtitle': 'Direct, комментарии и заявки профиля', 'status': 'Профессиональный канал Instagram'},
+  {'label': 'WhatsApp', 'value': 'WhatsApp', 'brand': 'whatsapp', 'logo': 'WA', 'title': 'WhatsApp Business', 'subtitle': 'Business-чаты, номера и заявки клиентов', 'status': 'Канал WhatsApp для продаж и сервиса'},
+  {'label': 'Facebook', 'value': 'Facebook', 'brand': 'facebook', 'logo': 'f', 'title': 'Facebook Messenger', 'subtitle': 'Сообщения страницы, лиды и обращения', 'status': 'Канал Facebook Page'},
+  {'label': 'Сайт', 'value': 'Сайт', 'brand': 'site', 'logo': 'WWW', 'title': 'Сайт чат', 'subtitle': 'Виджет сайта и онлайн-заявки', 'status': 'Канал обращений с сайта'},
+] %}
+{% set active_channel_profile = namespace(data=messenger_channel_profiles[0]) %}
+{% for profile in messenger_channel_profiles %}
+  {% if active_messenger_channel|lower == profile.value|lower %}
+    {% set active_channel_profile.data = profile %}
+  {% endif %}
+{% endfor %}
 
 <form class="business-module-filters messenger-channel-filter-form" method="get" action="{{ url_for('messengers_get') }}#inbox" data-workspace-view="inbox" data-messenger-channel-form hidden>
   <input type="hidden" name="channel" value="{{ active_messenger_channel }}" data-messenger-channel-input />
@@ -50,6 +63,19 @@
 </form>
 
 <section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox hidden>
+  {% set active_channel_count = messenger_channel_message_counts.get(active_channel_profile.data.value, 0) %}
+  <section class="messenger-channel-overview" data-channel-brand="{{ active_channel_profile.data.brand }}">
+    <div class="messenger-channel-overview-mark" aria-hidden="true">{{ active_channel_profile.data.logo }}</div>
+    <div class="messenger-channel-overview-copy">
+      <p>{{ active_channel_profile.data.status }}</p>
+      <h2>{{ active_channel_profile.data.title }}</h2>
+      <span>{{ active_channel_profile.data.subtitle }}</span>
+    </div>
+    <div class="messenger-channel-overview-stats">
+      <strong>{{ active_channel_count }}</strong>
+      <span>сообщений</span>
+    </div>
+  </section>
   <div class="messenger-inbox-shell">
     <aside class="messenger-dialog-list-panel" aria-label="Диалоги">
       <div class="messenger-dialog-list-head">
@@ -152,7 +178,7 @@
       <p class="settings-ios-footnote">Telegram</p>
       <h2>Управление чатами</h2>
       <span data-messenger-tg-status>Проверяем подключение...</span>
-      <small class="messenger-telegram-token" data-messenger-tg-token>@Uposchatbot · токен скрыт</small>
+      <small class="messenger-telegram-token" data-messenger-tg-token>Telegram подключен · ключ скрыт</small>
     </div>
     <div class="messenger-telegram-actions">
       <a class="btn btn-secondary" href="{{ url_for('settings_get') }}?tab=social">Привязка</a>
@@ -169,7 +195,7 @@
       </div>
       <div class="messenger-telegram-list" data-messenger-tg-chat-list></div>
       <div class="messenger-telegram-empty" data-messenger-tg-empty hidden>
-        Чатов пока нет. Подключите бота, добавьте его в группу и нажмите «Обновить список чатов».
+        Чатов пока нет. Подключите Telegram, добавьте канал в группу и нажмите «Обновить список чатов».
       </div>
     </aside>
 

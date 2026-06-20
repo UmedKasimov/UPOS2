@@ -1358,19 +1358,19 @@
                   <div class="social-telegram-card" data-social-telegram>
                     <div class="social-telegram-head">
                       <div>
-                        <p class="settings-ios-footnote">Telegram Bot</p>
-                        <h3>Интеграция чатов</h3>
+                        <p class="settings-ios-footnote">Telegram</p>
+                        <h3>Канал сообщений</h3>
                         <span data-social-tg-status>Проверяем подключение...</span>
                       </div>
                       <a class="btn btn-secondary" href="{{ url_for('messengers_get') }}#telegram">Открыть чаты</a>
                     </div>
                     <div class="social-telegram-grid">
                       <label class="settings-profile-field">
-                        <span class="settings-profile-field-label">Токен бота</span>
+                        <span class="settings-profile-field-label">Токен интеграции</span>
                         <input class="settings-profile-input js-anti-autofill" type="password" autocomplete="new-password" placeholder="123456:ABC..." data-social-tg-token />
                       </label>
                       <div class="social-telegram-summary">
-                        <span data-social-tg-bot>Бот не подключен</span>
+                        <span data-social-tg-bot>Telegram не подключен</span>
                         <small data-social-tg-chat-count>Чатов: 0</small>
                       </div>
                     </div>
@@ -1397,10 +1397,18 @@
                         <span class="settings-profile-field-label">Access token</span>
                         <input class="settings-profile-input js-anti-autofill" type="password" autocomplete="new-password" value="{{ settings.social_links.instagram_access_token|default('') }}" placeholder="EAAB..." data-social-field="instagram_access_token" />
                       </label>
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Логин Instagram</span>
+                        <input class="settings-profile-input" type="text" value="{{ settings.social_links.instagram_login|default('') }}" placeholder="@upos или email" autocomplete="username" data-social-field="instagram_login" />
+                      </label>
+                      <label class="settings-profile-field">
+                        <span class="settings-profile-field-label">Пароль Instagram</span>
+                        <input class="settings-profile-input js-anti-autofill" type="password" autocomplete="new-password" value="{{ settings.social_links.instagram_password|default('') }}" placeholder="Пароль аккаунта" data-social-field="instagram_password" />
+                      </label>
                     </div>
                     <div class="social-telegram-summary">
                       <span>Канал появится во вкладке «Инстаграм»</span>
-                      <small>После сохранения диалоги можно отправлять в CRM и привязывать к клиентам.</small>
+                      <small>Можно сохранить официальный Business API и резервные данные входа, чтобы вести Direct в Мессенджерах.</small>
                     </div>
                   </div>
                   <div class="social-telegram-card">

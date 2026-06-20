@@ -573,8 +573,8 @@
       var connected = !!payload.connected;
       if (botEl) {
         botEl.textContent = connected
-          ? (cfg.bot_username ? "@" + cfg.bot_username : cfg.bot_first_name || "Telegram бот")
-          : "Бот не подключен";
+          ? (cfg.bot_username ? "@" + cfg.bot_username : cfg.bot_first_name || "Telegram подключен")
+          : "Telegram не подключен";
       }
       if (countEl) {
         countEl.textContent =
@@ -587,7 +587,7 @@
       if (disconnectBtn) disconnectBtn.disabled = !connected || !payload.can_manage;
       if (connectBtn) connectBtn.disabled = !payload.can_manage;
       if (!connected) {
-        setStatus("Не подключен. Вставьте токен BotFather и нажмите подключить.", "warn");
+        setStatus("Не подключен. Вставьте токен Telegram и нажмите подключить.", "warn");
       } else if (cfg.last_error) {
         setStatus(cfg.last_error, "warn");
       } else {
@@ -608,7 +608,7 @@
         var token = tokenInput ? (tokenInput.value || "").trim() : "";
         if (!token) {
           if (tokenInput) tokenInput.focus();
-          setStatus("Укажите токен Telegram-бота.", "warn");
+          setStatus("Укажите токен Telegram.", "warn");
           return;
         }
         setBusy(connectBtn, true, "Подключаем...");
@@ -645,7 +645,7 @@
 
     if (disconnectBtn) {
       disconnectBtn.addEventListener("click", function () {
-        if (!confirm("Отключить Telegram-бота от программы?")) return;
+        if (!confirm("Отключить Telegram от программы?")) return;
         setBusy(disconnectBtn, true, "Отключаем...");
         call("DELETE", "/api/telegram/disconnect")
           .then(loadStatus)
