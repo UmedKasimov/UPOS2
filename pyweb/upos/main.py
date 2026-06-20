@@ -6339,6 +6339,31 @@ def create_app() -> FastAPI:
                 return client
         return None
 
+    def _messenger_payload_dict(value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def _messenger_avatar_url(payload: dict[str, Any]) -> str:
+        for key in ("avatar_url", "photo_url", "telegram_photo_url", "profile_photo_url", "photo_path"):
+            raw = str(payload.get(key) or "").strip()
+            if not raw:
+                continue
+            if raw.startswith(("http://", "https://", "/")):
+                return raw
+            return "/static/" + raw.lstrip("/")
+        return ""
+
+    def _messenger_presence(updated_at: Any, status_value: str = "") -> tuple[str, str]:
+        if str(status_value or "") == "waiting":
+            return "waiting", "Ожидает"
+        if isinstance(updated_at, datetime):
+            seen_at = updated_at if updated_at.tzinfo else updated_at.replace(tzinfo=timezone.utc)
+            age_seconds = (datetime.now(timezone.utc) - seen_at).total_seconds()
+            if age_seconds <= 10 * 60:
+                return "online", "В сети"
+            if age_seconds <= 24 * 60 * 60:
+                return "recent", "Недавно был(а)"
+        return "offline", "Не в сети"
+
     def _messenger_threads_from_sources(workspace_owner_id: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         with session_scope() as session:
@@ -6369,17 +6394,28 @@ def create_app() -> FastAPI:
                 display_name=title,
             )
             status_value = "active" if str(sub.status or "") == "approved" else "waiting"
+            payload = _messenger_payload_dict(sub.contact_payload)
+            avatar_url = _messenger_avatar_url(payload)
+            presence, presence_label = _messenger_presence(sub.decided_at or sub.requested_at, status_value)
+            is_new_contact = client is None or status_value == "waiting"
             rows.append(
                 {
                     "id": f"telegram-sub-{sub.id}",
                     "channel": "Telegram",
                     "contact": client.name if client else title,
                     "client": client.name if client else "",
+                    "username": username,
+                    "phone": str(sub.phone or ""),
                     "topic": ("@" + username) if username else str(sub.phone or "Заявка Telegram"),
                     "last_message": "Клиент ожидает ответа" if status_value == "waiting" else "Telegram-чат готов к работе",
                     "responsible": "",
                     "status": status_value,
                     "status_label": _messenger_status_label(status_value),
+                    "presence": presence,
+                    "presence_label": presence_label,
+                    "avatar_url": avatar_url,
+                    "avatar_ttl_days": 5,
+                    "is_new": is_new_contact,
                     "updated_at": sub.decided_at or sub.requested_at,
                     "messages": [
                         {"author": title, "text": "Контакт Telegram синхронизирован с клиентской базой.", "kind": "in"},
@@ -6393,6 +6429,7 @@ def create_app() -> FastAPI:
             if str(chat.chat_id) in seen_chat_ids:
                 continue
             status_value = "active" if chat.is_enabled else "waiting"
+            presence, presence_label = _messenger_presence(chat.last_seen_at, status_value)
             rows.append(
                 {
                     "id": f"telegram-chat-{chat.id}",
@@ -6404,6 +6441,11 @@ def create_app() -> FastAPI:
                     "responsible": "",
                     "status": status_value,
                     "status_label": _messenger_status_label(status_value),
+                    "presence": presence,
+                    "presence_label": presence_label,
+                    "avatar_url": "",
+                    "avatar_ttl_days": 5,
+                    "is_new": False,
                     "updated_at": chat.last_seen_at,
                     "messages": [
                         {"author": "Telegram", "text": "Чат доступен после обновления списка чатов.", "kind": "system"},
@@ -6467,6 +6509,8 @@ def create_app() -> FastAPI:
                 username=str(spec.get("contact") or ""),
                 display_name=str(spec.get("contact") or ""),
             )
+            status_value = "active" if configured else "waiting"
+            presence, presence_label = _messenger_presence(datetime.now(timezone.utc), status_value)
             messages = []
             if configured:
                 messages = [
@@ -6494,8 +6538,13 @@ def create_app() -> FastAPI:
                         else f"Подключите {channel} в Настройки -> Соцсети"
                     ),
                     "responsible": "",
-                    "status": "active" if configured else "waiting",
-                    "status_label": _messenger_status_label("active" if configured else "waiting"),
+                    "status": status_value,
+                    "status_label": _messenger_status_label(status_value),
+                    "presence": presence,
+                    "presence_label": presence_label,
+                    "avatar_url": "",
+                    "avatar_ttl_days": 5,
+                    "is_new": False,
                     "updated_at": datetime.now(timezone.utc),
                     "messages": messages,
                 }

@@ -70,10 +70,28 @@
             class="messenger-dialog-item"
             data-messenger-thread-id="{{ row.id }}"
             data-messenger-search="{{ (row.contact ~ ' ' ~ row.topic ~ ' ' ~ row.channel ~ ' ' ~ row.status_label ~ ' ' ~ row.last_message)|e }}"
+            data-messenger-avatar-url="{{ row.avatar_url|default('') }}"
+            data-messenger-presence="{{ row.presence|default('offline') }}"
+            data-messenger-presence-label="{{ row.presence_label|default('Не в сети') }}"
+            data-messenger-is-new="{{ '1' if row.is_new else '0' }}"
           >
-            <span class="messenger-dialog-channel">{{ row.channel[:2] }}</span>
-            <span>
-              <strong>{{ row.contact }}</strong>
+            <span class="messenger-dialog-avatar-wrap" data-messenger-avatar-open="{{ row.id }}">
+              <span class="messenger-dialog-channel">
+                {% if row.avatar_url %}
+                  <img src="{{ row.avatar_url }}" alt="" loading="lazy" />
+                {% else %}
+                  <span>{{ row.channel[:2] }}</span>
+                {% endif %}
+              </span>
+              <i class="messenger-presence-dot messenger-presence-dot--{{ row.presence|default('offline') }}" aria-hidden="true"></i>
+            </span>
+            <span class="messenger-dialog-main">
+              <span class="messenger-dialog-name-line">
+                <strong>{{ row.contact }}</strong>
+                {% if row.is_new %}
+                  <mark class="messenger-new-badge">NEW</mark>
+                {% endif %}
+              </span>
               <small>{{ row.topic or row.last_message or row.channel }}</small>
             </span>
             <span class="messenger-dialog-side">
@@ -92,9 +110,15 @@
 
     <section class="messenger-dialog-chat-panel" aria-label="Рабочий чат">
       <div class="messenger-dialog-chat-top">
-        <div>
-          <p class="settings-ios-footnote" data-messenger-thread-meta>Выберите диалог слева</p>
-          <h3 data-messenger-thread-title>Диалог</h3>
+        <div class="messenger-dialog-chat-identity">
+          <button type="button" class="messenger-dialog-chat-avatar" data-messenger-thread-avatar aria-label="Фото контакта">
+            <span>TE</span>
+          </button>
+          <div>
+            <p class="settings-ios-footnote" data-messenger-thread-meta>Выберите диалог слева</p>
+            <h3 data-messenger-thread-title>Диалог</h3>
+            <span class="messenger-thread-presence messenger-thread-presence--offline" data-messenger-thread-presence>Не в сети</span>
+          </div>
         </div>
         <button type="button" class="btn btn-secondary" data-messenger-attach-client>Отправить в CRM</button>
       </div>
@@ -110,6 +134,15 @@
         </div>
       </div>
     </section>
+  </div>
+  <div class="messenger-photo-dialog" data-messenger-photo-dialog hidden>
+    <button type="button" class="messenger-photo-backdrop" data-messenger-photo-close aria-label="Закрыть фото"></button>
+    <div class="messenger-photo-card" role="dialog" aria-modal="true" aria-label="Фото контакта">
+      <button type="button" class="messenger-photo-close" data-messenger-photo-close aria-label="Закрыть">×</button>
+      <div class="messenger-photo-preview" data-messenger-photo-preview></div>
+      <strong data-messenger-photo-title>Контакт</strong>
+      <span data-messenger-photo-subtitle>Фото хранится в кеше 5 дней и может быть скачано заново.</span>
+    </div>
   </div>
 </section>
 
