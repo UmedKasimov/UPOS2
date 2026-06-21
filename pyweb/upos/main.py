@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
 from zoneinfo import ZoneInfo
 
 from contextlib import asynccontextmanager
@@ -12577,6 +12579,175 @@ def create_app() -> FastAPI:
         if connection:
             out["connection"] = connection
         return out
+
+    def _meta_graph_version() -> str:
+        version = str(get_settings().meta_graph_version or "v20.0").strip().strip("/")
+        return version if version.startswith("v") else f"v{version}"
+
+    def _settings_social_redirect(message: str = "", error: str = "") -> RedirectResponse:
+        params = {"tab": "social"}
+        if message:
+            params["msg"] = message
+        if error:
+            params["error"] = error
+        return RedirectResponse(url="/settings?" + urlencode(params), status_code=302)
+
+    def _meta_json_get(url: str, params: dict[str, str]) -> dict[str, Any]:
+        full_url = url + ("&" if "?" in url else "?") + urlencode(params)
+        req = UrlRequest(full_url, headers={"Accept": "application/json"})
+        try:
+            with urlopen(req, timeout=15) as response:
+                payload = json.loads(response.read().decode("utf-8") or "{}")
+        except HTTPError as exc:
+            try:
+                payload = json.loads(exc.read().decode("utf-8") or "{}")
+                message = str((payload.get("error") or {}).get("message") or "")
+            except Exception:
+                message = str(exc)
+            raise ValueError(message or "Meta вернул ошибку") from exc
+        except (URLError, TimeoutError) as exc:
+            raise ValueError("Meta сейчас недоступен. Попробуйте позже.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("Meta вернул неожиданный ответ")
+        if isinstance(payload.get("error"), dict):
+            raise ValueError(str(payload["error"].get("message") or "Meta вернул ошибку"))
+        return payload
+
+    def _meta_redirect_uri(request: Request) -> str:
+        configured = str(get_settings().auth_url or "").strip().rstrip("/")
+        if configured:
+            return configured + "/settings/social/instagram/callback"
+        return str(request.url_for("settings_instagram_callback"))
+
+    def _meta_oauth_configured() -> tuple[str, str]:
+        app_id = str(get_settings().meta_app_id or os.getenv("META_APP_ID") or os.getenv("FACEBOOK_APP_ID") or "").strip()
+        app_secret = str(
+            get_settings().meta_app_secret
+            or os.getenv("META_APP_SECRET")
+            or os.getenv("FACEBOOK_APP_SECRET")
+            or ""
+        ).strip()
+        return app_id, app_secret
+
+    @app.get("/settings/social/instagram/start", name="settings_instagram_start")
+    def settings_instagram_start(request: Request):
+        wid, err = _role_permissions_owner_id(request)
+        if err:
+            return _settings_social_redirect(error="Нет доступа к настройкам Instagram.")
+        assert wid is not None
+        app_id, app_secret = _meta_oauth_configured()
+        if not app_id or not app_secret:
+            return _settings_social_redirect(
+                error="Для входа через Instagram укажите META_APP_ID и META_APP_SECRET в Railway Variables."
+            )
+        state = secrets.token_urlsafe(24)
+        request.session["instagram_oauth_state"] = state
+        request.session["instagram_oauth_workspace"] = wid
+        scopes = [
+            "pages_show_list",
+            "pages_read_engagement",
+            "pages_manage_metadata",
+            "instagram_basic",
+            "instagram_manage_messages",
+        ]
+        auth_url = f"https://www.facebook.com/{_meta_graph_version()}/dialog/oauth?" + urlencode(
+            {
+                "client_id": app_id,
+                "redirect_uri": _meta_redirect_uri(request),
+                "state": state,
+                "response_type": "code",
+                "scope": ",".join(scopes),
+            }
+        )
+        return RedirectResponse(url=auth_url, status_code=302)
+
+    @app.get("/settings/social/instagram/callback", name="settings_instagram_callback")
+    def settings_instagram_callback(request: Request):
+        wid, err = _role_permissions_owner_id(request)
+        if err:
+            return _settings_social_redirect(error="Нет доступа к настройкам Instagram.")
+        assert wid is not None
+        incoming_state = str(request.query_params.get("state") or "")
+        expected_state = str(request.session.pop("instagram_oauth_state", "") or "")
+        expected_wid = str(request.session.pop("instagram_oauth_workspace", "") or "")
+        if not incoming_state or incoming_state != expected_state or expected_wid != wid:
+            return _settings_social_redirect(error="Сессия входа Instagram устарела. Попробуйте еще раз.")
+        if request.query_params.get("error"):
+            return _settings_social_redirect(
+                error=str(request.query_params.get("error_description") or request.query_params.get("error") or "")
+            )
+        code = str(request.query_params.get("code") or "").strip()
+        if not code:
+            return _settings_social_redirect(error="Meta не вернул код авторизации.")
+        app_id, app_secret = _meta_oauth_configured()
+        if not app_id or not app_secret:
+            return _settings_social_redirect(error="META_APP_ID или META_APP_SECRET не настроены.")
+
+        version = _meta_graph_version()
+        graph_base = f"https://graph.facebook.com/{version}"
+        try:
+            token_payload = _meta_json_get(
+                f"{graph_base}/oauth/access_token",
+                {
+                    "client_id": app_id,
+                    "client_secret": app_secret,
+                    "redirect_uri": _meta_redirect_uri(request),
+                    "code": code,
+                },
+            )
+            user_token = str(token_payload.get("access_token") or "").strip()
+            if not user_token:
+                return _settings_social_redirect(error="Meta не вернул access token.")
+            pages_payload = _meta_json_get(
+                f"{graph_base}/me/accounts",
+                {
+                    "access_token": user_token,
+                    "fields": "id,name,access_token,instagram_business_account{id,username,profile_picture_url}",
+                },
+            )
+        except ValueError as exc:
+            return _settings_social_redirect(error=str(exc))
+
+        selected_page = None
+        selected_instagram = None
+        for page in pages_payload.get("data") or []:
+            if not isinstance(page, dict):
+                continue
+            ig_account = page.get("instagram_business_account")
+            if isinstance(ig_account, dict) and ig_account.get("id"):
+                selected_page = page
+                selected_instagram = ig_account
+                break
+        data = load_workspace_settings(wid)
+        social_links = data.get("social_links") if isinstance(data.get("social_links"), dict) else {}
+        updated = dict(social_links)
+        updated["primary_channel"] = updated.get("primary_channel") or "instagram"
+        if selected_instagram:
+            ig_id = str(selected_instagram.get("id") or "").strip()
+            username = str(selected_instagram.get("username") or "").strip()
+            updated["instagram_business_id"] = ig_id
+            updated["instagram_login"] = ("@" + username.lstrip("@")) if username else updated.get("instagram_login", "")
+            if username:
+                updated["instagram_url"] = f"https://instagram.com/{username.lstrip('@')}"
+        if selected_page:
+            updated["instagram_access_token"] = str(selected_page.get("access_token") or user_token).strip()
+            updated["facebook_page_id"] = str(selected_page.get("id") or "").strip()
+            updated["facebook_access_token"] = str(selected_page.get("access_token") or "").strip()
+        else:
+            updated["instagram_access_token"] = user_token
+        data["social_links"] = updated
+        save_workspace_settings(wid, data)
+        if _is_director(request.session.get("user") or {}):
+            session_user = request.session.get("user") or {}
+            owner_id = str(session_user.get("account_owner_id") or session_user.get("user_id") or "").strip()
+            if valid_workspace_owner_id(owner_id) and owner_id != wid:
+                sync_common_settings(owner_id, data)
+        if selected_instagram:
+            return _settings_social_redirect(message="instagram_connected")
+        return _settings_social_redirect(
+            message="instagram_token_saved",
+            error="Токен сохранен, но Instagram Business аккаунт не найден. Проверьте связь Instagram с Facebook Page.",
+        )
 
     @app.post("/api/settings/social-links")
     async def api_settings_social_links(request: Request):

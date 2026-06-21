@@ -1386,7 +1386,10 @@
                         <p class="settings-ios-footnote">Instagram</p>
                         <h3>Direct и комментарии</h3>
                       </div>
-                      <a class="btn btn-secondary" href="/messengers?channel=Instagram#inbox">Открыть чаты</a>
+                      <div class="social-telegram-actions">
+                        <a class="btn" href="/settings/social/instagram/start">Войти через Instagram / Meta</a>
+                        <a class="btn btn-secondary" href="/messengers?channel=Instagram#inbox">Открыть чаты</a>
+                      </div>
                     </div>
                     <div class="social-telegram-grid">
                       <label class="settings-profile-field">
@@ -1407,8 +1410,8 @@
                       </label>
                     </div>
                     <div class="social-telegram-summary">
-                      <span>Канал появится во вкладке «Инстаграм»</span>
-                      <small>Можно сохранить официальный Business API и резервные данные входа, чтобы вести Direct в Мессенджерах.</small>
+                      <span>Канал появится во вкладке «Инстаграм» после входа через Meta</span>
+                      <small>Для кнопки входа в Railway Variables должны быть META_APP_ID и META_APP_SECRET. Callback URL: /settings/social/instagram/callback.</small>
                     </div>
                   </div>
                   <div class="social-telegram-card">
