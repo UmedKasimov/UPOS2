@@ -57,6 +57,7 @@ __pycache__/
 # User-generated content (uploaded avatars, temp scripts)
 pyweb/upos/static/avatars/
 pyweb/upos/static/hr-photos/
+pyweb/upos/static/uploads/
 scratch/
 
 # Deprecated Next.js tree (optional archive folder)

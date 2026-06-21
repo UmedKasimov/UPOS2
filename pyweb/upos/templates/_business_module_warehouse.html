@@ -34,8 +34,11 @@
 <datalist id="warehouse-product-list">
   {% for item in warehouse_options.products %}<option value="{{ item }}">{% endfor %}
 </datalist>
+<datalist id="warehouse-supplier-list">
+  {% for item in warehouse_options.suppliers %}<option value="{{ item }}">{% endfor %}
+</datalist>
 
-<div class="products-layout" data-workspace-view="stocks transfers adjustments" hidden>
+<div class="products-layout" data-workspace-view="stocks warehouses transfers purchases adjustments" hidden>
   <article class="products-list-panel" data-workspace-view="stocks" hidden>
     <header class="products-panel-head">
       <div>
@@ -83,7 +86,40 @@
     </div>
   </article>
 
-  <aside class="product-form-panel" data-workspace-view="stocks" hidden>
+  <article class="products-list-panel" data-workspace-view="warehouses" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Склады</h2>
+        <span>Всего: {{ warehouse_records|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Ответственный</th>
+            <th>Статус</th>
+            <th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in warehouse_records %}
+            <tr>
+              <td><strong>{{ item.name }}</strong></td>
+              <td>{{ item.manager or "-" }}</td>
+              <td>{{ "Активный" if item.status == "active" else "Неактивный" }}</td>
+              <td>{{ item.note or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">Склады пока не созданы.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="warehouses" hidden>
     <header class="products-panel-head">
       <div>
         <h2>Новый склад</h2>
@@ -183,6 +219,207 @@
       </div>
     </form>
   </aside>
+
+  <article class="warehouse-purchases-board" data-workspace-view="purchases" hidden>
+    <header class="warehouse-purchases-head">
+      <h2>Закупки</h2>
+      <div class="warehouse-purchases-actions">
+        <button class="warehouse-purchases-icon" type="button" title="Избранное" aria-label="Избранное">☆</button>
+        <button type="button" class="btn" data-warehouse-open-operation>+ Закупка</button>
+        <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню">⋮</button>
+      </div>
+      <form class="warehouse-purchases-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
+        <label class="warehouse-purchases-search">
+          <span>Поиск</span>
+          <input name="q" type="search" value="{{ warehouse_filters.q }}" placeholder="Поиск" />
+        </label>
+        <label>
+          <span>Дата закупки</span>
+          <input type="text" placeholder="Дата закупки" disabled />
+        </label>
+        <label>
+          <span>Ответственный</span>
+          <select disabled><option>Ответственный</option></select>
+        </label>
+        <label>
+          <span>Склад</span>
+          <input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Склад" />
+        </label>
+        <input type="hidden" name="product" value="{{ warehouse_filters.product }}" />
+        <input type="hidden" name="op_type" value="{{ warehouse_filters.op_type }}" />
+        {% if warehouse_filters.critical %}<input type="hidden" name="critical" value="{{ warehouse_filters.critical }}" />{% endif %}
+        <button class="warehouse-purchases-filter-btn" type="submit" aria-label="Фильтр">⌯</button>
+      </form>
+    </header>
+    <div class="warehouse-purchases-table-wrap">
+      <table class="warehouse-purchases-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th class="warehouse-purchases-check"><input type="checkbox" aria-label="Выбрать все закупки" /></th>
+            <th>Номер</th>
+            <th>Дата ↑</th>
+            <th>Поставщик</th>
+            <th>Сумма</th>
+            <th>Статус</th>
+            <th class="warehouse-purchases-actions-col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in warehouse_purchases %}
+            <tr>
+              <td class="warehouse-purchases-check"><input type="checkbox" aria-label="Выбрать закупку {{ doc.number }}" /></td>
+              <td>
+                <a
+                  class="warehouse-purchase-number"
+                  href="{{ url_for('warehouse_get') }}?purchase_id={{ doc.id }}#purchases"
+                  data-warehouse-purchase-open
+                  data-purchase-id="{{ doc.id }}"
+                >
+                  <span aria-hidden="true">#</span>
+                  <strong data-warehouse-purchase-highlight>{{ doc.number }}</strong>
+                </a>
+              </td>
+              <td data-warehouse-purchase-highlight>{{ doc.date or "-" }}</td>
+              <td><a class="warehouse-purchase-supplier" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
+              <td class="warehouse-purchase-money" data-warehouse-purchase-highlight>{{ doc.amount }} {{ doc.currency }}</td>
+              <td><span class="warehouse-purchase-status">{{ doc.status_label }} <span aria-hidden="true">✎</span></span></td>
+              <td class="warehouse-purchase-row-actions">
+                <a
+                  class="products-action-icon products-action-icon--edit"
+                  href="{{ url_for('warehouse_get') }}?purchase_id={{ doc.id }}#purchases"
+                  data-warehouse-purchase-open
+                  data-purchase-id="{{ doc.id }}"
+                  title="Редактировать"
+                  aria-label="Редактировать {{ doc.number }}"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </a>
+                <form method="post" action="{{ url_for('warehouse_purchase_delete', purchase_id=doc.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить" aria-label="Удалить {{ doc.number }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v5" />
+                      <path d="M14 11v5" />
+                    </svg>
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">Документов закупки пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if warehouse_purchase_totals %}
+          <tfoot>
+            <tr>
+              <td colspan="4"></td>
+              <td class="warehouse-purchase-money warehouse-purchase-total">
+                {% for total in warehouse_purchase_totals %}
+                  <div>{{ total.amount }} {{ total.currency }}</div>
+                {% endfor %}
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
+    </div>
+    <footer class="warehouse-purchases-footer">
+      <nav class="products-pagination" aria-label="Страницы закупок">
+        <a class="products-page-link disabled" href="{{ url_for('warehouse_get') }}#purchases" aria-label="Предыдущая страница">‹</a>
+        <a class="products-page-link active" href="{{ url_for('warehouse_get') }}#purchases" aria-current="page">1</a>
+        <a class="products-page-link disabled" href="{{ url_for('warehouse_get') }}#purchases" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. 1 из 1</span>
+      </nav>
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по закупкам">
+          <span>Всего: {{ warehouse_purchases|length }}</span>
+          <span>Показано: 1-{{ warehouse_purchases|length }}</span>
+        </div>
+        <label class="products-page-size products-page-size--footer">
+          <span>Показать</span>
+          <select aria-label="Размер страницы закупок">
+            <option selected>100 шт</option>
+            <option>500 шт</option>
+            <option>1000 шт</option>
+            <option>10000 шт</option>
+          </select>
+        </label>
+      </div>
+    </footer>
+    {% for doc in warehouse_purchases %}
+      <script type="application/json" id="warehouse-purchase-data-{{ doc.id }}">{{ doc.detail_json|tojson }}</script>
+    {% endfor %}
+    <div class="warehouse-purchase-detail-backdrop" data-warehouse-purchase-close hidden></div>
+    <aside class="warehouse-purchase-detail" data-warehouse-purchase-detail hidden aria-live="polite">
+      <header class="warehouse-purchase-detail-head">
+        <div>
+          <p data-purchase-detail-date></p>
+          <h2 data-purchase-detail-title>Закупка</h2>
+        </div>
+        <div class="warehouse-purchase-detail-actions">
+          <button class="warehouse-purchases-icon" type="button" title="Печать" aria-label="Печать">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+          </button>
+          <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню">⋮</button>
+          <button class="warehouse-purchase-detail-close" type="button" data-warehouse-purchase-close aria-label="Закрыть">×</button>
+        </div>
+      </header>
+      <section class="warehouse-purchase-detail-summary">
+        <div>
+          <span>Поставщик</span>
+          <strong data-purchase-detail-supplier></strong>
+        </div>
+        <div>
+          <span>Склад</span>
+          <strong data-purchase-detail-warehouse></strong>
+        </div>
+        <div>
+          <span>Статус</span>
+          <strong data-purchase-detail-status></strong>
+        </div>
+      </section>
+      <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы закупки">
+        <button type="button" class="active">Товары</button>
+        <button type="button">Оплата</button>
+        <button type="button">Комментарий</button>
+      </nav>
+      <div class="warehouse-purchase-detail-table-wrap">
+        <table class="warehouse-purchase-detail-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Товар</th>
+              <th>К-во</th>
+              <th>Цена</th>
+              <th>Сумма</th>
+            </tr>
+          </thead>
+          <tbody data-purchase-detail-lines></tbody>
+        </table>
+      </div>
+      <footer class="warehouse-purchase-detail-footer">
+        <div>
+          <span>Оплачено</span>
+          <strong data-purchase-detail-paid></strong>
+        </div>
+        <div>
+          <span>Долг</span>
+          <strong data-purchase-detail-debt></strong>
+        </div>
+        <div class="warehouse-purchase-detail-total">
+          <span>Итого</span>
+          <strong data-purchase-detail-total></strong>
+        </div>
+      </footer>
+    </aside>
+  </article>
 
   <aside class="product-form-panel" data-workspace-view="adjustments" hidden>
     <header class="products-panel-head">
