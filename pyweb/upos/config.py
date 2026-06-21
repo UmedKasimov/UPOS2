@@ -54,6 +54,18 @@ class Settings(BaseSettings):
         default=3000,
         validation_alias=AliasChoices("PORT", "UPOS_PORT"),
     )
+    meta_app_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("META_APP_ID", "FACEBOOK_APP_ID"),
+    )
+    meta_app_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("META_APP_SECRET", "FACEBOOK_APP_SECRET"),
+    )
+    meta_graph_version: str = Field(
+        default="v20.0",
+        validation_alias=AliasChoices("META_GRAPH_VERSION", "FACEBOOK_GRAPH_VERSION"),
+    )
 
 
 def schema_align_on_startup() -> bool:
