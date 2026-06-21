@@ -17,7 +17,7 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=3" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=9" defer></script>
 {% endblock %}
 
 {% block main %}
@@ -57,16 +57,6 @@
         <span>Товары</span>
         <small>Каталог и остатки</small>
       </a>
-      <a class="general-report-card {{ 'active' if product_filters.kind == 'service' else '' }}" href="{{ url_for('products_get') }}?kind=service#service" data-workspace-card="service" data-workspace-tab-title="Услуги" data-workspace-tab-hash="service" data-workspace-tab-href="{{ url_for('products_get') }}?kind=service" {% if product_filters.kind == 'service' %}aria-current="page"{% endif %}>
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M12 3v18" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </span>
-        <span>Услуги</span>
-        <small>Работы без склада</small>
-      </a>
       <a class="general-report-card" href="#price-types" data-workspace-card="price_types" data-workspace-tab-title="Прайс-листы" data-workspace-tab-hash="price-types">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
@@ -90,54 +80,6 @@
     </section>
 
     <div class="workspace-module-stack" data-workspace-view="catalog service create price_types folders" hidden>
-    <form class="products-filter-bar" method="get" action="{{ url_for('products_get') }}" data-workspace-view="catalog service" hidden>
-      <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
-      <label>
-        <span>Поиск</span>
-        <input name="q" type="search" value="{{ product_filters.q }}" placeholder="Название, артикул, штрихкод" />
-      </label>
-      <label>
-        <span>Категория</span>
-        <input name="category" list="product-category-list" value="{{ product_filters.category }}" />
-      </label>
-      <label>
-        <span>Группа</span>
-        <input name="group" list="product-group-list" value="{{ product_filters.group }}" />
-      </label>
-      <label>
-        <span>Бренд</span>
-        <input name="brand" list="product-brand-list" value="{{ product_filters.brand }}" />
-      </label>
-      <label>
-        <span>Статус</span>
-        <select name="status">
-          <option value="active" {% if product_filters.status == 'active' %}selected{% endif %}>Активный</option>
-          <option value="inactive" {% if product_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
-          <option value="all" {% if product_filters.status == 'all' %}selected{% endif %}>Все</option>
-        </select>
-      </label>
-      <button class="btn btn-secondary" type="submit">Применить</button>
-      <a class="btn btn-secondary" href="{{ url_for('products_get') }}">Очистить</a>
-      <div class="products-filter-actions">
-        <form method="get" action="{{ url_for('products_export') }}" class="products-filter-inline-form">
-          <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
-          <input type="hidden" name="q" value="{{ product_filters.q }}" />
-          <input type="hidden" name="category" value="{{ product_filters.category }}" />
-          <input type="hidden" name="group" value="{{ product_filters.group }}" />
-          <input type="hidden" name="brand" value="{{ product_filters.brand }}" />
-          <input type="hidden" name="status" value="{{ product_filters.status }}" />
-          <button class="btn btn-secondary" type="submit">Экспорт Excel</button>
-        </form>
-        <form method="post" action="{{ url_for('products_import') }}" enctype="multipart/form-data" class="products-filter-inline-form">
-          {% include "_csrf_field.html" %}
-          <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
-          <label class="btn btn-secondary products-import-trigger">
-            <span>Импорт Excel</span>
-            <input type="file" name="excel_file" accept=".xlsx" onchange="if (this.files && this.files.length) this.form.submit()" hidden />
-          </label>
-        </form>
-      </div>
-    </form>
 
     <datalist id="product-category-list">
       {% for item in product_options.categories %}<option value="{{ item }}">{% endfor %}
@@ -155,13 +97,128 @@
     <div class="products-layout">
       <article class="products-list-panel" data-workspace-view="catalog service" hidden>
         <header class="products-panel-head">
-          <div>
-            <h2>{% if product_filters.kind == 'service' %}Услуги{% else %}Товары{% endif %}</h2>
-            <span>Всего: {{ products|length }}</span>
+          <div class="products-panel-title">
+            <h2>Товары</h2>
           </div>
-          <a class="btn" href="{{ url_for('products_get') }}?kind={{ product_filters.kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
-            {% if product_filters.kind == 'service' %}+ Услуга{% else %}+ Товар{% endif %}
-          </a>
+          <div class="products-panel-top-actions">
+            <div class="products-panel-actions">
+              <a class="btn" href="{{ url_for('products_get') }}?kind={{ product_filters.kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
+                {% if product_filters.kind == 'service' %}+ Услуга{% else %}+ Товар{% endif %}
+              </a>
+              <form method="get" action="{{ url_for('products_export') }}" class="products-filter-inline-form">
+                <input type="hidden" name="q" value="{{ product_filters.q }}" />
+                {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.category_values %}<input type="hidden" name="category" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.group_values %}<input type="hidden" name="group" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
+                <button class="btn btn-secondary" type="submit">Экспорт Excel</button>
+              </form>
+              <form method="post" action="{{ url_for('products_import') }}" enctype="multipart/form-data" class="products-filter-inline-form">
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+                <label class="btn btn-secondary products-import-trigger">
+                  <span>Импорт Excel</span>
+                  <input type="file" name="excel_file" accept=".xlsx" onchange="if (this.files && this.files.length) this.form.submit()" hidden />
+                </label>
+              </form>
+            </div>
+          </div>
+          <form
+            id="products-catalog-filter"
+            class="products-catalog-filter"
+            method="get"
+            action="{{ url_for('products_get') }}{% if product_filters.kind == 'service' %}#service{% else %}#catalog{% endif %}"
+            data-products-auto-filter
+            data-products-filter-base-action="{{ url_for('products_get') }}"
+          >
+            <label class="products-catalog-search">
+              <span>Поиск</span>
+              <input name="q" type="search" value="{{ product_filters.q }}" placeholder="Поиск" />
+            </label>
+            <label class="products-kind-filter">
+              <span>Тип</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Тип</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  <label><input type="checkbox" name="kind" value="all" data-products-filter-all {% if 'all' in product_filters.kind_values %}checked{% endif %} /> <span>Все типы</span></label>
+                  <label><input type="checkbox" name="kind" value="product" {% if 'product' in product_filters.kind_values %}checked{% endif %} /> <span>Товары</span></label>
+                  <label><input type="checkbox" name="kind" value="service" {% if 'service' in product_filters.kind_values %}checked{% endif %} /> <span>Услуги</span></label>
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Категория</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Категория</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.categories %}
+                    <label><input type="checkbox" name="category" value="{{ item }}" {% if item in product_filters.category_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Группа</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Группа</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.groups %}
+                    <label><input type="checkbox" name="group" value="{{ item }}" {% if item in product_filters.group_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Бренд</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Бренд</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.brands %}
+                    <label><input type="checkbox" name="brand" value="{{ item }}" {% if item in product_filters.brand_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Папка</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Папка</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.folders %}
+                    <label><input type="checkbox" name="folder" value="{{ item }}" {% if item in product_filters.folder_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label class="products-catalog-status">
+              <span>Статус</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Статус</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  <label><input type="checkbox" name="status" value="active" {% if 'active' in product_filters.status_values %}checked{% endif %} /> <span>Активный</span></label>
+                  <label><input type="checkbox" name="status" value="inactive" {% if 'inactive' in product_filters.status_values %}checked{% endif %} /> <span>Неактивный</span></label>
+                  <label><input type="checkbox" name="status" value="all" data-products-filter-all {% if 'all' in product_filters.status_values %}checked{% endif %} /> <span>Все</span></label>
+                </div>
+              </details>
+            </label>
+            <a class="products-filter-clear" href="{{ url_for('products_get') }}?kind=all#catalog" aria-label="Очистить фильтры" title="Очистить фильтры">×</a>
+          </form>
         </header>
         <form
           id="products-bulk-form"
@@ -173,35 +230,54 @@
         >
           {% include "_csrf_field.html" %}
           <input type="hidden" name="q" value="{{ product_filters.q }}" />
-          <input type="hidden" name="category" value="{{ product_filters.category }}" />
-          <input type="hidden" name="group" value="{{ product_filters.group }}" />
-          <input type="hidden" name="brand" value="{{ product_filters.brand }}" />
-          <input type="hidden" name="status" value="{{ product_filters.status }}" />
-          <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+          {% for item in product_filters.category_values %}<input type="hidden" name="category" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.group_values %}<input type="hidden" name="group" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
+          <input type="hidden" name="page_size" value="{{ product_page_size }}" />
           <div class="products-bulk-summary">
             <strong>Выбрано: <span data-products-selected-count>0</span></strong>
-            <small>Массовое обновление категории, группы, бренда и папки.</small>
           </div>
-          <label>
-            <span>Категория</span>
-            <input name="bulk_category" list="product-category-list" placeholder="Новая категория" data-products-bulk-input disabled />
-          </label>
-          <label>
-            <span>Группа</span>
-            <input name="bulk_group" list="product-group-list" placeholder="Новая группа" data-products-bulk-input disabled />
-          </label>
-          <label>
-            <span>Бренд</span>
-            <input name="bulk_brand" list="product-brand-list" placeholder="Новый бренд" data-products-bulk-input disabled />
-          </label>
-          <label>
-            <span>Папка</span>
-            <input name="bulk_folder" list="product-folder-list" placeholder="Новая папка" data-products-bulk-input disabled />
-          </label>
           <div class="products-bulk-actions">
-            <button class="btn" type="submit" data-products-bulk-submit disabled>Применить</button>
+            <button class="btn" type="button" data-products-bulk-open disabled>Редактировать</button>
             <button class="btn btn-secondary" type="button" data-products-clear-selection disabled>Снять выбор</button>
           </div>
+          <dialog class="products-bulk-dialog" data-products-bulk-dialog>
+            <div class="products-bulk-dialog-panel">
+              <header class="products-bulk-dialog-head">
+                <h3>Массовое редактирование</h3>
+                <button type="button" class="products-bulk-dialog-close" data-products-bulk-close aria-label="Закрыть">×</button>
+              </header>
+              <div class="products-bulk-dialog-body">
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Категория</span>
+                  <input name="bulk_category" list="product-category-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Группа товара</span>
+                  <input name="bulk_group" list="product-group-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Бренд</span>
+                  <input name="bulk_brand" list="product-brand-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Папка</span>
+                  <input name="bulk_folder" list="product-folder-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+              </div>
+              <footer class="products-bulk-dialog-actions">
+                <button class="btn" type="submit" data-products-bulk-submit disabled>Сохранить</button>
+                <button class="btn btn-secondary" type="button" data-products-bulk-close>Отменить</button>
+              </footer>
+            </div>
+          </dialog>
         </form>
         <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
           <table class="products-table products-catalog-table" id="products-catalog-table" data-upos-column-controls data-products-table>
@@ -210,6 +286,7 @@
                 <th data-column-label="Выбор" class="products-check-col">
                   <input type="checkbox" class="products-bulk-checkbox" data-products-select-all aria-label="Выбрать все товары" />
                 </th>
+                <th data-column-label="Фото" class="products-photo-col"></th>
                 <th data-column-label="Название" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="name">
                     <span>Название</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -279,11 +356,30 @@
                       aria-label="Выбрать товар {{ product.name }}"
                     />
                   </td>
+                  <td class="products-photo-col">
+                    {% if product.photo_url %}
+                      <button
+                        class="product-thumb-frame product-thumb-button"
+                        type="button"
+                        data-product-photo-preview="{{ product.photo_url }}"
+                        data-product-photo-title="{{ product.name }}"
+                        aria-label="Открыть фото {{ product.name }}"
+                        title="Открыть фото"
+                      >
+                        <img class="product-thumb" src="{{ product.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      </button>
+                    {% else %}
+                      <span class="product-thumb-frame" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" focusable="false">
+                          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                          <path d="m3.3 7 8.7 5 8.7-5" />
+                          <path d="M12 22V12" />
+                        </svg>
+                      </span>
+                    {% endif %}
+                  </td>
                   <td>
                     <div class="product-cell-main">
-                      {% if product.photo_url %}
-                        <img class="product-thumb" src="{{ product.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                      {% endif %}
                       <a
                         class="product-open-link product-cell-meta"
                         href="{{ product_tab_href }}#product-form"
@@ -302,7 +398,7 @@
                       </a>
                     </div>
                   </td>
-                  <td>{{ product.sku or "-" }}</td>
+                  <td data-products-search-highlight>{{ product.sku or "-" }}</td>
                   <td>{{ product.barcode or "-" }}</td>
                   <td>{{ product.unit or "-" }}</td>
                   <td>{{ product.quantity }} {{ product.unit }}</td>
@@ -313,8 +409,9 @@
                   <td>{{ product.category or "-" }}</td>
                   <td>{{ "Активный" if product.status == "active" else "Неактивный" }}</td>
                   <td class="products-row-actions">
-                    <a href="{{ url_for('products_get') }}?edit={{ product.id }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="Редактирование" data-workspace-tab-hash="product-form">Изменить</a>
+                    {% set product_has_stock = (product.quantity|float) > 0 %}
                     <a
+                      class="products-action-icon products-action-icon--edit"
                       href="{{ product_tab_href }}#product-form"
                       data-workspace-trigger="create"
                       data-workspace-tab-id="{{ product_tab_id }}"
@@ -322,78 +419,111 @@
                       data-workspace-tab-title="{{ product.name }}"
                       data-workspace-tab-hash="product-form"
                       data-workspace-tab-href="{{ product_tab_href }}"
-                    >РР·РјРµРЅРёС‚СЊ</a>
+                      aria-label="Редактировать {{ product.name }}"
+                      title="Редактировать"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </a>
                     <form method="post" action="{{ url_for('products_delete', product_id=product.id) }}">
                       {% include "_csrf_field.html" %}
-                      <button type="submit">Удалить</button>
+                      <button
+                        class="products-action-icon products-action-icon--delete"
+                        type="submit"
+                        aria-label="{% if product_has_stock %}Нельзя удалить {{ product.name }}: товар есть в наличии{% else %}Удалить {{ product.name }}{% endif %}"
+                        title="{% if product_has_stock %}Нельзя удалить: товар есть в наличии{% else %}Удалить{% endif %}"
+                        {% if product_has_stock %}disabled{% endif %}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v5" />
+                          <path d="M14 11v5" />
+                        </svg>
+                      </button>
                     </form>
                   </td>
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="10">Пока нет товаров. Создайте первый товар справа.</td>
+                  <td colspan="11">Пока нет товаров. Создайте первый товар справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        <footer class="products-catalog-footer">
+          <nav class="products-pagination" aria-label="Страницы товаров">
+            <a class="products-page-link {% if product_page <= 1 %}disabled{% endif %}" href="{{ product_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+            {% for page_no in product_pagination_pages %}
+              <a class="products-page-link {% if page_no == product_page %}active{% endif %}" href="{{ product_page_urls[page_no] }}" {% if page_no == product_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+            {% endfor %}
+            <a class="products-page-link {% if product_page >= product_total_pages %}disabled{% endif %}" href="{{ product_next_page_url }}" aria-label="Следующая страница">›</a>
+            <span class="products-page-count">Стр. {{ product_page }} из {{ product_total_pages }}</span>
+          </nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Информация по списку">
+              <span>Всего: {{ products_total|default(products|length) }}</span>
+              <span>Показано: {{ product_page_from }}-{{ product_page_to }}</span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select name="page_size" form="products-catalog-filter">
+                {% for size in [100, 500, 1000, 10000] %}
+                  <option value="{{ size }}" {% if product_page_size == size %}selected{% endif %}>{{ size }} шт</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </footer>
       </article>
 
       <aside class="product-form-panel" id="product-form" data-workspace-view="create" hidden>
         <header class="products-panel-head">
           <div>
             <h2>{% if edit_product %}Редактирование{% else %}Создание{% endif %}</h2>
-            <span>Логика товаров как в ibox</span>
           </div>
         </header>
-        <form method="post" action="{{ url_for('products_save') }}" class="product-form">
+        <form method="post" action="{{ url_for('products_save') }}" enctype="multipart/form-data" class="product-form product-form--clean">
           {% include "_csrf_field.html" %}
           <input type="hidden" name="product_id" value="{{ current.id or '' }}" />
 
-          <div class="product-kind-toggle">
-            <label><input type="radio" name="kind" value="product" {% if (current.kind or product_filters.kind) != 'service' %}checked{% endif %} /> Простой товар</label>
-            <label><input type="radio" name="kind" value="collection" {% if current.kind == 'collection' %}checked{% endif %} /> Товар коллекции</label>
-            <label><input type="radio" name="kind" value="service" {% if (current.kind or product_filters.kind) == 'service' %}checked{% endif %} /> Услуга</label>
-          </div>
+          <section class="product-form-hero">
+            <div class="product-kind-toggle product-kind-toggle--compact">
+              <label><input type="radio" name="kind" value="product" {% if (current.kind or product_filters.kind) != 'service' %}checked{% endif %} /> Простой товар</label>
+              <label><input type="radio" name="kind" value="collection" {% if current.kind == 'collection' %}checked{% endif %} /> Товар коллекции</label>
+              <label><input type="radio" name="kind" value="service" {% if (current.kind or product_filters.kind) == 'service' %}checked{% endif %} /> Услуга</label>
+            </div>
 
-          <div class="product-form-grid">
-            <label class="wide"><span>Название товара*</span><input name="name" required value="{{ current.name or '' }}" /></label>
-            <label><span>Категория</span><input name="category" list="product-category-list" value="{{ current.category or '' }}" /></label>
-            <label><span>Папка</span><input name="folder" list="product-folder-list" value="{{ current.folder or '' }}" /></label>
-            <label><span>Единица хранения*</span><input name="unit" value="{{ current.unit or 'Штука' }}" required /></label>
-            <label><span>Артикул</span><input name="sku" value="{{ current.sku or '' }}" /></label>
-            <label><span>Вторая единица</span><input name="second_unit" value="{{ current.second_unit or '' }}" /></label>
-            <label><span>Группа</span><input name="group" list="product-group-list" value="{{ current.group or '' }}" /></label>
-            <label><span>Бренд</span><input name="brand" list="product-brand-list" value="{{ current.brand or '' }}" /></label>
-            <label><span>Статус</span><select name="status"><option value="active" {% if current.status != 'inactive' %}selected{% endif %}>Активный</option><option value="inactive" {% if current.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
-          </div>
-
-          <section class="product-form-section">
-            <h3>Цены</h3>
-            {% for price in prices %}
-              <div class="product-line-grid product-line-grid--price">
-                <input name="price_name" value="{{ price.name or 'Продажная цена' }}" placeholder="Прайс-лист" />
-                <input name="price_value" value="{{ price.price or '' }}" placeholder="Цена" inputmode="decimal" />
-                <input name="price_currency" value="{{ price.currency or 'UZS' }}" maxlength="3" />
-              </div>
-            {% endfor %}
-            <p class="product-form-hint">Поддерживаются несколько прайс-листов: продажная, скидочная, приходная и стандартная цена.</p>
+            <div class="product-form-grid product-form-grid--identity">
+              <label class="wide"><span>Название товара*</span><input name="name" required value="{{ current.name or '' }}" /></label>
+              <label><span>Категория</span><input name="category" list="product-category-list" value="{{ current.category or '' }}" /></label>
+              <label><span>Бренд</span><input name="brand" list="product-brand-list" value="{{ current.brand or '' }}" /></label>
+              <label><span>Артикул</span><input name="sku" value="{{ current.sku or '' }}" /></label>
+              <label><span>Единица*</span><input name="unit" value="{{ current.unit or 'Штука' }}" required /></label>
+              <label><span>Статус</span><select name="status"><option value="active" {% if current.status != 'inactive' %}selected{% endif %}>Активный</option><option value="inactive" {% if current.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
+            </div>
           </section>
 
-          <section class="product-form-section">
-            <h3>Начальный остаток</h3>
-            {% for stock in stocks %}
-              <div class="product-line-grid product-line-grid--stock">
-                <input name="stock_warehouse" value="{{ stock.warehouse or 'Основной склад' }}" placeholder="Склад" />
-                <input name="stock_quantity" value="{{ stock.quantity or '' }}" placeholder="К-во" inputmode="decimal" />
-                <input name="stock_price" value="{{ stock.price or '' }}" placeholder="Цена" inputmode="decimal" />
-                <input name="stock_date" value="{{ stock.date or '' }}" placeholder="Дата" type="date" />
-              </div>
-            {% endfor %}
-          </section>
+          {% for price in prices %}
+            <input type="hidden" name="price_name" value="{{ price.name or 'Продажная цена' }}" />
+            <input type="hidden" name="price_value" value="{{ price.price or '' }}" />
+            <input type="hidden" name="price_currency" value="{{ price.currency or 'UZS' }}" />
+          {% endfor %}
+          {% for stock in stocks %}
+            <input type="hidden" name="stock_warehouse" value="{{ stock.warehouse or 'Основной склад' }}" />
+            <input type="hidden" name="stock_quantity" value="{{ stock.quantity or '' }}" />
+            <input type="hidden" name="stock_price" value="{{ stock.price or '' }}" />
+            <input type="hidden" name="stock_date" value="{{ stock.date or '' }}" />
+          {% endfor %}
 
-          <section class="product-form-section">
-            <h3>Штрихкод</h3>
+          <section class="product-form-section product-form-section--primary">
+            <div class="product-form-section-head">
+              <h3>Штрихкод</h3>
+            </div>
             <div class="product-line-grid product-line-grid--barcode">
               <input name="barcode" value="{{ current.barcode or '' }}" placeholder="Штрихкод" />
               <select name="barcode_type">
@@ -403,73 +533,31 @@
             </div>
           </section>
 
-          <section class="product-form-section product-variations-section" data-product-variations>
-            <div class="product-form-section-head">
-              <h3>Характеристики товара коллекции</h3>
-              <button class="btn btn-secondary btn-sm" type="button" data-products-add-variation-row>+ Атрибут</button>
-            </div>
-            <div class="product-variation-list" data-products-variation-list>
-              {% for variation in variations %}
-                <div class="product-line-grid product-line-grid--variation" data-products-variation-row>
-                  <input name="variation_attribute" value="{{ variation.attribute or '' }}" placeholder="Размер / Цвет / Материал" />
-                  <input name="variation_values" value="{{ variation.values_text or '' }}" placeholder="S, M, L или Красный, Чёрный" />
-                  <button type="button" class="btn btn-secondary" data-products-remove-line>×</button>
-                </div>
-              {% endfor %}
-            </div>
-            <p class="product-form-hint">Для коллекций укажите атрибуты и значения через запятую. Система сохранит их как структуру для будущих вариаций.</p>
-          </section>
+          <input type="hidden" name="folder" value="{{ current.folder or '' }}" />
+          <input type="hidden" name="group" value="{{ current.group or '' }}" />
+          <input type="hidden" name="second_unit" value="{{ current.second_unit or '' }}" />
+          {% for variation in variations %}
+            <input type="hidden" name="variation_attribute" value="{{ variation.attribute or '' }}" />
+            <input type="hidden" name="variation_values" value="{{ variation.values_text or '' }}" />
+          {% endfor %}
 
-          <section class="product-form-section">
-            <h3>Фото</h3>
-            <div class="product-form-grid">
+          <details class="product-form-section product-form-section--details">
+            <summary>
+              <span>Фото</span>
+              <small>Изображение для каталога</small>
+            </summary>
+            <div class="product-form-grid product-photo-grid">
               <label class="wide"><span>Фото URL</span><input name="photo_url" type="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
+              <label class="wide"><span>Выбрать из ПК</span><input name="photo_file" type="file" accept="image/*" /></label>
             </div>
-            <p class="product-form-hint">Фото можно использовать для каталога и анализа данных из внешней системы.</p>
-          </section>
-
-          <section class="product-form-section">
-            <div class="product-form-section-head">
-              <h3>История приходов</h3>
-              <button class="btn btn-secondary btn-sm" type="button" data-products-add-purchase-row>+ Добавить строку</button>
-            </div>
-            <div class="product-purchase-table" data-products-purchase-table>
-              <div class="product-purchase-row product-purchase-row--head">
-                <span>Дата</span>
-                <span>Склад</span>
-                <span>Количество</span>
-                <span>Цена</span>
-                <span>Поставщик</span>
-                <span></span>
-              </div>
-              <div data-products-purchase-list>
-                {% for row in purchase_history %}
-                  <div class="product-purchase-row" data-products-purchase-row>
-                    <input name="purchase_date" type="date" value="{{ row.date or '' }}" />
-                    <input name="purchase_warehouse" value="{{ row.warehouse or 'Основной склад' }}" placeholder="Склад" />
-                    <input name="purchase_quantity" value="{{ row.quantity or '' }}" placeholder="К-во" inputmode="decimal" />
-                    <input name="purchase_price" value="{{ row.price or '' }}" placeholder="Цена" inputmode="decimal" />
-                    <input name="purchase_supplier" value="{{ row.supplier or '' }}" placeholder="Поставщик" />
-                    <button type="button" class="btn btn-secondary" data-products-remove-line>×</button>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-            <input type="hidden" name="purchase_history_json" value="{{ current.purchase_history_json or '' }}" />
-            <p class="product-form-hint">История приходов хранит закупочную цену, количество и поставщика без ручного JSON.</p>
-          </section>
-
-          <section class="product-form-section">
-            <h3>Дополнительно</h3>
-            <div class="product-form-grid">
-              <label><span>Партийный учёт</span><select name="batch_tracking"><option value="0" {% if not current.batch_tracking %}selected{% endif %}>Нет</option><option value="1" {% if current.batch_tracking %}selected{% endif %}>Да</option></select></label>
-              <label><span>Упаковки</span><input name="packages" value="{{ current.packages or '' }}" /></label>
-              <label><span>Минимальный остаток</span><input name="min_stock" value="{{ current.min_stock or '' }}" inputmode="decimal" /></label>
-              <label><span>Характеристики</span><input name="characteristics" value="{{ current.characteristics or '' }}" /></label>
-              <label><span>Классификация</span><input name="classification" value="{{ current.classification or '' }}" /></label>
-              <label><span>Владелец данных</span><input name="owner" value="{{ current.owner or '' }}" /></label>
-            </div>
-          </section>
+          </details>
+          <input type="hidden" name="purchase_history_json" value="{{ current.purchase_history_json or '' }}" />
+          <input type="hidden" name="batch_tracking" value="{{ '1' if current.batch_tracking else '0' }}" />
+          <input type="hidden" name="packages" value="{{ current.packages or '' }}" />
+          <input type="hidden" name="min_stock" value="{{ current.min_stock or '' }}" />
+          <input type="hidden" name="characteristics" value="{{ current.characteristics or '' }}" />
+          <input type="hidden" name="classification" value="{{ current.classification or '' }}" />
+          <input type="hidden" name="owner" value="{{ current.owner or '' }}" />
 
           <div class="product-form-actions">
             <button class="btn" type="submit">Сохранить</button>

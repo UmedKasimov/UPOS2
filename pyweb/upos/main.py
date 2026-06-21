@@ -4,6 +4,7 @@ import calendar
 import json
 import logging
 import io
+import math
 import os
 import re
 import secrets
@@ -2904,6 +2905,7 @@ def create_app() -> FastAPI:
                 "launcher": [
                     {"id": "stocks", "title": "Остатки", "subtitle": "Товары по складам", "icon": "warehouse"},
                     {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
+                    {"id": "purchases", "title": "Закупки", "subtitle": "Приход от поставщиков", "icon": "purchase"},
                     {"id": "adjustments", "title": "Корректировки", "subtitle": "Приход и списание", "icon": "adjustment"},
                 ],
                 "filters": ["Поиск", "Склад", "Товар", "Дата", "Тип операции"],
@@ -3669,32 +3671,123 @@ def create_app() -> FastAPI:
         category: str = "",
         group: str = "",
         brand: str = "",
+        folder: str = "",
         status: str = "active",
         kind: str = "product",
-    ) -> dict[str, str]:
+        category_values: list[str] | None = None,
+        group_values: list[str] | None = None,
+        brand_values: list[str] | None = None,
+        folder_values: list[str] | None = None,
+        status_values: list[str] | None = None,
+        kind_values: list[str] | None = None,
+    ) -> dict[str, Any]:
+        def clean_values(values: list[str] | None, fallback: str = "") -> list[str]:
+            source = values if values is not None else [fallback]
+            out: list[str] = []
+            seen: set[str] = set()
+            for value in source:
+                text = str(value or "").strip()
+                if not text or text in seen:
+                    continue
+                out.append(text)
+                seen.add(text)
+            return out
+
+        selected_kind = clean_values(kind_values, kind.strip() or "product")
+        if not selected_kind:
+            selected_kind = ["product"]
+        selected_status = clean_values(status_values, status.strip() or "active")
+        if not selected_status:
+            selected_status = ["active"]
+        selected_category = clean_values(category_values, category)
+        selected_group = clean_values(group_values, group)
+        selected_brand = clean_values(brand_values, brand)
+        selected_folder = clean_values(folder_values, folder)
         return {
             "q": q.strip(),
-            "category": category.strip(),
-            "group": group.strip(),
-            "brand": brand.strip(),
-            "status": status.strip() or "all",
-            "kind": kind.strip() or "product",
+            "category": selected_category[0] if selected_category else "",
+            "group": selected_group[0] if selected_group else "",
+            "brand": selected_brand[0] if selected_brand else "",
+            "folder": selected_folder[0] if selected_folder else "",
+            "status": selected_status[0] if selected_status else "active",
+            "kind": selected_kind[0] if selected_kind else "product",
+            "category_values": selected_category,
+            "group_values": selected_group,
+            "brand_values": selected_brand,
+            "folder_values": selected_folder,
+            "status_values": selected_status,
+            "kind_values": selected_kind,
         }
 
-    def _product_matches_filters(item: dict[str, Any], filters: dict[str, str]) -> bool:
-        if filters["kind"] != "all" and item["kind"] != filters["kind"]:
+    def _product_page_size(raw: Any = 100) -> int:
+        try:
+            value = int(str(raw or "100").strip())
+        except Exception:
+            value = 100
+        return value if value in {100, 500, 1000, 10000} else 100
+
+    def _positive_int(raw: Any, default: int = 1) -> int:
+        try:
+            value = int(str(raw or str(default)).strip())
+        except Exception:
+            value = default
+        return max(1, value)
+
+    def _product_search_variants(raw: Any) -> list[str]:
+        text = str(raw or "").lower()
+        spaced = re.sub(r"[^0-9a-zа-яё]+", " ", text, flags=re.IGNORECASE).strip()
+        compact = re.sub(r"[^0-9a-zа-яё]+", "", text, flags=re.IGNORECASE)
+        parts = re.split(r"\s+", spaced) if spaced else []
+        return [item for item in (text, spaced, compact, *parts) if item]
+
+    def _product_query_terms(raw: Any) -> list[str]:
+        text = str(raw or "").strip().lower()
+        if not text:
+            return []
+        terms = re.split(r"\s+", text)
+        out: list[str] = []
+        seen: set[str] = set()
+        for term in terms:
+            for variant in _product_search_variants(term):
+                if variant and variant not in seen:
+                    out.append(variant)
+                    seen.add(variant)
+        return out
+
+    def _product_matches_filters(item: dict[str, Any], filters: dict[str, Any]) -> bool:
+        kind_values = [str(value) for value in filters.get("kind_values", []) if str(value)]
+        status_values = [str(value) for value in filters.get("status_values", []) if str(value)]
+        category_values = [str(value) for value in filters.get("category_values", []) if str(value)]
+        group_values = [str(value) for value in filters.get("group_values", []) if str(value)]
+        brand_values = [str(value) for value in filters.get("brand_values", []) if str(value)]
+        folder_values = [str(value) for value in filters.get("folder_values", []) if str(value)]
+        if kind_values and "all" not in kind_values and item["kind"] not in kind_values:
             return False
-        if filters["status"] != "all" and item["status"] != filters["status"]:
+        if status_values and "all" not in status_values and item["status"] not in status_values:
             return False
-        if filters["category"] and item["category"] != filters["category"]:
+        if category_values and item["category"] not in category_values:
             return False
-        if filters["group"] and item["group"] != filters["group"]:
+        if group_values and item["group"] not in group_values:
             return False
-        if filters["brand"] and item["brand"] != filters["brand"]:
+        if brand_values and item["brand"] not in brand_values:
             return False
-        hay = " ".join([item["name"], item["sku"], item["barcode"], item["category"], item["brand"]]).lower()
-        q_clean = filters["q"].lower()
-        if q_clean and q_clean not in hay:
+        if folder_values and item["folder"] not in folder_values:
+            return False
+        hay_parts = [
+            item["name"],
+            item["sku"],
+            item["barcode"],
+            item["category"],
+            item["brand"],
+            item["folder"],
+        ]
+        hay = " ".join(
+            variant
+            for part in hay_parts
+            for variant in _product_search_variants(part)
+        )
+        q_terms = _product_query_terms(filters["q"])
+        if q_terms and not all(term in hay for term in q_terms):
             return False
         return True
 
@@ -3706,6 +3799,7 @@ def create_app() -> FastAPI:
         edit: str = "",
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, dict[str, list[str]]]:
         products: list[dict[str, Any]] = []
+        all_items: list[dict[str, Any]] = []
         edit_product = None
         rows = list(
             session.execute(
@@ -3716,6 +3810,7 @@ def create_app() -> FastAPI:
         )
         for row in rows:
             item = _product_data(row)
+            all_items.append(item)
             if not _product_matches_filters(item, filters):
                 continue
             products.append(item)
@@ -3765,10 +3860,10 @@ def create_app() -> FastAPI:
                     "product_count": 0,
                 }
         options = {
-            "categories": sorted({p["category"] for p in products if p["category"]}),
-            "groups": sorted({p["group"] for p in products if p["group"]}),
-            "brands": sorted({p["brand"] for p in products if p["brand"]}),
-            "folders": sorted({p["folder"] for p in products if p["folder"]}),
+            "categories": sorted({p["category"] for p in all_items if p["category"]}),
+            "groups": sorted({p["group"] for p in all_items if p["group"]}),
+            "brands": sorted({p["brand"] for p in all_items if p["brand"]}),
+            "folders": sorted({p["folder"] for p in all_items if p["folder"]}),
             "price_types": sorted(
                 {
                     str(price.get("name") or "")
@@ -3844,35 +3939,61 @@ def create_app() -> FastAPI:
         category: str = "",
         group: str = "",
         brand: str = "",
+        folder: str = "",
         status: str = "active",
         kind: str = "product",
         msg: str = "",
         count: int = 0,
         error: str = "",
         anchor: str = "catalog",
+        category_values: list[str] | None = None,
+        group_values: list[str] | None = None,
+        brand_values: list[str] | None = None,
+        folder_values: list[str] | None = None,
+        status_values: list[str] | None = None,
+        kind_values: list[str] | None = None,
+        **_unused: Any,
     ) -> str:
-        query: dict[str, str] = {}
+        query: dict[str, Any] = {}
+        def values_or_single(values: list[str] | None, fallback: str = "") -> list[str]:
+            source = values if values is not None else [fallback]
+            out: list[str] = []
+            seen: set[str] = set()
+            for item in source:
+                text = str(item or "").strip()
+                if not text or text in seen:
+                    continue
+                out.append(text)
+                seen.add(text)
+            return out
+
         if q.strip():
             query["q"] = q.strip()
-        if category.strip():
-            query["category"] = category.strip()
-        if group.strip():
-            query["group"] = group.strip()
-        if brand.strip():
-            query["brand"] = brand.strip()
-        clean_status = status.strip() or "active"
-        if clean_status:
-            query["status"] = clean_status
-        clean_kind = kind.strip() or "product"
-        if clean_kind:
-            query["kind"] = clean_kind
+        selected_category = values_or_single(category_values, category)
+        selected_group = values_or_single(group_values, group)
+        selected_brand = values_or_single(brand_values, brand)
+        selected_folder = values_or_single(folder_values, folder)
+        selected_status = values_or_single(status_values, status.strip() or "active")
+        selected_kind = values_or_single(kind_values, kind.strip() or "product")
+        if selected_category:
+            query["category"] = selected_category
+        if selected_group:
+            query["group"] = selected_group
+        if selected_brand:
+            query["brand"] = selected_brand
+        if selected_folder:
+            query["folder"] = selected_folder
+        if selected_status:
+            query["status"] = selected_status
+        if selected_kind:
+            query["kind"] = selected_kind
         if msg:
             query["msg"] = msg
         if count > 0:
             query["count"] = str(count)
         if error:
             query["error"] = error
-        suffix = f"?{urlencode(query)}" if query else ""
+        suffix = f"?{urlencode(query, doseq=True)}" if query else ""
         target_hash = f"#{anchor}" if anchor else ""
         return f"/products{suffix}{target_hash}"
 
@@ -3883,23 +4004,72 @@ def create_app() -> FastAPI:
         category: str = "",
         group: str = "",
         brand: str = "",
+        folder: str = "",
         status: str = "active",
         kind: str = "product",
+        page_size: str = "100",
+        page: str = "1",
         edit: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
         assert wid is not None
-        filters = _product_filters_payload(q, category, group, brand, status, kind)
+        query = request.query_params
+        filters = _product_filters_payload(
+            q,
+            category,
+            group,
+            brand,
+            folder,
+            status,
+            kind,
+            category_values=query.getlist("category"),
+            group_values=query.getlist("group"),
+            brand_values=query.getlist("brand"),
+            folder_values=query.getlist("folder"),
+            status_values=query.getlist("status"),
+            kind_values=query.getlist("kind"),
+        )
+        product_page_size = _product_page_size(page_size)
         with session_scope() as session:
             products, edit_product, options = _collect_products_view_data(session, wid, filters, edit=edit)
+        products_total = len(products)
+        product_total_pages = max(1, math.ceil(products_total / product_page_size))
+        product_page = min(_positive_int(page, 1), product_total_pages)
+        product_page_start = (product_page - 1) * product_page_size
+        product_page_end = product_page_start + product_page_size
+        products = products[product_page_start:product_page_end]
+
+        def product_page_url(target_page: int) -> str:
+            pairs = [
+                (str(key), str(value))
+                for key, value in request.query_params.multi_items()
+                if str(key) != "page"
+            ]
+            pairs.append(("page", str(target_page)))
+            return f"{request.url.path}?{urlencode(pairs, doseq=True)}#catalog"
+
+        product_pagination_pages = [
+            page_no
+            for page_no in range(max(1, product_page - 2), min(product_total_pages, product_page + 2) + 1)
+        ]
         return tpl(
             request,
             "home_products.html",
             variant="user",
             active="products",
             products=products,
+            products_total=products_total,
+            product_page_size=product_page_size,
+            product_page=product_page,
+            product_total_pages=product_total_pages,
+            product_page_from=(product_page_start + 1) if products_total else 0,
+            product_page_to=min(product_page_end, products_total),
+            product_pagination_pages=product_pagination_pages,
+            product_prev_page_url=product_page_url(max(1, product_page - 1)),
+            product_next_page_url=product_page_url(min(product_total_pages, product_page + 1)),
+            product_page_urls={page_no: product_page_url(page_no) for page_no in product_pagination_pages},
             product_filters=filters,
             product_options=options,
             edit_product=edit_product,
@@ -3916,6 +4086,7 @@ def create_app() -> FastAPI:
         category: str = "",
         group: str = "",
         brand: str = "",
+        folder: str = "",
         status: str = "active",
         kind: str = "product",
     ):
@@ -3923,7 +4094,22 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        filters = _product_filters_payload(q, category, group, brand, status, kind)
+        query = request.query_params
+        filters = _product_filters_payload(
+            q,
+            category,
+            group,
+            brand,
+            folder,
+            status,
+            kind,
+            category_values=query.getlist("category"),
+            group_values=query.getlist("group"),
+            brand_values=query.getlist("brand"),
+            folder_values=query.getlist("folder"),
+            status_values=query.getlist("status"),
+            kind_values=query.getlist("kind"),
+        )
         with session_scope() as session:
             products, _, _ = _collect_products_view_data(session, wid, filters)
 
@@ -4184,6 +4370,26 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=_product_import_redirect_url(kind, error="В Excel не найдено ни одной строки товара"), status_code=302)
         return RedirectResponse(url=_product_import_redirect_url(kind, msg="imported", count=imported_count), status_code=302)
 
+    async def _save_product_photo_upload(workspace_owner_id: str, upload: Any) -> str:
+        filename = str(getattr(upload, "filename", "") or "").strip()
+        if not filename:
+            return ""
+        suffix = Path(filename).suffix.lower()
+        if suffix not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            return ""
+        content_type = str(getattr(upload, "content_type", "") or "").lower()
+        if content_type and not content_type.startswith("image/"):
+            return ""
+        payload = await upload.read()
+        if not payload:
+            return ""
+        target_dir = BASE_DIR / "static" / "uploads" / "products" / re.sub(r"[^a-zA-Z0-9_-]", "_", workspace_owner_id)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_name = f"{uuid.uuid4().hex}{suffix}"
+        target = target_dir / file_name
+        target.write_bytes(payload)
+        return f"/static/uploads/products/{target_dir.name}/{file_name}"
+
     @app.post("/products/save", name="products_save")
     async def products_save(request: Request):
         form = await request.form()
@@ -4200,6 +4406,9 @@ def create_app() -> FastAPI:
         sku = str(form.get("sku") or "").strip()
         barcode = str(form.get("barcode") or "").strip()
         data = _product_form_payload(form)
+        uploaded_photo_url = await _save_product_photo_upload(wid, form.get("photo_file"))
+        if uploaded_photo_url:
+            data["photo_url"] = uploaded_photo_url
         with session_scope() as session:
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
@@ -4241,8 +4450,15 @@ def create_app() -> FastAPI:
             str(form.get("category") or ""),
             str(form.get("group") or ""),
             str(form.get("brand") or ""),
+            str(form.get("folder") or ""),
             str(form.get("status") or "active"),
             str(form.get("kind") or "product"),
+            category_values=[str(item or "") for item in form.getlist("category")],
+            group_values=[str(item or "") for item in form.getlist("group")],
+            brand_values=[str(item or "") for item in form.getlist("brand")],
+            folder_values=[str(item or "") for item in form.getlist("folder")],
+            status_values=[str(item or "") for item in form.getlist("status")],
+            kind_values=[str(item or "") for item in form.getlist("kind")],
         )
         product_ids = [str(item or "").strip() for item in form.getlist("product_ids") if str(item or "").strip()]
         updates = {
@@ -4300,6 +4516,12 @@ def create_app() -> FastAPI:
         with session_scope() as session:
             row = session.get(Product, product_id)
             if row and row.workspace_owner_id == wid:
+                product = _product_data(row)
+                if _sales_decimal(product.get("quantity")) > 0:
+                    return RedirectResponse(
+                        url="/products?error=" + quote("Нельзя удалить товар, который есть в наличии") + "#catalog",
+                        status_code=302,
+                    )
                 session.delete(row)
         return RedirectResponse(url="/products?msg=deleted", status_code=302)
 
@@ -5170,6 +5392,72 @@ def create_app() -> FastAPI:
     def _module_flash_error(request: Request) -> str:
         return request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else "")
 
+    def _purchase_save_redirect(form: Any, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+        data, amount, currency = _purchase_document_payload(form)
+        if not data["supplier"]:
+            return RedirectResponse(url=f"{base_url}?error=" + quote("Поставщик обязателен") + "#purchases", status_code=302)
+        with session_scope() as session:
+            try:
+                supplier_row = _ensure_counterparty(
+                    session,
+                    workspace_owner_id,
+                    name=data["supplier"],
+                    role="supplier",
+                )
+                warehouse_row = _ensure_warehouse(
+                    session,
+                    workspace_owner_id,
+                    name=data["warehouse"],
+                )
+                data["lines"] = _sync_product_lines(
+                    session,
+                    workspace_owner_id,
+                    warehouse_name=warehouse_row.name,
+                    lines=list(data.get("lines") or []),
+                    delta_sign=1,
+                    op_date=str(data.get("date") or ""),
+                )
+                data["warehouse_id"] = warehouse_row.id
+                data["counterparty_id"] = supplier_row.id
+            except ValueError as exc:
+                return RedirectResponse(url=f"{base_url}?error=" + quote(str(exc)) + "#purchases", status_code=302)
+            count = session.execute(
+                select(func.count(PurchaseDocument.id)).where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
+            ).scalar_one()
+            number = str(form.get("number") or "").strip() or f"P-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{int(count) + 1:03d}"
+            row = PurchaseDocument(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=workspace_owner_id,
+                number=number,
+                amount=amount,
+                currency=currency,
+                counterparty_id=supplier_row.id,
+                external_source="local",
+                external_id=str(uuid.uuid4()),
+                data=data,
+            )
+            session.add(row)
+        return RedirectResponse(url=f"{base_url}?msg=saved#purchases", status_code=302)
+
+    def _purchase_delete_redirect(purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+        with session_scope() as session:
+            row = session.get(PurchaseDocument, purchase_id)
+            if row and row.workspace_owner_id == workspace_owner_id:
+                data = _json_object(row.data)
+                try:
+                    _sync_product_lines(
+                        session,
+                        workspace_owner_id,
+                        warehouse_name=str(data.get("warehouse") or "Основной склад"),
+                        lines=list(data.get("lines") or []),
+                        delta_sign=-1,
+                        op_date=str(data.get("date") or ""),
+                    )
+                except ValueError as exc:
+                    return RedirectResponse(url=f"{base_url}?error=" + quote(str(exc)) + "#purchases", status_code=302)
+                session.delete(row)
+        return RedirectResponse(url=f"{base_url}?msg=deleted#purchases", status_code=302)
+
     @app.get("/warehouse", response_class=HTMLResponse, name="warehouse_get")
     def warehouse_get(
         request: Request,
@@ -5198,8 +5486,11 @@ def create_app() -> FastAPI:
         warehouse_records: list[dict[str, Any]] = []
         warehouse_stocks: list[dict[str, Any]] = []
         warehouse_operations: list[dict[str, Any]] = []
+        warehouse_purchases: list[dict[str, Any]] = []
         product_names: list[str] = []
+        supplier_names: list[str] = []
         warehouse_stock_total = Decimal("0")
+        warehouse_purchase_totals: dict[str, Decimal] = {}
         with session_scope() as session:
             warehouse_rows = list(
                 session.execute(
@@ -5222,6 +5513,24 @@ def create_app() -> FastAPI:
                     .order_by(WarehouseOperation.updated_at.desc())
                 ).scalars()
             )
+            purchase_rows = list(
+                session.execute(
+                    select(PurchaseDocument)
+                    .where(PurchaseDocument.workspace_owner_id == wid)
+                    .order_by(PurchaseDocument.updated_at.desc())
+                ).scalars()
+            )
+            supplier_names = [
+                str(row.name)
+                for row in session.execute(
+                    select(Counterparty)
+                    .where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind.in_(["supplier", "both"]),
+                    )
+                    .order_by(Counterparty.name.asc())
+                ).scalars()
+            ]
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
             product_names = [str(row.name) for row in product_rows]
             for product_row in product_rows:
@@ -5270,9 +5579,27 @@ def create_app() -> FastAPI:
                 if filters["op_type"] != "all" and item["operation_type"] != filters["op_type"]:
                     continue
                 warehouse_operations.append(item)
+            for row in purchase_rows:
+                item = _purchase_document_data(row)
+                line_products = " ".join(
+                    str(line.get("product") or "")
+                    for line in item["lines"]
+                    if isinstance(line, dict)
+                ).lower()
+                hay = " ".join([item["number"], item["supplier"], item["warehouse"], item["status_label"], item["note"], line_products]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                if filters["warehouse"] and item["warehouse"] != filters["warehouse"]:
+                    continue
+                if filters["product"] and filters["product"].lower() not in line_products:
+                    continue
+                warehouse_purchases.append(item)
+                currency = str(row.currency or item["currency"] or "UZS").upper()
+                warehouse_purchase_totals[currency] = warehouse_purchase_totals.get(currency, Decimal("0")) + _sales_decimal(row.amount)
         warehouse_options = {
             "warehouses": [item["name"] for item in warehouse_records] or ["Основной склад"],
             "products": product_names,
+            "suppliers": supplier_names,
         }
         return tpl(
             request,
@@ -5286,6 +5613,11 @@ def create_app() -> FastAPI:
             warehouse_stocks=warehouse_stocks,
             warehouse_stock_total=_sales_money_label(warehouse_stock_total),
             warehouse_operations=warehouse_operations,
+            warehouse_purchases=warehouse_purchases,
+            warehouse_purchase_totals=[
+                {"currency": currency, "amount": _sales_money_label(amount)}
+                for currency, amount in sorted(warehouse_purchase_totals.items())
+            ],
             warehouse_operation_preset=operation_preset,
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
@@ -5440,6 +5772,28 @@ def create_app() -> FastAPI:
                 session.delete(row)
                 return RedirectResponse(url=f"/warehouse?msg=deleted#{target_hash}", status_code=302)
         return RedirectResponse(url="/warehouse?msg=deleted#adjustments", status_code=302)
+
+    @app.post("/warehouse/purchases/save", name="warehouse_purchase_save")
+    async def warehouse_purchase_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        return _purchase_save_redirect(form, wid, "/warehouse")
+
+    @app.post("/warehouse/purchases/{purchase_id}/delete", name="warehouse_purchase_delete")
+    async def warehouse_purchase_delete(request: Request, purchase_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        return _purchase_delete_redirect(purchase_id, wid, "/warehouse")
 
     @app.get("/clients", response_class=HTMLResponse, name="clients_get")
     def clients_get(
@@ -5884,51 +6238,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        data, amount, currency = _purchase_document_payload(form)
-        if not data["supplier"]:
-            return RedirectResponse(url="/suppliers?error=" + quote("Поставщик обязателен") + "#purchases", status_code=302)
-        with session_scope() as session:
-            try:
-                supplier_row = _ensure_counterparty(
-                    session,
-                    wid,
-                    name=data["supplier"],
-                    role="supplier",
-                )
-                warehouse_row = _ensure_warehouse(
-                    session,
-                    wid,
-                    name=data["warehouse"],
-                )
-                data["lines"] = _sync_product_lines(
-                    session,
-                    wid,
-                    warehouse_name=warehouse_row.name,
-                    lines=list(data.get("lines") or []),
-                    delta_sign=1,
-                    op_date=str(data.get("date") or ""),
-                )
-                data["warehouse_id"] = warehouse_row.id
-                data["counterparty_id"] = supplier_row.id
-            except ValueError as exc:
-                return RedirectResponse(url="/suppliers?error=" + quote(str(exc)) + "#purchases", status_code=302)
-            count = session.execute(
-                select(func.count(PurchaseDocument.id)).where(PurchaseDocument.workspace_owner_id == wid)
-            ).scalar_one()
-            number = str(form.get("number") or "").strip() or f"P-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{int(count) + 1:03d}"
-            row = PurchaseDocument(
-                id=str(uuid.uuid4()),
-                workspace_owner_id=wid,
-                number=number,
-                amount=amount,
-                currency=currency,
-                counterparty_id=supplier_row.id,
-                external_source="local",
-                external_id=str(uuid.uuid4()),
-                data=data,
-            )
-            session.add(row)
-        return RedirectResponse(url="/suppliers?msg=saved#purchases", status_code=302)
+        return _purchase_save_redirect(form, wid, "/suppliers")
 
     @app.post("/suppliers/purchases/{purchase_id}/delete", name="suppliers_purchase_delete")
     async def suppliers_purchase_delete(request: Request, purchase_id: str):
@@ -5939,23 +6249,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        with session_scope() as session:
-            row = session.get(PurchaseDocument, purchase_id)
-            if row and row.workspace_owner_id == wid:
-                data = _json_object(row.data)
-                try:
-                    _sync_product_lines(
-                        session,
-                        wid,
-                        warehouse_name=str(data.get("warehouse") or "Основной склад"),
-                        lines=list(data.get("lines") or []),
-                        delta_sign=-1,
-                        op_date=str(data.get("date") or ""),
-                    )
-                except ValueError as exc:
-                    return RedirectResponse(url="/suppliers?error=" + quote(str(exc)) + "#purchases", status_code=302)
-                session.delete(row)
-        return RedirectResponse(url="/suppliers?msg=deleted#purchases", status_code=302)
+        return _purchase_delete_redirect(purchase_id, wid, "/suppliers")
 
     @app.get("/crm", response_class=HTMLResponse, name="crm_get")
     def crm_get(
