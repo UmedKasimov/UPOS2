@@ -7037,6 +7037,53 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=f"/clients?client={quote(client_id)}&msg=saved#client-card", status_code=302)
         return RedirectResponse(url="/clients?msg=saved#clients", status_code=302)
 
+    @app.post("/api/clients/{counterparty_id}/location", name="client_location_save_api")
+    async def client_location_save_api(request: Request, counterparty_id: str):
+        tok = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, tok):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"ok": False, "error": "json"}, status_code=400)
+        if not isinstance(payload, dict):
+            return JSONResponse({"ok": False, "error": "json"}, status_code=400)
+        latitude = _clean_client_coordinate(payload.get("latitude"), minimum=-90, maximum=90)
+        longitude = _clean_client_coordinate(payload.get("longitude"), minimum=-180, maximum=180)
+        if not latitude or not longitude:
+            return JSONResponse({"ok": False, "error": "coordinates"}, status_code=400)
+        address = str(payload.get("address") or "").strip()
+        map_icon = str(payload.get("map_icon") or "").strip()
+        with session_scope() as session:
+            row = session.get(Counterparty, counterparty_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            has_client, _has_supplier = _counterparty_role_flags(row.kind)
+            if not has_client:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            extra = _counterparty_extra(row)
+            extra["latitude"] = latitude
+            extra["longitude"] = longitude
+            if address:
+                extra["address"] = address
+            if map_icon:
+                extra["map_icon"] = map_icon
+            row.data = extra
+            flag_modified(row, "data")
+        return JSONResponse(
+            {
+                "ok": True,
+                "latitude": latitude,
+                "longitude": longitude,
+                "address": address,
+                "map_icon": map_icon,
+            }
+        )
+
     @app.post("/clients/{counterparty_id}/delete", name="clients_delete")
     async def clients_delete(request: Request, counterparty_id: str):
         form = await request.form()

@@ -6,6 +6,13 @@
   const TILE_ATTRIBUTION = "&copy; OpenStreetMap";
   const overviewGeocodeCache = new Map();
 
+  function csrfToken(source) {
+    return source?.dataset?.csrf
+      || document.querySelector('meta[name="csrf-token"]')?.getAttribute("content")
+      || document.querySelector('input[name="csrf_token"]')?.value
+      || "";
+  }
+
   function setStatus(form, text) {
     const status = form.querySelector("[data-client-location-status]");
     if (status) status.textContent = text;
@@ -437,6 +444,7 @@
     api.layer.clearLayers();
     if (!point) {
       api.container.classList.add("client-location-map--empty");
+      if (hint) hint.hidden = false;
       api.map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       scheduleInvalidate(api);
       return;
@@ -456,6 +464,66 @@
     `);
     api.map.setView([point.lat, point.lon], PICK_ZOOM);
     scheduleInvalidate(api);
+  }
+
+  function setClientCardPoint(api, lat, lon, address = "") {
+    api.container.dataset.lat = String(lat);
+    api.container.dataset.lon = String(lon);
+    api.container.classList.remove("client-location-map--empty");
+    const hint = api.container.querySelector(".client-location-map-hint");
+    if (hint) hint.hidden = true;
+    const name = api.container.dataset.name || "РљР»РёРµРЅС‚";
+    const icon = api.container.dataset.icon || "";
+    const marker = window.L.marker([lat, lon], { icon: markerIcon(name, icon) }).addTo(api.layer);
+    marker.bindPopup(`
+      <strong>${escapeHtml(name)}</strong>
+      ${address ? `<span>${escapeHtml(address)}</span>` : ""}
+    `);
+    api.map.setView([lat, lon], PICK_ZOOM);
+    scheduleInvalidate(api);
+  }
+
+  async function saveClientCardLocation(api, lat, lon) {
+    const container = api.container;
+    const hint = container.querySelector(".client-location-map-hint");
+    let address = container.dataset.address || "";
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent = "РЎРѕС…СЂР°РЅСЏРµРј Р»РѕРєР°С†РёСЋ...";
+    }
+    if (!address) {
+      try {
+        address = (await reverseAddress(lat, lon)) || "";
+      } catch {}
+    }
+    const saveUrl = container.dataset.saveUrl || `/api/clients/${encodeURIComponent(container.dataset.clientId || "")}/location`;
+    const response = await fetch(saveUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken(container),
+      },
+      body: JSON.stringify({
+        latitude: lat,
+        longitude: lon,
+        address,
+        map_icon: container.dataset.icon || "",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "save_failed");
+    }
+    container.dataset.lat = String(payload.latitude || lat);
+    container.dataset.lon = String(payload.longitude || lon);
+    if (payload.address || address) {
+      container.dataset.address = String(payload.address || address);
+    }
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent = `Р›РѕРєР°С†РёСЏ СЃРѕС…СЂР°РЅРµРЅР°: ${lat}, ${lon}`;
+    }
   }
 
   function ensureClientCardMap(container) {
@@ -479,6 +547,21 @@
 
     const api = { container, map, layer: window.L.layerGroup().addTo(map) };
     container._clientCardMapApi = api;
+    map.on("click", async (event) => {
+      const lat = Number(event.latlng.lat.toFixed(6));
+      const lon = Number(event.latlng.lng.toFixed(6));
+      api.layer.clearLayers();
+      setClientCardPoint(api, lat, lon, api.container.dataset.address || "");
+      try {
+        await saveClientCardLocation(api, lat, lon);
+      } catch {
+        const hint = api.container.querySelector(".client-location-map-hint");
+        if (hint) {
+          hint.hidden = false;
+          hint.textContent = "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ Р»РѕРєР°С†РёСЋ. РћР±РЅРѕРІРёС‚Рµ СЃС‚СЂР°РЅРёС†Сѓ Рё РїРѕРІС‚РѕСЂРёС‚Рµ.";
+        }
+      }
+    });
     if (window.ResizeObserver) {
       api.resizeObserver = new ResizeObserver(() => scheduleInvalidate(api));
       api.resizeObserver.observe(container);
