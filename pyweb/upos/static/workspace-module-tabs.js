@@ -107,6 +107,11 @@
       };
       const aliasTab = aliasMap[key]?.[hash];
       if (aliasTab && tabMeta.has(aliasTab)) return aliasTab;
+      if (key === "products" && hash === "price-type-detail") {
+        const priceTypeId = new URLSearchParams(window.location.search).get("price_type");
+        const priceTab = priceTypeId ? `price-type-${priceTypeId}` : "";
+        if (priceTab && tabMeta.has(priceTab)) return priceTab;
+      }
       if (hash && tabMeta.has(hash)) return hash;
       for (const tabId of tabMeta.keys()) {
         const url = tabUrl(tabId);

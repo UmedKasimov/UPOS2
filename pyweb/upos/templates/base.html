@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=163" />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=180" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -201,7 +201,7 @@
                   {% endif %}
                 </div>
               </details>
-              <a href="{{ url_for('products_get') }}" class="nav-link {{ 'active' if active == 'products' else '' }}">
+              <a href="{{ url_for('products_get') }}#catalog" class="nav-link {{ 'active' if active == 'products' else '' }}">
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                 <span class="nav-label">Товары</span>
               </a>
@@ -319,10 +319,10 @@
     <script src="{{ url_for('static', path='theme.js') }}"></script>
     <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='layout-sidebar.js') }}" defer></script>
-    <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=8" defer></script>
+    <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=9" defer></script>
     <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=7" defer></script>
     <script src="{{ url_for('static', path='table-column-controls.js') }}?v=2" defer></script>
-    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=10"></script>
     <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=1" defer></script>

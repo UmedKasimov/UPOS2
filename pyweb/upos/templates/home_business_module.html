@@ -10,6 +10,10 @@
     <script src="{{ url_for('static', path='telephony.js') }}?v=2" defer></script>
   {% elif active == "warehouse" %}
     <script src="{{ url_for('static', path='warehouse.js') }}?v=1" defer></script>
+  {% elif active == "clients" %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script src="{{ url_for('static', path='clients.js') }}?v=8" defer></script>
   {% endif %}
 {% endblock %}
 
@@ -32,7 +36,9 @@
 {% endfor %}
 {% set module_views = module_views_ns.value %}
 {% if active == "clients" and selected_client_card %}
-  {% set module_stack_views = module_views ~ " profile" %}
+  {% set module_stack_views = module_views ~ " profile client_create client_edit clients_map" %}
+{% elif active == "clients" %}
+  {% set module_stack_views = module_views ~ " client_create client_edit clients_map" %}
 {% elif active == "suppliers" and selected_supplier_card %}
   {% set module_stack_views = module_views ~ " profile" %}
 {% else %}

@@ -68,18 +68,21 @@
         <span>Прайс-листы</span>
         <small>Продажные цены</small>
       </a>
-      <a class="general-report-card" href="#folders" data-workspace-card="folders" data-workspace-tab-title="Папки" data-workspace-tab-hash="folders">
+      <a class="general-report-card" href="#categories" data-workspace-card="categories" data-workspace-tab-title="Категории" data-workspace-tab-hash="categories">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <path d="M4 5h16" />
+            <path d="M4 12h16" />
+            <path d="M4 19h16" />
+            <path d="M8 5v14" />
           </svg>
         </span>
-        <span>Папки</span>
-        <small>Группировка каталога</small>
+        <span>Категории</span>
+        <small>Разделы товаров</small>
       </a>
     </section>
 
-    <div class="workspace-module-stack" data-workspace-view="catalog service create price_types folders" hidden>
+    <div class="workspace-module-stack" data-workspace-view="catalog service create price_types price_type_detail categories" hidden>
 
     <datalist id="product-category-list">
       {% for item in product_options.categories %}<option value="{{ item }}">{% endfor %}
@@ -105,6 +108,7 @@
               <a class="btn" href="{{ url_for('products_get') }}?kind={{ product_filters.kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
                 {% if product_filters.kind == 'service' %}+ Услуга{% else %}+ Товар{% endif %}
               </a>
+              <a class="btn btn-secondary" href="#categories" data-workspace-card="categories" data-workspace-tab-title="Категории" data-workspace-tab-hash="categories">Категории</a>
               <form method="get" action="{{ url_for('products_export') }}" class="products-filter-inline-form">
                 <input type="hidden" name="q" value="{{ product_filters.q }}" />
                 {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
@@ -567,49 +571,309 @@
       </aside>
     </div>
 
-    <section class="products-dictionaries" data-workspace-view="price_types folders" hidden>
+    <section class="products-dictionaries" data-workspace-view="price_types price_type_detail categories" hidden>
       <article id="price-types" data-workspace-view="price_types" hidden>
-        <h2>Прайс-листы</h2>
-        <p>Прайс-листы используются в карточках товаров и позволяют хранить продажные, скидочные и приходные цены.</p>
+        <header class="products-dictionary-head">
+          <div>
+            <h2>Прайс-листы</h2>
+            <p>Именованные наборы цен для продаж, закупок и автоматического расчета.</p>
+          </div>
+          <button class="btn" type="button" data-price-type-open>+ Прайс-лист</button>
+        </header>
+
+        <div class="price-type-card-grid">
+          {% for item in price_type_state.price_types %}
+            <article class="price-type-card">
+              <a
+                href="{{ url_for('products_get') }}?price_type={{ item.id }}#price-type-detail"
+                class="price-type-card-main"
+                data-workspace-trigger="price-type-{{ item.id }}"
+                data-workspace-view-id="price_type_detail"
+                data-workspace-tab-title="{{ item.name }}"
+                data-workspace-tab-hash="price-type-detail"
+                data-workspace-tab-href="{{ url_for('products_get') }}?price_type={{ item.id }}"
+              >
+                <strong>{{ item.name }}</strong>
+                <span>{{ "Зависит от другой цены" if item.pricing_method == "dependent" else "Ручное назначение" }}</span>
+                <small>Изменено: {{ item.updated_at }} · {{ item.created_by }}</small>
+              </a>
+              <div class="price-type-card-meta">
+                {% if item.is_for_sales %}<span>В продажах</span>{% endif %}
+                {% if item.is_for_purchases %}<span>В закупках</span>{% endif %}
+                <span class="{{ 'is-ok' if item.is_active else 'is-muted' }}">{{ "Активный" if item.is_active else "Неактивный" }}</span>
+                <span>{{ item.product_count }} цен</span>
+              </div>
+              <div class="price-type-card-actions">
+                <button type="button" class="products-action-icon products-action-icon--edit" data-price-type-open
+                  data-id="{{ item.id }}" data-name="{{ item.name }}" data-sort-order="{{ item.sort_order }}"
+                  data-for-sales="{{ '1' if item.is_for_sales else '0' }}" data-for-purchases="{{ '1' if item.is_for_purchases else '0' }}"
+                  data-active="{{ '1' if item.is_active else '0' }}" data-method="{{ item.pricing_method }}"
+                  data-base="{{ item.base_price_type_id }}" data-markup-type="{{ item.markup_type }}" data-markup-value="{{ item.markup_value }}"
+                  data-currency="{{ item.convert_to_currency }}" data-rounding="{{ item.rounding }}" title="Редактировать">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                </button>
+                <form method="post" action="{{ url_for('products_price_type_toggle') }}">
+                  {% include "_csrf_field.html" %}
+                  <input type="hidden" name="price_type_id" value="{{ item.id }}" />
+                  <button class="products-action-icon" type="submit" title="Активный / неактивный">⋯</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+
+      </article>
+      <article id="price-type-detail" data-workspace-view="price_type_detail" hidden>
+        {% set selected_price = price_type_state.selected %}
+        <section class="price-type-products-panel">
+          <header class="products-dictionary-head">
+            <div>
+              <h3>{{ selected_price.name }}</h3>
+              <p>
+                {% if selected_price.pricing_method == "dependent" %}
+                  База: {{ "последняя закупочная цена" if selected_price.base_price_type_id == "last_purchase_price" else selected_price.base_price_type_id }} ·
+                  {{ "Наценка" if selected_price.markup_type == "markup" else "Скидка" }} {{ selected_price.markup_value or 0 }}% ·
+                  {{ selected_price.convert_to_currency }} · округление {{ selected_price.rounding }}
+                {% else %}
+                  Ручное редактирование цен по каждому товару.
+                {% endif %}
+              </p>
+            </div>
+          </header>
+          <form class="products-catalog-filter price-type-filter" method="get" action="{{ url_for('products_get') }}#price-type-detail">
+            <input type="hidden" name="price_type" value="{{ selected_price.id }}" />
+            <label class="products-catalog-search"><span>Поиск</span><input name="price_q" value="{{ price_type_state.filters.q }}" placeholder="Поиск" /></label>
+            <label><span>Категория</span><select name="price_category"><option value="">Все</option>{% for item in product_options.categories %}<option value="{{ item }}" {% if price_type_state.filters.category == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+            <label><span>Группа</span><select name="price_group"><option value="">Все</option>{% for item in product_options.groups %}<option value="{{ item }}" {% if price_type_state.filters.group == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+            <label><span>Бренд</span><select name="price_brand"><option value="">Все</option>{% for item in product_options.brands %}<option value="{{ item }}" {% if price_type_state.filters.brand == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+            <label><span>Цена</span><select name="price_status"><option value="all" {% if price_type_state.filters.status == 'all' %}selected{% endif %}>Все</option><option value="with" {% if price_type_state.filters.status == 'with' %}selected{% endif %}>Есть цена</option><option value="without" {% if price_type_state.filters.status == 'without' %}selected{% endif %}>Нет цены</option></select></label>
+            <button class="btn btn-secondary" type="submit">Фильтр</button>
+          </form>
+          <form method="post" action="{{ url_for('products_price_type_prices_save') }}">
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="price_type_id" value="{{ selected_price.id }}" />
+            <div class="products-table-wrap">
+              <table class="products-table price-type-products-table">
+                <thead><tr><th>Фото</th><th>Название</th><th>Артикул</th><th>Бренд</th><th>Группа</th><th>Категория</th><th>Цена за ед.хр</th><th>Валюта</th></tr></thead>
+                <tbody>
+                  {% for product in price_type_state.rows %}
+                    <tr>
+                      <td>{% if product.photo_url %}<img class="product-thumb" src="{{ product.photo_url }}" alt="" />{% else %}<span class="product-thumb-frame">□</span>{% endif %}</td>
+                      <td><a class="product-open-link" href="{{ url_for('products_get') }}?edit={{ product.id }}#product-form"><strong>{{ product.name }}</strong></a></td>
+                      <td>{{ product.sku or "-" }}<input type="hidden" name="product_id" value="{{ product.id }}" /></td>
+                      <td>{{ product.brand or "-" }}</td>
+                      <td>{{ product.group or "-" }}</td>
+                      <td>{{ product.category or "-" }}</td>
+                      <td>
+                        {% if selected_price.pricing_method == "manual" %}
+                          <input class="price-type-price-input" name="price_value" value="{{ product.price_type_price }}" inputmode="decimal" />
+                        {% else %}
+                          {% if selected_price.pricing_method == "dependent" %}<input type="checkbox" title="Исключить из расчета" />{% endif %}
+                          <strong>{{ product.price_type_price or "-" }}</strong>
+                          <input type="hidden" name="price_value" value="{{ product.price_type_price }}" />
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if selected_price.pricing_method == "manual" %}
+                          <select name="price_currency"><option value="UZS" {% if product.price_type_currency == "UZS" %}selected{% endif %}>UZS</option><option value="USD" {% if product.price_type_currency == "USD" %}selected{% endif %}>USD</option></select>
+                        {% else %}
+                          {{ product.price_type_currency }}<input type="hidden" name="price_currency" value="{{ product.price_type_currency }}" />
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="8">Товары не найдены.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <footer class="products-catalog-footer">
+              <div class="products-pagination">
+                <a class="products-page-btn" href="{{ price_type_state.prev_url }}">‹</a>
+                {% for page_no, page_url in price_type_state.page_urls.items() %}
+                  <a class="products-page-btn {% if page_no == price_type_state.page %}active{% endif %}" href="{{ page_url }}">{{ page_no }}</a>
+                {% endfor %}
+                <a class="products-page-btn" href="{{ price_type_state.next_url }}">›</a>
+                <span>Стр. {{ price_type_state.page }} из {{ price_type_state.total_pages }}</span>
+              </div>
+              <div class="products-catalog-footer-meta"><span>Всего: {{ price_type_state.total }}</span><span>Показано: {{ price_type_state.from }}-{{ price_type_state.to }}</span></div>
+              {% if selected_price.pricing_method == "manual" %}<button class="btn" type="submit">Сохранить цены</button>{% endif %}
+            </footer>
+          </form>
+        </section>
+      </article>
+      <article id="categories" data-workspace-view="categories" hidden>
+        <header class="products-dictionary-head">
+          <div>
+            <h2>Категории</h2>
+            <p>Категории используются в фильтрах и карточках товаров.</p>
+          </div>
+          <button class="btn" type="button" data-product-category-open>+ Категория</button>
+        </header>
         <div class="products-table-wrap">
-          <table class="products-table" data-upos-column-controls>
+          <table class="products-table products-dictionary-table">
             <thead>
               <tr>
                 <th>Название</th>
-                <th>Тип</th>
-                <th>Валюта</th>
-                <th>Значение по умолчанию</th>
                 <th>Товаров</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {% for item in product_options.price_lists %}
+              {% for item in product_options.category_rows %}
                 <tr>
                   <td><strong>{{ item.name }}</strong></td>
-                  <td>{{ item.type }}</td>
-                  <td>{{ item.currency }}</td>
-                  <td>{{ item.default_value or "-" }}</td>
                   <td>{{ item.product_count }}</td>
+                  <td class="products-row-actions">
+                    <button
+                      class="products-action-icon products-action-icon--edit"
+                      type="button"
+                      title="Редактировать"
+                      aria-label="Редактировать {{ item.name }}"
+                      data-product-category-open
+                      data-category-name="{{ item.name }}"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    <form method="post" action="{{ url_for('products_category_delete') }}" onsubmit="return confirm({{ ('Удалить категорию ' ~ item.name ~ '? У товаров эта категория очистится.')|tojson }});">
+                      {% include "_csrf_field.html" %}
+                      <input type="hidden" name="name" value="{{ item.name }}" />
+                      <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить" aria-label="Удалить {{ item.name }}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v5" />
+                          <path d="M14 11v5" />
+                        </svg>
+                      </button>
+                    </form>
+                  </td>
                 </tr>
               {% else %}
-                <tr><td colspan="5">Прайс-листы пока не настроены. Добавьте цену в карточке товара.</td></tr>
+                <tr><td colspan="3">Категории пока не заполнены.</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </article>
-      <article id="folders" data-workspace-view="folders" hidden>
-        <h2>Папки</h2>
-        <p>Папки помогают группировать номенклатуру без изменения категории.</p>
-        <div class="products-chip-row">
-          {% for item in product_options.folders %}
-            <span>{{ item }}</span>
-          {% else %}
-            <span>Основная папка</span>
-          {% endfor %}
-        </div>
-      </article>
     </section>
+    <dialog class="settings-profile-modal products-category-dialog" id="products-price-type-dialog">
+      <form method="post" action="{{ url_for('products_price_type_save') }}" class="settings-profile-modal-card telephony-dialog-surface" data-price-type-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="price_type_id" data-price-type-id />
+        <header class="settings-profile-modal-head">
+          <div>
+            <p>Прайс-листы</p>
+            <h2 data-price-type-dialog-title>Новый прайс-лист</h2>
+          </div>
+          <button type="button" class="settings-profile-close" data-price-type-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="product-form-grid product-form-grid--identity price-type-dialog-grid">
+          <label class="wide"><span>Название*</span><input name="name" required data-price-type-name /></label>
+          <label><span>Сортировка</span><input name="sort_order" inputmode="numeric" data-price-type-sort /></label>
+          <label><span>Способ</span><select name="pricing_method" data-price-type-method><option value="manual">Ручное назначение</option><option value="dependent">Зависит от другой цены</option></select></label>
+          <label><span>Базовая цена</span><select name="base_price_type_id" data-price-type-base><option value="last_purchase_price">Последняя закупочная цена</option>{% for item in price_type_state.price_types %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+          <label><span>Тип</span><select name="markup_type" data-price-type-markup-type><option value="markup">Наценка</option><option value="discount">Скидка</option></select></label>
+          <label><span>%</span><input name="markup_value" inputmode="decimal" data-price-type-markup-value /></label>
+          <label><span>Валюта результата</span><select name="convert_to_currency" data-price-type-currency><option value="UZS">UZS</option><option value="USD">USD</option></select></label>
+          <label><span>Округление</span><select name="rounding" data-price-type-rounding>{% for item in price_type_state.roundings %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+        </div>
+        <div class="price-type-flags">
+          <label><input type="checkbox" name="is_for_sales" value="1" data-price-type-sales /> В продажах</label>
+          <label><input type="checkbox" name="is_for_purchases" value="1" data-price-type-purchases /> В закупках</label>
+          <label><input type="checkbox" name="is_active" value="1" data-price-type-active /> Активный</label>
+        </div>
+        <div class="products-bulk-dialog-actions">
+          <button class="btn" type="submit">Сохранить</button>
+          <button class="btn btn-secondary" type="button" data-price-type-close>Отмена</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="settings-profile-modal products-category-dialog" id="products-category-dialog">
+      <form method="post" action="{{ url_for('products_category_save') }}" class="settings-profile-modal-card telephony-dialog-surface" data-product-category-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="old_name" data-product-category-old-name />
+        <header class="settings-profile-modal-head">
+          <div>
+            <p>Справочник товаров</p>
+            <h2 data-product-category-dialog-title>Новая категория</h2>
+          </div>
+          <button type="button" class="settings-profile-close" data-product-category-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="products-bulk-dialog-body">
+          <label class="product-form-grid product-category-dialog-field">
+            <span>Название категории*</span>
+            <input name="name" required data-product-category-name />
+          </label>
+        </div>
+        <div class="products-bulk-dialog-actions">
+          <button class="btn" type="submit">Сохранить</button>
+          <button class="btn btn-secondary" type="button" data-product-category-close>Отмена</button>
+        </div>
+      </form>
+    </dialog>
     </div>
   </section>
+	  <script>
+	    (() => {
+	      const priceDialog = document.getElementById('products-price-type-dialog');
+	      if (priceDialog) {
+	        const setValue = (selector, value) => {
+	          const node = priceDialog.querySelector(selector);
+	          if (node) node.value = value || '';
+	        };
+	        const setChecked = (selector, value) => {
+	          const node = priceDialog.querySelector(selector);
+	          if (node) node.checked = value === '1';
+	        };
+	        document.querySelectorAll('[data-price-type-open]').forEach((button) => {
+	          button.addEventListener('click', () => {
+	            const id = button.dataset.id || '';
+	            const title = priceDialog.querySelector('[data-price-type-dialog-title]');
+	            if (title) title.textContent = id ? 'Редактировать прайс-лист' : 'Новый прайс-лист';
+	            setValue('[data-price-type-id]', id);
+	            setValue('[data-price-type-name]', button.dataset.name || '');
+	            setValue('[data-price-type-sort]', button.dataset.sortOrder || '0');
+	            setValue('[data-price-type-method]', button.dataset.method || 'manual');
+	            setValue('[data-price-type-base]', button.dataset.base || 'last_purchase_price');
+	            setValue('[data-price-type-markup-type]', button.dataset.markupType || 'markup');
+	            setValue('[data-price-type-markup-value]', button.dataset.markupValue || '');
+	            setValue('[data-price-type-currency]', button.dataset.currency || 'UZS');
+	            setValue('[data-price-type-rounding]', button.dataset.rounding || '1.0');
+	            setChecked('[data-price-type-sales]', button.dataset.forSales || '1');
+	            setChecked('[data-price-type-purchases]', button.dataset.forPurchases || '0');
+	            setChecked('[data-price-type-active]', button.dataset.active || '1');
+	            if (typeof priceDialog.showModal === 'function') priceDialog.showModal();
+	            window.setTimeout(() => priceDialog.querySelector('[data-price-type-name]')?.focus(), 30);
+	          });
+	        });
+	        priceDialog.querySelectorAll('[data-price-type-close]').forEach((button) => {
+	          button.addEventListener('click', () => priceDialog.close());
+	        });
+	      }
+
+	      const dialog = document.getElementById('products-category-dialog');
+	      if (!dialog) return;
+      const title = dialog.querySelector('[data-product-category-dialog-title]');
+      const oldName = dialog.querySelector('[data-product-category-old-name]');
+      const nameInput = dialog.querySelector('[data-product-category-name]');
+      document.querySelectorAll('[data-product-category-open]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const value = button.dataset.categoryName || '';
+          if (title) title.textContent = value ? 'Редактировать категорию' : 'Новая категория';
+          if (oldName) oldName.value = value;
+          if (nameInput) nameInput.value = value;
+          if (typeof dialog.showModal === 'function') dialog.showModal();
+          window.setTimeout(() => nameInput?.focus(), 30);
+        });
+      });
+      dialog.querySelectorAll('[data-product-category-close]').forEach((button) => {
+        button.addEventListener('click', () => dialog.close());
+      });
+    })();
+  </script>
 {% endblock %}

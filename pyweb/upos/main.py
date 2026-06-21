@@ -10,7 +10,7 @@ import re
 import secrets
 import socket
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,6 +27,7 @@ from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm.attributes import flag_modified
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -2903,7 +2904,7 @@ def create_app() -> FastAPI:
                 "heading": "Складской учет",
                 "action": "+ Операция",
                 "launcher": [
-                    {"id": "stocks", "title": "Остатки", "subtitle": "Товары по складам", "icon": "warehouse"},
+                    {"id": "warehouses", "title": "Склады", "subtitle": "Создание и настройки", "icon": "warehouse"},
                     {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
                     {"id": "purchases", "title": "Закупки", "subtitle": "Приход от поставщиков", "icon": "purchase"},
                     {"id": "adjustments", "title": "Корректировки", "subtitle": "Приход и списание", "icon": "adjustment"},
@@ -2924,16 +2925,16 @@ def create_app() -> FastAPI:
             "clients": {
                 "title": "Клиенты",
                 "kicker": "CRM и продажи",
-                "subtitle": "Клиенты, контакты, категории, маршруты и балансы",
+                "subtitle": "Клиенты, должники, маршруты и балансы",
                 "heading": "База клиентов",
                 "action": "+ Клиент",
                 "launcher": [
                     {"id": "clients", "title": "Клиенты", "subtitle": "База контрагентов", "icon": "clients"},
+                    {"id": "balances", "title": "Должники", "subtitle": "Клиенты с долгом", "icon": "balance"},
                     {"id": "routes", "title": "Маршруты", "subtitle": "Территории и график", "icon": "route"},
-                    {"id": "balances", "title": "Балансы", "subtitle": "Долги и оплаты", "icon": "balance"},
                 ],
                 "filters": ["Поиск", "Территория", "Категория", "Маршрут", "Статус"],
-                "columns": ["Название", "Официальное название", "Баланс", "Последняя отгрузка", "Телефон", "Категория"],
+                "columns": ["ИД", "Название", "Баланс", "Телефон", "Категория", "Маршрут"],
                 "list_title": "Список клиентов",
                 "status": "Каркас",
                 "empty": "Здесь будет клиентская база с балансами и связями с продажами.",
@@ -3473,6 +3474,143 @@ def create_app() -> FastAPI:
         data["stage"] = stage["title"]
         return stage
 
+    CLIENT_CRM_STATUS_LABELS = {
+        "new_lead": "Новый лид",
+        "qualification": "Квалификация",
+        "negotiation": "Переговоры",
+        "invoice": "Счёт",
+        "our_client": "Наш клиент",
+        "lost": "Потеряно",
+        "in_work": "В работе",
+        "paused": "Пауза",
+    }
+
+    CLIENT_CRM_STATUS_STAGE_IDS = {
+        "new_lead": "leads",
+        "qualification": "qualification",
+        "negotiation": "negotiation",
+        "invoice": "invoice",
+        "our_client": "won",
+        "lost": "lost",
+        "in_work": "negotiation",
+        "paused": "lost",
+    }
+
+    def _client_crm_status_from_stage(stage: dict[str, str] | None) -> str:
+        raw_id = str((stage or {}).get("id") or "").strip().lower()
+        raw_title = str((stage or {}).get("title") or "").strip().lower()
+        combined = f"{raw_id} {raw_title}"
+        if raw_id in {"leads", "lead", "new_lead"} or "лид" in combined:
+            return "new_lead"
+        if raw_id == "qualification" or "квалиф" in combined:
+            return "qualification"
+        if raw_id == "negotiation" or "перег" in combined:
+            return "negotiation"
+        if raw_id == "invoice" or "сч" in combined:
+            return "invoice"
+        if raw_id == "won" or "усп" in combined or "закрыт" in combined:
+            return "our_client"
+        if raw_id == "lost" or "потер" in combined or "отказ" in combined:
+            return "lost"
+        return "new_lead"
+
+    def _crm_stage_for_client_status(status: str, stages: list[dict[str, str]]) -> dict[str, str]:
+        status = status if status in CLIENT_CRM_STATUS_LABELS else "new_lead"
+        lookup = _crm_stage_lookup(stages)
+        for candidate in (CLIENT_CRM_STATUS_STAGE_IDS.get(status, ""), CLIENT_CRM_STATUS_LABELS.get(status, "")):
+            key = str(candidate or "").strip().lower()
+            if key and key in lookup:
+                return lookup[key]
+        if status in {"qualification", "negotiation", "invoice", "our_client", "lost"}:
+            for stage in stages:
+                if _client_crm_status_from_stage(stage) == status:
+                    return stage
+        return stages[0] if stages else dict(CRM_DEFAULT_STAGES[0])
+
+    def _crm_record_client_keys(row: CrmRecord) -> set[str]:
+        data = _json_object(row.data)
+        keys = {
+            str(row.counterparty_id or "").strip(),
+            str(data.get("counterparty_id") or "").strip(),
+            str(data.get("client") or "").strip().lower(),
+        }
+        keys.discard("")
+        return keys
+
+    def _crm_status_maps_from_records(rows: list[CrmRecord], stages: list[dict[str, str]]) -> tuple[dict[str, str], dict[str, str]]:
+        by_id: dict[str, str] = {}
+        by_name: dict[str, str] = {}
+        for row in rows:
+            data = _json_object(row.data)
+            stage = _crm_stage_for_value(data.get("stage_id") or data.get("stage"), stages)
+            status = _client_crm_status_from_stage(stage)
+            if row.counterparty_id and row.counterparty_id not in by_id:
+                by_id[row.counterparty_id] = status
+            name = str(data.get("client") or "").strip().lower()
+            if name and name not in by_name:
+                by_name[name] = status
+        return by_id, by_name
+
+    def _sync_counterparty_crm_status_from_stage(
+        session: Any,
+        workspace_owner_id: str,
+        row: CrmRecord,
+        stages: list[dict[str, str]],
+    ) -> None:
+        data = _json_object(row.data)
+        stage = _crm_stage_for_value(data.get("stage_id") or data.get("stage"), stages)
+        crm_status = _client_crm_status_from_stage(stage)
+        counterparty = session.get(Counterparty, row.counterparty_id) if row.counterparty_id else None
+        if counterparty is None and data.get("client"):
+            counterparty = _resolve_counterparty(session, workspace_owner_id, name=str(data.get("client") or ""), role="client")
+        if counterparty is None or counterparty.workspace_owner_id != workspace_owner_id:
+            return
+        extra = _counterparty_extra(counterparty)
+        extra["crm_status"] = crm_status
+        counterparty.data = extra
+        flag_modified(counterparty, "data")
+        row.counterparty_id = counterparty.id
+        data["client"] = counterparty.name
+        row.data = data
+        flag_modified(row, "data")
+
+    def _sync_crm_records_for_counterparty_status(
+        session: Any,
+        workspace_owner_id: str,
+        counterparty: Counterparty,
+        crm_status: str,
+        stages: list[dict[str, str]],
+    ) -> None:
+        stage = _crm_stage_for_client_status(crm_status, stages)
+        extra = _counterparty_extra(counterparty)
+        names = {
+            str(counterparty.name or "").strip().lower(),
+            str(extra.get("official_name") or "").strip().lower(),
+            str(extra.get("legal_name") or "").strip().lower(),
+        }
+        names.discard("")
+        rows = session.execute(
+            select(CrmRecord)
+            .where(CrmRecord.workspace_owner_id == workspace_owner_id)
+            .order_by(CrmRecord.updated_at.desc())
+        ).scalars()
+        for row in rows:
+            data = _json_object(row.data)
+            row_name = str(data.get("client") or "").strip().lower()
+            if row.counterparty_id != counterparty.id and row_name not in names:
+                continue
+            _crm_apply_stage(data, stages, stage["id"])
+            data["client"] = counterparty.name
+            row.data = data
+            flag_modified(row, "data")
+            row.counterparty_id = counterparty.id
+            if stage["id"] == "won":
+                row.status = "won"
+            elif stage["id"] == "lost":
+                row.status = "lost"
+            elif row.status in {"new", "won", "lost"}:
+                row.status = "in_progress"
+
     def _crm_stage_lines(stages: list[dict[str, str]]) -> str:
         return "\n".join(stage["title"] for stage in stages)
 
@@ -3552,7 +3690,7 @@ def create_app() -> FastAPI:
             "quantity": str(qty.normalize() if qty else 0),
             "sale_price": sale_price,
             "sale_currency": sale_currency,
-            "updated_at": row.updated_at,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else "",
         }
 
     def _product_json_rows(raw: Any, *, note_key: str = "note") -> list[dict[str, Any]]:
@@ -3703,6 +3841,9 @@ def create_app() -> FastAPI:
         selected_group = clean_values(group_values, group)
         selected_brand = clean_values(brand_values, brand)
         selected_folder = clean_values(folder_values, folder)
+        map_icon = str(extra.get("map_icon") or "").strip()
+        if not map_icon or map_icon == "default":
+            map_icon = str(extra.get("industry") or "default").strip() or "default"
         return {
             "q": q.strip(),
             "category": selected_category[0] if selected_category else "",
@@ -3732,6 +3873,228 @@ def create_app() -> FastAPI:
         except Exception:
             value = default
         return max(1, value)
+
+    PRODUCT_PRICE_TYPE_DEFAULTS = [
+        {
+            "id": "1",
+            "name": "ПРОДАЖНАЯ ЦЕНА",
+            "sort_order": 1,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-06-21",
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "1.0",
+        },
+        {
+            "id": "2",
+            "name": "PRIXOD CENA",
+            "sort_order": 2,
+            "is_for_sales": False,
+            "is_for_purchases": True,
+            "is_active": False,
+            "pricing_method": "dependent",
+            "created_by": "Admin123",
+            "updated_at": "2026-06-21",
+            "base_price_type_id": "last_purchase_price",
+            "markup_type": "markup",
+            "markup_value": "30",
+            "convert_to_currency": "USD",
+            "rounding": "0.001",
+        },
+        {
+            "id": "3",
+            "name": "СКИДОЧНЫЕ ЦЕНА",
+            "sort_order": 3,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-06-21",
+            "base_price_type_id": "",
+            "markup_type": "discount",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "1.0",
+        },
+        {
+            "id": "4",
+            "name": "СТАНДАРТНАЯ ЦЕНА",
+            "sort_order": 4,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": False,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-06-21",
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "1.0",
+        },
+    ]
+    PRODUCT_PRICE_ROUNDINGS = ["0.0001", "0.001", "0.01", "0.1", "0.5", "1.0", "5.0", "10.0", "50.0", "100.0", "500.0", "1000.0", "5000.0", "10000.0"]
+    PRODUCT_USD_RATE = Decimal("12000")
+
+    def _normalize_price_type(raw: dict[str, Any], fallback: dict[str, Any] | None = None) -> dict[str, Any]:
+        base = dict(fallback or {})
+        base.update(raw if isinstance(raw, dict) else {})
+        price_type_id = str(base.get("id") or uuid.uuid4()).strip()
+        name = str(base.get("name") or "Новый прайс-лист").strip()
+        method = str(base.get("pricing_method") or "manual").strip()
+        if method not in {"manual", "dependent"}:
+            method = "manual"
+        markup_type = str(base.get("markup_type") or "markup").strip()
+        if markup_type not in {"markup", "discount"}:
+            markup_type = "markup"
+        currency = str(base.get("convert_to_currency") or "UZS").strip().upper()
+        if currency not in {"UZS", "USD"}:
+            currency = "UZS"
+        rounding = str(base.get("rounding") or "1.0").strip()
+        if rounding not in PRODUCT_PRICE_ROUNDINGS:
+            rounding = "1.0"
+        try:
+            sort_order = int(str(base.get("sort_order") or "0"))
+        except Exception:
+            sort_order = 0
+        return {
+            "id": price_type_id,
+            "name": name,
+            "sort_order": sort_order,
+            "is_for_sales": bool(base.get("is_for_sales")),
+            "is_for_purchases": bool(base.get("is_for_purchases")),
+            "is_active": bool(base.get("is_active")),
+            "pricing_method": method,
+            "created_by": str(base.get("created_by") or "Admin123"),
+            "updated_at": str(base.get("updated_at") or datetime.now(timezone.utc).date().isoformat()),
+            "base_price_type_id": str(base.get("base_price_type_id") or "").strip(),
+            "markup_type": markup_type,
+            "markup_value": str(base.get("markup_value") or "").strip(),
+            "convert_to_currency": currency,
+            "rounding": rounding,
+        }
+
+    def _workspace_price_types(workspace_owner_id: str) -> list[dict[str, Any]]:
+        settings = load_workspace_settings(workspace_owner_id)
+        stored = settings.get("product_price_types") if isinstance(settings.get("product_price_types"), list) else []
+        by_id: dict[str, dict[str, Any]] = {
+            item["id"]: _normalize_price_type(item)
+            for item in PRODUCT_PRICE_TYPE_DEFAULTS
+        }
+        for item in stored:
+            if not isinstance(item, dict):
+                continue
+            normalized = _normalize_price_type(item, by_id.get(str(item.get("id") or "")))
+            by_id[normalized["id"]] = normalized
+        result = sorted(by_id.values(), key=lambda item: (int(item.get("sort_order") or 0), str(item.get("name") or "")))
+        if stored != result:
+            settings["product_price_types"] = result
+            save_workspace_settings(workspace_owner_id, settings)
+        return result
+
+    def _save_workspace_price_types(workspace_owner_id: str, price_types: list[dict[str, Any]]) -> None:
+        settings = load_workspace_settings(workspace_owner_id)
+        settings["product_price_types"] = sorted(
+            [_normalize_price_type(item) for item in price_types],
+            key=lambda item: (int(item.get("sort_order") or 0), str(item.get("name") or "")),
+        )
+        save_workspace_settings(workspace_owner_id, settings)
+
+    def _price_type_by_id(price_types: list[dict[str, Any]], price_type_id: str) -> dict[str, Any]:
+        return next((item for item in price_types if str(item.get("id")) == str(price_type_id)), price_types[0])
+
+    def _product_price_entry(product: dict[str, Any], price_type: dict[str, Any]) -> dict[str, Any] | None:
+        target_id = str(price_type.get("id") or "")
+        target_name = str(price_type.get("name") or "").strip().lower()
+        for price in product.get("prices") or []:
+            if not isinstance(price, dict):
+                continue
+            if str(price.get("price_type_id") or "") == target_id:
+                return price
+        for price in product.get("prices") or []:
+            if isinstance(price, dict) and str(price.get("name") or "").strip().lower() == target_name:
+                return price
+        if target_id == "1":
+            for price in product.get("prices") or []:
+                if isinstance(price, dict):
+                    return price
+        return None
+
+    def _product_last_purchase(product: dict[str, Any]) -> tuple[Decimal, str]:
+        rows = product.get("purchase_history") if isinstance(product.get("purchase_history"), list) else []
+        for item in reversed(rows):
+            if not isinstance(item, dict):
+                continue
+            value = _sales_decimal(item.get("price"))
+            if value:
+                return value, str(item.get("currency") or "UZS").upper()
+        stocks = product.get("stocks") if isinstance(product.get("stocks"), list) else []
+        for item in reversed(stocks):
+            if not isinstance(item, dict):
+                continue
+            value = _sales_decimal(item.get("price"))
+            if value:
+                return value, str(item.get("currency") or "UZS").upper()
+        return Decimal("0"), "UZS"
+
+    def _convert_product_currency(value: Decimal, from_currency: str, to_currency: str) -> Decimal:
+        source = str(from_currency or "UZS").upper()
+        target = str(to_currency or "UZS").upper()
+        if source == target:
+            return value
+        if source == "USD" and target == "UZS":
+            return value * PRODUCT_USD_RATE
+        if source == "UZS" and target == "USD":
+            return value / PRODUCT_USD_RATE
+        return value
+
+    def _round_product_price(value: Decimal, step_raw: Any) -> Decimal:
+        step = _sales_decimal(step_raw)
+        if step <= 0:
+            return value
+        return (value / step).to_integral_value(rounding=ROUND_HALF_UP) * step
+
+    def _calculated_product_price(product: dict[str, Any], price_type: dict[str, Any], price_types: list[dict[str, Any]]) -> tuple[str, str]:
+        if price_type.get("pricing_method") != "dependent":
+            entry = _product_price_entry(product, price_type)
+            if not entry:
+                return "", str(price_type.get("convert_to_currency") or "UZS")
+            return str(entry.get("price") or ""), str(entry.get("currency") or "UZS").upper()
+        base_id = str(price_type.get("base_price_type_id") or "")
+        if base_id == "last_purchase_price":
+            base, base_currency = _product_last_purchase(product)
+        else:
+            base_type = next((item for item in price_types if str(item.get("id")) == base_id), None)
+            if not base_type:
+                base, base_currency = Decimal("0"), "UZS"
+            else:
+                raw_value, base_currency = _calculated_product_price(product, base_type, price_types)
+                base = _sales_decimal(raw_value)
+        if not base:
+            return "", str(price_type.get("convert_to_currency") or "UZS")
+        percent = _sales_decimal(price_type.get("markup_value"))
+        factor = Decimal("1") + (percent / Decimal("100"))
+        if price_type.get("markup_type") == "discount":
+            factor = Decimal("1") - (percent / Decimal("100"))
+        value = base * factor
+        currency = str(price_type.get("convert_to_currency") or base_currency or "UZS").upper()
+        value = _convert_product_currency(value, base_currency, currency)
+        value = _round_product_price(value, price_type.get("rounding"))
+        return _decimal_plain_text(value), currency
+
+    def _price_type_product_rows(products: list[dict[str, Any]], price_type: dict[str, Any], price_types: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for product in products:
+            price, currency = _calculated_product_price(product, price_type, price_types)
+            rows.append({**product, "price_type_price": price, "price_type_currency": currency, "has_price": bool(price)})
+        return rows
 
     def _product_search_variants(raw: Any) -> list[str]:
         text = str(raw or "").lower()
@@ -3820,47 +4183,31 @@ def create_app() -> FastAPI:
             found = session.get(Product, edit)
             if found and found.workspace_owner_id == workspace_owner_id:
                 edit_product = _product_data(found)
-        price_lists: dict[str, dict[str, Any]] = {}
-        for product in products:
-            for price in product["prices"]:
-                if not isinstance(price, dict):
-                    continue
-                name = str(price.get("name") or "Продажная цена").strip() or "Продажная цена"
-                key = name.lower()
-                entry = price_lists.setdefault(
-                    key,
-                    {
-                        "name": name,
-                        "type": "Продажная",
-                        "currency": str(price.get("currency") or product.get("sale_currency") or "UZS").upper(),
-                        "default_value": str(price.get("price") or ""),
-                        "product_count": 0,
-                    },
-                )
-                entry["product_count"] += 1
-                if price.get("price") and not entry.get("default_value"):
-                    entry["default_value"] = str(price.get("price") or "")
-                lowered = name.lower()
-                if "скид" in lowered:
-                    entry["type"] = "Скидочная"
-                elif "приход" in lowered or "закуп" in lowered:
-                    entry["type"] = "Приходная"
-        if not price_lists:
-            for name, kind in (
-                ("Продажная цена", "Продажная"),
-                ("Скидочная цена", "Скидочная"),
-                ("Приходная цена", "Приходная"),
-                ("Стандартная цена", "Продажная"),
-            ):
-                price_lists[name.lower()] = {
-                    "name": name,
-                    "type": kind,
-                    "currency": "UZS",
-                    "default_value": "",
-                    "product_count": 0,
-                }
+        settings_payload = load_workspace_settings(workspace_owner_id)
+        price_lists = _workspace_price_types(workspace_owner_id)
+        for price_type in price_lists:
+            rows_with_price = _price_type_product_rows(all_items, price_type, price_lists)
+            price_type["product_count"] = sum(1 for row in rows_with_price if row["has_price"])
+            price_type["type"] = "Зависимая" if price_type.get("pricing_method") == "dependent" else "Ручная"
+            price_type["currency"] = str(price_type.get("convert_to_currency") or "UZS")
+            price_type["default_value"] = ""
+        stored_categories = [
+            str(item or "").strip()
+            for item in settings_payload.get("product_categories", [])
+            if str(item or "").strip()
+        ]
+        category_counts: dict[str, int] = {}
+        for product in all_items:
+            category_name = str(product.get("category") or "").strip()
+            if category_name:
+                category_counts[category_name] = category_counts.get(category_name, 0) + 1
+        category_names = sorted({*stored_categories, *category_counts.keys()})
         options = {
-            "categories": sorted({p["category"] for p in all_items if p["category"]}),
+            "categories": category_names,
+            "category_rows": [
+                {"name": name, "product_count": category_counts.get(name, 0)}
+                for name in category_names
+            ],
             "groups": sorted({p["group"] for p in all_items if p["group"]}),
             "brands": sorted({p["brand"] for p in all_items if p["brand"]}),
             "folders": sorted({p["folder"] for p in all_items if p["folder"]}),
@@ -3872,9 +4219,20 @@ def create_app() -> FastAPI:
                     if isinstance(price, dict) and price.get("name")
                 }
             ),
-            "price_lists": sorted(price_lists.values(), key=lambda item: str(item.get("name") or "")),
+            "price_lists": sorted(price_lists, key=lambda item: (int(item.get("sort_order") or 0), str(item.get("name") or ""))),
         }
         return products, edit_product, options
+
+    def _save_product_categories(workspace_owner_id: str, names: list[str]) -> None:
+        clean = sorted({str(name or "").strip() for name in names if str(name or "").strip()})
+        data = load_workspace_settings(workspace_owner_id)
+        data["product_categories"] = clean
+        save_workspace_settings(workspace_owner_id, data)
+
+    def _price_type_redirect(price_type_id: str = "", *, msg: str = "saved") -> RedirectResponse:
+        suffix = f"?price_type={quote(str(price_type_id))}&msg={quote(msg)}" if price_type_id else f"?msg={quote(msg)}"
+        anchor = "price-type-detail" if price_type_id else "price-types"
+        return RedirectResponse(url=f"/products{suffix}#{anchor}", status_code=302)
 
     def _product_excel_text(raw: Any) -> str:
         return str(raw or "").strip()
@@ -4010,6 +4368,13 @@ def create_app() -> FastAPI:
         page_size: str = "100",
         page: str = "1",
         edit: str = "",
+        price_type: str = "",
+        price_page: str = "1",
+        price_q: str = "",
+        price_category: str = "",
+        price_group: str = "",
+        price_brand: str = "",
+        price_status: str = "all",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -4034,6 +4399,14 @@ def create_app() -> FastAPI:
         product_page_size = _product_page_size(page_size)
         with session_scope() as session:
             products, edit_product, options = _collect_products_view_data(session, wid, filters, edit=edit)
+            price_products = [
+                _product_data(row)
+                for row in session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid)
+                    .order_by(Product.name.asc())
+                ).scalars()
+            ]
         products_total = len(products)
         product_total_pages = max(1, math.ceil(products_total / product_page_size))
         product_page = min(_positive_int(page, 1), product_total_pages)
@@ -4054,6 +4427,67 @@ def create_app() -> FastAPI:
             page_no
             for page_no in range(max(1, product_page - 2), min(product_total_pages, product_page + 2) + 1)
         ]
+        price_types = list(options.get("price_lists") or _workspace_price_types(wid))
+        selected_price_type = _price_type_by_id(price_types, price_type) if price_types else {}
+        price_rows = _price_type_product_rows(price_products, selected_price_type, price_types) if selected_price_type else []
+        price_q_clean = str(price_q or "").strip().lower()
+        if price_q_clean:
+            price_rows = [
+                row for row in price_rows
+                if price_q_clean in " ".join([row.get("name", ""), row.get("sku", ""), row.get("barcode", "")]).lower()
+            ]
+        if price_category:
+            price_rows = [row for row in price_rows if row.get("category") == price_category]
+        if price_group:
+            price_rows = [row for row in price_rows if row.get("group") == price_group]
+        if price_brand:
+            price_rows = [row for row in price_rows if row.get("brand") == price_brand]
+        if price_status == "with":
+            price_rows = [row for row in price_rows if row.get("has_price")]
+        elif price_status == "without":
+            price_rows = [row for row in price_rows if not row.get("has_price")]
+        price_page_size = 15
+        price_rows_total = len(price_rows)
+        price_total_pages = max(1, math.ceil(price_rows_total / price_page_size))
+        price_current_page = min(_positive_int(price_page, 1), price_total_pages)
+        price_start = (price_current_page - 1) * price_page_size
+        price_end = price_start + price_page_size
+
+        def price_page_url(target_page: int) -> str:
+            pairs = [
+                (str(key), str(value))
+                for key, value in request.query_params.multi_items()
+                if str(key) != "price_page"
+            ]
+            pairs.extend(
+                [
+                    ("price_type", str(selected_price_type.get("id") or "")),
+                    ("price_page", str(target_page)),
+                ]
+            )
+            return f"{request.url.path}?{urlencode(pairs, doseq=True)}#price-type-detail"
+
+        price_type_state = {
+            "price_types": price_types,
+            "selected": selected_price_type,
+            "rows": price_rows[price_start:price_end],
+            "filters": {
+                "q": price_q,
+                "category": price_category,
+                "group": price_group,
+                "brand": price_brand,
+                "status": price_status,
+            },
+            "total": price_rows_total,
+            "page": price_current_page,
+            "total_pages": price_total_pages,
+            "from": (price_start + 1) if price_rows_total else 0,
+            "to": min(price_end, price_rows_total),
+            "prev_url": price_page_url(max(1, price_current_page - 1)),
+            "next_url": price_page_url(min(price_total_pages, price_current_page + 1)),
+            "page_urls": {page_no: price_page_url(page_no) for page_no in range(max(1, price_current_page - 2), min(price_total_pages, price_current_page + 2) + 1)},
+            "roundings": PRODUCT_PRICE_ROUNDINGS,
+        }
         return tpl(
             request,
             "home_products.html",
@@ -4072,6 +4506,7 @@ def create_app() -> FastAPI:
             product_page_urls={page_no: product_page_url(page_no) for page_no in product_pagination_pages},
             product_filters=filters,
             product_options=options,
+            price_type_state=price_type_state,
             edit_product=edit_product,
             flash_ok=request.query_params.get("msg"),
             imported_count=request.query_params.get("count") or "0",
@@ -4434,6 +4869,180 @@ def create_app() -> FastAPI:
                 row.external_id = row.external_id or row.id
                 row.data = data
         return RedirectResponse(url="/products?msg=saved", status_code=302)
+
+    @app.post("/products/categories/save", name="products_category_save")
+    async def products_category_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#categories", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        old_name = str(form.get("old_name") or "").strip()
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/products?error=" + quote("Название категории обязательно") + "#categories", status_code=302)
+        with session_scope() as session:
+            rows = list(session.execute(select(Product).where(Product.workspace_owner_id == wid)).scalars())
+            used_names = []
+            for row in rows:
+                data = dict(row.data if isinstance(row.data, dict) else {})
+                category_name = str(data.get("category") or "").strip()
+                if category_name:
+                    used_names.append(category_name)
+                if old_name and category_name == old_name:
+                    data["category"] = name
+                    row.data = data
+            stored = [
+                str(item or "").strip()
+                for item in load_workspace_settings(wid).get("product_categories", [])
+                if str(item or "").strip()
+            ]
+            stored = [name if item == old_name else item for item in stored]
+            _save_product_categories(wid, [*stored, *used_names, name])
+        return RedirectResponse(url="/products?msg=saved#categories", status_code=302)
+
+    @app.post("/products/categories/delete", name="products_category_delete")
+    async def products_category_delete(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#categories", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/products#categories", status_code=302)
+        with session_scope() as session:
+            rows = list(session.execute(select(Product).where(Product.workspace_owner_id == wid)).scalars())
+            remaining_names = []
+            for row in rows:
+                data = dict(row.data if isinstance(row.data, dict) else {})
+                category_name = str(data.get("category") or "").strip()
+                if category_name == name:
+                    data["category"] = ""
+                    row.data = data
+                elif category_name:
+                    remaining_names.append(category_name)
+            stored = [
+                str(item or "").strip()
+                for item in load_workspace_settings(wid).get("product_categories", [])
+                if str(item or "").strip() and str(item or "").strip() != name
+            ]
+            _save_product_categories(wid, [*stored, *remaining_names])
+        return RedirectResponse(url="/products?msg=deleted#categories", status_code=302)
+
+    @app.post("/products/price-types/save", name="products_price_type_save")
+    async def products_price_type_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#price-types", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        price_types = _workspace_price_types(wid)
+        price_type_id = str(form.get("price_type_id") or "").strip() or str(uuid.uuid4())
+        existing = next((item for item in price_types if str(item.get("id")) == price_type_id), None)
+        payload = _normalize_price_type(
+            {
+                "id": price_type_id,
+                "name": str(form.get("name") or "").strip() or "Новый прайс-лист",
+                "sort_order": str(form.get("sort_order") or "0"),
+                "is_for_sales": str(form.get("is_for_sales") or "") == "1",
+                "is_for_purchases": str(form.get("is_for_purchases") or "") == "1",
+                "is_active": str(form.get("is_active") or "") == "1",
+                "pricing_method": str(form.get("pricing_method") or "manual"),
+                "base_price_type_id": str(form.get("base_price_type_id") or ""),
+                "markup_type": str(form.get("markup_type") or "markup"),
+                "markup_value": str(form.get("markup_value") or ""),
+                "convert_to_currency": str(form.get("convert_to_currency") or "UZS"),
+                "rounding": str(form.get("rounding") or "1.0"),
+                "created_by": (existing or {}).get("created_by") or "Admin123",
+                "updated_at": datetime.now(timezone.utc).date().isoformat(),
+            },
+            existing,
+        )
+        next_items = [item for item in price_types if str(item.get("id")) != price_type_id]
+        next_items.append(payload)
+        _save_workspace_price_types(wid, next_items)
+        return _price_type_redirect(price_type_id)
+
+    @app.post("/products/price-types/toggle", name="products_price_type_toggle")
+    async def products_price_type_toggle(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#price-types", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        price_type_id = str(form.get("price_type_id") or "").strip()
+        price_types = _workspace_price_types(wid)
+        for item in price_types:
+            if str(item.get("id")) == price_type_id:
+                item["is_active"] = not bool(item.get("is_active"))
+                item["updated_at"] = datetime.now(timezone.utc).date().isoformat()
+        _save_workspace_price_types(wid, price_types)
+        return _price_type_redirect(price_type_id)
+
+    @app.post("/products/price-types/delete", name="products_price_type_delete")
+    async def products_price_type_delete(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#price-types", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        price_type_id = str(form.get("price_type_id") or "").strip()
+        price_types = _workspace_price_types(wid)
+        if price_type_id in {"1", "2", "3", "4"}:
+            return _price_type_redirect(price_type_id, msg="base")
+        _save_workspace_price_types(wid, [item for item in price_types if str(item.get("id")) != price_type_id])
+        return _price_type_redirect("", msg="deleted")
+
+    @app.post("/products/price-types/prices", name="products_price_type_prices_save")
+    async def products_price_type_prices_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#price-types", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        price_types = _workspace_price_types(wid)
+        price_type_id = str(form.get("price_type_id") or "").strip()
+        price_type = _price_type_by_id(price_types, price_type_id)
+        if price_type.get("pricing_method") != "manual":
+            return _price_type_redirect(price_type_id)
+        product_ids = list(form.getlist("product_id"))
+        values = list(form.getlist("price_value"))
+        currencies = list(form.getlist("price_currency"))
+        with session_scope() as session:
+            for idx, product_id in enumerate(product_ids):
+                row = session.get(Product, str(product_id or ""))
+                if not row or row.workspace_owner_id != wid:
+                    continue
+                data = dict(row.data if isinstance(row.data, dict) else {})
+                prices = [dict(item) for item in data.get("prices", []) if isinstance(item, dict)]
+                value = str(values[idx] if idx < len(values) else "").strip()
+                currency = str(currencies[idx] if idx < len(currencies) else "UZS").strip().upper()
+                if currency not in {"UZS", "USD"}:
+                    currency = "UZS"
+                entry = next((item for item in prices if str(item.get("price_type_id") or "") == price_type_id), None)
+                if entry is None:
+                    entry = next((item for item in prices if str(item.get("name") or "").strip().lower() == str(price_type.get("name") or "").strip().lower()), None)
+                if entry is None:
+                    entry = {}
+                    prices.append(entry)
+                entry.update({"price_type_id": price_type_id, "name": price_type["name"], "price": value, "currency": currency})
+                data["prices"] = prices
+                row.data = data
+                flag_modified(row, "data")
+        return _price_type_redirect(price_type_id)
 
     @app.post("/products/bulk-update", name="products_bulk_update")
     async def products_bulk_update(request: Request):
@@ -4830,7 +5439,20 @@ def create_app() -> FastAPI:
         data = _json_object(row.data)
         paid_amount = _sales_decimal(data.get("paid_amount"))
         debt_amount = _sales_decimal(row.amount) - paid_amount
-        return {
+        raw_lines = data.get("lines") if isinstance(data.get("lines"), list) else []
+        safe_lines: list[dict[str, str]] = []
+        for line in raw_lines:
+            if not isinstance(line, dict):
+                continue
+            safe_lines.append(
+                {
+                    "product": str(line.get("product") or ""),
+                    "quantity": str(line.get("quantity") or ""),
+                    "price": str(line.get("price") or ""),
+                    "total": str(line.get("total") or ""),
+                }
+            )
+        item = {
             "id": row.id,
             "number": row.number,
             "date": str(data.get("date") or ""),
@@ -4844,9 +5466,27 @@ def create_app() -> FastAPI:
             "status_label": _purchase_status_label(str(data.get("status") or "new")),
             "payment_type": str(data.get("payment_type") or ""),
             "note": str(data.get("note") or ""),
-            "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
-            "updated_at": row.updated_at,
+            "lines": safe_lines,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else "",
         }
+        item["detail_json"] = {
+            "id": str(item["id"] or ""),
+            "number": str(item["number"] or ""),
+            "date": str(item["date"] or ""),
+            "supplier": str(item["supplier"] or ""),
+            "warehouse": str(item["warehouse"] or ""),
+            "amount": str(item["amount"] or "0"),
+            "currency": str(item["currency"] or "UZS"),
+            "paid_amount": str(item["paid_amount"] or "0"),
+            "debt_amount": str(item["debt_amount"] or "0"),
+            "status": str(item["status"] or "new"),
+            "status_label": str(item["status_label"] or "Новый"),
+            "payment_type": str(item["payment_type"] or ""),
+            "note": str(item["note"] or ""),
+            "lines": safe_lines,
+            "updated_at": str(item["updated_at"] or ""),
+        }
+        return item
 
     def _purchase_document_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
@@ -4917,6 +5557,30 @@ def create_app() -> FastAPI:
                     last_date_by_name[lowered] = doc_date
         return balance_by_id, balance_by_name, last_date_by_id, last_date_by_name
 
+    def _sales_rollup_currency_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, dict[str, Decimal]], dict[str, dict[str, Decimal]]]:
+        balance_by_id: dict[str, dict[str, Decimal]] = {}
+        balance_by_name: dict[str, dict[str, Decimal]] = {}
+        rows = session.execute(
+            select(SaleDocument)
+            .where(SaleDocument.workspace_owner_id == workspace_owner_id)
+            .order_by(SaleDocument.updated_at.desc())
+        ).scalars()
+        for row in rows:
+            data = _json_object(row.data)
+            doc_type = str(data.get("doc_type") or "sale")
+            signed = Decimal("-1") if doc_type == "return" else Decimal("1")
+            balance = signed * (_sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount")))
+            currency = str(row.currency or "UZS").strip().upper() or "UZS"
+            name = str(data.get("client") or "").strip()
+            counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
+            if counterparty_id:
+                bucket = balance_by_id.setdefault(counterparty_id, {})
+                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
+            if name:
+                bucket = balance_by_name.setdefault(name.lower(), {})
+                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
+        return balance_by_id, balance_by_name
+
     def _purchase_rollup_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, str], dict[str, str]]:
         balance_by_id: dict[str, Decimal] = {}
         balance_by_name: dict[str, Decimal] = {}
@@ -4951,28 +5615,110 @@ def create_app() -> FastAPI:
         balance_by_name: dict[str, Decimal],
         last_date_by_id: dict[str, str],
         last_date_by_name: dict[str, str],
+        balance_currency_by_id: dict[str, dict[str, Decimal]] | None = None,
+        balance_currency_by_name: dict[str, dict[str, Decimal]] | None = None,
+        crm_status_by_id: dict[str, str] | None = None,
+        crm_status_by_name: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         extra = _counterparty_extra(row)
         balance = balance_by_id.get(row.id, balance_by_name.get(row.name.lower(), Decimal("0")))
         last_date = last_date_by_id.get(row.id) or last_date_by_name.get(row.name.lower(), "")
         has_client, has_supplier = _counterparty_role_flags(row.kind)
+        balance_kind = "debt" if balance > 0 else "advance" if balance < 0 else "zero"
+        currency_balances = (
+            (balance_currency_by_id or {}).get(row.id)
+            or (balance_currency_by_name or {}).get(row.name.lower())
+            or {"UZS": balance}
+        )
+        balance_lines = []
+        for currency, amount in sorted(currency_balances.items()):
+            amount = _sales_decimal(amount)
+            if not amount and len(currency_balances) > 1:
+                continue
+            kind = "debt" if amount > 0 else "advance" if amount < 0 else "zero"
+            balance_lines.append(
+                {
+                    "currency": currency,
+                    "amount": _sales_money_label(amount),
+                    "amount_abs": _sales_money_label(abs(amount)),
+                    "kind": kind,
+                    "note": "Нам должны" if kind == "debt" else "Мы должны" if kind == "advance" else "Нет долга",
+                }
+            )
+        if not balance_lines:
+            balance_lines.append({"currency": "UZS", "amount": "0", "amount_abs": "0", "kind": "zero", "note": "Нет долга"})
+        raw_programs = extra.get("programs")
+        if isinstance(raw_programs, list):
+            programs = [str(item).strip() for item in raw_programs if str(item).strip()]
+        elif isinstance(raw_programs, str) and raw_programs.strip():
+            programs = [item.strip() for item in raw_programs.split(",") if item.strip()]
+        else:
+            programs = []
+        legacy_program = str(extra.get("program") or extra.get("software") or extra.get("category") or "").strip()
+        if legacy_program and legacy_program not in programs:
+            programs.append(legacy_program)
+        crm_status = str(
+            (crm_status_by_id or {}).get(row.id)
+            or (crm_status_by_name or {}).get(row.name.lower())
+            or extra.get("crm_status")
+            or "new_lead"
+        ).strip()
+        if crm_status not in CLIENT_CRM_STATUS_LABELS:
+            crm_status = "new_lead"
+        map_icon = str(extra.get("map_icon") or "").strip()
+        if not map_icon or map_icon == "default":
+            map_icon = str(extra.get("industry") or "default").strip() or "default"
         return {
             "id": row.id,
             "name": row.name,
             "official_name": str(extra.get("official_name") or row.name),
+            "legal_name": str(extra.get("legal_name") or extra.get("official_name") or row.name),
+            "legal_address": str(extra.get("legal_address") or ""),
+            "photo_url": str(extra.get("photo_url") or extra.get("photo") or ""),
             "phone": row.phone,
+            "phone_primary": row.phone,
             "tax_id": row.tax_id,
+            "inn": str(extra.get("inn") or row.tax_id or ""),
+            "pinfl": str(extra.get("pinfl") or ""),
+            "okved": str(extra.get("okved") or ""),
+            "client_type": str(extra.get("client_type") or "company"),
             "territory": str(extra.get("territory") or ""),
             "category": str(extra.get("category") or ""),
+            "industry": str(extra.get("industry") or ""),
+            "map_icon": map_icon,
+            "program": ", ".join(programs),
+            "programs": programs,
             "route": str(extra.get("route") or ""),
             "status": str(extra.get("status") or "active"),
+            "crm_status": crm_status,
+            "crm_status_label": CLIENT_CRM_STATUS_LABELS[crm_status],
+            "is_blacklisted": bool(extra.get("is_blacklisted")),
+            "sort_order": str(extra.get("sort_order") or "0"),
+            "code": str(extra.get("code") or ""),
             "telegram": str(extra.get("telegram") or ""),
+            "telegram_phone": str(extra.get("telegram_phone") or extra.get("telegram") or ""),
             "note": str(extra.get("note") or ""),
+            "comment": str(extra.get("comment") or extra.get("note") or ""),
             "email": str(extra.get("email") or ""),
             "address": str(extra.get("address") or ""),
+            "latitude": str(extra.get("latitude") or ""),
+            "longitude": str(extra.get("longitude") or ""),
+            "price_type": str(extra.get("price_type") or ""),
+            "credit_limit": str(extra.get("credit_limit") or ""),
+            "consignment_days": str(extra.get("consignment_days") or ""),
+            "cashback_percent": str(extra.get("cashback_percent") or ""),
+            "delivery_frequency_days": str(extra.get("delivery_frequency_days") or ""),
+            "owner_user": str(extra.get("owner_user") or ""),
+            "owner_group": str(extra.get("owner_group") or ""),
             "balance_value": balance,
             "balance": _sales_money_label(balance),
+            "balance_abs": _sales_money_label(abs(balance)),
+            "balance_lines": balance_lines,
+            "balance_kind": balance_kind,
+            "balance_note": "Нам должны" if balance_kind == "debt" else "Мы должны" if balance_kind == "advance" else "Нет долга",
             "last_date": last_date,
+            "created_at": row.created_at.date().isoformat() if getattr(row, "created_at", None) else "",
+            "updated_at": row.updated_at.date().isoformat() if getattr(row, "updated_at", None) else "",
             "is_client": has_client,
             "is_supplier": has_supplier,
         }
@@ -5084,6 +5830,10 @@ def create_app() -> FastAPI:
         balance_by_name: dict[str, Decimal],
         last_date_by_id: dict[str, str],
         last_date_by_name: dict[str, str],
+        balance_currency_by_id: dict[str, dict[str, Decimal]] | None = None,
+        balance_currency_by_name: dict[str, dict[str, Decimal]] | None = None,
+        crm_status_by_id: dict[str, str] | None = None,
+        crm_status_by_name: dict[str, str] | None = None,
     ) -> dict[str, Any] | None:
         row = session.get(Counterparty, client_id)
         if not row or row.workspace_owner_id != workspace_owner_id:
@@ -5098,6 +5848,10 @@ def create_app() -> FastAPI:
             balance_by_name=balance_by_name,
             last_date_by_id=last_date_by_id,
             last_date_by_name=last_date_by_name,
+            balance_currency_by_id=balance_currency_by_id,
+            balance_currency_by_name=balance_currency_by_name,
+            crm_status_by_id=crm_status_by_id,
+            crm_status_by_name=crm_status_by_name,
         )
         extra = _counterparty_extra(row)
         client_names = {
@@ -5112,6 +5866,62 @@ def create_app() -> FastAPI:
         def matches_client_name(value: Any) -> bool:
             lowered = str(value or "").strip().lower()
             return bool(lowered and lowered in client_names)
+
+        history_events: list[dict[str, str]] = []
+
+        def add_history_event(
+            *,
+            date: Any,
+            title: str,
+            detail: str = "",
+            category: str = "system",
+            amount: str = "",
+            status: str = "",
+        ) -> None:
+            raw_date = str(date or "").strip()
+            if not raw_date:
+                raw_date = datetime.now(timezone.utc).isoformat()
+            history_events.append(
+                {
+                    "date": raw_date[:19].replace("T", " "),
+                    "sort_date": raw_date,
+                    "title": title,
+                    "detail": detail,
+                    "category": category,
+                    "amount": amount,
+                    "status": status,
+                }
+            )
+
+        add_history_event(
+            date=row.created_at.isoformat() if getattr(row, "created_at", None) else client.get("created_at"),
+            title="Клиент создан",
+            detail=f"Карточка клиента {client['name']} добавлена в систему.",
+            category="client",
+            status=client.get("crm_status_label") or "",
+        )
+        if getattr(row, "updated_at", None) and getattr(row, "created_at", None) and row.updated_at != row.created_at:
+            add_history_event(
+                date=row.updated_at.isoformat(),
+                title="Карточка обновлена",
+                detail="Изменены данные клиента или его настройки.",
+                category="client",
+                status=client.get("status") or "",
+            )
+        if client.get("address") or client.get("latitude") or client.get("longitude"):
+            add_history_event(
+                date=row.updated_at.isoformat() if getattr(row, "updated_at", None) else client.get("updated_at"),
+                title="Локация клиента сохранена",
+                detail=client.get("address") or f"{client.get('latitude')}, {client.get('longitude')}",
+                category="location",
+            )
+        if client.get("comment") or client.get("note"):
+            add_history_event(
+                date=row.updated_at.isoformat() if getattr(row, "updated_at", None) else client.get("updated_at"),
+                title="Добавлена заметка",
+                detail=str(client.get("comment") or client.get("note") or "")[:160],
+                category="note",
+            )
 
         sale_rows = list(
             session.execute(
@@ -5131,6 +5941,24 @@ def create_app() -> FastAPI:
                 continue
             item = _sales_document_data(sale_row)
             matched_sale_rows.append(sale_row)
+            add_history_event(
+                date=item["date"] or sale_row.created_at.isoformat() if getattr(sale_row, "created_at", None) else "",
+                title=f"{item['doc_type_label']} {item['number']}",
+                detail="Документ клиента в продажах.",
+                category="document",
+                amount=f"{item['amount']} {item['currency']}",
+                status=item["status_label"],
+            )
+            paid_amount = _sales_decimal(data.get("paid_amount"))
+            if paid_amount > 0:
+                add_history_event(
+                    date=item["date"] or sale_row.updated_at.isoformat() if getattr(sale_row, "updated_at", None) else "",
+                    title=f"Оплата по {item['number']}",
+                    detail="Принята оплата по документу клиента.",
+                    category="payment",
+                    amount=f"{_sales_money_label(paid_amount)} {item['currency']}",
+                    status="Оплачено",
+                )
             if item["doc_type"] == "order":
                 orders.append(item)
             elif item["doc_type"] == "return":
@@ -5194,6 +6022,14 @@ def create_app() -> FastAPI:
             if crm_row.counterparty_id != client_id and not matches_client_name(data.get("client")):
                 continue
             item = _crm_record_data(crm_row)
+            add_history_event(
+                date=item.get("date") or item.get("due_date") or (crm_row.updated_at.isoformat() if getattr(crm_row, "updated_at", None) else ""),
+                title=f"{item['item_type_label']}: {item['title']}",
+                detail=item.get("note") or item.get("stage") or item.get("lead_source") or "",
+                category="crm",
+                amount=f"{item['amount']} {item['currency']}" if item["amount_value"] else "",
+                status=item["status_label"],
+            )
             if item["item_type"] == "task":
                 tasks.append(item)
             elif item["item_type"] == "deal":
@@ -5250,6 +6086,13 @@ def create_app() -> FastAPI:
                     "chat_id": str(subscriber.chat_id),
                 }
             )
+            add_history_event(
+                date=subscriber.requested_at.isoformat() if getattr(subscriber, "requested_at", None) else "",
+                title="Telegram контакт привязан",
+                detail=subscriber.display_name or subscriber.username or subscriber.phone or "",
+                category="message",
+                status=subscriber.status,
+            )
         if not conversations and telegram_value:
             conversations.append(
                 {
@@ -5285,7 +6128,15 @@ def create_app() -> FastAPI:
                         "comment": str(raw_call.get("comment") or raw_call.get("note") or ""),
                     }
                 )
+                add_history_event(
+                    date=str(raw_call.get("started_at") or raw_call.get("created_at") or ""),
+                    title="Звонок клиенту",
+                    detail=str(raw_call.get("comment") or raw_call.get("note") or raw_call.get("phone") or ""),
+                    category="call",
+                    status=_telephony_status_label("call", str(raw_call.get("status") or "")),
+                )
         calls.sort(key=lambda item: item["started_at"], reverse=True)
+        history_events.sort(key=lambda item: item["sort_date"], reverse=True)
 
         total_sales = sum(
             (_sales_decimal(item.amount) for item in matched_sale_rows if _json_object(item.data).get("doc_type") != "return"),
@@ -5311,6 +6162,7 @@ def create_app() -> FastAPI:
                 "correspondence": correspondence[:12],
                 "conversations": conversations[:8],
                 "reconciliation": reconciliation_rows[-18:],
+                "history": history_events[:80],
                 "summary": {
                     "sales": _sales_money_label(total_sales),
                     "returns": _sales_money_label(total_returns),
@@ -5635,7 +6487,7 @@ def create_app() -> FastAPI:
         assert wid is not None
         name = str(form.get("name") or "").strip()
         if not name:
-            return RedirectResponse(url="/warehouse?error=" + quote("Название склада обязательно") + "#stocks", status_code=302)
+            return RedirectResponse(url="/warehouse?error=" + quote("Название склада обязательно") + "#warehouses", status_code=302)
         with session_scope() as session:
             _ensure_warehouse(
                 session,
@@ -5647,7 +6499,7 @@ def create_app() -> FastAPI:
                     "note": str(form.get("note") or "").strip(),
                 },
             )
-        return RedirectResponse(url="/warehouse?msg=saved#stocks", status_code=302)
+        return RedirectResponse(url="/warehouse?msg=saved#warehouses", status_code=302)
 
     @app.post("/warehouse/operations/save", name="warehouse_operation_save")
     async def warehouse_operation_save(request: Request):
@@ -5801,6 +6653,7 @@ def create_app() -> FastAPI:
         q: str = "",
         territory: str = "",
         category: str = "",
+        program: str = "",
         route: str = "",
         status: str = "all",
         client: str = "",
@@ -5813,6 +6666,7 @@ def create_app() -> FastAPI:
             "q": q.strip(),
             "territory": territory.strip(),
             "category": category.strip(),
+            "program": program.strip(),
             "route": route.strip(),
             "status": status.strip() or "all",
         }
@@ -5823,6 +6677,7 @@ def create_app() -> FastAPI:
         selected_client_card: dict[str, Any] | None = None
         with session_scope() as session:
             balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
+            balance_currency_by_id, balance_currency_by_name = _sales_rollup_currency_maps(session, wid)
             settings_payload = load_workspace_settings(wid)
             raw_calls = settings_payload.get("telephony_calls") if isinstance(settings_payload.get("telephony_calls"), list) else []
             crm_rows_for_contact = list(
@@ -5832,6 +6687,8 @@ def create_app() -> FastAPI:
                     .order_by(CrmRecord.updated_at.desc())
                 ).scalars()
             )
+            crm_stages_for_clients = _crm_workspace_stages(wid)
+            crm_status_by_id, crm_status_by_name = _crm_status_maps_from_records(crm_rows_for_contact, crm_stages_for_clients)
             telegram_subscribers_for_contact = list(
                 session.execute(
                     select(TelegramSubscriber)
@@ -5892,6 +6749,10 @@ def create_app() -> FastAPI:
                     balance_by_name=balance_by_name,
                     last_date_by_id=last_date_by_id,
                     last_date_by_name=last_date_by_name,
+                    balance_currency_by_id=balance_currency_by_id,
+                    balance_currency_by_name=balance_currency_by_name,
+                    crm_status_by_id=crm_status_by_id,
+                    crm_status_by_name=crm_status_by_name,
                 )
             rows = list(
                 session.execute(
@@ -5911,13 +6772,35 @@ def create_app() -> FastAPI:
                     balance_by_name=balance_by_name,
                     last_date_by_id=last_date_by_id,
                     last_date_by_name=last_date_by_name,
+                    balance_currency_by_id=balance_currency_by_id,
+                    balance_currency_by_name=balance_currency_by_name,
+                    crm_status_by_id=crm_status_by_id,
+                    crm_status_by_name=crm_status_by_name,
                 )
-                hay = " ".join([item["name"], item["official_name"], item["phone"], item["category"], item["territory"], item["route"]]).lower()
+                hay = " ".join(
+                    [
+                        item["id"],
+                        item["name"],
+                        item["official_name"],
+                        item["legal_name"],
+                        item["phone"],
+                        item["telegram_phone"],
+                        item["category"],
+                        item["territory"],
+                        item["route"],
+                        item["inn"],
+                        item["pinfl"],
+                        item["address"],
+                        item["code"],
+                    ]
+                ).lower()
                 if q_clean and q_clean not in hay:
                     continue
                 if filters["territory"] and item["territory"] != filters["territory"]:
                     continue
                 if filters["category"] and item["category"] != filters["category"]:
+                    continue
+                if filters["program"] and filters["program"] not in item["programs"]:
                     continue
                 if filters["route"] and item["route"] != filters["route"]:
                     continue
@@ -5946,7 +6829,7 @@ def create_app() -> FastAPI:
                     summary["days"].add(str(extra.get("route_day")))
                 if extra.get("route_agent"):
                     summary["agents"].add(str(extra.get("route_agent")))
-                if item["balance_value"] != 0:
+                if item["balance_value"] > 0:
                     client_balances.append(item)
             client_routes = [
                 {
@@ -5960,10 +6843,11 @@ def create_app() -> FastAPI:
                 }
                 for key, value in sorted(route_map.items())
             ]
-            client_balances.sort(key=lambda item: abs(item["balance_value"]), reverse=True)
+            client_balances.sort(key=lambda item: item["balance_value"], reverse=True)
         client_options = {
             "territories": sorted({item["territory"] for item in clients_records if item["territory"]}),
             "categories": sorted({item["category"] for item in clients_records if item["category"]}),
+            "programs": sorted({program for item in clients_records for program in item["programs"] if program}),
             "routes": sorted({item["route"] for item in clients_records if item["route"]}),
             "clients": sorted({item["name"] for item in clients_records if item["name"]}),
         }
@@ -5983,6 +6867,26 @@ def create_app() -> FastAPI:
             flash_err=_module_flash_error(request),
         )
 
+    async def _save_client_photo_upload(workspace_owner_id: str, upload: Any) -> str:
+        filename = str(getattr(upload, "filename", "") or "").strip()
+        if not filename:
+            return ""
+        suffix = Path(filename).suffix.lower()
+        if suffix not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            return ""
+        content_type = str(getattr(upload, "content_type", "") or "").lower()
+        if content_type and not content_type.startswith("image/"):
+            return ""
+        payload = await upload.read()
+        if not payload:
+            return ""
+        target_dir = BASE_DIR / "static" / "uploads" / "clients" / re.sub(r"[^a-zA-Z0-9_-]", "_", workspace_owner_id)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_name = f"{uuid.uuid4().hex}{suffix}"
+        target = target_dir / file_name
+        target.write_bytes(payload)
+        return f"/static/uploads/clients/{target_dir.name}/{file_name}"
+
     @app.post("/clients/save", name="clients_save")
     async def clients_save(request: Request):
         form = await request.form()
@@ -5996,28 +6900,89 @@ def create_app() -> FastAPI:
         if not name:
             return RedirectResponse(url="/clients?error=" + quote("Название клиента обязательно") + "#clients", status_code=302)
         is_supplier = str(form.get("is_supplier") or "").strip() == "1"
+        client_id = str(form.get("client_id") or "").strip()
+        uploaded_photo_url = await _save_client_photo_upload(wid, form.get("photo_file"))
         with session_scope() as session:
-            _ensure_counterparty(
+            client_type = str(form.get("client_type") or "company").strip()
+            if client_type not in {"company", "individual"}:
+                client_type = "company"
+            status = str(form.get("status") or "active").strip()
+            if status not in {"active", "inactive"}:
+                status = "active"
+            crm_status = str(form.get("crm_status") or "new_lead").strip()
+            if crm_status not in CLIENT_CRM_STATUS_LABELS:
+                crm_status = "new_lead"
+            tax_id = str(form.get("tax_id") or form.get("inn") or "").strip()
+            industry = str(form.get("industry") or "").strip()
+            map_icon = str(form.get("map_icon") or "").strip()
+            if not map_icon or map_icon == "default":
+                map_icon = industry or "default"
+            selected_programs: list[str] = []
+            for value in form.getlist("programs"):
+                program = str(value or "").strip()
+                if program and program not in selected_programs:
+                    selected_programs.append(program)
+            custom_program = str(form.get("program_custom") or form.get("program") or "").strip()
+            if custom_program and custom_program not in selected_programs:
+                selected_programs.append(custom_program)
+            saved_row = _ensure_counterparty(
                 session,
                 wid,
+                counterparty_id=client_id,
                 name=name,
                 role="both" if is_supplier else "client",
                 phone=str(form.get("phone") or "").strip(),
-                tax_id=str(form.get("tax_id") or "").strip(),
+                tax_id=tax_id,
                 data={
                     "official_name": str(form.get("official_name") or "").strip(),
+                    "legal_name": str(form.get("legal_name") or form.get("official_name") or name).strip(),
+                    "legal_address": str(form.get("legal_address") or "").strip(),
+                    "photo_url": uploaded_photo_url or str(form.get("photo_url") or "").strip(),
+                    "client_type": client_type,
+                    "inn": tax_id,
+                    "pinfl": str(form.get("pinfl") or "").strip(),
+                    "okved": str(form.get("okved") or "").strip(),
                     "territory": str(form.get("territory") or "").strip(),
                     "category": str(form.get("category") or "").strip(),
+                    "industry": industry,
+                    "map_icon": map_icon,
+                    "program": ", ".join(selected_programs),
+                    "programs": selected_programs,
                     "route": str(form.get("route") or "").strip(),
-                    "status": str(form.get("status") or "active").strip(),
+                    "status": status,
+                    "crm_status": crm_status,
+                    "is_blacklisted": str(form.get("is_blacklisted") or "").strip() == "1",
+                    "sort_order": str(form.get("sort_order") or "0").strip(),
+                    "code": str(form.get("code") or "").strip(),
                     "telegram": str(form.get("telegram") or "").strip(),
+                    "telegram_phone": str(form.get("telegram_phone") or form.get("telegram") or "").strip(),
                     "note": str(form.get("note") or "").strip(),
+                    "comment": str(form.get("comment") or form.get("note") or "").strip(),
                     "email": str(form.get("email") or "").strip(),
                     "address": str(form.get("address") or "").strip(),
+                    "latitude": str(form.get("latitude") or "").strip(),
+                    "longitude": str(form.get("longitude") or "").strip(),
+                    "price_type": str(form.get("price_type") or "").strip(),
+                    "credit_limit": str(form.get("credit_limit") or "").strip(),
+                    "consignment_days": str(form.get("consignment_days") or "").strip(),
+                    "cashback_percent": str(form.get("cashback_percent") or "").strip(),
+                    "delivery_frequency_days": str(form.get("delivery_frequency_days") or "").strip(),
+                    "owner_user": str(form.get("owner_user") or "").strip(),
+                    "owner_group": str(form.get("owner_group") or "").strip(),
                     "is_client": True,
                     "is_supplier": is_supplier,
                 },
             )
+            _sync_crm_records_for_counterparty_status(
+                session,
+                wid,
+                saved_row,
+                crm_status,
+                _crm_workspace_stages(wid),
+            )
+            client_id = saved_row.id
+        if client_id and str(form.get("return_to_card") or "").strip() == "1":
+            return RedirectResponse(url=f"/clients?client={quote(client_id)}&msg=saved#client-card", status_code=302)
         return RedirectResponse(url="/clients?msg=saved#clients", status_code=302)
 
     @app.post("/clients/{counterparty_id}/delete", name="clients_delete")
@@ -6098,6 +7063,8 @@ def create_app() -> FastAPI:
                     balance_by_name=balance_by_name,
                     last_date_by_id=last_date_by_id,
                     last_date_by_name=last_date_by_name,
+                    balance_currency_by_id=balance_currency_by_id,
+                    balance_currency_by_name=balance_currency_by_name,
                 )
             counterparties = list(
                 session.execute(
@@ -7330,6 +8297,8 @@ def create_app() -> FastAPI:
                 data=data,
             )
             session.add(row)
+            if counterparty_id:
+                _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
         target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
         return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
 
@@ -7372,8 +8341,9 @@ def create_app() -> FastAPI:
                 row.status = "won"
             elif stage["id"] == "lost":
                 row.status = "lost"
-            elif row.status == "new":
+            elif row.status in {"new", "won", "lost"}:
                 row.status = "in_progress"
+            _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
         return JSONResponse({"ok": True, "stage": stage})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
@@ -7577,6 +8547,7 @@ def create_app() -> FastAPI:
         business_reports: dict[str, Any] = {
             "sales": {"summary": {}, "top_clients": [], "top_products": [], "days": []},
             "stock": {"summary": {}, "rows": []},
+            "stock_analysis": {"summary": {}, "rows": []},
             "receivables": {"summary": {}, "rows": []},
             "calls": {"summary": {}, "rows": []},
         }
@@ -7755,6 +8726,10 @@ def create_app() -> FastAPI:
                         row["cost"] = _sales_decimal(op.amount)
                 stock_rows = []
                 stock_total = Decimal("0")
+                stock_analysis_rows = []
+                stock_analysis_cost_total = Decimal("0")
+                stock_analysis_revenue_total = Decimal("0")
+                stock_analysis_qty_total = Decimal("0")
                 for row in stock_movements.values():
                     total = _sales_decimal(row.get("end")) * _sales_decimal(row.get("cost"))
                     stock_total += total
@@ -7769,9 +8744,66 @@ def create_app() -> FastAPI:
                             "total": _report_money(total, row.get("currency")),
                         }
                     )
+                for product in products:
+                    data = _json_object(product.data)
+                    item = _product_data(product)
+                    qty = _sales_decimal(item.get("quantity"))
+                    if qty <= 0:
+                        continue
+                    stocks = item.get("stocks") if isinstance(item.get("stocks"), list) else []
+                    stock_warehouses = ", ".join(
+                        sorted(
+                            {
+                                str(stock.get("warehouse") or "Основной склад")
+                                for stock in stocks
+                                if isinstance(stock, dict)
+                            }
+                        )
+                    ) or "Основной склад"
+                    cost = Decimal("0")
+                    cost_count = Decimal("0")
+                    for stock in stocks:
+                        if not isinstance(stock, dict):
+                            continue
+                        price = _sales_decimal(stock.get("price"))
+                        if price:
+                            cost += price
+                            cost_count += Decimal("1")
+                    avg_cost = cost / cost_count if cost_count else _sales_decimal(data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price"))
+                    sale_price = _sales_decimal(item.get("sale_price"))
+                    cost_sum = qty * avg_cost
+                    revenue_sum = qty * sale_price
+                    stock_analysis_qty_total += qty
+                    stock_analysis_cost_total += cost_sum
+                    stock_analysis_revenue_total += revenue_sum
+                    stock_analysis_rows.append(
+                        {
+                            "product": item["name"],
+                            "photo_url": item["photo_url"],
+                            "quantity": f"{_sales_money_label(qty)} {item['unit']}",
+                            "warehouse": stock_warehouses,
+                            "avg_cost": _report_money(avg_cost, "UZS"),
+                            "cost_sum": _report_money(cost_sum, "UZS"),
+                            "expected_revenue": _report_money(revenue_sum, item.get("sale_currency") or "UZS"),
+                            "category": item["category"],
+                            "group": item["group"],
+                            "brand": item["brand"],
+                            "is_critical": bool(_sales_decimal(item.get("min_stock")) > 0 and qty <= _sales_decimal(item.get("min_stock"))),
+                        }
+                    )
+                stock_analysis_rows.sort(key=lambda item: item["product"].lower())
                 business_reports["stock"] = {
                     "summary": {"items": len(stock_rows), "total": _report_money(stock_total, primary_currency)},
                     "rows": stock_rows[:50],
+                }
+                business_reports["stock_analysis"] = {
+                    "summary": {
+                        "items": len(stock_analysis_rows),
+                        "quantity": f"{_sales_money_label(stock_analysis_qty_total)} шт",
+                        "cost_total": _report_money(stock_analysis_cost_total, "UZS"),
+                        "revenue_total": _report_money(stock_analysis_revenue_total, primary_currency),
+                    },
+                    "rows": stock_analysis_rows[:200],
                 }
 
                 today = datetime.now(timezone.utc).date()
