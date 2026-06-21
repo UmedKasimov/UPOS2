@@ -183,6 +183,24 @@
     }
   }
 
+  async function prepareLocationBeforeSubmit(form) {
+    if (!form?.querySelector("[data-client-map]")) return;
+    if (readCoords(form)) return;
+    const addressInput = form.querySelector("[data-client-address]");
+    const address = (addressInput?.value || "").trim();
+    if (!address) return;
+    setStatus(form, "Ищем координаты по адресу...");
+    const point = await geocodeAddress(address);
+    if (!point) {
+      setStatus(form, "Адрес сохранится без координат");
+      return;
+    }
+    const lat = Number(point.lat.toFixed(6));
+    const lon = Number(point.lon.toFixed(6));
+    updateMap(form, lat, lon, { pan: false, replaceAddress: false });
+    setStatus(form, `Локация выбрана: ${lat}, ${lon}`);
+  }
+
   function ensureMap(form) {
     const container = form.querySelector("[data-client-map]");
     if (!container || !window.L) return null;
@@ -607,6 +625,22 @@
   document.addEventListener("focusin", (event) => {
     const form = event.target.closest?.("form");
     if (form?.querySelector("[data-client-map]")) ensureMap(form);
+  });
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.querySelector("[data-client-map]")) return;
+    if (form.dataset.clientLocationPrepared === "1") return;
+    event.preventDefault();
+    const submitter = event.submitter;
+    form.dataset.clientLocationPrepared = "1";
+    prepareLocationBeforeSubmit(form).finally(() => {
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit(submitter instanceof HTMLElement ? submitter : undefined);
+      } else {
+        form.submit();
+      }
+    });
   });
 
   document.addEventListener("DOMContentLoaded", () => {

@@ -6889,6 +6889,49 @@ def create_app() -> FastAPI:
         target.write_bytes(payload)
         return f"/static/uploads/clients/{target_dir.name}/{file_name}"
 
+    def _clean_client_coordinate(value: Any, *, minimum: float, maximum: float) -> str:
+        raw = str(value or "").strip().replace(",", ".")
+        if not raw:
+            return ""
+        try:
+            number = float(raw)
+        except ValueError:
+            return ""
+        if not (minimum <= number <= maximum):
+            return ""
+        return f"{number:.6f}".rstrip("0").rstrip(".")
+
+    def _geocode_client_address(address: str) -> tuple[str, str]:
+        query = str(address or "").strip()
+        if not query:
+            return "", ""
+        url = "https://nominatim.openstreetmap.org/search?" + urlencode(
+            {
+                "format": "jsonv2",
+                "limit": "1",
+                "countrycodes": "uz,kz,kg,tj,tm",
+                "q": query,
+            }
+        )
+        request = UrlRequest(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "UPOS/2.0 client-location-geocoder",
+            },
+        )
+        try:
+            with urlopen(request, timeout=5) as response:
+                payload = json.loads(response.read().decode("utf-8") or "[]")
+        except Exception:
+            return "", ""
+        if not isinstance(payload, list) or not payload:
+            return "", ""
+        first = payload[0] if isinstance(payload[0], dict) else {}
+        lat = _clean_client_coordinate(first.get("lat"), minimum=-90, maximum=90)
+        lon = _clean_client_coordinate(first.get("lon"), minimum=-180, maximum=180)
+        return lat, lon
+
     @app.post("/clients/save", name="clients_save")
     async def clients_save(request: Request):
         form = await request.form()
@@ -6927,6 +6970,13 @@ def create_app() -> FastAPI:
             custom_program = str(form.get("program_custom") or form.get("program") or "").strip()
             if custom_program and custom_program not in selected_programs:
                 selected_programs.append(custom_program)
+            address = str(form.get("address") or "").strip()
+            latitude = _clean_client_coordinate(form.get("latitude"), minimum=-90, maximum=90)
+            longitude = _clean_client_coordinate(form.get("longitude"), minimum=-180, maximum=180)
+            if address and (not latitude or not longitude):
+                geocoded_latitude, geocoded_longitude = _geocode_client_address(address)
+                latitude = latitude or geocoded_latitude
+                longitude = longitude or geocoded_longitude
             saved_row = _ensure_counterparty(
                 session,
                 wid,
@@ -6961,9 +7011,9 @@ def create_app() -> FastAPI:
                     "note": str(form.get("note") or "").strip(),
                     "comment": str(form.get("comment") or form.get("note") or "").strip(),
                     "email": str(form.get("email") or "").strip(),
-                    "address": str(form.get("address") or "").strip(),
-                    "latitude": str(form.get("latitude") or "").strip(),
-                    "longitude": str(form.get("longitude") or "").strip(),
+                    "address": address,
+                    "latitude": latitude,
+                    "longitude": longitude,
                     "price_type": str(form.get("price_type") or "").strip(),
                     "credit_limit": str(form.get("credit_limit") or "").strip(),
                     "consignment_days": str(form.get("consignment_days") or "").strip(),
