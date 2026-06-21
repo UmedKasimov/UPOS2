@@ -517,6 +517,9 @@
       <div
         class="client-location-map client-card-location-map{% if not selected_client_card.latitude and not selected_client_card.longitude and not selected_client_card.address %} client-location-map--empty{% endif %}"
         data-client-card-map
+        data-client-id="{{ selected_client_card.id }}"
+        data-save-url="{{ url_for('client_location_save_api', counterparty_id=selected_client_card.id) }}"
+        data-csrf="{{ csrf_token }}"
         data-lat="{{ selected_client_card.latitude or '' }}"
         data-lon="{{ selected_client_card.longitude or '' }}"
         data-address="{{ selected_client_card.address or '' }}"
