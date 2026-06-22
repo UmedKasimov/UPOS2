@@ -2,6 +2,9 @@
 {% block title %}Продажи{% endblock %}
 
 {% set sales_default_tab = 'order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else '')) %}
+{% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
+{% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
+{% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
 
 {% block page_header %}
   <div class="general-page-header">
@@ -138,7 +141,7 @@
             <h2>Журнал продаж</h2>
             <span>Всего: {{ sales|length }}</span>
           </div>
-          <a class="btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="Новая продажа" data-workspace-tab-hash="sales-form">+ Продажа</a>
+          <a class="btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
         </header>
         <div class="products-table-wrap">
           <table class="products-table sales-table">
@@ -159,7 +162,7 @@
               {% for sale in sales %}
                 <tr>
                   <td><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
-                  <td>{{ sale.date or "-" }}</td>
+                  <td>{{ sale.date_label or sale.date or "-" }}</td>
                   <td>{{ sale.doc_type_label }}</td>
                   <td>{{ sale.client or "-" }}</td>
                   <td>{{ sale.warehouse or "-" }}</td>
@@ -186,24 +189,27 @@
       <aside class="product-form-panel" id="sales-form" data-workspace-view="new" hidden>
         <header class="products-panel-head">
           <div>
-            <h2>Новая продажа</h2>
+            <h2>{{ sales_form_title }}</h2>
           </div>
         </header>
         <script type="application/json" id="sales-form-options">{{ sales_options | tojson }}</script>
-        <form method="post" action="{{ url_for('sales_save') }}" class="product-form sales-form">
+        <form method="post" action="{{ url_for('sales_save') }}" class="product-form sales-form" data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}">
           {% include "_csrf_field.html" %}
 
-          <div class="product-kind-toggle">
-            <label><input type="radio" name="doc_type" value="sale" checked /> Продажа</label>
-            <label><input type="radio" name="doc_type" value="order" /> Заказ</label>
-            <label><input type="radio" name="doc_type" value="return" /> Возврат</label>
-          </div>
+          <input type="hidden" name="doc_type" value="{{ sales_form_doc_type }}" />
 
           <div class="product-form-grid">
-            <label><span>ID</span><input name="number" value="{{ sales_options.next_numbers.sale }}" readonly data-sales-auto-number aria-readonly="true" /></label>
-            <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
-            <label class="wide sales-combobox" data-sales-combobox="client">
-              <span>Клиент*</span>
+            <label><span>ID</span><input name="number" value="{{ sales_options.next_numbers[sales_form_doc_type] }}" readonly data-sales-auto-number aria-readonly="true" /></label>
+            <label>
+              <span>Дата</span>
+              <input name="date" type="date" value="{{ today }}" data-upos-date-range data-upos-date-to="date_to" />
+              <input name="date_to" type="hidden" value="{{ today }}" />
+            </label>
+            <label class="sales-combobox" data-sales-combobox="client">
+              <span class="sales-client-label-line">
+                <span>Клиент*</span>
+                <span class="sales-client-balance" data-sales-client-balance hidden></span>
+              </span>
               <div class="sales-lock-field">
                 <input name="client" required autocomplete="off" placeholder="Выберите или введите клиента" data-sales-combo-input />
                 <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить клиента" title="Сменить клиента" hidden>✎</button>
@@ -217,36 +223,46 @@
                 {% endfor %}
               </select>
             </label>
-            <label><span>Прайс-лист</span>
-              <select name="price_type_id" data-sales-price-type>
-                {% for price_type in sales_options.price_types %}
-                  <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
-                {% else %}
-                  <option value="" data-name="" data-currency="UZS">Продажная цена</option>
-                {% endfor %}
-              </select>
-              <input type="hidden" name="price_type_name" data-sales-price-type-name />
-            </label>
             <input type="hidden" name="manager" value="{{ user.name if user else '' }}" />
+            <input type="hidden" name="paid_amount" value="0" data-sales-paid-amount />
+            <input type="hidden" name="payment_type" value="" data-sales-payment-type />
+            <input type="hidden" name="payment_lines" value="[]" data-sales-payment-lines />
           </div>
 
           <section class="product-form-section">
             <div class="sales-section-head">
               <h3>Позиции</h3>
-              <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
+              <div class="sales-section-actions">
+                <label class="sales-price-type-inline">
+                  <span>Прайс-лист</span>
+                  <select name="price_type_id" data-sales-price-type>
+                    {% for price_type in sales_options.price_types %}
+                      <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+                    {% else %}
+                      <option value="" data-name="" data-currency="UZS">Продажная цена</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <input type="hidden" name="price_type_name" data-sales-price-type-name />
+                <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
+              </div>
             </div>
             <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
               <table class="products-table products-catalog-table sales-lines-table">
                 <thead>
                   <tr>
+                    <th>№</th>
                     <th>Товар</th>
                     <th>Склад</th>
                     <th>К-во</th>
                     <th>Цена</th>
+                    <th>Сумма</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--product" data-sales-line-kind="product">
+                    <td class="sales-line-number"></td>
                     <td>
                       <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
                         <div class="sales-lock-field">
@@ -258,33 +274,25 @@
                     </td>
                     <td>
                       <label class="sales-combobox sales-warehouse-picker" data-sales-combobox="warehouse">
-                        <input name="line_warehouse" autocomplete="off" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" placeholder="Склад" data-sales-combo-input />
+                        <input name="line_warehouse" autocomplete="off" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" placeholder="Склад" data-sales-combo-input readonly aria-readonly="true" />
                         <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
                       </label>
                     </td>
                     <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
                     <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
-                  </tr>
-                  <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--product" data-sales-line-kind="product">
-                    <td>
-                      <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
-                        <div class="sales-lock-field">
-                          <input name="line_product" autocomplete="off" placeholder="Товар или услуга" data-sales-combo-input />
-                          <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
-                        </div>
-                        <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
-                      </label>
-                    </td>
-                    <td>
-                      <label class="sales-combobox sales-warehouse-picker" data-sales-combobox="warehouse">
-                        <input name="line_warehouse" autocomplete="off" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" placeholder="Склад" data-sales-combo-input />
-                        <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
-                      </label>
-                    </td>
-                    <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
-                    <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                    <td class="sales-line-total" data-sales-line-total></td>
+                    <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
                   </tr>
                 </tbody>
+                <tfoot>
+                  <tr class="sales-subtotal-row">
+                    <td colspan="3">Итого товары</td>
+                    <td><output data-sales-products-quantity>0</output></td>
+                    <td></td>
+                    <td><output data-sales-products-total>0 UZS</output></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
 
@@ -296,18 +304,32 @@
                 <table class="products-table products-catalog-table sales-lines-table sales-services-table">
                   <thead>
                     <tr>
+                      <th>№</th>
                       <th>Услуга</th>
+                      <th>Категория</th>
                       <th>К-во</th>
                       <th>Цена</th>
+                      <th>Сумма</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody data-sales-services-body></tbody>
+                  <tfoot>
+                    <tr class="sales-subtotal-row">
+                      <td colspan="3">Итого услуги</td>
+                      <td><output data-sales-services-quantity>0</output></td>
+                      <td></td>
+                      <td><output data-sales-services-total>0 UZS</output></td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
 
             <template id="sales-service-row-template">
               <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--service" data-sales-line-kind="service">
+                <td class="sales-line-number"></td>
                 <td>
                   <label class="sales-combobox sales-product-picker" data-sales-combobox="service">
                     <div class="sales-lock-field">
@@ -318,22 +340,188 @@
                   </label>
                   <input type="hidden" name="line_warehouse" value="Услуги" />
                 </td>
+                <td class="sales-line-category" data-sales-line-category></td>
                 <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
                 <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                <td class="sales-line-total" data-sales-line-total></td>
+                <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
               </tr>
             </template>
 
-            <div class="sales-total-bar">
+            <div class="sales-total-bar" data-sales-total-trigger role="button" tabindex="0" title="Изменить общую сумму">
               <span>Итого</span>
+              <span class="sales-total-quantity">Кол-во <output data-sales-lines-quantity>0</output></span>
+              <span class="sales-total-discount" data-sales-total-discount hidden></span>
               <output data-sales-lines-total>0 UZS</output>
             </div>
           </section>
 
-          <div class="product-form-actions">
-            <button class="btn" type="submit">Сохранить продажу</button>
-            <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
+          <div class="sales-payment-breakdown" data-sales-payment-breakdown hidden>
+            <div class="sales-payment-breakdown-row sales-payment-breakdown-row--total">
+              <span>Сумма</span>
+              <strong data-sales-payment-breakdown-total>0 UZS</strong>
+            </div>
+            <div class="sales-payment-breakdown-lines" data-sales-payment-breakdown-lines></div>
+          </div>
+
+          <div class="sales-form-footer">
+            <button type="button" class="btn sales-payment-add-btn" data-sales-payment-open>+ Добавить оплату</button>
+            <div class="product-form-actions">
+              <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
+              <button class="btn" type="submit">Сохранить продажу</button>
+            </div>
           </div>
         </form>
+
+        <dialog class="settings-profile-modal sales-payment-dialog" data-sales-payment-dialog>
+          <form class="settings-profile-modal-surface sales-payment-dialog-surface" data-sales-payment-form>
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Добавить оплату</h2>
+                <p class="settings-profile-modal-sub">Можно разделить оплату по двум или нескольким счетам.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-payment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-payment-lines" data-sales-payment-lines-ui>
+                <div class="sales-payment-line" data-sales-payment-line>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Счёт</span>
+                    <select class="settings-profile-input" data-sales-payment-account>
+                      {% for account in sales_options.payment_accounts %}
+                        <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Оплата</span>
+                    <select class="settings-profile-input" data-sales-payment-method>
+                      <option>Наличные</option>
+                      <option>Карта</option>
+                      <option>Перечисление</option>
+                      <option>Долг</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Сумма</span>
+                    <input class="settings-profile-input" inputmode="decimal" data-sales-payment-amount />
+                  </label>
+                  <button type="button" class="sales-payment-remove" data-sales-payment-remove aria-label="Удалить оплату">×</button>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary sales-payment-add-line" data-sales-payment-add-line>+ Ещё счёт</button>
+              <p class="sales-payment-summary" data-sales-payment-summary>Оплата: 0 UZS</p>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-payment-cancel>Отмена</button>
+              <button type="submit" class="btn sales-payment-submit">Применить оплату</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-product-dialog" data-sales-product-dialog>
+          <form class="settings-profile-modal-surface sales-product-dialog-surface" data-sales-product-form>
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="kind" value="product" data-sales-product-kind />
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title" data-sales-product-dialog-title>Создание товара</h2>
+                <p class="settings-profile-modal-sub" data-sales-product-dialog-sub>Позиция сразу попадёт в поиск продаж.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-product-dialog-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-scroll">
+              <div class="settings-profile-modal-body">
+                <div class="settings-profile-form-grid sales-product-dialog-grid">
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Название*</span>
+                    <input class="settings-profile-input" name="name" required data-sales-product-name />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Категория</span>
+                    <input class="settings-profile-input" name="category" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Бренд</span>
+                    <input class="settings-profile-input" name="brand" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Артикул</span>
+                    <input class="settings-profile-input" name="sku" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Штрихкод</span>
+                    <input class="settings-profile-input" name="barcode" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Единица*</span>
+                    <input class="settings-profile-input" name="unit" value="Штука" required data-sales-product-unit />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Статус</span>
+                    <select class="settings-profile-input" name="status">
+                      <option value="active" selected>Активный</option>
+                      <option value="inactive">Неактивный</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Цена</span>
+                    <input class="settings-profile-input" name="price_value" inputmode="decimal" data-sales-product-price />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Валюта</span>
+                    <select class="settings-profile-input" name="price_currency" data-sales-product-currency>
+                      {% for currency in sales_options.currencies %}
+                        <option value="{{ currency }}">{{ currency }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <input type="hidden" name="price_name" value="Продажная цена" />
+                  <input type="hidden" name="stock_warehouse" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" data-sales-product-warehouse />
+                  <input type="hidden" name="stock_quantity" value="" />
+                  <input type="hidden" name="stock_price" value="" />
+                  <input type="hidden" name="stock_date" value="{{ today }}" />
+                  <input type="hidden" name="barcode_type" value="EAN13" />
+                </div>
+                <p class="sales-product-dialog-status" data-sales-product-status aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-product-dialog-cancel>Отмена</button>
+              <button type="submit" class="btn" data-sales-product-submit>Сохранить</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-total-dialog" data-sales-total-dialog>
+          <form class="settings-profile-modal-surface sales-total-dialog-surface" data-sales-total-form>
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Новая общая сумма</h2>
+                <p class="settings-profile-modal-sub">Цены в строках пересчитаются пропорционально, старые цены будут зачёркнуты.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-total-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="settings-profile-form-grid sales-total-dialog-grid">
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Итог</span>
+                  <input class="settings-profile-input" name="manual_total" inputmode="decimal" required data-sales-total-input />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Скидка %</span>
+                  <input class="settings-profile-input" name="manual_percent" inputmode="decimal" data-sales-total-percent />
+                </label>
+              </div>
+              <p class="sales-product-dialog-status" data-sales-total-status aria-live="polite"></p>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-total-reset>Сбросить</button>
+              <button type="button" class="btn btn-secondary" data-sales-total-cancel>Отмена</button>
+              <button type="submit" class="btn">Применить</button>
+            </div>
+          </form>
+        </dialog>
       </aside>
     </div>
     </div>
@@ -341,5 +529,5 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=7" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=37" defer></script>
 {% endblock %}

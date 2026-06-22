@@ -3337,6 +3337,7 @@ def create_app() -> FastAPI:
         lines: list[dict[str, Any]],
         delta_sign: int,
         op_date: str = "",
+        require_stock_product: bool = False,
     ) -> list[dict[str, Any]]:
         resolved_lines: list[dict[str, Any]] = []
         managed_rows: list[tuple[Product, dict[str, Any], Decimal, str]] = []
@@ -3357,15 +3358,19 @@ def create_app() -> FastAPI:
                     product_row = row
             if product_row is None:
                 product_row = _resolve_product_row(session, workspace_owner_id, str(line.get("product") or ""))
-            if product_row is not None:
-                line["product_id"] = product_row.id
-                line["product"] = product_row.name
-                line["unit"] = str(_json_object(product_row.data).get("unit") or "Штука")
-                if _product_uses_stock(product_row):
-                    managed_rows.append((product_row, line, quantity, line_warehouse))
-                    if delta_sign < 0:
-                        key = (product_row.id, line_warehouse.lower())
-                        required_by_product_warehouse[key] = required_by_product_warehouse.get(key, Decimal("0")) + quantity
+            if product_row is None:
+                product_name = str(line.get("product") or "").strip()
+                raise ValueError(f"Позиция не найдена: {product_name or 'без названия'}")
+            if require_stock_product and not _product_uses_stock(product_row):
+                raise ValueError(f"Позиция {product_row.name} является услугой и не может менять склад")
+            line["product_id"] = product_row.id
+            line["product"] = product_row.name
+            line["unit"] = str(_json_object(product_row.data).get("unit") or "Штука")
+            if _product_uses_stock(product_row):
+                managed_rows.append((product_row, line, quantity, line_warehouse))
+                if delta_sign < 0:
+                    key = (product_row.id, line_warehouse.lower())
+                    required_by_product_warehouse[key] = required_by_product_warehouse.get(key, Decimal("0")) + quantity
             resolved_lines.append(line)
         if delta_sign < 0:
             checked: set[tuple[str, str]] = set()
@@ -4868,6 +4873,32 @@ def create_app() -> FastAPI:
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
                 return RedirectResponse(url="/products?error=" + quote("Товар не найден"), status_code=302)
+            duplicate = session.execute(
+                select(Product)
+                .where(
+                    Product.workspace_owner_id == wid,
+                    func.lower(Product.name) == name.lower(),
+                )
+                .limit(1)
+            ).scalars().first()
+            if duplicate and duplicate.id != product_id:
+                return RedirectResponse(url="/products?error=" + quote("Товар с таким названием уже есть") + "#product-form", status_code=302)
+            if sku:
+                duplicate = session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid, func.lower(Product.sku) == sku.lower())
+                    .limit(1)
+                ).scalars().first()
+                if duplicate and duplicate.id != product_id:
+                    return RedirectResponse(url="/products?error=" + quote("Товар с таким артикулом уже есть") + "#product-form", status_code=302)
+            if barcode:
+                duplicate = session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid, Product.barcode == barcode)
+                    .limit(1)
+                ).scalars().first()
+                if duplicate and duplicate.id != product_id:
+                    return RedirectResponse(url="/products?error=" + quote("Товар с таким штрихкодом уже есть") + "#product-form", status_code=302)
             if row is None:
                 product_id = str(uuid.uuid4())
                 row = Product(
@@ -5163,6 +5194,18 @@ def create_app() -> FastAPI:
         except Exception:
             return Decimal("0")
 
+    def _sales_decimal_strict(raw: Any, field_label: str) -> Decimal:
+        raw_text = str(raw or "").strip()
+        if not raw_text:
+            return Decimal("0")
+        value = re.sub(r"\s+", "", raw_text).replace(",", ".")
+        if not re.fullmatch(r"-?\d+(?:\.\d+)?", value):
+            raise ValueError(f"{field_label}: введите число")
+        try:
+            return Decimal(value)
+        except Exception as exc:
+            raise ValueError(f"{field_label}: введите число") from exc
+
     def _sales_money_label(raw: Any) -> str:
         amount = _sales_decimal(raw)
         if amount == amount.to_integral():
@@ -5187,20 +5230,26 @@ def create_app() -> FastAPI:
         }.get(doc_type or "", "Продажа")
 
     def _sales_number_prefix(doc_type: str) -> str:
-        return {"sale": "S", "order": "O", "return": "R"}.get(doc_type or "", "S")
+        return {"sale": "a", "order": "b", "return": "c"}.get(doc_type or "", "a")
 
-    def _sales_document_number(prefix: str, stamp: str, index: int) -> str:
-        return f"{prefix}-{stamp}-{index:03d}"
+    def _sales_document_number(prefix: str, index: int) -> str:
+        return f"{prefix}{index:02d}"
 
     def _next_sales_document_number(session: Session, workspace_owner_id: str, doc_type: str) -> str:
         prefix = _sales_number_prefix(doc_type)
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
-        count = session.execute(
-            select(func.count(SaleDocument.id)).where(SaleDocument.workspace_owner_id == workspace_owner_id)
-        ).scalar_one()
-        index = int(count) + 1
+        existing_numbers = session.execute(
+            select(SaleDocument.number).where(SaleDocument.workspace_owner_id == workspace_owner_id)
+        ).scalars().all()
+        pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$", re.IGNORECASE)
+        used_indexes = [
+            int(match.group(1))
+            for number in existing_numbers
+            for match in [pattern.match(str(number or ""))]
+            if match
+        ]
+        index = (max(used_indexes) + 1) if used_indexes else 1
         while True:
-            number = _sales_document_number(prefix, stamp, index)
+            number = _sales_document_number(prefix, index)
             exists = session.execute(
                 select(SaleDocument.id)
                 .where(
@@ -5219,10 +5268,15 @@ def create_app() -> FastAPI:
         debt_amount = _sales_decimal(row.amount) - paid_amount
         doc_type = str(data.get("doc_type") or "sale")
         status = str(data.get("status") or ("return" if doc_type == "return" else "new"))
+        date_from = str(data.get("date") or "")
+        date_to = str(data.get("date_to") or "")
+        date_label = f"{date_from} - {date_to}" if date_from and date_to and date_to != date_from else date_from
         return {
             "id": row.id,
             "number": row.number,
-            "date": str(data.get("date") or ""),
+            "date": date_from,
+            "date_to": date_to,
+            "date_label": date_label,
             "doc_type": doc_type,
             "doc_type_label": _sales_doc_type_label(doc_type),
             "client": str(data.get("client") or ""),
@@ -5240,6 +5294,33 @@ def create_app() -> FastAPI:
             "updated_at": row.updated_at,
         }
 
+    def _sales_product_option(
+        row: Product,
+        active_sales_price_types: list[dict[str, Any]],
+        price_types: list[dict[str, Any]],
+        usd_rate: Decimal,
+    ) -> dict[str, Any]:
+        row_data = _json_object(row.data)
+        product_view = {
+            "id": row.id,
+            "name": row.name,
+            "kind": str(row_data.get("kind") or "product"),
+            "category": str(row_data.get("category") or ""),
+            "sku": row.sku,
+            "barcode": row.barcode,
+            "unit": str(row_data.get("unit") or "Штука"),
+            "stocks": _product_stocks(row),
+            "prices": row_data.get("prices") if isinstance(row_data.get("prices"), list) else [],
+            "price_by_type": {},
+        }
+        for price_type in active_sales_price_types:
+            price, price_currency = _calculated_product_price(product_view, price_type, price_types, usd_rate)
+            product_view["price_by_type"][str(price_type.get("id") or "")] = {
+                "price": price,
+                "currency": price_currency,
+            }
+        return product_view
+
     def _sales_document_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
         doc_type = str(form.get("doc_type") or "sale").strip()
         if doc_type not in {"sale", "order", "return"}:
@@ -5255,35 +5336,78 @@ def create_app() -> FastAPI:
         for idx in range(max(len(products), len(warehouses), len(quantities), len(prices), 1)):
             product = str(products[idx] if idx < len(products) else "").strip()
             warehouse = str(warehouses[idx] if idx < len(warehouses) else "").strip() or "Основной склад"
-            quantity = _sales_decimal(quantities[idx] if idx < len(quantities) else "")
-            price = _sales_decimal(prices[idx] if idx < len(prices) else "")
+            quantity = _sales_decimal_strict(quantities[idx] if idx < len(quantities) else "", "Количество")
+            price = _sales_decimal_strict(prices[idx] if idx < len(prices) else "", "Цена")
+            if not product and not quantity and not price:
+                continue
+            if not product:
+                raise ValueError("В строке позиции не выбран товар или услуга")
+            if quantity < 0:
+                raise ValueError("Количество не может быть отрицательным")
+            if price < 0:
+                raise ValueError("Цена не может быть отрицательной")
+            if quantity <= 0:
+                quantity = Decimal("1")
             line_total = quantity * price
-            if product or quantity or price:
-                if not first_warehouse:
-                    first_warehouse = warehouse
-                total += line_total
-                lines.append(
-                    {
-                        "product": product,
-                        "warehouse": warehouse,
-                        "quantity": str(quantity.normalize() if quantity else ""),
-                        "price": str(price.normalize() if price else ""),
-                        "total": str(line_total.normalize() if line_total else "0"),
-                    }
-                )
+            if not first_warehouse:
+                first_warehouse = warehouse
+            total += line_total
+            lines.append(
+                {
+                    "product": product,
+                    "warehouse": warehouse,
+                    "quantity": str(quantity.normalize() if quantity else ""),
+                    "price": str(price.normalize() if price else ""),
+                    "total": str(line_total.normalize() if line_total else "0"),
+                }
+            )
         amount = total
-        paid_amount = Decimal("0")
-        status = "return" if doc_type == "return" else "new"
+        paid_amount = _sales_decimal_strict(form.get("paid_amount"), "Оплачено")
+        if paid_amount < 0:
+            raise ValueError("Оплачено не может быть отрицательным")
+        if doc_type == "return":
+            status = "return"
+        else:
+            status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "new"
+        payment_lines: list[dict[str, str]] = []
+        raw_payment_lines = str(form.get("payment_lines") or "").strip()
+        if raw_payment_lines:
+            try:
+                parsed_payment_lines = json.loads(raw_payment_lines)
+            except Exception:
+                parsed_payment_lines = []
+            if isinstance(parsed_payment_lines, list):
+                for payment in parsed_payment_lines:
+                    if not isinstance(payment, dict):
+                        continue
+                    payment_amount = _sales_decimal(payment.get("amount"))
+                    if payment_amount <= 0:
+                        continue
+                    payment_lines.append(
+                        {
+                            "account_id": str(payment.get("account_id") or "").strip(),
+                            "account": str(payment.get("account") or "").strip(),
+                            "type": str(payment.get("type") or "").strip(),
+                            "amount": str(payment_amount.normalize() if payment_amount else "0"),
+                        }
+                    )
+        payment_type = str(form.get("payment_type") or "").strip()
+        if not payment_type and payment_lines:
+            payment_type = ", ".join(
+                dict.fromkeys(str(item.get("type") or "").strip() for item in payment_lines if str(item.get("type") or "").strip())
+            )
         data = {
             "doc_type": doc_type,
             "date": str(form.get("date") or "").strip(),
+            "date_to": str(form.get("date_to") or form.get("date") or "").strip(),
             "client": str(form.get("client") or "").strip(),
             "warehouse": first_warehouse or "Основной склад",
             "status": status,
             "price_type_id": str(form.get("price_type_id") or "").strip(),
             "price_type": str(form.get("price_type_name") or "").strip(),
             "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
-            "payment_type": "",
+            "payment_type": payment_type,
+            "payment_lines": payment_lines,
             "manager": str(form.get("manager") or "").strip(),
             "note": "",
             "lines": lines,
@@ -5317,6 +5441,7 @@ def create_app() -> FastAPI:
         warehouses: list[str] = []
         warehouse_options: list[dict[str, Any]] = []
         price_type_options: list[dict[str, Any]] = []
+        payment_accounts: list[dict[str, str]] = []
         next_numbers: dict[str, str] = {}
         usd_rate = _workspace_usd_uzs_rate(wid)
         with session_scope() as session:
@@ -5362,25 +5487,7 @@ def create_app() -> FastAPI:
             )
             product_names = [str(row.name) for row in product_rows]
             for row in product_rows:
-                row_data = _json_object(row.data)
-                product_view = {
-                    "id": row.id,
-                    "name": row.name,
-                    "kind": str(row_data.get("kind") or "product"),
-                    "sku": row.sku,
-                    "barcode": row.barcode,
-                    "unit": str(row_data.get("unit") or "Штука"),
-                    "stocks": _product_stocks(row),
-                    "prices": row_data.get("prices") if isinstance(row_data.get("prices"), list) else [],
-                    "price_by_type": {},
-                }
-                for price_type in active_sales_price_types:
-                    price, price_currency = _calculated_product_price(product_view, price_type, price_types, usd_rate)
-                    product_view["price_by_type"][str(price_type.get("id") or "")] = {
-                        "price": price,
-                        "currency": price_currency,
-                    }
-                product_options.append(product_view)
+                product_options.append(_sales_product_option(row, active_sales_price_types, price_types, usd_rate))
             client_rows = list(
                 session.execute(
                     select(Counterparty)
@@ -5391,9 +5498,40 @@ def create_app() -> FastAPI:
                     .order_by(Counterparty.name.asc())
                 ).scalars()
             )
+            client_balance_by_id: dict[str, dict[str, Decimal]] = {}
+            client_balance_by_name: dict[str, dict[str, Decimal]] = {}
+            for sale_row in session.execute(
+                select(SaleDocument).where(SaleDocument.workspace_owner_id == wid)
+            ).scalars():
+                sale_data = _json_object(sale_row.data)
+                sale_client = str(sale_data.get("client") or "").strip()
+                if not sale_client:
+                    continue
+                sale_currency = str(sale_row.currency or "UZS").upper()
+                sale_doc_type = str(sale_data.get("doc_type") or "sale")
+                sale_sign = Decimal("-1") if sale_doc_type == "return" else Decimal("1")
+                sale_balance = sale_sign * (_sales_decimal(sale_row.amount) - _sales_decimal(sale_data.get("paid_amount")))
+                sale_counterparty_id = str(sale_data.get("counterparty_id") or "").strip()
+                if sale_counterparty_id:
+                    bucket = client_balance_by_id.setdefault(sale_counterparty_id, {})
+                    bucket[sale_currency] = bucket.get(sale_currency, Decimal("0")) + sale_balance
+                bucket = client_balance_by_name.setdefault(sale_client.lower(), {})
+                bucket[sale_currency] = bucket.get(sale_currency, Decimal("0")) + sale_balance
             clients = [str(row.name) for row in client_rows]
             for row in client_rows:
                 extra = _counterparty_extra(row)
+                balance_map = client_balance_by_id.get(row.id) or client_balance_by_name.get(row.name.lower()) or {}
+                balance_total = sum(balance_map.values(), Decimal("0"))
+                balance_kind = "debt" if balance_total > 0 else "advance" if balance_total < 0 else "zero"
+                balance_lines = [
+                    {
+                        "currency": currency,
+                        "amount": _sales_money_label(abs(amount)),
+                        "kind": "debt" if amount > 0 else "advance" if amount < 0 else "zero",
+                    }
+                    for currency, amount in sorted(balance_map.items())
+                    if amount
+                ]
                 client_options.append(
                     {
                         "id": row.id,
@@ -5401,6 +5539,10 @@ def create_app() -> FastAPI:
                         "phone": row.phone,
                         "tax_id": row.tax_id,
                         "price_type": str(extra.get("price_type") or ""),
+                        "balance_kind": balance_kind,
+                        "balance_note": "Баланс: нам должны" if balance_kind == "debt" else "Баланс: мы должны" if balance_kind == "advance" else "Баланс: 0",
+                        "balance": _sales_money_label(abs(balance_total)),
+                        "balance_lines": balance_lines,
                     }
                 )
             warehouse_rows = list(
@@ -5421,6 +5563,25 @@ def create_app() -> FastAPI:
         warehouses = sorted({item for item in [*warehouses, *[sale["warehouse"] for sale in sales if sale["warehouse"]]] if item}) or ["Основной склад"]
         if not warehouse_options:
             warehouse_options = [{"id": "", "name": item, "manager": "", "status": "active", "note": ""} for item in warehouses]
+        treasury = load_treasury(wid)
+        for pocket in treasury.get("pockets") or []:
+            if not isinstance(pocket, dict):
+                continue
+            label = str(pocket.get("label") or "").strip()
+            if not label:
+                continue
+            payment_accounts.append(
+                {
+                    "id": str(pocket.get("id") or "").strip(),
+                    "label": label,
+                    "template_id": str(pocket.get("template_id") or "").strip(),
+                }
+            )
+        if not payment_accounts:
+            payment_accounts = [
+                {"id": "cash", "label": "Наличные", "template_id": "cash"},
+                {"id": "card", "label": "Карта", "template_id": "card"},
+            ]
         return tpl(
             request,
             "home_sales.html",
@@ -5436,6 +5597,7 @@ def create_app() -> FastAPI:
                 "products": product_names,
                 "product_rows": product_options,
                 "price_types": price_type_options,
+                "payment_accounts": payment_accounts,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
@@ -5444,6 +5606,75 @@ def create_app() -> FastAPI:
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
         )
+
+    @app.post("/sales/products/quick-save", name="sales_product_quick_save")
+    async def sales_product_quick_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "workspace"}, status_code=403)
+        assert wid is not None
+        kind = _product_excel_kind(form.get("kind"), "product")
+        if kind not in {"product", "service"}:
+            kind = "product"
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return JSONResponse({"error": "Название обязательно"}, status_code=400)
+        sku = str(form.get("sku") or "").strip()
+        barcode = str(form.get("barcode") or "").strip()
+        data = _product_form_payload(form)
+        data["kind"] = kind
+        if kind == "service":
+            data["stocks"] = []
+            data["unit"] = data.get("unit") or "Услуга"
+        with session_scope() as session:
+            duplicate = session.execute(
+                select(Product).where(
+                    Product.workspace_owner_id == wid,
+                    func.lower(Product.name) == name.lower(),
+                )
+            ).scalar_one_or_none()
+            if duplicate:
+                return JSONResponse({"error": "Такая позиция уже есть"}, status_code=409)
+            if sku:
+                duplicate = session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid, func.lower(Product.sku) == sku.lower())
+                    .limit(1)
+                ).scalars().first()
+                if duplicate:
+                    return JSONResponse({"error": "Позиция с таким артикулом уже есть"}, status_code=409)
+            if barcode:
+                duplicate = session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid, Product.barcode == barcode)
+                    .limit(1)
+                ).scalars().first()
+                if duplicate:
+                    return JSONResponse({"error": "Позиция с таким штрихкодом уже есть"}, status_code=409)
+            product_id = str(uuid.uuid4())
+            row = Product(
+                id=product_id,
+                workspace_owner_id=wid,
+                name=name,
+                sku=sku,
+                barcode=barcode,
+                external_source="local",
+                external_id=product_id,
+                data=data,
+            )
+            session.add(row)
+            session.flush()
+            price_types = _workspace_price_types(wid)
+            active_sales_price_types = [
+                item
+                for item in price_types
+                if item.get("is_for_sales") and item.get("is_active")
+            ] or [item for item in price_types if item.get("is_for_sales")] or price_types
+            product_view = _sales_product_option(row, active_sales_price_types, price_types, _workspace_usd_uzs_rate(wid))
+        return JSONResponse({"ok": True, "product": product_view})
 
     @app.post("/sales/save", name="sales_save")
     async def sales_save(request: Request):
@@ -5454,7 +5685,10 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        data, amount, currency = _sales_document_payload(form)
+        try:
+            data, amount, currency = _sales_document_payload(form)
+        except ValueError as exc:
+            return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-form", status_code=302)
         session_user = request.session.get("user") or {}
         data["manager"] = str(session_user.get("name") or session_user.get("username") or "").strip()
         if not data["client"]:
@@ -5604,22 +5838,35 @@ def create_app() -> FastAPI:
         total = Decimal("0")
         for idx in range(max(len(products), len(quantities), len(prices), 1)):
             product = str(products[idx] if idx < len(products) else "").strip()
-            quantity = _sales_decimal(quantities[idx] if idx < len(quantities) else "")
-            price = _sales_decimal(prices[idx] if idx < len(prices) else "")
+            quantity = _sales_decimal_strict(quantities[idx] if idx < len(quantities) else "", "Количество")
+            price = _sales_decimal_strict(prices[idx] if idx < len(prices) else "", "Цена")
+            if not product and not quantity and not price:
+                continue
+            if not product:
+                raise ValueError("В строке прихода не выбран товар")
+            if quantity < 0:
+                raise ValueError("Количество не может быть отрицательным")
+            if price < 0:
+                raise ValueError("Цена не может быть отрицательной")
+            if quantity <= 0:
+                quantity = Decimal("1")
             line_total = quantity * price
-            if product or quantity or price:
-                total += line_total
-                lines.append(
-                    {
-                        "product": product,
-                        "quantity": str(quantity.normalize() if quantity else ""),
-                        "price": str(price.normalize() if price else ""),
-                        "total": str(line_total.normalize() if line_total else "0"),
-                    }
-                )
-        manual_amount = _sales_decimal(form.get("amount"))
+            total += line_total
+            lines.append(
+                {
+                    "product": product,
+                    "quantity": str(quantity.normalize() if quantity else ""),
+                    "price": str(price.normalize() if price else ""),
+                    "total": str(line_total.normalize() if line_total else "0"),
+                }
+            )
+        manual_amount = _sales_decimal_strict(form.get("amount"), "Итог")
         amount = manual_amount if manual_amount else total
-        paid_amount = _sales_decimal(form.get("paid_amount"))
+        paid_amount = _sales_decimal_strict(form.get("paid_amount"), "Оплачено")
+        if amount < 0:
+            raise ValueError("Итог не может быть отрицательным")
+        if paid_amount < 0:
+            raise ValueError("Оплачено не может быть отрицательным")
         status = str(form.get("status") or "").strip()
         if not status:
             status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "new"
@@ -5844,8 +6091,13 @@ def create_app() -> FastAPI:
         operation_type = str(form.get("operation_type") or "adjustment").strip()
         if operation_type not in {"in", "out", "adjustment", "transfer"}:
             operation_type = "adjustment"
-        quantity = _sales_decimal(form.get("quantity"))
-        amount = _sales_decimal(form.get("amount"))
+        quantity = _sales_decimal_strict(form.get("quantity"), "Количество")
+        amount = _sales_decimal_strict(form.get("amount"), "Сумма")
+        price = _sales_decimal_strict(form.get("price"), "Цена")
+        if price < 0:
+            raise ValueError("Цена не может быть отрицательной")
+        if amount < 0:
+            raise ValueError("Сумма не может быть отрицательной")
         data = {
             "date": str(form.get("date") or "").strip(),
             "operation_type": operation_type,
@@ -5853,7 +6105,7 @@ def create_app() -> FastAPI:
             "from_warehouse": str(form.get("from_warehouse") or "").strip() or "Основной склад",
             "to_warehouse": str(form.get("to_warehouse") or "").strip() or "Основной склад",
             "product": str(form.get("product") or "").strip(),
-            "price": str(form.get("price") or "").strip(),
+            "price": str(price.normalize() if price else ""),
             "responsible": str(form.get("responsible") or "").strip(),
             "note": str(form.get("note") or "").strip(),
             "quantity": str(quantity.normalize() if quantity else "0"),
@@ -6352,7 +6604,10 @@ def create_app() -> FastAPI:
         return request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else "")
 
     def _purchase_save_redirect(form: Any, workspace_owner_id: str, base_url: str) -> RedirectResponse:
-        data, amount, currency = _purchase_document_payload(form)
+        try:
+            data, amount, currency = _purchase_document_payload(form)
+        except ValueError as exc:
+            return RedirectResponse(url=f"{base_url}?error=" + quote(str(exc)) + "#purchases", status_code=302)
         if not data["supplier"]:
             return RedirectResponse(url=f"{base_url}?error=" + quote("Поставщик обязателен") + "#purchases", status_code=302)
         with session_scope() as session:
@@ -6375,6 +6630,7 @@ def create_app() -> FastAPI:
                     lines=list(data.get("lines") or []),
                     delta_sign=1,
                     op_date=str(data.get("date") or ""),
+                    require_stock_product=True,
                 )
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = supplier_row.id
@@ -6617,7 +6873,10 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        data, amount = _warehouse_operation_payload(form)
+        try:
+            data, amount = _warehouse_operation_payload(form)
+        except ValueError as exc:
+            return RedirectResponse(url="/warehouse?error=" + quote(str(exc)) + "#adjustments", status_code=302)
         if not data["product"]:
             return RedirectResponse(url="/warehouse?error=" + quote("Товар обязателен") + "#adjustments", status_code=302)
         quantity = _sales_decimal(data.get("quantity"))
@@ -6641,6 +6900,7 @@ def create_app() -> FastAPI:
                         lines=[{"product": product_row.name, "product_id": product_row.id, "quantity": data["quantity"], "price": data["price"]}],
                         delta_sign=-1,
                         op_date=str(data.get("date") or ""),
+                        require_stock_product=True,
                     )
                     _sync_product_lines(
                         session,
@@ -6649,6 +6909,7 @@ def create_app() -> FastAPI:
                         lines=[{"product": product_row.name, "product_id": product_row.id, "quantity": data["quantity"], "price": data["price"]}],
                         delta_sign=1,
                         op_date=str(data.get("date") or ""),
+                        require_stock_product=True,
                     )
                     data["warehouse_id"] = from_row.id
                 else:
@@ -6661,6 +6922,7 @@ def create_app() -> FastAPI:
                         lines=[{"product": product_row.name, "product_id": product_row.id, "quantity": data["quantity"], "price": data["price"]}],
                         delta_sign=delta_sign,
                         op_date=str(data.get("date") or ""),
+                        require_stock_product=True,
                     )
                     data["warehouse_id"] = warehouse_row.id
             except ValueError as exc:

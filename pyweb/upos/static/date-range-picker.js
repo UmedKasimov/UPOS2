@@ -88,6 +88,14 @@
     return new Date(date.getFullYear(), date.getMonth(), 1);
   }
 
+  function nextMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+  }
+
+  function sameMonth(a, b) {
+    return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+  }
+
   function mondayIndex(day) {
     return (day + 6) % 7;
   }
@@ -165,9 +173,16 @@
       const from = monthStart(parseIso(state.date_from) || new Date());
       const to = monthStart(parseIso(state.date_to) || new Date(from.getFullYear(), from.getMonth() + 1, 1));
       state.leftView = from;
-      state.rightView = to;
+      state.rightView = single || sameMonth(from, to) ? nextMonth(from) : to;
       state.view = from;
       state.pickerSide = 'from';
+    }
+
+    function normalizeRangeViews() {
+      if (single || sameMonth(state.leftView, state.rightView) || state.rightView < state.leftView) {
+        state.rightView = nextMonth(state.leftView);
+      }
+      state.view = state.pickerSide === 'to' ? state.rightView : state.leftView;
     }
 
     function dayButton(date, currentMonth) {
@@ -242,7 +257,7 @@
         ? yearsHtml(state.yearBase || activeView().getFullYear())
         : state.viewMode === 'months'
           ? monthsHtml(activeView().getFullYear())
-          : `<div class="upos-date-months">${monthHtml(state.leftView, 'from')}${single ? '' : monthHtml(state.rightView, 'to')}</div>`;
+          : `<div class="upos-date-months">${monthHtml(state.leftView, 'from')}${monthHtml(state.rightView, 'to')}</div>`;
       state.panel.innerHTML = `
         <div class="upos-date-presets">
           ${presets.map(([key, label]) => `<button type="button" class="upos-date-preset${state.preset === key ? ' active' : ''}" data-upos-preset="${key}">${label}</button>`).join('')}
@@ -364,10 +379,14 @@
           const view = activeView();
           setSideView(state.pickerSide, new Date(view.getFullYear() + delta, view.getMonth(), 1));
         } else {
-          if (delta < 0) {
+          if (single) {
+            const nextLeft = new Date(state.leftView.getFullYear(), state.leftView.getMonth() + delta, 1);
+            setSideView('from', nextLeft);
+            state.rightView = nextMonth(state.leftView);
+          } else if (delta < 0) {
             setSideView('from', new Date(state.leftView.getFullYear(), state.leftView.getMonth() - 1, 1));
           } else {
-            setSideView(single ? 'from' : 'to', new Date((single ? state.leftView : state.rightView).getFullYear(), (single ? state.leftView : state.rightView).getMonth() + 1, 1));
+            setSideView('to', new Date(state.rightView.getFullYear(), state.rightView.getMonth() + 1, 1));
           }
         }
         renderPanel();
@@ -412,18 +431,20 @@
       const day = event.target.closest('[data-upos-day]');
       if (day) {
         const value = day.getAttribute('data-upos-day') || '';
-        const side = day.closest('[data-upos-side]')?.getAttribute('data-upos-side') || state.pickerSide || 'from';
         state.preset = 'custom';
         if (single) {
           state.date_from = value;
           state.date_to = value;
           state.selecting = 'from';
-        } else if (side === 'to') {
+        } else if (state.selecting === 'to' && state.date_from) {
           state.date_to = value;
           state.selecting = 'from';
         } else {
           state.date_from = value;
+          state.date_to = '';
           state.selecting = 'to';
+          setSideView('from', parseIso(value) || new Date());
+          normalizeRangeViews();
         }
         renderPanel();
         return;
