@@ -288,6 +288,83 @@
     });
   }
 
+  function initUsdRateSetting() {
+    var input = document.querySelector("[data-usd-uzs-rate]");
+    if (!input) return;
+    var saveBtn = document.querySelector("[data-usd-uzs-save]");
+    var cancelBtn = document.querySelector("[data-usd-uzs-cancel]");
+    var lastSaved = cleanRate(input.value);
+
+    function cleanRate(raw) {
+      return String(raw || "").replace(",", ".").replace(/[^0-9.]/g, "");
+    }
+
+    function formatRate(raw) {
+      var clean = cleanRate(raw);
+      if (!clean) return "";
+      var parts = clean.split(".");
+      var integer = (parts[0] || "").replace(/^0+(?=\d)/, "");
+      integer = integer.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      return parts.length > 1 ? integer + "." + parts.slice(1).join("") : integer;
+    }
+
+    function setDirtyState() {
+      var changed = cleanRate(input.value) !== lastSaved;
+      if (saveBtn) saveBtn.disabled = !changed;
+      if (cancelBtn) cancelBtn.disabled = !changed;
+      input.classList.toggle("is-dirty", changed);
+    }
+
+    function applyFormat() {
+      var clean = cleanRate(input.value);
+      var formatted = formatRate(clean);
+      if (input.value !== formatted) input.value = formatted;
+      setDirtyState();
+    }
+
+    function saveRate() {
+      var value = cleanRate(input.value);
+      if (!value || value === lastSaved) {
+        setDirtyState();
+        return;
+      }
+      if (saveBtn) saveBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      savePreferences({ usd_uzs_rate: value })
+        .then(function (body) {
+          lastSaved = cleanRate(body.usd_uzs_rate || value);
+          input.value = formatRate(lastSaved);
+          setDirtyState();
+          showPrefToast();
+        })
+        .catch(function (err) {
+          alert(err.message || t("settings.js.save_err"));
+          setDirtyState();
+        });
+    }
+
+    function cancelRate() {
+      input.value = formatRate(lastSaved);
+      setDirtyState();
+    }
+
+    input.value = formatRate(input.value);
+    setDirtyState();
+    input.addEventListener("input", applyFormat);
+    input.addEventListener("change", applyFormat);
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        saveRate();
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        cancelRate();
+      }
+    });
+    if (saveBtn) saveBtn.addEventListener("click", saveRate);
+    if (cancelBtn) cancelBtn.addEventListener("click", cancelRate);
+  }
+
   function fieldVal(id) {
     var el = document.getElementById(id);
     return el ? (el.value || "").trim() : "";
@@ -1636,6 +1713,7 @@
     document.querySelectorAll(".js-anti-autofill").forEach(initTokenAntiAutofill);
     initLanguageDropdowns();
     initPreferencesAutoSave();
+    initUsdRateSetting();
     initIntegrationModals();
     initSocialSettings();
     initSocialTelegramIntegration();

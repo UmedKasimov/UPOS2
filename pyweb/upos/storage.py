@@ -44,6 +44,7 @@ def _default() -> dict[str, Any]:
         "telegram_bot_token": "",
         "theme": "light",
         "timezone": DEFAULT_WORKSPACE_TIMEZONE,
+        "usd_uzs_rate": "12000",
         "available_currencies": list(BASE_AVAILABLE_CURRENCIES),
         "enabled_currencies": list(DEFAULT_CURRENCIES),
         "integrations": default_integration_settings(),

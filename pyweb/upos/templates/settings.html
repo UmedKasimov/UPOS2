@@ -1568,6 +1568,34 @@
 
             <section class="settings-ios-group settings-dict-section">
               <div class="settings-dict-head">
+                <p class="settings-ios-footnote">Курс валют</p>
+              </div>
+              <div class="settings-ios-plate settings-ios-plate--flush">
+                <label class="dict-rate-field">
+                  <span class="dict-rate-main">
+                    <span class="dict-rate-title">1 USD =</span>
+                    <span class="dict-rate-note">Общий курс для продаж, прайс-листов и конвертации в доллары.</span>
+                  </span>
+                  <span class="dict-rate-control">
+                    <input
+                      class="settings-profile-input dict-rate-input"
+                      type="text"
+                      name="usd_uzs_rate"
+                      value="{{ settings.usd_uzs_rate | default('12000', true) }}"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      data-usd-uzs-rate
+                    />
+                    <span>UZS</span>
+                    <button type="button" class="dict-rate-action dict-rate-action--save" data-usd-uzs-save aria-label="Сохранить курс">&#10003;</button>
+                    <button type="button" class="dict-rate-action dict-rate-action--cancel" data-usd-uzs-cancel aria-label="Отменить изменение">&times;</button>
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <section class="settings-ios-group settings-dict-section">
+              <div class="settings-dict-head">
                 <p class="settings-ios-footnote">{{ _('settings.dict.cats') }}</p>
               </div>
               <div class="settings-ios-plate settings-ios-plate--list">
@@ -1762,6 +1790,6 @@
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=7" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=27" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=30" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

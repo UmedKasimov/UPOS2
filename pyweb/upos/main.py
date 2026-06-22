@@ -3339,11 +3339,13 @@ def create_app() -> FastAPI:
         op_date: str = "",
     ) -> list[dict[str, Any]]:
         resolved_lines: list[dict[str, Any]] = []
-        managed_rows: list[tuple[Product, dict[str, Any], Decimal]] = []
-        required_by_product: dict[str, Decimal] = {}
+        managed_rows: list[tuple[Product, dict[str, Any], Decimal, str]] = []
+        required_by_product_warehouse: dict[tuple[str, str], Decimal] = {}
         for raw_line in lines:
             line = dict(raw_line)
             quantity = _sales_decimal(line.get("quantity"))
+            line_warehouse = str(line.get("warehouse") or warehouse_name or "Основной склад").strip() or "Основной склад"
+            line["warehouse"] = line_warehouse
             if quantity <= 0:
                 resolved_lines.append(line)
                 continue
@@ -3360,23 +3362,29 @@ def create_app() -> FastAPI:
                 line["product"] = product_row.name
                 line["unit"] = str(_json_object(product_row.data).get("unit") or "Штука")
                 if _product_uses_stock(product_row):
-                    managed_rows.append((product_row, line, quantity))
+                    managed_rows.append((product_row, line, quantity, line_warehouse))
                     if delta_sign < 0:
-                        required_by_product[product_row.id] = required_by_product.get(product_row.id, Decimal("0")) + quantity
+                        key = (product_row.id, line_warehouse.lower())
+                        required_by_product_warehouse[key] = required_by_product_warehouse.get(key, Decimal("0")) + quantity
             resolved_lines.append(line)
         if delta_sign < 0:
-            for product_row, _, _ in managed_rows:
-                required = required_by_product.get(product_row.id, Decimal("0"))
+            checked: set[tuple[str, str]] = set()
+            for product_row, _, _, line_warehouse in managed_rows:
+                key = (product_row.id, line_warehouse.lower())
+                if key in checked:
+                    continue
+                checked.add(key)
+                required = required_by_product_warehouse.get(key, Decimal("0"))
                 if required <= 0:
                     continue
-                available = _product_available_in_warehouse(product_row, warehouse_name)
+                available = _product_available_in_warehouse(product_row, line_warehouse)
                 if available < required:
-                    raise ValueError(f"Недостаточно остатка для товара {product_row.name} на складе {warehouse_name}")
-                required_by_product[product_row.id] = Decimal("0")
-        for product_row, line, quantity in managed_rows:
+                    raise ValueError(f"Недостаточно остатка для товара {product_row.name} на складе {line_warehouse}")
+                required_by_product_warehouse[key] = Decimal("0")
+        for product_row, line, quantity, line_warehouse in managed_rows:
             _apply_product_stock_change(
                 product_row,
-                warehouse_name,
+                line_warehouse,
                 Decimal(delta_sign) * quantity,
                 price=str(line.get("price") or ""),
                 op_date=op_date,
@@ -3843,9 +3851,6 @@ def create_app() -> FastAPI:
         selected_group = clean_values(group_values, group)
         selected_brand = clean_values(brand_values, brand)
         selected_folder = clean_values(folder_values, folder)
-        map_icon = str(extra.get("map_icon") or "").strip()
-        if not map_icon or map_icon == "default":
-            map_icon = str(extra.get("industry") or "default").strip() or "default"
         return {
             "q": q.strip(),
             "category": selected_category[0] if selected_category else "",
@@ -3944,6 +3949,11 @@ def create_app() -> FastAPI:
     ]
     PRODUCT_PRICE_ROUNDINGS = ["0.0001", "0.001", "0.01", "0.1", "0.5", "1.0", "5.0", "10.0", "50.0", "100.0", "500.0", "1000.0", "5000.0", "10000.0"]
     PRODUCT_USD_RATE = Decimal("12000")
+
+    def _workspace_usd_uzs_rate(workspace_owner_id: str) -> Decimal:
+        settings = load_workspace_settings(workspace_owner_id)
+        rate = _sales_decimal(settings.get("usd_uzs_rate"))
+        return rate if rate > 0 else PRODUCT_USD_RATE
 
     def _normalize_price_type(raw: dict[str, Any], fallback: dict[str, Any] | None = None) -> dict[str, Any]:
         base = dict(fallback or {})
@@ -4046,15 +4056,16 @@ def create_app() -> FastAPI:
                 return value, str(item.get("currency") or "UZS").upper()
         return Decimal("0"), "UZS"
 
-    def _convert_product_currency(value: Decimal, from_currency: str, to_currency: str) -> Decimal:
+    def _convert_product_currency(value: Decimal, from_currency: str, to_currency: str, usd_uzs_rate: Decimal | None = None) -> Decimal:
         source = str(from_currency or "UZS").upper()
         target = str(to_currency or "UZS").upper()
+        rate = usd_uzs_rate if usd_uzs_rate and usd_uzs_rate > 0 else PRODUCT_USD_RATE
         if source == target:
             return value
         if source == "USD" and target == "UZS":
-            return value * PRODUCT_USD_RATE
+            return value * rate
         if source == "UZS" and target == "USD":
-            return value / PRODUCT_USD_RATE
+            return value / rate
         return value
 
     def _round_product_price(value: Decimal, step_raw: Any) -> Decimal:
@@ -4063,7 +4074,7 @@ def create_app() -> FastAPI:
             return value
         return (value / step).to_integral_value(rounding=ROUND_HALF_UP) * step
 
-    def _calculated_product_price(product: dict[str, Any], price_type: dict[str, Any], price_types: list[dict[str, Any]]) -> tuple[str, str]:
+    def _calculated_product_price(product: dict[str, Any], price_type: dict[str, Any], price_types: list[dict[str, Any]], usd_uzs_rate: Decimal | None = None) -> tuple[str, str]:
         if price_type.get("pricing_method") != "dependent":
             entry = _product_price_entry(product, price_type)
             if not entry:
@@ -4077,7 +4088,7 @@ def create_app() -> FastAPI:
             if not base_type:
                 base, base_currency = Decimal("0"), "UZS"
             else:
-                raw_value, base_currency = _calculated_product_price(product, base_type, price_types)
+                raw_value, base_currency = _calculated_product_price(product, base_type, price_types, usd_uzs_rate)
                 base = _sales_decimal(raw_value)
         if not base:
             return "", str(price_type.get("convert_to_currency") or "UZS")
@@ -4087,14 +4098,14 @@ def create_app() -> FastAPI:
             factor = Decimal("1") - (percent / Decimal("100"))
         value = base * factor
         currency = str(price_type.get("convert_to_currency") or base_currency or "UZS").upper()
-        value = _convert_product_currency(value, base_currency, currency)
+        value = _convert_product_currency(value, base_currency, currency, usd_uzs_rate)
         value = _round_product_price(value, price_type.get("rounding"))
         return _decimal_plain_text(value), currency
 
-    def _price_type_product_rows(products: list[dict[str, Any]], price_type: dict[str, Any], price_types: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _price_type_product_rows(products: list[dict[str, Any]], price_type: dict[str, Any], price_types: list[dict[str, Any]], usd_uzs_rate: Decimal | None = None) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for product in products:
-            price, currency = _calculated_product_price(product, price_type, price_types)
+            price, currency = _calculated_product_price(product, price_type, price_types, usd_uzs_rate)
             rows.append({**product, "price_type_price": price, "price_type_currency": currency, "has_price": bool(price)})
         return rows
 
@@ -4186,9 +4197,10 @@ def create_app() -> FastAPI:
             if found and found.workspace_owner_id == workspace_owner_id:
                 edit_product = _product_data(found)
         settings_payload = load_workspace_settings(workspace_owner_id)
+        usd_uzs_rate = _workspace_usd_uzs_rate(workspace_owner_id)
         price_lists = _workspace_price_types(workspace_owner_id)
         for price_type in price_lists:
-            rows_with_price = _price_type_product_rows(all_items, price_type, price_lists)
+            rows_with_price = _price_type_product_rows(all_items, price_type, price_lists, usd_uzs_rate)
             price_type["product_count"] = sum(1 for row in rows_with_price if row["has_price"])
             price_type["type"] = "Зависимая" if price_type.get("pricing_method") == "dependent" else "Ручная"
             price_type["currency"] = str(price_type.get("convert_to_currency") or "UZS")
@@ -4431,7 +4443,8 @@ def create_app() -> FastAPI:
         ]
         price_types = list(options.get("price_lists") or _workspace_price_types(wid))
         selected_price_type = _price_type_by_id(price_types, price_type) if price_types else {}
-        price_rows = _price_type_product_rows(price_products, selected_price_type, price_types) if selected_price_type else []
+        usd_uzs_rate = _workspace_usd_uzs_rate(wid)
+        price_rows = _price_type_product_rows(price_products, selected_price_type, price_types, usd_uzs_rate) if selected_price_type else []
         price_q_clean = str(price_q or "").strip().lower()
         if price_q_clean:
             price_rows = [
@@ -5174,7 +5187,22 @@ def create_app() -> FastAPI:
         debt_amount = _sales_decimal(row.amount) - paid_amount
         doc_type = str(data.get("doc_type") or "sale")
         status = str(data.get("status") or ("return" if doc_type == "return" else "new"))
-        return {
+        raw_lines = data.get("lines") if isinstance(data.get("lines"), list) else []
+        safe_lines: list[dict[str, str]] = []
+        for line in raw_lines:
+            if not isinstance(line, dict):
+                continue
+            safe_lines.append(
+                {
+                    "product": str(line.get("product") or ""),
+                    "warehouse": str(line.get("warehouse") or data.get("warehouse") or ""),
+                    "quantity": str(line.get("quantity") or ""),
+                    "price": str(line.get("price") or ""),
+                    "discount": str(line.get("discount") or ""),
+                    "total": str(line.get("total") or ""),
+                }
+            )
+        item = {
             "id": row.id,
             "number": row.number,
             "date": str(data.get("date") or ""),
@@ -5191,9 +5219,29 @@ def create_app() -> FastAPI:
             "status_label": _sales_status_label(status),
             "manager": str(data.get("manager") or ""),
             "note": str(data.get("note") or ""),
-            "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
+            "lines": safe_lines,
             "updated_at": row.updated_at,
         }
+        item["detail_json"] = {
+            "id": str(item["id"] or ""),
+            "number": str(item["number"] or ""),
+            "date": str(item["date"] or ""),
+            "doc_type": str(item["doc_type"] or "sale"),
+            "doc_type_label": str(item["doc_type_label"] or ""),
+            "client": str(item["client"] or ""),
+            "warehouse": str(item["warehouse"] or ""),
+            "amount": str(item["amount"] or "0"),
+            "currency": str(item["currency"] or "UZS"),
+            "paid_amount": str(item["paid_amount"] or "0"),
+            "debt_amount": str(item["debt_amount"] or "0"),
+            "payment_type": str(item["payment_type"] or ""),
+            "status": str(item["status"] or "new"),
+            "status_label": str(item["status_label"] or ""),
+            "manager": str(item["manager"] or ""),
+            "note": str(item["note"] or ""),
+            "lines": safe_lines,
+        }
+        return item
 
     def _sales_document_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
         doc_type = str(form.get("doc_type") or "sale").strip()
@@ -5201,13 +5249,16 @@ def create_app() -> FastAPI:
             doc_type = "sale"
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
         products = list(form.getlist("line_product"))
+        line_warehouses = list(form.getlist("line_warehouse"))
         quantities = list(form.getlist("line_quantity"))
         prices = list(form.getlist("line_price"))
         discounts = list(form.getlist("line_discount"))
         lines: list[dict[str, str]] = []
         total = Decimal("0")
-        for idx in range(max(len(products), len(quantities), len(prices), len(discounts), 1)):
+        default_warehouse = str(form.get("warehouse") or "").strip() or "Основной склад"
+        for idx in range(max(len(products), len(line_warehouses), len(quantities), len(prices), len(discounts), 1)):
             product = str(products[idx] if idx < len(products) else "").strip()
+            line_warehouse = str(line_warehouses[idx] if idx < len(line_warehouses) else "").strip() or default_warehouse
             quantity = _sales_decimal(quantities[idx] if idx < len(quantities) else "")
             price = _sales_decimal(prices[idx] if idx < len(prices) else "")
             discount = _sales_decimal(discounts[idx] if idx < len(discounts) else "")
@@ -5217,6 +5268,7 @@ def create_app() -> FastAPI:
                 lines.append(
                     {
                         "product": product,
+                        "warehouse": line_warehouse,
                         "quantity": str(quantity.normalize() if quantity else ""),
                         "price": str(price.normalize() if price else ""),
                         "discount": str(discount.normalize() if discount else ""),
@@ -5240,7 +5292,7 @@ def create_app() -> FastAPI:
             "doc_type": doc_type,
             "date": str(form.get("date") or "").strip(),
             "client": str(form.get("client") or "").strip(),
-            "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
+            "warehouse": default_warehouse,
             "status": status,
             "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
             "payment_type": str(form.get("payment_type") or "").strip(),
@@ -5271,8 +5323,18 @@ def create_app() -> FastAPI:
         }
         sales: list[dict[str, Any]] = []
         product_names: list[str] = []
+        product_choices: list[dict[str, Any]] = []
         clients: list[str] = []
         warehouses: list[str] = []
+        price_types = [
+            item
+            for item in _workspace_price_types(wid)
+            if item.get("is_active") and item.get("is_for_sales")
+        ]
+        usd_uzs_rate = _workspace_usd_uzs_rate(wid)
+        if not price_types:
+            price_types = _workspace_price_types(wid)[:1]
+        default_price_type_id = str(price_types[0].get("id") if price_types else "1")
         with session_scope() as session:
             rows = list(
                 session.execute(
@@ -5293,14 +5355,46 @@ def create_app() -> FastAPI:
                 if q_clean and q_clean not in hay:
                     continue
                 sales.append(item)
-            product_names = [
-                str(row.name)
-                for row in session.execute(
+            product_rows = list(
+                session.execute(
                     select(Product)
                     .where(Product.workspace_owner_id == wid)
                     .order_by(Product.name.asc())
                 ).scalars()
-            ]
+            )
+            for row in product_rows:
+                data = row.data if isinstance(row.data, dict) else {}
+                prices = data.get("prices") if isinstance(data.get("prices"), list) else []
+                stocks = data.get("stocks") if isinstance(data.get("stocks"), list) else []
+                purchase_history = data.get("purchase_history") if isinstance(data.get("purchase_history"), list) else []
+                product_payload = {"prices": prices, "stocks": stocks, "purchase_history": purchase_history}
+                price = ""
+                currency = "UZS"
+                price_map: dict[str, dict[str, str]] = {}
+                quantity = sum(
+                    (_sales_decimal(stock.get("quantity")) for stock in stocks if isinstance(stock, dict)),
+                    Decimal("0"),
+                )
+                for price_type in price_types:
+                    price_type_id = str(price_type.get("id") or "")
+                    calculated_price, calculated_currency = _calculated_product_price(product_payload, price_type, price_types, usd_uzs_rate)
+                    price_map[price_type_id] = {
+                        "price": calculated_price,
+                        "currency": calculated_currency,
+                    }
+                default_price = price_map.get(default_price_type_id) or {}
+                price = str(default_price.get("price") or "")
+                currency = str(default_price.get("currency") or "UZS").upper()
+                product_choices.append(
+                    {
+                        "name": str(row.name),
+                        "price": price,
+                        "currency": currency,
+                        "price_map": price_map,
+                        "quantity": _sales_money_label(quantity),
+                    }
+                )
+            product_names = [item["name"] for item in product_choices]
             clients = [
                 str(row.name)
                 for row in session.execute(
@@ -5333,6 +5427,10 @@ def create_app() -> FastAPI:
                 "clients": clients,
                 "warehouses": warehouses,
                 "products": product_names,
+                "product_choices": product_choices,
+                "price_types": price_types,
+                "default_price_type_id": default_price_type_id,
+                "usd_uzs_rate": _decimal_plain_text(usd_uzs_rate),
             },
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
@@ -12368,6 +12466,9 @@ def create_app() -> FastAPI:
                 available_raw=available_ccy if available_ccy else None,
                 enabled_raw=enabled_ccy if enabled_ccy else None,
             )
+        usd_uzs_rate = _sales_decimal(form_data.get("usd_uzs_rate"))
+        if usd_uzs_rate > 0:
+            data["usd_uzs_rate"] = _decimal_plain_text(usd_uzs_rate)
 
         save_workspace_settings(wid, data)
         if _is_director(u):
@@ -12520,12 +12621,17 @@ def create_app() -> FastAPI:
                 available_raw=raw_available if isinstance(raw_available, list) else None,
                 enabled_raw=raw_enabled if isinstance(raw_enabled, list) else None,
             )
+        if "usd_uzs_rate" in body:
+            usd_uzs_rate = _sales_decimal(body.get("usd_uzs_rate"))
+            if usd_uzs_rate > 0:
+                data["usd_uzs_rate"] = _decimal_plain_text(usd_uzs_rate)
         _save_workspace_settings_from_user(request, data)
         out = {
             "ok": True,
             "theme": data.get("theme"),
             "locale": data.get("locale"),
             "timezone": data.get("timezone"),
+            "usd_uzs_rate": data.get("usd_uzs_rate"),
             "available_currencies": data.get("available_currencies"),
             "enabled_currencies": data.get("enabled_currencies"),
             "reload": changed_locale,
