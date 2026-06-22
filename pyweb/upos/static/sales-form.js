@@ -63,7 +63,7 @@
 
   function sanitizeNumericInputs(root) {
     if (!root) return;
-    root.querySelectorAll('input[inputmode="decimal"], input[name="line_quantity"], input[name="line_price"]').forEach(function (input) {
+    root.querySelectorAll('input[inputmode="decimal"], input[name="line_quantity"], input[name="line_price"], input[name="line_discount_value"]').forEach(function (input) {
       sanitizeNumericInput(input);
     });
   }
@@ -74,13 +74,33 @@
     return String(num).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
   }
 
-  function formatMoney(value, currency) {
+  function currencyFractionDigits(currency) {
+    return String(currency || "").toUpperCase() === "UZS" ? 0 : 2;
+  }
+
+  function roundCurrency(value, currency) {
+    var digits = currencyFractionDigits(currency);
+    var factor = Math.pow(10, digits);
     var num = Number(value);
+    if (!Number.isFinite(num)) return 0;
+    return Math.round(num * factor) / factor;
+  }
+
+  function formatMoney(value, currency) {
+    var num = roundCurrency(value, currency);
     if (!Number.isFinite(num) || !num) return "0";
-    var maxDigits = String(currency || "").toUpperCase() === "UZS" ? 0 : 2;
+    var maxDigits = currencyFractionDigits(currency);
     if (num > 0 && num < 0.01) maxDigits = 4;
     return num.toLocaleString("ru-RU", {
       maximumFractionDigits: maxDigits
+    });
+  }
+
+  function formatPercent(value) {
+    var num = Number(value);
+    if (!Number.isFinite(num) || Math.abs(num) < 0.01) return "";
+    return num.toLocaleString("ru-RU", {
+      maximumFractionDigits: 2
     });
   }
 
@@ -356,13 +376,59 @@
     updateTotal(root);
   }
 
+  function setDiscountMode(row, mode) {
+    var clean = mode === "markup" ? "markup" : "discount";
+    var input = row ? row.querySelector("[data-sales-discount-mode]") : null;
+    var button = row ? row.querySelector("[data-sales-discount-mode-button]") : null;
+    if (input) input.value = clean;
+    if (button) {
+      button.dataset.mode = clean;
+      button.textContent = clean === "markup" ? "+" : "-";
+      button.title = clean === "markup" ? "Наценка" : "Скидка";
+    }
+  }
+
+  function wireDiscountControl(root, row) {
+    var control = row ? row.querySelector("[data-sales-discount]") : null;
+    if (!control || control.getAttribute("data-sales-discount-wired") === "1") return;
+    control.setAttribute("data-sales-discount-wired", "1");
+    var modeButton = control.querySelector("[data-sales-discount-mode-button]");
+    var menu = control.querySelector("[data-sales-discount-menu]");
+    var value = control.querySelector("[data-sales-discount-value]");
+    var unit = control.querySelector("[data-sales-discount-unit]");
+    if (modeButton && menu) {
+      modeButton.addEventListener("click", function () {
+        menu.hidden = !menu.hidden;
+      });
+      menu.querySelectorAll("[data-sales-discount-pick]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          setDiscountMode(row, button.getAttribute("data-sales-discount-pick"));
+          menu.hidden = true;
+          updateTotal(root);
+        });
+      });
+    }
+    [value, unit].forEach(function (input) {
+      if (!input) return;
+      input.addEventListener("input", function () {
+        if (input === value) sanitizeNumericInput(input);
+        updateTotal(root);
+      });
+      input.addEventListener("change", function () {
+        if (input === value) sanitizeNumericInput(input);
+        updateTotal(root);
+      });
+    });
+    setDiscountMode(row, control.querySelector("[data-sales-discount-mode]")?.value || "discount");
+  }
+
   function wireLine(root, row, options) {
     if (!row || row.getAttribute("data-sales-line-wired") === "1") return;
     row.setAttribute("data-sales-line-wired", "1");
     row.querySelectorAll("[data-sales-combobox]").forEach(function (combo) {
       wireCombo(root, combo, options);
     });
-    row.querySelectorAll('input[name="line_quantity"], input[name="line_price"]').forEach(function (input) {
+    row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_discount_value"]').forEach(function (input) {
       input.addEventListener("focus", function () {
         input.select();
       });
@@ -381,6 +447,7 @@
         updateTotal(root);
       });
     });
+    wireDiscountControl(root, row);
     var productInput = row.querySelector('[data-sales-combo-input]');
     if (productInput) {
       productInput.addEventListener("input", function () {
@@ -405,10 +472,15 @@
     resetCombo(row.querySelector('[data-sales-combobox="service"]'));
     var categoryCell = row.querySelector("[data-sales-line-category]");
     if (categoryCell) categoryCell.textContent = "";
-    row.querySelectorAll('input[name="line_quantity"], input[name="line_price"]').forEach(function (input) {
+    row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_discount_value"]').forEach(function (input) {
       input.value = "";
       delete input.dataset.salesOriginalPrice;
     });
+    setDiscountMode(row, "discount");
+    var discountUnit = row.querySelector("[data-sales-discount-unit]");
+    if (discountUnit) discountUnit.value = "percent";
+    var discountValue = row.querySelector("[data-sales-discount-value]");
+    if (discountValue) discountValue.value = "0";
     row.querySelectorAll(".sales-price-original").forEach(function (node) {
       node.remove();
     });
@@ -445,9 +517,14 @@
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     if (warehouse) warehouse.value = sourceWarehouse ? sourceWarehouse.value : warehouse.defaultValue || "";
     lockWarehouseCombo(row.querySelector('[data-sales-combobox="warehouse"]'));
-    row.querySelectorAll('input[name="line_quantity"], input[name="line_price"]').forEach(function (input) {
+    row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_discount_value"]').forEach(function (input) {
       input.value = "";
     });
+    setDiscountMode(row, "discount");
+    var discountUnit = row.querySelector("[data-sales-discount-unit]");
+    if (discountUnit) discountUnit.value = "percent";
+    var discountValue = row.querySelector("[data-sales-discount-value]");
+    if (discountValue) discountValue.value = "0";
     sourceRow.parentNode.insertBefore(row, sourceRow.nextSibling);
     wireLine(root, row, options);
     return row;
@@ -615,6 +692,9 @@
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     var quantity = row.querySelector('input[name="line_quantity"]');
     var price = row.querySelector('input[name="line_price"]');
+    var discountMode = row.querySelector("[data-sales-discount-mode]");
+    var discountValue = row.querySelector("[data-sales-discount-value]");
+    var discountUnit = row.querySelector("[data-sales-discount-unit]");
     var category = row.querySelector("[data-sales-line-category]");
     return {
       kind: rowKind(row),
@@ -622,6 +702,9 @@
       warehouse: warehouse ? warehouse.value || "" : "",
       quantity: quantity ? quantity.value || "" : "",
       price: price ? price.value || "" : "",
+      discountMode: discountMode ? discountMode.value || "discount" : "discount",
+      discountValue: discountValue ? discountValue.value || "" : "",
+      discountUnit: discountUnit ? discountUnit.value || "percent" : "percent",
       category: category ? category.textContent || "" : "",
       basePrice: row.dataset.salesBasePrice || "",
       baseCurrency: row.dataset.salesBaseCurrency || "",
@@ -630,7 +713,7 @@
   }
 
   function hasDraftLine(line) {
-    return !!(line && (String(line.product || "").trim() || String(line.quantity || "").trim() || String(line.price || "").trim()));
+    return !!(line && (String(line.product || "").trim() || String(line.quantity || "").trim() || String(line.price || "").trim() || numberValue(line.discountValue)));
   }
 
   function collectSalesDraft(root) {
@@ -685,6 +768,11 @@
     if (quantity) quantity.value = line.quantity || "";
     var price = row.querySelector('input[name="line_price"]');
     if (price) price.value = line.price || "";
+    setDiscountMode(row, line.discountMode || "discount");
+    var discountValue = row.querySelector("[data-sales-discount-value]");
+    if (discountValue) discountValue.value = line.discountValue || "0";
+    var discountUnit = row.querySelector("[data-sales-discount-unit]");
+    if (discountUnit) discountUnit.value = line.discountUnit || "percent";
     var category = row.querySelector("[data-sales-line-category]");
     if (category) category.textContent = line.category || "";
     if (line.basePrice) row.dataset.salesBasePrice = line.basePrice;
@@ -791,27 +879,39 @@
     return quantity;
   }
 
-  function rowsTotal(root, useOriginal, kind) {
-    var total = 0;
-    root.querySelectorAll(".sales-lines-table tbody .sales-line-grid").forEach(function (row) {
-      if (kind && rowKind(row) !== kind) return;
-      var product = rowProductValue(row);
-      var priceInput = row.querySelector('input[name="line_price"]');
-      var price = useOriginal ? lineBasePrice(row) : numberValue(priceInput ? priceInput.value : "");
-      var quantity = lineQuantity(row, false);
-      if (product && !quantity && price) quantity = 1;
-      total += quantity * price;
-    });
-    return total;
+  function lineDiscountValue(row, subtotal) {
+    var valueInput = row ? row.querySelector("[data-sales-discount-value]") : null;
+    var unit = row ? row.querySelector("[data-sales-discount-unit]") : null;
+    var mode = row ? row.querySelector("[data-sales-discount-mode]") : null;
+    var value = numberValue(valueInput ? valueInput.value : "");
+    if (!value || !subtotal) return 0;
+    var amount = unit && unit.value === "amount" ? value : subtotal * value / 100;
+    if (mode && mode.value === "markup") return amount;
+    return -Math.min(amount, subtotal);
   }
 
-  function lineTotalValue(row, useOriginal) {
+  function lineRawTotal(row, useOriginal) {
     if (!rowProductValue(row)) return 0;
     var priceInput = row.querySelector('input[name="line_price"]');
     var price = useOriginal ? lineBasePrice(row) : numberValue(priceInput ? priceInput.value : "");
     var quantity = lineQuantity(row, false);
     if (!quantity && price) quantity = 1;
     return quantity * price;
+  }
+
+  function rowsTotal(root, useOriginal, kind) {
+    var total = 0;
+    root.querySelectorAll(".sales-lines-table tbody .sales-line-grid").forEach(function (row) {
+      if (kind && rowKind(row) !== kind) return;
+      total += lineTotalValue(row, useOriginal);
+    });
+    return total;
+  }
+
+  function lineTotalValue(row, useOriginal) {
+    var subtotal = lineRawTotal(row, useOriginal);
+    if (!subtotal) return 0;
+    return Math.max(0, subtotal + lineDiscountValue(row, subtotal));
   }
 
   function updateLineTotals(root) {
@@ -900,35 +1000,68 @@
     updateTotal(root);
   }
 
-  function applyManualTotal(root, manualTotal) {
-    var originalTotal = rowsTotal(root, true);
+  function applyManualTotal(root, manualTotal, kind) {
+    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var originalTotal = rowsTotal(root, true, targetKind);
     if (!originalTotal || originalTotal <= 0) return false;
-    var factor = manualTotal / originalTotal;
+    var currency = selectedCurrency(root);
+    var targetTotal = roundCurrency(manualTotal, currency);
+    var factor = targetTotal / originalTotal;
+    var items = [];
     root.dataset.salesApplyingTotal = "1";
     root.querySelectorAll(".sales-lines-table tbody .sales-line-grid").forEach(function (row) {
+      if (targetKind && rowKind(row) !== targetKind) return;
       if (!rowProductValue(row)) return;
       var priceInput = row.querySelector('input[name="line_price"]');
       if (!priceInput) return;
       var originalPrice = lineBasePrice(row);
       if (!originalPrice) return;
-      priceInput.dataset.salesOriginalPrice = String(originalPrice);
-      priceInput.value = formatMoney(originalPrice * factor, selectedCurrency(root));
-      renderAdjustedPrice(priceInput, originalPrice);
+      var quantity = lineQuantity(row, false);
+      if (!quantity) quantity = 1;
+      var newPrice = roundCurrency(originalPrice * factor, currency);
+      items.push({
+        input: priceInput,
+        originalPrice: originalPrice,
+        quantity: quantity,
+        price: newPrice
+      });
     });
-    root.dataset.salesManualOriginalTotal = String(originalTotal);
+    var roundedTotal = items.reduce(function (sum, item) {
+      return sum + roundCurrency(item.price * item.quantity, currency);
+    }, 0);
+    var diff = roundCurrency(targetTotal - roundedTotal, currency);
+    if (diff && items.length) {
+      var adjustable = items.find(function (item) {
+        return item.quantity === 1;
+      }) || items[items.length - 1];
+      if (currencyFractionDigits(currency) === 0 && Math.abs(diff) < Math.abs(adjustable.quantity) && adjustable.quantity !== 1) {
+        adjustable.price = roundCurrency(adjustable.price + (diff > 0 ? 1 : -1), currency);
+      } else {
+        var step = roundCurrency(diff / adjustable.quantity, currency);
+        if (step) adjustable.price = roundCurrency(adjustable.price + step, currency);
+      }
+    }
+    items.forEach(function (item) {
+      item.input.dataset.salesOriginalPrice = String(item.originalPrice);
+      item.input.value = formatMoney(item.price, currency);
+      renderAdjustedPrice(item.input, item.originalPrice);
+    });
+    if (!root.dataset.salesManualOriginalTotal) root.dataset.salesManualOriginalTotal = String(rowsTotal(root, true));
     delete root.dataset.salesApplyingTotal;
     updateTotal(root);
     return true;
   }
 
-  function totalFromPercent(root, percent) {
-    var originalTotal = rowsTotal(root, true);
+  function totalFromPercent(root, percent, kind) {
+    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var originalTotal = rowsTotal(root, true, targetKind);
     if (!originalTotal || originalTotal <= 0) return 0;
-    return originalTotal * (1 - percent / 100);
+    return roundCurrency(originalTotal * (1 - percent / 100), selectedCurrency(root));
   }
 
-  function percentFromTotal(root, total) {
-    var originalTotal = rowsTotal(root, true);
+  function percentFromTotal(root, total, kind) {
+    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var originalTotal = rowsTotal(root, true, targetKind);
     if (!originalTotal || originalTotal <= 0) return 0;
     return ((originalTotal - total) / originalTotal) * 100;
   }
@@ -1321,16 +1454,18 @@
     });
   }
 
-  function openTotalDialog(root) {
+  function openTotalDialog(root, kind) {
     var dialog = root.parentElement ? root.parentElement.querySelector("[data-sales-total-dialog]") : null;
     if (!dialog) dialog = document.querySelector("[data-sales-total-dialog]");
     var input = dialog ? dialog.querySelector("[data-sales-total-input]") : null;
     var percentInput = dialog ? dialog.querySelector("[data-sales-total-percent]") : null;
     if (!dialog || !input) return;
-    input.value = formatMoney(rowsTotal(root, false), selectedCurrency(root));
+    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    dialog.dataset.salesTotalKind = targetKind;
+    input.value = formatMoney(rowsTotal(root, false, targetKind), selectedCurrency(root));
     if (percentInput) {
-      var percent = percentFromTotal(root, rowsTotal(root, false));
-      percentInput.value = Math.abs(percent) >= 0.01 ? formatQty(percent) : "";
+      var percent = percentFromTotal(root, rowsTotal(root, false, targetKind), targetKind);
+      percentInput.value = formatPercent(percent);
     }
     var status = dialog.querySelector("[data-sales-total-status]");
     if (status) {
@@ -1365,19 +1500,26 @@
 
   function wireTotalDialog(root) {
     var trigger = root.querySelector("[data-sales-total-trigger]");
+    var kindTriggers = Array.from(root.querySelectorAll("[data-sales-total-trigger-kind]"));
     var dialog = root.parentElement ? root.parentElement.querySelector("[data-sales-total-dialog]") : null;
     if (!dialog) dialog = document.querySelector("[data-sales-total-dialog]");
     var form = dialog ? dialog.querySelector("[data-sales-total-form]") : null;
     if (!trigger || !dialog || !form || dialog.getAttribute("data-sales-total-wired") === "1") return;
     dialog.setAttribute("data-sales-total-wired", "1");
-    trigger.addEventListener("click", function () {
-      openTotalDialog(root);
-    });
-    trigger.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openTotalDialog(root);
-      }
+    function wireTotalTrigger(node, kind) {
+      node.addEventListener("click", function () {
+        openTotalDialog(root, kind);
+      });
+      node.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openTotalDialog(root, kind);
+        }
+      });
+    }
+    wireTotalTrigger(trigger, "");
+    kindTriggers.forEach(function (node) {
+      wireTotalTrigger(node, node.getAttribute("data-sales-total-trigger-kind") || "");
     });
     dialog.querySelectorAll("[data-sales-total-close], [data-sales-total-cancel]").forEach(function (button) {
       button.addEventListener("click", function () {
@@ -1396,13 +1538,15 @@
     if (totalInput && percentInput) {
       totalInput.addEventListener("input", function () {
         sanitizeNumericInput(totalInput);
+        var kind = dialog.dataset.salesTotalKind || "";
         var value = numberValue(totalInput.value);
-        percentInput.value = value ? formatQty(percentFromTotal(root, value)) : "";
+        percentInput.value = value ? formatPercent(percentFromTotal(root, value, kind)) : "";
       });
       percentInput.addEventListener("input", function () {
         sanitizeNumericInput(percentInput);
+        var kind = dialog.dataset.salesTotalKind || "";
         var percent = numberValue(percentInput.value);
-        var value = totalFromPercent(root, percent);
+        var value = totalFromPercent(root, percent, kind);
         totalInput.value = value ? formatMoney(value, selectedCurrency(root)) : "";
       });
     }
@@ -1412,10 +1556,12 @@
       var input = form.querySelector("[data-sales-total-input]");
       var percent = form.querySelector("[data-sales-total-percent]");
       var status = form.querySelector("[data-sales-total-status]");
+      var kind = dialog.dataset.salesTotalKind || "";
       var value = numberValue(input ? input.value : "");
       if ((!value || value < 0) && percent && percent.value.trim()) {
-        value = totalFromPercent(root, numberValue(percent.value));
+        value = totalFromPercent(root, numberValue(percent.value), kind);
       }
+      value = roundCurrency(value, selectedCurrency(root));
       if (!value || value < 0) {
         if (status) {
           status.textContent = "Введите сумму или процент";
@@ -1423,7 +1569,7 @@
         }
         return;
       }
-      if (!applyManualTotal(root, value)) {
+      if (!applyManualTotal(root, value, kind)) {
         if (status) {
           status.textContent = "Сначала выберите товары и цены";
           status.dataset.variant = "err";
@@ -1452,6 +1598,25 @@
     return numberValue(row ? row.querySelector("[data-sales-payment-amount]")?.value : "");
   }
 
+  function selectedPaymentLabel(select) {
+    if (!select) return "";
+    var option = select.selectedOptions ? select.selectedOptions[0] : null;
+    return option ? option.getAttribute("data-label") || option.textContent.trim() || select.value : select.value || "";
+  }
+
+  function setPaymentSelect(select, wanted) {
+    if (!select || !wanted) return;
+    select.value = wanted;
+    if (select.value === wanted) return;
+    var wantedText = String(wanted).trim();
+    Array.from(select.options || []).some(function (option) {
+      var label = option.getAttribute("data-label") || option.textContent.trim();
+      if (label !== wantedText) return false;
+      select.value = option.value;
+      return true;
+    });
+  }
+
   function collectPayments(root) {
     var payments = [];
     paymentRows(root).forEach(function (row) {
@@ -1461,11 +1626,10 @@
       if (!amount) return;
       var account = row.querySelector("[data-sales-payment-account]");
       var method = row.querySelector("[data-sales-payment-method]");
-      var accountOption = account && account.selectedOptions ? account.selectedOptions[0] : null;
       payments.push({
         account_id: account ? account.value : "",
-        account: accountOption ? accountOption.getAttribute("data-label") || accountOption.textContent || "" : "",
-        type: method ? method.value : "",
+        account: selectedPaymentLabel(account),
+        type: selectedPaymentLabel(method),
         amount: String(amount)
       });
     });
@@ -1529,6 +1693,24 @@
     box.hidden = !items.length;
   }
 
+  function clearPayments(root) {
+    var amountInput = root.querySelector("[data-sales-paid-amount]");
+    var typeInput = root.querySelector("[data-sales-payment-type]");
+    var linesInput = root.querySelector("[data-sales-payment-lines]");
+    if (amountInput) amountInput.value = "0";
+    if (typeInput) typeInput.value = "";
+    if (linesInput) linesInput.value = "[]";
+    paymentRows(root).forEach(function (row, index) {
+      if (index > 0) row.remove();
+      else row.querySelectorAll("[data-sales-payment-amount]").forEach(function (input) {
+        input.value = "";
+      });
+    });
+    updatePaymentSummary(root);
+    updatePaymentBreakdown(root, []);
+    saveSalesDraftNow(root);
+  }
+
   function syncPaymentHidden(root) {
     var payments = collectPayments(root);
     var total = payments.reduce(function (sum, item) {
@@ -1563,8 +1745,8 @@
       var account = row.querySelector("[data-sales-payment-account]");
       var method = row.querySelector("[data-sales-payment-method]");
       var amount = row.querySelector("[data-sales-payment-amount]");
-      if (account && values.account_id) account.value = values.account_id;
-      if (method && values.type) method.value = values.type;
+      setPaymentSelect(account, values.account_id || values.account);
+      setPaymentSelect(method, values.type || values.account_id || values.account);
       if (amount && values.amount) amount.value = formatMoney(numberValue(values.amount), selectedCurrency(root));
     }
     wrap.appendChild(row);
@@ -1680,6 +1862,12 @@
       syncPaymentHidden(root);
       closePaymentDialog(root);
     });
+    var clear = root.querySelector("[data-sales-payment-clear]");
+    if (clear) {
+      clear.addEventListener("click", function () {
+        clearPayments(root);
+      });
+    }
   }
 
   function syncPriceType(root) {

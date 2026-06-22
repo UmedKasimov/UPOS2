@@ -5414,6 +5414,133 @@ def create_app() -> FastAPI:
         }
         return data, amount, currency
 
+    def _sales_payment_account_id(workspace_owner_id: str, account_id: str = "", account_label: str = "") -> str:
+        clean_id = str(account_id or "").strip()
+        clean_label = str(account_label or "").strip().lower()
+        with session_scope() as session:
+            if clean_id:
+                row = session.execute(
+                    select(FinanceAccount).where(
+                        FinanceAccount.id == clean_id,
+                        FinanceAccount.workspace_owner_id == workspace_owner_id,
+                        FinanceAccount.is_active == True,  # noqa: E712
+                    )
+                ).scalars().first()
+                if row:
+                    return row.id
+            rows = list(
+                session.execute(
+                    select(FinanceAccount)
+                    .where(
+                        FinanceAccount.workspace_owner_id == workspace_owner_id,
+                        FinanceAccount.is_active == True,  # noqa: E712
+                    )
+                    .order_by(FinanceAccount.created_at.asc())
+                ).scalars()
+            )
+            if clean_label:
+                for row in rows:
+                    if str(row.name or "").strip().lower() == clean_label:
+                        return row.id
+            return rows[0].id if rows else ""
+
+    def _delete_sales_cash_transactions(workspace_owner_id: str, sale_id: str) -> None:
+        clean_sale_id = str(sale_id or "").strip()
+        if not clean_sale_id:
+            return
+        with session_scope() as session:
+            tx_ids = list(
+                session.execute(
+                    select(Transaction.id).where(
+                        Transaction.workspace_owner_id == workspace_owner_id,
+                        Transaction.data.op("->>")("source") == "sales",
+                        Transaction.data.op("->>")("sales_document_id") == clean_sale_id,
+                    )
+                ).scalars()
+            )
+        for tx_id in tx_ids:
+            delete_transaction(workspace_owner_id, str(tx_id))
+
+    def _sync_sales_cash_transactions(
+        workspace_owner_id: str,
+        *,
+        sale_id: str,
+        sale_number: str,
+        data: dict[str, Any],
+        amount: Decimal,
+        currency: str,
+        user: dict[str, Any] | None = None,
+    ) -> None:
+        _delete_sales_cash_transactions(workspace_owner_id, sale_id)
+        doc_type = str(data.get("doc_type") or "sale").strip()
+        payment_rows: list[dict[str, Any]] = []
+        for payment in data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []:
+            if not isinstance(payment, dict):
+                continue
+            payment_amount = _sales_decimal(payment.get("amount"))
+            if payment_amount <= 0:
+                continue
+            payment_rows.append(
+                {
+                    "amount": payment_amount,
+                    "account_id": str(payment.get("account_id") or "").strip(),
+                    "account": str(payment.get("account") or "").strip(),
+                    "type": str(payment.get("type") or "").strip(),
+                }
+            )
+        paid_amount = _sales_decimal(data.get("paid_amount"))
+        if not payment_rows and paid_amount > 0:
+            payment_rows.append(
+                {
+                    "amount": paid_amount,
+                    "account_id": "",
+                    "account": "",
+                    "type": str(data.get("payment_type") or "Оплата").strip(),
+                }
+            )
+        if not payment_rows:
+            return
+        tx_type = "expense" if doc_type == "return" else "income"
+        actor_name = str((user or {}).get("name") or (user or {}).get("username") or "").strip()
+        employee_id = str((user or {}).get("user_id") or (user or {}).get("id") or "").strip()
+        for idx, payment in enumerate(payment_rows, start=1):
+            account_id = _sales_payment_account_id(
+                workspace_owner_id,
+                str(payment.get("account_id") or ""),
+                str(payment.get("account") or ""),
+            )
+            if not account_id:
+                continue
+            tx_data: dict[str, Any] = {
+                "amount": payment["amount"],
+                "currency": currency,
+                "type": tx_type,
+                "status": "confirmed",
+                "is_confirmed": True,
+                "category": "Возврат продажи" if doc_type == "return" else "Продажа",
+                "client": str(data.get("client") or ""),
+                "employee_id": employee_id,
+                "created_at": str(data.get("date") or ""),
+                "note": f"{'Возврат' if doc_type == 'return' else 'Продажа'} {sale_number}",
+                "data": {
+                    "source": "sales",
+                    "sales_document_id": sale_id,
+                    "sales_number": sale_number,
+                    "sales_doc_type": doc_type,
+                    "sales_amount": _decimal_plain_text(amount),
+                    "payment_index": idx,
+                    "payment_type": str(payment.get("type") or ""),
+                    "manager": actor_name,
+                },
+            }
+            if tx_type == "expense":
+                tx_data["from_pocket_id"] = account_id
+                tx_data["from_account_id"] = account_id
+            else:
+                tx_data["to_pocket_id"] = account_id
+                tx_data["to_account_id"] = account_id
+            create_transaction(workspace_owner_id, tx_data)
+
     @app.get("/sales", response_class=HTMLResponse, name="sales_get")
     def sales_get(
         request: Request,
@@ -5693,6 +5820,8 @@ def create_app() -> FastAPI:
         data["manager"] = str(session_user.get("name") or session_user.get("username") or "").strip()
         if not data["client"]:
             return RedirectResponse(url="/sales?error=" + quote("Клиент обязателен"), status_code=302)
+        saved_sale_id = ""
+        saved_sale_number = ""
         with session_scope() as session:
             try:
                 client_row = _ensure_counterparty(
@@ -5737,6 +5866,24 @@ def create_app() -> FastAPI:
                 data=data,
             )
             session.add(row)
+            saved_sale_id = doc_id
+            saved_sale_number = number
+        try:
+            _sync_sales_cash_transactions(
+                wid,
+                sale_id=saved_sale_id,
+                sale_number=saved_sale_number,
+                data=data,
+                amount=amount,
+                currency=currency,
+                user=session_user,
+            )
+        except Exception:
+            logger.exception("[sales] failed to sync sale %s with kassa", saved_sale_id)
+            return RedirectResponse(
+                url="/sales?error=" + quote("Продажа сохранена, но операция кассы не записалась") + "#sales-form",
+                status_code=302,
+            )
         return RedirectResponse(url="/sales?msg=saved#sales-form", status_code=302)
 
     @app.post("/sales/{sale_id}/delete", name="sales_delete")
@@ -5748,6 +5895,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        deleted_sale_id = ""
         with session_scope() as session:
             row = session.get(SaleDocument, sale_id)
             if row and row.workspace_owner_id == wid:
@@ -5765,7 +5913,13 @@ def create_app() -> FastAPI:
                     )
                 except ValueError as exc:
                     return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-journal", status_code=302)
+                deleted_sale_id = row.id
                 session.delete(row)
+        if deleted_sale_id:
+            try:
+                _delete_sales_cash_transactions(wid, deleted_sale_id)
+            except Exception:
+                logger.exception("[sales] failed to delete kassa transactions for sale %s", deleted_sale_id)
         return RedirectResponse(url="/sales?msg=deleted#sales-journal", status_code=302)
 
     def _purchase_status_label(status: str) -> str:

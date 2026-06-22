@@ -256,6 +256,7 @@
                     <th>Склад</th>
                     <th>К-во</th>
                     <th>Цена</th>
+                    <th>Скидка</th>
                     <th>Сумма</th>
                     <th></th>
                   </tr>
@@ -280,14 +281,30 @@
                     </td>
                     <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
                     <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                    <td class="sales-line-discount-cell">
+                      <div class="sales-discount-control" data-sales-discount>
+                        <button type="button" class="sales-discount-mode" data-sales-discount-mode-button data-mode="discount">-</button>
+                        <input type="hidden" name="line_discount_mode" value="discount" data-sales-discount-mode />
+                        <div class="sales-discount-menu" data-sales-discount-menu hidden>
+                          <button type="button" data-sales-discount-pick="discount">- Скидка</button>
+                          <button type="button" data-sales-discount-pick="markup">+ Наценка</button>
+                        </div>
+                        <input name="line_discount_value" value="0" inputmode="decimal" data-sales-discount-value />
+                        <select name="line_discount_unit" data-sales-discount-unit>
+                          <option value="percent">%</option>
+                          <option value="amount">UZS</option>
+                        </select>
+                      </div>
+                    </td>
                     <td class="sales-line-total" data-sales-line-total></td>
                     <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
                   </tr>
                 </tbody>
                 <tfoot>
-                  <tr class="sales-subtotal-row">
+                  <tr class="sales-subtotal-row" data-sales-total-trigger-kind="product" role="button" tabindex="0" title="Изменить сумму товаров">
                     <td colspan="3">Итого товары</td>
                     <td><output data-sales-products-quantity>0</output></td>
+                    <td></td>
                     <td></td>
                     <td><output data-sales-products-total>0 UZS</output></td>
                     <td></td>
@@ -309,15 +326,17 @@
                       <th>Категория</th>
                       <th>К-во</th>
                       <th>Цена</th>
+                      <th>Скидка</th>
                       <th>Сумма</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody data-sales-services-body></tbody>
                   <tfoot>
-                    <tr class="sales-subtotal-row">
+                    <tr class="sales-subtotal-row" data-sales-total-trigger-kind="service" role="button" tabindex="0" title="Изменить сумму услуг">
                       <td colspan="3">Итого услуги</td>
                       <td><output data-sales-services-quantity>0</output></td>
+                      <td></td>
                       <td></td>
                       <td><output data-sales-services-total>0 UZS</output></td>
                       <td></td>
@@ -343,6 +362,21 @@
                 <td class="sales-line-category" data-sales-line-category></td>
                 <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
                 <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                <td class="sales-line-discount-cell">
+                  <div class="sales-discount-control" data-sales-discount>
+                    <button type="button" class="sales-discount-mode" data-sales-discount-mode-button data-mode="discount">-</button>
+                    <input type="hidden" name="line_discount_mode" value="discount" data-sales-discount-mode />
+                    <div class="sales-discount-menu" data-sales-discount-menu hidden>
+                      <button type="button" data-sales-discount-pick="discount">- Скидка</button>
+                      <button type="button" data-sales-discount-pick="markup">+ Наценка</button>
+                    </div>
+                    <input name="line_discount_value" value="0" inputmode="decimal" data-sales-discount-value />
+                    <select name="line_discount_unit" data-sales-discount-unit>
+                      <option value="percent">%</option>
+                      <option value="amount">UZS</option>
+                    </select>
+                  </div>
+                </td>
                 <td class="sales-line-total" data-sales-line-total></td>
                 <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
               </tr>
@@ -357,6 +391,7 @@
           </section>
 
           <div class="sales-payment-breakdown" data-sales-payment-breakdown hidden>
+            <button type="button" class="sales-payment-breakdown-clear" data-sales-payment-clear aria-label="Убрать оплату" title="Убрать оплату">×</button>
             <div class="sales-payment-breakdown-row sales-payment-breakdown-row--total">
               <span>Сумма</span>
               <strong data-sales-payment-breakdown-total>0 UZS</strong>
@@ -396,10 +431,9 @@
                   <label class="settings-profile-field">
                     <span class="settings-profile-field-label">Оплата</span>
                     <select class="settings-profile-input" data-sales-payment-method>
-                      <option>Наличные</option>
-                      <option>Карта</option>
-                      <option>Перечисление</option>
-                      <option>Долг</option>
+                      {% for account in sales_options.payment_accounts %}
+                        <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                      {% endfor %}
                     </select>
                   </label>
                   <label class="settings-profile-field">
@@ -529,5 +563,5 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=37" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=42" defer></script>
 {% endblock %}
