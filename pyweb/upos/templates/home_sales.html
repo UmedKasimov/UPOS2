@@ -187,9 +187,9 @@
         <header class="products-panel-head">
           <div>
             <h2>Новая продажа</h2>
-            <span>Логика продаж как в ibox</span>
           </div>
         </header>
+        <script type="application/json" id="sales-form-options">{{ sales_options | tojson }}</script>
         <form method="post" action="{{ url_for('sales_save') }}" class="product-form sales-form">
           {% include "_csrf_field.html" %}
 
@@ -202,47 +202,95 @@
           <div class="product-form-grid">
             <label><span>Номер</span><input name="number" placeholder="Авто" /></label>
             <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
-            <label class="wide"><span>Клиент*</span><input name="client" list="sales-client-list" required placeholder="Выберите или введите клиента" /></label>
-            <label><span>Склад</span><input name="warehouse" list="sales-warehouse-list" value="Основной склад" /></label>
-            <label><span>Ответственный</span><input name="manager" value="{{ user.name if user else '' }}" /></label>
-            <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
-            <label><span>Статус</span>
-              <select name="status">
-                <option value="">Авто</option>
-                <option value="new">Новый</option>
-                <option value="reserved">Резерв</option>
-                <option value="paid">Оплачен</option>
-                <option value="partial">Частично</option>
-                <option value="debt">Долг</option>
-                <option value="return">Возврат</option>
+            <label class="wide sales-combobox" data-sales-combobox="client">
+              <span>Клиент*</span>
+              <div class="sales-lock-field">
+                <input name="client" required autocomplete="off" placeholder="Выберите или введите клиента" data-sales-combo-input />
+                <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить клиента" title="Сменить клиента" hidden>✎</button>
+              </div>
+              <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
+            </label>
+            <label><span>Валюта</span>
+              <select name="currency" data-sales-currency>
+                {% for currency in sales_options.currencies %}
+                  <option value="{{ currency }}" {% if currency == "UZS" %}selected{% endif %}>{{ currency }}</option>
+                {% endfor %}
               </select>
             </label>
+            <label><span>Прайс-лист</span>
+              <select name="price_type_id" data-sales-price-type>
+                {% for price_type in sales_options.price_types %}
+                  <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+                {% else %}
+                  <option value="" data-name="" data-currency="UZS">Продажная цена</option>
+                {% endfor %}
+              </select>
+              <input type="hidden" name="price_type_name" data-sales-price-type-name />
+            </label>
+            <input type="hidden" name="manager" value="{{ user.name if user else '' }}" />
           </div>
 
           <section class="product-form-section">
-            <h3>Позиции</h3>
-            <div class="sales-line-grid">
-              <input name="line_product" list="sales-product-list" placeholder="Товар или услуга" />
-              <input name="line_quantity" placeholder="К-во" inputmode="decimal" />
-              <input name="line_price" placeholder="Цена" inputmode="decimal" />
-              <input name="line_discount" placeholder="Скидка" inputmode="decimal" />
+            <div class="sales-section-head">
+              <h3>Позиции</h3>
             </div>
-            <div class="sales-line-grid">
-              <input name="line_product" list="sales-product-list" placeholder="Товар или услуга" />
-              <input name="line_quantity" placeholder="К-во" inputmode="decimal" />
-              <input name="line_price" placeholder="Цена" inputmode="decimal" />
-              <input name="line_discount" placeholder="Скидка" inputmode="decimal" />
-            </div>
-            <p class="product-form-hint">Сумма считается по строкам. Если нужно, можно указать итог вручную ниже.</p>
-          </section>
-
-          <section class="product-form-section">
-            <h3>Оплата</h3>
-            <div class="product-form-grid">
-              <label><span>Итог вручную</span><input name="amount" placeholder="Если отличается от строк" inputmode="decimal" /></label>
-              <label><span>Оплачено</span><input name="paid_amount" inputmode="decimal" /></label>
-              <label><span>Тип оплаты</span><select name="payment_type"><option value="">Не выбрано</option><option>Наличные</option><option>Карта</option><option>Перечисление</option><option>Долг</option></select></label>
-              <label><span>Комментарий</span><input name="note" /></label>
+            <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+              <table class="products-table products-catalog-table sales-lines-table">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Склад</th>
+                    <th>К-во</th>
+                    <th>Цена</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="sales-line-grid sales-line-grid--compact">
+                    <td>
+                      <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
+                        <div class="sales-lock-field">
+                          <input name="line_product" autocomplete="off" placeholder="Товар или услуга" data-sales-combo-input />
+                          <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                        </div>
+                        <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                      </label>
+                    </td>
+                    <td>
+                      <label class="sales-combobox sales-warehouse-picker" data-sales-combobox="warehouse">
+                        <input name="line_warehouse" autocomplete="off" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" placeholder="Склад" data-sales-combo-input />
+                        <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
+                      </label>
+                    </td>
+                    <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                    <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                  </tr>
+                  <tr class="sales-line-grid sales-line-grid--compact">
+                    <td>
+                      <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
+                        <div class="sales-lock-field">
+                          <input name="line_product" autocomplete="off" placeholder="Товар или услуга" data-sales-combo-input />
+                          <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                        </div>
+                        <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                      </label>
+                    </td>
+                    <td>
+                      <label class="sales-combobox sales-warehouse-picker" data-sales-combobox="warehouse">
+                        <input name="line_warehouse" autocomplete="off" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" placeholder="Склад" data-sales-combo-input />
+                        <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
+                      </label>
+                    </td>
+                    <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                    <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="3">Итого</td>
+                    <td><output data-sales-lines-total>0 UZS</output></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </section>
 
@@ -253,17 +301,10 @@
         </form>
       </aside>
     </div>
-
-    <section class="products-dictionaries sales-logic" data-workspace-view="new journal order return debt" hidden>
-      <article>
-        <h2>Логика продаж</h2>
-        <p>Продажа хранит клиента, склад, ответственного, строки товаров, сумму, оплату и долг. Заказ можно держать в резерве, возврат выделяется отдельным типом документа.</p>
-      </article>
-      <article>
-        <h2>Связи</h2>
-        <p>Дальше этот документ можно связать со складом, клиентским балансом, кассой и отчётами без изменения дизайна UPOS.</p>
-      </article>
-    </section>
     </div>
   </section>
+{% endblock %}
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=4" defer></script>
 {% endblock %}
