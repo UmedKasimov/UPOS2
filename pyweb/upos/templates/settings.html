@@ -1563,6 +1563,20 @@
                   <div class="dict-ccy-chips" data-ccy-active-chips aria-live="polite"></div>
                   <button type="button" class="btn btn-secondary btn-sm dict-ccy-edit-btn" data-ccy-edit-open>{{ _('settings.dict.ccy_edit') }}</button>
                 </div>
+                <div class="settings-fx-rate-card" data-fx-rate-settings>
+                  <label>
+                    <span>Курс USD → UZS</span>
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      value="{{ settings.usd_uzs_rate | default('12000', true) }}"
+                      data-fx-usd-uzs-rate
+                    />
+                  </label>
+                  <button type="button" class="btn btn-secondary btn-sm" data-fx-rate-save>Сохранить курс</button>
+                  <small data-fx-rate-status hidden></small>
+                </div>
               </div>
             </section>
 
@@ -1762,6 +1776,6 @@
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=7" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=27" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=28" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

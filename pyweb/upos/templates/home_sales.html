@@ -200,7 +200,7 @@
           </div>
 
           <div class="product-form-grid">
-            <label><span>Номер</span><input name="number" placeholder="Авто" /></label>
+            <label><span>ID</span><input name="number" value="{{ sales_options.next_numbers.sale }}" readonly data-sales-auto-number aria-readonly="true" /></label>
             <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
             <label class="wide sales-combobox" data-sales-combobox="client">
               <span>Клиент*</span>
@@ -233,6 +233,7 @@
           <section class="product-form-section">
             <div class="sales-section-head">
               <h3>Позиции</h3>
+              <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
             </div>
             <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
               <table class="products-table products-catalog-table sales-lines-table">
@@ -245,7 +246,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr class="sales-line-grid sales-line-grid--compact">
+                  <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--product" data-sales-line-kind="product">
                     <td>
                       <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
                         <div class="sales-lock-field">
@@ -264,7 +265,7 @@
                     <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
                     <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
                   </tr>
-                  <tr class="sales-line-grid sales-line-grid--compact">
+                  <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--product" data-sales-line-kind="product">
                     <td>
                       <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
                         <div class="sales-lock-field">
@@ -284,13 +285,47 @@
                     <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
                   </tr>
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="3">Итого</td>
-                    <td><output data-sales-lines-total>0 UZS</output></td>
-                  </tr>
-                </tfoot>
               </table>
+            </div>
+
+            <div class="sales-services-block" data-sales-services-block hidden>
+              <div class="sales-section-head sales-section-head--sub">
+                <h3>Услуги</h3>
+              </div>
+              <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+                <table class="products-table products-catalog-table sales-lines-table sales-services-table">
+                  <thead>
+                    <tr>
+                      <th>Услуга</th>
+                      <th>К-во</th>
+                      <th>Цена</th>
+                    </tr>
+                  </thead>
+                  <tbody data-sales-services-body></tbody>
+                </table>
+              </div>
+            </div>
+
+            <template id="sales-service-row-template">
+              <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--service" data-sales-line-kind="service">
+                <td>
+                  <label class="sales-combobox sales-product-picker" data-sales-combobox="service">
+                    <div class="sales-lock-field">
+                      <input name="line_product" autocomplete="off" placeholder="Услуга" data-sales-combo-input />
+                      <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить услугу" title="Сменить услугу" hidden>✎</button>
+                    </div>
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                  </label>
+                  <input type="hidden" name="line_warehouse" value="Услуги" />
+                </td>
+                <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+              </tr>
+            </template>
+
+            <div class="sales-total-bar">
+              <span>Итого</span>
+              <output data-sales-lines-total>0 UZS</output>
             </div>
           </section>
 
@@ -306,5 +341,5 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=7" defer></script>
 {% endblock %}

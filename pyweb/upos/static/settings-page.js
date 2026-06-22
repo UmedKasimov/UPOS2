@@ -1165,6 +1165,45 @@
     renderActiveChips();
   }
 
+  function initFxRateSettings() {
+    var root = document.querySelector("[data-fx-rate-settings]");
+    if (!root) return;
+    var input = root.querySelector("[data-fx-usd-uzs-rate]");
+    var saveBtn = root.querySelector("[data-fx-rate-save]");
+    var status = root.querySelector("[data-fx-rate-status]");
+    if (!input || !saveBtn) return;
+
+    function showStatus(text, variant) {
+      if (!status) return;
+      status.textContent = text;
+      status.dataset.variant = variant || "";
+      status.hidden = false;
+    }
+
+    saveBtn.addEventListener("click", function () {
+      var value = (input.value || "").replace(/\s+/g, "").replace(",", ".");
+      var rate = Number(value);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        showStatus("Введите курс больше 0", "err");
+        input.focus();
+        return;
+      }
+      saveBtn.disabled = true;
+      savePreferences({ usd_uzs_rate: value })
+        .then(function (body) {
+          input.value = body.usd_uzs_rate || value;
+          showStatus("Курс сохранён", "ok");
+          showPrefToast();
+        })
+        .catch(function (err) {
+          showStatus(err.message || t("settings.js.save_err"), "err");
+        })
+        .finally(function () {
+          saveBtn.disabled = false;
+        });
+    });
+  }
+
   function initRolePermissions() {
     var root = document.querySelector("[data-roles-settings]");
     if (!root) return;
@@ -1641,6 +1680,7 @@
     initSocialTelegramIntegration();
     initProfileEditor();
     initCurrencyVisibility();
+    initFxRateSettings();
     initRolePermissions();
     initCategoryManagement();
   }

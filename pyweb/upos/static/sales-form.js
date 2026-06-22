@@ -25,11 +25,13 @@
     return String(num).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
   }
 
-  function formatMoney(value) {
+  function formatMoney(value, currency) {
     var num = Number(value);
     if (!Number.isFinite(num) || !num) return "0";
+    var maxDigits = String(currency || "").toUpperCase() === "UZS" ? 0 : 2;
+    if (num > 0 && num < 0.01) maxDigits = 4;
     return num.toLocaleString("ru-RU", {
-      maximumFractionDigits: 2
+      maximumFractionDigits: maxDigits
     });
   }
 
@@ -78,6 +80,18 @@
     return select ? select.value : "";
   }
 
+  function selectedDocType(root) {
+    var checked = root.querySelector('input[name="doc_type"]:checked');
+    return checked ? checked.value : "sale";
+  }
+
+  function syncDocumentNumber(root, options) {
+    var input = root.querySelector("[data-sales-auto-number]");
+    if (!input) return;
+    var numbers = options.next_numbers || {};
+    input.value = numbers[selectedDocType(root)] || numbers.sale || "";
+  }
+
   function selectedLineWarehouse(root, combo) {
     var line = combo ? combo.closest(".sales-line-grid") : null;
     var input = line
@@ -93,6 +107,35 @@
       entry = map[Object.keys(map)[0]];
     }
     return entry || { price: "", currency: "" };
+  }
+
+  function usdRate(options) {
+    var fx = options.fx || {};
+    var rate = numberValue(fx.USD_UZS || fx.usd_uzs || fx.usdUzs || "12000");
+    return rate > 0 ? rate : 12000;
+  }
+
+  function convertPrice(value, fromCurrency, toCurrency, options) {
+    var amount = numberValue(value);
+    var source = String(fromCurrency || "UZS").toUpperCase();
+    var target = String(toCurrency || "UZS").toUpperCase();
+    var rate = usdRate(options);
+    if (!amount || source === target) return amount;
+    if (source === "USD" && target === "UZS") return amount * rate;
+    if (source === "UZS" && target === "USD") return amount / rate;
+    return amount;
+  }
+
+  function salesPrice(product, priceTypeId, targetCurrency, options) {
+    var entry = productPrice(product, priceTypeId);
+    var sourceCurrency = String(entry.currency || targetCurrency || "UZS").toUpperCase();
+    var converted = convertPrice(entry.price, sourceCurrency, targetCurrency, options);
+    return {
+      basePrice: entry.price || "",
+      baseCurrency: sourceCurrency,
+      price: converted ? formatMoney(converted, targetCurrency) : "",
+      currency: String(targetCurrency || sourceCurrency || "UZS").toUpperCase()
+    };
   }
 
   function selectedCurrency(root) {
@@ -130,12 +173,18 @@
     var input = combo.querySelector("[data-sales-combo-input]");
     if (!input) return;
     input.value = value || "";
-    setLocked(combo, !!input.value && /^(client|product)$/.test(combo.getAttribute("data-sales-combobox") || ""));
+    setLocked(combo, !!input.value && /^(client|product|service)$/.test(combo.getAttribute("data-sales-combobox") || ""));
   }
 
   function rowProductValue(row) {
     var input = row ? row.querySelector('[data-sales-combobox="product"] [data-sales-combo-input]') : null;
+    if (!input && row) input = row.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]');
     return input ? input.value.trim() : "";
+  }
+
+  function syncRowState(row) {
+    if (!row) return;
+    row.classList.toggle("is-empty", !rowProductValue(row));
   }
 
   function resetCombo(combo) {
@@ -151,6 +200,39 @@
     closePanel(combo);
   }
 
+  function applyLineCurrency(row, root, options) {
+    if (!row || !row.dataset.salesBasePrice) return;
+    var priceInput = row.querySelector('input[name="line_price"]');
+    if (!priceInput) return;
+    var value = convertPrice(row.dataset.salesBasePrice, row.dataset.salesBaseCurrency || "UZS", selectedCurrency(root), options);
+    priceInput.value = value ? formatMoney(value, selectedCurrency(root)) : "";
+  }
+
+  function refreshLineProductPrice(root, row, options) {
+    var productName = rowProductValue(row);
+    if (!productName) return;
+    var product = (options.product_rows || []).find(function (item) {
+      return normalize(item.name) === normalize(productName);
+    });
+    if (!product) {
+      applyLineCurrency(row, root, options);
+      return;
+    }
+    var price = salesPrice(product, selectedPriceTypeId(root), selectedCurrency(root), options);
+    var priceInput = row.querySelector('input[name="line_price"]');
+    row.dataset.salesBasePrice = price.basePrice || price.price || "";
+    row.dataset.salesBaseCurrency = price.baseCurrency || price.currency || selectedCurrency(root);
+    row.dataset.salesPriceTypeId = selectedPriceTypeId(root) || "";
+    if (priceInput) priceInput.value = price.price || "";
+  }
+
+  function refreshAllLinePrices(root, options) {
+    root.querySelectorAll(".sales-lines-table tbody .sales-line-grid").forEach(function (row) {
+      refreshLineProductPrice(root, row, options);
+    });
+    updateTotal(root);
+  }
+
   function wireLine(root, row, options) {
     if (!row || row.getAttribute("data-sales-line-wired") === "1") return;
     row.setAttribute("data-sales-line-wired", "1");
@@ -159,14 +241,28 @@
     });
     row.querySelectorAll('input[name="line_quantity"], input[name="line_price"]').forEach(function (input) {
       input.addEventListener("input", function () {
+        if (input.name === "line_price") {
+          row.removeAttribute("data-sales-base-price");
+          row.removeAttribute("data-sales-base-currency");
+        }
+        syncRowState(row);
         updateTotal(root);
       });
     });
+    var productInput = row.querySelector('[data-sales-combo-input]');
+    if (productInput) {
+      productInput.addEventListener("input", function () {
+        syncRowState(row);
+        updateTotal(root);
+      });
+    }
+    syncRowState(row);
   }
 
   function cloneLine(root, sourceRow, options) {
     var row = sourceRow.cloneNode(true);
     row.removeAttribute("data-sales-line-wired");
+    row.classList.remove("is-empty");
     resetCombo(row.querySelector('[data-sales-combobox="product"]'));
     resetCombo(row.querySelector('[data-sales-combobox="warehouse"]'));
     var sourceWarehouse = sourceRow.querySelector('input[name="line_warehouse"]');
@@ -182,7 +278,7 @@
 
   function ensureNextLine(root, currentRow, options) {
     if (!currentRow) return;
-    var rows = Array.from(root.querySelectorAll(".sales-lines-table tbody .sales-line-grid"));
+    var rows = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]'));
     var currentIndex = rows.indexOf(currentRow);
     var nextBlank = rows.slice(currentIndex + 1).find(function (row) {
       return !rowProductValue(row);
@@ -192,6 +288,20 @@
     }
     var nextInput = nextBlank.querySelector('[data-sales-combobox="product"] [data-sales-combo-input]');
     if (nextInput) nextInput.focus();
+  }
+
+  function addServiceLine(root, options) {
+    var block = root.querySelector("[data-sales-services-block]");
+    var body = root.querySelector("[data-sales-services-body]");
+    var template = document.getElementById("sales-service-row-template");
+    if (!body || !template || !template.content) return null;
+    if (block) block.hidden = false;
+    var row = template.content.firstElementChild.cloneNode(true);
+    body.appendChild(row);
+    wireLine(root, row, options);
+    var input = row.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]');
+    if (input) input.focus();
+    return row;
   }
 
   function updateTotal(root) {
@@ -206,7 +316,11 @@
       total += quantity * price;
     });
     var output = root.querySelector("[data-sales-lines-total]");
-    if (output) output.textContent = formatMoney(total) + " " + selectedCurrency(root);
+    if (output) output.textContent = formatMoney(total, selectedCurrency(root)) + " " + selectedCurrency(root);
+  }
+
+  function productKind(item) {
+    return String(item.kind || "product").toLowerCase() === "service" ? "service" : "product";
   }
 
   function buttonHtml(main, metaLeft, metaRight, query) {
@@ -255,15 +369,18 @@
     var panel = combo.querySelector("[data-sales-combo-panel]");
     var warehouse = selectedLineWarehouse(root, combo);
     var priceTypeId = selectedPriceTypeId(root);
+    var currency = selectedCurrency(root);
+    var comboType = combo.getAttribute("data-sales-combobox") === "service" ? "service" : "product";
     var rows = (options.product_rows || []).filter(function (item) {
-      return itemMatches(item, query, ["name", "sku", "barcode"]);
+      return productKind(item) === comboType && itemMatches(item, query, ["name", "sku", "barcode"]);
     }).slice(0, 100);
     panel.innerHTML = rows.length
       ? rows.map(function (item) {
-          var price = productPrice(item, priceTypeId);
-          var code = item.sku || item.barcode || "Товар";
+          var price = salesPrice(item, priceTypeId, currency, options);
+          var code = item.sku || item.barcode || (comboType === "service" ? "Услуга" : "Товар");
+          var meta = comboType === "service" ? code : code + " · " + stockLabel(item, warehouse);
           var priceLabel = price.price ? price.price + " " + (price.currency || "") : "Без цены";
-          return buttonHtml(item.name, code + " · " + stockLabel(item, warehouse), priceLabel, query);
+          return buttonHtml(item.name, meta, priceLabel, query);
         }).join("")
       : '<div class="sales-combo-empty">Ничего не найдено</div>';
     panel.hidden = false;
@@ -272,17 +389,21 @@
         event.preventDefault();
         var item = rows[index];
         var line = combo.closest(".sales-line-grid");
-        var price = productPrice(item, priceTypeId);
+        var price = salesPrice(item, priceTypeId, selectedCurrency(root), options);
         commitCombo(combo, item.name || "");
         if (line && price.price) {
+          line.dataset.salesBasePrice = price.basePrice || price.price;
+          line.dataset.salesBaseCurrency = price.baseCurrency || price.currency || selectedCurrency(root);
+          line.dataset.salesPriceTypeId = priceTypeId || "";
           var priceInput = line.querySelector('input[name="line_price"]');
           if (priceInput) priceInput.value = price.price;
         }
         if (line) {
           var quantityInput = line.querySelector('input[name="line_quantity"]');
           if (quantityInput && !quantityInput.value.trim()) quantityInput.value = "1";
+          syncRowState(line);
           updateTotal(root);
-          ensureNextLine(root, line, options);
+          if (comboType === "product") ensureNextLine(root, line, options);
         }
         closePanel(combo);
       });
@@ -329,7 +450,7 @@
         return;
       }
       if (type === "client") renderClient(combo, options, input.value);
-      if (type === "product") renderProduct(root, combo, options, input.value);
+      if (type === "product" || type === "service") renderProduct(root, combo, options, input.value);
       if (type === "warehouse") renderWarehouse(root, combo, options, input.value);
     };
     var edit = combo.querySelector("[data-sales-combo-edit]");
@@ -377,17 +498,29 @@
     if (priceType) {
       priceType.addEventListener("change", function () {
         syncPriceType(root);
-        updateTotal(root);
+        refreshAllLinePrices(root, options);
       });
       syncPriceType(root);
     }
+    root.querySelectorAll('input[name="doc_type"]').forEach(function (input) {
+      input.addEventListener("change", function () {
+        syncDocumentNumber(root, options);
+      });
+    });
+    syncDocumentNumber(root, options);
     root.querySelectorAll(".sales-lines-table tbody .sales-line-grid").forEach(function (row) {
       wireLine(root, row, options);
     });
+    var addServiceBtn = root.querySelector("[data-sales-add-service]");
+    if (addServiceBtn) {
+      addServiceBtn.addEventListener("click", function () {
+        addServiceLine(root, options);
+      });
+    }
     var currency = root.querySelector("[data-sales-currency]");
     if (currency) {
       currency.addEventListener("change", function () {
-        updateTotal(root);
+        refreshAllLinePrices(root, options);
       });
     }
     updateTotal(root);

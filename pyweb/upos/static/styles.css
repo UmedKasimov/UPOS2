@@ -5653,10 +5653,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-section-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .sales-section-head h3 {
   margin: 0 0 0.55rem;
+}
+
+.sales-section-head--sub {
+  margin-top: 0.9rem;
+}
+
+.sales-add-service-btn {
+  min-height: 2rem;
+  white-space: nowrap;
 }
 
 .sales-combobox {
@@ -5678,6 +5689,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-form select:focus {
   border-color: var(--brand-box, #2d6cdf);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent, #5eb8ff) 22%, transparent);
+}
+
+.sales-form input[readonly] {
+  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
+  color: var(--muted-foreground);
+  cursor: default;
+  font-weight: 800;
 }
 
 .sales-lock-field {
@@ -5777,6 +5795,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   vertical-align: middle;
 }
 
+.sales-lines-table .sales-line-grid.is-empty td:not(:first-child) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .sales-lines-table th:first-child,
 .sales-lines-table td:first-child {
   min-width: 28rem;
@@ -5813,26 +5836,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   outline-offset: -2px;
 }
 
-.sales-lines-table tfoot td {
-  padding: 0.52rem 0.68rem;
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
-  color: var(--foreground);
-  font-weight: 850;
-}
-
-.sales-lines-table tfoot td:first-child {
-  text-align: right;
-  text-transform: uppercase;
-}
-
-.sales-lines-table output {
-  display: block;
-  min-height: 1.35rem;
-  color: var(--brand-box, #2d6cdf);
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
 .sales-combo-panel {
   position: absolute;
   z-index: 300;
@@ -5850,6 +5853,55 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-combo-panel--wide {
   width: min(42rem, calc(100vw - 2rem));
+}
+
+.sales-combobox[data-sales-combobox="client"] .sales-combo-panel {
+  width: 100%;
+  max-height: 16rem;
+}
+
+.sales-services-block[hidden] {
+  display: none !important;
+}
+
+.sales-services-table th:first-child,
+.sales-services-table td:first-child {
+  min-width: 32rem;
+}
+
+.sales-services-table th:nth-child(2),
+.sales-services-table td:nth-child(2) {
+  width: 6rem;
+  min-width: 6rem;
+}
+
+.sales-services-table th:nth-child(3),
+.sales-services-table td:nth-child(3) {
+  width: 8rem;
+  min-width: 8rem;
+}
+
+.sales-total-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 18%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
+  color: var(--foreground);
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.sales-total-bar output {
+  min-width: 8rem;
+  color: var(--brand-box, #2d6cdf);
+  font-weight: 900;
+  text-align: right;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .sales-combo-option {
@@ -13940,6 +13992,52 @@ body:has(dialog[open]) {
 
 .dict-ccy-edit-btn {
   flex: 0 0 auto;
+}
+
+.settings-fx-rate-card {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) auto minmax(7rem, 1fr);
+  align-items: end;
+  gap: 0.65rem;
+  margin: 0 1rem 1rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 18%, var(--settings-ios-hairline, var(--border)));
+  border-radius: var(--settings-ios-radius-sm, 8px);
+  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 8%, var(--card));
+}
+
+.settings-fx-rate-card label {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 750;
+}
+
+.settings-fx-rate-card input {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 22%, var(--border));
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 850;
+}
+
+.settings-fx-rate-card small {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.settings-fx-rate-card small[data-variant="ok"] {
+  color: #0f7b36;
+}
+
+.settings-fx-rate-card small[data-variant="err"] {
+  color: #a62626;
 }
 
 .ccy-check-item--inactive {
