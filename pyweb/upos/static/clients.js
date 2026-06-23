@@ -713,15 +713,21 @@
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.querySelector("[data-client-map]")) return;
-    if (form.dataset.clientLocationPrepared === "1") return;
+    if (form.dataset.clientLocationPrepared === "1") {
+      delete form.dataset.clientLocationPrepared;
+      return;
+    }
+    if (form.dataset.clientLocationSubmitting === "1" || !form.checkValidity()) return;
     event.preventDefault();
-    const submitter = event.submitter;
-    form.dataset.clientLocationPrepared = "1";
-    prepareLocationBeforeSubmit(form).finally(() => {
+    form.dataset.clientLocationSubmitting = "1";
+    prepareLocationBeforeSubmit(form).catch(() => {
+      setStatus(form, "Р›РѕРєР°С†РёСЏ СЃРѕС…СЂР°РЅРёС‚СЃСЏ Р±РµР· РєРѕРѕСЂРґРёРЅР°С‚");
+    }).finally(() => {
+      form.dataset.clientLocationPrepared = "1";
       if (typeof form.requestSubmit === "function") {
-        form.requestSubmit(submitter instanceof HTMLElement ? submitter : undefined);
+        form.requestSubmit();
       } else {
-        form.submit();
+        HTMLFormElement.prototype.submit.call(form);
       }
     });
   });

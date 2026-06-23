@@ -1,4 +1,4 @@
-<div class="business-module-toolbar" data-workspace-view="stocks transfers adjustments" hidden>
+<div class="business-module-toolbar" data-workspace-view="stocks transfers" hidden>
   <div>
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
     <h2 id="business-module-title">{{ module.heading }}</h2>
@@ -6,7 +6,7 @@
   <button type="button" class="btn" data-warehouse-open-operation>{{ module.action }}</button>
 </div>
 
-<form class="business-module-filters" method="get" action="{{ url_for('warehouse_get') }}" data-workspace-view="stocks transfers adjustments" hidden>
+<form class="business-module-filters" method="get" action="{{ url_for('warehouse_get') }}" data-workspace-view="stocks transfers" hidden>
   <label><span>Поиск</span><input name="q" value="{{ warehouse_filters.q }}" placeholder="Товар, склад, документ" /></label>
   <label><span>Склад</span><input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Склад" /></label>
   <label><span>Товар</span><input name="product" list="warehouse-product-list" value="{{ warehouse_filters.product }}" placeholder="Товар" /></label>
@@ -141,7 +141,7 @@
     </form>
   </aside>
 
-  <article class="products-list-panel" data-workspace-view="transfers adjustments" hidden>
+  <article class="products-list-panel" data-workspace-view="transfers" hidden>
     <header class="products-panel-head">
       <div>
         <h2>Журнал операций</h2>
@@ -421,7 +421,102 @@
     </aside>
   </article>
 
-  <aside class="product-form-panel" data-workspace-view="adjustments" hidden>
+  <article class="warehouse-purchase-entry product-form-panel" data-workspace-view="adjustments" hidden>
+    <header class="products-panel-head warehouse-purchase-entry-head">
+      <div>
+        <h2>Новая закупка</h2>
+        <span>Закупка сразу попадет в остатки склада.</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry>
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
+      <input type="hidden" name="paid_amount" value="0" />
+      <input type="hidden" name="status" value="new" />
+
+      <div class="product-form-grid warehouse-purchase-entry-grid">
+        <label>
+          <span>ID</span>
+          <input name="number" placeholder="Авто" autocomplete="off" />
+        </label>
+        <label>
+          <span>Дата</span>
+          <input name="date" type="date" value="{{ today }}" />
+        </label>
+        <label class="wide">
+          <span>Поставщик*</span>
+          <input name="supplier" list="warehouse-supplier-list" placeholder="Выберите или введите поставщика" autocomplete="off" required />
+        </label>
+        <label>
+          <span>Склад*</span>
+          <input name="warehouse" list="warehouse-name-list" value="Основной склад" autocomplete="off" required />
+        </label>
+        <label>
+          <span>Валюта</span>
+          <select name="currency" data-purchase-entry-currency>
+            <option value="UZS">UZS</option>
+            <option value="USD">USD</option>
+          </select>
+        </label>
+      </div>
+
+      <section class="product-form-section warehouse-purchase-entry-section">
+        <div class="sales-section-head warehouse-purchase-entry-section-head">
+          <h3>Позиции</h3>
+        </div>
+        <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel warehouse-purchase-entry-table-wrap">
+          <table class="products-table products-catalog-table sales-lines-table warehouse-purchase-entry-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Товар</th>
+                <th>К-во</th>
+                <th>Цена</th>
+                <th>Сумма</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody data-purchase-entry-lines>
+              <tr class="sales-line-grid sales-line-grid--compact" data-purchase-entry-row>
+                <td class="warehouse-purchase-entry-row-number">1</td>
+                <td>
+                  <input name="line_product" list="warehouse-product-list" placeholder="Товар или услуга" autocomplete="off" />
+                </td>
+                <td>
+                  <input name="line_quantity" inputmode="decimal" placeholder="К-во" data-purchase-entry-number />
+                </td>
+                <td>
+                  <input name="line_price" inputmode="decimal" placeholder="Цена" data-purchase-entry-number />
+                </td>
+                <td>
+                  <strong data-purchase-entry-line-total>0 UZS</strong>
+                </td>
+                <td class="sales-line-remove-cell">
+                  <button type="button" class="sales-line-remove warehouse-purchase-entry-line-remove" data-purchase-entry-remove aria-label="Удалить строку">×</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="sales-total-bar warehouse-purchase-entry-total">
+          <span>ИТОГО</span>
+          <output data-purchase-entry-total>0 UZS</output>
+        </div>
+      </section>
+
+      <label class="wide warehouse-purchase-entry-note">
+        <span>Комментарий</span>
+        <input name="note" autocomplete="off" />
+      </label>
+
+      <div class="product-form-actions warehouse-purchase-entry-footer">
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#purchases">Отмена</a>
+        <button class="btn" type="submit">Сохранить закупку</button>
+      </div>
+    </form>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="adjustments-old" hidden>
     <header class="products-panel-head">
       <div>
         <h2>Корректировка</h2>

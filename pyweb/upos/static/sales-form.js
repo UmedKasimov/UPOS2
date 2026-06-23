@@ -388,6 +388,12 @@
     }
   }
 
+  function closeDiscountMenus(root, exceptMenu) {
+    (root || document).querySelectorAll("[data-sales-discount-menu]").forEach(function (menu) {
+      if (menu !== exceptMenu) menu.hidden = true;
+    });
+  }
+
   function wireDiscountControl(root, row) {
     var control = row ? row.querySelector("[data-sales-discount]") : null;
     if (!control || control.getAttribute("data-sales-discount-wired") === "1") return;
@@ -397,11 +403,15 @@
     var value = control.querySelector("[data-sales-discount-value]");
     var unit = control.querySelector("[data-sales-discount-unit]");
     if (modeButton && menu) {
-      modeButton.addEventListener("click", function () {
-        menu.hidden = !menu.hidden;
+      modeButton.addEventListener("click", function (event) {
+        event.stopPropagation();
+        var shouldOpen = menu.hidden;
+        closeDiscountMenus(root, menu);
+        menu.hidden = !shouldOpen;
       });
       menu.querySelectorAll("[data-sales-discount-pick]").forEach(function (button) {
-        button.addEventListener("click", function () {
+        button.addEventListener("click", function (event) {
+          event.stopPropagation();
           setDiscountMode(row, button.getAttribute("data-sales-discount-pick"));
           menu.hidden = true;
           updateTotal(root);
@@ -1598,6 +1608,35 @@
     return numberValue(row ? row.querySelector("[data-sales-payment-amount]")?.value : "");
   }
 
+  function paymentCurrency(row, root) {
+    var select = row ? row.querySelector("[data-sales-payment-currency]") : null;
+    return String((select && select.value) || (root ? selectedCurrency(root) : "UZS") || "UZS").toUpperCase();
+  }
+
+  function paymentTotalInCurrency(root, targetCurrency) {
+    var options = readOptions();
+    var target = String(targetCurrency || selectedCurrency(root) || "UZS").toUpperCase();
+    return collectPayments(root).reduce(function (sum, item) {
+      return sum + convertPrice(item.amount, item.currency || target, target, options);
+    }, 0);
+  }
+
+  function convertPaymentLineCurrency(root, row, nextCurrency) {
+    if (!row) return;
+    var amountInput = row.querySelector("[data-sales-payment-amount]");
+    var target = String(nextCurrency || paymentCurrency(row, root)).toUpperCase();
+    var previous = String(row.dataset.salesPaymentCurrency || selectedCurrency(root) || target).toUpperCase();
+    if (amountInput) {
+      var amount = numberValue(amountInput.value);
+      if (amount && previous !== target) {
+        amountInput.value = formatMoney(convertPrice(amount, previous, target, readOptions()), target);
+      } else if (amount) {
+        amountInput.value = formatMoney(amount, target);
+      }
+    }
+    row.dataset.salesPaymentCurrency = target;
+  }
+
   function selectedPaymentLabel(select) {
     if (!select) return "";
     var option = select.selectedOptions ? select.selectedOptions[0] : null;
@@ -1625,11 +1664,13 @@
       var amount = paymentAmount(row);
       if (!amount) return;
       var account = row.querySelector("[data-sales-payment-account]");
-      var method = row.querySelector("[data-sales-payment-method]");
+      var currency = row.querySelector("[data-sales-payment-currency]");
+      var paymentCurrency = currency ? String(currency.value || "").toUpperCase() : selectedCurrency(root);
       payments.push({
         account_id: account ? account.value : "",
         account: selectedPaymentLabel(account),
-        type: selectedPaymentLabel(method),
+        currency: paymentCurrency || selectedCurrency(root),
+        type: selectedPaymentLabel(account),
         amount: String(amount)
       });
     });
@@ -1645,7 +1686,32 @@
   function updatePaymentSummary(root) {
     var dialog = paymentDialog(root);
     var summary = dialog ? dialog.querySelector("[data-sales-payment-summary]") : null;
-    if (summary) summary.textContent = "Оплата: " + formatMoney(paymentTotal(root), selectedCurrency(root)) + " " + selectedCurrency(root);
+    if (!summary) return;
+    var currency = selectedCurrency(root);
+    var due = rowsTotal(root, false);
+    var paid = paymentTotalInCurrency(root, currency);
+    var rest = Math.max(0, due - paid);
+    var overpaid = Math.max(0, paid - due);
+    var dueNode = dialog.querySelector("[data-sales-payment-due]");
+    var paidNode = dialog.querySelector("[data-sales-payment-paid]");
+    var restNode = dialog.querySelector("[data-sales-payment-rest]");
+    var overRow = dialog.querySelector("[data-sales-payment-over-row]");
+    var overNode = dialog.querySelector("[data-sales-payment-over]");
+    var submit = dialog.querySelector("[data-sales-payment-submit]");
+    if (dueNode && paidNode && restNode) {
+      dueNode.textContent = formatMoney(due, currency) + " " + currency;
+      paidNode.textContent = formatMoney(paid, currency) + " " + currency;
+      restNode.textContent = formatMoney(rest, currency) + " " + currency;
+      if (overNode) overNode.textContent = formatMoney(overpaid, currency) + " " + currency;
+      if (overRow) overRow.hidden = overpaid <= 0;
+      summary.classList.toggle("is-overpaid", overpaid > 0);
+      if (submit) {
+        submit.disabled = overpaid > 0;
+        submit.title = overpaid > 0 ? "Оплата больше суммы на " + formatMoney(overpaid, currency) + " " + currency : "";
+      }
+      return;
+    }
+    summary.textContent = "Оплата: " + formatMoney(paid, currency) + " " + currency;
   }
 
   function parsePaymentLines(root) {
@@ -1681,9 +1747,10 @@
         var label = document.createElement("span");
         label.textContent = index === 0 ? "Оплата" : "";
         var value = document.createElement("strong");
-        value.textContent = formatMoney(amount, currency) + " " + currency;
+        var itemCurrency = String(item.currency || currency).toUpperCase();
+        value.textContent = formatMoney(amount, itemCurrency) + " " + itemCurrency;
         var method = document.createElement("em");
-        method.textContent = item.type || item.account || "";
+        method.textContent = item.account || item.type || "";
         row.appendChild(label);
         row.appendChild(value);
         row.appendChild(method);
@@ -1705,6 +1772,11 @@
       else row.querySelectorAll("[data-sales-payment-amount]").forEach(function (input) {
         input.value = "";
       });
+      var currency = row.querySelector("[data-sales-payment-currency]");
+      if (currency) {
+        setPaymentSelect(currency, selectedCurrency(root));
+        row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+      }
     });
     updatePaymentSummary(root);
     updatePaymentBreakdown(root, []);
@@ -1713,9 +1785,7 @@
 
   function syncPaymentHidden(root) {
     var payments = collectPayments(root);
-    var total = payments.reduce(function (sum, item) {
-      return sum + numberValue(item.amount);
-    }, 0);
+    var total = paymentTotalInCurrency(root, selectedCurrency(root));
     var amountInput = root.querySelector("[data-sales-paid-amount]");
     var typeInput = root.querySelector("[data-sales-payment-type]");
     var linesInput = root.querySelector("[data-sales-payment-lines]");
@@ -1743,11 +1813,16 @@
     });
     if (values) {
       var account = row.querySelector("[data-sales-payment-account]");
-      var method = row.querySelector("[data-sales-payment-method]");
+      var currency = row.querySelector("[data-sales-payment-currency]");
       var amount = row.querySelector("[data-sales-payment-amount]");
       setPaymentSelect(account, values.account_id || values.account);
-      setPaymentSelect(method, values.type || values.account_id || values.account);
-      if (amount && values.amount) amount.value = formatMoney(numberValue(values.amount), selectedCurrency(root));
+      setPaymentSelect(currency, values.currency || selectedCurrency(root));
+      if (amount && values.amount) amount.value = formatMoney(numberValue(values.amount), values.currency || selectedCurrency(root));
+      row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+    } else {
+      var defaultCurrency = row.querySelector("[data-sales-payment-currency]");
+      setPaymentSelect(defaultCurrency, selectedCurrency(root));
+      row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
     }
     wrap.appendChild(row);
     wirePaymentLine(root, row);
@@ -1773,8 +1848,11 @@
     removeExtraPaymentLines(root);
     var first = ensureSingleEmptyPaymentLine(root);
     var amountInput = first ? first.querySelector("[data-sales-payment-amount]") : null;
+    var currencyInput = first ? first.querySelector("[data-sales-payment-currency]") : null;
     var currentPaid = numberValue(root.querySelector("[data-sales-paid-amount]")?.value || "");
     var total = rowsTotal(root, false);
+    if (currencyInput && !currentPaid) setPaymentSelect(currencyInput, selectedCurrency(root));
+    if (first) first.dataset.salesPaymentCurrency = paymentCurrency(first, root);
     if (amountInput && !currentPaid && total) amountInput.value = formatMoney(total, selectedCurrency(root));
     updatePaymentSummary(root);
     if (typeof dialog.showModal === "function") {
@@ -1807,13 +1885,14 @@
   function wirePaymentLine(root, row) {
     if (!row || row.getAttribute("data-sales-payment-wired") === "1") return;
     row.setAttribute("data-sales-payment-wired", "1");
-    row.querySelectorAll("[data-sales-payment-amount], [data-sales-payment-account], [data-sales-payment-method]").forEach(function (input) {
+    row.querySelectorAll("[data-sales-payment-amount], [data-sales-payment-account], [data-sales-payment-currency]").forEach(function (input) {
       input.addEventListener("input", function () {
         if (input.matches("[data-sales-payment-amount]")) sanitizeNumericInput(input);
         updatePaymentSummary(root);
       });
       input.addEventListener("change", function () {
         if (input.matches("[data-sales-payment-amount]")) sanitizeNumericInput(input);
+        if (input.matches("[data-sales-payment-currency]")) convertPaymentLineCurrency(root, row, input.value);
         updatePaymentSummary(root);
       });
     });
@@ -1824,6 +1903,11 @@
           row.querySelectorAll("input").forEach(function (input) {
             input.value = "";
           });
+          var currency = row.querySelector("[data-sales-payment-currency]");
+          if (currency) {
+            setPaymentSelect(currency, selectedCurrency(root));
+            row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+          }
         } else {
           row.remove();
         }
@@ -1859,6 +1943,11 @@
     }
     form.addEventListener("submit", function (event) {
       event.preventDefault();
+      updatePaymentSummary(root);
+      var currency = selectedCurrency(root);
+      var due = rowsTotal(root, false);
+      var paid = paymentTotalInCurrency(root, currency);
+      if (paid > due) return;
       syncPaymentHidden(root);
       closePaymentDialog(root);
     });
@@ -1933,6 +2022,36 @@
     root.addEventListener("submit", function (event) {
       sanitizeNumericInputs(root);
       syncPaymentHidden(root);
+      var filledLine = Array.from(root.querySelectorAll(".sales-lines-table tbody .sales-line-grid")).find(function (row) {
+        return rowProductValue(row);
+      });
+      if (!filledLine) {
+        event.preventDefault();
+        var productInput = root.querySelector('[data-sales-combobox="product"] [data-sales-combo-input]') || root.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]');
+        if (productInput) {
+          productInput.setCustomValidity("Добавьте товар или услугу");
+          productInput.reportValidity();
+          productInput.focus();
+          setTimeout(function () {
+            productInput.setCustomValidity("");
+          }, 0);
+        }
+        return;
+      }
+      if (rowsTotal(root, false) <= 0) {
+        event.preventDefault();
+        var priceInput = filledLine.querySelector('input[name="line_price"]');
+        if (priceInput) {
+          priceInput.setCustomValidity("Укажите цену больше 0");
+          priceInput.reportValidity();
+          priceInput.focus();
+          priceInput.select();
+          setTimeout(function () {
+            priceInput.setCustomValidity("");
+          }, 0);
+        }
+        return;
+      }
       var duplicate = duplicateProductInput(root);
       if (!duplicate) {
         clearSalesDraft();
@@ -1948,6 +2067,7 @@
       root.querySelectorAll("[data-sales-combobox]").forEach(function (combo) {
         if (!combo.contains(event.target)) closePanel(combo);
       });
+      if (!event.target.closest("[data-sales-discount]")) closeDiscountMenus(root, null);
     });
   }
 

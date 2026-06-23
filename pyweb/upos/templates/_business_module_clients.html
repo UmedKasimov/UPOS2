@@ -89,7 +89,7 @@
     </header>
 
     <div class="products-table-wrap clients-table-wrap">
-      <table class="products-table clients-table" data-upos-column-controls>
+      <table class="products-table products-catalog-table clients-table" data-upos-column-controls>
         <thead>
           <tr>
             <th><input type="checkbox" aria-label="Выбрать всех клиентов" /></th>
@@ -155,6 +155,25 @@
             <tr><td colspan="15">Клиенты пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
+        <tfoot>
+          <tr class="clients-total-row">
+            <td colspan="4">Итого клиенты</td>
+            <td>
+              <div class="client-balance-total-lines">
+                <span class="client-balance-pill client-balance-pill--debt">{{ clients_balance_summary.debt }} UZS</span>
+                <small>Нам должны{% if clients_balance_summary.debt_count %}: {{ clients_balance_summary.debt_count }}{% endif %}</small>
+                <span class="client-balance-pill client-balance-pill--advance">{{ clients_balance_summary.advance }} UZS</span>
+                <small>Мы должны{% if clients_balance_summary.advance_count %}: {{ clients_balance_summary.advance_count }}{% endif %}</small>
+              </div>
+            </td>
+            <td colspan="10">
+              <div class="client-balance-net">
+                <span>Итоговый баланс</span>
+                <strong>{{ clients_balance_summary.net }} UZS</strong>
+              </div>
+            </td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </article>
@@ -470,6 +489,16 @@
                 <tr><td colspan="5">Документов для акта сверки пока нет.</td></tr>
               {% endfor %}
             </tbody>
+            {% if selected_client_card.reconciliation %}
+              <tfoot>
+                <tr class="client-act-total-row">
+                  <td colspan="2">Итого</td>
+                  <td>{{ selected_client_card.reconciliation_totals.debit }} {{ selected_client_card.reconciliation_totals.currency }}</td>
+                  <td>{{ selected_client_card.reconciliation_totals.credit }} {{ selected_client_card.reconciliation_totals.currency }}</td>
+                  <td>{{ selected_client_card.reconciliation_totals.balance }} {{ selected_client_card.reconciliation_totals.currency }}</td>
+                </tr>
+              </tfoot>
+            {% endif %}
           </table>
         </div>
       </article>

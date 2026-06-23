@@ -47,6 +47,133 @@
     return `${text} ${code}`;
   }
 
+  function purchaseEntryNumber(value) {
+    const normalized = String(value || "")
+      .replace(/\s+/g, "")
+      .replace(",", ".")
+      .replace(/[^\d.-]/g, "");
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function purchaseEntryFormat(value) {
+    const rounded = Math.round(Number(value || 0));
+    return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(rounded);
+  }
+
+  function purchaseEntryMoney(value, currency) {
+    return `${purchaseEntryFormat(value)} ${currency || "UZS"}`;
+  }
+
+  function initPurchaseEntry(root = document) {
+    root.querySelectorAll("[data-warehouse-purchase-entry]").forEach((form) => {
+      if (form.dataset.purchaseEntryReady === "1") return;
+      form.dataset.purchaseEntryReady = "1";
+
+      const body = form.querySelector("[data-purchase-entry-lines]");
+      const currencyInput = form.querySelector("[data-purchase-entry-currency]");
+      const amountInput = form.querySelector("[data-purchase-entry-amount]");
+      const totalOutput = form.querySelector("[data-purchase-entry-total]");
+      if (!body) return;
+
+      const rows = () => Array.from(body.querySelectorAll("[data-purchase-entry-row]"));
+      const rowHasProduct = (row) => Boolean(row.querySelector('input[name="line_product"]')?.value.trim());
+      const rowTotal = (row) => {
+        const quantity = purchaseEntryNumber(row.querySelector('input[name="line_quantity"]')?.value || "1") || 0;
+        const price = purchaseEntryNumber(row.querySelector('input[name="line_price"]')?.value);
+        return quantity * price;
+      };
+      const currency = () => currencyInput?.value || "UZS";
+
+      const renumber = () => {
+        rows().forEach((row, index) => {
+          const number = row.querySelector(".warehouse-purchase-entry-row-number");
+          if (number) number.textContent = String(index + 1);
+        });
+      };
+
+      const recalc = () => {
+        let total = 0;
+        rows().forEach((row) => {
+          const value = rowTotal(row);
+          const output = row.querySelector("[data-purchase-entry-line-total]");
+          if (output) output.textContent = purchaseEntryMoney(value, currency());
+          if (rowHasProduct(row)) total += value;
+        });
+        if (amountInput) amountInput.value = String(Math.round(total));
+        if (totalOutput) totalOutput.textContent = purchaseEntryMoney(total, currency());
+        renumber();
+      };
+
+      const ensureBlankLine = () => {
+        const currentRows = rows();
+        const last = currentRows[currentRows.length - 1];
+        if (!last || !rowHasProduct(last)) return;
+        const clone = last.cloneNode(true);
+        delete clone.dataset.purchaseEntryRowReady;
+        clone.querySelectorAll("input").forEach((input) => {
+          input.value = "";
+        });
+        const output = clone.querySelector("[data-purchase-entry-line-total]");
+        if (output) output.textContent = purchaseEntryMoney(0, currency());
+        body.append(clone);
+        wireRow(clone);
+        recalc();
+      };
+
+      const wireRow = (row) => {
+        if (row.dataset.purchaseEntryRowReady === "1") return;
+        row.dataset.purchaseEntryRowReady = "1";
+        row.querySelectorAll("input").forEach((input) => {
+          input.addEventListener("focus", () => {
+            if (input.name === "line_quantity" || input.name === "line_price") {
+              window.setTimeout(() => input.select(), 0);
+            }
+          });
+          input.addEventListener("input", () => {
+            if (input.name === "line_quantity" || input.name === "line_price") {
+              const cursorAtEnd = input.selectionStart === input.value.length;
+              input.value = input.value.replace(/[^\d\s.,-]/g, "");
+              if (cursorAtEnd) input.setSelectionRange(input.value.length, input.value.length);
+            }
+            recalc();
+            if (input.name === "line_product") ensureBlankLine();
+          });
+          input.addEventListener("blur", () => {
+            if (input.name === "line_quantity" || input.name === "line_price") {
+              const value = purchaseEntryNumber(input.value);
+              input.value = value ? purchaseEntryFormat(value) : "";
+              recalc();
+            }
+          });
+        });
+        row.querySelector("[data-purchase-entry-remove]")?.addEventListener("click", () => {
+          if (rows().length > 1) {
+            row.remove();
+          } else {
+            row.querySelectorAll("input").forEach((input) => {
+              input.value = "";
+            });
+          }
+          recalc();
+        });
+      };
+
+      rows().forEach(wireRow);
+      currencyInput?.addEventListener("change", recalc);
+      form.addEventListener("submit", () => {
+        rows().forEach((row) => {
+          row.querySelectorAll('input[name="line_quantity"], input[name="line_price"]').forEach((input) => {
+            const value = purchaseEntryNumber(input.value);
+            input.value = value ? String(value) : "";
+          });
+        });
+        recalc();
+      });
+      recalc();
+    });
+  }
+
   function readPurchase(id) {
     const node = document.getElementById(`warehouse-purchase-data-${id}`);
     if (!node) return null;
@@ -133,6 +260,7 @@
   }
 
   function init(root = document) {
+    initPurchaseEntry(root);
     root.querySelectorAll("[data-warehouse-purchases-filter]").forEach((form) => {
       if (form.dataset.warehousePurchasesReady === "1") return;
       form.dataset.warehousePurchasesReady = "1";

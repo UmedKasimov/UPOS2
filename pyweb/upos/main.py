@@ -2414,6 +2414,10 @@ def create_app() -> FastAPI:
             return err
         assert oid is not None
         try:
+            _ensure_sales_cash_transactions(oid)
+        except Exception:
+            logger.exception("[sales] failed to ensure sales cash transactions for %s", oid)
+        try:
             limit = int(request.query_params.get("limit") or 500)
         except (TypeError, ValueError):
             limit = 500
@@ -5265,13 +5269,14 @@ def create_app() -> FastAPI:
     def _sales_document_data(row: SaleDocument) -> dict[str, Any]:
         data = row.data if isinstance(row.data, dict) else {}
         paid_amount = _sales_decimal(data.get("paid_amount"))
-        debt_amount = _sales_decimal(row.amount) - paid_amount
+        amount_value = _sales_decimal(row.amount)
+        debt_amount = amount_value - paid_amount
         doc_type = str(data.get("doc_type") or "sale")
         status = str(data.get("status") or ("return" if doc_type == "return" else "new"))
         date_from = str(data.get("date") or "")
         date_to = str(data.get("date_to") or "")
         date_label = f"{date_from} - {date_to}" if date_from and date_to and date_to != date_from else date_from
-        return {
+        item = {
             "id": row.id,
             "number": row.number,
             "date": date_from,
@@ -5282,9 +5287,12 @@ def create_app() -> FastAPI:
             "client": str(data.get("client") or ""),
             "warehouse": str(data.get("warehouse") or ""),
             "amount": _sales_money_label(row.amount),
+            "amount_value": str(amount_value),
             "currency": row.currency,
             "paid_amount": _sales_money_label(paid_amount),
+            "paid_value": str(paid_amount),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
+            "debt_value": str(debt_amount if debt_amount > 0 else 0),
             "payment_type": str(data.get("payment_type") or ""),
             "status": status,
             "status_label": _sales_status_label(status),
@@ -5293,6 +5301,12 @@ def create_app() -> FastAPI:
             "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
             "updated_at": row.updated_at,
         }
+        item["detail_json"] = {
+            key: value
+            for key, value in item.items()
+            if key != "updated_at"
+        }
+        return item
 
     def _sales_product_option(
         row: Product,
@@ -5361,6 +5375,10 @@ def create_app() -> FastAPI:
                     "total": str(line_total.normalize() if line_total else "0"),
                 }
             )
+        if not lines:
+            raise ValueError("Добавьте хотя бы один товар или услугу")
+        if total <= 0:
+            raise ValueError("Сумма продажи должна быть больше 0")
         amount = total
         paid_amount = _sales_decimal_strict(form.get("paid_amount"), "Оплачено")
         if paid_amount < 0:
@@ -5383,11 +5401,13 @@ def create_app() -> FastAPI:
                     payment_amount = _sales_decimal(payment.get("amount"))
                     if payment_amount <= 0:
                         continue
+                    payment_currency = str(payment.get("currency") or currency or "UZS").strip().upper() or "UZS"
                     payment_lines.append(
                         {
                             "account_id": str(payment.get("account_id") or "").strip(),
                             "account": str(payment.get("account") or "").strip(),
                             "type": str(payment.get("type") or "").strip(),
+                            "currency": payment_currency[:8],
                             "amount": str(payment_amount.normalize() if payment_amount else "0"),
                         }
                     )
@@ -5486,6 +5506,7 @@ def create_app() -> FastAPI:
                     "account_id": str(payment.get("account_id") or "").strip(),
                     "account": str(payment.get("account") or "").strip(),
                     "type": str(payment.get("type") or "").strip(),
+                    "currency": str(payment.get("currency") or currency or "UZS").strip().upper() or "UZS",
                 }
             )
         paid_amount = _sales_decimal(data.get("paid_amount"))
@@ -5496,6 +5517,7 @@ def create_app() -> FastAPI:
                     "account_id": "",
                     "account": "",
                     "type": str(data.get("payment_type") or "Оплата").strip(),
+                    "currency": currency,
                 }
             )
         if not payment_rows:
@@ -5513,7 +5535,7 @@ def create_app() -> FastAPI:
                 continue
             tx_data: dict[str, Any] = {
                 "amount": payment["amount"],
-                "currency": currency,
+                "currency": str(payment.get("currency") or currency or "UZS").strip().upper() or "UZS",
                 "type": tx_type,
                 "status": "confirmed",
                 "is_confirmed": True,
@@ -5540,6 +5562,55 @@ def create_app() -> FastAPI:
                 tx_data["to_pocket_id"] = account_id
                 tx_data["to_account_id"] = account_id
             create_transaction(workspace_owner_id, tx_data)
+
+    def _sales_cash_payment_count(data: dict[str, Any]) -> int:
+        count = 0
+        for payment in data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []:
+            if isinstance(payment, dict) and _sales_decimal(payment.get("amount")) > 0:
+                count += 1
+        if count:
+            return count
+        return 1 if _sales_decimal(data.get("paid_amount")) > 0 else 0
+
+    def _ensure_sales_cash_transactions(workspace_owner_id: str) -> None:
+        with session_scope() as session:
+            sale_rows = list(
+                session.execute(
+                    select(SaleDocument)
+                    .where(SaleDocument.workspace_owner_id == workspace_owner_id)
+                    .order_by(SaleDocument.updated_at.desc())
+                    .limit(500)
+                ).scalars()
+            )
+            sales_doc_id = Transaction.data.op("->>")("sales_document_id")
+            tx_counts = {
+                str(doc_id or ""): int(count or 0)
+                for doc_id, count in session.execute(
+                    select(sales_doc_id, func.count(Transaction.id))
+                    .where(
+                        Transaction.workspace_owner_id == workspace_owner_id,
+                        Transaction.data.op("->>")("source") == "sales",
+                    )
+                    .group_by(sales_doc_id)
+                ).all()
+                if str(doc_id or "").strip()
+            }
+        for row in sale_rows:
+            data = _json_object(row.data)
+            expected = _sales_cash_payment_count(data)
+            if expected <= 0:
+                continue
+            if tx_counts.get(str(row.id), 0) == expected:
+                continue
+            _sync_sales_cash_transactions(
+                workspace_owner_id,
+                sale_id=str(row.id),
+                sale_number=str(row.number or ""),
+                data=data,
+                amount=_sales_decimal(row.amount),
+                currency=str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS",
+                user=None,
+            )
 
     @app.get("/sales", response_class=HTMLResponse, name="sales_get")
     def sales_get(
@@ -5591,6 +5662,25 @@ def create_app() -> FastAPI:
                 if q_clean and q_clean not in hay:
                     continue
                 sales.append(item)
+            sales_journal_totals_by_currency: dict[str, dict[str, Decimal]] = {}
+            for item in sales:
+                currency = str(item.get("currency") or "UZS").upper()
+                bucket = sales_journal_totals_by_currency.setdefault(
+                    currency,
+                    {"amount": Decimal("0"), "paid": Decimal("0"), "debt": Decimal("0")},
+                )
+                bucket["amount"] += _sales_decimal(item.get("amount_value"))
+                bucket["paid"] += _sales_decimal(item.get("paid_value"))
+                bucket["debt"] += _sales_decimal(item.get("debt_value"))
+            sales_journal_totals = [
+                {
+                    "currency": currency,
+                    "amount": _sales_money_label(values["amount"]),
+                    "paid": _sales_money_label(values["paid"]),
+                    "debt": _sales_money_label(values["debt"]),
+                }
+                for currency, values in sorted(sales_journal_totals_by_currency.items())
+            ]
             price_types = _workspace_price_types(wid)
             active_sales_price_types = [
                 item
@@ -5715,6 +5805,7 @@ def create_app() -> FastAPI:
             variant="user",
             active="sales",
             sales=sales,
+            sales_journal_totals=sales_journal_totals,
             sales_filters=filters,
             sales_options={
                 "clients": clients,
@@ -5732,6 +5823,7 @@ def create_app() -> FastAPI:
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
+            sales_saved_id=request.query_params.get("saved_id") or "",
         )
 
     @app.post("/sales/products/quick-save", name="sales_product_quick_save")
@@ -5819,7 +5911,7 @@ def create_app() -> FastAPI:
         session_user = request.session.get("user") or {}
         data["manager"] = str(session_user.get("name") or session_user.get("username") or "").strip()
         if not data["client"]:
-            return RedirectResponse(url="/sales?error=" + quote("Клиент обязателен"), status_code=302)
+            return RedirectResponse(url="/sales?error=" + quote("Клиент обязателен") + "#sales-form", status_code=302)
         saved_sale_id = ""
         saved_sale_number = ""
         with session_scope() as session:
@@ -5884,7 +5976,7 @@ def create_app() -> FastAPI:
                 url="/sales?error=" + quote("Продажа сохранена, но операция кассы не записалась") + "#sales-form",
                 status_code=302,
             )
-        return RedirectResponse(url="/sales?msg=saved#sales-form", status_code=302)
+        return RedirectResponse(url=f"/sales?msg=saved&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/delete", name="sales_delete")
     async def sales_delete(request: Request, sale_id: str):
@@ -5921,6 +6013,29 @@ def create_app() -> FastAPI:
             except Exception:
                 logger.exception("[sales] failed to delete kassa transactions for sale %s", deleted_sale_id)
         return RedirectResponse(url="/sales?msg=deleted#sales-journal", status_code=302)
+
+    @app.post("/sales/{sale_id}/status", name="sales_status_update")
+    async def sales_status_update(request: Request, sale_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        status = str(form.get("status") or "").strip()
+        if status not in {"new", "reserved", "paid", "partial", "debt", "return"}:
+            return RedirectResponse(url="/sales?error=" + quote("Неверный статус") + "#sales-journal", status_code=302)
+        with session_scope() as session:
+            row = session.get(SaleDocument, sale_id)
+            if row and row.workspace_owner_id == wid:
+                data = _json_object(row.data)
+                data["status"] = status
+                data["status_manual"] = True
+                row.data = data
+                flag_modified(row, "data")
+                session.add(row)
+        return RedirectResponse(url="/sales?msg=status#sales-journal", status_code=302)
 
     def _purchase_status_label(status: str) -> str:
         return {
@@ -6447,6 +6562,21 @@ def create_app() -> FastAPI:
         orders: list[dict[str, Any]] = []
         returns: list[dict[str, Any]] = []
         matched_sale_rows: list[SaleDocument] = []
+
+        def sale_document_created_label(document: SaleDocument) -> str:
+            created_at = getattr(document, "created_at", None)
+            return created_at.isoformat() if created_at else ""
+
+        def sale_document_day_label(document: SaleDocument, fallback_date: Any = "") -> str:
+            raw_date = str(fallback_date or "").strip()
+            if raw_date:
+                return raw_date
+            created_at = getattr(document, "created_at", None)
+            return created_at.date().isoformat() if created_at else ""
+
+        def sale_document_sort_key(document: SaleDocument) -> tuple[str, str]:
+            data = _json_object(document.data)
+            return (str(data.get("date") or ""), sale_document_created_label(document))
         for sale_row in sale_rows:
             data = _json_object(sale_row.data)
             counterparty_id = str(data.get("counterparty_id") or sale_row.counterparty_id or "").strip()
@@ -6455,7 +6585,7 @@ def create_app() -> FastAPI:
             item = _sales_document_data(sale_row)
             matched_sale_rows.append(sale_row)
             add_history_event(
-                date=item["date"] or sale_row.created_at.isoformat() if getattr(sale_row, "created_at", None) else "",
+                date=item["date"] or sale_document_created_label(sale_row),
                 title=f"{item['doc_type_label']} {item['number']}",
                 detail="Документ клиента в продажах.",
                 category="document",
@@ -6465,7 +6595,7 @@ def create_app() -> FastAPI:
             paid_amount = _sales_decimal(data.get("paid_amount"))
             if paid_amount > 0:
                 add_history_event(
-                    date=item["date"] or sale_row.updated_at.isoformat() if getattr(sale_row, "updated_at", None) else "",
+                    date=item["date"] or (sale_row.updated_at.isoformat() if getattr(sale_row, "updated_at", None) else ""),
                     title=f"Оплата по {item['number']}",
                     detail="Принята оплата по документу клиента.",
                     category="payment",
@@ -6481,9 +6611,12 @@ def create_app() -> FastAPI:
 
         reconciliation_rows: list[dict[str, str]] = []
         running_balance = Decimal("0")
+        reconciliation_total_debit = Decimal("0")
+        reconciliation_total_credit = Decimal("0")
+        reconciliation_currency = str(client.get("currency") or "UZS").upper()
         for sale_row in sorted(
             matched_sale_rows,
-            key=lambda item: (str(_json_object(item.data).get("date") or ""), item.created_at),
+            key=sale_document_sort_key,
         ):
             data = _json_object(sale_row.data)
             item = _sales_document_data(sale_row)
@@ -6497,9 +6630,12 @@ def create_app() -> FastAPI:
                 debit = amount
                 credit = Decimal("0")
                 running_balance += amount
+            reconciliation_total_debit += debit
+            reconciliation_total_credit += credit
+            reconciliation_currency = item["currency"] or reconciliation_currency
             reconciliation_rows.append(
                 {
-                    "date": item["date"] or sale_row.created_at.date().isoformat(),
+                    "date": sale_document_day_label(sale_row, item["date"]),
                     "document": f"{item['doc_type_label']} {item['number']}",
                     "debit": _sales_money_label(debit),
                     "credit": _sales_money_label(credit),
@@ -6509,9 +6645,10 @@ def create_app() -> FastAPI:
             )
             if paid_amount > 0 and item["doc_type"] != "return":
                 running_balance -= paid_amount
+                reconciliation_total_credit += paid_amount
                 reconciliation_rows.append(
                     {
-                        "date": item["date"] or sale_row.created_at.date().isoformat(),
+                        "date": sale_document_day_label(sale_row, item["date"]),
                         "document": f"Оплата по {item['number']}",
                         "debit": _sales_money_label(Decimal("0")),
                         "credit": _sales_money_label(paid_amount),
@@ -6675,6 +6812,12 @@ def create_app() -> FastAPI:
                 "correspondence": correspondence[:12],
                 "conversations": conversations[:8],
                 "reconciliation": reconciliation_rows[-18:],
+                "reconciliation_totals": {
+                    "debit": _sales_money_label(reconciliation_total_debit),
+                    "credit": _sales_money_label(reconciliation_total_credit),
+                    "balance": _sales_money_label(running_balance),
+                    "currency": reconciliation_currency,
+                },
                 "history": history_events[:80],
                 "summary": {
                     "sales": _sales_money_label(total_sales),
@@ -7264,19 +7407,23 @@ def create_app() -> FastAPI:
 
             selected_client_id = client.strip()
             if selected_client_id:
-                selected_client_card = _client_card_context(
-                    session,
-                    wid,
-                    selected_client_id,
-                    balance_by_id=balance_by_id,
-                    balance_by_name=balance_by_name,
-                    last_date_by_id=last_date_by_id,
-                    last_date_by_name=last_date_by_name,
-                    balance_currency_by_id=balance_currency_by_id,
-                    balance_currency_by_name=balance_currency_by_name,
-                    crm_status_by_id=crm_status_by_id,
-                    crm_status_by_name=crm_status_by_name,
-                )
+                try:
+                    selected_client_card = _client_card_context(
+                        session,
+                        wid,
+                        selected_client_id,
+                        balance_by_id=balance_by_id,
+                        balance_by_name=balance_by_name,
+                        last_date_by_id=last_date_by_id,
+                        last_date_by_name=last_date_by_name,
+                        balance_currency_by_id=balance_currency_by_id,
+                        balance_currency_by_name=balance_currency_by_name,
+                        crm_status_by_id=crm_status_by_id,
+                        crm_status_by_name=crm_status_by_name,
+                    )
+                except Exception:
+                    logger.exception("Failed to build client card %s", selected_client_id)
+                    selected_client_card = None
             rows = list(
                 session.execute(
                     select(Counterparty)
@@ -7367,6 +7514,21 @@ def create_app() -> FastAPI:
                 for key, value in sorted(route_map.items())
             ]
             client_balances.sort(key=lambda item: item["balance_value"], reverse=True)
+        clients_debt_total = sum(
+            (item["balance_value"] for item in clients_records if item["balance_value"] > 0),
+            Decimal("0"),
+        )
+        clients_advance_total = sum(
+            (abs(item["balance_value"]) for item in clients_records if item["balance_value"] < 0),
+            Decimal("0"),
+        )
+        clients_balance_summary = {
+            "debt": _sales_money_label(clients_debt_total),
+            "advance": _sales_money_label(clients_advance_total),
+            "net": _sales_money_label(clients_debt_total - clients_advance_total),
+            "debt_count": sum(1 for item in clients_records if item["balance_value"] > 0),
+            "advance_count": sum(1 for item in clients_records if item["balance_value"] < 0),
+        }
         client_options = {
             "territories": sorted({item["territory"] for item in clients_records if item["territory"]}),
             "categories": sorted({item["category"] for item in clients_records if item["category"]}),
@@ -7383,6 +7545,7 @@ def create_app() -> FastAPI:
             client_filters=filters,
             client_options=client_options,
             clients_records=clients_records,
+            clients_balance_summary=clients_balance_summary,
             client_routes=client_routes,
             client_balances=client_balances,
             selected_client_card=selected_client_card,

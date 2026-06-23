@@ -22,7 +22,7 @@
     data-workspace-home-href="{{ url_for('sales_get') }}"
   >
     {% if flash_ok == "saved" %}
-      <div class="flash ok settings-ios-flash">Документ продажи сохранён.</div>
+      <div class="flash ok settings-ios-flash">Успешно продано. Продажа добавлена в журнал.</div>
     {% elif flash_ok == "deleted" %}
       <div class="flash ok settings-ios-flash">Документ продажи удалён.</div>
     {% endif %}
@@ -90,8 +90,8 @@
     </section>
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
-    <form class="products-filter-bar sales-filter-bar" method="get" action="{{ url_for('sales_get') }}" data-workspace-view="journal order return debt" hidden>
-      <label>
+    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}" data-workspace-view="journal order return debt" hidden>
+      <label class="products-catalog-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
       </label>
@@ -141,49 +141,206 @@
             <h2>Журнал продаж</h2>
             <span>Всего: {{ sales|length }}</span>
           </div>
-          <a class="btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
+          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
         </header>
-        <div class="products-table-wrap">
-          <table class="products-table sales-table">
+        <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table sales-table sales-journal-table" id="sales-journal-table" data-upos-column-controls>
             <thead>
               <tr>
-                <th>№</th>
-                <th>Дата</th>
-                <th>Тип</th>
-                <th>Клиент</th>
-                <th>Склад</th>
-                <th>Сумма</th>
-                <th>Оплата</th>
-                <th>Статус</th>
-                <th></th>
+                <th data-column-label="№">№</th>
+                <th data-column-label="ID">ID</th>
+                <th data-column-label="Дата" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Тип" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Тип</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Клиент" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Клиент</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Склад" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Склад</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Сумма" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Сумма</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Оплата" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Оплата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Статус" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Действия" class="products-actions-head"></th>
               </tr>
             </thead>
             <tbody>
               {% for sale in sales %}
-                <tr>
-                  <td><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
+                <tr{% if sales_saved_id and sales_saved_id == sale.id %} class="sales-table-row--saved"{% endif %}>
+                  <td class="sales-journal-row-index">{{ loop.index }}</td>
+                  <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0"><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
                   <td>{{ sale.date_label or sale.date or "-" }}</td>
                   <td>{{ sale.doc_type_label }}</td>
                   <td>{{ sale.client or "-" }}</td>
                   <td>{{ sale.warehouse or "-" }}</td>
                   <td>{{ sale.amount }} {{ sale.currency }}</td>
                   <td><span>{{ sale.paid_amount }} {{ sale.currency }}</span><small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small></td>
-                  <td><span class="sales-status sales-status--{{ sale.status }}">{{ sale.status_label }}</span></td>
+                  <td>
+                    {% set status_style = 'confirmed' if sale.status == 'paid' else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['reserved', 'partial', 'debt'] else 'draft')) %}
+                    <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <select
+                        class="kassa-status-select kassa-status-select--{{ status_style }} sales-status-select"
+                        name="status"
+                        data-sales-status-select
+                        aria-label="Статус продажи {{ sale.number }}"
+                      >
+                        <option value="new" {% if sale.status == 'new' %}selected{% endif %}>Новый</option>
+                        <option value="reserved" {% if sale.status == 'reserved' %}selected{% endif %}>Резерв</option>
+                        <option value="paid" {% if sale.status == 'paid' %}selected{% endif %}>Оплачен</option>
+                        <option value="partial" {% if sale.status == 'partial' %}selected{% endif %}>Частично</option>
+                        <option value="debt" {% if sale.status == 'debt' %}selected{% endif %}>Долг</option>
+                        <option value="return" {% if sale.status == 'return' %}selected{% endif %}>Возврат</option>
+                      </select>
+                    </form>
+                  </td>
                   <td class="products-row-actions">
+                    <button
+                      class="products-action-icon products-action-icon--edit sales-journal-edit"
+                      type="button"
+                      data-sales-journal-open
+                      data-sale-id="{{ sale.id }}"
+                      title="Редактировать"
+                      aria-label="Редактировать {{ sale.number }}"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
                     <form method="post" action="{{ url_for('sales_delete', sale_id=sale.id) }}">
                       {% include "_csrf_field.html" %}
-                      <button type="submit">Удалить</button>
+                      <button class="products-action-icon products-action-icon--delete sales-journal-delete" type="submit" aria-label="Удалить" title="Удалить">×</button>
                     </form>
                   </td>
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="9">Пока нет продаж. Создайте первую продажу справа.</td>
+                  <td colspan="10">Пока нет продаж. Создайте первую продажу справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
+            {% if sales %}
+              <tfoot>
+                <tr class="sales-journal-total-row">
+                  <td colspan="6">ИТОГО</td>
+                  <td>
+                    {% for total in sales_journal_totals %}
+                      <span>{{ total.amount }} {{ total.currency }}</span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% for total in sales_journal_totals %}
+                      <span>{{ total.paid }} {{ total.currency }}</span>
+                      <small>Долг: {{ total.debt }} {{ total.currency }}</small>
+                    {% endfor %}
+                  </td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            {% endif %}
           </table>
         </div>
+        {% for sale in sales %}
+          <script type="application/json" id="sales-journal-data-{{ sale.id }}">{{ sale.detail_json|tojson }}</script>
+        {% endfor %}
+        <div class="warehouse-purchase-detail-backdrop sales-document-detail-backdrop" data-sales-journal-close hidden></div>
+        <aside class="warehouse-purchase-detail sales-document-detail" data-sales-journal-detail hidden aria-live="polite">
+          <header class="warehouse-purchase-detail-head">
+            <div>
+              <p data-sales-detail-date></p>
+              <h2 data-sales-detail-title>Продажа</h2>
+            </div>
+            <div class="warehouse-purchase-detail-actions">
+              <button class="btn btn-secondary btn-sm sales-detail-return-btn" type="button" data-sales-detail-return hidden>
+                Сделать возврат
+              </button>
+              <button class="warehouse-purchases-icon" type="button" title="Печать" aria-label="Печать" data-sales-detail-print>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+              </button>
+              <div class="sales-document-detail-menu-wrap">
+                <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню" aria-expanded="false" data-sales-detail-menu-toggle>⋮</button>
+                <div class="sales-document-detail-menu" data-sales-detail-menu hidden>
+                  <button type="button" data-sales-detail-menu-return>Сделать возврат</button>
+                  <button type="button" data-sales-detail-menu-print>Печать</button>
+                  <button type="button" data-sales-detail-menu-close>Закрыть</button>
+                </div>
+              </div>
+              <button class="warehouse-purchase-detail-close" type="button" data-sales-journal-close aria-label="Закрыть">×</button>
+            </div>
+          </header>
+          <section class="warehouse-purchase-detail-summary">
+            <div>
+              <span>Клиент</span>
+              <strong data-sales-detail-client></strong>
+            </div>
+            <div>
+              <span>Склад</span>
+              <strong data-sales-detail-warehouse></strong>
+            </div>
+            <div>
+              <span>Статус</span>
+              <strong data-sales-detail-status></strong>
+            </div>
+          </section>
+          <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы продажи">
+            <button type="button" class="active">Товары</button>
+            <button type="button">Оплата</button>
+            <button type="button">Комментарий</button>
+          </nav>
+          <div class="warehouse-purchase-detail-table-wrap">
+            <table class="warehouse-purchase-detail-table sales-document-detail-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Товар</th>
+                  <th>Склад</th>
+                  <th>К-во</th>
+                  <th>Цена</th>
+                  <th>Сумма</th>
+                </tr>
+              </thead>
+              <tbody data-sales-detail-lines></tbody>
+            </table>
+          </div>
+          <footer class="warehouse-purchase-detail-footer">
+            <div>
+              <span>Оплачено</span>
+              <strong data-sales-detail-paid></strong>
+            </div>
+            <div>
+              <span>Долг</span>
+              <strong data-sales-detail-debt></strong>
+            </div>
+            <div class="warehouse-purchase-detail-total">
+              <span>Итого</span>
+              <strong data-sales-detail-total></strong>
+            </div>
+          </footer>
+        </aside>
       </article>
 
       <aside class="product-form-panel" id="sales-form" data-workspace-view="new" hidden>
@@ -429,10 +586,10 @@
                     </select>
                   </label>
                   <label class="settings-profile-field">
-                    <span class="settings-profile-field-label">Оплата</span>
-                    <select class="settings-profile-input" data-sales-payment-method>
-                      {% for account in sales_options.payment_accounts %}
-                        <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                    <span class="settings-profile-field-label">Валюта</span>
+                    <select class="settings-profile-input" data-sales-payment-currency>
+                      {% for currency in sales_options.currencies %}
+                        <option value="{{ currency }}">{{ currency }}</option>
                       {% endfor %}
                     </select>
                   </label>
@@ -444,11 +601,28 @@
                 </div>
               </div>
               <button type="button" class="btn btn-secondary sales-payment-add-line" data-sales-payment-add-line>+ Ещё счёт</button>
-              <p class="sales-payment-summary" data-sales-payment-summary>Оплата: 0 UZS</p>
+              <div class="sales-payment-summary-card" data-sales-payment-summary>
+                <div class="sales-payment-summary-row">
+                  <span>К оплате:</span>
+                  <strong data-sales-payment-due>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row">
+                  <span>Оплачено:</span>
+                  <strong data-sales-payment-paid>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row">
+                  <span>Остаток:</span>
+                  <strong data-sales-payment-rest>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row sales-payment-summary-row--over" data-sales-payment-over-row hidden>
+                  <span>Даёте больше:</span>
+                  <strong data-sales-payment-over>0 UZS</strong>
+                </div>
+              </div>
             </div>
             <div class="settings-profile-modal-foot">
               <button type="button" class="btn btn-secondary" data-sales-payment-cancel>Отмена</button>
-              <button type="submit" class="btn sales-payment-submit">Применить оплату</button>
+              <button type="submit" class="btn sales-payment-submit" data-sales-payment-submit>Применить оплату</button>
             </div>
           </form>
         </dialog>
@@ -563,5 +737,6 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=42" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=47" defer></script>
 {% endblock %}
