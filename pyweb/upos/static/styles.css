@@ -4316,6 +4316,133 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 0;
 }
 
+.crm-service-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 0.42fr);
+  gap: 1rem;
+  align-items: stretch;
+  margin-bottom: 1rem;
+}
+
+.crm-service-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(7.5rem, 1fr));
+  gap: 0.7rem;
+}
+
+.crm-service-metric,
+.crm-next-actions {
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
+}
+
+.crm-service-metric {
+  display: grid;
+  gap: 0.25rem;
+  min-height: 6.25rem;
+  padding: 0.85rem;
+}
+
+.crm-service-metric span,
+.crm-service-metric small,
+.crm-next-actions header span,
+.crm-next-action span,
+.crm-next-action small,
+.crm-next-action-empty {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-service-metric strong {
+  color: var(--foreground);
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.crm-service-metric.is-alert {
+  border-color: color-mix(in srgb, #ef4444 45%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #ef4444 7%, var(--card));
+}
+
+.crm-next-actions {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.crm-next-actions header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0.85rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.crm-next-actions h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.crm-next-action-list {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+}
+
+.crm-next-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in oklch, var(--muted), transparent 82%);
+}
+
+.crm-next-action button,
+.crm-kanban-card-actions button {
+  min-height: 1.9rem;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: 850;
+}
+
+.crm-next-action button {
+  padding: 0.25rem 0.55rem;
+}
+
+.crm-next-action strong,
+.crm-next-action span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-next-action[data-state="overdue"] {
+  border-color: color-mix(in srgb, #ef4444 38%, var(--border));
+  background: color-mix(in srgb, #ef4444 8%, var(--card));
+}
+
+.crm-next-action[data-state="today"] {
+  border-color: color-mix(in srgb, #22c55e 35%, var(--border));
+  background: color-mix(in srgb, #22c55e 8%, var(--card));
+}
+
+.crm-next-action-empty {
+  margin: 0;
+  padding: 0.7rem;
+}
+
 .crm-pipeline-shell {
   display: grid;
   gap: 1rem;
@@ -4351,7 +4478,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-kanban-filters {
   display: grid;
-  grid-template-columns: minmax(13rem, 1.35fr) repeat(3, minmax(10rem, 1fr)) auto auto auto;
+  grid-template-columns: minmax(13rem, 1.35fr) repeat(4, minmax(9rem, 0.9fr)) repeat(4, auto);
   gap: 0.75rem;
   align-items: end;
 }
@@ -4502,22 +4629,67 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-kanban-card-top,
 .crm-kanban-card-meta,
+.crm-kanban-card-tags,
 .crm-kanban-card-money,
 .crm-kanban-card footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
 }
 
+.crm-kanban-card-top,
+.crm-kanban-card-meta,
+.crm-kanban-card-money,
+.crm-kanban-card footer {
+  justify-content: space-between;
+}
+
+.crm-kanban-card-tags {
+  flex-wrap: wrap;
+}
+
+.crm-kanban-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+  gap: 0.35rem;
+}
+
+.crm-kanban-card-actions form {
+  margin: 0;
+}
+
+.crm-kanban-card-actions button {
+  width: 100%;
+  padding: 0.2rem 0.35rem;
+}
+
 .crm-kanban-card-top span,
-.crm-kanban-card-meta span {
+.crm-kanban-card-meta span,
+.crm-kanban-card-tags span {
   display: inline-flex;
   align-items: center;
   min-height: 1.35rem;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--primary) 9%, var(--card));
+}
+
+.crm-kanban-card-tags span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.crm-kanban-card-tags span[data-priority="high"],
+.crm-kanban-card-tags span[data-priority="urgent"],
+.crm-kanban-card-tags span[data-state="overdue"] {
+  color: #991b1b;
+  background: color-mix(in srgb, #ef4444 12%, var(--card));
+}
+
+.crm-kanban-card-tags span[data-state="today"] {
+  color: #166534;
+  background: color-mix(in srgb, #22c55e 13%, var(--card));
 }
 
 .crm-kanban-client {
@@ -5345,9 +5517,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   }
 
   .crm-pipeline-head,
+  .crm-service-dashboard,
   .crm-kanban-filters,
   .crm-record-form-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crm-service-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .crm-pipeline-head--filters {
@@ -5380,7 +5557,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 @media (max-width: 640px) {
   .client-card-metrics,
-  .client-card-info div {
+  .client-card-info div,
+  .crm-service-metrics,
+  .crm-next-action {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -19693,4 +19872,391 @@ button.general-module-tab {
   background: #f7fbff;
   font-weight: 700;
   color: #1f3b57;
+}
+
+.upos-floating-phone {
+  position: fixed;
+  left: 28px;
+  bottom: 92px;
+  z-index: 1200;
+  touch-action: none;
+}
+
+.upos-floating-phone.is-dragging {
+  user-select: none;
+}
+
+.upos-floating-phone-toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.32);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  touch-action: none;
+}
+
+.upos-floating-phone.is-dragging,
+.upos-floating-phone.is-dragging .upos-floating-phone-toggle,
+.upos-floating-phone.is-dragging .upos-floating-phone-head {
+  cursor: grabbing;
+}
+
+.upos-floating-phone-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 42px rgba(37, 99, 235, 0.38);
+}
+
+.upos-floating-phone-toggle:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 3px;
+}
+
+.upos-floating-phone-pulse {
+  position: absolute;
+  inset: -6px;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  border-radius: 22px;
+  pointer-events: none;
+  animation: upos-phone-pulse 1.8s ease-out infinite;
+}
+
+@keyframes upos-phone-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+.upos-floating-phone-panel[hidden] {
+  display: none;
+}
+
+.upos-floating-phone-panel {
+  position: absolute;
+  left: 0;
+  bottom: 70px;
+  width: min(330px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid #bfd4ee;
+  border-radius: 8px;
+  background: #fff;
+  color: #12233d;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+}
+
+.upos-floating-phone-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  cursor: grab;
+}
+
+.upos-floating-phone-head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.upos-floating-phone-head span {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.upos-floating-phone-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d6e3f5;
+  border-radius: 8px;
+  background: #f5f9ff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.upos-floating-phone-form {
+  display: grid;
+  gap: 8px;
+}
+
+.upos-floating-phone-form label {
+  display: grid;
+  gap: 5px;
+  color: #53657f;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.upos-floating-phone-form input,
+.upos-floating-phone-form select {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  border: 1px solid #c7d7ea;
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #fff;
+  color: #10213a;
+  font: inherit;
+}
+
+.upos-floating-phone-form input:focus,
+.upos-floating-phone-form select:focus {
+  outline: none;
+  border-color: #2f80ed;
+  box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.16);
+}
+
+.upos-floating-phone-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  border: 1px solid #cfe8d8;
+  border-radius: 7px;
+  padding: 8px 9px;
+  background: #f0fff6;
+  color: #087443;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.upos-floating-phone-status span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.upos-floating-phone-status[data-state="pending"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.upos-floating-phone-status[data-state="pending"] span {
+  background: #2f80ed;
+  box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.14);
+}
+
+.upos-floating-phone-status[data-state="error"] {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.upos-floating-phone-status[data-state="error"] span {
+  background: #f43f5e;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.14);
+}
+
+.upos-floating-phone-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.upos-floating-phone-links a {
+  border: 1px solid #cfe0f5;
+  border-radius: 7px;
+  padding: 8px 6px;
+  background: #f7fbff;
+  color: #1768d1;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.upos-floating-phone-links a:hover {
+  background: #eaf4ff;
+}
+
+body.sidebar-collapsed .upos-floating-phone,
+body.is-sidebar-collapsed .upos-floating-phone,
+.layout.sidebar-collapsed .upos-floating-phone {
+  left: 18px;
+}
+
+@media (max-width: 760px) {
+  .upos-floating-phone {
+    left: 16px;
+    bottom: 16px;
+  }
+
+  .upos-floating-phone-panel {
+    bottom: 66px;
+  }
+}
+
+.telephony-dashboard-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.telephony-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.telephony-kpi-card {
+  border: 1px solid rgba(30, 64, 175, 0.18);
+  border-radius: 10px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.08), rgba(255, 255, 255, 0.9));
+  color: #172033;
+}
+
+.telephony-kpi-card span,
+.telephony-kpi-card small {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.telephony-kpi-card strong {
+  display: block;
+  margin: 8px 0 4px;
+  color: #1e40af;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.telephony-kpi-card.danger {
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.telephony-kpi-card.danger strong {
+  color: #dc2626;
+}
+
+.telephony-dashboard-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.telephony-dashboard-columns section,
+.telephony-recordings-section {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.telephony-dashboard-columns h3,
+.telephony-recordings-section h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.telephony-mini-list {
+  display: grid;
+  gap: 8px;
+}
+
+.telephony-mini-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 8px 0;
+}
+
+.telephony-mini-row strong,
+.telephony-mini-row span,
+.telephony-mini-row em {
+  display: block;
+}
+
+.telephony-mini-row span,
+.telephony-mini-row em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.telephony-mini-row em {
+  grid-column: 1 / -1;
+}
+
+.telephony-state {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #e5e7eb;
+  color: #475569;
+  font-weight: 800;
+}
+
+.telephony-state--online,
+.telephony-state--connected,
+.telephony-state--active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.billing-telephony-mini {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.billing-telephony-mini > div {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.billing-telephony-mini h4 {
+  margin: 0 0 10px;
+}
+
+.billing-telephony-mini p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.billing-telephony-mini p:last-child {
+  border-bottom: 0;
+}
+
+.billing-telephony-mini span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .telephony-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .telephony-dashboard-columns,
+  .billing-telephony-mini {
+    grid-template-columns: 1fr;
+  }
 }

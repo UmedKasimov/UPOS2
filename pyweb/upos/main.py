@@ -329,12 +329,71 @@ def db_account_size_bytes(owner_id: str) -> int:
     return total
 
 
+TELEPHONY_SETTING_LIST_KEYS = (
+    "telephony_calls",
+    "telephony_numbers",
+    "telephony_providers",
+    "telephony_devices",
+    "telephony_recordings",
+)
+
+
+def telephony_account_dashboard(workspace_owner_id: str) -> dict[str, Any]:
+    data = load_workspace_settings(workspace_owner_id)
+    calls = data.get("telephony_calls") if isinstance(data.get("telephony_calls"), list) else []
+    numbers = data.get("telephony_numbers") if isinstance(data.get("telephony_numbers"), list) else []
+    providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+    devices = data.get("telephony_devices") if isinstance(data.get("telephony_devices"), list) else []
+    recordings = data.get("telephony_recordings") if isinstance(data.get("telephony_recordings"), list) else []
+
+    def recent_key(item: dict[str, Any]) -> str:
+        return str(
+            item.get("last_seen_at")
+            or item.get("updated_at")
+            or item.get("started_at")
+            or item.get("created_at")
+            or ""
+        )
+
+    def is_online(item: dict[str, Any]) -> bool:
+        return str(item.get("status") or "").strip().lower() in {"online", "connected", "active"}
+
+    answered = sum(1 for row in calls if str(row.get("status") or "") == "answered")
+    missed = sum(1 for row in calls if str(row.get("status") or "") == "missed")
+    incoming = sum(1 for row in calls if str(row.get("direction") or "") == "incoming")
+    outgoing = sum(1 for row in calls if str(row.get("direction") or "") == "outgoing")
+    connected_devices = sum(1 for row in devices if is_online(row))
+    online_providers = sum(1 for row in providers if is_online(row))
+
+    return {
+        "total_calls": len(calls),
+        "answered_calls": answered,
+        "missed_calls": missed,
+        "incoming_calls": incoming,
+        "outgoing_calls": outgoing,
+        "numbers_count": len(numbers),
+        "providers_count": len(providers),
+        "online_providers": online_providers,
+        "devices_count": len(devices),
+        "connected_devices": connected_devices,
+        "recordings_count": len(recordings),
+        "latest_calls": sorted([dict(row) for row in calls], key=recent_key, reverse=True)[:10],
+        "devices": sorted([dict(row) for row in devices], key=recent_key, reverse=True)[:20],
+        "recordings": sorted([dict(row) for row in recordings], key=recent_key, reverse=True)[:10],
+    }
+
+
 def billing_clients_context() -> list[dict[str, Any]]:
     clients = []
     for row in list_users_safe():
         if str(row.get("role") or "") == "user":
             account_key = str(row.get("account_id") or row.get("id") or "")
-            clients.append({**row, "workspace_path": ensure_client_workspace(account_key)})
+            owner_id = str(row.get("id") or "")
+            clients.append({
+                **row,
+                "workspace_path": ensure_client_workspace(account_key),
+                "telephony": telephony_account_dashboard(owner_id) if owner_id else {},
+            })
     return clients
 
 
@@ -405,6 +464,7 @@ def billing_account_detail(account_key: str, *, temp_password: str = "") -> dict
         "db_size": format_bytes(db_bytes),
         "total_size": format_bytes(total_bytes),
         "temp_password": temp_password,
+        "telephony": telephony_account_dashboard(str(owner_payload["id"])),
     }
 
 
@@ -1045,6 +1105,7 @@ def create_app() -> FastAPI:
             or path.startswith("/auth")
             or path.startswith("/billing")
             or path.startswith("/api/telegram/webhook/")
+            or path == "/api/telephony/calls/ingest"
         ):
             return await call_next(request)
         user = request.session.get("user")
@@ -3007,9 +3068,11 @@ def create_app() -> FastAPI:
                 "heading": "Центр телефонии",
                 "action": "+ Звонок",
                 "launcher": [
+                    {"id": "dashboard", "title": "Дашборд", "subtitle": "Телефоны и записи", "icon": "deals"},
                     {"id": "calls", "title": "Звонки", "subtitle": "Журнал и статусы", "icon": "phone"},
                     {"id": "numbers", "title": "Номера", "subtitle": "Линии и сотрудники", "icon": "numbers"},
                     {"id": "integrations", "title": "Интеграции", "subtitle": "АТС и SIP", "icon": "adjustment"},
+                    {"id": "operators", "title": "Операторы", "subtitle": "Команда связи", "icon": "clients", "view_id": "numbers"},
                 ],
                 "filters": ["Поиск", "Провайдер", "Ответственный", "Статус"],
                 "columns": ["Клиент", "Номер", "Направление", "Ответственный", "Статус"],
@@ -3440,6 +3503,56 @@ def create_app() -> FastAPI:
         {"id": "lost", "title": "Потеряно", "hint": "Отказ или пауза"},
     )
     CRM_LEAD_SOURCES = ("Сайт", "Instagram", "Telegram", "WhatsApp", "Facebook", "Звонок", "Ручной ввод")
+    CRM_SERVICE_TYPES = (
+        "Консультация",
+        "Диагностика",
+        "Внедрение",
+        "Обслуживание",
+        "Поддержка",
+        "Доставка",
+        "Другое",
+    )
+    CRM_PRIORITY_LABELS = {
+        "low": "Низкий",
+        "normal": "Обычный",
+        "high": "Высокий",
+        "urgent": "Срочный",
+    }
+
+    def _crm_priority_label(priority: str) -> str:
+        clean = str(priority or "normal").strip()
+        return CRM_PRIORITY_LABELS.get(clean, CRM_PRIORITY_LABELS["normal"])
+
+    def _crm_probability_value(value: Any) -> str:
+        raw = str(value or "").strip().replace("%", "")
+        if not raw:
+            return ""
+        try:
+            number = int(Decimal(raw))
+        except Exception:
+            return ""
+        number = max(0, min(100, number))
+        return str(number)
+
+    def _crm_due_state(due_date: str, status: str, today_iso: str) -> dict[str, str]:
+        if str(status or "") in {"done", "won", "lost"}:
+            return {"id": "closed", "label": "Закрыто"}
+        raw = str(due_date or "").strip()
+        if not raw:
+            return {"id": "", "label": ""}
+        try:
+            due = datetime.strptime(raw[:10], "%Y-%m-%d").date()
+            today = datetime.strptime(today_iso[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return {"id": "", "label": ""}
+        delta = (due - today).days
+        if delta < 0:
+            return {"id": "overdue", "label": f"Просрочено {abs(delta)} дн."}
+        if delta == 0:
+            return {"id": "today", "label": "Сегодня"}
+        if delta <= 3:
+            return {"id": "soon", "label": f"Через {delta} дн."}
+        return {"id": "planned", "label": raw[:10]}
 
     def _crm_stage_slug(value: str, fallback: str = "stage") -> str:
         base = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(value or "").strip())
@@ -6419,12 +6532,22 @@ def create_app() -> FastAPI:
             "lead_source": str(form.get("lead_source") or form.get("contact_type") or "").strip(),
             "contact_type": str(form.get("contact_type") or "").strip(),
             "chat_ref": str(form.get("chat_ref") or "").strip(),
+            "service_type": str(form.get("service_type") or "").strip(),
+            "priority": str(form.get("priority") or "normal").strip(),
+            "next_step": str(form.get("next_step") or "").strip(),
+            "probability": _crm_probability_value(form.get("probability")),
             "note": str(form.get("note") or "").strip(),
         }
+        if data["priority"] not in CRM_PRIORITY_LABELS:
+            data["priority"] = "normal"
         return data, amount, currency
 
     def _crm_record_data(row: CrmRecord) -> dict[str, Any]:
         data = _json_object(row.data)
+        priority = str(data.get("priority") or "normal")
+        probability = _crm_probability_value(data.get("probability"))
+        amount_value = _sales_decimal(row.amount)
+        amount_input = str(amount_value.normalize()) if amount_value else ""
         return {
             "id": row.id,
             "title": row.title,
@@ -6442,12 +6565,48 @@ def create_app() -> FastAPI:
             "lead_source": str(data.get("lead_source") or ""),
             "contact_type": str(data.get("contact_type") or ""),
             "chat_ref": str(data.get("chat_ref") or ""),
+            "service_type": str(data.get("service_type") or ""),
+            "priority": priority if priority in CRM_PRIORITY_LABELS else "normal",
+            "priority_label": _crm_priority_label(priority),
+            "next_step": str(data.get("next_step") or ""),
+            "probability": probability,
+            "probability_label": f"{probability}%" if probability else "",
             "note": str(data.get("note") or ""),
             "amount": _sales_money_label(row.amount),
-            "amount_value": _sales_decimal(row.amount),
+            "amount_value": amount_value,
+            "amount_input": amount_input,
             "currency": row.currency,
             "counterparty_id": row.counterparty_id or "",
         }
+
+    def _crm_record_edit_payload(item: dict[str, Any]) -> dict[str, str]:
+        keys = (
+            "id",
+            "item_type",
+            "title",
+            "client",
+            "responsible",
+            "lead_source",
+            "stage_id",
+            "related_deal_id",
+            "service_type",
+            "priority",
+            "contact_type",
+            "chat_ref",
+            "date",
+            "due_date",
+            "status",
+            "probability",
+            "amount_input",
+            "currency",
+            "next_step",
+            "note",
+        )
+        payload: dict[str, str] = {}
+        for key in keys:
+            value = item.get(key)
+            payload[key] = "" if value is None else str(value)
+        return payload
 
     def _client_card_context(
         session: Any,
@@ -8008,6 +8167,7 @@ def create_app() -> FastAPI:
         client: str = "",
         responsible: str = "",
         status: str = "all",
+        priority: str = "all",
         date_from: str = "",
         date_to: str = "",
     ):
@@ -8020,15 +8180,32 @@ def create_app() -> FastAPI:
             "client": client.strip(),
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
+            "priority": priority.strip() or "all",
             "date_from": date_from.strip(),
             "date_to": date_to.strip(),
         }
+        if filters["priority"] not in {"all", *CRM_PRIORITY_LABELS.keys()}:
+            filters["priority"] = "all"
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
         crm_history_records: list[dict[str, Any]] = []
+        crm_next_actions: list[dict[str, Any]] = []
+        crm_summary = {
+            "active_count": 0,
+            "open_deals": 0,
+            "pipeline_total": "0",
+            "overdue_count": 0,
+            "today_count": 0,
+            "won_count": 0,
+            "conversion_rate": "0%",
+        }
+        summary_pipeline_total = Decimal("0")
+        summary_won = 0
+        summary_lost = 0
         crm_options = {"clients": [], "responsibles": []}
         crm_stages = _crm_workspace_stages(wid)
         crm_stage_map = {stage["id"]: {**stage, "records": [], "total_value": Decimal("0"), "total": "0"} for stage in crm_stages}
+        today_iso = datetime.now(timezone.utc).date().isoformat()
         with session_scope() as session:
             counterparty_rows = list(
                 session.execute(
@@ -8128,7 +8305,22 @@ def create_app() -> FastAPI:
                 item["kanban_amount"] = item["amount"] if item["amount_value"] else item["order_amount"]
                 item["kanban_amount_value"] = item["amount_value"] if item["amount_value"] else (linked_sale.get("amount_value") if linked_sale else Decimal("0"))
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
-                hay = " ".join([item["title"], item["client"], item["responsible"], item["status_label"], item["stage"], item["note"]]).lower()
+                item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
+                item["edit_payload"] = _crm_record_edit_payload(item)
+                hay = " ".join(
+                    [
+                        item["title"],
+                        item["client"],
+                        item["responsible"],
+                        item["status_label"],
+                        item["stage"],
+                        item["lead_source"],
+                        item["service_type"],
+                        item["priority_label"],
+                        item["next_step"],
+                        item["note"],
+                    ]
+                ).lower()
                 if q_clean and q_clean not in hay:
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
@@ -8136,6 +8328,8 @@ def create_app() -> FastAPI:
                 if filters["responsible"] and item["responsible"] != filters["responsible"]:
                     continue
                 if filters["status"] != "all" and item["status"] != filters["status"]:
+                    continue
+                if filters["priority"] != "all" and item["priority"] != filters["priority"]:
                     continue
                 if item["item_type"] == "history":
                     history_date = str(item.get("date") or item.get("due_date") or "")
@@ -8147,6 +8341,22 @@ def create_app() -> FastAPI:
                 if item["item_type"] == "history":
                     crm_history_records.append(item)
                     continue
+                if item["status"] not in {"done", "won", "lost"}:
+                    crm_summary["active_count"] += 1
+                    if item["item_type"] == "deal":
+                        crm_summary["open_deals"] += 1
+                    if item["action_state"]["id"] == "overdue":
+                        crm_summary["overdue_count"] += 1
+                    elif item["action_state"]["id"] == "today":
+                        crm_summary["today_count"] += 1
+                    if item["due_date"] or item["next_step"]:
+                        crm_next_actions.append(item)
+                    if isinstance(item["kanban_amount_value"], Decimal):
+                        summary_pipeline_total += item["kanban_amount_value"]
+                if item["status"] == "won":
+                    summary_won += 1
+                elif item["status"] == "lost":
+                    summary_lost += 1
                 column = crm_stage_map.get(item["stage_id"]) or crm_stage_map[crm_stages[0]["id"]]
                 column["records"].append(item)
                 column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
@@ -8160,6 +8370,19 @@ def create_app() -> FastAPI:
             column = crm_stage_map[stage["id"]]
             column["total"] = _sales_money_label(column["total_value"])
             crm_kanban_columns.append(column)
+        closed_count = summary_won + summary_lost
+        crm_summary["pipeline_total"] = _sales_money_label(summary_pipeline_total)
+        crm_summary["won_count"] = summary_won
+        crm_summary["conversion_rate"] = f"{round(summary_won * 100 / closed_count)}%" if closed_count else "0%"
+        action_rank = {"overdue": 0, "today": 1, "soon": 2, "planned": 3, "": 4}
+        crm_next_actions = sorted(
+            crm_next_actions,
+            key=lambda item: (
+                action_rank.get(str(item.get("action_state", {}).get("id") or ""), 5),
+                str(item.get("due_date") or "9999-12-31"),
+                str(item.get("title") or ""),
+            ),
+        )[:6]
         return tpl(
             request,
             "home_business_module.html",
@@ -8170,11 +8393,15 @@ def create_app() -> FastAPI:
             crm_options=crm_options,
             crm_records=crm_records,
             crm_history_records=crm_history_records,
+            crm_summary=crm_summary,
+            crm_next_actions=crm_next_actions,
             crm_pipeline_stages=crm_stages,
             crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
             crm_kanban_columns=crm_kanban_columns,
             crm_lead_sources=list(CRM_LEAD_SOURCES),
-            today=datetime.now(timezone.utc).date().isoformat(),
+            crm_service_types=list(CRM_SERVICE_TYPES),
+            crm_priorities=CRM_PRIORITY_LABELS,
+            today=today_iso,
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
@@ -8199,7 +8426,7 @@ def create_app() -> FastAPI:
 
     def _telephony_settings_payload(workspace_owner_id: str) -> dict[str, Any]:
         data = load_workspace_settings(workspace_owner_id)
-        for key in ("telephony_calls", "telephony_numbers", "telephony_providers"):
+        for key in TELEPHONY_SETTING_LIST_KEYS:
             if not isinstance(data.get(key), list):
                 data[key] = []
         return data
@@ -8278,6 +8505,169 @@ def create_app() -> FastAPI:
         items.insert(0, item)
         data[key] = items[:500]
         save_workspace_settings(workspace_owner_id, data)
+
+    def _telephony_default_workspace_owner_id() -> str:
+        with session_scope() as session:
+            row = session.execute(
+                select(User)
+                .where(User.role != "admin", User.employer_user_id.is_(None))
+                .order_by(User.created_at.asc())
+            ).scalars().first()
+            return str(row.id if row else "").strip()
+
+    def _telephony_normalized_phone(value: Any) -> str:
+        return re.sub(r"\D+", "", str(value or ""))
+
+    def _telephony_client_name_by_phone(workspace_owner_id: str, phone: str) -> str:
+        clean_phone = _telephony_normalized_phone(phone)
+        if not clean_phone:
+            return ""
+        with session_scope() as session:
+            clients = session.execute(
+                select(Counterparty)
+                .where(Counterparty.workspace_owner_id == workspace_owner_id)
+                .order_by(Counterparty.updated_at.desc())
+            ).scalars().all()
+            for client in clients:
+                extra = _counterparty_extra(client)
+                client_phone = _telephony_normalized_phone(client.phone or extra.get("phone") or "")
+                if client_phone and clean_phone.endswith(client_phone[-9:]):
+                    return str(client.name or "").strip()
+        return ""
+
+    def _telephony_upsert_device_entry(data: dict[str, Any], payload: dict[str, Any], now_iso: str) -> dict[str, Any] | None:
+        raw_device_id = str(
+            payload.get("device_id")
+            or payload.get("app_instance_id")
+            or payload.get("machine")
+            or payload.get("machine_name")
+            or ""
+        ).strip()
+        if not raw_device_id:
+            return None
+        devices = data.get("telephony_devices") if isinstance(data.get("telephony_devices"), list) else []
+        device_id = f"upos-sip:{raw_device_id}"
+        item = {
+            "id": device_id,
+            "device_id": raw_device_id,
+            "name": str(payload.get("device_name") or payload.get("machine") or payload.get("machine_name") or "Upos Sip").strip(),
+            "account": str(payload.get("account") or payload.get("sip_account") or "").strip(),
+            "status": str(payload.get("device_status") or "online").strip() or "online",
+            "last_seen_at": now_iso,
+            "app_version": str(payload.get("app_version") or "").strip(),
+            "platform": str(payload.get("platform") or "").strip(),
+            "operator": str(payload.get("operator") or payload.get("responsible") or "").strip(),
+        }
+        existing_index = next((idx for idx, row in enumerate(devices) if str(row.get("id") or "") == device_id), None)
+        if existing_index is None:
+            item["created_at"] = now_iso
+            devices.insert(0, item)
+        else:
+            existing = dict(devices[existing_index])
+            existing.update({key: val for key, val in item.items() if val not in ("", None)})
+            devices.pop(existing_index)
+            devices.insert(0, existing)
+            item = existing
+        data["telephony_devices"] = devices[:200]
+        return item
+
+    def _telephony_upsert_recording_entry(
+        data: dict[str, Any],
+        call_item: dict[str, Any],
+        payload: dict[str, Any],
+        now_iso: str,
+    ) -> dict[str, Any] | None:
+        recording_path = str(payload.get("recording_path") or call_item.get("recording_path") or "").strip()
+        if not recording_path:
+            return None
+        recordings = data.get("telephony_recordings") if isinstance(data.get("telephony_recordings"), list) else []
+        recording_id = str(payload.get("recording_id") or call_item.get("external_id") or call_item.get("id") or recording_path).strip()
+        item = {
+            "id": f"upos-sip-recording:{recording_id}",
+            "call_id": str(call_item.get("id") or call_item.get("external_id") or "").strip(),
+            "client": str(call_item.get("client") or "").strip(),
+            "phone": str(call_item.get("phone") or "").strip(),
+            "path": recording_path,
+            "duration": str(call_item.get("duration") or payload.get("duration_sec") or "").strip(),
+            "started_at": str(call_item.get("started_at") or payload.get("started_at") or "").strip(),
+            "created_at": str(payload.get("recording_created_at") or now_iso).strip(),
+            "device_id": str(payload.get("device_id") or "").strip(),
+            "account": str(payload.get("account") or "").strip(),
+            "updated_at": now_iso,
+        }
+        existing_index = next((idx for idx, row in enumerate(recordings) if str(row.get("id") or "") == item["id"]), None)
+        if existing_index is None:
+            recordings.insert(0, item)
+        else:
+            existing = dict(recordings[existing_index])
+            existing.update({key: val for key, val in item.items() if val not in ("", None)})
+            recordings.pop(existing_index)
+            recordings.insert(0, existing)
+            item = existing
+        data["telephony_recordings"] = recordings[:500]
+        return item
+
+    def _telephony_upsert_call_from_payload(workspace_owner_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        data = _telephony_settings_payload(workspace_owner_id)
+        calls = data.get("telephony_calls") if isinstance(data.get("telephony_calls"), list) else []
+        call_id = str(payload.get("call_id") or payload.get("id") or "").strip()
+        external_id = f"upos-sip:{call_id}" if call_id else str(uuid.uuid4())
+        raw_phone = str(payload.get("phone") or payload.get("remote_ext") or payload.get("from") or "").strip()
+        clean_name = str(payload.get("client") or payload.get("display_name") or "").strip()
+        if not clean_name:
+            clean_name = _telephony_client_name_by_phone(workspace_owner_id, raw_phone)
+
+        direction = str(payload.get("direction") or "outgoing").strip()
+        if direction not in {"incoming", "outgoing"}:
+            direction = "outgoing"
+
+        status = str(payload.get("status") or "").strip()
+        if status not in TELEPHONY_CALL_STATUS:
+            status = "answered" if str(payload.get("event") or "") in {"connected", "ended"} else "planned"
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        device = _telephony_upsert_device_entry(data, payload, now_iso)
+        item = {
+            "id": external_id,
+            "external_id": external_id,
+            "client": clean_name or raw_phone or "Неизвестный клиент",
+            "phone": raw_phone,
+            "direction": direction,
+            "started_at": str(payload.get("started_at") or now_iso).strip(),
+            "ended_at": str(payload.get("ended_at") or "").strip(),
+            "duration": str(payload.get("duration") or payload.get("duration_sec") or "").strip(),
+            "responsible": str(payload.get("responsible") or payload.get("operator") or "Upos Sip").strip(),
+            "status": status,
+            "note": str(payload.get("note") or "").strip(),
+            "source": "upos-sip",
+            "account": str(payload.get("account") or "").strip(),
+            "device_id": str(payload.get("device_id") or "").strip(),
+            "device_name": str((device or {}).get("name") or payload.get("device_name") or "").strip(),
+            "recording_path": str(payload.get("recording_path") or "").strip(),
+            "updated_at": now_iso,
+        }
+
+        existing_index = next(
+            (idx for idx, row in enumerate(calls) if str(row.get("external_id") or row.get("id") or "") == external_id),
+            None,
+        )
+        if existing_index is None:
+            item["created_at"] = now_iso
+            calls.insert(0, item)
+        else:
+            existing = dict(calls[existing_index])
+            existing.update({key: val for key, val in item.items() if val not in ("", None)})
+            existing["updated_at"] = now_iso
+            calls.pop(existing_index)
+            calls.insert(0, existing)
+            item = existing
+
+        data["telephony_calls"] = calls[:500]
+        _telephony_upsert_recording_entry(data, item, payload, now_iso)
+        save_workspace_settings(workspace_owner_id, data)
+        item["direction_label"] = _telephony_direction_label(item["direction"])
+        item["status_label"] = _telephony_status_label("call", item["status"])
+        return item
 
     def _telephony_update_provider_test(workspace_owner_id: str, provider_id: str) -> tuple[str, str]:
         data = _telephony_settings_payload(workspace_owner_id)
@@ -8679,6 +9069,8 @@ def create_app() -> FastAPI:
         providers = _telephony_rows_with_labels(list(data.get("telephony_providers") or []), "provider")
         numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
         calls = _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call")
+        devices = list(data.get("telephony_devices") or [])
+        recordings = list(data.get("telephony_recordings") or [])
         provider_options = sorted(
             {
                 "SIP",
@@ -8713,6 +9105,9 @@ def create_app() -> FastAPI:
             telephony_calls=_telephony_filter_rows(calls, filters, kind="call"),
             telephony_numbers=_telephony_filter_rows(numbers, filters, kind="number"),
             telephony_providers=_telephony_filter_rows(providers, filters, kind="provider"),
+            telephony_devices=devices,
+            telephony_recordings=recordings,
+            telephony_dashboard=telephony_account_dashboard(wid),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
@@ -8819,6 +9214,44 @@ def create_app() -> FastAPI:
         status_value, message = _telephony_update_provider_test(wid, str(form.get("provider_id") or ""))
         key = "saved" if status_value == "online" else "sip_test_failed"
         return RedirectResponse(url=f"/telephony?msg={quote(key)}&note={quote(message)}#integrations", status_code=302)
+
+    @app.post("/api/telephony/calls/ingest", name="telephony_calls_ingest_api")
+    async def telephony_calls_ingest_api(request: Request):
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+
+        expected_token = str(os.getenv("UPOS_SIP_TOKEN") or "upos-local-sip").strip()
+        provided_token = str(payload.get("token") or request.headers.get("X-UPOS-SIP-Token") or "").strip()
+        if expected_token and provided_token != expected_token:
+            return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+
+        wid = str(payload.get("workspace_owner_id") or "").strip()
+        if not valid_workspace_owner_id(wid):
+            wid = _telephony_default_workspace_owner_id()
+        if not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
+        if str(payload.get("event") or "") == "test":
+            return JSONResponse({"ok": True, "workspace_owner_id": wid, "message": "connected"})
+        if str(payload.get("event") or "") == "heartbeat":
+            data = _telephony_settings_payload(wid)
+            device = _telephony_upsert_device_entry(data, payload, datetime.now(timezone.utc).isoformat())
+            save_workspace_settings(wid, data)
+            return JSONResponse({"ok": True, "workspace_owner_id": wid, "device": device})
+
+        call_item = _telephony_upsert_call_from_payload(wid, payload)
+        return JSONResponse({"ok": True, "workspace_owner_id": wid, "call": call_item})
+
+    @app.get("/api/telephony/dashboard", name="telephony_dashboard_api")
+    def telephony_dashboard_api(request: Request):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        return JSONResponse({"ok": True, "dashboard": telephony_account_dashboard(wid)})
 
     @app.post("/api/telephony/incoming-call", name="telephony_incoming_call_api")
     async def telephony_incoming_call_api(request: Request):
@@ -9084,6 +9517,73 @@ def create_app() -> FastAPI:
                 _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
         target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
         return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
+
+    @app.post("/crm/{record_id}/update", name="crm_update")
+    async def crm_update(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        title = str(form.get("title") or "").strip()
+        if not title:
+            return RedirectResponse(url="/crm?error=" + quote("Название записи обязательно") + "#tasks", status_code=302)
+        data, amount, currency = _crm_record_payload(form)
+        stages = _crm_workspace_stages(wid)
+        _crm_apply_stage(data, stages)
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return RedirectResponse(url="/crm?error=" + quote("CRM-запись не найдена") + "#tasks", status_code=302)
+            counterparty_id = None
+            if data["client"]:
+                counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
+                counterparty_id = counterparty.id if counterparty else None
+            row.title = title
+            row.item_type = str(data.get("item_type") or "task")
+            row.counterparty_id = counterparty_id
+            row.status = str(form.get("status") or "new").strip() or "new"
+            row.due_date = str(data.get("due_date") or "")
+            row.amount = amount
+            row.currency = currency
+            row.data = data
+            flag_modified(row, "data")
+            if counterparty_id:
+                _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
+        target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
+        return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
+
+    @app.post("/crm/{record_id}/complete", name="crm_complete")
+    async def crm_complete(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if row and row.workspace_owner_id == wid:
+                data = _json_object(row.data).copy()
+                stages = _crm_workspace_stages(wid)
+                result = str(form.get("result") or "").strip()
+                if row.item_type == "deal":
+                    row.status = "lost" if result == "lost" else "won"
+                    target_stage = _crm_stage_for_client_status("lost" if row.status == "lost" else "our_client", stages)
+                    _crm_apply_stage(data, stages, target_stage["id"])
+                else:
+                    row.status = "done"
+                data["next_step"] = ""
+                row.data = data
+                flag_modified(row, "data")
+                if row.item_type == "deal":
+                    _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
+                target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(row.item_type, "tasks")
+                return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
+        return RedirectResponse(url="/crm?error=" + quote("CRM-запись не найдена") + "#tasks", status_code=302)
 
     @app.post("/crm/stages/save", name="crm_stages_save")
     async def crm_stages_save(request: Request):

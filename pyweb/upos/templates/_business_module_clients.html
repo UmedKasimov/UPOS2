@@ -490,12 +490,14 @@
               {% endfor %}
             </tbody>
             {% if selected_client_card.reconciliation %}
+              {% set reconciliation_totals = selected_client_card.reconciliation_totals|default(none) %}
+              {% set reconciliation_currency = reconciliation_totals.currency if reconciliation_totals else 'UZS' %}
               <tfoot>
                 <tr class="client-act-total-row">
                   <td colspan="2">Итого</td>
-                  <td>{{ selected_client_card.reconciliation_totals.debit }} {{ selected_client_card.reconciliation_totals.currency }}</td>
-                  <td>{{ selected_client_card.reconciliation_totals.credit }} {{ selected_client_card.reconciliation_totals.currency }}</td>
-                  <td>{{ selected_client_card.reconciliation_totals.balance }} {{ selected_client_card.reconciliation_totals.currency }}</td>
+                  <td>{{ reconciliation_totals.debit if reconciliation_totals else '0' }} {{ reconciliation_currency }}</td>
+                  <td>{{ reconciliation_totals.credit if reconciliation_totals else '0' }} {{ reconciliation_currency }}</td>
+                  <td>{{ reconciliation_totals.balance if reconciliation_totals else '0' }} {{ reconciliation_currency }}</td>
                 </tr>
               </tfoot>
             {% endif %}

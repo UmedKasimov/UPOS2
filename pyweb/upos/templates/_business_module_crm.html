@@ -7,6 +7,58 @@
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
 </datalist>
 
+<section class="crm-service-dashboard" data-workspace-view="tasks deals" hidden>
+  <div class="crm-service-metrics" aria-label="Сводка CRM">
+    <div class="crm-service-metric">
+      <span>Активные</span>
+      <strong>{{ crm_summary.active_count }}</strong>
+      <small>задачи и сделки</small>
+    </div>
+    <div class="crm-service-metric">
+      <span>Воронка</span>
+      <strong>{{ crm_summary.pipeline_total }}</strong>
+      <small>UZS в работе</small>
+    </div>
+    <div class="crm-service-metric{% if crm_summary.overdue_count %} is-alert{% endif %}">
+      <span>Просрочено</span>
+      <strong>{{ crm_summary.overdue_count }}</strong>
+      <small>нужна реакция</small>
+    </div>
+    <div class="crm-service-metric">
+      <span>Сегодня</span>
+      <strong>{{ crm_summary.today_count }}</strong>
+      <small>следующих шагов</small>
+    </div>
+    <div class="crm-service-metric">
+      <span>Конверсия</span>
+      <strong>{{ crm_summary.conversion_rate }}</strong>
+      <small>{{ crm_summary.won_count }} успешно</small>
+    </div>
+  </div>
+  <aside class="crm-next-actions" aria-label="Ближайшие действия CRM">
+    <header>
+      <div>
+        <h3>Ближайшие действия</h3>
+        <span>Контроль обещаний по клиентам</span>
+      </div>
+      <button class="btn btn-secondary" type="button" data-crm-open-dialog data-crm-kind="task">+ Задача</button>
+    </header>
+    <div class="crm-next-action-list">
+      {% for row in crm_next_actions %}
+        <article class="crm-next-action" data-state="{{ row.action_state.id }}">
+          <div>
+            <strong>{{ row.next_step or row.title }}</strong>
+            <span>{{ row.client or row.service_type or row.item_type_label }}</span>
+          </div>
+          <button type="button" data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'>Открыть</button>
+        </article>
+      {% else %}
+        <p class="crm-next-action-empty">Ближайших действий пока нет.</p>
+      {% endfor %}
+    </div>
+  </aside>
+</section>
+
 <section class="crm-pipeline-shell" data-workspace-view="tasks deals" hidden>
   <header class="crm-pipeline-head crm-pipeline-head--filters">
     <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
@@ -25,9 +77,19 @@
           <option value="lost" {% if crm_filters.status == 'lost' %}selected{% endif %}>Потеряно</option>
         </select>
       </label>
+      <label>
+        <span>Приоритет</span>
+        <select name="priority">
+          <option value="all" {% if crm_filters.priority == 'all' %}selected{% endif %}>Все</option>
+          {% for value, label in crm_priorities.items() %}
+            <option value="{{ value }}" {% if crm_filters.priority == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Очистить</a>
       <button class="btn" type="button" data-crm-open-dialog data-crm-kind="deal">+ Сделка</button>
+      <button class="btn btn-secondary" type="button" data-crm-open-dialog data-crm-kind="history">+ Контакт</button>
     </form>
     <details class="crm-stage-settings crm-stage-settings--compact">
       <summary>Этапы</summary>
@@ -69,6 +131,12 @@
                 <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
                 <span>{{ row.status_label }}</span>
               </div>
+              <div class="crm-kanban-card-tags">
+                {% if row.service_type %}<span>{{ row.service_type }}</span>{% endif %}
+                <span data-priority="{{ row.priority }}">{{ row.priority_label }}</span>
+                {% if row.probability_label %}<span>{{ row.probability_label }}</span>{% endif %}
+                {% if row.action_state.label %}<span data-state="{{ row.action_state.id }}">{{ row.action_state.label }}</span>{% endif %}
+              </div>
               {% if row.client %}
                 {% if row.client_href %}
                   <a class="crm-kanban-client" href="{{ row.client_href }}">{{ row.client }}</a>
@@ -93,6 +161,25 @@
                   <span>{{ row.due_date or row.date or "-" }}</span>
                 </footer>
               {% endif %}
+              <div class="crm-kanban-card-actions">
+                <button type="button" data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'>Открыть</button>
+                <button type="button" data-crm-followup="history" data-crm-base='{{ row.edit_payload|tojson|forceescape }}'>Контакт</button>
+                <button type="button" data-crm-followup="task" data-crm-base='{{ row.edit_payload|tojson|forceescape }}'>Задача</button>
+                <form method="post" action="{{ url_for('crm_complete', record_id=row.id) }}">
+                  {% include "_csrf_field.html" %}
+                  {% if row.item_type == "deal" %}
+                    <button type="submit" name="result" value="won">Выиграно</button>
+                  {% else %}
+                    <button type="submit">Готово</button>
+                  {% endif %}
+                </form>
+                {% if row.item_type == "deal" %}
+                  <form method="post" action="{{ url_for('crm_complete', record_id=row.id) }}">
+                    {% include "_csrf_field.html" %}
+                    <button type="submit" name="result" value="lost">Потеряно</button>
+                  </form>
+                {% endif %}
+              </div>
             </article>
           {% else %}
             <div class="crm-kanban-empty">Перетащите карточку сюда</div>
@@ -119,9 +206,12 @@
             <th>Тип</th>
             <th>Клиент</th>
             <th>Источник</th>
+            <th>Услуга</th>
             <th>Этап</th>
+            <th>Приоритет</th>
             <th>Сделка</th>
             <th>Ответственный</th>
+            <th>Следующий шаг</th>
             <th>Сумма</th>
             <th>Статус</th>
             <th></th>
@@ -140,12 +230,31 @@
                 {% endif %}
               </td>
               <td>{{ row.lead_source or "-" }}</td>
+              <td>{{ row.service_type or "-" }}</td>
               <td>{{ row.stage or "-" }}</td>
+              <td>{{ row.priority_label }}</td>
               <td>{{ row.related_deal_title or "-" }}</td>
               <td>{{ row.responsible or "-" }}</td>
+              <td>{{ row.next_step or row.due_date or "-" }}</td>
               <td>{{ row.kanban_amount or row.amount }} {{ row.order_currency or row.currency }}</td>
               <td>{{ row.status_label }}</td>
               <td class="products-row-actions">
+                <button type="button" data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'>Открыть</button>
+                <button type="button" data-crm-followup="history" data-crm-base='{{ row.edit_payload|tojson|forceescape }}'>Контакт</button>
+                <form method="post" action="{{ url_for('crm_complete', record_id=row.id) }}">
+                  {% include "_csrf_field.html" %}
+                  {% if row.item_type == "deal" %}
+                    <button type="submit" name="result" value="won">Выиграно</button>
+                  {% else %}
+                    <button type="submit">Готово</button>
+                  {% endif %}
+                </form>
+                {% if row.item_type == "deal" %}
+                  <form method="post" action="{{ url_for('crm_complete', record_id=row.id) }}">
+                    {% include "_csrf_field.html" %}
+                    <button type="submit" name="result" value="lost">Потеряно</button>
+                  </form>
+                {% endif %}
                 <form method="post" action="{{ url_for('crm_delete', record_id=row.id) }}">
                   {% include "_csrf_field.html" %}
                   <button type="submit">Удалить</button>
@@ -153,7 +262,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="10">CRM-записей пока нет.</td></tr>
+            <tr><td colspan="13">CRM-записей пока нет.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -194,7 +303,10 @@
               <td>{{ row.contact_type or row.lead_source or "-" }}</td>
               <td>{{ row.responsible or "-" }}</td>
               <td>{{ row.note or row.status_label }}</td>
-              <td>{{ row.due_date or "-" }}</td>
+              <td>
+                {{ row.due_date or "-" }}
+                <button type="button" data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'>Открыть</button>
+              </td>
             </tr>
           {% else %}
             <tr><td colspan="6">История контактов пока пустая.</td></tr>
@@ -218,6 +330,7 @@
     <div class="settings-profile-modal-scroll">
       <form method="post" action="{{ url_for('crm_save') }}" class="product-form crm-record-form">
         {% include "_csrf_field.html" %}
+        <input type="hidden" name="record_id" value="" data-crm-record-id-field />
         <div class="product-kind-toggle">
           <label><input type="radio" name="item_type" value="task" /> Задача</label>
           <label><input type="radio" name="item_type" value="deal" checked /> Сделка</label>
@@ -230,13 +343,17 @@
           <label><span>Источник лида</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
           <label><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
           <label><span>Связать со сделкой</span><select name="related_deal_id"><option value="">Не выбрано</option>{% for item in crm_options.deals %}<option value="{{ item.id }}">{{ item.title }}{% if item.client %} · {{ item.client }}{% endif %}</option>{% endfor %}</select></label>
+          <label><span>Услуга</span><select name="service_type"><option value="">Не выбрано</option>{% for item in crm_service_types %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+          <label><span>Приоритет</span><select name="priority">{% for value, label in crm_priorities.items() %}<option value="{{ value }}" {% if value == 'normal' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
           <label><span>Тип контакта</span><input name="contact_type" placeholder="Звонок, встреча, Telegram" /></label>
           <label><span>Привязка чата</span><input name="chat_ref" placeholder="@username, ссылка или chat id" /></label>
           <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
           <label><span>Срок</span><input name="due_date" type="date" value="{{ today }}" /></label>
           <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option></select></label>
+          <label><span>Вероятность</span><input name="probability" inputmode="numeric" placeholder="0-100" /></label>
           <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
           <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+          <label class="wide"><span>Следующий шаг</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
           <label class="wide"><span>Комментарий</span><input name="note" /></label>
         </div>
         <div class="product-form-actions crm-record-form-actions">

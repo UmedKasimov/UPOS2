@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=67" />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=68" />
   </head>
   <body data-theme="light">
     <main class="billing-page">
@@ -187,6 +187,52 @@
                 <strong>{{ detail.last_seen_at or "Пока не входили" }}</strong>
               </div>
             </div>
+
+            <section class="billing-detail-section billing-telephony-section">
+              <div class="billing-detail-section-head">
+                <div>
+                  <h3>Телефония аккаунта</h3>
+                  <p class="billing-detail-muted">Подключенные SIP-приложения, звонки и записи этого клиента.</p>
+                </div>
+                <a class="btn btn-xs btn-secondary" href="/telephony#dashboard" target="_blank" rel="noopener">Открыть дашборд</a>
+              </div>
+              <div class="billing-detail-grid">
+                <div class="billing-detail-card">
+                  <span>Телефоны онлайн</span>
+                  <strong>{{ detail.telephony.connected_devices|default(0) }} / {{ detail.telephony.devices_count|default(0) }}</strong>
+                </div>
+                <div class="billing-detail-card">
+                  <span>Все звонки</span>
+                  <strong>{{ detail.telephony.total_calls|default(0) }}</strong>
+                </div>
+                <div class="billing-detail-card">
+                  <span>Пропущено</span>
+                  <strong>{{ detail.telephony.missed_calls|default(0) }}</strong>
+                </div>
+                <div class="billing-detail-card">
+                  <span>Записи</span>
+                  <strong>{{ detail.telephony.recordings_count|default(0) }}</strong>
+                </div>
+              </div>
+              <div class="billing-telephony-mini">
+                <div>
+                  <h4>Подключенные телефоны</h4>
+                  {% for row in detail.telephony.devices|default([]) %}
+                    <p><strong>{{ row.name or row.device_id or "Upos Sip" }}</strong><span>{{ row.account or "Без аккаунта" }} · {{ row.status or "offline" }}</span></p>
+                  {% else %}
+                    <p class="billing-detail-muted">Телефоны пока не подключались.</p>
+                  {% endfor %}
+                </div>
+                <div>
+                  <h4>Последние звонки</h4>
+                  {% for row in detail.telephony.latest_calls|default([]) %}
+                    <p><strong>{{ row.client or row.phone }}</strong><span>{{ row.phone or "-" }} · {{ row.status or "-" }}</span></p>
+                  {% else %}
+                    <p class="billing-detail-muted">Звонков пока нет.</p>
+                  {% endfor %}
+                </div>
+              </div>
+            </section>
 
             <section class="billing-detail-section">
               <div class="billing-detail-section-head">

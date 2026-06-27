@@ -5,7 +5,7 @@
     <script src="{{ url_for('static', path='messengers.js') }}?v=4" defer></script>
     <script src="{{ url_for('static', path='messengers-telegram.js') }}?v=2" defer></script>
   {% elif active == "crm" %}
-    <script src="{{ url_for('static', path='crm-kanban.js') }}?v=3" defer></script>
+    <script src="{{ url_for('static', path='crm-kanban.js') }}?v=4" defer></script>
   {% elif active == "telephony" %}
     <script src="{{ url_for('static', path='telephony.js') }}?v=2" defer></script>
   {% elif active == "warehouse" %}
@@ -77,7 +77,7 @@
 
     <section class="general-report-launcher workbench-launcher business-module-launcher" aria-label="Разделы {{ module.title }}" data-workspace-launcher>
       {% for item in module.launcher %}
-        <a class="general-report-card" href="#{{ item.id }}" data-workspace-card="{{ item.id }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}">
+        <a class="general-report-card" href="#{{ item.id }}" data-workspace-card="{{ item.id }}" data-workspace-view-id="{{ item.view_id|default(item.id) }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}">
           <span class="general-report-card-icon" aria-hidden="true">
             {% if item.icon == "warehouse" %}
               <svg viewBox="0 0 24 24" focusable="false"><path d="M3 21V8l9-5 9 5v13" /><path d="M13 13h4v8H7v-8h4" /><path d="M7 8h10" /></svg>

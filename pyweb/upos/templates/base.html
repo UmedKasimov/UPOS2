@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=215" />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=216" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -313,6 +313,56 @@
         </div>
       </div>
     </div>
+    {% if user %}
+    <div class="upos-floating-phone" data-floating-phone data-floating-phone-bridge="http://127.0.0.1:5058/call">
+      <button class="upos-floating-phone-toggle" type="button" data-floating-phone-toggle aria-label="Быстрый телефон" aria-expanded="false">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.16a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92z"/></svg>
+        <span class="upos-floating-phone-pulse" aria-hidden="true"></span>
+      </button>
+      <section class="upos-floating-phone-panel" data-floating-phone-panel hidden aria-label="Быстрый телефон">
+        <div class="upos-floating-phone-head">
+          <div>
+            <strong>Телефон</strong>
+            <span>SIP быстрый набор</span>
+          </div>
+          <button class="upos-floating-phone-close" type="button" data-floating-phone-close aria-label="Закрыть">×</button>
+        </div>
+        <form class="upos-floating-phone-form" data-floating-phone-form>
+          {% set floating_phone_providers = telephony_providers|default([]) %}
+          <label>
+            <span>Провайдер</span>
+            <select data-floating-phone-provider>
+              <option value="" data-login="" data-provider-name="Авто">Авто (SIP приложение)</option>
+              {% for provider in floating_phone_providers %}
+                <option
+                  value="{{ provider.id }}"
+                  data-login="{{ provider.login or provider.account or '' }}"
+                  data-provider-name="{{ provider.name or provider.login or provider.host or 'SIP' }}"
+                >
+                  {{ provider.name or provider.login or provider.host or 'SIP' }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Номер</span>
+            <input data-floating-phone-input type="tel" inputmode="tel" autocomplete="tel" placeholder="+998">
+          </label>
+          <button class="btn" type="submit">Позвонить</button>
+        </form>
+        <div class="upos-floating-phone-status" data-floating-phone-status>
+          <span aria-hidden="true"></span>
+          SIP готов к набору
+        </div>
+        <div class="upos-floating-phone-links">
+          <a href="{{ url_for('telephony_get') }}">Телефония</a>
+          <a href="{{ url_for('telephony_get') }}#calls">История</a>
+          <a href="{{ url_for('telephony_get') }}#integrations">SIP</a>
+        </div>
+      </section>
+    </div>
+    {% endif %}
+
     <script>
       window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
     </script>
@@ -327,6 +377,191 @@
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=13"></script>
     <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=2" defer></script>
     {% if user %}
+    <script>
+      (() => {
+        const root = document.querySelector("[data-floating-phone]");
+        if (!root) return;
+        const toggle = root.querySelector("[data-floating-phone-toggle]");
+        const panel = root.querySelector("[data-floating-phone-panel]");
+        const close = root.querySelector("[data-floating-phone-close]");
+        const head = root.querySelector(".upos-floating-phone-head");
+        const form = root.querySelector("[data-floating-phone-form]");
+        const input = root.querySelector("[data-floating-phone-input]");
+        const providerSelect = root.querySelector("[data-floating-phone-provider]");
+        const status = root.querySelector("[data-floating-phone-status]");
+        const submitButton = form?.querySelector('button[type="submit"]');
+        const bridgeUrl = root.dataset.floatingPhoneBridge || "http://127.0.0.1:5058/call";
+        const storageKey = "upos:floating-phone-position";
+        const edgeGap = 8;
+        const dragGap = 4;
+        let dragState = null;
+        let ignoreNextToggleClick = false;
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+        const alignPanel = () => {
+          if (!panel || panel.hidden) return;
+          panel.style.left = "0";
+          panel.style.right = "auto";
+          panel.style.top = "auto";
+          panel.style.bottom = "70px";
+          const phoneRect = root.getBoundingClientRect();
+          const panelRect = panel.getBoundingClientRect();
+          if (phoneRect.left + panelRect.width > window.innerWidth - edgeGap) {
+            panel.style.left = "auto";
+            panel.style.right = "0";
+          }
+          if (phoneRect.top - panelRect.height < edgeGap) {
+            panel.style.top = "70px";
+            panel.style.bottom = "auto";
+          }
+        };
+        const applyPosition = (position, save = false) => {
+          const rect = root.getBoundingClientRect();
+          const maxX = window.innerWidth - rect.width - edgeGap;
+          const maxY = window.innerHeight - rect.height - edgeGap;
+          const x = clamp(position.x, edgeGap, maxX);
+          const y = clamp(position.y, edgeGap, maxY);
+          root.style.left = `${x}px`;
+          root.style.top = `${y}px`;
+          root.style.right = "auto";
+          root.style.bottom = "auto";
+          root.classList.add("is-positioned");
+          alignPanel();
+          if (save) {
+            try {
+              window.localStorage.setItem(storageKey, JSON.stringify({ x, y }));
+            } catch (error) {
+              // Local storage can be disabled in some browser modes.
+            }
+          }
+        };
+        const restorePosition = () => {
+          try {
+            const saved = JSON.parse(window.localStorage.getItem(storageKey) || "null");
+            if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+              applyPosition(saved);
+            }
+          } catch (error) {
+            window.localStorage.removeItem(storageKey);
+          }
+        };
+        const openPanel = () => {
+          panel.hidden = false;
+          toggle.setAttribute("aria-expanded", "true");
+          window.requestAnimationFrame(() => {
+            alignPanel();
+            input?.focus();
+          });
+        };
+        const closePanel = () => {
+          panel.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        };
+        const startDrag = (event) => {
+          if (event.button !== undefined && event.button !== 0) return;
+          const target = event.target instanceof Element ? event.target : null;
+          if (target?.closest("[data-floating-phone-close], input, a")) return;
+          const rect = root.getBoundingClientRect();
+          dragState = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: rect.left,
+            originY: rect.top,
+            moved: false,
+          };
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+        };
+        const moveDrag = (event) => {
+          if (!dragState || event.pointerId !== dragState.pointerId) return;
+          const dx = event.clientX - dragState.startX;
+          const dy = event.clientY - dragState.startY;
+          if (!dragState.moved && Math.hypot(dx, dy) < dragGap) return;
+          dragState.moved = true;
+          root.classList.add("is-dragging");
+          event.preventDefault();
+          applyPosition({ x: dragState.originX + dx, y: dragState.originY + dy });
+        };
+        const endDrag = (event) => {
+          if (!dragState || event.pointerId !== dragState.pointerId) return;
+          const wasMoved = dragState.moved;
+          dragState = null;
+          root.classList.remove("is-dragging");
+          if (wasMoved) {
+            const rect = root.getBoundingClientRect();
+            applyPosition({ x: rect.left, y: rect.top }, true);
+            ignoreNextToggleClick = true;
+            window.setTimeout(() => {
+              ignoreNextToggleClick = false;
+            }, 0);
+          }
+        };
+        restorePosition();
+        toggle?.addEventListener("pointerdown", startDrag);
+        head?.addEventListener("pointerdown", startDrag);
+        document.addEventListener("pointermove", moveDrag);
+        document.addEventListener("pointerup", endDrag);
+        document.addEventListener("pointercancel", endDrag);
+        window.addEventListener("resize", () => {
+          if (!root.classList.contains("is-positioned")) return;
+          const rect = root.getBoundingClientRect();
+          applyPosition({ x: rect.left, y: rect.top }, true);
+        });
+        toggle?.addEventListener("click", (event) => {
+          if (ignoreNextToggleClick) {
+            event.preventDefault();
+            event.stopPropagation();
+            ignoreNextToggleClick = false;
+            return;
+          }
+          panel.hidden ? openPanel() : closePanel();
+        });
+        close?.addEventListener("click", closePanel);
+        document.addEventListener("click", (event) => {
+          if (!panel.hidden && !root.contains(event.target)) closePanel();
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closePanel();
+        });
+        const setStatus = (message, tone = "ready") => {
+          if (!status) return;
+          status.dataset.state = tone;
+          const dot = status.querySelector("span");
+          status.textContent = "";
+          if (dot) status.append(dot);
+          status.append(document.createTextNode(message));
+        };
+        form?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const phone = (input?.value || "").trim();
+          const selectedProvider = providerSelect?.selectedOptions?.[0] || null;
+          const providerId = providerSelect?.value || "";
+          const providerName = selectedProvider?.dataset.providerName || selectedProvider?.textContent?.trim() || "";
+          const providerLogin = selectedProvider?.dataset.login || "";
+          if (!phone) {
+            input?.focus();
+            return;
+          }
+          submitButton?.setAttribute("disabled", "disabled");
+          setStatus("Отправляю вызов в SIP...", "pending");
+          try {
+            const response = await fetch(bridgeUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ phone, provider_id: providerId, provider: providerName, provider_login: providerLogin }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.ok === false) {
+              throw new Error(payload.error || "SIP-приложение не приняло вызов");
+            }
+            setStatus("Вызов отправлен в SIP", "ok");
+          } catch (error) {
+            setStatus(`Запустите SIP-приложение: ${error.message || "нет связи"}`, "error");
+          } finally {
+            submitButton?.removeAttribute("disabled");
+          }
+        });
+      })();
+    </script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

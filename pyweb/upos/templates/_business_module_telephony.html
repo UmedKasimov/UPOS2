@@ -3,8 +3,11 @@
 {% set telephony_calls = telephony_calls|default([]) %}
 {% set telephony_numbers = telephony_numbers|default([]) %}
 {% set telephony_providers = telephony_providers|default([]) %}
+{% set telephony_devices = telephony_devices|default([]) %}
+{% set telephony_recordings = telephony_recordings|default([]) %}
+{% set telephony_dashboard = telephony_dashboard|default({}) %}
 
-<div class="business-module-toolbar" data-workspace-view="calls numbers integrations" hidden>
+<div class="business-module-toolbar" data-workspace-view="dashboard calls numbers integrations" hidden>
   <div>
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
     <h2 id="business-module-title">{{ module.heading }}</h2>
@@ -46,7 +49,113 @@
   {% for item in telephony_options.clients %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
 </datalist>
 
-<div class="products-layout telephony-layout" data-workspace-view="calls numbers integrations" hidden>
+<div class="products-layout telephony-layout" data-workspace-view="dashboard calls numbers integrations" hidden>
+  <article class="products-list-panel telephony-dashboard-panel" data-workspace-view="dashboard" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Дашборд телефонии</h2>
+        <span>Телефоны, звонки, записи и состояние аккаунта</span>
+      </div>
+      <a class="btn btn-secondary" href="/api/telephony/dashboard">API данных</a>
+    </header>
+
+    <div class="telephony-dashboard-grid">
+      <div class="telephony-kpi-card">
+        <span>Подключено телефонов</span>
+        <strong>{{ telephony_dashboard.connected_devices|default(0) }}</strong>
+        <small>Всего устройств: {{ telephony_dashboard.devices_count|default(0) }}</small>
+      </div>
+      <div class="telephony-kpi-card">
+        <span>Все звонки</span>
+        <strong>{{ telephony_dashboard.total_calls|default(0) }}</strong>
+        <small>Входящие {{ telephony_dashboard.incoming_calls|default(0) }} · Исходящие {{ telephony_dashboard.outgoing_calls|default(0) }}</small>
+      </div>
+      <div class="telephony-kpi-card">
+        <span>Отвечено</span>
+        <strong>{{ telephony_dashboard.answered_calls|default(0) }}</strong>
+        <small>Рабочие соединения</small>
+      </div>
+      <div class="telephony-kpi-card danger">
+        <span>Пропущено</span>
+        <strong>{{ telephony_dashboard.missed_calls|default(0) }}</strong>
+        <small>Нужно обработать</small>
+      </div>
+      <div class="telephony-kpi-card">
+        <span>Записи</span>
+        <strong>{{ telephony_dashboard.recordings_count|default(0) }}</strong>
+        <small>Сохранённые разговоры</small>
+      </div>
+    </div>
+
+    <div class="telephony-dashboard-columns">
+      <section>
+        <h3>Подключенные телефоны</h3>
+        <div class="telephony-mini-list">
+          {% for row in telephony_dashboard.devices|default([]) %}
+            <div class="telephony-mini-row">
+              <div>
+                <strong>{{ row.name or row.device_id or "Upos Sip" }}</strong>
+                <span>{{ row.account or row.operator or "Без аккаунта" }}</span>
+              </div>
+              <small class="telephony-state telephony-state--{{ row.status or 'offline' }}">{{ row.status or "offline" }}</small>
+              <em>{{ row.last_seen_at or "-" }}</em>
+            </div>
+          {% else %}
+            <p class="empty-hint">Пока нет подключенных SIP-приложений. Откройте Upos Sip с включенной интеграцией.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section>
+        <h3>Последние звонки</h3>
+        <div class="telephony-mini-list">
+          {% for row in telephony_dashboard.latest_calls|default([]) %}
+            <div class="telephony-mini-row">
+              <div>
+                <strong>{{ row.client or row.phone }}</strong>
+                <span>{{ row.phone or "-" }} · {{ row.direction or "-" }}</span>
+              </div>
+              <small>{{ row.status or "-" }}</small>
+              <em>{{ row.started_at or row.created_at or "-" }}</em>
+            </div>
+          {% else %}
+            <p class="empty-hint">Звонков пока нет.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <section class="telephony-recordings-section">
+      <h3>Записи разговоров</h3>
+      <div class="products-table-wrap">
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>Клиент</th>
+              <th>Номер</th>
+              <th>Длительность</th>
+              <th>Файл</th>
+              <th>Дата</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in telephony_dashboard.recordings|default([]) %}
+              <tr>
+                <td><strong>{{ row.client or "Без имени" }}</strong></td>
+                <td>{{ row.phone or "-" }}</td>
+                <td>{{ row.duration or "-" }}</td>
+                <td><small>{{ row.path or "-" }}</small></td>
+                <td>{{ row.started_at or row.created_at or "-" }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5">Записей пока нет.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </article>
+
   <article class="products-list-panel" data-workspace-view="calls" hidden>
     <header class="products-panel-head">
       <div>
