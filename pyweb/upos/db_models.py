@@ -757,12 +757,36 @@ class CrmRecord(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
     counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="new", server_default=text("'new'"))
+    stage_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    responsible_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     due_date: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    next_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
     data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CrmActivity(Base):
+    """Единый таймлайн CRM: звонки, сообщения, заметки, смены этапа/статуса."""
+
+    __tablename__ = "crm_activities"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    crm_record_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("crm_records.id", ondelete="SET NULL"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False, default="note", server_default=text("'note'"))
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="manual", server_default=text("'manual'"))
+    direction: Mapped[str] = mapped_column(String(10), nullable=False, default="system", server_default=text("'system'"))
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    actor_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class PaymentDocument(Base):

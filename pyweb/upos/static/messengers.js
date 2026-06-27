@@ -312,27 +312,6 @@
     if (dialog) dialog.hidden = true;
   }
 
-  function crmUrlForThread(thread) {
-    var client = thread.client || thread.contact || "";
-    var channel = thread.channel || "Telegram";
-    var topic = thread.topic || thread.last_message || "";
-    var title = "Сделка: " + (client || "новый клиент");
-    var note = "Диалог из мессенджера";
-    if (topic) note += ": " + topic;
-
-    var params = new URLSearchParams();
-    params.set("crm_open", "deal");
-    params.set("crm_title", title);
-    params.set("crm_client", client);
-    params.set("crm_stage", "leads");
-    params.set("crm_status", "new");
-    params.set("crm_source", channel);
-    params.set("crm_contact_type", channel === "Telegram" ? "Чат Telegram" : "Чат");
-    params.set("crm_chat_ref", thread.username || thread.topic || thread.id || "");
-    params.set("crm_note", note);
-    return "/crm?" + params.toString() + "#tasks";
-  }
-
   function boot(root) {
     var threads = readThreads().map(normalizeThread);
     var channelInput = document.querySelector("[data-messenger-channel-input]");
@@ -389,7 +368,41 @@
         var current = currentThread();
         if (!current) return;
         rememberThread(current);
-        window.location.assign(crmUrlForThread(current));
+        sendToCrm.disabled = true;
+        fetch("/api/csrf-token", { headers: { Accept: "application/json" } })
+          .then(function (r) { return r.json(); })
+          .then(function (t) {
+            var body = new URLSearchParams();
+            body.set("csrf_token", (t && t.csrf_token) || "");
+            body.set("channel", current.channel || "Telegram");
+            body.set("chat_id", current.chat_id || current.telegram_user_id || "");
+            body.set("username", String(current.username || "").replace(/^@/, ""));
+            body.set("phone", current.phone || "");
+            body.set("client", current.client || current.contact || "");
+            body.set("topic", current.topic || "");
+            body.set("last_message", current.last_message || "");
+            return fetch("/crm/from-chat", {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              },
+              body: body.toString(),
+            });
+          })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d && d.ok) {
+              window.location.assign("/crm#deals");
+            } else {
+              sendToCrm.disabled = false;
+              window.alert("Не удалось создать сделку из диалога");
+            }
+          })
+          .catch(function () {
+            sendToCrm.disabled = false;
+            window.alert("Не удалось создать сделку из диалога");
+          });
       });
     }
 

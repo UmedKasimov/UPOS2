@@ -60,7 +60,7 @@
         <div class="crm-kanban-column-total">{{ column.total }} UZS</div>
         <div class="crm-kanban-dropzone" data-crm-dropzone>
           {% for row in column.records %}
-            <article class="crm-kanban-card" draggable="true" data-crm-record-id="{{ row.id }}">
+            <article class="crm-kanban-card{% if row.is_overdue %} is-overdue{% endif %}" draggable="true" data-crm-record-id="{{ row.id }}" data-crm-open-card="{{ row.id }}">
               <div class="crm-kanban-card-top">
                 <strong>{{ row.title }}</strong>
                 <span>{{ row.item_type_label }}</span>
@@ -68,6 +68,7 @@
               <div class="crm-kanban-card-meta">
                 <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
                 <span>{{ row.status_label }}</span>
+                {% if row.is_overdue %}<span class="crm-overdue-badge">Просрочено</span>{% endif %}
               </div>
               {% if row.client %}
                 {% if row.client_href %}
@@ -129,7 +130,7 @@
         </thead>
         <tbody>
           {% for row in crm_records if row.item_type != 'history' %}
-            <tr {% if row.item_type == 'task' %}data-workspace-view="tasks"{% else %}data-workspace-view="deals"{% endif %}>
+            <tr class="crm-record-row" data-crm-open-card="{{ row.id }}" {% if row.item_type == 'task' %}data-workspace-view="tasks"{% else %}data-workspace-view="deals"{% endif %}>
               <td><strong>{{ row.title }}</strong><small>{{ row.note or row.chat_label or row.contact_type or row.item_type_label }}</small></td>
               <td>{{ row.item_type_label }}</td>
               <td>
@@ -218,6 +219,8 @@
     <div class="settings-profile-modal-scroll">
       <form method="post" action="{{ url_for('crm_save') }}" class="product-form crm-record-form">
         {% include "_csrf_field.html" %}
+        <input type="hidden" name="record_id" value="" />
+        <input type="hidden" name="counterparty_id" value="" />
         <div class="product-kind-toggle">
           <label><input type="radio" name="item_type" value="task" /> Задача</label>
           <label><input type="radio" name="item_type" value="deal" checked /> Сделка</label>
@@ -244,6 +247,41 @@
           <button class="btn btn-secondary" type="button" data-crm-close-dialog>Отмена</button>
         </div>
       </form>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal crm-detail-dialog" id="crm-detail-dialog" aria-labelledby="crm-detail-title" data-crm-detail data-crm-csrf="{{ csrf_token }}">
+  <div class="settings-profile-modal-surface crm-detail-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-detail-title" class="settings-profile-modal-title" data-crm-detail-title>Карточка</h2>
+        <p class="settings-profile-modal-sub" data-crm-detail-sub></p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-detail-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll crm-detail-scroll">
+      <div class="crm-detail-actions">
+        <button type="button" class="btn btn-secondary" data-crm-detail-edit>Редактировать</button>
+        <a class="btn btn-secondary" data-crm-detail-call hidden>Позвонить</a>
+        <a class="btn btn-secondary" data-crm-detail-client hidden>Открыть клиента</a>
+      </div>
+      <dl class="crm-detail-grid" data-crm-detail-fields></dl>
+      <section class="crm-detail-timeline-wrap">
+        <h3>Таймлайн</h3>
+        <form class="crm-detail-note-form" data-crm-note-form>
+          <select name="kind" class="crm-detail-note-kind">
+            <option value="note">Заметка</option>
+            <option value="call">Звонок</option>
+            <option value="message">Сообщение</option>
+          </select>
+          <input name="body" placeholder="Что произошло…" autocomplete="off" required />
+          <button class="btn" type="submit">Добавить</button>
+        </form>
+        <ol class="crm-detail-timeline" data-crm-timeline>
+          <li class="crm-detail-timeline-empty">Активностей пока нет.</li>
+        </ol>
+      </section>
     </div>
   </div>
 </dialog>

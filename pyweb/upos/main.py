@@ -38,6 +38,7 @@ from upos.csrf import csrf_matches_session, ensure_csrf_token, rotate_csrf_token
 from upos.db import get_engine, init_db, list_public_tables, session_scope, startup_timings_ms
 from upos.db_models import (
     Counterparty,
+    CrmActivity,
     CrmRecord,
     EmployeeAccountAccess,
     FinanceAccount,
@@ -6447,7 +6448,280 @@ def create_app() -> FastAPI:
             "amount_value": _sales_decimal(row.amount),
             "currency": row.currency,
             "counterparty_id": row.counterparty_id or "",
+            "responsible_user_id": row.responsible_user_id or "",
+            "next_action_at": row.next_action_at.isoformat() if row.next_action_at else "",
+            "last_activity_at": row.last_activity_at.isoformat() if row.last_activity_at else "",
+            "is_overdue": _crm_record_is_overdue(row),
         }
+
+    CRM_ACTIVITY_KIND_LABELS = {
+        "note": "Заметка",
+        "call": "Звонок",
+        "message": "Сообщение",
+        "stage_change": "Смена этапа",
+        "status_change": "Смена статуса",
+        "task": "Задача",
+        "created": "Создано",
+        "system": "Система",
+    }
+    CRM_ACTIVITY_CHANNEL_LABELS = {
+        "manual": "Вручную",
+        "telegram": "Telegram",
+        "whatsapp": "WhatsApp",
+        "instagram": "Instagram",
+        "sip": "Телефония",
+        "call": "Телефония",
+        "system": "Система",
+    }
+
+    def _crm_due_to_dt(value: Any) -> datetime | None:
+        """Старое строковое поле due_date (YYYY-MM-DD) -> datetime (конец дня UTC)."""
+        raw = str(value or "").strip()[:10]
+        if not raw:
+            return None
+        try:
+            parsed = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            return None
+        return parsed.replace(hour=23, minute=59, tzinfo=timezone.utc)
+
+    def _crm_record_is_overdue(row: CrmRecord) -> bool:
+        if row.status in {"done", "won", "lost"}:
+            return False
+        data = _json_object(row.data)
+        deadline = row.next_action_at or _crm_due_to_dt(row.due_date or data.get("due_date"))
+        return bool(deadline and deadline < datetime.now(timezone.utc))
+
+    def _crm_log_activity(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        kind: str,
+        record: CrmRecord | None = None,
+        counterparty_id: str | None = None,
+        channel: str = "manual",
+        direction: str = "system",
+        title: str = "",
+        body: str = "",
+        payload: dict[str, Any] | None = None,
+        actor_user_id: str | None = None,
+        occurred_at: datetime | None = None,
+    ) -> CrmActivity:
+        moment = occurred_at or datetime.now(timezone.utc)
+        activity = CrmActivity(
+            id=str(uuid.uuid4()),
+            workspace_owner_id=workspace_owner_id,
+            counterparty_id=counterparty_id if counterparty_id is not None else (record.counterparty_id if record else None),
+            crm_record_id=record.id if record else None,
+            kind=str(kind or "note"),
+            channel=str(channel or "manual"),
+            direction=str(direction or "system"),
+            title=str(title or "")[:255],
+            body=str(body or ""),
+            payload=dict(payload or {}),
+            actor_user_id=actor_user_id,
+            occurred_at=moment,
+        )
+        session.add(activity)
+        if record is not None:
+            record.last_activity_at = moment
+        return activity
+
+    def _crm_activity_data(row: CrmActivity) -> dict[str, Any]:
+        occurred = row.occurred_at
+        return {
+            "id": row.id,
+            "kind": row.kind,
+            "kind_label": CRM_ACTIVITY_KIND_LABELS.get(row.kind, row.kind),
+            "channel": row.channel,
+            "channel_label": CRM_ACTIVITY_CHANNEL_LABELS.get(row.channel, row.channel),
+            "direction": row.direction,
+            "title": row.title,
+            "body": row.body,
+            "payload": _json_object(row.payload),
+            "occurred_at": occurred.isoformat() if occurred else "",
+            "occurred_label": occurred.strftime("%Y-%m-%d %H:%M") if occurred else "",
+            "crm_record_id": row.crm_record_id or "",
+            "counterparty_id": row.counterparty_id or "",
+        }
+
+    def _crm_load_activities(session: Any, workspace_owner_id: str, record_id: str) -> list[dict[str, Any]]:
+        rows = session.execute(
+            select(CrmActivity)
+            .where(
+                CrmActivity.workspace_owner_id == workspace_owner_id,
+                CrmActivity.crm_record_id == record_id,
+            )
+            .order_by(CrmActivity.occurred_at.desc())
+        ).scalars().all()
+        return [_crm_activity_data(row) for row in rows]
+
+    def _crm_find_open_deal_for_counterparty(session: Any, workspace_owner_id: str, counterparty_id: str | None) -> CrmRecord | None:
+        if not counterparty_id:
+            return None
+        return session.execute(
+            select(CrmRecord)
+            .where(
+                CrmRecord.workspace_owner_id == workspace_owner_id,
+                CrmRecord.counterparty_id == counterparty_id,
+                CrmRecord.item_type == "deal",
+                CrmRecord.status.notin_(["won", "lost", "done"]),
+            )
+            .order_by(CrmRecord.updated_at.desc())
+        ).scalars().first()
+
+    def _crm_ensure_lead_for_counterparty(
+        session: Any,
+        workspace_owner_id: str,
+        counterparty: Counterparty,
+        *,
+        lead_source: str = "",
+        stages: list[dict[str, str]] | None = None,
+        actor_user_id: str | None = None,
+        title: str | None = None,
+    ) -> tuple[CrmRecord, bool]:
+        existing = _crm_find_open_deal_for_counterparty(session, workspace_owner_id, counterparty.id)
+        if existing is not None:
+            return existing, False
+        stages = stages or _crm_workspace_stages(workspace_owner_id)
+        stage = _crm_stage_for_value("leads", stages)
+        data = {
+            "item_type": "deal",
+            "client": counterparty.name,
+            "responsible": "",
+            "date": datetime.now(timezone.utc).date().isoformat(),
+            "due_date": "",
+            "lead_source": lead_source or "",
+            "contact_type": "",
+            "chat_ref": "",
+            "note": "",
+        }
+        _crm_apply_stage(data, stages, stage["id"])
+        row = CrmRecord(
+            id=str(uuid.uuid4()),
+            workspace_owner_id=workspace_owner_id,
+            item_type="deal",
+            title=(title or f"Лид: {counterparty.name}")[:255],
+            counterparty_id=counterparty.id,
+            status="new",
+            stage_id=stage["id"],
+            due_date="",
+            amount=0,
+            currency="UZS",
+            data=data,
+        )
+        session.add(row)
+        session.flush()
+        _crm_log_activity(
+            session, workspace_owner_id, kind="created", record=row, channel="manual",
+            title=f"Авто-лид: {counterparty.name}", actor_user_id=actor_user_id,
+        )
+        _sync_counterparty_crm_status_from_stage(session, workspace_owner_id, row, stages)
+        return row, True
+
+    def _crm_register_contact_event(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        counterparty: Counterparty | None,
+        kind: str,
+        channel: str,
+        direction: str,
+        title: str,
+        body: str = "",
+        payload: dict[str, Any] | None = None,
+        lead_source: str = "",
+        actor_user_id: str | None = None,
+        auto_lead: bool = True,
+    ) -> tuple[CrmRecord | None, CrmActivity]:
+        """Привязывает звонок/сообщение к открытой сделке клиента (создавая лид при необходимости)."""
+        record = _crm_find_open_deal_for_counterparty(session, workspace_owner_id, counterparty.id) if counterparty else None
+        if record is None and auto_lead and counterparty is not None:
+            record, _ = _crm_ensure_lead_for_counterparty(
+                session, workspace_owner_id, counterparty,
+                lead_source=lead_source, actor_user_id=actor_user_id,
+            )
+        activity = _crm_log_activity(
+            session, workspace_owner_id, kind=kind, record=record,
+            counterparty_id=counterparty.id if counterparty else None,
+            channel=channel, direction=direction, title=title, body=body,
+            payload=payload, actor_user_id=actor_user_id,
+        )
+        return record, activity
+
+    def _crm_messenger_counterparty(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        channel: str,
+        chat_id: str = "",
+        username: str = "",
+        phone: str = "",
+        name: str = "",
+    ) -> Counterparty:
+        """Находит контрагента по (канал, chat_id/handle/телефон) или создаёт нового, фиксируя мессенджер-привязку."""
+        channel_key = _messenger_channel_key(channel) or "telegram"
+        handle = str(username or "").lstrip("@").strip().lower()
+        chat = str(chat_id or "").strip()
+        clean_phone = re.sub(r"\D+", "", str(phone or ""))
+        clients = session.execute(
+            select(Counterparty).where(Counterparty.workspace_owner_id == workspace_owner_id)
+        ).scalars().all()
+
+        def handle_match(messengers: list[Any]) -> bool:
+            for m in messengers:
+                if not isinstance(m, dict) or (_messenger_channel_key(m.get("channel")) or "") != channel_key:
+                    continue
+                if chat and str(m.get("chat_id") or "").strip() == chat:
+                    return True
+                if handle and str(m.get("handle") or "").lstrip("@").strip().lower() == handle:
+                    return True
+            return False
+
+        match = None
+        for cp in clients:
+            extra = _counterparty_extra(cp)
+            messengers = extra.get("messengers") if isinstance(extra.get("messengers"), list) else []
+            if handle_match(messengers):
+                match = cp
+                break
+            if channel_key == "telegram" and handle and str(extra.get("telegram") or "").lstrip("@").strip().lower() == handle:
+                match = cp
+                break
+        if match is None and clean_phone:
+            for cp in clients:
+                extra = _counterparty_extra(cp)
+                cp_phone = re.sub(r"\D+", "", str(cp.phone or extra.get("phone") or ""))
+                if cp_phone and clean_phone.endswith(cp_phone[-9:]):
+                    match = cp
+                    break
+
+        display = (
+            str(name or "").strip()
+            or (("@" + handle) if handle else "")
+            or str(phone or "").strip()
+            or f"Контакт {channel}"
+        )
+        if match is None:
+            match = _ensure_counterparty(
+                session, workspace_owner_id, name=display, role="client",
+                phone=str(phone or ""), data={"lead_source": channel},
+            )
+
+        extra = _counterparty_extra(match)
+        messengers = extra.get("messengers") if isinstance(extra.get("messengers"), list) else []
+        if (chat or handle) and not handle_match(messengers):
+            messengers.append({
+                "channel": channel_key,
+                "chat_id": chat,
+                "handle": ("@" + handle) if handle else "",
+            })
+            extra["messengers"] = messengers
+            if channel_key == "telegram" and handle and not extra.get("telegram"):
+                extra["telegram"] = "@" + handle
+            match.data = extra
+            flag_modified(match, "data")
+        return match
 
     def _client_card_context(
         session: Any,
@@ -6686,6 +6960,37 @@ def create_app() -> FastAPI:
                 deals.append(item)
             else:
                 correspondence.append(item)
+
+        activity_rows = list(
+            session.execute(
+                select(CrmActivity)
+                .where(
+                    CrmActivity.workspace_owner_id == workspace_owner_id,
+                    CrmActivity.counterparty_id == client_id,
+                )
+                .order_by(CrmActivity.occurred_at.desc())
+            ).scalars()
+        )
+        activity_category = {
+            "call": "call",
+            "message": "message",
+            "note": "note",
+            "stage_change": "crm",
+            "status_change": "crm",
+            "created": "crm",
+            "task": "crm",
+            "system": "system",
+        }
+        for act in activity_rows:
+            kind_label = CRM_ACTIVITY_KIND_LABELS.get(act.kind, act.kind)
+            channel_label = CRM_ACTIVITY_CHANNEL_LABELS.get(act.channel, act.channel)
+            add_history_event(
+                date=act.occurred_at.isoformat() if getattr(act, "occurred_at", None) else "",
+                title=act.title or kind_label,
+                detail=act.body or (channel_label if act.channel not in ("manual", "system") else ""),
+                category=activity_category.get(act.kind, "crm"),
+                status=kind_label,
+            )
 
         phone_digits = digits(client.get("phone"))
         telegram_value = str(client.get("telegram") or extra.get("telegram") or "").strip()
@@ -8730,17 +9035,41 @@ def create_app() -> FastAPI:
         phone = str(form.get("phone") or "").strip()
         if not client or not phone:
             return RedirectResponse(url="/telephony?error=" + quote("Клиент и номер телефона обязательны") + "#calls", status_code=302)
+        direction = str(form.get("direction") or "outgoing").strip()
+        status_value = str(form.get("status") or "planned").strip()
+        note_value = str(form.get("note") or "").strip()
+        crm_record_id = ""
+        settings_data = _telephony_settings_payload(wid)
+        auto_lead = settings_data.get("telephony_auto_lead", True) is not False
+        actor_user_id = str((request.session.get("user") or {}).get("user_id") or "").strip() or None
+        with session_scope() as session:
+            matched = _ensure_counterparty(
+                session, wid, name=client, role="client", phone=phone,
+                data={"phone": phone, "lead_source": "Звонок"},
+            )
+            record, _activity = _crm_register_contact_event(
+                session, wid,
+                counterparty=matched,
+                kind="call", channel="sip",
+                direction="out" if direction == "outgoing" else "in",
+                title=f"{_telephony_direction_label(direction)} звонок · {phone}",
+                body=note_value,
+                payload={"phone": phone, "status": status_value},
+                lead_source="Звонок", actor_user_id=actor_user_id, auto_lead=auto_lead,
+            )
+            crm_record_id = record.id if record else ""
         _telephony_save_item(
             wid,
             "telephony_calls",
             {
                 "client": client,
                 "phone": phone,
-                "direction": str(form.get("direction") or "outgoing").strip(),
+                "direction": direction,
                 "started_at": str(form.get("started_at") or datetime.now(timezone.utc).isoformat()).strip(),
                 "responsible": str(form.get("responsible") or _telephony_user_name(request)).strip(),
-                "status": str(form.get("status") or "planned").strip(),
-                "note": str(form.get("note") or "").strip(),
+                "status": status_value,
+                "note": note_value,
+                "crm_record_id": crm_record_id,
             },
         )
         return RedirectResponse(url="/telephony?msg=saved#calls", status_code=302)
@@ -8830,11 +9159,26 @@ def create_app() -> FastAPI:
         wid = str(payload.get("workspace_owner_id") or user.get("workspace_owner_id") or user.get("user_id") or "").strip()
         if not valid_workspace_owner_id(wid):
             return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=401)
+        settings_data = _telephony_settings_payload(wid)
+        expected_token = str(settings_data.get("telephony_webhook_token") or "").strip()
+        if expected_token:
+            provided = str(
+                request.headers.get("x-upos-webhook-token")
+                or payload.get("token")
+                or ""
+            ).strip()
+            if provided != expected_token:
+                return JSONResponse({"ok": False, "error": "invalid_token"}, status_code=401)
+        auto_lead = settings_data.get("telephony_auto_lead", True) is not False
         raw_phone = str(payload.get("phone") or payload.get("from") or payload.get("caller") or "").strip()
         clean_phone = re.sub(r"\D+", "", raw_phone)
         client_name = str(payload.get("client") or "").strip()
+        status_value = str(payload.get("status") or "missed").strip() or "missed"
+        note_value = str(payload.get("note") or "Входящий webhook").strip()
+        crm_record_id = ""
         with session_scope() as session:
-            if not client_name and clean_phone:
+            matched = None
+            if clean_phone:
                 clients = session.execute(
                     select(Counterparty)
                     .where(Counterparty.workspace_owner_id == wid)
@@ -8844,22 +9188,89 @@ def create_app() -> FastAPI:
                     extra = _counterparty_extra(client)
                     client_phone = re.sub(r"\D+", "", str(client.phone or extra.get("phone") or ""))
                     if client_phone and clean_phone.endswith(client_phone[-9:]):
-                        client_name = client.name
+                        matched = client
                         break
+            if matched is None and (client_name or clean_phone):
+                matched = _ensure_counterparty(
+                    session, wid,
+                    name=client_name or raw_phone or "Неизвестный номер",
+                    role="client",
+                    phone=raw_phone,
+                    data={"phone": raw_phone, "lead_source": "Звонок"},
+                )
+            if matched is not None:
+                client_name = matched.name
+                record, _activity = _crm_register_contact_event(
+                    session, wid,
+                    counterparty=matched,
+                    kind="call", channel="sip", direction="in",
+                    title=f"Входящий звонок · {raw_phone or 'без номера'}",
+                    body=note_value,
+                    payload={"phone": raw_phone, "status": status_value, "source": "webhook"},
+                    lead_source="Звонок",
+                    auto_lead=auto_lead,
+                )
+                crm_record_id = record.id if record else ""
         call_item = {
             "client": client_name or "Неизвестный клиент",
             "phone": raw_phone,
             "direction": "incoming",
             "started_at": str(payload.get("started_at") or datetime.now(timezone.utc).isoformat()[:16]),
             "responsible": str(payload.get("responsible") or "").strip(),
-            "status": str(payload.get("status") or "missed").strip() or "missed",
-            "note": str(payload.get("note") or "Входящий webhook").strip(),
+            "status": status_value,
+            "note": note_value,
             "source": "webhook",
+            "crm_record_id": crm_record_id,
         }
         _telephony_save_item(wid, "telephony_calls", call_item)
         call_item["direction_label"] = _telephony_direction_label(call_item["direction"])
         call_item["status_label"] = _telephony_status_label("call", call_item["status"])
-        return JSONResponse({"ok": True, "call": call_item, "client": client_name})
+        return JSONResponse({"ok": True, "call": call_item, "client": client_name, "crm_record_id": crm_record_id})
+
+    @app.post("/api/telephony/click-to-call", name="telephony_click_to_call")
+    async def telephony_click_to_call(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        phone = str(form.get("phone") or "").strip()
+        counterparty_id = str(form.get("counterparty_id") or "").strip()
+        record_id = str(form.get("record_id") or "").strip()
+        if not phone and not counterparty_id:
+            return JSONResponse({"ok": False, "error": "phone_required"}, status_code=400)
+        actor_user_id = str((request.session.get("user") or {}).get("user_id") or "").strip() or None
+        with session_scope() as session:
+            counterparty = session.get(Counterparty, counterparty_id) if counterparty_id else None
+            if counterparty is not None and counterparty.workspace_owner_id != wid:
+                counterparty = None
+            if counterparty is None and phone:
+                clean = re.sub(r"\D+", "", phone)
+                if clean:
+                    for cp in session.execute(
+                        select(Counterparty).where(Counterparty.workspace_owner_id == wid)
+                    ).scalars():
+                        extra = _counterparty_extra(cp)
+                        cp_phone = re.sub(r"\D+", "", str(cp.phone or extra.get("phone") or ""))
+                        if cp_phone and clean.endswith(cp_phone[-9:]):
+                            counterparty = cp
+                            break
+            record = session.get(CrmRecord, record_id) if record_id else None
+            if record is not None and record.workspace_owner_id != wid:
+                record = None
+            if record is None and counterparty is not None:
+                record = _crm_find_open_deal_for_counterparty(session, wid, counterparty.id)
+            dial = phone or (counterparty.phone if counterparty else "")
+            _crm_log_activity(
+                session, wid, kind="call", record=record,
+                counterparty_id=counterparty.id if counterparty else None,
+                channel="sip", direction="out",
+                title=f"Исходящий звонок · {dial or 'без номера'}",
+                payload={"phone": dial, "mode": "click_to_call"}, actor_user_id=actor_user_id,
+            )
+        return JSONResponse({"ok": True})
 
     @app.get("/messengers", response_class=HTMLResponse, name="messengers_get")
     def messengers_get(
@@ -9061,25 +9472,71 @@ def create_app() -> FastAPI:
             return RedirectResponse(url="/crm?error=" + quote("Название записи обязательно") + "#tasks", status_code=302)
         data, amount, currency = _crm_record_payload(form)
         stages = _crm_workspace_stages(wid)
-        _crm_apply_stage(data, stages)
+        stage = _crm_apply_stage(data, stages)
+        record_id = str(form.get("record_id") or "").strip()
+        status_value = str(form.get("status") or "new").strip() or "new"
+        explicit_cp = str(form.get("counterparty_id") or "").strip()
+        responsible_user_id = str(form.get("responsible_user_id") or "").strip() or None
+        actor_user_id = str((request.session.get("user") or {}).get("user_id") or "").strip() or None
+        next_action_at = _crm_due_to_dt(data.get("due_date"))
         with session_scope() as session:
-            counterparty_id = None
-            if data["client"]:
+            counterparty = None
+            if explicit_cp:
+                counterparty = _resolve_counterparty(session, wid, counterparty_id=explicit_cp, name=data["client"], role="client")
+            elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
-                counterparty_id = counterparty.id if counterparty else None
-            row = CrmRecord(
-                id=str(uuid.uuid4()),
-                workspace_owner_id=wid,
-                item_type=str(data.get("item_type") or "task"),
-                title=title,
-                counterparty_id=counterparty_id,
-                status=str(form.get("status") or "new").strip() or "new",
-                due_date=str(data.get("due_date") or ""),
-                amount=amount,
-                currency=currency,
-                data=data,
-            )
-            session.add(row)
+            counterparty_id = counterparty.id if counterparty else None
+
+            existing = session.get(CrmRecord, record_id) if record_id else None
+            is_edit = bool(existing and existing.workspace_owner_id == wid)
+            if is_edit:
+                row = existing
+                prev_stage_id = str(row.stage_id or _json_object(row.data).get("stage_id") or "")
+                row.item_type = str(data.get("item_type") or row.item_type or "task")
+                row.title = title
+                row.counterparty_id = counterparty_id
+                row.status = status_value
+                row.stage_id = stage["id"]
+                row.responsible_user_id = responsible_user_id
+                row.due_date = str(data.get("due_date") or "")
+                row.next_action_at = next_action_at
+                row.amount = amount
+                row.currency = currency
+                row.data = data
+                flag_modified(row, "data")
+                _crm_log_activity(
+                    session, wid, kind="system", record=row, channel="manual",
+                    title="Запись изменена", actor_user_id=actor_user_id,
+                )
+                if prev_stage_id != stage["id"]:
+                    _crm_log_activity(
+                        session, wid, kind="stage_change", record=row, channel="manual",
+                        title=f"Этап: {stage['title']}", actor_user_id=actor_user_id,
+                        payload={"stage_id": stage["id"]},
+                    )
+            else:
+                row = CrmRecord(
+                    id=str(uuid.uuid4()),
+                    workspace_owner_id=wid,
+                    item_type=str(data.get("item_type") or "task"),
+                    title=title,
+                    counterparty_id=counterparty_id,
+                    status=status_value,
+                    stage_id=stage["id"],
+                    responsible_user_id=responsible_user_id,
+                    due_date=str(data.get("due_date") or ""),
+                    next_action_at=next_action_at,
+                    amount=amount,
+                    currency=currency,
+                    data=data,
+                )
+                session.add(row)
+                session.flush()
+                _crm_log_activity(
+                    session, wid, kind="created", record=row, channel="manual",
+                    title=f"{_crm_type_label(row.item_type)} создана: {title}",
+                    body=str(data.get("note") or ""), actor_user_id=actor_user_id,
+                )
             if counterparty_id:
                 _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
         target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
@@ -9113,21 +9570,136 @@ def create_app() -> FastAPI:
         stage_id = str(form.get("stage_id") or "").strip()
         stages = _crm_workspace_stages(wid)
         stage = _crm_stage_for_value(stage_id, stages)
+        actor_user_id = str((request.session.get("user") or {}).get("user_id") or "").strip() or None
         with session_scope() as session:
             row = session.get(CrmRecord, record_id)
             if not row or row.workspace_owner_id != wid:
                 return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            prev_stage_id = str(row.stage_id or _json_object(row.data).get("stage_id") or "")
             data = _json_object(row.data).copy()
             _crm_apply_stage(data, stages, stage["id"])
             row.data = data
+            row.stage_id = stage["id"]
+            flag_modified(row, "data")
             if stage["id"] == "won":
                 row.status = "won"
             elif stage["id"] == "lost":
                 row.status = "lost"
             elif row.status in {"new", "won", "lost"}:
                 row.status = "in_progress"
+            if prev_stage_id != stage["id"]:
+                _crm_log_activity(
+                    session, wid, kind="stage_change", record=row, channel="manual",
+                    title=f"Этап: {stage['title']}", actor_user_id=actor_user_id,
+                    payload={"stage_id": stage["id"], "from": prev_stage_id},
+                )
             _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
         return JSONResponse({"ok": True, "stage": stage})
+
+    @app.get("/crm/{record_id}", name="crm_record_detail")
+    def crm_record_detail(request: Request, record_id: str):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        stages = _crm_workspace_stages(wid)
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            item = _crm_record_data(row)
+            stage = _crm_stage_for_value(row.stage_id or item["stage_id"] or item["stage"], stages)
+            item["stage_id"] = stage["id"]
+            item["stage"] = stage["title"]
+            item["client_phone"] = ""
+            if row.counterparty_id:
+                cp = session.get(Counterparty, row.counterparty_id)
+                if cp and cp.workspace_owner_id == wid:
+                    extra = _counterparty_extra(cp)
+                    item["client"] = cp.name
+                    item["client_href"] = f"/clients?client={cp.id}#client-card"
+                    item["client_phone"] = str(cp.phone or extra.get("phone") or "")
+            activities = _crm_load_activities(session, wid, record_id)
+        item["amount_value"] = str(item.get("amount_value") or "0")
+        return JSONResponse({"ok": True, "record": item, "activities": activities, "stages": stages})
+
+    @app.post("/crm/{record_id}/activity", name="crm_activity_add")
+    async def crm_activity_add(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        kind = str(form.get("kind") or "note").strip() or "note"
+        if kind not in CRM_ACTIVITY_KIND_LABELS:
+            kind = "note"
+        channel = str(form.get("channel") or "manual").strip() or "manual"
+        direction = str(form.get("direction") or "system").strip() or "system"
+        title = str(form.get("title") or "").strip()
+        body = str(form.get("body") or "").strip()
+        if not title and not body:
+            return JSONResponse({"ok": False, "error": "empty"}, status_code=400)
+        actor_user_id = str((request.session.get("user") or {}).get("user_id") or "").strip() or None
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            activity = _crm_log_activity(
+                session, wid, kind=kind, record=row, channel=channel,
+                direction=direction, title=title or CRM_ACTIVITY_KIND_LABELS.get(kind, "Заметка"),
+                body=body, actor_user_id=actor_user_id,
+            )
+            session.flush()
+            data = _crm_activity_data(activity)
+        return JSONResponse({"ok": True, "activity": data})
+
+    @app.post("/crm/from-chat", name="crm_from_chat")
+    async def crm_from_chat(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        channel = str(form.get("channel") or "Telegram").strip() or "Telegram"
+        chat_id = str(form.get("chat_id") or "").strip()
+        username = str(form.get("username") or "").strip()
+        phone = str(form.get("phone") or "").strip()
+        name = str(form.get("client") or "").strip()
+        topic = str(form.get("topic") or "").strip()
+        note = str(form.get("note") or "").strip()
+        last_message = str(form.get("last_message") or "").strip()
+        actor_user_id = str((request.session.get("user") or {}).get("user_id") or "").strip() or None
+        with session_scope() as session:
+            counterparty = _crm_messenger_counterparty(
+                session, wid, channel=channel, chat_id=chat_id,
+                username=username, phone=phone, name=name,
+            )
+            chat_ref = ("@" + username.lstrip("@")) if username else (topic or chat_id)
+            record, _activity = _crm_register_contact_event(
+                session, wid, counterparty=counterparty,
+                kind="message", channel=_messenger_channel_key(channel) or "telegram", direction="in",
+                title=f"Сообщение · {channel}" + (f" · {chat_ref}" if chat_ref else ""),
+                body=note or last_message or topic,
+                payload={"chat_id": chat_id, "username": username, "channel": channel},
+                lead_source=channel, actor_user_id=actor_user_id, auto_lead=True,
+            )
+            if record is not None:
+                data = _json_object(record.data)
+                if chat_ref and not data.get("chat_ref"):
+                    data["chat_ref"] = chat_ref
+                if not data.get("lead_source"):
+                    data["lead_source"] = channel
+                if not data.get("contact_type"):
+                    data["contact_type"] = f"Чат {channel}"
+                record.data = data
+                flag_modified(record, "data")
+            rid = record.id if record else ""
+            cname = counterparty.name if counterparty else name
+        return JSONResponse({"ok": True, "record_id": rid, "client": cname})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
     async def crm_delete(request: Request, record_id: str):

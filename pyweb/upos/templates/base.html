@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=215" />
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=217" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -313,6 +313,42 @@
         </div>
       </div>
     </div>
+    {% if user and variant != 'admin' %}
+    <div class="upos-callfab" data-callfab>
+      <button type="button" class="upos-callfab-btn" data-callfab-toggle aria-expanded="false" aria-label="Быстрый звонок" title="Быстрый звонок">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.16a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92z"/></svg>
+      </button>
+      <div class="upos-callfab-panel" data-callfab-panel hidden>
+        <div class="upos-callfab-head">
+          <strong>Быстрый звонок</strong>
+          <button type="button" class="upos-callfab-close" data-callfab-close aria-label="Закрыть">×</button>
+        </div>
+        <input type="tel" class="upos-callfab-input" data-callfab-input inputmode="tel" placeholder="+998 __ ___ __ __" autocomplete="off" />
+        <div class="upos-callfab-dialpad" data-callfab-dialpad>
+          <button type="button" class="upos-callfab-key">1</button>
+          <button type="button" class="upos-callfab-key">2</button>
+          <button type="button" class="upos-callfab-key">3</button>
+          <button type="button" class="upos-callfab-key">4</button>
+          <button type="button" class="upos-callfab-key">5</button>
+          <button type="button" class="upos-callfab-key">6</button>
+          <button type="button" class="upos-callfab-key">7</button>
+          <button type="button" class="upos-callfab-key">8</button>
+          <button type="button" class="upos-callfab-key">9</button>
+          <button type="button" class="upos-callfab-key">*</button>
+          <button type="button" class="upos-callfab-key">0</button>
+          <button type="button" class="upos-callfab-key">#</button>
+        </div>
+        <div class="upos-callfab-actions">
+          <button type="button" class="btn upos-callfab-call" data-callfab-call>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.16a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92z"/></svg>
+            Позвонить
+          </button>
+          <a class="btn btn-secondary" href="{{ url_for('telephony_get') }}#calls">Журнал</a>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', path='telephony-fab.js') }}?v=1" defer></script>
+    {% endif %}
     <script>
       window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
     </script>

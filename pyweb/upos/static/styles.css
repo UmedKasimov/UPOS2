@@ -4540,7 +4540,99 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-radius: var(--workbench-radius-sm, 8px);
 }
 
-.settings-profile-modal.crm-record-dialog {
+.crm-overdue-badge {
+  background: color-mix(in srgb, #e5484d 16%, var(--card)) !important;
+  color: #e5484d;
+  font-weight: 700;
+}
+
+.crm-kanban-card.is-overdue {
+  box-shadow: inset 3px 0 0 0 #e5484d;
+}
+
+.crm-record-row {
+  cursor: pointer;
+}
+
+.crm-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.crm-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.6rem 1.1rem;
+  margin: 0 0 1.1rem;
+}
+
+.crm-detail-field dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.crm-detail-field dd {
+  margin: 0.1rem 0 0;
+  font-weight: 600;
+}
+
+.crm-detail-timeline-wrap h3 {
+  margin: 0 0 0.6rem;
+}
+
+.crm-detail-note-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.crm-detail-note-form input {
+  flex: 1;
+}
+
+.crm-detail-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.crm-detail-activity {
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+}
+
+.crm-detail-activity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.74rem;
+  opacity: 0.7;
+}
+
+.crm-detail-activity-title {
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+
+.crm-detail-activity-body {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+}
+
+.crm-detail-timeline-empty {
+  opacity: 0.6;
+}
+
+.settings-profile-modal.crm-record-dialog,
+.settings-profile-modal.crm-detail-dialog {
   width: min(62rem, 96vw);
   max-width: min(62rem, 96vw);
 }
@@ -19693,4 +19785,159 @@ button.general-module-tab {
   background: #f7fbff;
   font-weight: 700;
   color: #1f3b57;
+}
+
+/* =====================================================================
+   UPOS 2026 refresh — современная отделка + плавающий телефон (call FAB)
+   ===================================================================== */
+:root {
+  --upos-accent-grad: linear-gradient(135deg,
+    color-mix(in oklch, var(--primary), white 8%),
+    color-mix(in oklch, var(--primary), #6a5cff 32%));
+  --upos-ring-soft: 0 0 0 4px color-mix(in oklch, var(--primary), transparent 80%);
+  --upos-elev-1: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .10);
+  --upos-elev-2: 0 6px 16px -6px rgba(16, 24, 40, .18), 0 2px 6px -2px rgba(16, 24, 40, .10);
+  --upos-elev-3: 0 18px 42px -12px rgba(16, 24, 40, .28), 0 6px 16px -8px rgba(16, 24, 40, .18);
+}
+html.dark {
+  --upos-elev-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --upos-elev-2: 0 8px 20px -8px rgba(0, 0, 0, .55);
+  --upos-elev-3: 0 22px 48px -14px rgba(0, 0, 0, .65);
+}
+
+/* Плавные интеракции на ключевых элементах */
+a, button, .btn, .nav-link, .nav-sublink, input, select, textarea,
+.crm-kanban-card, .general-report-card {
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease,
+              box-shadow .22s ease, transform .14s cubic-bezier(.2, .7, .3, 1), filter .18s ease;
+}
+
+/* Современные основные кнопки — мягкий градиент + подъём */
+.btn:not(.btn-secondary):not(.btn-ghost) {
+  background: var(--upos-accent-grad);
+  box-shadow: var(--upos-elev-1);
+}
+.btn:not(.btn-secondary):not(.btn-ghost):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--upos-elev-2);
+  filter: saturate(1.05) brightness(1.03);
+}
+.btn:active { transform: translateY(0); }
+
+/* Доступный современный focus-ring */
+:where(a, button, .btn, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--upos-ring-soft);
+}
+
+/* Лёгкий подъём карточек */
+.general-report-card:hover { transform: translateY(-2px); box-shadow: var(--upos-elev-2); }
+.crm-kanban-card { box-shadow: var(--upos-elev-1); }
+.crm-kanban-card:hover { transform: translateY(-2px); box-shadow: var(--upos-elev-2); }
+
+/* Тонкие современные скроллбары */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary), transparent 55%) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--primary), transparent 62%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--primary), transparent 40%);
+  background-clip: padding-box;
+}
+
+/* ---- Плавающий телефон (call FAB) ---- */
+.upos-callfab {
+  position: fixed;
+  right: clamp(14px, 2.4vw, 30px);
+  bottom: clamp(14px, 2.4vw, 30px);
+  z-index: 1200;
+}
+.upos-callfab-btn {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--upos-accent-grad);
+  box-shadow: 0 12px 30px -8px color-mix(in oklch, var(--primary), transparent 35%), var(--upos-elev-2);
+  position: relative;
+}
+.upos-callfab-btn svg { width: 24px; height: 24px; }
+.upos-callfab-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: upos-callpulse 2.4s ease-out infinite;
+}
+@keyframes upos-callpulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary), transparent 45%); }
+  70% { box-shadow: 0 0 0 16px color-mix(in oklch, var(--primary), transparent 100%); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary), transparent 100%); }
+}
+.upos-callfab-btn:hover { transform: translateY(-2px) scale(1.04); }
+.upos-callfab.is-open .upos-callfab-btn::after { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .upos-callfab-btn::after { animation: none; }
+}
+
+.upos-callfab-panel {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: 290px;
+  background: color-mix(in oklch, var(--card), transparent 6%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid var(--card-ring);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--upos-elev-3);
+  padding: 14px;
+  color: var(--foreground);
+  transform-origin: bottom right;
+  animation: upos-fab-in .16s ease;
+}
+@keyframes upos-fab-in {
+  from { opacity: 0; transform: translateY(8px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+.upos-callfab-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.upos-callfab-head strong { font-size: var(--text-md); }
+.upos-callfab-close { background: none; border: none; cursor: pointer; font-size: 20px; line-height: 1; color: var(--muted-foreground); }
+.upos-callfab-input {
+  width: 100%;
+  padding: .6rem .7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .5px;
+}
+.upos-callfab-dialpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.upos-callfab-key {
+  padding: .55rem 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), transparent 30%);
+  color: var(--foreground);
+  font-size: var(--text-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+.upos-callfab-key:hover { background: var(--accent); transform: translateY(-1px); }
+.upos-callfab-actions { display: flex; gap: 8px; }
+.upos-callfab-actions .btn { flex: 1; }
+.upos-callfab-call { display: inline-flex; gap: 6px; }
+@media (max-width: 600px) {
+  .upos-callfab-panel { width: min(290px, calc(100vw - 28px)); }
 }

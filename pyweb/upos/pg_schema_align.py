@@ -400,6 +400,26 @@ _REQUIRED_COLUMN_PATCHES: tuple[tuple[str, str], ...] = (
         "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
     ),
     (
+        "crm_records.stage_id",
+        "ALTER TABLE crm_records "
+        "ADD COLUMN IF NOT EXISTS stage_id VARCHAR(80) NULL",
+    ),
+    (
+        "crm_records.responsible_user_id",
+        "ALTER TABLE crm_records "
+        "ADD COLUMN IF NOT EXISTS responsible_user_id VARCHAR(36) NULL",
+    ),
+    (
+        "crm_records.next_action_at",
+        "ALTER TABLE crm_records "
+        "ADD COLUMN IF NOT EXISTS next_action_at TIMESTAMP WITH TIME ZONE NULL",
+    ),
+    (
+        "crm_records.last_activity_at",
+        "ALTER TABLE crm_records "
+        "ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP WITH TIME ZONE NULL",
+    ),
+    (
         "payment_documents.created_at",
         "ALTER TABLE payment_documents "
         "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
