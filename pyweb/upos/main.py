@@ -14,7 +14,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 from zoneinfo import ZoneInfo
@@ -8773,18 +8773,42 @@ def create_app() -> FastAPI:
         item["status_label"] = _telephony_status_label("call", item["status"])
         return item
 
+    def _telephony_parse_sip_host(raw_host: Any, raw_port: Any = "5060") -> tuple[str, int, str]:
+        value = str(raw_host or "").strip()
+        port_text = str(raw_port or "5060").strip() or "5060"
+        try:
+            port = int(port_text)
+        except ValueError:
+            port = 5060
+
+        if value:
+            candidate = value
+            if "://" not in candidate:
+                candidate = "sip://" + candidate
+            parsed = urlparse(candidate)
+            host = (parsed.hostname or value).strip()
+            if parsed.port:
+                port = parsed.port
+            host = host.strip("[]").strip()
+        else:
+            host = ""
+
+        if host.casefold().startswith(("http://", "https://", "sip://", "sips://")):
+            return _telephony_parse_sip_host(host, port)
+        return host, port, f"{host}:{port}" if host else ""
+
     def _telephony_update_provider_test(workspace_owner_id: str, provider_id: str) -> tuple[str, str]:
         data = _telephony_settings_payload(workspace_owner_id)
         providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
         target = next((item for item in providers if str(item.get("id")) == str(provider_id)), None)
         if not target:
             return "offline", "Провайдер не найден"
-        host = str(target.get("host") or target.get("endpoint") or "").strip()
+        host, port, endpoint = _telephony_parse_sip_host(target.get("host") or target.get("endpoint"), target.get("port") or "5060")
+        if host:
+            target["host"] = host
+            target["port"] = str(port)
+            target["endpoint"] = endpoint
         transport = str(target.get("transport") or "UDP").strip().upper()
-        try:
-            port = int(str(target.get("port") or "5060").strip())
-        except ValueError:
-            port = 5060
         status = "offline"
         message = "Не указан SIP-сервер"
         if host:
@@ -9283,7 +9307,8 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         name = str(form.get("name") or "").strip()
-        host = str(form.get("host") or "").strip()
+        raw_host = str(form.get("host") or "").strip()
+        host, port, endpoint = _telephony_parse_sip_host(raw_host, form.get("port") or "5060")
         login = str(form.get("login") or "").strip()
         if not name or not host or not login:
             return RedirectResponse(url="/telephony?error=" + quote("Название, SIP-сервер и логин обязательны") + "#integrations", status_code=302)
@@ -9294,8 +9319,8 @@ def create_app() -> FastAPI:
                 "name": name,
                 "kind": "SIP",
                 "host": host,
-                "port": str(form.get("port") or "5060").strip() or "5060",
-                "endpoint": f"{host}:{str(form.get('port') or '5060').strip() or '5060'}",
+                "port": str(port),
+                "endpoint": endpoint,
                 "login": login,
                 "account": login,
                 "password": str(form.get("password") or "").strip(),
