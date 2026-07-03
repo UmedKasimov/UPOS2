@@ -8535,6 +8535,43 @@ def create_app() -> FastAPI:
             "token_header": "X-UPOS-SIP-Token",
         }
 
+    def _telephony_sip_accounts_for_softphone(data: dict[str, Any]) -> list[dict[str, Any]]:
+        providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        accounts: list[dict[str, Any]] = []
+        for provider in providers:
+            if not isinstance(provider, dict):
+                continue
+            host, port, endpoint = _telephony_parse_sip_host(
+                provider.get("host") or provider.get("endpoint"),
+                provider.get("port") or "5060",
+            )
+            login = str(provider.get("login") or provider.get("account") or provider.get("extension") or "").strip()
+            password = str(provider.get("password") or "").strip()
+            if not host or not login:
+                continue
+            server = host if port == 5060 else endpoint
+            name = str(provider.get("name") or provider.get("label") or "").strip()
+            accounts.append(
+                {
+                    "id": str(provider.get("id") or login),
+                    "provider_id": str(provider.get("id") or ""),
+                    "server": server,
+                    "host": host,
+                    "port": str(port),
+                    "extension": login,
+                    "auth_id": str(provider.get("auth_id") or login).strip(),
+                    "password": password,
+                    "display_name": str(provider.get("display_name") or provider.get("employee") or name or login).strip(),
+                    "transport": str(provider.get("transport") or "UDP").strip().upper() or "UDP",
+                    "secure_media": str(provider.get("secure_media") or "Disabled").strip() or "Disabled",
+                    "expire_time": int(str(provider.get("expire_time") or "300").strip() or "300"),
+                    "label": name or f"Account {login}",
+                    "codec": str(provider.get("codec") or "G711").strip(),
+                    "status": str(provider.get("status") or "").strip(),
+                }
+            )
+        return accounts
+
     def _telephony_first(payload: dict[str, Any], *keys: str) -> Any:
         for key in keys:
             value = payload.get(key)
@@ -9383,6 +9420,74 @@ def create_app() -> FastAPI:
 
         call_item = _telephony_upsert_call_from_payload(wid, payload)
         return JSONResponse({"ok": True, "workspace_owner_id": wid, "call": call_item})
+
+    @app.get("/api/telephony/config", name="telephony_softphone_config_api")
+    def telephony_softphone_config_api(request: Request):
+        wid = str(
+            request.query_params.get("workspace_owner_id")
+            or request.query_params.get("workspace_id")
+            or request.headers.get("X-UPOS-Workspace")
+            or ""
+        ).strip()
+        if not valid_workspace_owner_id(wid):
+            wid = _telephony_default_workspace_owner_id()
+        if not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
+        provided_token = _telephony_request_token({key: value for key, value in request.query_params.items()}, request)
+        if not _telephony_token_allowed(wid, provided_token):
+            return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+        data = _telephony_settings_payload(wid)
+        integration = _telephony_integration_context(request, wid, data)
+        return JSONResponse(
+            {
+                "ok": True,
+                "workspace_owner_id": wid,
+                "endpoint_url": integration["endpoint_url"],
+                "token": integration["token"],
+                "accounts": _telephony_sip_accounts_for_softphone(data),
+            }
+        )
+
+    @app.post("/api/telephony/softphone/login", name="telephony_softphone_login_api")
+    async def telephony_softphone_login_api(request: Request):
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                payload = {}
+        except Exception:
+            form = await request.form()
+            payload = {str(key): value for key, value in form.items()}
+
+        account_id = str(payload.get("account_id") or payload.get("organization") or payload.get("workspace") or "").strip()
+        login_value = str(payload.get("login") or payload.get("username") or "").strip()
+        password = str(payload.get("password") or "").strip()
+        user = verify_login(login_value, password, account_id)
+        if not user:
+            return JSONResponse({"ok": False, "error": "bad_credentials"}, status_code=401)
+
+        wid = str(user.get("workspace_owner_id") or user.get("account_owner_id") or user.get("user_id") or "").strip()
+        if not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
+        data = _telephony_settings_payload(wid)
+        integration = _telephony_integration_context(request, wid, data)
+        accounts = _telephony_sip_accounts_for_softphone(data)
+        return JSONResponse(
+            {
+                "ok": True,
+                "workspace_owner_id": wid,
+                "endpoint_url": integration["endpoint_url"],
+                "config_url": f"{_telephony_public_base_url(request)}/api/telephony/config",
+                "token": integration["token"],
+                "token_header": integration["token_header"],
+                "user": {
+                    "id": str(user.get("user_id") or ""),
+                    "login": str(user.get("username") or login_value),
+                    "name": str(user.get("name") or login_value),
+                    "role": str(user.get("role") or ""),
+                },
+                "accounts": accounts,
+            }
+        )
 
     @app.get("/api/telephony/dashboard", name="telephony_dashboard_api")
     def telephony_dashboard_api(request: Request):
