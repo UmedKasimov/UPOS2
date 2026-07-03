@@ -1106,6 +1106,8 @@ def create_app() -> FastAPI:
             or path.startswith("/billing")
             or path.startswith("/api/telegram/webhook/")
             or path == "/api/telephony/calls/ingest"
+            or path == "/api/telephony/config"
+            or path == "/api/telephony/softphone/login"
         ):
             return await call_next(request)
         user = request.session.get("user")
