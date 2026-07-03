@@ -4757,6 +4757,85 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 1rem;
 }
 
+.telephony-webhook-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
+  gap: 14px;
+  margin: 1rem 1rem 0;
+  border: 1px solid rgba(30, 64, 175, 0.18);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.telephony-webhook-copy h3 {
+  margin: 0 0 8px;
+  color: #172033;
+  font-size: 16px;
+}
+
+.telephony-webhook-copy p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.telephony-webhook-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.telephony-webhook-fields label,
+.telephony-webhook-example {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.telephony-webhook-fields span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.telephony-copy-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.telephony-copy-field input {
+  width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.telephony-webhook-example {
+  grid-column: 1 / -1;
+}
+
+.telephony-webhook-example summary {
+  cursor: pointer;
+  color: #1e40af;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.telephony-webhook-example pre {
+  overflow: auto;
+  margin: 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.9);
+  color: #172033;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .telephony-sip-form,
 .telephony-provider-table {
   min-width: 0;
@@ -5532,6 +5611,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   }
 
   .telephony-integrations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .telephony-webhook-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .telephony-copy-field {
     grid-template-columns: 1fr;
   }
 

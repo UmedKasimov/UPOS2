@@ -240,6 +240,49 @@
       </div>
     </header>
 
+    {% set ti = telephony_integration|default({}) %}
+    <section class="telephony-webhook-panel">
+      <div class="telephony-webhook-copy">
+        <h3>Подключение на Railway</h3>
+        <p>Укажите этот webhook в SIP/АТС или в U-POS SIP. Звонки будут попадать в историю, устройства и записи.</p>
+      </div>
+      <div class="telephony-webhook-fields">
+        <label>
+          <span>Webhook URL</span>
+          <div class="telephony-copy-field">
+            <input readonly value="{{ ti.webhook_url or '' }}" data-telephony-copy-value />
+            <button class="btn btn-secondary" type="button" data-telephony-copy>Копировать</button>
+          </div>
+        </label>
+        <label>
+          <span>Token header</span>
+          <div class="telephony-copy-field">
+            <input readonly value="{{ ti.token_header or 'X-UPOS-SIP-Token' }}: {{ ti.token or '' }}" data-telephony-copy-value />
+            <button class="btn btn-secondary" type="button" data-telephony-copy>Копировать</button>
+          </div>
+        </label>
+        <label>
+          <span>Workspace ID</span>
+          <div class="telephony-copy-field">
+            <input readonly value="{{ ti.workspace_owner_id or '' }}" data-telephony-copy-value />
+            <button class="btn btn-secondary" type="button" data-telephony-copy>Копировать</button>
+          </div>
+        </label>
+      </div>
+      <details class="telephony-webhook-example">
+        <summary>Пример POST JSON</summary>
+        <pre>{
+  "token": "{{ ti.token or '' }}",
+  "workspace_owner_id": "{{ ti.workspace_owner_id or '' }}",
+  "event": "ended",
+  "direction": "incoming",
+  "caller_id": "+998901234567",
+  "status": "answered",
+  "duration_sec": 42
+}</pre>
+      </details>
+    </section>
+
     <div class="telephony-integrations-grid">
       <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form">
         {% include "_csrf_field.html" %}

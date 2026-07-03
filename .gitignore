@@ -47,6 +47,9 @@ Example/
 
 # Python web app (FastAPI)
 pyweb/.venv/
+pyweb/.deps/
+pyweb/.pgdata/
+pyweb/run_local_server.py
 pyweb/data/
 pyweb/client_workspaces/
 pyweb/**/__pycache__/

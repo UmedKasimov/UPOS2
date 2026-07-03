@@ -79,6 +79,33 @@
       });
     });
 
+    document.querySelectorAll("[data-telephony-copy]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var wrap = button.closest(".telephony-copy-field");
+        var input = wrap ? wrap.querySelector("[data-telephony-copy-value]") : null;
+        var value = input ? input.value : "";
+        if (!value) return;
+        function done() {
+          var previous = button.textContent;
+          button.textContent = "Скопировано";
+          window.setTimeout(function () {
+            button.textContent = previous;
+          }, 1400);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).then(done).catch(function () {
+            input.select();
+            document.execCommand("copy");
+            done();
+          });
+        } else {
+          input.select();
+          document.execCommand("copy");
+          done();
+        }
+      });
+    });
+
     window.UPOS_TELEPHONY_INCOMING_CALL = showIncomingCallPopup;
     window.addEventListener("upos:incoming-call", function (event) {
       showIncomingCallPopup(event.detail || {});
