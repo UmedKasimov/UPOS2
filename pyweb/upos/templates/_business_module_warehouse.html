@@ -542,7 +542,7 @@
         <span>Закупка сразу попадет в остатки склада.</span>
       </div>
     </header>
-    <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}">
+    <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}">
       {% include "_csrf_field.html" %}
       <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
       <input type="hidden" name="paid_amount" value="0" data-purchase-paid-amount />
@@ -681,6 +681,79 @@
         <button class="btn" type="submit">Сохранить закупку</button>
       </div>
     </form>
+
+    <dialog class="settings-profile-modal sales-product-dialog warehouse-product-dialog" data-warehouse-product-dialog>
+      <form class="settings-profile-modal-surface sales-product-dialog-surface" data-warehouse-product-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="kind" value="product" data-warehouse-product-kind />
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Создание товара</h2>
+            <p class="settings-profile-modal-sub">Товар сразу появится в текущей закупке.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-warehouse-product-dialog-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-scroll">
+          <div class="settings-profile-modal-body">
+            <div class="settings-profile-form-grid sales-product-dialog-grid">
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Название*</span>
+                <input class="settings-profile-input" name="name" required data-warehouse-product-name />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Категория</span>
+                <input class="settings-profile-input" name="category" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Бренд</span>
+                <input class="settings-profile-input" name="brand" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Артикул</span>
+                <input class="settings-profile-input" name="sku" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Штрихкод</span>
+                <input class="settings-profile-input" name="barcode" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Единица*</span>
+                <input class="settings-profile-input" name="unit" value="Штука" required data-warehouse-product-unit />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Статус</span>
+                <select class="settings-profile-input" name="status">
+                  <option value="active" selected>Активный</option>
+                  <option value="inactive">Неактивный</option>
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Цена</span>
+                <input class="settings-profile-input" name="price_value" inputmode="decimal" data-warehouse-product-price />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Валюта</span>
+                <select class="settings-profile-input" name="price_currency" data-warehouse-product-currency>
+                  <option value="UZS">UZS</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <input type="hidden" name="price_name" value="Продажная цена" />
+              <input type="hidden" name="stock_warehouse" value="{{ warehouse_options.warehouses[0] if warehouse_options.warehouses else 'Основной склад' }}" data-warehouse-product-warehouse />
+              <input type="hidden" name="stock_quantity" value="" />
+              <input type="hidden" name="stock_price" value="" />
+              <input type="hidden" name="stock_date" value="{{ today }}" />
+              <input type="hidden" name="barcode_type" value="EAN13" />
+            </div>
+            <p class="sales-product-dialog-status" data-warehouse-product-status aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-warehouse-product-dialog-cancel>Отмена</button>
+          <button type="submit" class="btn" data-warehouse-product-submit>Сохранить</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog class="settings-profile-modal sales-payment-dialog warehouse-purchase-payment-dialog" data-purchase-payment-dialog>
       <form class="settings-profile-modal-surface sales-payment-dialog-surface" data-purchase-payment-form>

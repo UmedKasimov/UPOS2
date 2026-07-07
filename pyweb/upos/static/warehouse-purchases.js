@@ -1,5 +1,6 @@
 (function () {
   let activeSupplierPicker = null;
+  let activeProductPicker = null;
 
   function updateAction(form) {
     const hash = form.action.includes("#") ? form.action.slice(form.action.indexOf("#")) : "#purchases";
@@ -145,6 +146,11 @@
     } catch (_) {
       return {};
     }
+  }
+
+  function writePurchaseOptions(options) {
+    const node = document.getElementById("warehouse-purchase-options");
+    if (node) node.textContent = JSON.stringify(options || {});
   }
 
   function normalize(value) {
@@ -369,6 +375,33 @@
     status.dataset.variant = variant || "";
   }
 
+  function setProductDialogStatus(form, message, variant) {
+    const status = form?.querySelector("[data-warehouse-product-status]");
+    if (!status) return;
+    status.textContent = message || "";
+    status.dataset.variant = variant || "";
+  }
+
+  function upsertProductOption(product) {
+    if (!product || !product.name) return;
+    const options = readPurchaseOptions();
+    const products = Array.isArray(options.product_rows) ? options.product_rows : [];
+    const productId = String(product.id || "").trim();
+    const productName = normalize(product.name);
+    const index = products.findIndex((item) => {
+      return (productId && String(item.id || "").trim() === productId) || normalize(item.name) === productName;
+    });
+    if (index >= 0) {
+      products[index] = product;
+    } else {
+      products.push(product);
+    }
+    products.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ru"));
+    options.product_rows = products;
+    options.products = products.map((item) => item.name).filter(Boolean);
+    writePurchaseOptions(options);
+  }
+
   function upsertSupplierOption(name) {
     const cleanName = String(name || "").trim();
     if (!cleanName) return;
@@ -457,6 +490,103 @@
         })
         .catch((error) => {
           setSupplierDialogStatus(form, error.message || "Не удалось сохранить", "err");
+        })
+        .finally(() => {
+          if (submit) submit.disabled = false;
+        });
+    });
+  }
+
+  function closeProductDialog(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-product-dialog]") || document.querySelector("[data-warehouse-product-dialog]");
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.hidden = true;
+    dialog.removeAttribute("open");
+    activeProductPicker = null;
+  }
+
+  function openProductDialog(entryForm, picker, query) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-product-dialog]") || document.querySelector("[data-warehouse-product-dialog]");
+    const form = dialog?.querySelector("[data-warehouse-product-form]");
+    if (!dialog || !form) return;
+    activeProductPicker = picker || null;
+    closeProductPanel(picker);
+    form.reset();
+    const nameInput = form.querySelector("[data-warehouse-product-name]");
+    const unitInput = form.querySelector("[data-warehouse-product-unit]");
+    const currencyInput = form.querySelector("[data-warehouse-product-currency]");
+    const warehouseInput = form.querySelector("[data-warehouse-product-warehouse]");
+    if (nameInput) nameInput.value = String(query || "").trim();
+    if (unitInput) unitInput.value = "Штука";
+    if (currencyInput) currencyInput.value = entryForm.querySelector("[data-purchase-entry-currency]")?.value || "UZS";
+    if (warehouseInput) warehouseInput.value = entryForm.querySelector('input[name="warehouse"]')?.value || warehouseInput.defaultValue || "Основной склад";
+    setProductDialogStatus(form, "", "");
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.hidden = false;
+      dialog.setAttribute("open", "");
+    }
+    if (!dialog.open) dialog.setAttribute("open", "");
+    setTimeout(() => {
+      if (nameInput) {
+        nameInput.focus();
+        nameInput.select();
+      }
+    }, 0);
+  }
+
+  function wireProductDialog(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-product-dialog]") || document.querySelector("[data-warehouse-product-dialog]");
+    const form = dialog?.querySelector("[data-warehouse-product-form]");
+    if (!dialog || !form || dialog.dataset.warehouseProductDialogReady === "1") return;
+    dialog.dataset.warehouseProductDialogReady = "1";
+    dialog.querySelectorAll("[data-warehouse-product-dialog-close], [data-warehouse-product-dialog-cancel]").forEach((button) => {
+      button.addEventListener("click", () => closeProductDialog(entryForm));
+    });
+    form.querySelectorAll('input[inputmode="decimal"]').forEach((input) => {
+      input.addEventListener("input", () => {
+        formatPurchasePriceInput(input, form.querySelector("[data-warehouse-product-currency]")?.value || "UZS");
+      });
+    });
+    form.querySelector("[data-warehouse-product-currency]")?.addEventListener("change", () => {
+      form.querySelectorAll('input[inputmode="decimal"]').forEach((input) => {
+        formatPurchasePriceInput(input, form.querySelector("[data-warehouse-product-currency]")?.value || "UZS");
+      });
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const submit = form.querySelector("[data-warehouse-product-submit]");
+      const endpoint = entryForm.getAttribute("data-warehouse-product-quick-save-url") || "/sales/products/quick-save";
+      setProductDialogStatus(form, "Сохраняю...", "");
+      if (submit) submit.disabled = true;
+      fetch(endpoint, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json" },
+      })
+        .then((response) =>
+          response.json().catch(() => ({})).then((body) => {
+            if (!response.ok || !body.product) throw new Error(body.error || "Не удалось сохранить");
+            return body.product;
+          })
+        )
+        .then((product) => {
+          upsertProductOption(product);
+          const picker = activeProductPicker && document.contains(activeProductPicker)
+            ? activeProductPicker
+            : entryForm.querySelector("[data-warehouse-product-picker]");
+          applyProductSelection(entryForm, picker, product);
+          setProductDialogStatus(form, "Сохранено", "ok");
+          closeProductDialog(entryForm);
+        })
+        .catch((error) => {
+          setProductDialogStatus(form, error.message || "Не удалось сохранить", "err");
         })
         .finally(() => {
           if (submit) submit.disabled = false;
@@ -568,7 +698,7 @@
     positionProductPanel(picker);
     panel.querySelector("[data-warehouse-product-create]")?.addEventListener("mousedown", (event) => {
       event.preventDefault();
-      window.location.href = "/products?kind=product#product-form";
+      openProductDialog(form, picker, query);
     });
     panel.querySelectorAll(".sales-combo-option").forEach((button, index) => {
       button.addEventListener("mousedown", (event) => {
@@ -675,6 +805,7 @@
       if (!body) return;
       wireSupplierPicker(form);
       wireSupplierDialog(form);
+      wireProductDialog(form);
       syncPurchasePriceTitle(form);
 
       const rows = () => Array.from(body.querySelectorAll("[data-purchase-entry-row]"));
