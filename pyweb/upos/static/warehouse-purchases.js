@@ -821,6 +821,22 @@
     });
   }
 
+  function updatePurchasePaymentButton(panel, purchase) {
+    const form = panel.querySelector("[data-purchase-payment-form]");
+    const button = panel.querySelector("[data-purchase-payment-pay]");
+    if (!form || !button) return;
+    const purchaseId = String(purchase.id || panel.dataset.purchaseId || "").trim();
+    const template = String(form.dataset.purchasePaymentUrlTemplate || "");
+    const debt = purchaseEntryNumber(purchase.debt_amount);
+    if (purchaseId && template) {
+      form.action = template.replace("__purchase_id__", encodeURIComponent(purchaseId));
+    }
+    const canPay = Boolean(purchaseId && debt > 0);
+    form.hidden = !canPay;
+    button.disabled = !canPay;
+    button.textContent = canPay ? `Оплатить ${moneyWithCurrency(debt, purchase.currency || "UZS")}` : "Оплачено";
+  }
+
   function renderDetail(panel, purchase) {
     const currency = purchase.currency || "UZS";
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
@@ -843,6 +859,7 @@
     setText(panel, "[data-purchase-detail-note]", purchase.note || "Комментарий не указан");
     const paymentPane = panel.querySelector('[data-purchase-detail-pane="payment"]');
     if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
+    updatePurchasePaymentButton(panel, purchase);
     setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
     if (!linesRoot) return;
     linesRoot.replaceChildren();

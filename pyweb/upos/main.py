@@ -6281,6 +6281,84 @@ def create_app() -> FastAPI:
                 session.add(row)
         return RedirectResponse(url="/sales?msg=status#sales-journal", status_code=302)
 
+    @app.post("/sales/{sale_id}/pay", name="sales_pay")
+    async def sales_pay(request: Request, sale_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        session_user = request.session.get("user") or {}
+        saved_sale_id = ""
+        saved_sale_number = ""
+        data: dict[str, Any] = {}
+        amount = Decimal("0")
+        currency = "UZS"
+        with session_scope() as session:
+            row = session.get(SaleDocument, sale_id)
+            if not row or row.workspace_owner_id != wid:
+                return RedirectResponse(url="/sales?error=" + quote("Продажа не найдена") + "#sales-journal", status_code=302)
+            data = _json_object(row.data)
+            doc_type = str(data.get("doc_type") or "sale").strip()
+            if doc_type == "return":
+                return RedirectResponse(url="/sales?error=" + quote("Возврат нельзя оплатить как продажу") + "#sales-journal", status_code=302)
+            amount = _sales_decimal(row.amount)
+            paid_amount = _sales_decimal(data.get("paid_amount"))
+            debt_amount = amount - paid_amount
+            if debt_amount <= 0:
+                return RedirectResponse(url=f"/sales?msg=paid&saved_id={quote(row.id)}#sales-journal", status_code=302)
+            currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
+            raw_payment_lines = data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []
+            payment_lines = [dict(item) for item in raw_payment_lines if isinstance(item, dict)]
+            lines_total = sum((_sales_decimal(item.get("amount")) for item in payment_lines), Decimal("0"))
+            if paid_amount > lines_total:
+                payment_lines.append(
+                    {
+                        "amount": _decimal_plain_text(paid_amount - lines_total),
+                        "currency": currency,
+                        "type": str(data.get("payment_type") or "Оплата"),
+                        "account": "Наличные",
+                        "account_id": "",
+                    }
+                )
+            payment_lines.append(
+                {
+                    "amount": _decimal_plain_text(debt_amount),
+                    "currency": currency,
+                    "type": "Оплата",
+                    "account": "Наличные",
+                    "account_id": "",
+                }
+            )
+            data["paid_amount"] = _decimal_plain_text(amount)
+            data["payment_type"] = str(data.get("payment_type") or "Оплата")
+            data["payment_lines"] = payment_lines
+            data["status"] = "paid"
+            row.data = data
+            flag_modified(row, "data")
+            session.add(row)
+            saved_sale_id = row.id
+            saved_sale_number = row.number
+        try:
+            _sync_sales_cash_transactions(
+                wid,
+                sale_id=saved_sale_id,
+                sale_number=saved_sale_number,
+                data=data,
+                amount=amount,
+                currency=currency,
+                user=session_user,
+            )
+        except Exception:
+            logger.exception("[sales] failed to sync payment for sale %s", saved_sale_id)
+            return RedirectResponse(
+                url="/sales?error=" + quote("Оплата внесена, но операция кассы не записалась") + "#sales-journal",
+                status_code=302,
+            )
+        return RedirectResponse(url=f"/sales?msg=paid&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
+
     def _purchase_status_label(status: str) -> str:
         return {
             "new": "Новый",
@@ -7299,6 +7377,49 @@ def create_app() -> FastAPI:
                 session.delete(row)
         return RedirectResponse(url=f"{base_url}?msg=deleted#purchases", status_code=302)
 
+    def _purchase_pay_redirect(purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+        with session_scope() as session:
+            row = session.get(PurchaseDocument, purchase_id)
+            if not row or row.workspace_owner_id != workspace_owner_id:
+                return RedirectResponse(url=f"{base_url}?error=" + quote("Закупка не найдена") + "#purchases", status_code=302)
+            data = _json_object(row.data)
+            amount = _sales_decimal(row.amount)
+            paid_amount = _sales_decimal(data.get("paid_amount"))
+            debt_amount = amount - paid_amount
+            if debt_amount <= 0:
+                return RedirectResponse(url=f"{base_url}?msg=paid#purchases", status_code=302)
+            currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
+            raw_payment_lines = data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []
+            payment_lines = [dict(item) for item in raw_payment_lines if isinstance(item, dict)]
+            lines_total = sum((_sales_decimal(item.get("amount")) for item in payment_lines), Decimal("0"))
+            if paid_amount > lines_total:
+                payment_lines.append(
+                    {
+                        "amount": _decimal_plain_text(paid_amount - lines_total),
+                        "currency": currency,
+                        "type": str(data.get("payment_type") or "Оплата"),
+                        "account": "Наличные",
+                        "account_id": "",
+                    }
+                )
+            payment_lines.append(
+                {
+                    "amount": _decimal_plain_text(debt_amount),
+                    "currency": currency,
+                    "type": "Оплата",
+                    "account": "Наличные",
+                    "account_id": "",
+                }
+            )
+            data["paid_amount"] = _decimal_plain_text(amount)
+            data["payment_type"] = str(data.get("payment_type") or "Оплата")
+            data["payment_lines"] = payment_lines
+            data["status"] = "paid"
+            row.data = data
+            flag_modified(row, "data")
+            session.add(row)
+        return RedirectResponse(url=f"{base_url}?msg=paid#purchases", status_code=302)
+
     @app.get("/warehouse", response_class=HTMLResponse, name="warehouse_get")
     def warehouse_get(
         request: Request,
@@ -7666,6 +7787,17 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         return _purchase_delete_redirect(purchase_id, wid, "/warehouse")
+
+    @app.post("/warehouse/purchases/{purchase_id}/pay", name="warehouse_purchase_pay")
+    async def warehouse_purchase_pay(request: Request, purchase_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf#purchases", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        return _purchase_pay_redirect(purchase_id, wid, "/warehouse")
 
     @app.get("/clients", response_class=HTMLResponse, name="clients_get")
     def clients_get(
@@ -8404,6 +8536,17 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         return _purchase_delete_redirect(purchase_id, wid, "/suppliers")
+
+    @app.post("/suppliers/purchases/{purchase_id}/pay", name="suppliers_purchase_pay")
+    async def suppliers_purchase_pay(request: Request, purchase_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/suppliers?err=csrf#purchases", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        return _purchase_pay_redirect(purchase_id, wid, "/suppliers")
 
     @app.get("/crm", response_class=HTMLResponse, name="crm_get")
     def crm_get(

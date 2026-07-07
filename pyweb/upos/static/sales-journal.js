@@ -323,6 +323,23 @@
     });
   }
 
+  function updatePaymentButton(panel, sale) {
+    var form = panel.querySelector("[data-sales-payment-form]");
+    var button = panel.querySelector("[data-sales-payment-pay]");
+    if (!form || !button) return;
+    var saleId = String(sale.id || panel.dataset.saleId || "").trim();
+    var template = String(form.dataset.salesPaymentUrlTemplate || "");
+    var debt = amountNumber(sale.debt_amount || sale.debt_value);
+    var isReturn = String(sale.doc_type || "").toLowerCase() === "return";
+    if (saleId && template) {
+      form.action = template.replace("__sale_id__", encodeURIComponent(saleId));
+    }
+    var canPay = Boolean(saleId && debt > 0 && !isReturn);
+    form.hidden = !canPay;
+    button.disabled = !canPay;
+    button.textContent = canPay ? "Оплатить " + moneyWithCurrency(debt, sale.currency || "UZS") : "Оплачено";
+  }
+
   function renderDetail(panel, sale) {
     var currency = sale.currency || "UZS";
     var dateText = sale.date_label || sale.date || "";
@@ -347,6 +364,7 @@
     if (paymentPane) {
       paymentPane.dataset.paymentState = amountNumber(sale.debt_amount || sale.debt_value) > 0 ? "debt" : "paid";
     }
+    updatePaymentButton(panel, sale);
     updateReturnButton(panel, sale);
     renderLines(panel, sale);
   }

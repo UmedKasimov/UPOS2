@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Продажи{% endblock %}
 
-{% set sales_default_tab = 'journal' if flash_ok == 'saved' else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))) %}
+{% set sales_default_tab = 'journal' if flash_ok in ['saved', 'paid'] else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
 {% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
 {% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
@@ -19,12 +19,14 @@
     data-workspace-tabs
     data-workspace-key="sales"
     data-workspace-default-tab="{{ sales_default_tab }}"
-    data-workspace-force-tab="{{ 'journal' if flash_ok == 'saved' else '' }}"
+    data-workspace-force-tab="{{ 'journal' if flash_ok in ['saved', 'paid'] else '' }}"
     data-workspace-close-tabs-on-load="{{ 'new' if flash_ok == 'saved' else '' }}"
     data-workspace-home-href="{{ url_for('sales_get') }}"
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Успешно продано. Продажа добавлена в журнал.</div>
+    {% elif flash_ok == "paid" %}
+      <div class="flash ok settings-ios-flash">Оплата внесена. Продажа обновлена.</div>
     {% elif flash_ok == "deleted" %}
       <div class="flash ok settings-ios-flash">Документ продажи удалён.</div>
     {% endif %}
@@ -326,7 +328,7 @@
                     <th>Сумма</th>
                   </tr>
                 </thead>
-                <tbody data-sales-detail-lines></tbody>
+            <tbody data-sales-detail-lines></tbody>
               </table>
             </div>
           </section>
@@ -357,6 +359,10 @@
                 </tbody>
               </table>
             </div>
+            <form class="document-detail-payment-actions" method="post" action="" data-sales-payment-form data-sales-payment-url-template="{{ url_for('sales_pay', sale_id='__sale_id__') }}" hidden>
+              {% include "_csrf_field.html" %}
+              <button class="btn document-detail-payment-pay-btn" type="submit" data-sales-payment-pay>Оплатить</button>
+            </form>
           </section>
           <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-sales-detail-pane="note" hidden>
             <div class="warehouse-purchase-detail-table-wrap">
@@ -785,6 +791,6 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=5" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=6" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=49" defer></script>
 {% endblock %}
