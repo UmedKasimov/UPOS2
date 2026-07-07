@@ -5672,7 +5672,7 @@ def create_app() -> FastAPI:
             "payment_type": payment_type,
             "payment_lines": payment_lines,
             "manager": str(form.get("manager") or "").strip(),
-            "note": "",
+            "note": str(form.get("note") or "").strip(),
             "lines": lines,
         }
         return data, amount, currency

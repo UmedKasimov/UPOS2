@@ -1320,6 +1320,19 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin-left: auto;
 }
 
+.sales-document-note,
+.warehouse-purchase-entry-note {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.sales-document-note textarea,
+.warehouse-purchase-entry-note textarea {
+  min-height: 4.25rem;
+  resize: vertical;
+}
+
 .sales-payment-add-btn,
 .sales-payment-submit {
   border-color: color-mix(in srgb, #168a43 78%, var(--border));
@@ -7195,11 +7208,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .warehouse-purchase-entry-total {
   margin-top: 1rem;
-}
-
-.warehouse-purchase-entry-note {
-  display: grid;
-  gap: 0.35rem;
 }
 
 .warehouse-purchase-entry-footer {
