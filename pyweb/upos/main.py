@@ -3355,6 +3355,7 @@ def create_app() -> FastAPI:
         *,
         price: str = "",
         op_date: str = "",
+        allow_negative_stock: bool = False,
     ) -> None:
         if not delta:
             return
@@ -3367,7 +3368,7 @@ def create_app() -> FastAPI:
         if delta < 0:
             required = abs(delta)
             available = sum((_sales_decimal(stock.get("quantity")) for stock in matches), Decimal("0"))
-            if available < required:
+            if available < required and not allow_negative_stock:
                 raise ValueError(f"Недостаточно остатка по товару {row.name}")
             remaining = required
             for stock in matches:
@@ -3379,6 +3380,23 @@ def create_app() -> FastAPI:
                 remaining -= take
                 if remaining <= 0:
                     break
+            if remaining > 0 and allow_negative_stock:
+                target = matches[0] if matches else None
+                if target is None:
+                    target = {
+                        "warehouse": clean_name,
+                        "quantity": "0",
+                        "price": "",
+                        "date": "",
+                    }
+                    stocks.append(target)
+                current = _sales_decimal(target.get("quantity"))
+                target["warehouse"] = clean_name
+                target["quantity"] = str((current - remaining).normalize() if current - remaining else "0")
+                if price:
+                    target["price"] = str(price)
+                if op_date:
+                    target["date"] = str(op_date)
         else:
             target = matches[0] if matches else None
             if target is None:
@@ -3407,6 +3425,7 @@ def create_app() -> FastAPI:
         delta_sign: int,
         op_date: str = "",
         require_stock_product: bool = False,
+        allow_negative_stock: bool = False,
     ) -> list[dict[str, Any]]:
         resolved_lines: list[dict[str, Any]] = []
         managed_rows: list[tuple[Product, dict[str, Any], Decimal, str]] = []
@@ -3441,7 +3460,7 @@ def create_app() -> FastAPI:
                     key = (product_row.id, line_warehouse.lower())
                     required_by_product_warehouse[key] = required_by_product_warehouse.get(key, Decimal("0")) + quantity
             resolved_lines.append(line)
-        if delta_sign < 0:
+        if delta_sign < 0 and not allow_negative_stock:
             checked: set[tuple[str, str]] = set()
             for product_row, _, _, line_warehouse in managed_rows:
                 key = (product_row.id, line_warehouse.lower())
@@ -3461,6 +3480,7 @@ def create_app() -> FastAPI:
                 Decimal(delta_sign) * quantity,
                 price=str(line.get("price") or ""),
                 op_date=op_date,
+                allow_negative_stock=allow_negative_stock,
             )
         return resolved_lines
 
@@ -6162,6 +6182,7 @@ def create_app() -> FastAPI:
                     lines=list(data.get("lines") or []),
                     delta_sign=delta_sign,
                     op_date=str(data.get("date") or ""),
+                    allow_negative_stock=data["doc_type"] == "sale",
                 )
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = client_row.id
