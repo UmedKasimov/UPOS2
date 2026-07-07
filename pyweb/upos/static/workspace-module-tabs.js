@@ -147,9 +147,19 @@
       openTabs = unique(saved.openTabs.filter((tabId) => tabMeta.has(tabId)));
       const storedActive = tabMeta.has(saved.activeTab) ? saved.activeTab : "";
       const defaultTab = normalize(root.dataset.workspaceDefaultTab);
+      const forceTab = normalize(root.dataset.workspaceForceTab);
+      const closeTabsOnLoad = splitViews(root.dataset.workspaceCloseTabsOnLoad);
       const hashTab = tabFromLocation();
       const hasLocationHash = Boolean(normalize(window.location.hash).replace(/^#/, ""));
 
+      if (closeTabsOnLoad.length) {
+        openTabs = openTabs.filter((tabId) => !closeTabsOnLoad.includes(tabId));
+      }
+      if (forceTab && tabMeta.has(forceTab)) {
+        activeTab = forceTab;
+        ensureOpen(forceTab);
+        return;
+      }
       if (hashTab) {
         activeTab = hashTab;
         ensureOpen(hashTab);

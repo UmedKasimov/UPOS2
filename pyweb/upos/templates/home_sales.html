@@ -19,6 +19,8 @@
     data-workspace-tabs
     data-workspace-key="sales"
     data-workspace-default-tab="{{ sales_default_tab }}"
+    data-workspace-force-tab="{{ 'journal' if flash_ok == 'saved' else '' }}"
+    data-workspace-close-tabs-on-load="{{ 'new' if flash_ok == 'saved' else '' }}"
     data-workspace-home-href="{{ url_for('sales_get') }}"
   >
     {% if flash_ok == "saved" %}
