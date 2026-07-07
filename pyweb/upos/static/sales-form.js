@@ -780,6 +780,14 @@
     removeSalesDraftText();
   }
 
+  function isSalesSavedPage() {
+    try {
+      return new URLSearchParams(window.location.search).get("msg") === "saved";
+    } catch (_) {
+      return false;
+    }
+  }
+
   function setDraftField(root, selector, value) {
     var input = root.querySelector(selector);
     if (input && value !== undefined && value !== null) input.value = value;
@@ -2023,7 +2031,11 @@
         addServiceLine(root, options);
       });
     }
-    restoreSalesDraft(root, options);
+    if (isSalesSavedPage()) {
+      clearSalesDraft();
+    } else {
+      restoreSalesDraft(root, options);
+    }
     root.addEventListener("input", function () {
       scheduleSalesDraft(root);
     });
