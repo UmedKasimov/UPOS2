@@ -7158,6 +7158,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--card) 88%, var(--brand-box, #2d6cdf) 12%);
 }
 
+.warehouse-purchase-entry-row--attention td {
+  background: color-mix(in srgb, var(--brand-box, #2d6cdf) 15%, var(--card));
+  transition: background 0.25s ease;
+}
+
 .warehouse-purchase-entry-table strong {
   display: block;
   text-align: right;

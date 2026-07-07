@@ -256,6 +256,40 @@
       || null;
   }
 
+  function purchaseProductKey(item) {
+    const id = String(item?.id || "").trim();
+    if (id) return `id:${id}`;
+    return `name:${normalize(item?.name)}`;
+  }
+
+  function selectedPurchaseProductKeys(form, exceptRow) {
+    const keys = new Set();
+    form?.querySelectorAll("[data-purchase-entry-row]").forEach((row) => {
+      if (row === exceptRow) return;
+      const picker = row.querySelector("[data-warehouse-product-picker]");
+      const input = row.querySelector('input[name="line_product"]');
+      const id = String(picker?.dataset?.productId || "").trim();
+      const name = String(input?.value || "").trim();
+      if (id) keys.add(`id:${id}`);
+      else if (name) keys.add(`name:${normalize(name)}`);
+    });
+    return keys;
+  }
+
+  function findDuplicatePurchaseProductRow(form, currentRow, item) {
+    const selectedKey = purchaseProductKey(item);
+    if (!selectedKey || selectedKey === "name:") return null;
+    return Array.from(form?.querySelectorAll("[data-purchase-entry-row]") || []).find((row) => {
+      if (row === currentRow) return false;
+      const picker = row.querySelector("[data-warehouse-product-picker]");
+      const input = row.querySelector('input[name="line_product"]');
+      const id = String(picker?.dataset?.productId || "").trim();
+      const name = String(input?.value || "").trim();
+      const rowKey = id ? `id:${id}` : name ? `name:${normalize(name)}` : "";
+      return rowKey === selectedKey;
+    }) || null;
+  }
+
   function closeProductPanel(picker) {
     const panel = picker?.querySelector("[data-warehouse-product-panel]");
     if (panel) panel.hidden = true;
@@ -501,8 +535,12 @@
     const options = readPurchaseOptions();
     const panel = picker.querySelector("[data-warehouse-product-panel]");
     if (!panel) return;
-    const rows = (options.product_rows || [])
-      .filter((item) => productKind(item) === "product" && itemMatches(item, query))
+    const row = picker.closest("[data-purchase-entry-row]");
+    const selectedKeys = selectedPurchaseProductKeys(form, row);
+    const matchedRows = (options.product_rows || [])
+      .filter((item) => productKind(item) === "product" && itemMatches(item, query));
+    const rows = matchedRows
+      .filter((item) => !selectedKeys.has(purchaseProductKey(item)))
       .slice(0, 100);
     panel.innerHTML =
       '<button type="button" class="sales-combo-create" data-warehouse-product-create>+ Создать товар</button>' +
@@ -525,7 +563,7 @@
             );
           })
           .join("")
-      : '<div class="sales-combo-empty">Ничего не найдено</div>');
+      : `<div class="sales-combo-empty">${matchedRows.length ? "Товар уже добавлен в список" : "Ничего не найдено"}</div>`);
     panel.hidden = false;
     positionProductPanel(picker);
     panel.querySelector("[data-warehouse-product-create]")?.addEventListener("mousedown", (event) => {
@@ -544,6 +582,18 @@
     if (!picker || !item) return;
     const input = picker.querySelector("[data-warehouse-product-input]");
     const row = picker.closest("[data-purchase-entry-row]");
+    const duplicateRow = findDuplicatePurchaseProductRow(form, row, item);
+    if (duplicateRow) {
+      if (input) input.value = picker.dataset.previousProductName || "";
+      if (picker.dataset.previousProductId) picker.dataset.productId = picker.dataset.previousProductId;
+      else delete picker.dataset.productId;
+      setProductLocked(picker, Boolean(input?.value));
+      closeProductPanel(picker);
+      duplicateRow.querySelector('input[name="line_quantity"]')?.focus();
+      duplicateRow.classList.add("warehouse-purchase-entry-row--attention");
+      window.setTimeout(() => duplicateRow.classList.remove("warehouse-purchase-entry-row--attention"), 900);
+      return;
+    }
     if (input) input.value = item.name || "";
     picker.dataset.productId = item.id || "";
     if (row) {
@@ -596,6 +646,8 @@
       }
     });
     edit?.addEventListener("click", () => {
+      picker.dataset.previousProductName = input.value || "";
+      picker.dataset.previousProductId = picker.dataset.productId || "";
       setProductLocked(picker, false);
       input.focus();
       input.select();
