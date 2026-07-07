@@ -393,7 +393,7 @@
       </nav>
       <section class="warehouse-purchase-detail-pane active" data-purchase-detail-pane="items">
         <div class="warehouse-purchase-detail-table-wrap">
-          <table class="warehouse-purchase-detail-table">
+          <table class="warehouse-purchase-detail-table purchase-document-detail-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -409,35 +409,31 @@
         </div>
       </section>
       <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-purchase-detail-pane="payment" hidden>
-        <div class="warehouse-purchase-payment-grid">
-          <div class="warehouse-purchase-payment-card warehouse-purchase-payment-card--total">
-            <span>Итого заказа</span>
-            <strong data-purchase-payment-total></strong>
-          </div>
-          <div class="warehouse-purchase-payment-card">
-            <span>Оплачено</span>
-            <strong data-purchase-payment-paid></strong>
-          </div>
-          <div class="warehouse-purchase-payment-card warehouse-purchase-payment-card--debt">
-            <span>Осталось оплатить</span>
-            <strong data-purchase-payment-debt></strong>
-          </div>
-          <div class="warehouse-purchase-payment-card">
-            <span>Статус</span>
-            <strong data-purchase-payment-status></strong>
-          </div>
-          <div class="warehouse-purchase-payment-card">
-            <span>Тип оплаты</span>
-            <strong data-purchase-payment-type></strong>
-          </div>
-          <div class="warehouse-purchase-payment-card">
-            <span>Дата закупки</span>
-            <strong data-purchase-payment-date></strong>
-          </div>
-          <div class="warehouse-purchase-payment-card warehouse-purchase-payment-card--wide">
-            <span>Поставщик</span>
-            <strong data-purchase-payment-supplier></strong>
-          </div>
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table purchase-document-detail-table purchase-document-payment-table">
+            <thead>
+              <tr>
+                <th>Итого заказа</th>
+                <th>Оплачено</th>
+                <th>Осталось оплатить</th>
+                <th>Статус</th>
+                <th>Тип оплаты</th>
+                <th>Дата закупки</th>
+                <th>Поставщик</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong data-purchase-payment-total></strong></td>
+                <td><strong data-purchase-payment-paid></strong></td>
+                <td><strong data-purchase-payment-debt></strong></td>
+                <td data-purchase-payment-status></td>
+                <td data-purchase-payment-type></td>
+                <td data-purchase-payment-date></td>
+                <td data-purchase-payment-supplier></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <form class="document-detail-payment-actions" method="post" action="" data-purchase-payment-form data-purchase-payment-url-template="{{ url_for('warehouse_purchase_pay', purchase_id='__purchase_id__') }}" hidden>
           {% include "_csrf_field.html" %}
@@ -445,7 +441,20 @@
         </form>
       </section>
       <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-purchase-detail-pane="note" hidden>
-        <div class="warehouse-purchase-note-box" data-purchase-detail-note></div>
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table purchase-document-note-table">
+            <thead>
+              <tr>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-purchase-detail-note></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
       <footer class="warehouse-purchase-detail-footer">
         <div>
