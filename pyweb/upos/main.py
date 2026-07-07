@@ -6568,6 +6568,28 @@ def create_app() -> FastAPI:
                     last_date_by_name[lowered] = doc_date
         return balance_by_id, balance_by_name, last_date_by_id, last_date_by_name
 
+    def _purchase_rollup_currency_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, dict[str, Decimal]], dict[str, dict[str, Decimal]]]:
+        balance_by_id: dict[str, dict[str, Decimal]] = {}
+        balance_by_name: dict[str, dict[str, Decimal]] = {}
+        rows = session.execute(
+            select(PurchaseDocument)
+            .where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
+            .order_by(PurchaseDocument.updated_at.desc())
+        ).scalars()
+        for row in rows:
+            data = _json_object(row.data)
+            balance = _sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount"))
+            currency = str(row.currency or "UZS").strip().upper() or "UZS"
+            name = str(data.get("supplier") or "").strip()
+            counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
+            if counterparty_id:
+                bucket = balance_by_id.setdefault(counterparty_id, {})
+                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
+            if name:
+                bucket = balance_by_name.setdefault(name.lower(), {})
+                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
+        return balance_by_id, balance_by_name
+
     def _counterparty_view_data(
         row: Counterparty,
         *,
@@ -7252,8 +7274,22 @@ def create_app() -> FastAPI:
         )
         purchases: list[dict[str, Any]] = []
         payables: list[dict[str, Any]] = []
+        reconciliation_rows: list[dict[str, str]] = []
         total_amount = Decimal("0")
         total_paid = Decimal("0")
+        running_balance = Decimal("0")
+        reconciliation_total_purchase = Decimal("0")
+        reconciliation_total_paid = Decimal("0")
+        reconciliation_currency = str(supplier.get("currency") or "UZS").strip().upper() or "UZS"
+
+        def purchase_sort_key(document: PurchaseDocument) -> tuple[str, str]:
+            document_data = _json_object(document.data)
+            created_at = getattr(document, "created_at", None)
+            return (
+                str(document_data.get("date") or ""),
+                created_at.isoformat() if created_at else "",
+            )
+
         for purchase_row in purchase_rows:
             data = _json_object(purchase_row.data)
             counterparty_id = str(data.get("counterparty_id") or purchase_row.counterparty_id or "").strip()
@@ -7266,10 +7302,59 @@ def create_app() -> FastAPI:
             total_paid += _sales_decimal(data.get("paid_amount"))
             if _sales_decimal(item.get("debt_amount")) > 0:
                 payables.append(item)
+        for purchase_row in sorted(
+            [
+                row_item
+                for row_item in purchase_rows
+                if (
+                    str(_json_object(row_item.data).get("counterparty_id") or row_item.counterparty_id or "").strip() == supplier_id
+                    or str(_json_object(row_item.data).get("supplier") or "").strip().lower() in names
+                )
+            ],
+            key=purchase_sort_key,
+        ):
+            data = _json_object(purchase_row.data)
+            item = _purchase_document_data(purchase_row)
+            amount = _sales_decimal(purchase_row.amount)
+            paid_amount = _sales_decimal(data.get("paid_amount"))
+            currency = str(item.get("currency") or purchase_row.currency or reconciliation_currency or "UZS").strip().upper() or "UZS"
+            reconciliation_currency = currency
+            running_balance += amount
+            reconciliation_total_purchase += amount
+            reconciliation_rows.append(
+                {
+                    "date": str(item.get("date") or ""),
+                    "document": f"Закупка {item['number']}",
+                    "purchase": _sales_money_label(amount),
+                    "payment": _sales_money_label(Decimal("0")),
+                    "balance": _sales_money_label(running_balance),
+                    "currency": currency,
+                }
+            )
+            if paid_amount > 0:
+                running_balance -= paid_amount
+                reconciliation_total_paid += paid_amount
+                reconciliation_rows.append(
+                    {
+                        "date": str(item.get("date") or ""),
+                        "document": f"Оплата по {item['number']}",
+                        "purchase": _sales_money_label(Decimal("0")),
+                        "payment": _sales_money_label(paid_amount),
+                        "balance": _sales_money_label(running_balance),
+                        "currency": currency,
+                    }
+                )
         supplier.update(
             {
                 "purchases": purchases[:10],
                 "payables": payables[:10],
+                "reconciliation": reconciliation_rows[-24:],
+                "reconciliation_totals": {
+                    "purchase": _sales_money_label(reconciliation_total_purchase),
+                    "payment": _sales_money_label(reconciliation_total_paid),
+                    "balance": _sales_money_label(running_balance),
+                    "currency": reconciliation_currency,
+                },
                 "summary": {
                     "purchases": _sales_money_label(total_amount),
                     "paid": _sales_money_label(total_paid),
@@ -8322,6 +8407,7 @@ def create_app() -> FastAPI:
         warehouse_names: list[str] = []
         with session_scope() as session:
             balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _purchase_rollup_maps(session, wid)
+            balance_currency_by_id, balance_currency_by_name = _purchase_rollup_currency_maps(session, wid)
             selected_supplier_id = supplier.strip()
             if selected_supplier_id:
                 selected_supplier_card = _supplier_card_context(

@@ -55,12 +55,6 @@
                 <a
                   class="client-open-link product-cell-meta"
                   href="{{ supplier_tab_href }}#supplier-card"
-                  data-workspace-trigger="profile"
-                  data-workspace-tab-id="supplier-{{ supplier.id }}"
-                  data-workspace-view-id="profile"
-                  data-workspace-tab-title="{{ supplier.name }}"
-                  data-workspace-tab-hash="supplier-card"
-                  data-workspace-tab-href="{{ supplier_tab_href }}"
                 >
                   <strong>{{ supplier.name }}</strong>
                   <small>{{ supplier.official_name or supplier.category or "Поставщик" }}</small>
@@ -216,7 +210,7 @@
     data-workspace-trigger="profile"
     data-workspace-tab-id="supplier-{{ selected_supplier_card.id }}"
     data-workspace-view-id="profile"
-    data-workspace-tab-title="{{ selected_supplier_card.name }}"
+    data-workspace-tab-title="Акт: {{ selected_supplier_card.name }}"
     data-workspace-tab-hash="supplier-card"
     data-workspace-tab-href="{{ selected_supplier_href }}"
   ></span>
@@ -224,7 +218,7 @@
   <section class="client-card-shell" id="supplier-card" data-workspace-view="profile" hidden>
     <header class="client-card-header">
       <div>
-        <span class="client-card-kicker">Карточка поставщика</span>
+        <span class="client-card-kicker">Акт сверки поставщика</span>
         <h2>{{ selected_supplier_card.name }}</h2>
         <p>{{ selected_supplier_card.official_name or selected_supplier_card.category or "Поставщик и закупки" }}</p>
       </div>
@@ -252,6 +246,54 @@
         <strong>{{ selected_supplier_card.summary.purchase_count }}</strong>
       </div>
     </div>
+
+    <article class="client-card-panel client-card-panel--wide">
+      <header>
+        <div>
+          <h3>Акт сверки</h3>
+          <span>Закупки, оплаты и текущий остаток долга перед поставщиком</span>
+        </div>
+        {% set supplier_reconciliation_totals = selected_supplier_card.reconciliation_totals|default(none) %}
+        <strong>{{ supplier_reconciliation_totals.balance if supplier_reconciliation_totals else selected_supplier_card.summary.payable }} {{ supplier_reconciliation_totals.currency if supplier_reconciliation_totals else 'UZS' }}</strong>
+      </header>
+      <div class="products-table-wrap">
+        <table class="products-table client-card-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Документ</th>
+              <th>Закупка</th>
+              <th>Оплата</th>
+              <th>Баланс</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in selected_supplier_card.reconciliation %}
+              <tr>
+                <td>{{ row.date or "-" }}</td>
+                <td>{{ row.document }}</td>
+                <td>{{ row.purchase }} {{ row.currency }}</td>
+                <td>{{ row.payment }} {{ row.currency }}</td>
+                <td>{{ row.balance }} {{ row.currency }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5">Документов для акта сверки пока нет.</td></tr>
+            {% endfor %}
+          </tbody>
+          {% if selected_supplier_card.reconciliation %}
+            {% set supplier_reconciliation_currency = supplier_reconciliation_totals.currency if supplier_reconciliation_totals else 'UZS' %}
+            <tfoot>
+              <tr class="client-act-total-row">
+                <td colspan="2">Итого</td>
+                <td>{{ supplier_reconciliation_totals.purchase if supplier_reconciliation_totals else '0' }} {{ supplier_reconciliation_currency }}</td>
+                <td>{{ supplier_reconciliation_totals.payment if supplier_reconciliation_totals else '0' }} {{ supplier_reconciliation_currency }}</td>
+                <td>{{ supplier_reconciliation_totals.balance if supplier_reconciliation_totals else '0' }} {{ supplier_reconciliation_currency }}</td>
+              </tr>
+            </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </article>
 
     <div class="client-card-grid client-card-grid--even">
       <article class="client-card-panel">
