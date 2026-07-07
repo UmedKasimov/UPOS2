@@ -405,7 +405,7 @@
                   <td data-products-search-highlight>{{ product.sku or "-" }}</td>
                   <td>{{ product.barcode or "-" }}</td>
                   <td>{{ product.unit or "-" }}</td>
-                  <td>{{ product.quantity }} {{ product.unit }}</td>
+                  <td>{{ product.quantity }}</td>
                   <td>
                     {% if product.sale_price %}{{ product.sale_price }} {{ product.sale_currency }}{% else %}-{% endif %}
                     {% if product.prices|length > 1 %}<small>Все ({{ product.prices|length }})</small>{% endif %}
