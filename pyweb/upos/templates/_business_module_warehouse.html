@@ -474,8 +474,10 @@
     <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}">
       {% include "_csrf_field.html" %}
       <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
-      <input type="hidden" name="paid_amount" value="0" />
-      <input type="hidden" name="status" value="new" />
+      <input type="hidden" name="paid_amount" value="0" data-purchase-paid-amount />
+      <input type="hidden" name="payment_type" value="" data-purchase-payment-type />
+      <input type="hidden" name="payment_lines" value="[]" data-purchase-payment-lines />
+      <input type="hidden" name="status" value="new" data-purchase-status />
 
       <div class="product-form-grid warehouse-purchase-entry-grid">
         <label>
@@ -588,16 +590,87 @@
         </div>
       </section>
 
+      <div class="sales-payment-breakdown" data-purchase-payment-breakdown hidden>
+        <button type="button" class="sales-payment-breakdown-clear" data-purchase-payment-clear aria-label="Убрать оплату" title="Убрать оплату">×</button>
+        <div class="sales-payment-breakdown-row sales-payment-breakdown-row--total">
+          <span>Сумма</span>
+          <strong data-purchase-payment-breakdown-total>0 UZS</strong>
+        </div>
+        <div class="sales-payment-breakdown-lines" data-purchase-payment-breakdown-lines></div>
+      </div>
+
       <label class="wide warehouse-purchase-entry-note">
         <span>Комментарий</span>
         <input name="note" autocomplete="off" />
       </label>
 
       <div class="product-form-actions warehouse-purchase-entry-footer">
+        <button type="button" class="btn sales-payment-add-btn" data-purchase-payment-open>+ Добавить оплату</button>
         <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#purchases">Отмена</a>
         <button class="btn" type="submit">Сохранить закупку</button>
       </div>
     </form>
+
+    <dialog class="settings-profile-modal sales-payment-dialog warehouse-purchase-payment-dialog" data-purchase-payment-dialog>
+      <form class="settings-profile-modal-surface sales-payment-dialog-surface" data-purchase-payment-form>
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Добавить оплату</h2>
+            <p class="settings-profile-modal-sub">Оплату закупки можно разделить по нескольким счетам.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-purchase-payment-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body">
+          <div class="sales-payment-lines" data-purchase-payment-lines-ui>
+            <div class="sales-payment-line" data-purchase-payment-line>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Счёт</span>
+                <select class="settings-profile-input" data-purchase-payment-account>
+                  {% for account in warehouse_options.payment_accounts %}
+                    <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Валюта</span>
+                <select class="settings-profile-input" data-purchase-payment-currency>
+                  <option value="UZS">UZS</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Сумма</span>
+                <input class="settings-profile-input" inputmode="decimal" data-purchase-payment-amount />
+              </label>
+              <button type="button" class="sales-payment-remove" data-purchase-payment-remove aria-label="Удалить оплату">×</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary sales-payment-add-line" data-purchase-payment-add-line>+ Ещё счёт</button>
+          <div class="sales-payment-summary-card" data-purchase-payment-summary>
+            <div class="sales-payment-summary-row">
+              <span>К оплате:</span>
+              <strong data-purchase-payment-due>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Оплачено:</span>
+              <strong data-purchase-payment-paid>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Остаток:</span>
+              <strong data-purchase-payment-rest>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row sales-payment-summary-row--over" data-purchase-payment-over-row hidden>
+              <span>Больше суммы:</span>
+              <strong data-purchase-payment-over>0 UZS</strong>
+            </div>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-purchase-payment-cancel>Отмена</button>
+          <button type="submit" class="btn sales-payment-submit" data-purchase-payment-submit>Применить оплату</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog class="settings-profile-modal warehouse-supplier-dialog" data-warehouse-supplier-dialog>
       <form class="settings-profile-modal-surface warehouse-supplier-dialog-surface" data-warehouse-supplier-form>

@@ -663,9 +663,14 @@
       const body = form.querySelector("[data-purchase-entry-lines]");
       const currencyInput = form.querySelector("[data-purchase-entry-currency]");
       const amountInput = form.querySelector("[data-purchase-entry-amount]");
+      const paidInput = form.querySelector("[data-purchase-paid-amount]");
+      const paymentTypeInput = form.querySelector("[data-purchase-payment-type]");
+      const paymentLinesInput = form.querySelector("[data-purchase-payment-lines]");
+      const statusInput = form.querySelector("[data-purchase-status]");
       const totalOutput = form.querySelector("[data-purchase-entry-total]");
       const totalDisplayOutput = form.querySelector("[data-purchase-entry-total-display]");
       const saleTotalOutput = form.querySelector("[data-purchase-entry-sale-total]");
+      const paymentDialog = form.parentElement ? form.parentElement.querySelector("[data-purchase-payment-dialog]") : null;
       const options = readPurchaseOptions();
       if (!body) return;
       wireSupplierPicker(form);
@@ -687,6 +692,216 @@
       const currency = () => currencyInput?.value || "UZS";
       const saleCurrency = () => currency();
       form.dataset.purchaseEntryCurrency = currency();
+
+      const paymentRows = () => paymentDialog ? Array.from(paymentDialog.querySelectorAll("[data-purchase-payment-line]")) : [];
+      const paymentLabel = (select) => {
+        if (!select) return "";
+        const option = select.selectedOptions ? select.selectedOptions[0] : null;
+        return option ? option.getAttribute("data-label") || option.textContent.trim() || select.value : select.value || "";
+      };
+      const setPaymentSelect = (select, wanted) => {
+        if (!select || !wanted) return;
+        select.value = wanted;
+        if (select.value === wanted) return;
+        Array.from(select.options || []).some((option) => {
+          const label = option.getAttribute("data-label") || option.textContent.trim();
+          if (label !== String(wanted).trim()) return false;
+          select.value = option.value;
+          return true;
+        });
+      };
+      const purchasePaymentCurrency = (row) => String(row?.querySelector("[data-purchase-payment-currency]")?.value || currency()).toUpperCase();
+      const purchasePaymentAmount = (row) => purchaseEntryNumber(row?.querySelector("[data-purchase-payment-amount]")?.value || "");
+      const collectPurchasePayments = () => paymentRows().map((row) => {
+        const amountInputNode = row.querySelector("[data-purchase-payment-amount]");
+        if (amountInputNode) formatPurchasePriceInput(amountInputNode, purchasePaymentCurrency(row));
+        const amount = purchasePaymentAmount(row);
+        if (!amount) return null;
+        const account = row.querySelector("[data-purchase-payment-account]");
+        const lineCurrency = purchasePaymentCurrency(row);
+        return {
+          account_id: account ? account.value : "",
+          account: paymentLabel(account),
+          currency: lineCurrency,
+          type: paymentLabel(account),
+          amount: String(amount)
+        };
+      }).filter(Boolean);
+      const paymentTotalInCurrency = (items, targetCurrency) => {
+        const target = String(targetCurrency || currency()).toUpperCase();
+        return (Array.isArray(items) ? items : collectPurchasePayments()).reduce((sum, item) => {
+          return sum + convertPurchaseCurrency(item.amount, item.currency || target, target, options);
+        }, 0);
+      };
+      const parsePurchasePaymentLines = () => {
+        if (!paymentLinesInput || !paymentLinesInput.value) return [];
+        try {
+          const parsed = JSON.parse(paymentLinesInput.value);
+          if (!Array.isArray(parsed)) return [];
+          return parsed.filter((item) => item && purchaseEntryNumber(item.amount));
+        } catch (_) {
+          return [];
+        }
+      };
+      const currentPurchaseTotal = () => purchaseEntryNumber(amountInput?.value || "");
+      const updatePurchasePaymentStatus = (items) => {
+        const payments = Array.isArray(items) ? items : parsePurchasePaymentLines();
+        const total = currentPurchaseTotal();
+        const paid = paymentTotalInCurrency(payments, currency());
+        if (paidInput) paidInput.value = paid ? purchaseEntryFormatCurrency(paid, currency()) : "0";
+        if (statusInput) statusInput.value = paid ? paid >= total && total ? "paid" : "partial" : "new";
+        return { total, paid };
+      };
+      const updatePurchasePaymentBreakdown = (items) => {
+        const box = form.querySelector("[data-purchase-payment-breakdown]");
+        if (!box) return;
+        const payments = Array.isArray(items) ? items : parsePurchasePaymentLines();
+        const totalNode = box.querySelector("[data-purchase-payment-breakdown-total]");
+        const linesNode = box.querySelector("[data-purchase-payment-breakdown-lines]");
+        const state = updatePurchasePaymentStatus(payments);
+        if (totalNode) totalNode.textContent = purchaseEntryMoney(state.paid, currency());
+        if (linesNode) {
+          linesNode.innerHTML = "";
+          payments.forEach((item, index) => {
+            const amount = purchaseEntryNumber(item.amount);
+            if (!amount) return;
+            const row = document.createElement("div");
+            row.className = "sales-payment-breakdown-row";
+            const label = document.createElement("span");
+            label.textContent = index === 0 ? "Оплата" : "";
+            const value = document.createElement("strong");
+            const itemCurrency = String(item.currency || currency()).toUpperCase();
+            value.textContent = purchaseEntryMoney(amount, itemCurrency);
+            const method = document.createElement("em");
+            method.textContent = item.account || item.type || "";
+            row.append(label, value, method);
+            linesNode.append(row);
+          });
+        }
+        box.hidden = !payments.length;
+      };
+      const updatePurchasePaymentSummary = () => {
+        if (!paymentDialog) return;
+        const paid = paymentTotalInCurrency(collectPurchasePayments(), currency());
+        const total = currentPurchaseTotal();
+        const rest = Math.max(0, total - paid);
+        const overpaid = Math.max(0, paid - total);
+        const dueNode = paymentDialog.querySelector("[data-purchase-payment-due]");
+        const paidNode = paymentDialog.querySelector("[data-purchase-payment-paid]");
+        const restNode = paymentDialog.querySelector("[data-purchase-payment-rest]");
+        const overRow = paymentDialog.querySelector("[data-purchase-payment-over-row]");
+        const overNode = paymentDialog.querySelector("[data-purchase-payment-over]");
+        const submit = paymentDialog.querySelector("[data-purchase-payment-submit]");
+        if (dueNode) dueNode.textContent = purchaseEntryMoney(total, currency());
+        if (paidNode) paidNode.textContent = purchaseEntryMoney(paid, currency());
+        if (restNode) restNode.textContent = purchaseEntryMoney(rest, currency());
+        if (overNode) overNode.textContent = purchaseEntryMoney(overpaid, currency());
+        if (overRow) overRow.hidden = overpaid <= 0;
+        paymentDialog.querySelector("[data-purchase-payment-summary]")?.classList.toggle("is-overpaid", overpaid > 0);
+        if (submit) {
+          submit.disabled = paid <= 0 || overpaid > 0;
+          submit.title = overpaid > 0 ? `Оплата больше суммы на ${purchaseEntryMoney(overpaid, currency())}` : "";
+        }
+      };
+      const syncPurchasePaymentHidden = () => {
+        const payments = collectPurchasePayments();
+        const paid = paymentTotalInCurrency(payments, currency());
+        if (paidInput) paidInput.value = paid ? purchaseEntryFormatCurrency(paid, currency()) : "0";
+        if (paymentTypeInput) {
+          const types = [];
+          payments.forEach((item) => {
+            if (item.type && !types.includes(item.type)) types.push(item.type);
+          });
+          paymentTypeInput.value = types.join(", ");
+        }
+        if (paymentLinesInput) paymentLinesInput.value = JSON.stringify(payments);
+        updatePurchasePaymentBreakdown(payments);
+      };
+      const convertPurchasePaymentLineCurrency = (row, nextCurrency) => {
+        if (!row) return;
+        const input = row.querySelector("[data-purchase-payment-amount]");
+        const target = String(nextCurrency || purchasePaymentCurrency(row)).toUpperCase();
+        const previous = String(row.dataset.purchasePaymentCurrency || currency() || target).toUpperCase();
+        const amount = purchaseEntryNumber(input?.value || "");
+        if (input && amount) {
+          input.value = purchaseEntryFormatCurrency(convertPurchaseCurrency(amount, previous, target, options), target);
+        }
+        row.dataset.purchasePaymentCurrency = target;
+      };
+      const wirePurchasePaymentLine = (row) => {
+        if (!row || row.dataset.purchasePaymentReady === "1") return;
+        row.dataset.purchasePaymentReady = "1";
+        row.querySelectorAll("[data-purchase-payment-amount], [data-purchase-payment-account], [data-purchase-payment-currency]").forEach((input) => {
+          input.addEventListener("input", () => {
+            if (input.matches("[data-purchase-payment-amount]")) formatPurchasePriceInput(input, purchasePaymentCurrency(row));
+            updatePurchasePaymentSummary();
+          });
+          input.addEventListener("change", () => {
+            if (input.matches("[data-purchase-payment-currency]")) convertPurchasePaymentLineCurrency(row, input.value);
+            if (input.matches("[data-purchase-payment-amount]")) formatPurchasePriceInput(input, purchasePaymentCurrency(row));
+            updatePurchasePaymentSummary();
+          });
+        });
+        row.querySelector("[data-purchase-payment-remove]")?.addEventListener("click", () => {
+          if (paymentRows().length <= 1) {
+            row.querySelectorAll("input").forEach((input) => {
+              input.value = "";
+            });
+            setPaymentSelect(row.querySelector("[data-purchase-payment-currency]"), currency());
+            row.dataset.purchasePaymentCurrency = currency();
+          } else {
+            row.remove();
+          }
+          updatePurchasePaymentSummary();
+        });
+      };
+      const addPurchasePaymentLine = () => {
+        if (!paymentDialog) return null;
+        const wrap = paymentDialog.querySelector("[data-purchase-payment-lines-ui]");
+        const source = paymentDialog.querySelector("[data-purchase-payment-line]");
+        if (!wrap || !source) return null;
+        const row = source.cloneNode(true);
+        row.removeAttribute("data-purchase-payment-ready");
+        row.querySelectorAll("input").forEach((input) => {
+          input.value = "";
+        });
+        setPaymentSelect(row.querySelector("[data-purchase-payment-currency]"), currency());
+        row.dataset.purchasePaymentCurrency = currency();
+        wrap.append(row);
+        wirePurchasePaymentLine(row);
+        updatePurchasePaymentSummary();
+        return row;
+      };
+      const openPurchasePaymentDialog = () => {
+        if (!paymentDialog) return;
+        paymentRows().forEach((row, index) => {
+          if (index > 0) row.remove();
+        });
+        const first = paymentRows()[0] || addPurchasePaymentLine();
+        const input = first?.querySelector("[data-purchase-payment-amount]");
+        setPaymentSelect(first?.querySelector("[data-purchase-payment-currency]"), currency());
+        if (first) first.dataset.purchasePaymentCurrency = currency();
+        if (input && !purchaseEntryNumber(paidInput?.value || "")) input.value = purchaseEntryFormatCurrency(currentPurchaseTotal(), currency());
+        updatePurchasePaymentSummary();
+        if (typeof paymentDialog.showModal === "function") {
+          try {
+            paymentDialog.showModal();
+          } catch (_) {
+            paymentDialog.setAttribute("open", "");
+          }
+        } else {
+          paymentDialog.setAttribute("open", "");
+        }
+        window.setTimeout(() => {
+          input?.focus();
+          input?.select();
+        }, 0);
+      };
+      const closePurchasePaymentDialog = () => {
+        if (!paymentDialog) return;
+        if (typeof paymentDialog.close === "function") paymentDialog.close();
+        paymentDialog.removeAttribute("open");
+      };
 
       const renumber = () => {
         rows().forEach((row, index) => {
@@ -712,6 +927,8 @@
         if (totalDisplayOutput) totalDisplayOutput.textContent = purchaseEntryMoney(total, currency());
         if (saleTotalOutput) saleTotalOutput.textContent = purchaseEntryMoney(saleTotal, saleCurrency());
         renumber();
+        updatePurchasePaymentBreakdown();
+        updatePurchasePaymentSummary();
       };
 
       const ensureBlankLine = () => {
@@ -809,6 +1026,40 @@
       };
 
       rows().forEach(wireRow);
+      paymentRows().forEach(wirePurchasePaymentLine);
+      form.querySelector("[data-purchase-payment-open]")?.addEventListener("click", openPurchasePaymentDialog);
+      paymentDialog?.querySelectorAll("[data-purchase-payment-close], [data-purchase-payment-cancel]").forEach((button) => {
+        button.addEventListener("click", closePurchasePaymentDialog);
+      });
+      paymentDialog?.querySelector("[data-purchase-payment-add-line]")?.addEventListener("click", () => {
+        const row = addPurchasePaymentLine();
+        row?.querySelector("[data-purchase-payment-amount]")?.focus();
+      });
+      paymentDialog?.querySelector("[data-purchase-payment-form]")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        updatePurchasePaymentSummary();
+        const paid = paymentTotalInCurrency(collectPurchasePayments(), currency());
+        const total = currentPurchaseTotal();
+        if (paid <= 0 || paid > total) return;
+        syncPurchasePaymentHidden();
+        closePurchasePaymentDialog();
+      });
+      form.querySelector("[data-purchase-payment-clear]")?.addEventListener("click", () => {
+        if (paidInput) paidInput.value = "0";
+        if (paymentTypeInput) paymentTypeInput.value = "";
+        if (paymentLinesInput) paymentLinesInput.value = "[]";
+        paymentRows().forEach((row, index) => {
+          if (index > 0) row.remove();
+          else {
+            row.querySelectorAll("input").forEach((input) => {
+              input.value = "";
+            });
+            setPaymentSelect(row.querySelector("[data-purchase-payment-currency]"), currency());
+            row.dataset.purchasePaymentCurrency = currency();
+          }
+        });
+        updatePurchasePaymentBreakdown([]);
+      });
       currencyInput?.addEventListener("change", () => convertVisiblePrices(currency()));
       form.querySelector("[data-purchase-price-type]")?.addEventListener("change", () => {
         const priceType = syncPurchasePriceTitle(form);
@@ -832,6 +1083,7 @@
       });
       form.addEventListener("submit", () => {
         syncPurchasePriceTitle(form);
+        updatePurchasePaymentStatus();
         rows().forEach((row) => {
           row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_sale_price"]').forEach((input) => {
             const value = purchaseEntryNumber(input.value);

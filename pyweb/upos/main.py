@@ -6470,16 +6470,46 @@ def create_app() -> FastAPI:
             raise ValueError("Итог не может быть отрицательным")
         if paid_amount < 0:
             raise ValueError("Оплачено не может быть отрицательным")
+        payment_lines: list[dict[str, str]] = []
+        raw_payment_lines = str(form.get("payment_lines") or "").strip()
+        if raw_payment_lines:
+            try:
+                parsed_payment_lines = json.loads(raw_payment_lines)
+            except Exception:
+                parsed_payment_lines = []
+            if isinstance(parsed_payment_lines, list):
+                for payment in parsed_payment_lines:
+                    if not isinstance(payment, dict):
+                        continue
+                    payment_amount = _sales_decimal(payment.get("amount"))
+                    if payment_amount <= 0:
+                        continue
+                    payment_currency = str(payment.get("currency") or currency or "UZS").strip().upper() or "UZS"
+                    payment_lines.append(
+                        {
+                            "account_id": str(payment.get("account_id") or "").strip(),
+                            "account": str(payment.get("account") or "").strip(),
+                            "type": str(payment.get("type") or "").strip(),
+                            "currency": payment_currency[:8],
+                            "amount": str(payment_amount.normalize() if payment_amount else "0"),
+                        }
+                    )
         status = str(form.get("status") or "").strip()
         if not status:
             status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "new"
+        payment_type = str(form.get("payment_type") or "").strip()
+        if not payment_type and payment_lines:
+            payment_type = ", ".join(
+                dict.fromkeys(str(item.get("type") or "").strip() for item in payment_lines if str(item.get("type") or "").strip())
+            )
         data = {
             "date": str(form.get("date") or "").strip(),
             "supplier": str(form.get("supplier") or "").strip(),
             "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
             "status": status,
             "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
-            "payment_type": str(form.get("payment_type") or "").strip(),
+            "payment_type": payment_type,
+            "payment_lines": payment_lines,
             "price_type_id": str(form.get("purchase_price_type_id") or "").strip(),
             "price_type_name": str(form.get("purchase_price_type_name") or "").strip(),
             "save_prices_to_price_type": str(form.get("save_purchase_prices") or "").strip().lower() in {"1", "on", "true", "yes"},
@@ -7653,6 +7683,26 @@ def create_app() -> FastAPI:
             for item in price_types
             if item.get("is_active") and item.get("is_for_sales")
         ] or price_types
+        payment_accounts: list[dict[str, str]] = []
+        treasury = load_treasury(wid)
+        for pocket in treasury.get("pockets") or []:
+            if not isinstance(pocket, dict):
+                continue
+            label = str(pocket.get("label") or "").strip()
+            if not label:
+                continue
+            payment_accounts.append(
+                {
+                    "id": str(pocket.get("id") or "").strip(),
+                    "label": label,
+                    "template_id": str(pocket.get("template_id") or "").strip(),
+                }
+            )
+        if not payment_accounts:
+            payment_accounts = [
+                {"id": "cash", "label": "Наличные", "template_id": "cash"},
+                {"id": "card", "label": "Карта", "template_id": "card"},
+            ]
         warehouse_options = {
             "warehouses": [item["name"] for item in warehouse_records] or ["Основной склад"],
             "products": product_names,
@@ -7671,6 +7721,7 @@ def create_app() -> FastAPI:
                 key=lambda item: (item["sort_order"], item["name"]),
             ),
             "suppliers": supplier_names,
+            "payment_accounts": payment_accounts,
             "fx": {"USD_UZS": _decimal_plain_text(_workspace_usd_uzs_rate(wid))},
         }
         return tpl(

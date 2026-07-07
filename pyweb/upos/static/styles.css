@@ -7206,6 +7206,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: flex-end;
 }
 
+.warehouse-purchase-entry-footer [data-purchase-payment-open] {
+  margin-right: auto;
+}
+
 .sales-total-quantity {
   display: inline-flex;
   align-items: baseline;
