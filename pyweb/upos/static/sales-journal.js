@@ -18,6 +18,15 @@
     node.textContent = value == null || value === "" ? "-" : String(value);
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function moneyWithCurrency(value, currency) {
     var text = String(value == null || value === "" ? "0" : value).trim() || "0";
     var moneyCurrency = String(currency || "UZS").trim() || "UZS";
@@ -33,6 +42,97 @@
       }).format(Math.round((numeric + Number.EPSILON) * 100) / 100);
     }
     return text + " " + moneyCurrency;
+  }
+
+  function receiptLineRows(sale) {
+    var lines = Array.isArray(sale.lines) ? sale.lines : [];
+    var currency = sale.currency || "UZS";
+    if (!lines.length) {
+      return (
+        "<tr>" +
+        "<td>" + escapeHtml(sale.number || "Продажа") + "</td>" +
+        "<td class=\"num\">1</td>" +
+        "<td class=\"num\">" + escapeHtml(moneyWithCurrency(sale.amount, currency)) + "</td>" +
+        "</tr>"
+      );
+    }
+    return lines.map(function (line) {
+      var name = lineValue(line, ["product", "product_name", "name", "service", "title"], "Товар");
+      var qty = lineValue(line, ["quantity", "qty", "count"], "1");
+      var total = lineValue(line, ["total", "sum", "amount", "line_total"], "");
+      var price = lineValue(line, ["price", "unit_price", "price_label"], "");
+      var amount = total === "" ? price : total;
+      return (
+        "<tr>" +
+        "<td>" + escapeHtml(name) + "</td>" +
+        "<td class=\"num\">" + escapeHtml(qty) + "</td>" +
+        "<td class=\"num\">" + escapeHtml(amount === "" ? "-" : moneyWithCurrency(amount, currency)) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function printSaleReceipt(sale) {
+    if (!sale) return;
+    var currency = sale.currency || "UZS";
+    var title = (sale.doc_type_label || "Продажа") + " " + (sale.number || "");
+    var html =
+      "<!doctype html><html><head><meta charset=\"utf-8\">" +
+      "<title>" + escapeHtml(title) + "</title>" +
+      "<style>" +
+      "@page{size:80mm auto;margin:4mm}" +
+      "body{font-family:Arial,'Inter',sans-serif;color:#111;margin:0;font-size:11px}" +
+      ".receipt{width:72mm;margin:0 auto}" +
+      ".center{text-align:center}.muted{color:#555}.row{display:flex;justify-content:space-between;gap:8px;margin:3px 0}" +
+      "h1{font-size:15px;margin:0 0 3px;font-weight:800}.meta{border-top:1px dashed #999;border-bottom:1px dashed #999;padding:6px 0;margin:7px 0}" +
+      "table{width:100%;border-collapse:collapse;margin:7px 0}th,td{padding:4px 0;border-bottom:1px dashed #bbb;text-align:left;vertical-align:top}" +
+      "th{font-size:10px;text-transform:uppercase}.num{text-align:right;white-space:nowrap}.total{font-size:13px;font-weight:800}.footer{margin-top:10px;border-top:1px dashed #999;padding-top:7px}" +
+      "</style></head><body><main class=\"receipt\">" +
+      "<div class=\"center\"><h1>UPOS FINANCE</h1><div class=\"muted\">Чек продажи</div></div>" +
+      "<section class=\"meta\">" +
+      "<div class=\"row\"><span>Документ</span><strong>" + escapeHtml(sale.number || "-") + "</strong></div>" +
+      "<div class=\"row\"><span>Дата</span><strong>" + escapeHtml(sale.date_label || sale.date || "-") + "</strong></div>" +
+      "<div class=\"row\"><span>Клиент</span><strong>" + escapeHtml(sale.client || "-") + "</strong></div>" +
+      "<div class=\"row\"><span>Склад</span><strong>" + escapeHtml(sale.warehouse || "-") + "</strong></div>" +
+      "</section>" +
+      "<table><thead><tr><th>Товар</th><th class=\"num\">К-во</th><th class=\"num\">Сумма</th></tr></thead><tbody>" +
+      receiptLineRows(sale) +
+      "</tbody></table>" +
+      "<section class=\"meta\">" +
+      "<div class=\"row total\"><span>Итого</span><strong>" + escapeHtml(moneyWithCurrency(sale.amount, currency)) + "</strong></div>" +
+      "<div class=\"row\"><span>Оплачено</span><strong>" + escapeHtml(moneyWithCurrency(sale.paid_amount, currency)) + "</strong></div>" +
+      "<div class=\"row\"><span>Долг</span><strong>" + escapeHtml(moneyWithCurrency(sale.debt_amount, currency)) + "</strong></div>" +
+      "</section>" +
+      "<div class=\"footer center muted\">Спасибо за покупку</div>" +
+      "</main></body></html>";
+    var frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.left = "-10000px";
+    frame.style.top = "0";
+    frame.style.width = "1px";
+    frame.style.height = "1px";
+    frame.style.border = "0";
+    document.body.appendChild(frame);
+    var printWindow = frame.contentWindow;
+    if (!printWindow || !printWindow.document) {
+      frame.remove();
+      window.print();
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    try {
+      printWindow.focus();
+      printWindow.print();
+    } catch (_err) {
+      window.print();
+    } finally {
+      window.setTimeout(function () {
+        frame.remove();
+      }, 1200);
+    }
   }
 
   function draftStorage(name) {
@@ -63,6 +163,12 @@
       .replace(/\b(UZS|USD)\b/gi, "")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function amountNumber(value) {
+    var normalized = numericText(value).replace(/\s+/g, "").replace(",", ".");
+    var number = Number(normalized);
+    return Number.isFinite(number) ? number : 0;
   }
 
   function lineValue(line, names, fallback) {
@@ -161,6 +267,21 @@
     });
   }
 
+  function activateSalesDetailTab(panel, tabName) {
+    if (!panel) return;
+    var activeTab = tabName || "items";
+    panel.querySelectorAll("[data-sales-detail-tab]").forEach(function (button) {
+      var isActive = button.dataset.salesDetailTab === activeTab;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    panel.querySelectorAll("[data-sales-detail-pane]").forEach(function (pane) {
+      var isActive = pane.dataset.salesDetailPane === activeTab;
+      pane.hidden = !isActive;
+      pane.classList.toggle("active", isActive);
+    });
+  }
+
   function appendCell(row, value) {
     var cell = document.createElement("td");
     cell.textContent = value == null || value === "" ? "-" : String(value);
@@ -214,6 +335,18 @@
     setText(panel, "[data-sales-detail-paid]", moneyWithCurrency(sale.paid_amount, currency));
     setText(panel, "[data-sales-detail-debt]", moneyWithCurrency(sale.debt_amount, currency));
     setText(panel, "[data-sales-detail-total]", moneyWithCurrency(sale.amount, currency));
+    setText(panel, "[data-sales-payment-total]", moneyWithCurrency(sale.amount, currency));
+    setText(panel, "[data-sales-payment-paid]", moneyWithCurrency(sale.paid_amount, currency));
+    setText(panel, "[data-sales-payment-debt]", moneyWithCurrency(sale.debt_amount, currency));
+    setText(panel, "[data-sales-payment-status]", sale.status_label || "Новый");
+    setText(panel, "[data-sales-payment-type]", sale.payment_type || "Не указано");
+    setText(panel, "[data-sales-payment-date]", sale.date_label || sale.date || "-");
+    setText(panel, "[data-sales-payment-client]", sale.client || "Клиент не указан");
+    setText(panel, "[data-sales-detail-note]", sale.note || "Комментарий не указан");
+    var paymentPane = panel.querySelector('[data-sales-detail-pane="payment"]');
+    if (paymentPane) {
+      paymentPane.dataset.paymentState = amountNumber(sale.debt_amount || sale.debt_value) > 0 ? "debt" : "paid";
+    }
     updateReturnButton(panel, sale);
     renderLines(panel, sale);
   }
@@ -223,7 +356,9 @@
     var backdrop = root.querySelector(".sales-document-detail-backdrop");
     var sale = readSale(saleId);
     if (!panel || !sale) return;
+    panel.dataset.saleId = saleId || "";
     renderDetail(panel, sale);
+    activateSalesDetailTab(panel, "items");
     closeDetailMenu(root);
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;
@@ -319,6 +454,14 @@
         event.stopPropagation();
       });
     });
+    scope.querySelectorAll("[data-sales-detail-tab]").forEach(function (tab) {
+      if (tab.dataset.salesDetailTabReady === "1") return;
+      tab.dataset.salesDetailTabReady = "1";
+      tab.addEventListener("click", function () {
+        var panel = tab.closest("[data-sales-journal-detail]");
+        activateSalesDetailTab(panel, tab.dataset.salesDetailTab || "items");
+      });
+    });
     scope.querySelectorAll("[data-sales-detail-menu-return]").forEach(function (trigger) {
       if (trigger.dataset.salesDetailMenuReturnReady === "1") return;
       trigger.dataset.salesDetailMenuReturnReady = "1";
@@ -334,7 +477,9 @@
       trigger.dataset.salesDetailPrintReady = "1";
       trigger.addEventListener("click", function () {
         closeDetailMenu(scope);
-        window.print();
+        var panel = trigger.closest("[data-sales-journal-detail]");
+        var sale = panel ? readSale(panel.dataset.saleId || "") : null;
+        printSaleReceipt(sale);
       });
     });
     scope.querySelectorAll("[data-sales-detail-menu-close]").forEach(function (trigger) {

@@ -282,6 +282,24 @@
     return item.balance ? String(item.balance || "0") + " UZS" : "";
   }
 
+  function clientBalanceOptionHtml(item) {
+    if (!item) return "";
+    var kind = String(item.balance_kind || "zero");
+    if (kind === "zero") return "";
+    var text = clientBalanceText(item);
+    if (!text) return "";
+    var label = kind === "debt" ? "Долг" : kind === "advance" ? "Депозит" : "Баланс";
+    return (
+      '<span class="sales-combo-balance" data-balance-kind="' +
+      escapeHtml(kind) +
+      '"><span>' +
+      escapeHtml(label) +
+      "</span><strong>" +
+      escapeHtml(text) +
+      "</strong></span>"
+    );
+  }
+
   function updateClientBalance(root, client) {
     var node = root.querySelector("[data-sales-client-balance]");
     if (!node) return;
@@ -1192,6 +1210,9 @@
     panel.innerHTML = rows.length
       ? rows.map(function (item, index) {
           return buttonHtml(item.name, item.phone || item.tax_id || "Клиент", item.tax_id || "", query).replace(
+            "</button>",
+            clientBalanceOptionHtml(item) + "</button>"
+          ).replace(
             'class="sales-combo-option"',
             'class="sales-combo-option" data-index="' + index + '"'
           );

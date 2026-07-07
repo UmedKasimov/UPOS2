@@ -307,25 +307,71 @@
             </div>
           </section>
           <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы продажи">
-            <button type="button" class="active">Товары</button>
-            <button type="button">Оплата</button>
-            <button type="button">Комментарий</button>
+            <button type="button" class="active" data-sales-detail-tab="items" aria-selected="true">Товары</button>
+            <button type="button" data-sales-detail-tab="payment" aria-selected="false">Оплата</button>
+            <button type="button" data-sales-detail-tab="note" aria-selected="false">Комментарий</button>
           </nav>
-          <div class="warehouse-purchase-detail-table-wrap">
-            <table class="warehouse-purchase-detail-table sales-document-detail-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Товар</th>
-                  <th>Склад</th>
-                  <th>К-во</th>
-                  <th>Цена</th>
-                  <th>Сумма</th>
-                </tr>
-              </thead>
-              <tbody data-sales-detail-lines></tbody>
-            </table>
-          </div>
+          <section class="warehouse-purchase-detail-pane active" data-sales-detail-pane="items">
+            <div class="warehouse-purchase-detail-table-wrap">
+              <table class="warehouse-purchase-detail-table sales-document-detail-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Товар</th>
+                    <th>Склад</th>
+                    <th>К-во</th>
+                    <th>Цена</th>
+                    <th>Сумма</th>
+                  </tr>
+                </thead>
+                <tbody data-sales-detail-lines></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-sales-detail-pane="payment" hidden>
+            <div class="warehouse-purchase-detail-table-wrap">
+              <table class="warehouse-purchase-detail-table sales-document-detail-table sales-document-payment-table">
+                <thead>
+                  <tr>
+                    <th>Итого продажи</th>
+                    <th>Оплачено</th>
+                    <th>Осталось оплатить</th>
+                    <th>Статус</th>
+                    <th>Тип оплаты</th>
+                    <th>Дата продажи</th>
+                    <th>Клиент</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong data-sales-payment-total></strong></td>
+                    <td><strong data-sales-payment-paid></strong></td>
+                    <td><strong data-sales-payment-debt></strong></td>
+                    <td data-sales-payment-status></td>
+                    <td data-sales-payment-type></td>
+                    <td data-sales-payment-date></td>
+                    <td data-sales-payment-client></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-sales-detail-pane="note" hidden>
+            <div class="warehouse-purchase-detail-table-wrap">
+              <table class="warehouse-purchase-detail-table sales-document-note-table">
+                <thead>
+                  <tr>
+                    <th>Комментарий</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td data-sales-detail-note></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <footer class="warehouse-purchase-detail-footer">
             <div>
               <span>Оплачено</span>
@@ -737,6 +783,6 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=2" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=47" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=5" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=48" defer></script>
 {% endblock %}

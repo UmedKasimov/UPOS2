@@ -387,25 +387,62 @@
         </div>
       </section>
       <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы закупки">
-        <button type="button" class="active">Товары</button>
-        <button type="button">Оплата</button>
-        <button type="button">Комментарий</button>
+        <button type="button" class="active" data-purchase-detail-tab="items" aria-selected="true">Товары</button>
+        <button type="button" data-purchase-detail-tab="payment" aria-selected="false">Оплата</button>
+        <button type="button" data-purchase-detail-tab="note" aria-selected="false">Комментарий</button>
       </nav>
-      <div class="warehouse-purchase-detail-table-wrap">
-        <table class="warehouse-purchase-detail-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Товар</th>
-              <th>К-во</th>
-              <th>Цена</th>
-              <th data-purchase-detail-sale-price-title>Продажная цена</th>
-              <th>Сумма</th>
-            </tr>
-          </thead>
-          <tbody data-purchase-detail-lines></tbody>
-        </table>
-      </div>
+      <section class="warehouse-purchase-detail-pane active" data-purchase-detail-pane="items">
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Товар</th>
+                <th>К-во</th>
+                <th>Цена</th>
+                <th data-purchase-detail-sale-price-title>Продажная цена</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody data-purchase-detail-lines></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-purchase-detail-pane="payment" hidden>
+        <div class="warehouse-purchase-payment-grid">
+          <div class="warehouse-purchase-payment-card warehouse-purchase-payment-card--total">
+            <span>Итого заказа</span>
+            <strong data-purchase-payment-total></strong>
+          </div>
+          <div class="warehouse-purchase-payment-card">
+            <span>Оплачено</span>
+            <strong data-purchase-payment-paid></strong>
+          </div>
+          <div class="warehouse-purchase-payment-card warehouse-purchase-payment-card--debt">
+            <span>Осталось оплатить</span>
+            <strong data-purchase-payment-debt></strong>
+          </div>
+          <div class="warehouse-purchase-payment-card">
+            <span>Статус</span>
+            <strong data-purchase-payment-status></strong>
+          </div>
+          <div class="warehouse-purchase-payment-card">
+            <span>Тип оплаты</span>
+            <strong data-purchase-payment-type></strong>
+          </div>
+          <div class="warehouse-purchase-payment-card">
+            <span>Дата закупки</span>
+            <strong data-purchase-payment-date></strong>
+          </div>
+          <div class="warehouse-purchase-payment-card warehouse-purchase-payment-card--wide">
+            <span>Поставщик</span>
+            <strong data-purchase-payment-supplier></strong>
+          </div>
+        </div>
+      </section>
+      <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-purchase-detail-pane="note" hidden>
+        <div class="warehouse-purchase-note-box" data-purchase-detail-note></div>
+      </section>
       <footer class="warehouse-purchase-detail-footer">
         <div>
           <span>Оплачено</span>
@@ -472,6 +509,10 @@
             {% endfor %}
           </select>
           <input type="hidden" name="purchase_price_type_name" data-purchase-price-type-name />
+        </label>
+        <label class="warehouse-price-save-toggle">
+          <input type="checkbox" name="save_purchase_prices" value="1" data-purchase-save-prices />
+          <span>Сохранить в этот прайс</span>
         </label>
       </div>
 

@@ -44,15 +44,17 @@
   }
 
   function moneyWithCurrency(value, currency) {
-    const text = String(value || "0").trim() || "0";
     const code = String(currency || "UZS").trim() || "UZS";
-    return `${text} ${code}`;
+    return purchaseEntryMoney(purchaseEntryNumber(value), code);
   }
 
   function purchaseEntryNumber(value) {
-    const normalized = String(value || "")
+    const compact = String(value || "")
       .replace(/\s+/g, "")
-      .replace(",", ".")
+      .replace(",", ".");
+    const direct = Number.parseFloat(compact);
+    if (Number.isFinite(direct) && /^[+-]?\d/.test(compact)) return direct;
+    const normalized = compact
       .replace(/[^\d.-]/g, "");
     const parsed = Number.parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -63,20 +65,41 @@
     return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(rounded);
   }
 
-  function purchaseEntryFormatLive(value) {
-    const text = String(value || "");
-    const negative = text.trim().startsWith("-");
-    const digits = text.replace(/\D/g, "");
-    if (!digits) return negative ? "-" : "";
-    return `${negative ? "-" : ""}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
+  function purchaseEntryCurrencyDigits(currency) {
+    return String(currency || "").toUpperCase() === "UZS" ? 0 : 2;
   }
 
-  function formatPurchasePriceInput(input) {
+  function purchaseEntryFormatCurrency(value, currency) {
+    const digits = purchaseEntryCurrencyDigits(currency);
+    const factor = Math.pow(10, digits);
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) return "0";
+    const rounded = Math.round(numeric * factor) / factor;
+    return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: digits }).format(rounded);
+  }
+
+  function purchaseEntryFormatLive(value, currency) {
+    const text = String(value || "").replace(/\s+/g, "");
+    const negative = text.trim().startsWith("-");
+    const unsigned = text.replace(/-/g, "");
+    const separatorIndexes = [unsigned.indexOf("."), unsigned.indexOf(",")].filter((index) => index >= 0);
+    const separatorIndex = separatorIndexes.length ? Math.min(...separatorIndexes) : -1;
+    const hasDecimal = purchaseEntryCurrencyDigits(currency) > 0 && separatorIndex >= 0;
+    const integerRaw = hasDecimal ? unsigned.slice(0, separatorIndex) : unsigned;
+    const fractionRaw = hasDecimal ? unsigned.slice(separatorIndex + 1) : "";
+    const integerDigits = integerRaw.replace(/\D/g, "");
+    const fractionDigits = fractionRaw.replace(/\D/g, "").slice(0, purchaseEntryCurrencyDigits(currency));
+    if (!integerDigits && !hasDecimal) return negative ? "-" : "";
+    const grouped = (integerDigits || "0").replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return `${negative ? "-" : ""}${grouped}${hasDecimal ? `,${fractionDigits}` : ""}`;
+  }
+
+  function formatPurchasePriceInput(input, currency) {
     const value = String(input.value || "");
     const cursor = input.selectionStart ?? value.length;
     const cursorAtEnd = cursor >= value.length;
     const digitsBeforeCursor = value.slice(0, cursor).replace(/\D/g, "").length;
-    const formatted = purchaseEntryFormatLive(value);
+    const formatted = purchaseEntryFormatLive(value, currency);
     input.value = formatted;
     let nextCursor = formatted.length;
     if (!cursorAtEnd) {
@@ -94,7 +117,24 @@
   }
 
   function purchaseEntryMoney(value, currency) {
-    return `${purchaseEntryFormat(value)} ${currency || "UZS"}`;
+    return `${purchaseEntryFormatCurrency(value, currency)} ${currency || "UZS"}`;
+  }
+
+  function purchaseEntryUsdRate(options) {
+    const fx = options?.fx || {};
+    const rate = purchaseEntryNumber(fx.USD_UZS || fx.usd_uzs || fx.usdUzs || "12000");
+    return rate > 0 ? rate : 12000;
+  }
+
+  function convertPurchaseCurrency(value, fromCurrency, toCurrency, options) {
+    const amount = purchaseEntryNumber(value);
+    const source = String(fromCurrency || "UZS").toUpperCase();
+    const target = String(toCurrency || "UZS").toUpperCase();
+    const rate = purchaseEntryUsdRate(options);
+    if (!amount || source === target) return amount;
+    if (source === "USD" && target === "UZS") return amount * rate;
+    if (source === "UZS" && target === "USD") return amount / rate;
+    return amount;
   }
 
   function readPurchaseOptions() {
@@ -194,6 +234,15 @@
     const entry = prices.find((price) => String(price?.price_type_id || "").trim() === typeId)
       || prices.find((price) => normalize(price?.name) === typeName);
     return entry?.price || "";
+  }
+
+  function productPriceEntryForType(item, priceType) {
+    const prices = Array.isArray(item?.prices) ? item.prices : [];
+    const typeId = String(priceType?.id || "").trim();
+    const typeName = normalize(priceType?.name);
+    return prices.find((price) => String(price?.price_type_id || "").trim() === typeId)
+      || prices.find((price) => normalize(price?.name) === typeName)
+      || null;
   }
 
   function productByRow(form, row) {
@@ -507,8 +556,17 @@
         if (value) price.value = purchaseEntryFormat(value);
       }
       if (salePrice && !salePrice.value.trim()) {
-        const value = purchaseEntryNumber(productPriceForType(item, selectedPurchasePriceType(form)) || item.sale_price);
-        if (value) salePrice.value = purchaseEntryFormat(value);
+        const priceType = selectedPurchasePriceType(form);
+        const entry = productPriceEntryForType(item, priceType);
+        const sourceCurrency = String(entry?.currency || priceType.currency || "UZS").toUpperCase();
+        const targetCurrency = form.querySelector("[data-purchase-entry-currency]")?.value || "UZS";
+        const value = purchaseEntryNumber(entry?.price || "");
+        if (value) {
+          salePrice.value = purchaseEntryFormatCurrency(
+            convertPurchaseCurrency(value, sourceCurrency, targetCurrency, readPurchaseOptions()),
+            targetCurrency
+          );
+        }
       }
     }
     setProductLocked(picker, Boolean(input?.value));
@@ -556,6 +614,7 @@
       const totalOutput = form.querySelector("[data-purchase-entry-total]");
       const totalDisplayOutput = form.querySelector("[data-purchase-entry-total-display]");
       const saleTotalOutput = form.querySelector("[data-purchase-entry-sale-total]");
+      const options = readPurchaseOptions();
       if (!body) return;
       wireSupplierPicker(form);
       wireSupplierDialog(form);
@@ -574,7 +633,8 @@
         return quantity * price;
       };
       const currency = () => currencyInput?.value || "UZS";
-      const saleCurrency = () => selectedPurchasePriceType(form).currency || currency();
+      const saleCurrency = () => currency();
+      form.dataset.purchaseEntryCurrency = currency();
 
       const renumber = () => {
         rows().forEach((row, index) => {
@@ -632,6 +692,25 @@
         recalc();
       };
 
+      const convertVisiblePrices = (nextCurrency) => {
+        const previousCurrency = String(form.dataset.purchaseEntryCurrency || nextCurrency || currency()).toUpperCase();
+        const targetCurrency = String(nextCurrency || currency()).toUpperCase();
+        if (previousCurrency === targetCurrency) {
+          recalc();
+          return;
+        }
+        rows().forEach((row) => {
+          row.querySelectorAll('input[name="line_price"], input[name="line_sale_price"]').forEach((input) => {
+            const value = purchaseEntryNumber(input.value);
+            input.value = value
+              ? purchaseEntryFormatCurrency(convertPurchaseCurrency(value, previousCurrency, targetCurrency, options), targetCurrency)
+              : "";
+          });
+        });
+        form.dataset.purchaseEntryCurrency = targetCurrency;
+        recalc();
+      };
+
       const wireRow = (row) => {
         if (row.dataset.purchaseEntryRowReady === "1") return;
         row.dataset.purchaseEntryRowReady = "1";
@@ -644,7 +723,7 @@
           });
           input.addEventListener("input", () => {
             if (input.name === "line_price" || input.name === "line_sale_price") {
-              formatPurchasePriceInput(input);
+              formatPurchasePriceInput(input, input.name === "line_sale_price" ? saleCurrency() : currency());
             } else if (input.name === "line_quantity") {
               const cursorAtEnd = input.selectionStart === input.value.length;
               input.value = input.value.replace(/[^\d\s.,-]/g, "");
@@ -656,7 +735,11 @@
           input.addEventListener("blur", () => {
             if (input.name === "line_quantity" || input.name === "line_price" || input.name === "line_sale_price") {
               const value = purchaseEntryNumber(input.value);
-              input.value = value ? purchaseEntryFormat(value) : "";
+              input.value = value
+                ? input.name === "line_quantity"
+                  ? purchaseEntryFormat(value)
+                  : purchaseEntryFormatCurrency(value, input.name === "line_sale_price" ? saleCurrency() : currency())
+                : "";
               recalc();
             }
           });
@@ -674,15 +757,19 @@
       };
 
       rows().forEach(wireRow);
-      currencyInput?.addEventListener("change", recalc);
+      currencyInput?.addEventListener("change", () => convertVisiblePrices(currency()));
       form.querySelector("[data-purchase-price-type]")?.addEventListener("change", () => {
         const priceType = syncPurchasePriceTitle(form);
         rows().forEach((row) => {
           const product = productByRow(form, row);
           const input = row.querySelector('input[name="line_sale_price"]');
           if (!product || !input) return;
-          const value = purchaseEntryNumber(productPriceForType(product, priceType));
-          input.value = value ? purchaseEntryFormat(value) : "";
+          const entry = productPriceEntryForType(product, priceType);
+          const sourceCurrency = String(entry?.currency || priceType.currency || currency()).toUpperCase();
+          const value = purchaseEntryNumber(entry?.price || "");
+          input.value = value
+            ? purchaseEntryFormatCurrency(convertPurchaseCurrency(value, sourceCurrency, currency(), options), currency())
+            : "";
         });
       });
       form.addEventListener("purchase-entry-product-selected", (event) => {
@@ -720,6 +807,20 @@
     if (node) node.textContent = value == null || value === "" ? "-" : String(value);
   }
 
+  function activatePurchaseDetailTab(panel, tabName) {
+    const activeTab = tabName || "items";
+    panel.querySelectorAll("[data-purchase-detail-tab]").forEach((button) => {
+      const active = button.getAttribute("data-purchase-detail-tab") === activeTab;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    panel.querySelectorAll("[data-purchase-detail-pane]").forEach((pane) => {
+      const active = pane.getAttribute("data-purchase-detail-pane") === activeTab;
+      pane.hidden = !active;
+      pane.classList.toggle("active", active);
+    });
+  }
+
   function renderDetail(panel, purchase) {
     const currency = purchase.currency || "UZS";
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
@@ -732,6 +833,16 @@
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-detail-debt]", moneyWithCurrency(purchase.debt_amount, currency));
     setText(panel, "[data-purchase-detail-total]", moneyWithCurrency(purchase.amount, currency));
+    setText(panel, "[data-purchase-payment-total]", moneyWithCurrency(purchase.amount, currency));
+    setText(panel, "[data-purchase-payment-paid]", moneyWithCurrency(purchase.paid_amount, currency));
+    setText(panel, "[data-purchase-payment-debt]", moneyWithCurrency(purchase.debt_amount, currency));
+    setText(panel, "[data-purchase-payment-status]", purchase.status_label || "Новый");
+    setText(panel, "[data-purchase-payment-type]", purchase.payment_type || "Не указано");
+    setText(panel, "[data-purchase-payment-date]", purchase.date || "-");
+    setText(panel, "[data-purchase-payment-supplier]", purchase.supplier || "Поставщик не указан");
+    setText(panel, "[data-purchase-detail-note]", purchase.note || "Комментарий не указан");
+    const paymentPane = panel.querySelector('[data-purchase-detail-pane="payment"]');
+    if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
     setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
     if (!linesRoot) return;
     linesRoot.replaceChildren();
@@ -774,6 +885,7 @@
     const purchase = readPurchase(purchaseId);
     if (!panel || !purchase) return;
     renderDetail(panel, purchase);
+    activatePurchaseDetailTab(panel, "items");
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;
     requestAnimationFrame(() => {
@@ -835,6 +947,15 @@
       if (trigger.dataset.warehousePurchaseCloseReady === "1") return;
       trigger.dataset.warehousePurchaseCloseReady = "1";
       trigger.addEventListener("click", () => closeDetail(root));
+    });
+    root.querySelectorAll("[data-warehouse-purchase-detail]").forEach((panel) => {
+      if (panel.dataset.purchaseDetailTabsReady === "1") return;
+      panel.dataset.purchaseDetailTabsReady = "1";
+      panel.querySelectorAll("[data-purchase-detail-tab]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activatePurchaseDetailTab(panel, button.getAttribute("data-purchase-detail-tab"));
+        });
+      });
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeDetail(root);

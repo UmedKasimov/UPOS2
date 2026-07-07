@@ -6383,6 +6383,7 @@ def create_app() -> FastAPI:
             "payment_type": str(form.get("payment_type") or "").strip(),
             "price_type_id": str(form.get("purchase_price_type_id") or "").strip(),
             "price_type_name": str(form.get("purchase_price_type_name") or "").strip(),
+            "save_prices_to_price_type": str(form.get("save_purchase_prices") or "").strip().lower() in {"1", "on", "true", "yes"},
             "note": str(form.get("note") or "").strip(),
             "lines": lines,
         }
@@ -7221,11 +7222,18 @@ def create_app() -> FastAPI:
                     data["price_type_name"] = str(selected_price_type.get("name") or data.get("price_type_name") or "")
                     price_currency = str(selected_price_type.get("convert_to_currency") or currency or "UZS").strip().upper() or "UZS"
                     data["price_type_currency"] = price_currency
+                if selected_price_type and data.get("save_prices_to_price_type"):
                     for line in data["lines"]:
                         sale_price = _sales_decimal(line.get("sale_price"))
                         product_id = str(line.get("product_id") or "").strip()
                         if sale_price <= 0 or not product_id:
                             continue
+                        sale_price = _convert_product_currency(
+                            sale_price,
+                            currency,
+                            price_currency,
+                            _workspace_usd_uzs_rate(workspace_owner_id),
+                        )
                         product_row = session.get(Product, product_id)
                         if product_row and product_row.workspace_owner_id == workspace_owner_id:
                             _apply_product_price_change(product_row, selected_price_type, sale_price, price_currency)
@@ -7436,6 +7444,7 @@ def create_app() -> FastAPI:
                 key=lambda item: (item["sort_order"], item["name"]),
             ),
             "suppliers": supplier_names,
+            "fx": {"USD_UZS": _decimal_plain_text(_workspace_usd_uzs_rate(wid))},
         }
         return tpl(
             request,
