@@ -5707,6 +5707,77 @@ def create_app() -> FastAPI:
                         return row.id
             return rows[0].id if rows else ""
 
+    def _document_payment_entries_from_form(
+        form: Any,
+        document_currency: str,
+        debt_amount: Decimal,
+        workspace_owner_id: str,
+    ) -> tuple[list[dict[str, str]], Decimal, str]:
+        currency = str(document_currency or "UZS").strip().upper() or "UZS"
+        rate = _workspace_usd_uzs_rate(workspace_owner_id)
+        raw_entries: list[dict[str, Any]] = []
+        raw_payment_lines = str(form.get("payment_lines") or "").strip()
+        if raw_payment_lines:
+            try:
+                parsed_payment_lines = json.loads(raw_payment_lines)
+            except Exception:
+                parsed_payment_lines = []
+            if isinstance(parsed_payment_lines, list):
+                raw_entries = [item for item in parsed_payment_lines if isinstance(item, dict)]
+        if not raw_entries:
+            raw_entries = [
+                {
+                    "amount": form.get("payment_amount"),
+                    "currency": form.get("payment_currency") or currency,
+                    "type": form.get("payment_type") or form.get("payment_account") or "Оплата",
+                    "account": form.get("payment_account") or "Наличные",
+                    "account_id": form.get("payment_account_id") or "",
+                }
+            ]
+        payment_lines: list[dict[str, str]] = []
+        paid_in_document_currency = Decimal("0")
+        for item in raw_entries:
+            payment_amount = _sales_decimal(item.get("amount"))
+            if payment_amount <= 0:
+                continue
+            payment_currency = str(item.get("currency") or currency).strip().upper() or currency
+            converted_amount = _convert_product_currency(payment_amount, payment_currency, currency, rate)
+            if converted_amount <= 0:
+                continue
+            remaining = debt_amount - paid_in_document_currency
+            if remaining <= 0:
+                break
+            if converted_amount > remaining:
+                converted_amount = remaining
+                payment_amount = _convert_product_currency(converted_amount, currency, payment_currency, rate)
+            account_label = str(item.get("account") or item.get("type") or "Наличные").strip() or "Наличные"
+            payment_type = str(item.get("type") or account_label or "Оплата").strip() or "Оплата"
+            payment_lines.append(
+                {
+                    "amount": _decimal_plain_text(payment_amount),
+                    "currency": payment_currency[:8],
+                    "type": payment_type,
+                    "account": account_label,
+                    "account_id": str(item.get("account_id") or "").strip(),
+                }
+            )
+            paid_in_document_currency += converted_amount
+        if not payment_lines and debt_amount > 0:
+            payment_lines.append(
+                {
+                    "amount": _decimal_plain_text(debt_amount),
+                    "currency": currency,
+                    "type": "Оплата",
+                    "account": "Наличные",
+                    "account_id": "",
+                }
+            )
+            paid_in_document_currency = debt_amount
+        payment_type = ", ".join(
+            dict.fromkeys(str(item.get("type") or "").strip() for item in payment_lines if str(item.get("type") or "").strip())
+        )
+        return payment_lines, paid_in_document_currency, payment_type or "Оплата"
+
     def _delete_sales_cash_transactions(workspace_owner_id: str, sale_id: str) -> None:
         clean_sale_id = str(sale_id or "").strip()
         if not clean_sale_id:
@@ -6323,19 +6394,15 @@ def create_app() -> FastAPI:
                         "account_id": "",
                     }
                 )
-            payment_lines.append(
-                {
-                    "amount": _decimal_plain_text(debt_amount),
-                    "currency": currency,
-                    "type": "Оплата",
-                    "account": "Наличные",
-                    "account_id": "",
-                }
-            )
-            data["paid_amount"] = _decimal_plain_text(amount)
-            data["payment_type"] = str(data.get("payment_type") or "Оплата")
+            new_payment_lines, payment_amount, payment_type = _document_payment_entries_from_form(form, currency, debt_amount, wid)
+            payment_lines.extend(new_payment_lines)
+            next_paid_amount = paid_amount + payment_amount
+            if next_paid_amount > amount:
+                next_paid_amount = amount
+            data["paid_amount"] = _decimal_plain_text(next_paid_amount)
+            data["payment_type"] = payment_type or str(data.get("payment_type") or "Оплата")
             data["payment_lines"] = payment_lines
-            data["status"] = "paid"
+            data["status"] = "paid" if next_paid_amount >= amount else "partial"
             row.data = data
             flag_modified(row, "data")
             session.add(row)
@@ -7517,19 +7584,15 @@ def create_app() -> FastAPI:
                         "account_id": "",
                     }
                 )
-            payment_lines.append(
-                {
-                    "amount": _decimal_plain_text(debt_amount),
-                    "currency": currency,
-                    "type": "Оплата",
-                    "account": "Наличные",
-                    "account_id": "",
-                }
-            )
-            data["paid_amount"] = _decimal_plain_text(amount)
-            data["payment_type"] = str(data.get("payment_type") or "Оплата")
+            new_payment_lines, payment_amount, payment_type = _document_payment_entries_from_form(form, currency, debt_amount, workspace_owner_id)
+            payment_lines.extend(new_payment_lines)
+            next_paid_amount = paid_amount + payment_amount
+            if next_paid_amount > amount:
+                next_paid_amount = amount
+            data["paid_amount"] = _decimal_plain_text(next_paid_amount)
+            data["payment_type"] = payment_type or str(data.get("payment_type") or "Оплата")
             data["payment_lines"] = payment_lines
-            data["status"] = "paid"
+            data["status"] = "paid" if next_paid_amount >= amount else "partial"
             row.data = data
             flag_modified(row, "data")
             session.add(row)

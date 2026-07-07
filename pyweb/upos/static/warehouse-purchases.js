@@ -1111,6 +1111,155 @@
     if (node) node.textContent = value == null || value === "" ? "-" : String(value);
   }
 
+  function detailPaymentDialog(root = document) {
+    return root.querySelector("[data-purchase-detail-payment-dialog]");
+  }
+
+  function detailPaymentRows(dialog) {
+    return dialog ? Array.from(dialog.querySelectorAll("[data-detail-payment-line]")) : [];
+  }
+
+  function detailPaymentLabel(select) {
+    if (!select) return "";
+    const option = select.selectedOptions ? select.selectedOptions[0] : null;
+    return option ? option.getAttribute("data-label") || option.textContent.trim() || select.value : select.value || "";
+  }
+
+  function detailPaymentCurrency(row, dialog) {
+    return String(row?.querySelector("[data-detail-payment-currency]")?.value || dialog?.dataset.paymentCurrency || "UZS").toUpperCase();
+  }
+
+  function collectDetailPayments(dialog) {
+    if (!dialog) return [];
+    return detailPaymentRows(dialog).map((row) => {
+      const amountInput = row.querySelector("[data-detail-payment-amount]");
+      const currency = detailPaymentCurrency(row, dialog);
+      if (amountInput) formatPurchasePriceInput(amountInput, currency);
+      const amount = purchaseEntryNumber(amountInput?.value || "");
+      if (!amount) return null;
+      const account = row.querySelector("[data-detail-payment-account]");
+      const accountLabel = detailPaymentLabel(account);
+      return {
+        account_id: account ? account.value : "",
+        account: accountLabel,
+        currency,
+        type: accountLabel || "Оплата",
+        amount: String(amount)
+      };
+    }).filter(Boolean);
+  }
+
+  function detailPaymentTotal(dialog) {
+    const options = readPurchaseOptions();
+    const currency = String(dialog?.dataset.paymentCurrency || "UZS").toUpperCase();
+    return collectDetailPayments(dialog).reduce((sum, item) => {
+      return sum + convertPurchaseCurrency(item.amount, item.currency || currency, currency, options);
+    }, 0);
+  }
+
+  function updateDetailPaymentSummary(dialog) {
+    if (!dialog) return;
+    const currency = String(dialog.dataset.paymentCurrency || "UZS").toUpperCase();
+    const due = purchaseEntryNumber(dialog.dataset.paymentDue || "0");
+    const paid = detailPaymentTotal(dialog);
+    const rest = Math.max(0, due - paid);
+    const overpaid = Math.max(0, paid - due);
+    setText(dialog, "[data-detail-payment-due]", purchaseEntryMoney(due, currency));
+    setText(dialog, "[data-detail-payment-paid]", purchaseEntryMoney(paid, currency));
+    setText(dialog, "[data-detail-payment-rest]", purchaseEntryMoney(rest, currency));
+    setText(dialog, "[data-detail-payment-over]", purchaseEntryMoney(overpaid, currency));
+    const overRow = dialog.querySelector("[data-detail-payment-over-row]");
+    if (overRow) overRow.hidden = overpaid <= 0;
+    dialog.querySelector("[data-detail-payment-summary]")?.classList.toggle("is-overpaid", overpaid > 0);
+    const submit = dialog.querySelector("[data-detail-payment-submit]");
+    if (submit) {
+      submit.disabled = paid <= 0 || overpaid > 0;
+      submit.title = overpaid > 0 ? `Оплата больше суммы на ${purchaseEntryMoney(overpaid, currency)}` : "";
+    }
+  }
+
+  function wireDetailPaymentRow(dialog, row) {
+    if (!dialog || !row || row.dataset.detailPaymentReady === "1") return;
+    row.dataset.detailPaymentReady = "1";
+    row.querySelectorAll("[data-detail-payment-amount], [data-detail-payment-account], [data-detail-payment-currency]").forEach((input) => {
+      input.addEventListener("input", () => {
+        if (input.matches("[data-detail-payment-amount]")) formatPurchasePriceInput(input, detailPaymentCurrency(row, dialog));
+        updateDetailPaymentSummary(dialog);
+      });
+      input.addEventListener("change", () => {
+        if (input.matches("[data-detail-payment-amount]")) formatPurchasePriceInput(input, detailPaymentCurrency(row, dialog));
+        updateDetailPaymentSummary(dialog);
+      });
+    });
+    row.querySelector("[data-detail-payment-remove]")?.addEventListener("click", () => {
+      if (detailPaymentRows(dialog).length <= 1) {
+        row.querySelectorAll("input").forEach((input) => {
+          input.value = "";
+        });
+      } else {
+        row.remove();
+      }
+      updateDetailPaymentSummary(dialog);
+    });
+  }
+
+  function addDetailPaymentRow(dialog) {
+    const wrap = dialog?.querySelector("[data-detail-payment-lines-ui]");
+    const source = dialog?.querySelector("[data-detail-payment-line]");
+    if (!wrap || !source) return null;
+    const row = source.cloneNode(true);
+    row.removeAttribute("data-detail-payment-ready");
+    row.querySelectorAll("input").forEach((input) => {
+      input.value = "";
+    });
+    const currency = row.querySelector("[data-detail-payment-currency]");
+    if (currency) currency.value = dialog.dataset.paymentCurrency || currency.value || "UZS";
+    wrap.append(row);
+    wireDetailPaymentRow(dialog, row);
+    updateDetailPaymentSummary(dialog);
+    return row;
+  }
+
+  function closeDetailPaymentDialog(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    dialog.removeAttribute("open");
+  }
+
+  function openDetailPaymentDialog(root, panel) {
+    const dialog = detailPaymentDialog(root);
+    const actionForm = panel?.querySelector("[data-purchase-payment-form]");
+    const modalForm = dialog?.querySelector("[data-purchase-detail-payment-modal-form]");
+    if (!dialog || !actionForm || !modalForm) return;
+    const currency = String(actionForm.dataset.paymentCurrency || "UZS").toUpperCase();
+    const due = purchaseEntryNumber(actionForm.dataset.paymentDue || "0");
+    dialog.dataset.paymentCurrency = currency;
+    dialog.dataset.paymentDue = String(due);
+    modalForm.action = actionForm.action || "";
+    detailPaymentRows(dialog).forEach((row, index) => {
+      if (index > 0) row.remove();
+    });
+    const row = detailPaymentRows(dialog)[0] || addDetailPaymentRow(dialog);
+    const currencyInput = row?.querySelector("[data-detail-payment-currency]");
+    const amountInput = row?.querySelector("[data-detail-payment-amount]");
+    if (currencyInput) currencyInput.value = currency;
+    if (amountInput) amountInput.value = purchaseEntryFormatCurrency(due, currency);
+    updateDetailPaymentSummary(dialog);
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_err) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    window.setTimeout(() => {
+      amountInput?.focus();
+      amountInput?.select();
+    }, 0);
+  }
+
   function activatePurchaseDetailTab(panel, tabName) {
     const activeTab = tabName || "items";
     panel.querySelectorAll("[data-purchase-detail-tab]").forEach((button) => {
@@ -1135,6 +1284,8 @@
     if (purchaseId && template) {
       form.action = template.replace("__purchase_id__", encodeURIComponent(purchaseId));
     }
+    form.dataset.paymentDue = String(debt);
+    form.dataset.paymentCurrency = String(purchase.currency || "UZS").toUpperCase();
     const canPay = Boolean(purchaseId && debt > 0);
     form.hidden = !canPay;
     button.disabled = !canPay;
@@ -1276,6 +1427,39 @@
         button.addEventListener("click", () => {
           activatePurchaseDetailTab(panel, button.getAttribute("data-purchase-detail-tab"));
         });
+      });
+    });
+    const paymentDialog = detailPaymentDialog(root);
+    if (paymentDialog && paymentDialog.dataset.detailPaymentDialogReady !== "1") {
+      paymentDialog.dataset.detailPaymentDialogReady = "1";
+      detailPaymentRows(paymentDialog).forEach((row) => {
+        wireDetailPaymentRow(paymentDialog, row);
+      });
+      paymentDialog.querySelector("[data-detail-payment-add-line]")?.addEventListener("click", () => {
+        const row = addDetailPaymentRow(paymentDialog);
+        row?.querySelector("[data-detail-payment-amount]")?.focus();
+      });
+      paymentDialog.querySelectorAll("[data-detail-payment-close], [data-detail-payment-cancel]").forEach((button) => {
+        button.addEventListener("click", () => closeDetailPaymentDialog(paymentDialog));
+      });
+      paymentDialog.querySelector("[data-purchase-detail-payment-modal-form]")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        updateDetailPaymentSummary(paymentDialog);
+        const payments = collectDetailPayments(paymentDialog);
+        const paid = detailPaymentTotal(paymentDialog);
+        const due = purchaseEntryNumber(paymentDialog.dataset.paymentDue || "0");
+        if (!payments.length || paid <= 0 || paid > due) return;
+        const hidden = paymentDialog.querySelector("[data-detail-payment-lines]");
+        if (hidden) hidden.value = JSON.stringify(payments);
+        event.currentTarget.submit();
+      });
+    }
+    root.querySelectorAll("[data-purchase-payment-pay]").forEach((button) => {
+      if (button.dataset.purchasePaymentOpenReady === "1") return;
+      button.dataset.purchasePaymentOpenReady = "1";
+      button.addEventListener("click", () => {
+        const panel = button.closest("[data-warehouse-purchase-detail]");
+        openDetailPaymentDialog(root, panel);
       });
     });
     document.addEventListener("keydown", (event) => {

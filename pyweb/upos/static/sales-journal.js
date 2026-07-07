@@ -171,6 +171,202 @@
     return Number.isFinite(number) ? number : 0;
   }
 
+  function readSalesOptions() {
+    var node = document.getElementById("sales-form-options");
+    if (!node) return {};
+    try {
+      return JSON.parse(node.textContent || "{}") || {};
+    } catch (_err) {
+      return {};
+    }
+  }
+
+  function detailCurrencyDigits(currency) {
+    return String(currency || "").toUpperCase() === "UZS" ? 0 : 2;
+  }
+
+  function detailFormatAmount(value, currency) {
+    var digits = detailCurrencyDigits(currency);
+    var factor = Math.pow(10, digits);
+    var numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) return "0";
+    var rounded = Math.round(numeric * factor) / factor;
+    return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: digits }).format(rounded);
+  }
+
+  function detailFormatAmountInput(input, currency) {
+    if (!input) return;
+    var value = String(input.value || "").replace(/\s+/g, "");
+    var hasDecimal = detailCurrencyDigits(currency) > 0 && /[.,]/.test(value);
+    var parts = value.split(/[.,]/);
+    var integerDigits = String(parts[0] || "").replace(/\D/g, "");
+    var fractionDigits = String(parts[1] || "").replace(/\D/g, "").slice(0, detailCurrencyDigits(currency));
+    if (!integerDigits && !hasDecimal) {
+      input.value = "";
+      return;
+    }
+    input.value = integerDigits.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (hasDecimal ? "," + fractionDigits : "");
+  }
+
+  function detailConvertCurrency(value, fromCurrency, toCurrency) {
+    var options = readSalesOptions();
+    var fx = options.fx || {};
+    var rate = amountNumber(fx.USD_UZS || fx.usd_uzs || fx.usdUzs || "12000") || 12000;
+    var amount = amountNumber(value);
+    var source = String(fromCurrency || "UZS").toUpperCase();
+    var target = String(toCurrency || "UZS").toUpperCase();
+    if (!amount || source === target) return amount;
+    if (source === "USD" && target === "UZS") return amount * rate;
+    if (source === "UZS" && target === "USD") return amount / rate;
+    return amount;
+  }
+
+  function detailPaymentDialog(scope) {
+    return (scope || document).querySelector("[data-sales-detail-payment-dialog]");
+  }
+
+  function detailPaymentRows(dialog) {
+    return dialog ? Array.from(dialog.querySelectorAll("[data-detail-payment-line]")) : [];
+  }
+
+  function detailPaymentLabel(select) {
+    if (!select) return "";
+    var option = select.selectedOptions ? select.selectedOptions[0] : null;
+    return option ? option.getAttribute("data-label") || option.textContent.trim() || select.value : select.value || "";
+  }
+
+  function detailPaymentCurrency(row, dialog) {
+    return String(row?.querySelector("[data-detail-payment-currency]")?.value || dialog?.dataset.paymentCurrency || "UZS").toUpperCase();
+  }
+
+  function collectDetailPayments(dialog) {
+    if (!dialog) return [];
+    return detailPaymentRows(dialog).map(function (row) {
+      var amountInput = row.querySelector("[data-detail-payment-amount]");
+      var currency = detailPaymentCurrency(row, dialog);
+      detailFormatAmountInput(amountInput, currency);
+      var amount = amountNumber(amountInput ? amountInput.value : "");
+      if (!amount) return null;
+      var account = row.querySelector("[data-detail-payment-account]");
+      var accountLabel = detailPaymentLabel(account);
+      return {
+        account_id: account ? account.value : "",
+        account: accountLabel,
+        currency: currency,
+        type: accountLabel || "Оплата",
+        amount: String(amount)
+      };
+    }).filter(Boolean);
+  }
+
+  function detailPaymentTotal(dialog) {
+    var currency = String(dialog?.dataset.paymentCurrency || "UZS").toUpperCase();
+    return collectDetailPayments(dialog).reduce(function (sum, item) {
+      return sum + detailConvertCurrency(item.amount, item.currency || currency, currency);
+    }, 0);
+  }
+
+  function updateDetailPaymentSummary(dialog) {
+    if (!dialog) return;
+    var currency = String(dialog.dataset.paymentCurrency || "UZS").toUpperCase();
+    var due = amountNumber(dialog.dataset.paymentDue || "0");
+    var paid = detailPaymentTotal(dialog);
+    var rest = Math.max(0, due - paid);
+    var overpaid = Math.max(0, paid - due);
+    setText(dialog, "[data-detail-payment-due]", moneyWithCurrency(due, currency));
+    setText(dialog, "[data-detail-payment-paid]", moneyWithCurrency(paid, currency));
+    setText(dialog, "[data-detail-payment-rest]", moneyWithCurrency(rest, currency));
+    setText(dialog, "[data-detail-payment-over]", moneyWithCurrency(overpaid, currency));
+    var overRow = dialog.querySelector("[data-detail-payment-over-row]");
+    if (overRow) overRow.hidden = overpaid <= 0;
+    dialog.querySelector("[data-detail-payment-summary]")?.classList.toggle("is-overpaid", overpaid > 0);
+    var submit = dialog.querySelector("[data-detail-payment-submit]");
+    if (submit) {
+      submit.disabled = paid <= 0 || overpaid > 0;
+      submit.title = overpaid > 0 ? "Оплата больше суммы на " + moneyWithCurrency(overpaid, currency) : "";
+    }
+  }
+
+  function wireDetailPaymentRow(dialog, row) {
+    if (!dialog || !row || row.dataset.detailPaymentReady === "1") return;
+    row.dataset.detailPaymentReady = "1";
+    row.querySelectorAll("[data-detail-payment-amount], [data-detail-payment-account], [data-detail-payment-currency]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        if (input.matches("[data-detail-payment-amount]")) detailFormatAmountInput(input, detailPaymentCurrency(row, dialog));
+        updateDetailPaymentSummary(dialog);
+      });
+      input.addEventListener("change", function () {
+        if (input.matches("[data-detail-payment-amount]")) detailFormatAmountInput(input, detailPaymentCurrency(row, dialog));
+        updateDetailPaymentSummary(dialog);
+      });
+    });
+    row.querySelector("[data-detail-payment-remove]")?.addEventListener("click", function () {
+      if (detailPaymentRows(dialog).length <= 1) {
+        row.querySelectorAll("input").forEach(function (input) { input.value = ""; });
+      } else {
+        row.remove();
+      }
+      updateDetailPaymentSummary(dialog);
+    });
+  }
+
+  function addDetailPaymentRow(dialog) {
+    var wrap = dialog ? dialog.querySelector("[data-detail-payment-lines-ui]") : null;
+    var source = dialog ? dialog.querySelector("[data-detail-payment-line]") : null;
+    if (!wrap || !source) return null;
+    var row = source.cloneNode(true);
+    row.removeAttribute("data-detail-payment-ready");
+    row.querySelectorAll("input").forEach(function (input) { input.value = ""; });
+    var currency = row.querySelector("[data-detail-payment-currency]");
+    if (currency) currency.value = dialog.dataset.paymentCurrency || currency.value || "UZS";
+    wrap.appendChild(row);
+    wireDetailPaymentRow(dialog, row);
+    updateDetailPaymentSummary(dialog);
+    return row;
+  }
+
+  function closeDetailPaymentDialog(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    dialog.removeAttribute("open");
+  }
+
+  function openDetailPaymentDialog(scope, panel) {
+    var dialog = detailPaymentDialog(scope);
+    var actionForm = panel ? panel.querySelector("[data-sales-payment-form]") : null;
+    var modalForm = dialog ? dialog.querySelector("[data-sales-detail-payment-modal-form]") : null;
+    if (!dialog || !actionForm || !modalForm) return;
+    var currency = String(actionForm.dataset.paymentCurrency || "UZS").toUpperCase();
+    var due = amountNumber(actionForm.dataset.paymentDue || "0");
+    dialog.dataset.paymentCurrency = currency;
+    dialog.dataset.paymentDue = String(due);
+    modalForm.action = actionForm.action || "";
+    detailPaymentRows(dialog).forEach(function (row, index) {
+      if (index > 0) row.remove();
+    });
+    var row = detailPaymentRows(dialog)[0] || addDetailPaymentRow(dialog);
+    var currencyInput = row ? row.querySelector("[data-detail-payment-currency]") : null;
+    var amountInput = row ? row.querySelector("[data-detail-payment-amount]") : null;
+    if (currencyInput) currencyInput.value = currency;
+    if (amountInput) amountInput.value = detailFormatAmount(due, currency);
+    updateDetailPaymentSummary(dialog);
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_err) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    window.setTimeout(function () {
+      if (amountInput) {
+        amountInput.focus();
+        amountInput.select();
+      }
+    }, 0);
+  }
+
   function lineValue(line, names, fallback) {
     for (var i = 0; i < names.length; i += 1) {
       var value = line[names[i]];
@@ -334,6 +530,8 @@
     if (saleId && template) {
       form.action = template.replace("__sale_id__", encodeURIComponent(saleId));
     }
+    form.dataset.paymentDue = String(debt);
+    form.dataset.paymentCurrency = String(sale.currency || "UZS").toUpperCase();
     var canPay = Boolean(saleId && debt > 0 && !isReturn);
     form.hidden = !canPay;
     button.disabled = !canPay;
@@ -478,6 +676,41 @@
       tab.addEventListener("click", function () {
         var panel = tab.closest("[data-sales-journal-detail]");
         activateSalesDetailTab(panel, tab.dataset.salesDetailTab || "items");
+      });
+    });
+    var detailDialog = detailPaymentDialog(scope);
+    if (detailDialog && detailDialog.dataset.detailPaymentDialogReady !== "1") {
+      detailDialog.dataset.detailPaymentDialogReady = "1";
+      detailPaymentRows(detailDialog).forEach(function (row) {
+        wireDetailPaymentRow(detailDialog, row);
+      });
+      detailDialog.querySelector("[data-detail-payment-add-line]")?.addEventListener("click", function () {
+        var row = addDetailPaymentRow(detailDialog);
+        row?.querySelector("[data-detail-payment-amount]")?.focus();
+      });
+      detailDialog.querySelectorAll("[data-detail-payment-close], [data-detail-payment-cancel]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          closeDetailPaymentDialog(detailDialog);
+        });
+      });
+      detailDialog.querySelector("[data-sales-detail-payment-modal-form]")?.addEventListener("submit", function (event) {
+        event.preventDefault();
+        updateDetailPaymentSummary(detailDialog);
+        var payments = collectDetailPayments(detailDialog);
+        var paid = detailPaymentTotal(detailDialog);
+        var due = amountNumber(detailDialog.dataset.paymentDue || "0");
+        if (!payments.length || paid <= 0 || paid > due) return;
+        var hidden = detailDialog.querySelector("[data-detail-payment-lines]");
+        if (hidden) hidden.value = JSON.stringify(payments);
+        event.currentTarget.submit();
+      });
+    }
+    scope.querySelectorAll("[data-sales-payment-pay]").forEach(function (button) {
+      if (button.dataset.salesPaymentOpenReady === "1") return;
+      button.dataset.salesPaymentOpenReady = "1";
+      button.addEventListener("click", function () {
+        var panel = button.closest("[data-sales-journal-detail]");
+        openDetailPaymentDialog(scope, panel);
       });
     });
     scope.querySelectorAll("[data-sales-detail-menu-return]").forEach(function (trigger) {
