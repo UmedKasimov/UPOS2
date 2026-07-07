@@ -37,6 +37,7 @@
 <datalist id="warehouse-supplier-list">
   {% for item in warehouse_options.suppliers %}<option value="{{ item }}">{% endfor %}
 </datalist>
+<script type="application/json" id="warehouse-purchase-options">{{ warehouse_options | tojson }}</script>
 
 <div class="products-layout" data-workspace-view="stocks warehouses transfers purchases adjustments" hidden>
   <article class="products-list-panel" data-workspace-view="stocks" hidden>
@@ -398,6 +399,7 @@
               <th>Товар</th>
               <th>К-во</th>
               <th>Цена</th>
+              <th data-purchase-detail-sale-price-title>Продажная цена</th>
               <th>Сумма</th>
             </tr>
           </thead>
@@ -428,7 +430,7 @@
         <span>Закупка сразу попадет в остатки склада.</span>
       </div>
     </header>
-    <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry>
+    <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}">
       {% include "_csrf_field.html" %}
       <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
       <input type="hidden" name="paid_amount" value="0" />
@@ -443,9 +445,13 @@
           <span>Дата</span>
           <input name="date" type="date" value="{{ today }}" />
         </label>
-        <label class="wide">
+        <label class="sales-combobox warehouse-supplier-picker" data-warehouse-supplier-picker>
           <span>Поставщик*</span>
-          <input name="supplier" list="warehouse-supplier-list" placeholder="Выберите или введите поставщика" autocomplete="off" required />
+          <div class="sales-lock-field">
+            <input name="supplier" placeholder="Выберите или введите поставщика" autocomplete="off" required data-warehouse-supplier-input />
+            <button type="button" class="sales-combo-edit" data-warehouse-supplier-edit aria-label="Сменить поставщика" title="Сменить поставщика" hidden>✎</button>
+          </div>
+          <div class="sales-combo-panel" data-warehouse-supplier-panel hidden></div>
         </label>
         <label>
           <span>Склад*</span>
@@ -457,6 +463,15 @@
             <option value="UZS">UZS</option>
             <option value="USD">USD</option>
           </select>
+        </label>
+        <label>
+          <span>Прайс</span>
+          <select name="purchase_price_type_id" data-purchase-price-type>
+            {% for price_type in warehouse_options.price_types %}
+              <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="purchase_price_type_name" data-purchase-price-type-name />
         </label>
       </div>
 
@@ -472,6 +487,7 @@
                 <th>Товар</th>
                 <th>К-во</th>
                 <th>Цена</th>
+                <th data-purchase-sale-price-title>Продажная цена</th>
                 <th>Сумма</th>
                 <th></th>
               </tr>
@@ -480,13 +496,22 @@
               <tr class="sales-line-grid sales-line-grid--compact" data-purchase-entry-row>
                 <td class="warehouse-purchase-entry-row-number">1</td>
                 <td>
-                  <input name="line_product" list="warehouse-product-list" placeholder="Товар или услуга" autocomplete="off" />
+                  <label class="sales-combobox sales-product-picker warehouse-product-picker" data-warehouse-product-picker>
+                    <div class="sales-lock-field">
+                      <input name="line_product" placeholder="Товар или услуга" autocomplete="off" data-warehouse-product-input />
+                      <button type="button" class="sales-combo-edit" data-warehouse-product-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                    </div>
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-warehouse-product-panel hidden></div>
+                  </label>
                 </td>
                 <td>
                   <input name="line_quantity" inputmode="decimal" placeholder="К-во" data-purchase-entry-number />
                 </td>
                 <td>
                   <input name="line_price" inputmode="decimal" placeholder="Цена" data-purchase-entry-number />
+                </td>
+                <td>
+                  <input name="line_sale_price" inputmode="decimal" placeholder="Продажная цена" data-purchase-entry-sale-price />
                 </td>
                 <td>
                   <strong data-purchase-entry-line-total>0 UZS</strong>
@@ -496,11 +521,25 @@
                 </td>
               </tr>
             </tbody>
+            <tfoot>
+              <tr class="warehouse-purchase-entry-summary-row">
+                <td colspan="4"></td>
+                <td>
+                  <span>Продажная сумма</span>
+                  <output data-purchase-entry-sale-total>0 UZS</output>
+                </td>
+                <td>
+                  <span>Итого</span>
+                  <output data-purchase-entry-total>0 UZS</output>
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <div class="sales-total-bar warehouse-purchase-entry-total">
           <span>ИТОГО</span>
-          <output data-purchase-entry-total>0 UZS</output>
+          <output data-purchase-entry-total-display>0 UZS</output>
         </div>
       </section>
 
@@ -514,6 +553,70 @@
         <button class="btn" type="submit">Сохранить закупку</button>
       </div>
     </form>
+
+    <dialog class="settings-profile-modal warehouse-supplier-dialog" data-warehouse-supplier-dialog>
+      <form class="settings-profile-modal-surface warehouse-supplier-dialog-surface" data-warehouse-supplier-form>
+        {% include "_csrf_field.html" %}
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Создание поставщика</h2>
+            <p class="settings-profile-modal-sub">Карточка сразу попадет в выбор поставщика для закупки.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-warehouse-supplier-dialog-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-scroll">
+          <div class="settings-profile-modal-body">
+            <div class="settings-profile-form-grid warehouse-supplier-dialog-grid">
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Название*</span>
+                <input class="settings-profile-input" name="name" required data-warehouse-supplier-name />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Официальное название</span>
+                <input class="settings-profile-input" name="official_name" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Телефон</span>
+                <input class="settings-profile-input" name="phone" inputmode="tel" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">ИНН</span>
+                <input class="settings-profile-input" name="tax_id" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Email</span>
+                <input class="settings-profile-input" name="email" type="email" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Категория</span>
+                <input class="settings-profile-input" name="category" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Статус</span>
+                <select class="settings-profile-input" name="status">
+                  <option value="active" selected>Активный</option>
+                  <option value="paused">Пауза</option>
+                  <option value="blocked">Заблокирован</option>
+                </select>
+              </label>
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Адрес</span>
+                <input class="settings-profile-input" name="address" />
+              </label>
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Комментарий</span>
+                <textarea class="settings-profile-input warehouse-supplier-dialog-note" name="note"></textarea>
+              </label>
+            </div>
+            <p class="sales-product-dialog-status" data-warehouse-supplier-status aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-warehouse-supplier-dialog-cancel>Отмена</button>
+          <button type="submit" class="btn" data-warehouse-supplier-submit>Сохранить</button>
+        </div>
+      </form>
+    </dialog>
   </article>
 
   <aside class="product-form-panel" data-workspace-view="adjustments-old" hidden>

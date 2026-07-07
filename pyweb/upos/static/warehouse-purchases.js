@@ -1,4 +1,6 @@
 (function () {
+  let activeSupplierPicker = null;
+
   function updateAction(form) {
     const hash = form.action.includes("#") ? form.action.slice(form.action.indexOf("#")) : "#purchases";
     const base = form.action.split("#")[0] || window.location.pathname;
@@ -61,8 +63,486 @@
     return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(rounded);
   }
 
+  function purchaseEntryFormatLive(value) {
+    const text = String(value || "");
+    const negative = text.trim().startsWith("-");
+    const digits = text.replace(/\D/g, "");
+    if (!digits) return negative ? "-" : "";
+    return `${negative ? "-" : ""}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
+  }
+
+  function formatPurchasePriceInput(input) {
+    const value = String(input.value || "");
+    const cursor = input.selectionStart ?? value.length;
+    const cursorAtEnd = cursor >= value.length;
+    const digitsBeforeCursor = value.slice(0, cursor).replace(/\D/g, "").length;
+    const formatted = purchaseEntryFormatLive(value);
+    input.value = formatted;
+    let nextCursor = formatted.length;
+    if (!cursorAtEnd) {
+      nextCursor = formatted.startsWith("-") && digitsBeforeCursor === 0 ? 1 : 0;
+      let seenDigits = 0;
+      for (let index = 0; index < formatted.length; index += 1) {
+        if (/\d/.test(formatted[index])) seenDigits += 1;
+        if (seenDigits >= digitsBeforeCursor) {
+          nextCursor = index + 1;
+          break;
+        }
+      }
+    }
+    input.setSelectionRange(nextCursor, nextCursor);
+  }
+
   function purchaseEntryMoney(value, currency) {
     return `${purchaseEntryFormat(value)} ${currency || "UZS"}`;
+  }
+
+  function readPurchaseOptions() {
+    const node = document.getElementById("warehouse-purchase-options");
+    if (!node) return {};
+    try {
+      return JSON.parse(node.textContent || "{}") || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function normalize(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function highlightText(value, query) {
+    const text = String(value || "");
+    const q = String(query || "").trim();
+    if (!q) return escapeHtml(text);
+    const index = text.toLowerCase().indexOf(q.toLowerCase());
+    if (index < 0) return escapeHtml(text);
+    return (
+      escapeHtml(text.slice(0, index)) +
+      '<mark class="sales-search-mark">' +
+      escapeHtml(text.slice(index, index + q.length)) +
+      "</mark>" +
+      escapeHtml(text.slice(index + q.length))
+    );
+  }
+
+  function productKind(item) {
+    return String(item?.kind || "product").toLowerCase() === "service" ? "service" : "product";
+  }
+
+  function itemMatches(item, query) {
+    const q = normalize(query);
+    if (!q) return true;
+    return ["name", "sku", "barcode", "category", "brand"].some((field) => normalize(item?.[field]).includes(q));
+  }
+
+  function productStockLabel(item) {
+    const total = Array.isArray(item?.stocks)
+      ? item.stocks.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0)
+      : 0;
+    const unit = String(item?.unit || "шт").trim() || "шт";
+    return `${purchaseEntryFormat(total)} ${unit}`;
+  }
+
+  function latestPurchasePrice(item) {
+    const history = Array.isArray(item?.purchase_history) ? item.purchase_history : [];
+    const latest = [...history].reverse().find((row) => purchaseEntryNumber(row?.price) > 0);
+    if (latest) return latest.price;
+    const stock = Array.isArray(item?.stocks) ? item.stocks.find((row) => purchaseEntryNumber(row?.price) > 0) : null;
+    if (stock) return stock.price;
+    return item?.sale_price || "";
+  }
+
+  function selectedPurchasePriceType(form) {
+    const select = form?.querySelector("[data-purchase-price-type]");
+    const hidden = form?.querySelector("[data-purchase-price-type-name]");
+    const option = select?.selectedOptions?.[0] || null;
+    const selected = {
+      id: String(select?.value || "").trim(),
+      name: String(option?.dataset?.name || option?.textContent || "").trim(),
+      currency: String(option?.dataset?.currency || "UZS").trim().toUpperCase() || "UZS",
+    };
+    if (hidden) hidden.value = selected.name;
+    return selected;
+  }
+
+  function syncPurchasePriceTitle(form) {
+    const priceType = selectedPurchasePriceType(form);
+    const title = priceType.name || "Продажная цена";
+    const header = form?.querySelector("[data-purchase-sale-price-title]");
+    if (header) header.textContent = title;
+    form?.querySelectorAll("[data-purchase-entry-sale-price]").forEach((input) => {
+      input.placeholder = title;
+      input.title = title;
+    });
+    return priceType;
+  }
+
+  function productPriceForType(item, priceType) {
+    const prices = Array.isArray(item?.prices) ? item.prices : [];
+    const typeId = String(priceType?.id || "").trim();
+    const typeName = normalize(priceType?.name);
+    const entry = prices.find((price) => String(price?.price_type_id || "").trim() === typeId)
+      || prices.find((price) => normalize(price?.name) === typeName);
+    return entry?.price || "";
+  }
+
+  function productByRow(form, row) {
+    const picker = row?.querySelector("[data-warehouse-product-picker]");
+    const productId = String(picker?.dataset?.productId || "").trim();
+    const name = String(row?.querySelector('input[name="line_product"]')?.value || "").trim();
+    const options = readPurchaseOptions();
+    const products = Array.isArray(options.product_rows) ? options.product_rows : [];
+    return products.find((item) => String(item?.id || "") === productId)
+      || products.find((item) => normalize(item?.name) === normalize(name))
+      || null;
+  }
+
+  function closeProductPanel(picker) {
+    const panel = picker?.querySelector("[data-warehouse-product-panel]");
+    if (panel) panel.hidden = true;
+  }
+
+  function closeSupplierPanel(picker) {
+    const panel = picker?.querySelector("[data-warehouse-supplier-panel]");
+    if (panel) panel.hidden = true;
+  }
+
+  function positionFloatingPanel(input, panel, minWidth) {
+    if (!input || !panel || panel.hidden) return;
+    const rect = input.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const width = Math.min(Math.max(rect.width, minWidth), Math.max(260, viewportWidth - 24));
+    const left = Math.min(Math.max(12, rect.left), Math.max(12, viewportWidth - width - 12));
+    let top = rect.bottom + 4;
+    let maxHeight = Math.min(288, viewportHeight - top - 12);
+    if (maxHeight < 160 && rect.top > 180) {
+      maxHeight = Math.min(288, rect.top - 12);
+      top = Math.max(12, rect.top - maxHeight - 4);
+    }
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.width = `${width}px`;
+    panel.style.maxHeight = `${Math.max(160, maxHeight)}px`;
+  }
+
+  function positionProductPanel(picker) {
+    const input = picker?.querySelector("[data-warehouse-product-input]");
+    const panel = picker?.querySelector("[data-warehouse-product-panel]");
+    positionFloatingPanel(input, panel, 420);
+  }
+
+  function positionSupplierPanel(picker) {
+    const input = picker?.querySelector("[data-warehouse-supplier-input]");
+    const panel = picker?.querySelector("[data-warehouse-supplier-panel]");
+    positionFloatingPanel(input, panel, 320);
+  }
+
+  function setProductLocked(picker, locked) {
+    const input = picker?.querySelector("[data-warehouse-product-input]");
+    const edit = picker?.querySelector("[data-warehouse-product-edit]");
+    picker?.classList.toggle("is-locked", Boolean(locked));
+    if (input) input.readOnly = Boolean(locked);
+    if (edit) edit.hidden = !locked;
+    if (locked) closeProductPanel(picker);
+  }
+
+  function setSupplierLocked(picker, locked) {
+    const input = picker?.querySelector("[data-warehouse-supplier-input]");
+    const edit = picker?.querySelector("[data-warehouse-supplier-edit]");
+    picker?.classList.toggle("is-locked", Boolean(locked));
+    if (input) input.readOnly = Boolean(locked);
+    if (edit) edit.hidden = !locked;
+    if (locked) closeSupplierPanel(picker);
+  }
+
+  function supplierMatches(name, query) {
+    const q = normalize(query);
+    if (!q) return true;
+    return normalize(name).includes(q);
+  }
+
+  function commitSupplier(picker, value) {
+    const input = picker?.querySelector("[data-warehouse-supplier-input]");
+    if (!input) return;
+    input.value = String(value || "").trim();
+    setSupplierLocked(picker, Boolean(input.value));
+  }
+
+  function setSupplierDialogStatus(form, message, variant) {
+    const status = form?.querySelector("[data-warehouse-supplier-status]");
+    if (!status) return;
+    status.textContent = message || "";
+    status.dataset.variant = variant || "";
+  }
+
+  function upsertSupplierOption(name) {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) return;
+    const node = document.getElementById("warehouse-purchase-options");
+    const options = readPurchaseOptions();
+    const suppliers = Array.isArray(options.suppliers) ? options.suppliers : [];
+    if (!suppliers.some((item) => normalize(item) === normalize(cleanName))) {
+      suppliers.push(cleanName);
+      suppliers.sort((a, b) => String(a || "").localeCompare(String(b || ""), "ru"));
+    }
+    options.suppliers = suppliers;
+    if (node) node.textContent = JSON.stringify(options);
+  }
+
+  function closeSupplierDialog(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-supplier-dialog]") || document.querySelector("[data-warehouse-supplier-dialog]");
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.hidden = true;
+    dialog.removeAttribute("open");
+    activeSupplierPicker = null;
+  }
+
+  function openSupplierDialog(entryForm, picker, query) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-supplier-dialog]") || document.querySelector("[data-warehouse-supplier-dialog]");
+    const form = dialog?.querySelector("[data-warehouse-supplier-form]");
+    if (!dialog || !form) return;
+    activeSupplierPicker = picker || null;
+    closeSupplierPanel(picker);
+    form.reset();
+    const nameInput = form.querySelector("[data-warehouse-supplier-name]");
+    if (nameInput) nameInput.value = String(query || "").trim();
+    setSupplierDialogStatus(form, "", "");
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.hidden = false;
+      dialog.setAttribute("open", "");
+    }
+    if (!dialog.open) dialog.setAttribute("open", "");
+    setTimeout(() => {
+      if (nameInput) {
+        nameInput.focus();
+        nameInput.select();
+      }
+    }, 0);
+  }
+
+  function wireSupplierDialog(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-supplier-dialog]") || document.querySelector("[data-warehouse-supplier-dialog]");
+    const form = dialog?.querySelector("[data-warehouse-supplier-form]");
+    if (!dialog || !form || dialog.dataset.warehouseSupplierDialogReady === "1") return;
+    dialog.dataset.warehouseSupplierDialogReady = "1";
+    dialog.querySelectorAll("[data-warehouse-supplier-dialog-close], [data-warehouse-supplier-dialog-cancel]").forEach((button) => {
+      button.addEventListener("click", () => closeSupplierDialog(entryForm));
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const submit = form.querySelector("[data-warehouse-supplier-submit]");
+      const endpoint = entryForm.getAttribute("data-warehouse-supplier-quick-save-url") || "/warehouse/suppliers/quick-save";
+      setSupplierDialogStatus(form, "Сохраняю...", "");
+      if (submit) submit.disabled = true;
+      fetch(endpoint, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json" },
+      })
+        .then((response) =>
+          response.json().catch(() => ({})).then((body) => {
+            if (!response.ok || !body.supplier) throw new Error(body.error || "Не удалось сохранить");
+            return body.supplier;
+          })
+        )
+        .then((supplier) => {
+          upsertSupplierOption(supplier.name);
+          const picker = activeSupplierPicker && document.contains(activeSupplierPicker)
+            ? activeSupplierPicker
+            : entryForm.querySelector("[data-warehouse-supplier-picker]");
+          commitSupplier(picker, supplier.name);
+          setSupplierDialogStatus(form, "Сохранено", "ok");
+          closeSupplierDialog(entryForm);
+        })
+        .catch((error) => {
+          setSupplierDialogStatus(form, error.message || "Не удалось сохранить", "err");
+        })
+        .finally(() => {
+          if (submit) submit.disabled = false;
+        });
+    });
+  }
+
+  function renderSupplierPicker(picker, query) {
+    const options = readPurchaseOptions();
+    const panel = picker.querySelector("[data-warehouse-supplier-panel]");
+    if (!panel) return;
+    const cleanQuery = String(query || "").trim();
+    const rows = (options.suppliers || [])
+      .filter((name) => supplierMatches(name, cleanQuery))
+      .slice(0, 80);
+    const createLabel = cleanQuery ? `+ Создать поставщика "${cleanQuery}"` : "+ Создать поставщика";
+    panel.innerHTML =
+      `<button type="button" class="sales-combo-create" data-warehouse-supplier-create>${escapeHtml(createLabel)}</button>` +
+      (rows.length
+        ? rows
+            .map(
+              (name) =>
+                '<button type="button" class="sales-combo-option">' +
+                '<span class="sales-combo-main">' +
+                highlightText(name, cleanQuery) +
+                "</span>" +
+                '<span class="sales-combo-meta"><span>Поставщик</span><strong>Контрагент</strong></span>' +
+                "</button>"
+            )
+            .join("")
+        : '<div class="sales-combo-empty">Ничего не найдено</div>');
+    panel.hidden = false;
+    positionSupplierPanel(picker);
+    panel.querySelector("[data-warehouse-supplier-create]")?.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      openSupplierDialog(picker.closest("[data-warehouse-purchase-entry]"), picker, cleanQuery);
+    });
+    panel.querySelectorAll(".sales-combo-option").forEach((button, index) => {
+      button.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        commitSupplier(picker, rows[index]);
+      });
+    });
+  }
+
+  function wireSupplierPicker(form) {
+    const picker = form.querySelector("[data-warehouse-supplier-picker]");
+    const input = picker?.querySelector("[data-warehouse-supplier-input]");
+    const edit = picker?.querySelector("[data-warehouse-supplier-edit]");
+    if (!picker || !input || picker.dataset.warehouseSupplierReady === "1") return;
+    picker.dataset.warehouseSupplierReady = "1";
+    input.addEventListener("focus", () => {
+      if (!input.readOnly) renderSupplierPicker(picker, input.value);
+    });
+    input.addEventListener("input", () => {
+      if (!input.readOnly) renderSupplierPicker(picker, input.value);
+    });
+    input.addEventListener("keydown", (event) => {
+      const panel = picker.querySelector("[data-warehouse-supplier-panel]");
+      const first = panel?.querySelector(".sales-combo-option");
+      if (event.key === "Escape") closeSupplierPanel(picker);
+      if (event.key === "Enter" && first && !panel.hidden) {
+        event.preventDefault();
+        first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      }
+    });
+    edit?.addEventListener("click", () => {
+      setSupplierLocked(picker, false);
+      input.focus();
+      input.select();
+      renderSupplierPicker(picker, input.value);
+    });
+  }
+
+  function renderProductPicker(form, picker, query) {
+    const options = readPurchaseOptions();
+    const panel = picker.querySelector("[data-warehouse-product-panel]");
+    if (!panel) return;
+    const rows = (options.product_rows || [])
+      .filter((item) => productKind(item) === "product" && itemMatches(item, query))
+      .slice(0, 100);
+    panel.innerHTML =
+      '<button type="button" class="sales-combo-create" data-warehouse-product-create>+ Создать товар</button>' +
+      (rows.length
+      ? rows
+          .map((item) => {
+            const code = item.sku || item.barcode || "Товар";
+            const price = latestPurchasePrice(item);
+            const priceLabel = price ? `${purchaseEntryFormat(purchaseEntryNumber(price))} ${form.querySelector("[data-purchase-entry-currency]")?.value || "UZS"}` : "Без цены";
+            return (
+              '<button type="button" class="sales-combo-option">' +
+              '<span class="sales-combo-main">' +
+              highlightText(item.name, query) +
+              "</span>" +
+              '<span class="sales-combo-meta"><span>' +
+              escapeHtml(`${code} · ${productStockLabel(item)}`) +
+              "</span><strong>" +
+              escapeHtml(priceLabel) +
+              "</strong></span></button>"
+            );
+          })
+          .join("")
+      : '<div class="sales-combo-empty">Ничего не найдено</div>');
+    panel.hidden = false;
+    positionProductPanel(picker);
+    panel.querySelector("[data-warehouse-product-create]")?.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      window.location.href = "/products?kind=product#product-form";
+    });
+    panel.querySelectorAll(".sales-combo-option").forEach((button, index) => {
+      button.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        applyProductSelection(form, picker, rows[index]);
+      });
+    });
+  }
+
+  function applyProductSelection(form, picker, item) {
+    if (!picker || !item) return;
+    const input = picker.querySelector("[data-warehouse-product-input]");
+    const row = picker.closest("[data-purchase-entry-row]");
+    if (input) input.value = item.name || "";
+    picker.dataset.productId = item.id || "";
+    if (row) {
+      const quantity = row.querySelector('input[name="line_quantity"]');
+      const price = row.querySelector('input[name="line_price"]');
+      const salePrice = row.querySelector('input[name="line_sale_price"]');
+      if (quantity && !quantity.value.trim()) quantity.value = "1";
+      if (price) {
+        const value = purchaseEntryNumber(latestPurchasePrice(item));
+        if (value) price.value = purchaseEntryFormat(value);
+      }
+      if (salePrice && !salePrice.value.trim()) {
+        const value = purchaseEntryNumber(productPriceForType(item, selectedPurchasePriceType(form)) || item.sale_price);
+        if (value) salePrice.value = purchaseEntryFormat(value);
+      }
+    }
+    setProductLocked(picker, Boolean(input?.value));
+    closeProductPanel(picker);
+    picker.dispatchEvent(new CustomEvent("purchase-entry-product-selected", { bubbles: true }));
+  }
+
+  function wireProductPicker(form, row) {
+    const picker = row.querySelector("[data-warehouse-product-picker]");
+    const input = picker?.querySelector("[data-warehouse-product-input]");
+    const edit = picker?.querySelector("[data-warehouse-product-edit]");
+    if (!picker || !input || picker.dataset.warehouseProductReady === "1") return;
+    picker.dataset.warehouseProductReady = "1";
+    input.addEventListener("focus", () => {
+      if (!input.readOnly) renderProductPicker(form, picker, input.value);
+    });
+    input.addEventListener("input", () => {
+      if (!input.readOnly) renderProductPicker(form, picker, input.value);
+    });
+    input.addEventListener("keydown", (event) => {
+      const panel = picker.querySelector("[data-warehouse-product-panel]");
+      const first = panel?.querySelector(".sales-combo-option");
+      if (event.key === "Escape") closeProductPanel(picker);
+      if (event.key === "Enter" && first && !panel.hidden) {
+        event.preventDefault();
+        first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      }
+    });
+    edit?.addEventListener("click", () => {
+      setProductLocked(picker, false);
+      input.focus();
+      input.select();
+      renderProductPicker(form, picker, input.value);
+    });
   }
 
   function initPurchaseEntry(root = document) {
@@ -74,7 +554,12 @@
       const currencyInput = form.querySelector("[data-purchase-entry-currency]");
       const amountInput = form.querySelector("[data-purchase-entry-amount]");
       const totalOutput = form.querySelector("[data-purchase-entry-total]");
+      const totalDisplayOutput = form.querySelector("[data-purchase-entry-total-display]");
+      const saleTotalOutput = form.querySelector("[data-purchase-entry-sale-total]");
       if (!body) return;
+      wireSupplierPicker(form);
+      wireSupplierDialog(form);
+      syncPurchasePriceTitle(form);
 
       const rows = () => Array.from(body.querySelectorAll("[data-purchase-entry-row]"));
       const rowHasProduct = (row) => Boolean(row.querySelector('input[name="line_product"]')?.value.trim());
@@ -83,7 +568,13 @@
         const price = purchaseEntryNumber(row.querySelector('input[name="line_price"]')?.value);
         return quantity * price;
       };
+      const rowSaleTotal = (row) => {
+        const quantity = purchaseEntryNumber(row.querySelector('input[name="line_quantity"]')?.value || "1") || 0;
+        const price = purchaseEntryNumber(row.querySelector('input[name="line_sale_price"]')?.value);
+        return quantity * price;
+      };
       const currency = () => currencyInput?.value || "UZS";
+      const saleCurrency = () => selectedPurchasePriceType(form).currency || currency();
 
       const renumber = () => {
         rows().forEach((row, index) => {
@@ -94,14 +585,20 @@
 
       const recalc = () => {
         let total = 0;
+        let saleTotal = 0;
         rows().forEach((row) => {
           const value = rowTotal(row);
           const output = row.querySelector("[data-purchase-entry-line-total]");
           if (output) output.textContent = purchaseEntryMoney(value, currency());
-          if (rowHasProduct(row)) total += value;
+          if (rowHasProduct(row)) {
+            total += value;
+            saleTotal += rowSaleTotal(row);
+          }
         });
         if (amountInput) amountInput.value = String(Math.round(total));
         if (totalOutput) totalOutput.textContent = purchaseEntryMoney(total, currency());
+        if (totalDisplayOutput) totalDisplayOutput.textContent = purchaseEntryMoney(total, currency());
+        if (saleTotalOutput) saleTotalOutput.textContent = purchaseEntryMoney(saleTotal, saleCurrency());
         renumber();
       };
 
@@ -111,7 +608,21 @@
         if (!last || !rowHasProduct(last)) return;
         const clone = last.cloneNode(true);
         delete clone.dataset.purchaseEntryRowReady;
+        clone.querySelectorAll("[data-warehouse-product-picker]").forEach((picker) => {
+          delete picker.dataset.warehouseProductReady;
+          delete picker.dataset.productId;
+          picker.classList.remove("is-locked");
+          const panel = picker.querySelector("[data-warehouse-product-panel]");
+          if (panel) {
+            panel.hidden = true;
+            panel.innerHTML = "";
+          }
+          const edit = picker.querySelector("[data-warehouse-product-edit]");
+          if (edit) edit.hidden = true;
+        });
         clone.querySelectorAll("input").forEach((input) => {
+          input.readOnly = false;
+          input.removeAttribute("aria-readonly");
           input.value = "";
         });
         const output = clone.querySelector("[data-purchase-entry-line-total]");
@@ -124,14 +635,17 @@
       const wireRow = (row) => {
         if (row.dataset.purchaseEntryRowReady === "1") return;
         row.dataset.purchaseEntryRowReady = "1";
+        wireProductPicker(form, row);
         row.querySelectorAll("input").forEach((input) => {
           input.addEventListener("focus", () => {
-            if (input.name === "line_quantity" || input.name === "line_price") {
+            if (input.name === "line_quantity" || input.name === "line_price" || input.name === "line_sale_price") {
               window.setTimeout(() => input.select(), 0);
             }
           });
           input.addEventListener("input", () => {
-            if (input.name === "line_quantity" || input.name === "line_price") {
+            if (input.name === "line_price" || input.name === "line_sale_price") {
+              formatPurchasePriceInput(input);
+            } else if (input.name === "line_quantity") {
               const cursorAtEnd = input.selectionStart === input.value.length;
               input.value = input.value.replace(/[^\d\s.,-]/g, "");
               if (cursorAtEnd) input.setSelectionRange(input.value.length, input.value.length);
@@ -140,7 +654,7 @@
             if (input.name === "line_product") ensureBlankLine();
           });
           input.addEventListener("blur", () => {
-            if (input.name === "line_quantity" || input.name === "line_price") {
+            if (input.name === "line_quantity" || input.name === "line_price" || input.name === "line_sale_price") {
               const value = purchaseEntryNumber(input.value);
               input.value = value ? purchaseEntryFormat(value) : "";
               recalc();
@@ -161,9 +675,26 @@
 
       rows().forEach(wireRow);
       currencyInput?.addEventListener("change", recalc);
-      form.addEventListener("submit", () => {
+      form.querySelector("[data-purchase-price-type]")?.addEventListener("change", () => {
+        const priceType = syncPurchasePriceTitle(form);
         rows().forEach((row) => {
-          row.querySelectorAll('input[name="line_quantity"], input[name="line_price"]').forEach((input) => {
+          const product = productByRow(form, row);
+          const input = row.querySelector('input[name="line_sale_price"]');
+          if (!product || !input) return;
+          const value = purchaseEntryNumber(productPriceForType(product, priceType));
+          input.value = value ? purchaseEntryFormat(value) : "";
+        });
+      });
+      form.addEventListener("purchase-entry-product-selected", (event) => {
+        recalc();
+        ensureBlankLine();
+        const row = event.target?.closest?.("[data-purchase-entry-row]");
+        row?.querySelector('input[name="line_quantity"]')?.focus();
+      });
+      form.addEventListener("submit", () => {
+        syncPurchasePriceTitle(form);
+        rows().forEach((row) => {
+          row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_sale_price"]').forEach((input) => {
             const value = purchaseEntryNumber(input.value);
             input.value = value ? String(value) : "";
           });
@@ -201,6 +732,7 @@
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-detail-debt]", moneyWithCurrency(purchase.debt_amount, currency));
     setText(panel, "[data-purchase-detail-total]", moneyWithCurrency(purchase.amount, currency));
+    setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
     if (!linesRoot) return;
     linesRoot.replaceChildren();
     const appendCell = (row, value) => {
@@ -215,6 +747,7 @@
       appendCell(row, purchase.number || "Закупка");
       appendCell(row, "-");
       appendCell(row, "-");
+      appendCell(row, "-");
       appendCell(row, moneyWithCurrency(purchase.amount, currency));
       linesRoot.append(row);
       return;
@@ -223,11 +756,13 @@
       const row = document.createElement("tr");
       const qty = String(line.quantity || "-");
       const price = line.price ? moneyWithCurrency(line.price, currency) : "-";
+      const salePrice = line.sale_price ? moneyWithCurrency(line.sale_price, purchase.price_type_currency || currency) : "-";
       const total = line.total ? moneyWithCurrency(line.total, currency) : "-";
       appendCell(row, index + 1);
       appendCell(row, line.product || "Товар");
       appendCell(row, qty);
       appendCell(row, price);
+      appendCell(row, salePrice);
       appendCell(row, total);
       linesRoot.append(row);
     });
@@ -304,6 +839,29 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeDetail(root);
     });
+    if (document.body.dataset.warehouseProductPickerGlobalReady !== "1") {
+      document.body.dataset.warehouseProductPickerGlobalReady = "1";
+      document.addEventListener("mousedown", (event) => {
+        document.querySelectorAll("[data-warehouse-product-picker]").forEach((picker) => {
+          if (!picker.contains(event.target)) closeProductPanel(picker);
+        });
+        document.querySelectorAll("[data-warehouse-supplier-picker]").forEach((picker) => {
+          if (!picker.contains(event.target)) closeSupplierPanel(picker);
+        });
+      });
+      window.addEventListener("resize", () => {
+        document.querySelectorAll("[data-warehouse-product-picker]").forEach(positionProductPanel);
+        document.querySelectorAll("[data-warehouse-supplier-picker]").forEach(positionSupplierPanel);
+      });
+      window.addEventListener(
+        "scroll",
+        () => {
+          document.querySelectorAll("[data-warehouse-product-picker]").forEach(positionProductPanel);
+          document.querySelectorAll("[data-warehouse-supplier-picker]").forEach(positionSupplierPanel);
+        },
+        true
+      );
+    }
     highlight(root);
   }
 

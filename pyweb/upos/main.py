@@ -3464,6 +3464,34 @@ def create_app() -> FastAPI:
             )
         return resolved_lines
 
+    def _apply_product_price_change(row: Product, price_type: dict[str, Any], price: Any, currency: str) -> None:
+        price_value = _sales_decimal(price)
+        if price_value <= 0:
+            return
+        price_type_id = str(price_type.get("id") or "").strip()
+        price_type_name = str(price_type.get("name") or "").strip() or "Продажная цена"
+        if not price_type_id:
+            return
+        data = dict(_json_object(row.data))
+        prices = [dict(item) for item in data.get("prices", []) if isinstance(item, dict)]
+        entry = next((item for item in prices if str(item.get("price_type_id") or "") == price_type_id), None)
+        if entry is None:
+            entry = next((item for item in prices if str(item.get("name") or "").strip().lower() == price_type_name.lower()), None)
+        if entry is None:
+            entry = {}
+            prices.append(entry)
+        entry.update(
+            {
+                "price_type_id": price_type_id,
+                "name": price_type_name,
+                "price": str(price_value.normalize() if price_value else ""),
+                "currency": str(currency or price_type.get("convert_to_currency") or "UZS").strip().upper() or "UZS",
+            }
+        )
+        data["prices"] = prices
+        row.data = data
+        flag_modified(row, "data")
+
     def _sales_signed_balance(item: dict[str, Any]) -> Decimal:
         doc_type = str(item.get("doc_type") or "sale")
         amount = _sales_decimal(item.get("amount"))
@@ -4068,6 +4096,86 @@ def create_app() -> FastAPI:
             "markup_value": "",
             "convert_to_currency": "UZS",
             "rounding": "1.0",
+        },
+        {
+            "id": "retail",
+            "name": "Розничная цена",
+            "sort_order": 5,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-07-07",
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "100.0",
+        },
+        {
+            "id": "wholesale",
+            "name": "Оптовая цена",
+            "sort_order": 6,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-07-07",
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "100.0",
+        },
+        {
+            "id": "vip",
+            "name": "VIP цена",
+            "sort_order": 7,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-07-07",
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "100.0",
+        },
+        {
+            "id": "marketplace",
+            "name": "Маркетплейс",
+            "sort_order": 8,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-07-07",
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "100.0",
+        },
+        {
+            "id": "promo",
+            "name": "Акционная цена",
+            "sort_order": 9,
+            "is_for_sales": True,
+            "is_for_purchases": False,
+            "is_active": True,
+            "pricing_method": "manual",
+            "created_by": "Admin123",
+            "updated_at": "2026-07-07",
+            "base_price_type_id": "",
+            "markup_type": "discount",
+            "markup_value": "",
+            "convert_to_currency": "UZS",
+            "rounding": "100.0",
         },
     ]
     PRODUCT_PRICE_ROUNDINGS = ["0.0001", "0.001", "0.01", "0.1", "0.5", "1.0", "5.0", "10.0", "50.0", "100.0", "500.0", "1000.0", "5000.0", "10000.0"]
@@ -6174,6 +6282,7 @@ def create_app() -> FastAPI:
                     "product": str(line.get("product") or ""),
                     "quantity": str(line.get("quantity") or ""),
                     "price": str(line.get("price") or ""),
+                    "sale_price": str(line.get("sale_price") or ""),
                     "total": str(line.get("total") or ""),
                 }
             )
@@ -6190,6 +6299,9 @@ def create_app() -> FastAPI:
             "status": str(data.get("status") or "new"),
             "status_label": _purchase_status_label(str(data.get("status") or "new")),
             "payment_type": str(data.get("payment_type") or ""),
+            "price_type_id": str(data.get("price_type_id") or ""),
+            "price_type_name": str(data.get("price_type_name") or ""),
+            "price_type_currency": str(data.get("price_type_currency") or row.currency or "UZS"),
             "note": str(data.get("note") or ""),
             "lines": safe_lines,
             "updated_at": row.updated_at.isoformat() if row.updated_at else "",
@@ -6207,6 +6319,9 @@ def create_app() -> FastAPI:
             "status": str(item["status"] or "new"),
             "status_label": str(item["status_label"] or "Новый"),
             "payment_type": str(item["payment_type"] or ""),
+            "price_type_id": str(item["price_type_id"] or ""),
+            "price_type_name": str(item["price_type_name"] or ""),
+            "price_type_currency": str(item["price_type_currency"] or item["currency"] or "UZS"),
             "note": str(item["note"] or ""),
             "lines": safe_lines,
             "updated_at": str(item["updated_at"] or ""),
@@ -6218,13 +6333,15 @@ def create_app() -> FastAPI:
         products = list(form.getlist("line_product"))
         quantities = list(form.getlist("line_quantity"))
         prices = list(form.getlist("line_price"))
+        sale_prices = list(form.getlist("line_sale_price"))
         lines: list[dict[str, str]] = []
         total = Decimal("0")
-        for idx in range(max(len(products), len(quantities), len(prices), 1)):
+        for idx in range(max(len(products), len(quantities), len(prices), len(sale_prices), 1)):
             product = str(products[idx] if idx < len(products) else "").strip()
             quantity = _sales_decimal_strict(quantities[idx] if idx < len(quantities) else "", "Количество")
             price = _sales_decimal_strict(prices[idx] if idx < len(prices) else "", "Цена")
-            if not product and not quantity and not price:
+            sale_price = _sales_decimal_strict(sale_prices[idx] if idx < len(sale_prices) else "", "Продажная цена")
+            if not product and not quantity and not price and not sale_price:
                 continue
             if not product:
                 raise ValueError("В строке прихода не выбран товар")
@@ -6232,6 +6349,8 @@ def create_app() -> FastAPI:
                 raise ValueError("Количество не может быть отрицательным")
             if price < 0:
                 raise ValueError("Цена не может быть отрицательной")
+            if sale_price < 0:
+                raise ValueError("Продажная цена не может быть отрицательной")
             if quantity <= 0:
                 quantity = Decimal("1")
             line_total = quantity * price
@@ -6241,6 +6360,7 @@ def create_app() -> FastAPI:
                     "product": product,
                     "quantity": str(quantity.normalize() if quantity else ""),
                     "price": str(price.normalize() if price else ""),
+                    "sale_price": str(sale_price.normalize() if sale_price else ""),
                     "total": str(line_total.normalize() if line_total else "0"),
                 }
             )
@@ -6261,6 +6381,8 @@ def create_app() -> FastAPI:
             "status": status,
             "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
             "payment_type": str(form.get("payment_type") or "").strip(),
+            "price_type_id": str(form.get("purchase_price_type_id") or "").strip(),
+            "price_type_name": str(form.get("purchase_price_type_name") or "").strip(),
             "note": str(form.get("note") or "").strip(),
             "lines": lines,
         }
@@ -7090,6 +7212,23 @@ def create_app() -> FastAPI:
                     op_date=str(data.get("date") or ""),
                     require_stock_product=True,
                 )
+                price_types = _workspace_price_types(workspace_owner_id)
+                selected_price_type = next(
+                    (item for item in price_types if str(item.get("id") or "") == str(data.get("price_type_id") or "")),
+                    None,
+                )
+                if selected_price_type:
+                    data["price_type_name"] = str(selected_price_type.get("name") or data.get("price_type_name") or "")
+                    price_currency = str(selected_price_type.get("convert_to_currency") or currency or "UZS").strip().upper() or "UZS"
+                    data["price_type_currency"] = price_currency
+                    for line in data["lines"]:
+                        sale_price = _sales_decimal(line.get("sale_price"))
+                        product_id = str(line.get("product_id") or "").strip()
+                        if sale_price <= 0 or not product_id:
+                            continue
+                        product_row = session.get(Product, product_id)
+                        if product_row and product_row.workspace_owner_id == workspace_owner_id:
+                            _apply_product_price_change(product_row, selected_price_type, sale_price, price_currency)
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = supplier_row.id
             except ValueError as exc:
@@ -7269,9 +7408,33 @@ def create_app() -> FastAPI:
                 warehouse_purchases.append(item)
                 currency = str(row.currency or item["currency"] or "UZS").upper()
                 warehouse_purchase_totals[currency] = warehouse_purchase_totals.get(currency, Decimal("0")) + _sales_decimal(row.amount)
+        price_types = _workspace_price_types(wid)
+        purchase_price_types = [
+            item
+            for item in price_types
+            if item.get("is_active") and item.get("is_for_sales") and item.get("pricing_method") == "manual"
+        ] or [
+            item
+            for item in price_types
+            if item.get("is_active") and item.get("is_for_sales")
+        ] or price_types
         warehouse_options = {
             "warehouses": [item["name"] for item in warehouse_records] or ["Основной склад"],
             "products": product_names,
+            "product_rows": [_product_data(row) for row in product_rows],
+            "price_types": sorted(
+                [
+                    {
+                        "id": str(item.get("id") or ""),
+                        "name": str(item.get("name") or ""),
+                        "currency": str(item.get("convert_to_currency") or "UZS").upper(),
+                        "sort_order": int(item.get("sort_order") or 0),
+                    }
+                    for item in purchase_price_types
+                    if str(item.get("id") or "").strip()
+                ],
+                key=lambda item: (item["sort_order"], item["name"]),
+            ),
             "suppliers": supplier_names,
         }
         return tpl(
@@ -8089,6 +8252,56 @@ def create_app() -> FastAPI:
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
         )
+
+    @app.post("/warehouse/suppliers/quick-save", name="warehouse_supplier_quick_save")
+    async def warehouse_supplier_quick_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"error": "Форма устарела. Обновите страницу и повторите."}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "Нужно войти заново"}, status_code=401)
+        assert wid is not None
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return JSONResponse({"error": "Название поставщика обязательно"}, status_code=400)
+        phone = str(form.get("phone") or "").strip()
+        tax_id = str(form.get("tax_id") or "").strip()
+        data = {
+            "official_name": str(form.get("official_name") or "").strip(),
+            "category": str(form.get("category") or "").strip(),
+            "status": str(form.get("status") or "active").strip(),
+            "note": str(form.get("note") or "").strip(),
+            "email": str(form.get("email") or "").strip(),
+            "address": str(form.get("address") or "").strip(),
+            "is_client": False,
+            "is_supplier": True,
+        }
+        with session_scope() as session:
+            row = _ensure_counterparty(
+                session,
+                wid,
+                name=name,
+                role="supplier",
+                phone=phone,
+                tax_id=tax_id,
+                data=data,
+            )
+            session.flush()
+            extra = _counterparty_extra(row)
+            supplier = {
+                "id": row.id,
+                "name": row.name,
+                "phone": row.phone or "",
+                "tax_id": row.tax_id or "",
+                "official_name": str(extra.get("official_name") or ""),
+                "category": str(extra.get("category") or ""),
+                "status": str(extra.get("status") or "active"),
+                "email": str(extra.get("email") or ""),
+                "address": str(extra.get("address") or ""),
+                "note": str(extra.get("note") or ""),
+            }
+        return JSONResponse({"ok": True, "supplier": supplier})
 
     @app.post("/suppliers/save", name="suppliers_save")
     async def suppliers_save(request: Request):

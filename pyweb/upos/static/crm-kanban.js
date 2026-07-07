@@ -26,17 +26,69 @@
     if (empty) empty.hidden = cards.length > 0;
   }
 
+  function prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function animateCardMove(card, fromRect) {
+    if (!card || !fromRect || prefersReducedMotion()) return;
+    const toRect = card.getBoundingClientRect();
+    const dx = fromRect.left - toRect.left;
+    const dy = fromRect.top - toRect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+      card.classList.add("is-stage-saved");
+      window.setTimeout(() => card.classList.remove("is-stage-saved"), 900);
+      return;
+    }
+
+    card.classList.remove("is-stage-saved");
+    card.classList.add("is-moving");
+    card.style.transition = "none";
+    card.style.transform = `translate(${dx}px, ${dy}px) scale(0.985)`;
+    card.style.zIndex = "5";
+
+    card.getBoundingClientRect();
+    window.requestAnimationFrame(() => {
+      card.style.transition = "transform 420ms cubic-bezier(.2,.85,.2,1), box-shadow 420ms ease, opacity 220ms ease";
+      card.style.transform = "";
+    });
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      card.classList.remove("is-moving");
+      card.classList.add("is-stage-saved");
+      card.style.transition = "";
+      card.style.transform = "";
+      card.style.zIndex = "";
+      window.setTimeout(() => card.classList.remove("is-stage-saved"), 900);
+    };
+
+    card.addEventListener(
+      "transitionend",
+      (event) => {
+        if (event.propertyName === "transform") finish();
+      },
+      { once: true },
+    );
+    window.setTimeout(finish, 520);
+  }
+
   function initKanban(root) {
     let dragged = null;
     root.querySelectorAll(".crm-kanban-card").forEach((card) => {
       card.addEventListener("dragstart", (event) => {
         dragged = card;
         card.classList.add("is-dragging");
+        root.classList.add("is-drag-active");
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", card.dataset.crmRecordId || "");
       });
       card.addEventListener("dragend", () => {
         card.classList.remove("is-dragging");
+        root.classList.remove("is-drag-active");
+        root.querySelectorAll(".crm-kanban-column.is-over").forEach((column) => column.classList.remove("is-over"));
         dragged = null;
       });
     });
@@ -60,12 +112,24 @@
         const stageId = column.dataset.crmStageId || "";
         if (!card || !recordId || !stageId) return;
         const previousColumn = card.closest(".crm-kanban-column");
+        const previousRect = card.getBoundingClientRect();
         dropzone.appendChild(card);
+        card.classList.remove("is-dragging");
+        column.classList.add("is-committing");
         if (previousColumn) updateColumnState(previousColumn);
         updateColumnState(column);
-        postStage(root, recordId, stageId).catch(() => {
-          window.location.reload();
-        });
+        animateCardMove(card, previousRect);
+        postStage(root, recordId, stageId)
+          .then(() => {
+            column.classList.add("is-saved");
+            window.setTimeout(() => column.classList.remove("is-saved"), 900);
+          })
+          .catch(() => {
+            window.location.reload();
+          })
+          .finally(() => {
+            column.classList.remove("is-committing");
+          });
       });
     });
 
