@@ -70,18 +70,53 @@
       <button class="btn" type="button" data-crm-open-dialog data-crm-kind="deal">+ Сделка</button>
       <button class="btn btn-secondary" type="button" data-crm-open-dialog data-crm-kind="history">+ Контакт</button>
     </form>
-    <details class="crm-stage-settings crm-stage-settings--compact">
-      <summary>Этапы</summary>
-      <form method="post" action="{{ url_for('crm_stages_save') }}">
-        {% include "_csrf_field.html" %}
-        <label>
-          <span>Настройка воронки</span>
-          <textarea name="stages" rows="4">{{ crm_pipeline_stage_lines }}</textarea>
-        </label>
-        <button class="btn btn-secondary" type="submit">Сохранить</button>
-      </form>
-    </details>
+    <button class="btn btn-secondary crm-archive-toggle" type="button" data-crm-archive-toggle>
+      Архивы <span data-crm-archive-count>{{ crm_archive_records|length }}</span>
+    </button>
   </header>
+
+  <section class="crm-archive-row" data-crm-archive-row hidden>
+    <header class="crm-archive-row-head">
+      <div>
+        <h3>Архивы</h3>
+        <span>Карточки, убранные из активного канбана</span>
+      </div>
+      <label>
+        <span>Поиск</span>
+        <input type="search" data-crm-archive-search placeholder="Название или клиент" autocomplete="off" />
+      </label>
+    </header>
+    <div class="crm-archive-card-row" data-crm-archive-card-row>
+      {% for row in crm_archive_records %}
+        <article
+          class="crm-archive-card"
+          data-crm-archive-card
+          data-crm-detail-title="{{ row.title|e }}"
+          data-crm-detail-client="{{ row.client|e }}"
+        >
+          {% if row.date or row.due_date %}
+            <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
+          {% endif %}
+          <div class="crm-kanban-card-top">
+            <strong>{{ row.title }}</strong>
+            <span>{{ row.item_type_label }}</span>
+          </div>
+          {% if row.client %}
+            <span class="crm-kanban-client">{{ row.client }}</span>
+          {% endif %}
+          <div class="crm-kanban-card-money">
+            {% if row.kanban_amount %}
+              <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+            {% else %}
+              <span>Сумма не указана</span>
+            {% endif %}
+          </div>
+        </article>
+      {% else %}
+        <p class="crm-archive-empty" data-crm-archive-empty>Архив пока пустой.</p>
+      {% endfor %}
+    </div>
+  </section>
 
   <div
     class="crm-kanban"

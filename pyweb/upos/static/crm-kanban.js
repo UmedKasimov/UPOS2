@@ -292,29 +292,13 @@
   function initKanban(root) {
     let dragged = null;
     let selectedCard = null;
-    const archiveDialog = document.getElementById("crm-archive-dialog");
-    const archiveList = archiveDialog?.querySelector("[data-crm-archive-list]");
+    const archiveToggle = document.querySelector("[data-crm-archive-toggle]");
+    const archiveRow = document.querySelector("[data-crm-archive-row]");
+    const archiveList = document.querySelector("[data-crm-archive-card-row]");
     const archiveCount = document.querySelector("[data-crm-archive-count]");
+    const archiveSearch = document.querySelector("[data-crm-archive-search]");
     const searchInput = document.querySelector('.crm-kanban-filters input[name="q"]');
     const trashDrop = document.querySelector("[data-crm-trash-drop]");
-
-    const showArchiveDialog = () => {
-      if (!archiveDialog) return;
-      if (typeof archiveDialog.showModal === "function") {
-        archiveDialog.showModal();
-      } else {
-        archiveDialog.setAttribute("open", "");
-      }
-    };
-
-    const closeArchiveDialog = () => {
-      if (!archiveDialog) return;
-      if (archiveDialog.open && typeof archiveDialog.close === "function") {
-        archiveDialog.close();
-      } else {
-        archiveDialog.removeAttribute("open");
-      }
-    };
 
     const setSelectedCard = (card) => {
       if (selectedCard && selectedCard !== card) selectedCard.classList.remove("is-selected");
@@ -327,27 +311,31 @@
       const empty = archiveList.querySelector("[data-crm-archive-empty]");
       if (empty) empty.remove();
       const item = document.createElement("article");
-      item.className = "crm-archive-item";
-      item.setAttribute("data-crm-archive-item", "");
+      item.className = "crm-archive-card";
+      item.setAttribute("data-crm-archive-card", "");
       const title = valueOrDash(card.dataset.crmDetailTitle);
       const client = valueOrDash(card.dataset.crmDetailClient);
       const amount = valueOrDash(card.dataset.crmDetailAmount);
       const date = valueOrDash(card.dataset.crmDetailDate || card.dataset.crmDetailDueDate);
+      const type = valueOrDash(card.dataset.crmDetailType);
+      item.dataset.crmDetailTitle = title;
+      item.dataset.crmDetailClient = client === "-" ? "" : client;
       item.innerHTML = `
-        <div>
+        <div class="crm-kanban-card-date"></div>
+        <div class="crm-kanban-card-top">
           <strong></strong>
           <span></span>
         </div>
-        <div>
-          <strong></strong>
-          <span></span>
-        </div>
+        <span class="crm-kanban-client"></span>
+        <div class="crm-kanban-card-money"><strong></strong></div>
       `;
-      item.querySelector("div:first-child strong").textContent = client === "-" ? title : client;
-      item.querySelector("div:first-child span").textContent = title;
-      item.querySelector("div:last-child strong").textContent = amount;
-      item.querySelector("div:last-child span").textContent = date;
+      item.querySelector(".crm-kanban-card-date").textContent = date;
+      item.querySelector(".crm-kanban-card-top strong").textContent = title;
+      item.querySelector(".crm-kanban-card-top span").textContent = type;
+      item.querySelector(".crm-kanban-client").textContent = client === "-" ? "" : client;
+      item.querySelector(".crm-kanban-card-money strong").textContent = amount;
       archiveList.prepend(item);
+      applyArchiveSearch();
     };
 
     const updateArchiveCount = () => {
@@ -400,6 +388,24 @@
       if (clientNode) clientNode.innerHTML = highlightText(client, query);
     };
 
+    const applyArchiveSearch = () => {
+      const query = String(archiveSearch?.value || "").trim();
+      let visibleCount = 0;
+      archiveList?.querySelectorAll("[data-crm-archive-card]").forEach((card) => {
+        const visible = cardMatchesSearch(card, query);
+        card.hidden = !visible;
+        renderSearchMatch(card, visible ? query : "");
+        if (visible) visibleCount += 1;
+      });
+      const empty = archiveList?.querySelector("[data-crm-archive-empty]");
+      if (empty) {
+        const hasCards = Boolean(archiveList?.querySelector("[data-crm-archive-card]"));
+        empty.hidden = hasCards && visibleCount > 0;
+        if (hasCards && visibleCount === 0) empty.textContent = "Ничего не найдено.";
+        if (!hasCards) empty.textContent = "Архив пока пустой.";
+      }
+    };
+
     const applySearch = () => {
       const query = String(searchInput?.value || "").trim();
       root.querySelectorAll(".crm-kanban-card").forEach((card) => {
@@ -411,11 +417,13 @@
       root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
     };
 
-    archiveDialog?.querySelectorAll("[data-crm-archive-close]").forEach((button) => {
-      button.addEventListener("click", closeArchiveDialog);
-    });
-    archiveDialog?.addEventListener("click", (event) => {
-      if (event.target === archiveDialog) closeArchiveDialog();
+    archiveToggle?.addEventListener("click", () => {
+      if (!archiveRow) return;
+      archiveRow.hidden = !archiveRow.hidden;
+      if (!archiveRow.hidden) {
+        applyArchiveSearch();
+        archiveSearch?.focus();
+      }
     });
 
     root.querySelectorAll(".crm-kanban-card").forEach((card) => {
@@ -502,6 +510,10 @@
     if (searchInput) {
       searchInput.addEventListener("input", applySearch);
       applySearch();
+    }
+    if (archiveSearch) {
+      archiveSearch.addEventListener("input", applyArchiveSearch);
+      applyArchiveSearch();
     }
   }
 
