@@ -4374,6 +4374,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   line-height: 1.1;
 }
 
+.crm-service-metric:nth-child(2) strong,
+.crm-kanban-column-total,
+.crm-kanban-card-money strong {
+  color: #16a34a;
+}
+
 .crm-service-metric.is-alert {
   border-color: color-mix(in srgb, #ef4444 45%, var(--workbench-line, var(--border)));
   background: color-mix(in srgb, #ef4444 7%, var(--card));
