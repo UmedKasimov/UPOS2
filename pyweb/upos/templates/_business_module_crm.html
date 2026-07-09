@@ -35,27 +35,6 @@
       <small>{{ crm_summary.won_count }} успешно</small>
     </div>
   </div>
-  <aside class="crm-next-actions" aria-label="Ближайшие действия CRM">
-    <header>
-      <div>
-        <h3>Ближайшие действия</h3>
-        <span>Контроль обещаний по клиентам</span>
-      </div>
-    </header>
-    <div class="crm-next-action-list">
-      {% for row in crm_next_actions %}
-        <article class="crm-next-action" data-state="{{ row.action_state.id }}">
-          <div>
-            <strong>{{ row.next_step or row.title }}</strong>
-            <span>{{ row.client or row.service_type or row.item_type_label }}</span>
-          </div>
-          <button type="button" data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'>Открыть</button>
-        </article>
-      {% else %}
-        <p class="crm-next-action-empty">Ближайших действий пока нет.</p>
-      {% endfor %}
-    </div>
-  </aside>
 </section>
 
 <section class="crm-pipeline-shell" data-workspace-view="tasks deals" hidden>
