@@ -37,7 +37,7 @@
   }
 
   function updateColumnState(column) {
-    const cards = Array.from(column.querySelectorAll(".crm-kanban-card"));
+    const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !card.hidden);
     const count = column.querySelector("header strong");
     if (count) count.textContent = String(cards.length);
     const empty = column.querySelector(".crm-kanban-empty");
@@ -96,6 +96,36 @@
   function valueOrDash(value) {
     const normalized = String(value || "").trim();
     return normalized || "-";
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function highlightText(value, query) {
+    const text = String(value || "");
+    const term = String(query || "").trim();
+    if (!term) return escapeHtml(text);
+    const lowerText = text.toLocaleLowerCase();
+    const lowerTerm = term.toLocaleLowerCase();
+    let cursor = 0;
+    let result = "";
+    while (cursor < text.length) {
+      const index = lowerText.indexOf(lowerTerm, cursor);
+      if (index === -1) {
+        result += escapeHtml(text.slice(cursor));
+        break;
+      }
+      result += escapeHtml(text.slice(cursor, index));
+      result += `<mark class="crm-search-hit">${escapeHtml(text.slice(index, index + term.length))}</mark>`;
+      cursor = index + term.length;
+    }
+    return result;
   }
 
   function initCardDetails() {
@@ -202,6 +232,7 @@
     const archiveDialog = document.getElementById("crm-archive-dialog");
     const archiveList = archiveDialog?.querySelector("[data-crm-archive-list]");
     const archiveCount = document.querySelector("[data-crm-archive-count]");
+    const searchInput = document.querySelector('.crm-kanban-filters input[name="q"]');
 
     const showArchiveDialog = () => {
       if (!archiveDialog) return;
@@ -261,6 +292,29 @@
       if (!archiveCount) return;
       const current = Number.parseInt(archiveCount.textContent || "0", 10) || 0;
       archiveCount.textContent = String(current + 1);
+    };
+
+    const renderSearchMatch = (card, query) => {
+      const title = card.dataset.crmDetailTitle || "";
+      const client = card.dataset.crmDetailClient || "";
+      const titleNode = card.querySelector(".crm-kanban-card-top > strong");
+      const clientNode = card.querySelector(".crm-kanban-client");
+      if (titleNode) titleNode.innerHTML = highlightText(title, query);
+      if (clientNode) clientNode.innerHTML = highlightText(client, query);
+    };
+
+    const applySearch = () => {
+      const query = String(searchInput?.value || "").trim();
+      const needle = query.toLocaleLowerCase();
+      root.querySelectorAll(".crm-kanban-card").forEach((card) => {
+        const title = String(card.dataset.crmDetailTitle || "").toLocaleLowerCase();
+        const client = String(card.dataset.crmDetailClient || "").toLocaleLowerCase();
+        const visible = !needle || title.includes(needle) || client.includes(needle);
+        card.hidden = !visible;
+        renderSearchMatch(card, visible ? query : "");
+        if (!visible && selectedCard === card) setSelectedCard(null);
+      });
+      root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
     };
 
     archiveOpenButtons.forEach((button) => button.addEventListener("click", showArchiveDialog));
@@ -356,6 +410,10 @@
     });
 
     root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
+    if (searchInput) {
+      searchInput.addEventListener("input", applySearch);
+      applySearch();
+    }
   }
 
   function initDialog() {

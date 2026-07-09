@@ -4838,6 +4838,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   line-height: 1.2;
 }
 
+.crm-search-hit {
+  padding: 0 0.08rem;
+  border-radius: 0.22rem;
+  background: #fef08a;
+  color: #713f12;
+  font: inherit;
+}
+
 .crm-kanban-card-tags {
   flex-wrap: wrap;
 }
