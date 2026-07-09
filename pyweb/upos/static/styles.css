@@ -4582,52 +4582,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   scrollbar-gutter: stable;
 }
 
-.crm-selection-toolbar {
-  position: sticky;
-  top: 0.35rem;
-  z-index: 15;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.55rem;
-  width: fit-content;
-  max-width: min(100%, 38rem);
-  margin: -0.15rem 0 0.65rem auto;
-  padding: 0.42rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--workbench-line, var(--border)));
-  border-radius: var(--workbench-radius-sm, 8px);
-  background: color-mix(in srgb, var(--card) 92%, var(--primary));
-  box-shadow: 0 14px 28px rgb(15 23 42 / 0.12);
-}
-
-.crm-selection-toolbar[hidden] {
-  display: none;
-}
-
-.crm-selection-toolbar > div {
-  display: grid;
-  min-width: 10rem;
-  max-width: 17rem;
-}
-
-.crm-selection-toolbar span {
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-
-.crm-selection-toolbar strong {
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crm-selection-archive-btn {
-  background: #0f766e;
-  border-color: #0f766e;
-}
-
 .crm-trash-drop {
   position: fixed;
   right: 1.4rem;

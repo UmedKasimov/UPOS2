@@ -292,10 +292,6 @@
   function initKanban(root) {
     let dragged = null;
     let selectedCard = null;
-    const toolbar = document.querySelector("[data-crm-selection-toolbar]");
-    const selectionTitle = toolbar?.querySelector("[data-crm-selection-title]");
-    const archiveButton = toolbar?.querySelector("[data-crm-archive-selected]");
-    const archiveOpenButtons = document.querySelectorAll("[data-crm-open-archive]");
     const archiveDialog = document.getElementById("crm-archive-dialog");
     const archiveList = archiveDialog?.querySelector("[data-crm-archive-list]");
     const archiveCount = document.querySelector("[data-crm-archive-count]");
@@ -324,8 +320,6 @@
       if (selectedCard && selectedCard !== card) selectedCard.classList.remove("is-selected");
       selectedCard = card;
       if (selectedCard) selectedCard.classList.add("is-selected");
-      if (toolbar) toolbar.hidden = !selectedCard;
-      if (selectionTitle) selectionTitle.textContent = selectedCard?.dataset.crmDetailClient || selectedCard?.dataset.crmDetailTitle || "-";
     };
 
     const appendArchivedItem = (card) => {
@@ -417,7 +411,6 @@
       root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
     };
 
-    archiveOpenButtons.forEach((button) => button.addEventListener("click", showArchiveDialog));
     archiveDialog?.querySelectorAll("[data-crm-archive-close]").forEach((button) => {
       button.addEventListener("click", closeArchiveDialog);
     });
@@ -446,16 +439,6 @@
         window.setTimeout(hideTrashDrop, 80);
         dragged = null;
       });
-    });
-
-    archiveButton?.addEventListener("click", () => {
-      const card = selectedCard;
-      if (!card || archiveButton.disabled) return;
-      archiveButton.disabled = true;
-      archiveCard(card)
-        .finally(() => {
-          archiveButton.disabled = false;
-        });
     });
 
     if (trashDrop) {
