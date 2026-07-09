@@ -137,6 +137,8 @@
         <div class="crm-kanban-column-total">{{ column.total }} UZS</div>
         <div class="crm-kanban-dropzone" data-crm-dropzone>
           {% for row in column.records %}
+            {% set activity = row.get("activity_state") or {"state": "green", "fill": 100, "label": ""} %}
+            {% set action_state = row.get("action_state") or {"id": "", "label": ""} %}
             <article
               class="crm-kanban-card"
               draggable="true"
@@ -161,9 +163,9 @@
               data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
             >
               <div
-                class="crm-card-activity crm-card-activity--{{ row.activity_state.state }}"
-                style="--crm-activity-fill: {{ row.activity_state.fill }}%;"
-                title="{{ row.activity_state.label }}"
+                class="crm-card-activity crm-card-activity--{{ activity.state }}"
+                style="--crm-activity-fill: {{ activity.fill }}%;"
+                title="{{ activity.label }}"
               ></div>
               {% if row.date or row.due_date %}
                 <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
@@ -180,7 +182,7 @@
                 {% if row.service_type %}<span>{{ row.service_type }}</span>{% endif %}
                 <span data-priority="{{ row.priority }}">{{ row.priority_label }}</span>
                 {% if row.probability_label %}<span>{{ row.probability_label }}</span>{% endif %}
-                {% if row.action_state.label %}<span data-state="{{ row.action_state.id }}">{{ row.action_state.label }}</span>{% endif %}
+                {% if action_state.label %}<span data-state="{{ action_state.id }}">{{ action_state.label }}</span>{% endif %}
               </div>
               {% if row.client %}
                 {% if row.client_href %}
