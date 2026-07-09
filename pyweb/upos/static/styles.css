@@ -4582,6 +4582,52 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   scrollbar-gutter: stable;
 }
 
+.crm-selection-toolbar {
+  position: sticky;
+  top: 0.35rem;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  width: fit-content;
+  max-width: min(100%, 38rem);
+  margin: -0.15rem 0 0.65rem auto;
+  padding: 0.42rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--workbench-line, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in srgb, var(--card) 92%, var(--primary));
+  box-shadow: 0 14px 28px rgb(15 23 42 / 0.12);
+}
+
+.crm-selection-toolbar[hidden] {
+  display: none;
+}
+
+.crm-selection-toolbar > div {
+  display: grid;
+  min-width: 10rem;
+  max-width: 17rem;
+}
+
+.crm-selection-toolbar span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-selection-toolbar strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-selection-archive-btn {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
 .crm-kanban-column {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -4689,6 +4735,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-kanban-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 32px rgb(15 23 42 / 0.12);
+}
+
+.crm-kanban-card.is-selected {
+  border-color: color-mix(in srgb, #0f766e 60%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #0f766e 7%, var(--card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #0f766e 18%, transparent);
+}
+
+.crm-kanban-card.is-archiving {
+  opacity: 0.58;
+  pointer-events: none;
+  transform: scale(0.985);
 }
 
 .crm-kanban-card.is-dragging {
@@ -4996,6 +5054,64 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-card-detail-event p {
   margin: 0;
+}
+
+.crm-archive-dialog {
+  width: min(52rem, 94vw);
+  max-width: min(52rem, 94vw);
+}
+
+.crm-archive-surface {
+  width: 100%;
+  max-height: min(84vh, 46rem);
+  overflow: hidden;
+}
+
+.crm-archive-list {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  max-height: calc(84vh - 5rem);
+  overflow: auto;
+  padding: 1rem;
+}
+
+.crm-archive-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+}
+
+.crm-archive-item div {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.crm-archive-item div:last-child {
+  justify-items: end;
+}
+
+.crm-archive-item strong,
+.crm-archive-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-archive-item span,
+.crm-archive-empty {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-archive-item div:last-child strong {
+  color: #16a34a;
 }
 
 .telephony-layout {

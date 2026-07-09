@@ -18,6 +18,24 @@
     });
   }
 
+  function postArchive(root, recordId) {
+    const template = root.dataset.crmArchiveUrlTemplate || "/crm/__record__/archive";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: body.toString(),
+    }).then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    });
+  }
+
   function updateColumnState(column) {
     const cards = Array.from(column.querySelectorAll(".crm-kanban-card"));
     const count = column.querySelector("header strong");
@@ -176,9 +194,91 @@
 
   function initKanban(root) {
     let dragged = null;
+    let selectedCard = null;
+    const toolbar = document.querySelector("[data-crm-selection-toolbar]");
+    const selectionTitle = toolbar?.querySelector("[data-crm-selection-title]");
+    const archiveButton = toolbar?.querySelector("[data-crm-archive-selected]");
+    const archiveOpenButtons = document.querySelectorAll("[data-crm-open-archive]");
+    const archiveDialog = document.getElementById("crm-archive-dialog");
+    const archiveList = archiveDialog?.querySelector("[data-crm-archive-list]");
+    const archiveCount = document.querySelector("[data-crm-archive-count]");
+
+    const showArchiveDialog = () => {
+      if (!archiveDialog) return;
+      if (typeof archiveDialog.showModal === "function") {
+        archiveDialog.showModal();
+      } else {
+        archiveDialog.setAttribute("open", "");
+      }
+    };
+
+    const closeArchiveDialog = () => {
+      if (!archiveDialog) return;
+      if (archiveDialog.open && typeof archiveDialog.close === "function") {
+        archiveDialog.close();
+      } else {
+        archiveDialog.removeAttribute("open");
+      }
+    };
+
+    const setSelectedCard = (card) => {
+      if (selectedCard && selectedCard !== card) selectedCard.classList.remove("is-selected");
+      selectedCard = card;
+      if (selectedCard) selectedCard.classList.add("is-selected");
+      if (toolbar) toolbar.hidden = !selectedCard;
+      if (selectionTitle) selectionTitle.textContent = selectedCard?.dataset.crmDetailClient || selectedCard?.dataset.crmDetailTitle || "-";
+    };
+
+    const appendArchivedItem = (card) => {
+      if (!archiveList || !card) return;
+      const empty = archiveList.querySelector("[data-crm-archive-empty]");
+      if (empty) empty.remove();
+      const item = document.createElement("article");
+      item.className = "crm-archive-item";
+      item.setAttribute("data-crm-archive-item", "");
+      const title = valueOrDash(card.dataset.crmDetailTitle);
+      const client = valueOrDash(card.dataset.crmDetailClient);
+      const amount = valueOrDash(card.dataset.crmDetailAmount);
+      const date = valueOrDash(card.dataset.crmDetailDate || card.dataset.crmDetailDueDate);
+      item.innerHTML = `
+        <div>
+          <strong></strong>
+          <span></span>
+        </div>
+        <div>
+          <strong></strong>
+          <span></span>
+        </div>
+      `;
+      item.querySelector("div:first-child strong").textContent = client === "-" ? title : client;
+      item.querySelector("div:first-child span").textContent = title;
+      item.querySelector("div:last-child strong").textContent = amount;
+      item.querySelector("div:last-child span").textContent = date;
+      archiveList.prepend(item);
+    };
+
+    const updateArchiveCount = () => {
+      if (!archiveCount) return;
+      const current = Number.parseInt(archiveCount.textContent || "0", 10) || 0;
+      archiveCount.textContent = String(current + 1);
+    };
+
+    archiveOpenButtons.forEach((button) => button.addEventListener("click", showArchiveDialog));
+    archiveDialog?.querySelectorAll("[data-crm-archive-close]").forEach((button) => {
+      button.addEventListener("click", closeArchiveDialog);
+    });
+    archiveDialog?.addEventListener("click", (event) => {
+      if (event.target === archiveDialog) closeArchiveDialog();
+    });
+
     root.querySelectorAll(".crm-kanban-card").forEach((card) => {
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("a, button, input, select, textarea")) return;
+        setSelectedCard(card);
+      });
       card.addEventListener("dragstart", (event) => {
         dragged = card;
+        setSelectedCard(card);
         card.classList.add("is-dragging");
         root.classList.add("is-drag-active");
         event.dataTransfer.effectAllowed = "move";
@@ -190,6 +290,29 @@
         root.querySelectorAll(".crm-kanban-column.is-over").forEach((column) => column.classList.remove("is-over"));
         dragged = null;
       });
+    });
+
+    archiveButton?.addEventListener("click", () => {
+      const card = selectedCard;
+      const recordId = card?.dataset.crmRecordId || "";
+      if (!card || !recordId || archiveButton.disabled) return;
+      const previousColumn = card.closest(".crm-kanban-column");
+      archiveButton.disabled = true;
+      card.classList.add("is-archiving");
+      postArchive(root, recordId)
+        .then(() => {
+          appendArchivedItem(card);
+          updateArchiveCount();
+          card.remove();
+          if (previousColumn) updateColumnState(previousColumn);
+          setSelectedCard(null);
+        })
+        .catch(() => {
+          window.location.reload();
+        })
+        .finally(() => {
+          archiveButton.disabled = false;
+        });
     });
 
     root.querySelectorAll(".crm-kanban-column").forEach((column) => {

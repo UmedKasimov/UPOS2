@@ -53,6 +53,7 @@
           <option value="done" {% if crm_filters.status == 'done' %}selected{% endif %}>Завершено</option>
           <option value="won" {% if crm_filters.status == 'won' %}selected{% endif %}>Успешно</option>
           <option value="lost" {% if crm_filters.status == 'lost' %}selected{% endif %}>Потеряно</option>
+          <option value="archived" {% if crm_filters.status == 'archived' %}selected{% endif %}>Архив</option>
         </select>
       </label>
       <label>
@@ -82,11 +83,23 @@
     </details>
   </header>
 
+  <div class="crm-selection-toolbar" data-crm-selection-toolbar hidden>
+    <div>
+      <span>Выбрана карточка</span>
+      <strong data-crm-selection-title>-</strong>
+    </div>
+    <button class="btn crm-selection-archive-btn" type="button" data-crm-archive-selected>Архив</button>
+    <button class="btn btn-secondary" type="button" data-crm-open-archive>
+      В архиве <span data-crm-archive-count>{{ crm_archive_records|length }}</span>
+    </button>
+  </div>
+
   <div
     class="crm-kanban"
     data-crm-kanban
     data-crm-csrf="{{ csrf_token }}"
     data-crm-stage-url-template="/crm/__record__/stage"
+    data-crm-archive-url-template="/crm/__record__/archive"
   >
     {% for column in crm_kanban_columns %}
       <section class="crm-kanban-column" data-crm-stage-id="{{ column.id }}">
@@ -270,6 +283,34 @@
           <button class="btn btn-secondary" type="button" data-crm-close-dialog>Отмена</button>
         </div>
       </form>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal crm-archive-dialog" id="crm-archive-dialog" aria-labelledby="crm-archive-dialog-title">
+  <div class="settings-profile-modal-surface crm-archive-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-archive-dialog-title" class="settings-profile-modal-title">Архив CRM</h2>
+        <p class="settings-profile-modal-sub">Клиенты и сделки, убранные из активного канбана</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-archive-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="crm-archive-list" data-crm-archive-list>
+      {% for row in crm_archive_records %}
+        <article class="crm-archive-item" data-crm-archive-item>
+          <div>
+            <strong>{{ row.client or row.title }}</strong>
+            <span>{{ row.title }}</span>
+          </div>
+          <div>
+            <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+            <span>{{ row.date or row.due_date or "-" }}</span>
+          </div>
+        </article>
+      {% else %}
+        <p class="crm-archive-empty" data-crm-archive-empty>Архив пока пустой.</p>
+      {% endfor %}
     </div>
   </div>
 </dialog>

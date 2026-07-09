@@ -3542,6 +3542,7 @@ def create_app() -> FastAPI:
             "lost": "Потеряно",
             "done": "Завершено",
             "planned": "Запланировано",
+            "archived": "Архив",
         }.get(str(status or ""), "Новый")
 
     CRM_DEFAULT_STAGES = (
@@ -3585,7 +3586,7 @@ def create_app() -> FastAPI:
         return str(number)
 
     def _crm_due_state(due_date: str, status: str, today_iso: str) -> dict[str, str]:
-        if str(status or "") in {"done", "won", "lost"}:
+        if str(status or "") in {"done", "won", "lost", "archived"}:
             return {"id": "closed", "label": "Закрыто"}
         raw = str(due_date or "").strip()
         if not raw:
@@ -8777,6 +8778,7 @@ def create_app() -> FastAPI:
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
         crm_history_records: list[dict[str, Any]] = []
+        crm_archive_records: list[dict[str, Any]] = []
         crm_next_actions: list[dict[str, Any]] = []
         crm_summary = {
             "active_count": 0,
@@ -8867,7 +8869,7 @@ def create_app() -> FastAPI:
                 for row in rows
                 if row.item_type == "deal"
             ]
-            deal_options = [item for item in all_deal_options if next((row.status for row in rows if row.id == item["id"]), "") not in {"won", "lost", "done"}]
+            deal_options = [item for item in all_deal_options if next((row.status for row in rows if row.id == item["id"]), "") not in {"won", "lost", "done", "archived"}]
             deal_title_by_id = {item["id"]: item["title"] for item in all_deal_options}
             for row in rows:
                 item = _crm_record_data(row)
@@ -8925,6 +8927,9 @@ def create_app() -> FastAPI:
                         continue
                     if filters["date_to"] and history_date and history_date > filters["date_to"]:
                         continue
+                if item["status"] == "archived":
+                    crm_archive_records.append(item)
+                    continue
                 crm_records.append(item)
                 if item["item_type"] == "history":
                     crm_history_records.append(item)
@@ -8981,6 +8986,7 @@ def create_app() -> FastAPI:
             crm_options=crm_options,
             crm_records=crm_records,
             crm_history_records=crm_history_records,
+            crm_archive_records=crm_archive_records,
             crm_summary=crm_summary,
             crm_next_actions=crm_next_actions,
             crm_pipeline_stages=crm_stages,
@@ -10460,6 +10466,26 @@ def create_app() -> FastAPI:
                 row.status = "in_progress"
             _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
         return JSONResponse({"ok": True, "stage": stage})
+
+    @app.post("/crm/{record_id}/archive", name="crm_archive")
+    async def crm_archive(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            data = _json_object(row.data).copy()
+            data["archived_at"] = datetime.now(timezone.utc).isoformat()
+            row.status = "archived"
+            row.data = data
+            flag_modified(row, "data")
+        return JSONResponse({"ok": True})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
     async def crm_delete(request: Request, record_id: str):
