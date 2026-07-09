@@ -300,6 +300,7 @@
     const archiveList = archiveDialog?.querySelector("[data-crm-archive-list]");
     const archiveCount = document.querySelector("[data-crm-archive-count]");
     const searchInput = document.querySelector('.crm-kanban-filters input[name="q"]');
+    const trashDrop = document.querySelector("[data-crm-trash-drop]");
 
     const showArchiveDialog = () => {
       if (!archiveDialog) return;
@@ -361,6 +362,41 @@
       archiveCount.textContent = String(current + 1);
     };
 
+    const showTrashDrop = () => {
+      if (trashDrop) trashDrop.hidden = false;
+    };
+
+    const hideTrashDrop = () => {
+      if (!trashDrop) return;
+      trashDrop.hidden = true;
+      trashDrop.classList.remove("is-over", "is-saving");
+    };
+
+    const archiveCard = (card) => {
+      const recordId = card?.dataset.crmRecordId || "";
+      if (!card || !recordId || card.classList.contains("is-archiving")) return Promise.resolve(false);
+      const previousColumn = card.closest(".crm-kanban-column");
+      card.classList.add("is-archiving");
+      if (trashDrop) trashDrop.classList.add("is-saving");
+      return postArchive(root, recordId)
+        .then(() => {
+          appendArchivedItem(card);
+          updateArchiveCount();
+          card.remove();
+          if (previousColumn) updateColumnState(previousColumn);
+          setSelectedCard(null);
+          return true;
+        })
+        .catch(() => {
+          window.location.reload();
+          return false;
+        })
+        .finally(() => {
+          card.classList.remove("is-archiving");
+          if (trashDrop) trashDrop.classList.remove("is-over", "is-saving");
+        });
+    };
+
     const renderSearchMatch = (card, query) => {
       const title = card.dataset.crmDetailTitle || "";
       const client = card.dataset.crmDetailClient || "";
@@ -397,6 +433,7 @@
       card.addEventListener("dragstart", (event) => {
         dragged = card;
         setSelectedCard(card);
+        showTrashDrop();
         card.classList.add("is-dragging");
         root.classList.add("is-drag-active");
         event.dataTransfer.effectAllowed = "move";
@@ -406,32 +443,37 @@
         card.classList.remove("is-dragging");
         root.classList.remove("is-drag-active");
         root.querySelectorAll(".crm-kanban-column.is-over").forEach((column) => column.classList.remove("is-over"));
+        window.setTimeout(hideTrashDrop, 80);
         dragged = null;
       });
     });
 
     archiveButton?.addEventListener("click", () => {
       const card = selectedCard;
-      const recordId = card?.dataset.crmRecordId || "";
-      if (!card || !recordId || archiveButton.disabled) return;
-      const previousColumn = card.closest(".crm-kanban-column");
+      if (!card || archiveButton.disabled) return;
       archiveButton.disabled = true;
-      card.classList.add("is-archiving");
-      postArchive(root, recordId)
-        .then(() => {
-          appendArchivedItem(card);
-          updateArchiveCount();
-          card.remove();
-          if (previousColumn) updateColumnState(previousColumn);
-          setSelectedCard(null);
-        })
-        .catch(() => {
-          window.location.reload();
-        })
+      archiveCard(card)
         .finally(() => {
           archiveButton.disabled = false;
         });
     });
+
+    if (trashDrop) {
+      trashDrop.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        trashDrop.classList.add("is-over");
+        event.dataTransfer.dropEffect = "move";
+      });
+      trashDrop.addEventListener("dragleave", (event) => {
+        if (!trashDrop.contains(event.relatedTarget)) trashDrop.classList.remove("is-over");
+      });
+      trashDrop.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const recordId = event.dataTransfer.getData("text/plain") || dragged?.dataset.crmRecordId || "";
+        const card = dragged || root.querySelector(`[data-crm-record-id="${CSS.escape(recordId)}"]`);
+        archiveCard(card).finally(hideTrashDrop);
+      });
+    }
 
     root.querySelectorAll(".crm-kanban-column").forEach((column) => {
       const dropzone = column.querySelector("[data-crm-dropzone]");
