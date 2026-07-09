@@ -135,6 +135,9 @@
               data-crm-detail-note="{{ row.note|e }}"
               data-crm-detail-chat="{{ row.chat_label|e }}"
             >
+              {% if row.date or row.due_date %}
+                <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
+              {% endif %}
               <div class="crm-kanban-card-top">
                 <strong>{{ row.title }}</strong>
                 <span>{{ row.item_type_label }}</span>
@@ -166,12 +169,6 @@
               </div>
               {% if row.chat_label %}
                 <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
-              {% endif %}
-              {% if row.responsible or row.due_date %}
-                <footer>
-                  <span>{{ row.responsible or "Без ответственного" }}</span>
-                  <span>{{ row.due_date or row.date or "-" }}</span>
-                </footer>
               {% endif %}
               <template data-crm-card-history>
                 {% for history in crm_history_records if (history.related_deal_id and history.related_deal_id == row.id) or (row.client and history.client == row.client) %}
