@@ -202,6 +202,7 @@
     const subtitle = dialog.querySelector("[data-crm-card-detail-subtitle]");
     const client = dialog.querySelector("[data-crm-card-detail-client]");
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
+    const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
     const fields = {
@@ -239,6 +240,11 @@
           clientLink.hidden = true;
           clientLink.removeAttribute("href");
         }
+      }
+      if (editButton) {
+        const payload = data.crmEditPayload || "";
+        editButton.hidden = !payload;
+        editButton.dataset.crmEditPayload = payload;
       }
       setText(chat, data.crmDetailChat || "Не привязан");
       setText(fields.title, data.crmDetailTitle);
@@ -283,6 +289,11 @@
     });
     dialog.querySelectorAll("[data-crm-card-detail-close]").forEach((button) => {
       button.addEventListener("click", closeDetails);
+    });
+    editButton?.addEventListener("click", () => {
+      const raw = editButton.dataset.crmEditPayload || "{}";
+      closeDetails();
+      document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
     });
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) closeDetails();
@@ -614,6 +625,11 @@
         const payload = parsePayload(button.getAttribute("data-crm-edit"));
         openDialog(payload.item_type || "deal", payload, "edit");
       });
+    });
+    document.addEventListener("crm:edit-record", (event) => {
+      const payload = parsePayload(event.detail?.payload);
+      if (!payload?.id) return;
+      openDialog(payload.item_type || "deal", payload, "edit");
     });
     document.querySelectorAll("[data-crm-followup]").forEach((button) => {
       button.addEventListener("click", () => {

@@ -158,6 +158,7 @@
               data-crm-detail-next-step="{{ row.next_step|e }}"
               data-crm-detail-note="{{ row.note|e }}"
               data-crm-detail-chat="{{ row.chat_label|e }}"
+              data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
             >
               {% if row.date or row.due_date %}
                 <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
@@ -359,6 +360,7 @@
           <strong data-crm-card-detail-client>Клиент не указан</strong>
           <a href="#" data-crm-card-detail-client-link hidden>Открыть клиента</a>
         </div>
+        <button class="btn crm-card-detail-edit" type="button" data-crm-card-detail-edit>Редактировать</button>
         <dl class="crm-card-detail-list">
           <div><dt>Сделка</dt><dd data-crm-card-detail-field="title">-</dd></div>
           <div><dt>Тип</dt><dd data-crm-card-detail-field="type">-</dd></div>
