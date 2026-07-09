@@ -4377,7 +4377,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-service-metric:nth-child(2) strong,
 .crm-kanban-column-total,
 .crm-kanban-card-money strong {
-  color: #16a34a;
+  color: #16a34a !important;
 }
 
 .crm-service-metric.is-alert {
@@ -4633,9 +4633,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-kanban-column-total {
-  padding: 0.55rem 0.9rem;
+  padding: 0.62rem 0.9rem;
   border-bottom: 1px solid var(--workbench-line, var(--border));
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1.15;
 }
 
 .crm-kanban-dropzone {
