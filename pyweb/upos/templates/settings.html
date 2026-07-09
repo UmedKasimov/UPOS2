@@ -44,6 +44,8 @@
     {% set active_settings_label = _('settings.tab.integrations') %}
   {% elif active_settings_tab == 'social' %}
     {% set active_settings_label = 'Соцсети' %}
+  {% elif active_settings_tab == 'crm' %}
+    {% set active_settings_label = 'CRM' %}
   {% elif active_settings_tab == 'dictionary' %}
     {% set active_settings_label = _('settings.tab.dictionary') %}
   {% elif active_settings_tab == 'roles' %}
@@ -98,6 +100,15 @@
         </span>
         <span>Соцсети</span>
         <small>Привязка профилей и каналов</small>
+      </a>
+      {% endif %}
+      {% if settings_can_manage_settings | default(false) %}
+      <a class="general-report-card general-settings-card {{ 'active' if active_settings_tab == 'crm' else '' }}" href="{{ settings_base_url }}?tab=crm" {% if active_settings_tab == 'crm' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+        </span>
+        <span>CRM</span>
+        <small>Шкала карточек и этапы</small>
       </a>
       {% endif %}
       {% if telegram_can_manage | default(false) %}
@@ -190,6 +201,18 @@
             >
               <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l1.76-1.76a5 5 0 1 0-7.07-7.07L10 5.93"/><path d="M14 11a5 5 0 0 0-7.07 0l-1.76 1.76a5 5 0 1 0 7.07 7.07L14 18.07"/><path d="M8.5 15.5 15.5 8.5"/></svg>
               <span class="settings-tab-title">Соцсети</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="settings-tab settings-tab--rail"
+              id="tab-crm"
+              data-settings-tab="crm"
+              aria-selected="false"
+              aria-controls="panel-crm"
+            >
+              <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+              <span class="settings-tab-title">CRM</span>
             </button>
             {% endif %}
             {% if settings_can_manage_dictionary | default(false) %}
@@ -525,6 +548,46 @@
               </div>
             </div>
           </div>
+
+          {% if settings_can_manage_settings | default(false) %}
+          <div
+            class="settings-panel"
+            id="panel-crm"
+            data-settings-panel="crm"
+            role="tabpanel"
+            aria-labelledby="tab-crm"
+            hidden
+          >
+            <form class="settings-crm-form" method="post" action="{{ url_for('settings_crm_post') }}">
+              {% include "_csrf_field.html" %}
+              <input type="hidden" name="return_to" value="{{ settings_base_url }}" />
+              <section class="settings-ios-group settings-business-panel settings-business-panel--wide settings-crm-card">
+                <div class="settings-dict-head">
+                  <div>
+                    <p class="settings-ios-footnote">CRM</p>
+                    <p class="settings-business-note">Настройте цветную шкалу карточек и этапы воронки.</p>
+                  </div>
+                  <button class="btn" type="submit">Сохранить CRM</button>
+                </div>
+                <div class="settings-crm-grid">
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Жёлтая шкала через, часов</span>
+                    <input class="settings-profile-input" type="number" name="crm_yellow_hours" min="1" max="720" value="{{ settings.crm_activity.yellow_hours | default(24) }}" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Красная шкала через, часов</span>
+                    <input class="settings-profile-input" type="number" name="crm_red_hours" min="2" max="1440" value="{{ settings.crm_activity.red_hours | default(48) }}" />
+                  </label>
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Этапы CRM</span>
+                    <textarea class="settings-profile-input settings-crm-stages-input" name="crm_pipeline_stages" rows="8">{{ crm_pipeline_stage_lines }}</textarea>
+                    <small>Каждый этап с новой строки. Порядок строк станет порядком колонок в CRM.</small>
+                  </label>
+                </div>
+              </section>
+            </form>
+          </div>
+          {% endif %}
 
           {% if settings_can_manage_employees | default(false) %}
           <div

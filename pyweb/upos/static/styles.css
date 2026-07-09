@@ -4804,7 +4804,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: grid;
   gap: 0.55rem;
   min-width: 0;
-  padding: 0.75rem;
+  padding: 0.9rem 0.75rem 0.75rem;
+  overflow: hidden;
   cursor: grab;
   transform-origin: center;
   transition:
@@ -4814,6 +4815,37 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
     background 180ms ease,
     opacity 160ms ease;
   will-change: transform;
+}
+
+.crm-card-activity {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0.28rem;
+  background: color-mix(in srgb, var(--workbench-line, var(--border)) 72%, var(--card));
+}
+
+.crm-card-activity::before {
+  content: "";
+  display: block;
+  width: var(--crm-activity-fill, 100%);
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  background: var(--crm-activity-color, #16a34a);
+  transition: width 240ms ease, background 240ms ease;
+}
+
+.crm-card-activity--green {
+  --crm-activity-color: #16a34a;
+}
+
+.crm-card-activity--yellow {
+  --crm-activity-color: #eab308;
+}
+
+.crm-card-activity--red {
+  --crm-activity-color: #ef4444;
 }
 
 .crm-kanban-card:hover {
@@ -6263,6 +6295,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   }
 
   .crm-archive-row-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-crm-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -11135,6 +11171,33 @@ html.dark .settings-tab.settings-tab--rail.active {
 .settings-pref-card {
   padding: 0;
   overflow: hidden;
+}
+
+.settings-crm-form {
+  display: block;
+}
+
+.settings-crm-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.settings-crm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.settings-crm-stages-input {
+  min-height: 12rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.settings-crm-grid small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 .settings-pref-list {

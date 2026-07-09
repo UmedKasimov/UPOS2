@@ -160,6 +160,11 @@
               data-crm-detail-chat="{{ row.chat_label|e }}"
               data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
             >
+              <div
+                class="crm-card-activity crm-card-activity--{{ row.activity_state.state }}"
+                style="--crm-activity-fill: {{ row.activity_state.fill }}%;"
+                title="{{ row.activity_state.label }}"
+              ></div>
               {% if row.date or row.due_date %}
                 <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
               {% endif %}

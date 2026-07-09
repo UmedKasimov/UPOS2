@@ -3796,6 +3796,34 @@ def create_app() -> FastAPI:
     def _crm_stage_lines(stages: list[dict[str, str]]) -> str:
         return "\n".join(stage["title"] for stage in stages)
 
+    def _crm_activity_settings(data: dict[str, Any]) -> dict[str, int]:
+        raw = data.get("crm_activity") if isinstance(data.get("crm_activity"), dict) else {}
+        try:
+            yellow_hours = max(1, min(int(raw.get("yellow_hours") or 24), 720))
+        except (TypeError, ValueError):
+            yellow_hours = 24
+        try:
+            red_hours = max(yellow_hours + 1, min(int(raw.get("red_hours") or 48), 1440))
+        except (TypeError, ValueError):
+            red_hours = 48
+        return {"yellow_hours": yellow_hours, "red_hours": red_hours}
+
+    def _crm_activity_state(row: CrmRecord, settings: dict[str, int]) -> dict[str, str]:
+        now = datetime.now(timezone.utc)
+        touched = row.updated_at or row.created_at or now
+        if touched.tzinfo is None:
+            touched = touched.replace(tzinfo=timezone.utc)
+        age_hours = max((now - touched).total_seconds() / 3600, 0)
+        yellow_at = max(settings.get("yellow_hours", 24), 1)
+        red_at = max(settings.get("red_hours", 48), yellow_at + 1)
+        if age_hours >= red_at:
+            return {"state": "red", "fill": "100", "label": "Нет контакта больше лимита"}
+        if age_hours >= yellow_at:
+            fill = round(((age_hours - yellow_at) / (red_at - yellow_at)) * 100)
+            return {"state": "yellow", "fill": str(max(12, min(fill, 100))), "label": "Нужно связаться"}
+        fill = round((age_hours / yellow_at) * 100)
+        return {"state": "green", "fill": str(max(8, min(fill, 100))), "label": "Свежая карточка"}
+
     def _product_data(row: Product) -> dict[str, Any]:
         data = row.data if isinstance(row.data, dict) else {}
         prices = data.get("prices") if isinstance(data.get("prices"), list) else []
@@ -8793,7 +8821,9 @@ def create_app() -> FastAPI:
         summary_won = 0
         summary_lost = 0
         crm_options = {"clients": [], "responsibles": []}
-        crm_stages = _crm_workspace_stages(wid)
+        crm_workspace_settings = load_workspace_settings(wid)
+        crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
+        crm_activity_settings = _crm_activity_settings(crm_workspace_settings)
         crm_stage_map = {stage["id"]: {**stage, "records": [], "total_value": Decimal("0"), "total": "0"} for stage in crm_stages}
         today_iso = datetime.now(timezone.utc).date().isoformat()
         with session_scope() as session:
@@ -8896,6 +8926,7 @@ def create_app() -> FastAPI:
                 item["kanban_amount_value"] = item["amount_value"] if item["amount_value"] else (linked_sale.get("amount_value") if linked_sale else Decimal("0"))
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
+                item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
                 item["edit_payload"] = _crm_record_edit_payload(item)
                 hay = " ".join(
                     [
@@ -13582,6 +13613,8 @@ def create_app() -> FastAPI:
             settings_can_manage_roles = bool(
                 settings_can_manage_config and (_is_director(u) or _is_employee_adminish(u)),
             )
+            data["crm_activity"] = _crm_activity_settings(data)
+            crm_settings_stage_lines = _crm_stage_lines(_crm_clean_stages(data.get("crm_pipeline_stages")))
             allowed_tabs = set()
             default_allowed_tab = "general"
             if settings_can_manage_config:
@@ -13591,7 +13624,7 @@ def create_app() -> FastAPI:
                 if default_allowed_tab not in allowed_tabs:
                     default_allowed_tab = "employees"
             if settings_can_manage_config:
-                allowed_tabs.update({"telegram", "integrations"})
+                allowed_tabs.update({"telegram", "integrations", "crm"})
             if settings_can_manage_dictionary:
                 allowed_tabs.add("dictionary")
                 if default_allowed_tab not in allowed_tabs:
@@ -13627,6 +13660,7 @@ def create_app() -> FastAPI:
                 settings_show_advanced=settings_can_manage_config,
                 settings_can_manage_employees=settings_can_manage_employees,
                 settings_can_manage_roles=settings_can_manage_roles,
+                crm_pipeline_stage_lines=crm_settings_stage_lines,
                 staff_role_labels={k: translate(loc, f"staff.role.{k}") for k in STAFF_ROLE_LABELS},
                 flash_ok=request.query_params.get("msg"),
                 flash_err=request.query_params.get("error"),
@@ -14207,6 +14241,8 @@ def create_app() -> FastAPI:
         }
         usd_rate = _sales_decimal(data.get("usd_uzs_rate"))
         data["usd_uzs_rate"] = _decimal_plain_text(usd_rate if usd_rate > 0 else PRODUCT_USD_RATE)
+        data["crm_activity"] = _crm_activity_settings(data)
+        crm_settings_stage_lines = _crm_stage_lines(_crm_clean_stages(data.get("crm_pipeline_stages")))
         tab_raw = (request.query_params.get("tab") or "").strip().lower()
         settings_can_manage_employees = _can_manage_employees(u)
         settings_can_manage_config = bool((not u.get("is_employee")) or _has_permission(u, "settings"))
@@ -14223,7 +14259,7 @@ def create_app() -> FastAPI:
             if default_allowed_tab not in allowed_tabs:
                 default_allowed_tab = "employees"
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations", "social"})
+            allowed_tabs.update({"telegram", "integrations", "social", "crm"})
         if settings_can_manage_dictionary:
             allowed_tabs.add("dictionary")
             if default_allowed_tab not in allowed_tabs:
@@ -14273,6 +14309,7 @@ def create_app() -> FastAPI:
             settings_show_advanced=settings_can_manage_config,
             settings_can_manage_employees=settings_can_manage_employees,
             settings_can_manage_roles=settings_can_manage_roles,
+            crm_pipeline_stage_lines=crm_settings_stage_lines,
             staff_role_labels={k: translate(loc, f"staff.role.{k}") for k in STAFF_ROLE_LABELS},
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error"),
@@ -14422,13 +14459,42 @@ def create_app() -> FastAPI:
         if settings_can_manage_employees:
             allowed_tabs.add("employees")
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations", "social", "dictionary"})
+            allowed_tabs.update({"telegram", "integrations", "social", "dictionary", "crm"})
         if settings_can_manage_roles:
             allowed_tabs.add("roles")
         tab = active_settings_tab.strip().lower() if active_settings_tab.strip().lower() in allowed_tabs else "general"
         resp = RedirectResponse(url=f"/settings?saved=1&tab={tab}", status_code=302)
         apply_locale_cookie(resp, str(data.get("locale") or "ru"))
         return resp
+
+    @app.post("/settings/crm", name="settings_crm_post")
+    async def settings_crm_post(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/settings?err=csrf&tab=crm", status_code=302)
+        u = request.session.get("user") or {}
+        settings_can_manage_config = bool((not u.get("is_employee")) or _has_permission(u, "settings"))
+        if not settings_can_manage_config:
+            return RedirectResponse(url="/settings", status_code=302)
+        wid = _settings_storage_owner_id(u)
+        data = load_workspace_settings(wid)
+        try:
+            yellow_hours = max(1, min(int(str(form.get("crm_yellow_hours") or "24")), 720))
+        except (TypeError, ValueError):
+            yellow_hours = 24
+        try:
+            red_hours = max(yellow_hours + 1, min(int(str(form.get("crm_red_hours") or "48")), 1440))
+        except (TypeError, ValueError):
+            red_hours = 48
+        data["crm_activity"] = {"yellow_hours": yellow_hours, "red_hours": red_hours}
+        raw_lines = str(form.get("crm_pipeline_stages") or "").splitlines()
+        data["crm_pipeline_stages"] = _crm_clean_stages(raw_lines)
+        save_workspace_settings(wid, data)
+        return_to = str(form.get("return_to") or "").strip()
+        if not (return_to.startswith("/settings") or return_to.startswith("/organizations/settings")):
+            return_to = "/settings"
+        sep = "&" if "?" in return_to else "?"
+        return RedirectResponse(url=f"{return_to}{sep}saved=1&tab=crm", status_code=302)
 
     @app.post("/settings/account", name="settings_account_post")
     def settings_account_post(
