@@ -100,7 +100,28 @@
         <div class="crm-kanban-column-total">{{ column.total }} UZS</div>
         <div class="crm-kanban-dropzone" data-crm-dropzone>
           {% for row in column.records %}
-            <article class="crm-kanban-card" draggable="true" data-crm-record-id="{{ row.id }}">
+            <article
+              class="crm-kanban-card"
+              draggable="true"
+              data-crm-record-id="{{ row.id }}"
+              data-crm-detail-title="{{ row.title|e }}"
+              data-crm-detail-client="{{ row.client|e }}"
+              data-crm-detail-client-href="{{ row.client_href|e }}"
+              data-crm-detail-type="{{ row.item_type_label|e }}"
+              data-crm-detail-source="{{ (row.lead_source or row.contact_type or 'Ручной ввод')|e }}"
+              data-crm-detail-status="{{ row.status_label|e }}"
+              data-crm-detail-stage="{{ row.stage|e }}"
+              data-crm-detail-service="{{ row.service_type|e }}"
+              data-crm-detail-priority="{{ row.priority_label|e }}"
+              data-crm-detail-probability="{{ row.probability_label|e }}"
+              data-crm-detail-amount="{{ ((row.kanban_amount ~ ' ' ~ (row.order_currency or row.currency)) if row.kanban_amount else 'Сумма не указана')|e }}"
+              data-crm-detail-responsible="{{ (row.responsible or 'Без ответственного')|e }}"
+              data-crm-detail-date="{{ (row.date or '-')|e }}"
+              data-crm-detail-due-date="{{ (row.due_date or '-')|e }}"
+              data-crm-detail-next-step="{{ row.next_step|e }}"
+              data-crm-detail-note="{{ row.note|e }}"
+              data-crm-detail-chat="{{ row.chat_label|e }}"
+            >
               <div class="crm-kanban-card-top">
                 <strong>{{ row.title }}</strong>
                 <span>{{ row.item_type_label }}</span>
@@ -139,6 +160,15 @@
                   <span>{{ row.due_date or row.date or "-" }}</span>
                 </footer>
               {% endif %}
+              <template data-crm-card-history>
+                {% for history in crm_history_records if (history.related_deal_id and history.related_deal_id == row.id) or (row.client and history.client == row.client) %}
+                  <article class="crm-card-detail-event">
+                    <strong>{{ history.date or history.due_date or "-" }}</strong>
+                    <span>{{ history.contact_type or history.lead_source or history.item_type_label }}</span>
+                    <p>{{ history.note or history.next_step or history.status_label }}</p>
+                  </article>
+                {% endfor %}
+              </template>
             </article>
           {% endfor %}
         </div>
@@ -240,6 +270,53 @@
           <button class="btn btn-secondary" type="button" data-crm-close-dialog>Отмена</button>
         </div>
       </form>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal crm-card-detail-dialog" id="crm-card-detail-dialog" aria-labelledby="crm-card-detail-title">
+  <div class="settings-profile-modal-surface crm-card-detail-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-card-detail-title" class="settings-profile-modal-title">Карточка клиента</h2>
+        <p class="settings-profile-modal-sub" data-crm-card-detail-subtitle>CRM, чат и история</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-card-detail-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="crm-card-detail-grid">
+      <section class="crm-card-detail-panel">
+        <h3>Данные клиента</h3>
+        <div class="crm-card-detail-client">
+          <strong data-crm-card-detail-client>Клиент не указан</strong>
+          <a href="#" data-crm-card-detail-client-link hidden>Открыть клиента</a>
+        </div>
+        <dl class="crm-card-detail-list">
+          <div><dt>Сделка</dt><dd data-crm-card-detail-field="title">-</dd></div>
+          <div><dt>Тип</dt><dd data-crm-card-detail-field="type">-</dd></div>
+          <div><dt>Источник</dt><dd data-crm-card-detail-field="source">-</dd></div>
+          <div><dt>Этап</dt><dd data-crm-card-detail-field="stage">-</dd></div>
+          <div><dt>Статус</dt><dd data-crm-card-detail-field="status">-</dd></div>
+          <div><dt>Услуга</dt><dd data-crm-card-detail-field="service">-</dd></div>
+          <div><dt>Приоритет</dt><dd data-crm-card-detail-field="priority">-</dd></div>
+          <div><dt>Вероятность</dt><dd data-crm-card-detail-field="probability">-</dd></div>
+          <div><dt>Сумма</dt><dd class="crm-card-detail-money" data-crm-card-detail-field="amount">-</dd></div>
+          <div><dt>Ответственный</dt><dd data-crm-card-detail-field="responsible">-</dd></div>
+          <div><dt>Дата</dt><dd data-crm-card-detail-field="date">-</dd></div>
+          <div><dt>Срок</dt><dd data-crm-card-detail-field="dueDate">-</dd></div>
+          <div class="wide"><dt>Следующий шаг</dt><dd data-crm-card-detail-field="nextStep">-</dd></div>
+          <div class="wide"><dt>Комментарий</dt><dd data-crm-card-detail-field="note">-</dd></div>
+        </dl>
+      </section>
+      <section class="crm-card-detail-panel crm-card-detail-panel--timeline">
+        <h3>Чат и история</h3>
+        <div class="crm-card-detail-chatbox">
+          <span>Чат</span>
+          <strong data-crm-card-detail-chat>Не привязан</strong>
+        </div>
+        <div class="crm-card-detail-history" data-crm-card-detail-history>
+          <p class="crm-card-detail-empty">История по клиенту пока пустая.</p>
+        </div>
+      </section>
     </div>
   </div>
 </dialog>

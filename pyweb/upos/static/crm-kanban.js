@@ -75,6 +75,105 @@
     window.setTimeout(finish, 520);
   }
 
+  function valueOrDash(value) {
+    const normalized = String(value || "").trim();
+    return normalized || "-";
+  }
+
+  function initCardDetails() {
+    const dialog = document.getElementById("crm-card-detail-dialog");
+    if (!dialog) return;
+    const title = dialog.querySelector("#crm-card-detail-title");
+    const subtitle = dialog.querySelector("[data-crm-card-detail-subtitle]");
+    const client = dialog.querySelector("[data-crm-card-detail-client]");
+    const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
+    const chat = dialog.querySelector("[data-crm-card-detail-chat]");
+    const history = dialog.querySelector("[data-crm-card-detail-history]");
+    const fields = {
+      title: dialog.querySelector('[data-crm-card-detail-field="title"]'),
+      type: dialog.querySelector('[data-crm-card-detail-field="type"]'),
+      source: dialog.querySelector('[data-crm-card-detail-field="source"]'),
+      stage: dialog.querySelector('[data-crm-card-detail-field="stage"]'),
+      status: dialog.querySelector('[data-crm-card-detail-field="status"]'),
+      service: dialog.querySelector('[data-crm-card-detail-field="service"]'),
+      priority: dialog.querySelector('[data-crm-card-detail-field="priority"]'),
+      probability: dialog.querySelector('[data-crm-card-detail-field="probability"]'),
+      amount: dialog.querySelector('[data-crm-card-detail-field="amount"]'),
+      responsible: dialog.querySelector('[data-crm-card-detail-field="responsible"]'),
+      date: dialog.querySelector('[data-crm-card-detail-field="date"]'),
+      dueDate: dialog.querySelector('[data-crm-card-detail-field="dueDate"]'),
+      nextStep: dialog.querySelector('[data-crm-card-detail-field="nextStep"]'),
+      note: dialog.querySelector('[data-crm-card-detail-field="note"]'),
+    };
+
+    const setText = (node, value) => {
+      if (node) node.textContent = valueOrDash(value);
+    };
+
+    const openDetails = (card) => {
+      if (!card) return;
+      const data = card.dataset;
+      setText(title, data.crmDetailTitle || "Карточка клиента");
+      setText(subtitle, `${valueOrDash(data.crmDetailStage)} · ${valueOrDash(data.crmDetailStatus)}`);
+      setText(client, data.crmDetailClient || "Клиент не указан");
+      if (clientLink) {
+        if (data.crmDetailClientHref) {
+          clientLink.href = data.crmDetailClientHref;
+          clientLink.hidden = false;
+        } else {
+          clientLink.hidden = true;
+          clientLink.removeAttribute("href");
+        }
+      }
+      setText(chat, data.crmDetailChat || "Не привязан");
+      setText(fields.title, data.crmDetailTitle);
+      setText(fields.type, data.crmDetailType);
+      setText(fields.source, data.crmDetailSource);
+      setText(fields.stage, data.crmDetailStage);
+      setText(fields.status, data.crmDetailStatus);
+      setText(fields.service, data.crmDetailService);
+      setText(fields.priority, data.crmDetailPriority);
+      setText(fields.probability, data.crmDetailProbability);
+      setText(fields.amount, data.crmDetailAmount);
+      setText(fields.responsible, data.crmDetailResponsible);
+      setText(fields.date, data.crmDetailDate);
+      setText(fields.dueDate, data.crmDetailDueDate);
+      setText(fields.nextStep, data.crmDetailNextStep);
+      setText(fields.note, data.crmDetailNote);
+      if (history) {
+        const historyTemplate = card.querySelector("template[data-crm-card-history]");
+        const content = historyTemplate?.innerHTML?.trim() || "";
+        history.innerHTML = content || '<p class="crm-card-detail-empty">История по клиенту пока пустая.</p>';
+      }
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+    };
+
+    const closeDetails = () => {
+      if (dialog.open && typeof dialog.close === "function") {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    };
+
+    document.querySelectorAll(".crm-kanban-card").forEach((card) => {
+      card.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        openDetails(card);
+      });
+    });
+    dialog.querySelectorAll("[data-crm-card-detail-close]").forEach((button) => {
+      button.addEventListener("click", closeDetails);
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) closeDetails();
+    });
+  }
+
   function initKanban(root) {
     let dragged = null;
     root.querySelectorAll(".crm-kanban-card").forEach((card) => {
@@ -317,6 +416,7 @@
   function init() {
     document.querySelectorAll("[data-crm-kanban]").forEach(initKanban);
     initDialog();
+    initCardDetails();
   }
 
   if (document.readyState === "loading") {

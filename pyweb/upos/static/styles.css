@@ -4867,6 +4867,137 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: linear-gradient(180deg, transparent, var(--card) 24%);
 }
 
+.crm-card-detail-dialog {
+  width: min(72rem, 96vw);
+  max-width: min(72rem, 96vw);
+}
+
+.crm-card-detail-surface {
+  width: 100%;
+  max-height: min(88vh, 58rem);
+  overflow: hidden;
+}
+
+.crm-card-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(18rem, 1.08fr);
+  gap: 1rem;
+  padding: 1rem;
+  overflow: auto;
+  max-height: calc(88vh - 5rem);
+}
+
+.crm-card-detail-panel {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in oklch, var(--muted), transparent 82%);
+}
+
+.crm-card-detail-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.crm-card-detail-client {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--workbench-line, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+}
+
+.crm-card-detail-client strong {
+  font-size: 1.1rem;
+}
+
+.crm-card-detail-client a {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.crm-card-detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.crm-card-detail-list div {
+  min-width: 0;
+  padding: 0.58rem 0.65rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+}
+
+.crm-card-detail-list div.wide {
+  grid-column: 1 / -1;
+}
+
+.crm-card-detail-list dt {
+  margin: 0 0 0.22rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-card-detail-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.crm-card-detail-money {
+  color: #16a34a;
+}
+
+.crm-card-detail-panel--timeline {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.crm-card-detail-chatbox {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, #2aa8ff 22%, var(--workbench-line, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in srgb, #2aa8ff 8%, var(--card));
+}
+
+.crm-card-detail-chatbox span,
+.crm-card-detail-event span,
+.crm-card-detail-empty {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-card-detail-history {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  min-height: 14rem;
+  overflow: auto;
+}
+
+.crm-card-detail-event {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.7rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+}
+
+.crm-card-detail-event p {
+  margin: 0;
+}
+
 .telephony-layout {
   grid-template-columns: 1fr;
 }
