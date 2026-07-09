@@ -116,12 +116,62 @@
       .replaceAll("'", "&#39;");
   }
 
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .toLocaleLowerCase()
+      .replaceAll("ё", "е")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  }
+
+  function searchTokens(value) {
+    return normalizeSearchText(value).split(/\s+/).filter(Boolean);
+  }
+
+  function editDistanceWithin(a, b, limit) {
+    if (Math.abs(a.length - b.length) > limit) return false;
+    let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+      const current = [i];
+      let rowMin = current[0];
+      for (let j = 1; j <= b.length; j += 1) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        const value = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost);
+        current[j] = value;
+        rowMin = Math.min(rowMin, value);
+      }
+      if (rowMin > limit) return false;
+      previous = current;
+    }
+    return previous[b.length] <= limit;
+  }
+
+  function tokenLooksLike(needle, word) {
+    if (!needle || !word) return false;
+    if (word.includes(needle) || needle.includes(word)) return true;
+    if (needle.length < 3 || word.length < 3) return false;
+    const limit = needle.length <= 4 ? 1 : 2;
+    return editDistanceWithin(needle, word, limit);
+  }
+
+  function cardMatchesSearch(card, query) {
+    const tokens = searchTokens(query);
+    if (!tokens.length) return true;
+    const title = card.dataset.crmDetailTitle || "";
+    const client = card.dataset.crmDetailClient || "";
+    const haystack = normalizeSearchText(`${title} ${client}`);
+    if (haystack.includes(normalizeSearchText(query))) return true;
+    const words = haystack.split(/\s+/).filter(Boolean);
+    return tokens.every((token) => words.some((word) => tokenLooksLike(token, word)));
+  }
+
   function highlightText(value, query) {
     const text = String(value || "");
     const term = String(query || "").trim();
     if (!term) return escapeHtml(text);
     const lowerText = text.toLocaleLowerCase();
     const lowerTerm = term.toLocaleLowerCase();
+    const tokens = searchTokens(term);
     let cursor = 0;
     let result = "";
     while (cursor < text.length) {
@@ -134,7 +184,15 @@
       result += `<mark class="crm-search-hit">${escapeHtml(text.slice(index, index + term.length))}</mark>`;
       cursor = index + term.length;
     }
-    return result;
+    if (result !== escapeHtml(text)) return result;
+    return text
+      .split(/([\p{L}\p{N}_]+)/gu)
+      .map((part) => {
+        const normalized = normalizeSearchText(part);
+        const isHit = normalized && tokens.some((token) => tokenLooksLike(token, normalized));
+        return isHit ? `<mark class="crm-search-hit">${escapeHtml(part)}</mark>` : escapeHtml(part);
+      })
+      .join("");
   }
 
   function initCardDetails() {
@@ -314,11 +372,8 @@
 
     const applySearch = () => {
       const query = String(searchInput?.value || "").trim();
-      const needle = query.toLocaleLowerCase();
       root.querySelectorAll(".crm-kanban-card").forEach((card) => {
-        const title = String(card.dataset.crmDetailTitle || "").toLocaleLowerCase();
-        const client = String(card.dataset.crmDetailClient || "").toLocaleLowerCase();
-        const visible = !needle || title.includes(needle) || client.includes(needle);
+        const visible = cardMatchesSearch(card, query);
         card.hidden = !visible;
         renderSearchMatch(card, visible ? query : "");
         if (!visible && selectedCard === card) setSelectedCard(null);
