@@ -4780,11 +4780,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow-x: hidden;
   padding: 0.75rem;
   background: color-mix(in oklch, var(--muted), transparent 78%);
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   transition:
     background 220ms ease,
     outline-color 220ms ease,
     box-shadow 220ms ease;
+}
+
+.crm-kanban-dropzone::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .crm-kanban-column.is-over .crm-kanban-dropzone {
