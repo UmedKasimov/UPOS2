@@ -4333,7 +4333,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(19rem, 0.42fr);
   gap: 1rem;
-  align-items: stretch;
+  align-items: start;
   margin-bottom: 1rem;
 }
 
@@ -4353,9 +4353,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-service-metric {
   display: grid;
-  gap: 0.25rem;
-  min-height: 6.25rem;
-  padding: 0.85rem;
+  gap: 0.18rem;
+  min-height: 4.1rem;
+  padding: 0.58rem 0.7rem;
 }
 
 .crm-service-metric span,
@@ -4370,7 +4370,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-service-metric strong {
   color: var(--foreground);
-  font-size: 1.35rem;
+  font-size: 1.18rem;
   line-height: 1.1;
 }
 
@@ -4382,6 +4382,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-next-actions {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  max-height: 9rem;
   min-width: 0;
   overflow: hidden;
 }
@@ -4391,27 +4392,28 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.8rem 0.85rem;
+  padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--workbench-line, var(--border));
 }
 
 .crm-next-actions h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.92rem;
 }
 
 .crm-next-action-list {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.7rem;
+  gap: 0.35rem;
+  padding: 0.5rem 0.55rem;
+  overflow: auto;
 }
 
 .crm-next-action {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.7rem;
+  gap: 0.55rem;
   align-items: center;
-  padding: 0.6rem 0.65rem;
+  padding: 0.42rem 0.55rem;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
   background: color-mix(in oklch, var(--muted), transparent 82%);
@@ -4565,17 +4567,16 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-kanban {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(17rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.85rem;
-  overflow-x: auto;
+  overflow: visible;
   padding-bottom: 0.35rem;
 }
 
 .crm-kanban-column {
   display: grid;
-  grid-template-rows: auto auto minmax(15rem, 1fr);
-  min-height: 24rem;
+  grid-template-rows: auto auto auto auto;
+  min-height: 0;
   overflow: hidden;
   transition:
     border-color 180ms ease,
@@ -4629,9 +4630,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-kanban-dropzone {
   display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   align-content: start;
   gap: 0.65rem;
-  min-height: 14rem;
+  max-height: min(48rem, calc(100vh - 20rem));
+  min-height: 7.5rem;
+  overflow: auto;
   padding: 0.75rem;
   background: color-mix(in oklch, var(--muted), transparent 78%);
   transition:
@@ -4656,6 +4660,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   position: relative;
   display: grid;
   gap: 0.55rem;
+  min-width: 0;
   padding: 0.75rem;
   cursor: grab;
   transform-origin: center;
@@ -4666,6 +4671,30 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
     background 180ms ease,
     opacity 160ms ease;
   will-change: transform;
+}
+
+.crm-kanban-card[hidden] {
+  display: none !important;
+}
+
+.crm-kanban-show-more {
+  justify-self: center;
+  min-height: 2.15rem;
+  margin: 0.2rem 0 0.75rem;
+  padding: 0 1rem;
+  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 22%);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--card), var(--primary) 6%);
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 850;
+}
+
+.crm-kanban-show-more:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 30%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
 }
 
 .crm-kanban-card:hover {

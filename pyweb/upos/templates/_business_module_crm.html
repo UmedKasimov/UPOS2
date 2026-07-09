@@ -41,7 +41,6 @@
         <h3>Ближайшие действия</h3>
         <span>Контроль обещаний по клиентам</span>
       </div>
-      <button class="btn btn-secondary" type="button" data-crm-open-dialog data-crm-kind="task">+ Задача</button>
     </header>
     <div class="crm-next-action-list">
       {% for row in crm_next_actions %}
@@ -183,6 +182,7 @@
             </article>
           {% endfor %}
         </div>
+        <button class="crm-kanban-show-more" type="button" data-crm-show-more hidden>Показать ещё</button>
       </section>
     {% endfor %}
   </div>
