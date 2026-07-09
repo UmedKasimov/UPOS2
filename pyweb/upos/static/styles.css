@@ -4925,20 +4925,20 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: linear-gradient(180deg, transparent, var(--card) 24%);
 }
 
-.crm-card-detail-dialog {
-  width: min(72rem, 96vw);
-  max-width: min(72rem, 96vw);
+.settings-profile-modal.crm-card-detail-dialog {
+  width: min(78rem, calc(100vw - 3rem));
+  max-width: min(78rem, calc(100vw - 3rem));
 }
 
 .crm-card-detail-surface {
   width: 100%;
-  max-height: min(88vh, 58rem);
+  max-height: min(88vh, 60rem);
   overflow: hidden;
 }
 
 .crm-card-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(18rem, 1.08fr);
+  grid-template-columns: minmax(23rem, 0.95fr) minmax(25rem, 1.05fr);
   gap: 1rem;
   padding: 1rem;
   overflow: auto;
@@ -5007,7 +5007,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-card-detail-list dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font-weight: 800;
 }
 
@@ -5054,6 +5054,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-card-detail-event p {
   margin: 0;
+}
+
+@media (max-width: 860px) {
+  .settings-profile-modal.crm-card-detail-dialog {
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+  }
+
+  .crm-card-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .crm-archive-dialog {
