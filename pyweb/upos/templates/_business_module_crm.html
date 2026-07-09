@@ -139,25 +139,6 @@
                   <span>{{ row.due_date or row.date or "-" }}</span>
                 </footer>
               {% endif %}
-              <div class="crm-kanban-card-actions">
-                <button type="button" data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'>Открыть</button>
-                <button type="button" data-crm-followup="history" data-crm-base='{{ row.edit_payload|tojson|forceescape }}'>Контакт</button>
-                <button type="button" data-crm-followup="task" data-crm-base='{{ row.edit_payload|tojson|forceescape }}'>Задача</button>
-                <form method="post" action="{{ url_for('crm_complete', record_id=row.id) }}">
-                  {% include "_csrf_field.html" %}
-                  {% if row.item_type == "deal" %}
-                    <button type="submit" name="result" value="won">Выиграно</button>
-                  {% else %}
-                    <button type="submit">Готово</button>
-                  {% endif %}
-                </form>
-                {% if row.item_type == "deal" %}
-                  <form method="post" action="{{ url_for('crm_complete', record_id=row.id) }}">
-                    {% include "_csrf_field.html" %}
-                    <button type="submit" name="result" value="lost">Потеряно</button>
-                  </form>
-                {% endif %}
-              </div>
             </article>
           {% endfor %}
         </div>
