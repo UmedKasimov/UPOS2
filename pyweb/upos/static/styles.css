@@ -4809,6 +4809,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   position: relative;
   display: grid;
   gap: 0.55rem;
+  height: 9.75rem;
+  align-content: start;
   min-width: 0;
   padding: 0.9rem 0.75rem 0.75rem;
   overflow: hidden;
@@ -4945,6 +4947,16 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-kanban-card-meta,
 .crm-kanban-card-money {
   justify-content: space-between;
+}
+
+.crm-kanban-card-top strong,
+.crm-kanban-client,
+.crm-kanban-chat,
+.crm-kanban-card-money small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crm-kanban-card-date {
