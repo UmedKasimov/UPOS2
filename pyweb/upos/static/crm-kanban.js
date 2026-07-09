@@ -1,6 +1,4 @@
 (() => {
-  const CRM_CARDS_STEP = 5;
-
   function postStage(root, recordId, stageId) {
     const template = root.dataset.crmStageUrlTemplate || "/crm/__record__/stage";
     const url = template.replace("__record__", encodeURIComponent(recordId));
@@ -26,19 +24,6 @@
     if (count) count.textContent = String(cards.length);
     const empty = column.querySelector(".crm-kanban-empty");
     if (empty) empty.hidden = cards.length > 0;
-    const showMore = column.querySelector("[data-crm-show-more]");
-    const storedLimit = Number.parseInt(column.dataset.crmVisibleLimit || "", 10);
-    const limit = Math.max(CRM_CARDS_STEP, Number.isFinite(storedLimit) ? storedLimit : CRM_CARDS_STEP);
-    const visibleLimit = Math.min(cards.length, limit);
-    column.dataset.crmVisibleLimit = String(visibleLimit || CRM_CARDS_STEP);
-    cards.forEach((card, index) => {
-      card.hidden = index >= visibleLimit;
-    });
-    if (showMore) {
-      const hiddenCount = Math.max(0, cards.length - visibleLimit);
-      showMore.hidden = hiddenCount <= 0;
-      showMore.textContent = hiddenCount > 0 ? `Показать ещё (${hiddenCount})` : "Показать ещё";
-    }
   }
 
   function prefersReducedMotion() {
@@ -129,9 +114,6 @@
         const previousColumn = card.closest(".crm-kanban-column");
         const previousRect = card.getBoundingClientRect();
         dropzone.appendChild(card);
-        const columnCardsCount = column.querySelectorAll(".crm-kanban-card").length;
-        const currentLimit = Number.parseInt(column.dataset.crmVisibleLimit || "", 10);
-        column.dataset.crmVisibleLimit = String(Math.max(CRM_CARDS_STEP, Number.isFinite(currentLimit) ? currentLimit : CRM_CARDS_STEP, columnCardsCount));
         card.classList.remove("is-dragging");
         column.classList.add("is-committing");
         if (previousColumn) updateColumnState(previousColumn);
@@ -151,18 +133,7 @@
       });
     });
 
-    root.querySelectorAll(".crm-kanban-column").forEach((column) => {
-      const showMore = column.querySelector("[data-crm-show-more]");
-      if (showMore) {
-        showMore.addEventListener("click", () => {
-          const currentLimit = Number.parseInt(column.dataset.crmVisibleLimit || "", 10);
-          const nextLimit = Math.max(CRM_CARDS_STEP, Number.isFinite(currentLimit) ? currentLimit : CRM_CARDS_STEP) + CRM_CARDS_STEP;
-          column.dataset.crmVisibleLimit = String(nextLimit);
-          updateColumnState(column);
-        });
-      }
-      updateColumnState(column);
-    });
+    root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
   }
 
   function initDialog() {
