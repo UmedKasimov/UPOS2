@@ -4738,9 +4738,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-kanban-card.is-selected {
-  border-color: color-mix(in srgb, #0f766e 60%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, #0f766e 7%, var(--card));
-  box-shadow: 0 0 0 3px color-mix(in srgb, #0f766e 18%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
 .crm-kanban-card.is-archiving {

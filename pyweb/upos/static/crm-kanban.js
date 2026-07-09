@@ -93,6 +93,15 @@
     window.setTimeout(finish, 520);
   }
 
+  function moveCardToTop(dropzone, card) {
+    if (!dropzone || !card) return;
+    const firstCard =
+      Array.from(dropzone.querySelectorAll(".crm-kanban-card")).find((candidate) => candidate !== card && !candidate.hidden) ||
+      Array.from(dropzone.querySelectorAll(".crm-kanban-card")).find((candidate) => candidate !== card) ||
+      null;
+    dropzone.insertBefore(card, firstCard);
+  }
+
   function valueOrDash(value) {
     const normalized = String(value || "").trim();
     return normalized || "-";
@@ -389,7 +398,7 @@
         if (!card || !recordId || !stageId) return;
         const previousColumn = card.closest(".crm-kanban-column");
         const previousRect = card.getBoundingClientRect();
-        dropzone.appendChild(card);
+        moveCardToTop(dropzone, card);
         card.classList.remove("is-dragging");
         column.classList.add("is-committing");
         if (previousColumn) updateColumnState(previousColumn);
