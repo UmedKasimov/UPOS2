@@ -6892,6 +6892,28 @@ def create_app() -> FastAPI:
             item_type = "task"
         amount = _sales_decimal(form.get("amount"))
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+
+        def clean_tags(raw: Any) -> list[str]:
+            if isinstance(raw, (list, tuple, set)):
+                parts = [str(item or "") for item in raw]
+            else:
+                parts = re.split(r"[,;\n]+", str(raw or ""))
+            tags: list[str] = []
+            seen: set[str] = set()
+            for part in parts:
+                tag = re.sub(r"\s+", " ", part).strip(" #\t\r\n")
+                if not tag:
+                    continue
+                tag = tag[:24]
+                key = tag.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                tags.append(tag)
+                if len(tags) >= 8:
+                    break
+            return tags
+
         data = {
             "item_type": item_type,
             "client": str(form.get("client") or "").strip(),
@@ -6909,6 +6931,7 @@ def create_app() -> FastAPI:
             "next_step": str(form.get("next_step") or "").strip(),
             "probability": _crm_probability_value(form.get("probability")),
             "note": str(form.get("note") or "").strip(),
+            "tags": clean_tags(form.get("tags")),
         }
         if data["priority"] not in CRM_PRIORITY_LABELS:
             data["priority"] = "normal"
@@ -6918,6 +6941,7 @@ def create_app() -> FastAPI:
         data = _json_object(row.data)
         priority = str(data.get("priority") or "normal")
         probability = _crm_probability_value(data.get("probability"))
+        tags = [str(item or "").strip() for item in data.get("tags", []) if str(item or "").strip()] if isinstance(data.get("tags"), list) else []
         amount_value = _sales_decimal(row.amount)
         amount_input = str(amount_value.normalize()) if amount_value else ""
         return {
@@ -6944,6 +6968,8 @@ def create_app() -> FastAPI:
             "probability": probability,
             "probability_label": f"{probability}%" if probability else "",
             "note": str(data.get("note") or ""),
+            "tags": tags[:8],
+            "tags_text": ", ".join(tags[:8]),
             "amount": _sales_money_label(row.amount),
             "amount_value": amount_value,
             "amount_input": amount_input,
@@ -6973,9 +6999,13 @@ def create_app() -> FastAPI:
             "currency",
             "next_step",
             "note",
+            "tags",
         )
         payload: dict[str, str] = {}
         for key in keys:
+            if key == "tags":
+                payload[key] = str(item.get("tags_text") or "")
+                continue
             value = item.get(key)
             payload[key] = "" if value is None else str(value)
         return payload
@@ -10517,6 +10547,31 @@ def create_app() -> FastAPI:
             row.data = data
             flag_modified(row, "data")
         return JSONResponse({"ok": True})
+
+    @app.post("/crm/{record_id}/tag", name="crm_tag_add")
+    async def crm_tag_add(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        tag = re.sub(r"\s+", " ", str(form.get("tag") or "")).strip(" #\t\r\n")[:24]
+        if not tag:
+            return JSONResponse({"ok": False, "error": "empty"}, status_code=400)
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            data = _json_object(row.data).copy()
+            tags = [str(item or "").strip() for item in data.get("tags", []) if str(item or "").strip()] if isinstance(data.get("tags"), list) else []
+            if tag.casefold() not in {item.casefold() for item in tags}:
+                tags.append(tag)
+            data["tags"] = tags[:8]
+            row.data = data
+            flag_modified(row, "data")
+        return JSONResponse({"ok": True, "tags": tags[:8]})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
     async def crm_delete(request: Request, record_id: str):

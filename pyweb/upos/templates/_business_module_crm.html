@@ -124,6 +124,7 @@
     data-crm-csrf="{{ csrf_token }}"
     data-crm-stage-url-template="/crm/__record__/stage"
     data-crm-archive-url-template="/crm/__record__/archive"
+    data-crm-tag-url-template="/crm/__record__/tag"
   >
     {% for column in crm_kanban_columns %}
       <section class="crm-kanban-column" data-crm-stage-id="{{ column.id }}">
@@ -160,6 +161,7 @@
               data-crm-detail-next-step="{{ row.next_step|e }}"
               data-crm-detail-note="{{ row.note|e }}"
               data-crm-detail-chat="{{ row.chat_label|e }}"
+              data-crm-tags="{{ row.tags_text|e }}"
               data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
             >
               <div
@@ -172,11 +174,7 @@
               {% endif %}
               <div class="crm-kanban-card-top">
                 <strong>{{ row.title }}</strong>
-                <span>{{ row.item_type_label }}</span>
-              </div>
-              <div class="crm-kanban-card-meta">
                 <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
-                <span>{{ row.status_label }}</span>
               </div>
               {% if row.client %}
                 {% if row.client_href %}
@@ -196,6 +194,15 @@
               {% if row.chat_label %}
                 <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
               {% endif %}
+              <div class="crm-kanban-card-tags" data-crm-card-tags>
+                {% for tag in row.tags %}
+                  <span>{{ tag }}</span>
+                {% endfor %}
+              </div>
+              <form class="crm-kanban-tag-form" data-crm-tag-form>
+                <input name="tag" maxlength="24" autocomplete="off" placeholder="Тег" aria-label="Добавить тег" />
+                <button type="submit" aria-label="Добавить тег">+</button>
+              </form>
               <template data-crm-card-history>
                 {% for history in crm_history_records if (history.related_deal_id and history.related_deal_id == row.id) or (row.client and history.client == row.client) %}
                   <article class="crm-card-detail-event">
@@ -283,6 +290,7 @@
       <form method="post" action="{{ url_for('crm_save') }}" class="product-form crm-record-form">
         {% include "_csrf_field.html" %}
         <input type="hidden" name="record_id" value="" data-crm-record-id-field />
+        <input type="hidden" name="tags" value="" />
         <div class="product-kind-toggle">
           <label><input type="radio" name="item_type" value="task" /> Задача</label>
           <label><input type="radio" name="item_type" value="deal" checked /> Сделка</label>

@@ -36,6 +36,25 @@
     });
   }
 
+  function postTag(root, recordId, tag) {
+    const template = root.dataset.crmTagUrlTemplate || "/crm/__record__/tag";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    body.set("tag", tag);
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: body.toString(),
+    }).then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    });
+  }
+
   function updateColumnState(column) {
     const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !card.hidden);
     const count = column.querySelector("header strong");
@@ -159,7 +178,8 @@
     if (!tokens.length) return true;
     const title = card.dataset.crmDetailTitle || "";
     const client = card.dataset.crmDetailClient || "";
-    const haystack = normalizeSearchText(`${title} ${client}`);
+    const tags = card.dataset.crmTags || "";
+    const haystack = normalizeSearchText(`${title} ${client} ${tags}`);
     if (haystack.includes(normalizeSearchText(query))) return true;
     const words = haystack.split(/\s+/).filter(Boolean);
     return tokens.every((token) => words.some((word) => tokenLooksLike(token, word)));
@@ -404,6 +424,28 @@
       if (clientNode) clientNode.innerHTML = highlightText(client, query);
     };
 
+    const renderTags = (card, tags) => {
+      const normalizedTags = Array.isArray(tags) ? tags.map((item) => String(item || "").trim()).filter(Boolean) : [];
+      const tagText = normalizedTags.join(", ");
+      card.dataset.crmTags = tagText;
+      const list = card.querySelector("[data-crm-card-tags]");
+      if (list) {
+        list.innerHTML = "";
+        normalizedTags.forEach((tag) => {
+          const chip = document.createElement("span");
+          chip.textContent = tag;
+          list.appendChild(chip);
+        });
+      }
+      try {
+        const payload = JSON.parse(card.dataset.crmEditPayload || "{}");
+        payload.tags = tagText;
+        card.dataset.crmEditPayload = JSON.stringify(payload);
+      } catch {
+        // Ignore malformed payload; the visible tag is still updated.
+      }
+    };
+
     const applyArchiveSearch = () => {
       const query = String(archiveSearch?.value || "").trim();
       let visibleCount = 0;
@@ -440,6 +482,30 @@
         applyArchiveSearch();
         archiveSearch?.focus();
       }
+    });
+
+    root.addEventListener("submit", (event) => {
+      const form = event.target?.closest?.("[data-crm-tag-form]");
+      if (!form || !root.contains(form)) return;
+      event.preventDefault();
+      const card = form.closest(".crm-kanban-card");
+      const input = form.querySelector('input[name="tag"]');
+      const tag = String(input?.value || "").trim();
+      const recordId = card?.dataset.crmRecordId || "";
+      if (!tag || !card || !recordId || form.classList.contains("is-saving")) return;
+      form.classList.add("is-saving");
+      postTag(root, recordId, tag)
+        .then((result) => {
+          if (!result?.ok) throw new Error(result?.error || "tag_failed");
+          renderTags(card, result.tags || []);
+          if (input) input.value = "";
+        })
+        .catch(() => {
+          window.location.reload();
+        })
+        .finally(() => {
+          form.classList.remove("is-saving");
+        });
     });
 
     root.querySelectorAll(".crm-kanban-card").forEach((card) => {
