@@ -178,12 +178,6 @@
                 <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
                 <span>{{ row.status_label }}</span>
               </div>
-              <div class="crm-kanban-card-tags">
-                {% if row.service_type %}<span>{{ row.service_type }}</span>{% endif %}
-                <span data-priority="{{ row.priority }}">{{ row.priority_label }}</span>
-                {% if row.probability_label %}<span>{{ row.probability_label }}</span>{% endif %}
-                {% if action_state.label %}<span data-state="{{ action_state.id }}">{{ action_state.label }}</span>{% endif %}
-              </div>
               {% if row.client %}
                 {% if row.client_href %}
                   <a class="crm-kanban-client" href="{{ row.client_href }}">{{ row.client }}</a>
