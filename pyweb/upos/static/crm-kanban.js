@@ -55,10 +55,31 @@
     });
   }
 
+  function parseCardAmount(card) {
+    const raw = String(card?.dataset.crmAmountValue || "").trim().replace(",", ".");
+    const value = Number.parseFloat(raw);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function formatColumnMoney(value, currency = "UZS") {
+    const rounded = Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+    const options = Number.isInteger(rounded)
+      ? { maximumFractionDigits: 0 }
+      : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
+    const formatted = rounded.toLocaleString("ru-RU", options).replace(/\u00a0/g, " ");
+    return `${formatted} ${currency || "UZS"}`;
+  }
+
   function updateColumnState(column) {
     const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !card.hidden);
     const count = column.querySelector("header strong");
     if (count) count.textContent = String(cards.length);
+    const total = column.querySelector(".crm-kanban-column-total");
+    if (total) {
+      const amount = cards.reduce((sum, card) => sum + parseCardAmount(card), 0);
+      const currency = cards.find((card) => card.dataset.crmAmountCurrency)?.dataset.crmAmountCurrency || "UZS";
+      total.textContent = formatColumnMoney(amount, currency);
+    }
     const empty = column.querySelector(".crm-kanban-empty");
     if (empty) empty.hidden = cards.length > 0;
   }
