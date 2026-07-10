@@ -4938,7 +4938,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-kanban-card-meta,
 .crm-kanban-card-tags,
 .crm-kanban-card-money,
-.crm-kanban-client-line {
+.crm-kanban-client-line,
+.crm-kanban-card-titleline {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -4950,7 +4951,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: space-between;
 }
 
-.crm-kanban-card-top strong,
+.crm-kanban-card-titleline,
+.crm-kanban-card-titleline strong,
 .crm-kanban-client,
 .crm-kanban-chat,
 .crm-kanban-card-money small {
@@ -4958,6 +4960,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.crm-kanban-card-titleline {
+  flex: 1 1 auto;
 }
 
 .crm-kanban-card-date {

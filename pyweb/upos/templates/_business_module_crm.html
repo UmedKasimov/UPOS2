@@ -175,7 +175,12 @@
                 <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
               {% endif %}
               <div class="crm-kanban-card-top">
-                <strong>{{ row.title }}</strong>
+                <div class="crm-kanban-card-titleline">
+                  <strong>{{ row.title }}</strong>
+                  {% if not row.client and activity.age_label %}
+                    <span class="crm-kanban-age crm-kanban-age--{{ activity.state }}">{{ activity.age_label }}</span>
+                  {% endif %}
+                </div>
                 <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
               </div>
               {% if row.client %}
