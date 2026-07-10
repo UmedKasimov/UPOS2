@@ -177,7 +177,7 @@
               <div class="crm-kanban-card-top">
                 <div class="crm-kanban-card-titleline">
                   <strong>{{ row.title }}</strong>
-                  {% if not row.client and activity.age_label %}
+                  {% if activity.age_label %}
                     <span class="crm-kanban-age crm-kanban-age--{{ activity.state }}">{{ activity.age_label }}</span>
                   {% endif %}
                 </div>
@@ -189,9 +189,6 @@
                     <a class="crm-kanban-client" href="{{ row.client_href }}">{{ row.client }}</a>
                   {% else %}
                     <span class="crm-kanban-client">{{ row.client }}</span>
-                  {% endif %}
-                  {% if activity.age_label %}
-                    <span class="crm-kanban-age crm-kanban-age--{{ activity.state }}">{{ activity.age_label }}</span>
                   {% endif %}
                 </div>
               {% endif %}

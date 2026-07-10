@@ -4951,7 +4951,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: space-between;
 }
 
-.crm-kanban-card-titleline,
 .crm-kanban-card-titleline strong,
 .crm-kanban-client,
 .crm-kanban-chat,
@@ -4964,6 +4963,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-kanban-card-titleline {
   flex: 1 1 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+.crm-kanban-card-titleline strong {
+  flex: 0 1 auto;
 }
 
 .crm-kanban-card-date {
