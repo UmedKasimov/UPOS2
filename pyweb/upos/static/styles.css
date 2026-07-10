@@ -4808,11 +4808,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-kanban-card {
   position: relative;
   display: grid;
-  gap: 0.55rem;
-  height: 9.75rem;
+  gap: 0.42rem;
+  height: 11.5rem;
   align-content: start;
   min-width: 0;
-  padding: 0.9rem 0.75rem 0.75rem;
+  padding: 0.82rem 0.75rem 0.7rem;
   overflow: hidden;
   cursor: grab;
   transform-origin: center;
