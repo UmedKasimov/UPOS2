@@ -208,10 +208,6 @@
                   <span>{{ tag }}</span>
                 {% endfor %}
               </div>
-              <form class="crm-kanban-tag-form" data-crm-tag-form>
-                <input name="tag" maxlength="24" autocomplete="off" placeholder="Тег" aria-label="Добавить тег" />
-                <button type="submit" aria-label="Добавить тег">+</button>
-              </form>
               <template data-crm-card-history>
                 {% for history in crm_history_records if (history.related_deal_id and history.related_deal_id == row.id) or (row.client and history.client == row.client) %}
                   <article class="crm-card-detail-event">
@@ -385,6 +381,16 @@
         <div class="crm-card-detail-client">
           <strong data-crm-card-detail-client>Клиент не указан</strong>
           <a href="#" data-crm-card-detail-client-link hidden>Открыть клиента</a>
+        </div>
+        <div class="crm-card-detail-tags">
+          <div class="crm-card-detail-tags-head">
+            <span>Теги</span>
+          </div>
+          <div class="crm-kanban-card-tags crm-card-detail-tag-list" data-crm-card-detail-tags></div>
+          <form class="crm-card-detail-tag-form" data-crm-card-detail-tag-form>
+            <input name="tag" maxlength="24" autocomplete="off" placeholder="Добавить тег" aria-label="Добавить тег" />
+            <button type="submit" aria-label="Добавить тег">+</button>
+          </form>
         </div>
         <dl class="crm-card-detail-list">
           <div><dt>Сделка</dt><dd data-crm-card-detail-field="title">-</dd></div>

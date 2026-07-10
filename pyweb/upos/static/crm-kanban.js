@@ -55,6 +55,41 @@
     });
   }
 
+  function normalizeTags(tags) {
+    if (Array.isArray(tags)) return tags.map((item) => String(item || "").trim()).filter(Boolean);
+    return String(tags || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function fillTagList(list, tags) {
+    if (!list) return;
+    const normalizedTags = normalizeTags(tags);
+    list.innerHTML = "";
+    normalizedTags.forEach((tag) => {
+      const chip = document.createElement("span");
+      chip.textContent = tag;
+      list.appendChild(chip);
+    });
+  }
+
+  function updateCardTags(card, tags) {
+    if (!card) return [];
+    const normalizedTags = normalizeTags(tags);
+    const tagText = normalizedTags.join(", ");
+    card.dataset.crmTags = tagText;
+    fillTagList(card.querySelector("[data-crm-card-tags]"), normalizedTags);
+    try {
+      const payload = JSON.parse(card.dataset.crmEditPayload || "{}");
+      payload.tags = tagText;
+      card.dataset.crmEditPayload = JSON.stringify(payload);
+    } catch {
+      // Ignore malformed payload; the visible tag is still updated.
+    }
+    return normalizedTags;
+  }
+
   function parseCardAmount(card) {
     const raw = String(card?.dataset.crmAmountValue || "").trim().replace(",", ".");
     const value = Number.parseFloat(raw);
@@ -246,6 +281,9 @@
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
+    const detailTags = dialog.querySelector("[data-crm-card-detail-tags]");
+    const detailTagForm = dialog.querySelector("[data-crm-card-detail-tag-form]");
+    let detailCard = null;
     const fields = {
       title: dialog.querySelector('[data-crm-card-detail-field="title"]'),
       type: dialog.querySelector('[data-crm-card-detail-field="type"]'),
@@ -269,6 +307,7 @@
 
     const openDetails = (card) => {
       if (!card) return;
+      detailCard = card;
       const data = card.dataset;
       setText(title, data.crmDetailTitle || "Карточка клиента");
       setText(subtitle, `${valueOrDash(data.crmDetailStage)} · ${valueOrDash(data.crmDetailStatus)}`);
@@ -302,6 +341,7 @@
       setText(fields.dueDate, data.crmDetailDueDate);
       setText(fields.nextStep, data.crmDetailNextStep);
       setText(fields.note, data.crmDetailNote);
+      fillTagList(detailTags, data.crmTags || "");
       if (history) {
         const historyTemplate = card.querySelector("template[data-crm-card-history]");
         const content = historyTemplate?.innerHTML?.trim() || "";
@@ -315,6 +355,7 @@
     };
 
     const closeDetails = () => {
+      detailCard = null;
       if (dialog.open && typeof dialog.close === "function") {
         dialog.close();
       } else {
@@ -340,6 +381,28 @@
       const raw = editButton.dataset.crmEditPayload || "{}";
       closeDetails();
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
+    });
+    detailTagForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const root = document.querySelector("[data-crm-tag-url-template]");
+      const input = detailTagForm.querySelector('input[name="tag"]');
+      const tag = String(input?.value || "").trim();
+      const recordId = detailCard?.dataset.crmRecordId || "";
+      if (!root || !detailCard || !recordId || !tag || detailTagForm.classList.contains("is-saving")) return;
+      detailTagForm.classList.add("is-saving");
+      postTag(root, recordId, tag)
+        .then((result) => {
+          if (!result?.ok) throw new Error(result?.error || "tag_failed");
+          const tags = updateCardTags(detailCard, result.tags || []);
+          fillTagList(detailTags, tags);
+          if (input) input.value = "";
+        })
+        .catch(() => {
+          window.location.reload();
+        })
+        .finally(() => {
+          detailTagForm.classList.remove("is-saving");
+        });
     });
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) closeDetails();
@@ -439,32 +502,14 @@
     const renderSearchMatch = (card, query) => {
       const title = card.dataset.crmDetailTitle || "";
       const client = card.dataset.crmDetailClient || "";
-      const titleNode = card.querySelector(".crm-kanban-card-top > strong");
+      const titleNode = card.querySelector(".crm-kanban-card-titleline strong, .crm-kanban-card-top > strong");
       const clientNode = card.querySelector(".crm-kanban-client");
       if (titleNode) titleNode.innerHTML = highlightText(title, query);
       if (clientNode) clientNode.innerHTML = highlightText(client, query);
     };
 
     const renderTags = (card, tags) => {
-      const normalizedTags = Array.isArray(tags) ? tags.map((item) => String(item || "").trim()).filter(Boolean) : [];
-      const tagText = normalizedTags.join(", ");
-      card.dataset.crmTags = tagText;
-      const list = card.querySelector("[data-crm-card-tags]");
-      if (list) {
-        list.innerHTML = "";
-        normalizedTags.forEach((tag) => {
-          const chip = document.createElement("span");
-          chip.textContent = tag;
-          list.appendChild(chip);
-        });
-      }
-      try {
-        const payload = JSON.parse(card.dataset.crmEditPayload || "{}");
-        payload.tags = tagText;
-        card.dataset.crmEditPayload = JSON.stringify(payload);
-      } catch {
-        // Ignore malformed payload; the visible tag is still updated.
-      }
+      updateCardTags(card, tags);
     };
 
     const applyArchiveSearch = () => {
