@@ -5175,9 +5175,46 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in oklch, var(--muted), transparent 82%);
 }
 
+.crm-card-detail-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
 .crm-card-detail-panel h3 {
   margin: 0;
   font-size: 1rem;
+}
+
+.crm-card-detail-edit-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--workbench-line, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.crm-card-detail-edit-icon svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.crm-card-detail-edit-icon:hover {
+  background: color-mix(in srgb, var(--primary) 16%, var(--card));
 }
 
 .crm-card-detail-client {
@@ -5197,10 +5234,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--primary);
   font-weight: 800;
   text-decoration: none;
-}
-
-.crm-card-detail-edit {
-  justify-self: start;
 }
 
 .crm-card-detail-list {

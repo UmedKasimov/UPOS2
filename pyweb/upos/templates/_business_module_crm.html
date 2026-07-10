@@ -371,12 +371,19 @@
     </header>
     <div class="crm-card-detail-grid">
       <section class="crm-card-detail-panel">
-        <h3>Данные клиента</h3>
+        <div class="crm-card-detail-panel-head">
+          <h3>Данные клиента</h3>
+          <button class="crm-card-detail-edit-icon" type="button" data-crm-card-detail-edit aria-label="Редактировать">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4Z"></path>
+              <path d="m13.5 6.5 4 4"></path>
+            </svg>
+          </button>
+        </div>
         <div class="crm-card-detail-client">
           <strong data-crm-card-detail-client>Клиент не указан</strong>
           <a href="#" data-crm-card-detail-client-link hidden>Открыть клиента</a>
         </div>
-        <button class="btn crm-card-detail-edit" type="button" data-crm-card-detail-edit>Редактировать</button>
         <dl class="crm-card-detail-list">
           <div><dt>Сделка</dt><dd data-crm-card-detail-field="title">-</dd></div>
           <div><dt>Тип</dt><dd data-crm-card-detail-field="type">-</dd></div>
