@@ -3814,15 +3814,17 @@ def create_app() -> FastAPI:
         if touched.tzinfo is None:
             touched = touched.replace(tzinfo=timezone.utc)
         age_hours = max((now - touched).total_seconds() / 3600, 0)
+        age_days = max(1, math.ceil(age_hours / 24))
+        age_label = f"{age_days}д прошло"
         yellow_at = max(settings.get("yellow_hours", 24), 1)
         red_at = max(settings.get("red_hours", 48), yellow_at + 1)
         if age_hours >= red_at:
-            return {"state": "red", "fill": "100", "label": "Нет контакта больше лимита"}
+            return {"state": "red", "fill": "100", "label": "Нет контакта больше лимита", "age_label": age_label}
         if age_hours >= yellow_at:
             fill = round(((age_hours - yellow_at) / (red_at - yellow_at)) * 100)
-            return {"state": "yellow", "fill": str(max(12, min(fill, 100))), "label": "Нужно связаться"}
+            return {"state": "yellow", "fill": str(max(12, min(fill, 100))), "label": "Нужно связаться", "age_label": age_label}
         fill = round((age_hours / yellow_at) * 100)
-        return {"state": "green", "fill": str(max(8, min(fill, 100))), "label": "Свежая карточка"}
+        return {"state": "green", "fill": str(max(8, min(fill, 100))), "label": "Свежая карточка", "age_label": age_label}
 
     def _product_data(row: Product) -> dict[str, Any]:
         data = row.data if isinstance(row.data, dict) else {}
