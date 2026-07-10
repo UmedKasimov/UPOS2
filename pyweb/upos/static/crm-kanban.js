@@ -282,6 +282,11 @@
     };
 
     document.querySelectorAll(".crm-kanban-card").forEach((card) => {
+      card.querySelectorAll("a.crm-kanban-client").forEach((link) => {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+        });
+      });
       card.addEventListener("dblclick", (event) => {
         event.preventDefault();
         openDetails(card);
