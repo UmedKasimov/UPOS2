@@ -34,6 +34,11 @@
       <strong>{{ crm_summary.conversion_rate }}</strong>
       <small>{{ crm_summary.won_count }} успешно</small>
     </div>
+    <div class="crm-service-metric{% if crm_summary.missing_next_step_count %} is-warning{% endif %}">
+      <span>Без плана</span>
+      <strong>{{ crm_summary.missing_next_step_count }}</strong>
+      <small>нужен следующий шаг</small>
+    </div>
   </div>
 </section>
 
@@ -111,6 +116,10 @@
               <span>Сумма не указана</span>
             {% endif %}
           </div>
+          <form method="post" action="{{ url_for('crm_restore', record_id=row.id) }}" class="crm-archive-restore-form">
+            {% include "_csrf_field.html" %}
+            <button class="btn btn-secondary" type="submit">Восстановить</button>
+          </form>
         </article>
       {% else %}
         <p class="crm-archive-empty" data-crm-archive-empty>Архив пока пустой.</p>
@@ -127,7 +136,11 @@
     data-crm-tag-url-template="/crm/__record__/tag"
   >
     {% for column in crm_kanban_columns %}
-      <section class="crm-kanban-column" data-crm-stage-id="{{ column.id }}">
+      <section
+        class="crm-kanban-column"
+        data-crm-stage-id="{{ column.id }}"
+        data-crm-stage-outcome="{% if column.id == 'lost' or 'потер' in column.title|lower %}lost{% elif column.id == 'won' or 'успеш' in column.title|lower %}won{% endif %}"
+      >
         <header>
           <div>
             <h3>{{ column.title }}</h3>
@@ -142,6 +155,7 @@
             {% set action_state = row.get("action_state") or {"id": "", "label": ""} %}
             <article
               class="crm-kanban-card"
+              {% if loop.index > 20 %}hidden data-crm-deferred="true"{% endif %}
               draggable="true"
               data-crm-record-id="{{ row.id }}"
               data-crm-detail-title="{{ row.title|e }}"
@@ -162,6 +176,7 @@
               data-crm-detail-due-date="{{ (row.due_date or '-')|e }}"
               data-crm-detail-next-step="{{ row.next_step|e }}"
               data-crm-detail-note="{{ row.note|e }}"
+              data-crm-detail-lost-reason="{{ row.lost_reason|e }}"
               data-crm-detail-chat="{{ row.chat_label|e }}"
               data-crm-tags="{{ row.tags_text|e }}"
               data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
@@ -209,6 +224,20 @@
                 {% endfor %}
               </div>
               <template data-crm-card-history>
+                {% for event in row.activity_log %}
+                  <article class="crm-card-detail-event crm-card-detail-event--system">
+                    <strong>{{ (event.at or "-")[:16]|replace("T", " ") }}</strong>
+                    <span>{{ event.action or "Изменение" }}{% if event.actor %} · {{ event.actor }}{% endif %}</span>
+                    {% if event.detail %}<p>{{ event.detail }}</p>{% endif %}
+                  </article>
+                {% endfor %}
+                {% if row.order_number %}
+                  <article class="crm-card-detail-event crm-card-detail-event--sale">
+                    <strong>Продажа {{ row.order_number }}</strong>
+                    <span>Связанный документ</span>
+                    <p>{{ row.order_amount }} {{ row.order_currency or row.currency }}</p>
+                  </article>
+                {% endif %}
                 {% for history in crm_history_records if (history.related_deal_id and history.related_deal_id == row.id) or (row.client and history.client == row.client) %}
                   <article class="crm-card-detail-event">
                     <strong>{{ history.date or history.due_date or "-" }}</strong>
@@ -219,6 +248,11 @@
               </template>
             </article>
           {% endfor %}
+          {% if column.records|length > 20 %}
+            <button class="btn btn-secondary crm-kanban-show-more" type="button" data-crm-show-more>
+              Показать ещё <span>{{ column.records|length - 20 }}</span>
+            </button>
+          {% endif %}
         </div>
       </section>
     {% endfor %}
@@ -303,7 +337,11 @@
         </div>
         <div class="product-form-grid crm-record-form-grid">
           <label class="wide"><span>Название*</span><input name="title" required /></label>
-          <label><span>Клиент</span><input name="client" list="crm-client-list" /></label>
+          <label class="crm-client-picker-field">
+            <span>Клиент</span>
+            <input name="client" list="crm-client-list" autocomplete="off" />
+            <small class="crm-client-duplicate-note" data-crm-client-duplicate hidden>Этот клиент уже есть. Карточка будет привязана к существующему клиенту.</small>
+          </label>
           <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ user.name if user else '' }}" /></label>
           <label><span>Источник лида</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
           <label><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
@@ -318,7 +356,8 @@
           <label><span>Вероятность</span><input name="probability" inputmode="numeric" placeholder="0-100" /></label>
           <label><span>Сумма</span><input name="amount" inputmode="decimal" /></label>
           <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
-          <label class="wide"><span>Следующий шаг</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
+          <label class="wide" data-crm-next-step-field><span>Следующий шаг*</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
+          <label class="wide crm-lost-reason-field" data-crm-lost-reason-field hidden><span>Причина потери*</span><input name="lost_reason" placeholder="Почему клиент отказался" /></label>
           <label class="wide"><span>Комментарий</span><input name="note" /></label>
         </div>
         <div class="product-form-actions crm-record-form-actions">
@@ -327,6 +366,28 @@
         </div>
       </form>
     </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal crm-lost-reason-dialog" id="crm-lost-reason-dialog" aria-labelledby="crm-lost-reason-title">
+  <div class="settings-profile-modal-surface crm-lost-reason-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-lost-reason-title" class="settings-profile-modal-title">Причина потери</h2>
+        <p class="settings-profile-modal-sub">Причина сохранится в истории сделки.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-lost-cancel aria-label="Закрыть">×</button>
+    </header>
+    <form class="crm-lost-reason-form" data-crm-lost-reason-form>
+      <label>
+        <span>Почему сделка потеряна*</span>
+        <textarea name="lost_reason" rows="4" maxlength="300" required placeholder="Например: выбрал конкурента, дорого, нет ответа"></textarea>
+      </label>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить и перенести</button>
+        <button class="btn btn-secondary" type="button" data-crm-lost-cancel>Отмена</button>
+      </div>
+    </form>
   </div>
 </dialog>
 
@@ -349,6 +410,10 @@
           <div>
             <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
             <span>{{ row.date or row.due_date or "-" }}</span>
+            <form method="post" action="{{ url_for('crm_restore', record_id=row.id) }}" class="crm-archive-restore-form">
+              {% include "_csrf_field.html" %}
+              <button class="btn btn-secondary" type="submit">Восстановить</button>
+            </form>
           </div>
         </article>
       {% else %}
@@ -406,6 +471,7 @@
           <div><dt>Дата</dt><dd data-crm-card-detail-field="date">-</dd></div>
           <div><dt>Срок</dt><dd data-crm-card-detail-field="dueDate">-</dd></div>
           <div class="wide"><dt>Следующий шаг</dt><dd data-crm-card-detail-field="nextStep">-</dd></div>
+          <div class="wide"><dt>Причина потери</dt><dd data-crm-card-detail-field="lostReason">-</dd></div>
           <div class="wide"><dt>Комментарий</dt><dd data-crm-card-detail-field="note">-</dd></div>
         </dl>
       </section>

@@ -1,10 +1,11 @@
 (() => {
-  function postStage(root, recordId, stageId) {
+  function postStage(root, recordId, stageId, lostReason = "") {
     const template = root.dataset.crmStageUrlTemplate || "/crm/__record__/stage";
     const url = template.replace("__record__", encodeURIComponent(recordId));
     const body = new URLSearchParams();
     body.set("csrf_token", root.dataset.crmCsrf || "");
     body.set("stage_id", stageId);
+    if (lostReason) body.set("lost_reason", lostReason);
     return fetch(url, {
       method: "POST",
       headers: {
@@ -106,7 +107,7 @@
   }
 
   function updateColumnState(column) {
-    const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !card.hidden);
+    const cards = Array.from(column.querySelectorAll(".crm-kanban-card"));
     const count = column.querySelector("header strong");
     if (count) count.textContent = String(cards.length);
     const total = column.querySelector(".crm-kanban-column-total");
@@ -117,6 +118,13 @@
     }
     const empty = column.querySelector(".crm-kanban-empty");
     if (empty) empty.hidden = cards.length > 0;
+    const showMore = column.querySelector("[data-crm-show-more]");
+    if (showMore) {
+      const remaining = cards.filter((card) => card.dataset.crmDeferred === "true").length;
+      const badge = showMore.querySelector("span");
+      if (badge) badge.textContent = String(remaining);
+      showMore.hidden = remaining === 0;
+    }
   }
 
   function prefersReducedMotion() {
@@ -170,6 +178,8 @@
 
   function moveCardToTop(dropzone, card) {
     if (!dropzone || !card) return;
+    card.hidden = false;
+    delete card.dataset.crmDeferred;
     const firstCard =
       Array.from(dropzone.querySelectorAll(".crm-kanban-card")).find((candidate) => candidate !== card && !candidate.hidden) ||
       Array.from(dropzone.querySelectorAll(".crm-kanban-card")).find((candidate) => candidate !== card) ||
@@ -223,6 +233,7 @@
 
   function tokenLooksLike(needle, word) {
     if (!needle || !word) return false;
+    if (/^\d+$/.test(needle) || /^\d+$/.test(word)) return word.includes(needle);
     if (word.includes(needle) || needle.includes(word)) return true;
     if (needle.length < 3 || word.length < 3) return false;
     const limit = needle.length <= 4 ? 1 : 2;
@@ -299,6 +310,7 @@
       dueDate: dialog.querySelector('[data-crm-card-detail-field="dueDate"]'),
       nextStep: dialog.querySelector('[data-crm-card-detail-field="nextStep"]'),
       note: dialog.querySelector('[data-crm-card-detail-field="note"]'),
+      lostReason: dialog.querySelector('[data-crm-card-detail-field="lostReason"]'),
     };
 
     const setText = (node, value) => {
@@ -341,6 +353,7 @@
       setText(fields.dueDate, data.crmDetailDueDate);
       setText(fields.nextStep, data.crmDetailNextStep);
       setText(fields.note, data.crmDetailNote);
+      setText(fields.lostReason, data.crmDetailLostReason);
       fillTagList(detailTags, data.crmTags || "");
       if (history) {
         const historyTemplate = card.querySelector("template[data-crm-card-history]");
@@ -419,6 +432,47 @@
     const archiveSearch = document.querySelector("[data-crm-archive-search]");
     const searchInput = document.querySelector('.crm-kanban-filters input[name="q"]');
     const trashDrop = document.querySelector("[data-crm-trash-drop]");
+    const lostDialog = document.getElementById("crm-lost-reason-dialog");
+
+    const requestLostReason = () =>
+      new Promise((resolve) => {
+        if (!lostDialog) {
+          resolve(window.prompt("Почему сделка потеряна?") || "");
+          return;
+        }
+        const form = lostDialog.querySelector("[data-crm-lost-reason-form]");
+        const input = form?.querySelector('[name="lost_reason"]');
+        let settled = false;
+        const finish = (value) => {
+          if (settled) return;
+          settled = true;
+          form?.removeEventListener("submit", onSubmit);
+          lostDialog.querySelectorAll("[data-crm-lost-cancel]").forEach((button) => button.removeEventListener("click", onCancel));
+          lostDialog.removeEventListener("cancel", onCancel);
+          if (lostDialog.open) lostDialog.close();
+          resolve(value);
+        };
+        const onSubmit = (event) => {
+          event.preventDefault();
+          const value = String(input?.value || "").trim();
+          if (!value) {
+            input?.focus();
+            return;
+          }
+          finish(value);
+        };
+        const onCancel = (event) => {
+          event?.preventDefault?.();
+          finish("");
+        };
+        if (input) input.value = "";
+        form?.addEventListener("submit", onSubmit);
+        lostDialog.querySelectorAll("[data-crm-lost-cancel]").forEach((button) => button.addEventListener("click", onCancel));
+        lostDialog.addEventListener("cancel", onCancel);
+        if (typeof lostDialog.showModal === "function") lostDialog.showModal();
+        else lostDialog.setAttribute("open", "");
+        input?.focus();
+      });
 
     const setSelectedCard = (card) => {
       if (selectedCard && selectedCard !== card) selectedCard.classList.remove("is-selected");
@@ -534,12 +588,24 @@
       const query = String(searchInput?.value || "").trim();
       root.querySelectorAll(".crm-kanban-card").forEach((card) => {
         const visible = cardMatchesSearch(card, query);
-        card.hidden = !visible;
+        card.hidden = query ? !visible : card.dataset.crmDeferred === "true";
         renderSearchMatch(card, visible ? query : "");
         if (!visible && selectedCard === card) setSelectedCard(null);
       });
       root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
     };
+
+    root.querySelectorAll("[data-crm-show-more]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const column = button.closest(".crm-kanban-column");
+        const deferred = Array.from(column?.querySelectorAll('.crm-kanban-card[data-crm-deferred="true"]') || []).slice(0, 20);
+        deferred.forEach((card) => {
+          delete card.dataset.crmDeferred;
+          card.hidden = false;
+        });
+        if (column) updateColumnState(column);
+      });
+    });
 
     archiveToggle?.addEventListener("click", () => {
       if (!archiveRow) return;
@@ -625,13 +691,15 @@
       dropzone.addEventListener("dragleave", (event) => {
         if (!column.contains(event.relatedTarget)) column.classList.remove("is-over");
       });
-      dropzone.addEventListener("drop", (event) => {
+      dropzone.addEventListener("drop", async (event) => {
         event.preventDefault();
         column.classList.remove("is-over");
         const recordId = event.dataTransfer.getData("text/plain") || dragged?.dataset.crmRecordId || "";
         const card = dragged || root.querySelector(`[data-crm-record-id="${CSS.escape(recordId)}"]`);
         const stageId = column.dataset.crmStageId || "";
         if (!card || !recordId || !stageId) return;
+        const lostReason = column.dataset.crmStageOutcome === "lost" ? await requestLostReason() : "";
+        if (column.dataset.crmStageOutcome === "lost" && !lostReason) return;
         const previousColumn = card.closest(".crm-kanban-column");
         const previousRect = card.getBoundingClientRect();
         moveCardToTop(dropzone, card);
@@ -640,7 +708,7 @@
         if (previousColumn) updateColumnState(previousColumn);
         updateColumnState(column);
         animateCardMove(card, previousRect);
-        postStage(root, recordId, stageId)
+        postStage(root, recordId, stageId, lostReason)
           .then(() => {
             column.classList.add("is-saved");
             window.setTimeout(() => column.classList.remove("is-saved"), 900);
@@ -673,11 +741,44 @@
     const title = dialog.querySelector("#crm-record-dialog-title");
     const subtitle = dialog.querySelector(".settings-profile-modal-sub");
     const submit = dialog.querySelector('.crm-record-form-actions button[type="submit"]');
+    const clientInput = form?.querySelector('input[name="client"]');
+    const duplicateNote = dialog.querySelector("[data-crm-client-duplicate]");
+    const existingClients = new Set(
+      Array.from(document.querySelectorAll("#crm-client-list option"))
+        .map((option) => String(option.value || "").trim().toLocaleLowerCase())
+        .filter(Boolean),
+    );
+
+    const syncDuplicateNotice = () => {
+      if (!duplicateNote || !clientInput) return;
+      duplicateNote.hidden = !existingClients.has(String(clientInput.value || "").trim().toLocaleLowerCase());
+    };
+
+    const syncConditionalFields = () => {
+      if (!form) return;
+      const kind = form.querySelector('input[name="item_type"]:checked')?.value || "deal";
+      const status = form.querySelector('select[name="status"]')?.value || "new";
+      const stage = form.querySelector('select[name="stage_id"]');
+      const stageText = String(stage?.selectedOptions?.[0]?.textContent || "").toLocaleLowerCase();
+      const isLost = status === "lost" || stage?.value === "lost" || stageText.includes("потер");
+      const isOpenWork = kind !== "history" && !isLost && !["done", "won", "lost", "archived"].includes(status);
+      const nextStep = form.querySelector('input[name="next_step"]');
+      const dueDate = form.querySelector('input[name="due_date"]');
+      const lostReason = form.querySelector('input[name="lost_reason"]');
+      const lostField = form.querySelector("[data-crm-lost-reason-field]");
+      if (nextStep) nextStep.required = isOpenWork;
+      if (dueDate) dueDate.required = isOpenWork;
+      if (lostReason) lostReason.required = isLost;
+      if (lostField) lostField.hidden = !isLost;
+    };
 
     const setKind = (kind) => {
       if (!kind) return;
       const input = dialog.querySelector(`input[name="item_type"][value="${CSS.escape(kind)}"]`);
-      if (input) input.checked = true;
+      if (input) {
+        input.checked = true;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     };
 
     const setField = (name, value) => {
@@ -705,6 +806,8 @@
       if (title) title.textContent = "Новая запись";
       if (subtitle) subtitle.textContent = "Сделка, задача или история контакта";
       if (submit) submit.textContent = "Сохранить запись";
+      syncConditionalFields();
+      syncDuplicateNotice();
     };
 
     const fillPayload = (payload) => {
@@ -738,6 +841,8 @@
         if (subtitle) subtitle.textContent = "Карточка клиента, этап, следующий шаг и история";
         if (submit) submit.textContent = "Сохранить изменения";
       }
+      syncConditionalFields();
+      syncDuplicateNotice();
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {
@@ -763,6 +868,10 @@
         openDialog(payload.item_type || "deal", payload, "edit");
       });
     });
+    form?.querySelectorAll('input[name="item_type"], select[name="status"], select[name="stage_id"]').forEach((field) => {
+      field.addEventListener("change", syncConditionalFields);
+    });
+    clientInput?.addEventListener("input", syncDuplicateNotice);
     document.addEventListener("crm:edit-record", (event) => {
       const payload = parsePayload(event.detail?.payload);
       if (!payload?.id) return;

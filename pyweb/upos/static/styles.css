@@ -4339,7 +4339,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-service-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(7.5rem, 1fr));
+  grid-template-columns: repeat(6, minmax(7.5rem, 1fr));
   gap: 0.7rem;
 }
 
@@ -4383,6 +4383,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-service-metric.is-alert {
   border-color: color-mix(in srgb, #ef4444 45%, var(--workbench-line, var(--border)));
   background: color-mix(in srgb, #ef4444 7%, var(--card));
+}
+
+.crm-service-metric.is-warning {
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #f59e0b 7%, var(--card));
 }
 
 .crm-next-actions {
@@ -4652,6 +4657,28 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-archive-card .crm-kanban-card-date {
   justify-self: start;
+}
+
+.crm-archive-restore-form {
+  margin: 0;
+}
+
+.crm-archive-restore-form .btn {
+  min-height: 1.9rem;
+  padding: 0.28rem 0.58rem;
+  font-size: var(--text-xs);
+}
+
+.crm-kanban-show-more {
+  position: sticky;
+  bottom: 0;
+  width: calc(100% - 0.7rem);
+  margin: 0.35rem;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.crm-kanban-show-more[hidden] {
+  display: none;
 }
 
 .crm-kanban {
@@ -5375,6 +5402,61 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-card-detail-event p {
   margin: 0;
+}
+
+.crm-card-detail-event--system {
+  border-left: 3px solid var(--primary);
+}
+
+.crm-card-detail-event--sale {
+  border-left: 3px solid #16a34a;
+}
+
+.crm-client-duplicate-note {
+  display: block;
+  margin-top: 0.25rem;
+  color: #b45309;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.crm-client-duplicate-note[hidden],
+.crm-lost-reason-field[hidden] {
+  display: none;
+}
+
+.crm-lost-reason-surface {
+  width: min(32rem, calc(100vw - 2rem));
+}
+
+.crm-lost-reason-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.crm-lost-reason-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 800;
+}
+
+.crm-lost-reason-form textarea {
+  width: 100%;
+  min-height: 7rem;
+  padding: 0.7rem;
+  resize: vertical;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  font: inherit;
+}
+
+@media (max-width: 980px) {
+  .crm-service-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {

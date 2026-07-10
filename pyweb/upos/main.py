@@ -3826,6 +3826,39 @@ def create_app() -> FastAPI:
         fill = round((age_hours / yellow_at) * 100)
         return {"state": "green", "fill": str(max(8, min(fill, 100))), "label": "Свежая карточка", "age_label": age_label}
 
+    def _crm_actor_name(request: Request) -> str:
+        user = request.session.get("user") or {}
+        return str(user.get("name") or user.get("username") or user.get("login") or "UPOS").strip() or "UPOS"
+
+    def _crm_append_activity(data: dict[str, Any], action: str, actor: str = "", detail: str = "") -> None:
+        raw = data.get("activity_log") if isinstance(data.get("activity_log"), list) else []
+        events = [item for item in raw if isinstance(item, dict)][-49:]
+        events.append(
+            {
+                "at": datetime.now(timezone.utc).isoformat(),
+                "action": str(action or "Изменение").strip()[:120],
+                "actor": str(actor or "UPOS").strip()[:120],
+                "detail": str(detail or "").strip()[:300],
+            }
+        )
+        data["activity_log"] = events
+
+    def _crm_open_record_error(data: dict[str, Any], status: str, stages: list[dict[str, str]]) -> str:
+        item_type = str(data.get("item_type") or "task")
+        if item_type == "history":
+            return ""
+        stage = _crm_stage_for_value(data.get("stage_id") or data.get("stage"), stages)
+        is_lost = status == "lost" or _client_crm_status_from_stage(stage) == "lost"
+        if is_lost and not str(data.get("lost_reason") or "").strip():
+            return "Укажите причину потери сделки"
+        if status in {"done", "won", "lost", "archived"} or is_lost:
+            return ""
+        if not str(data.get("next_step") or "").strip():
+            return "Укажите следующий шаг"
+        if not str(data.get("due_date") or "").strip():
+            return "Укажите дату следующего шага"
+        return ""
+
     def _product_data(row: Product) -> dict[str, Any]:
         data = row.data if isinstance(row.data, dict) else {}
         prices = data.get("prices") if isinstance(data.get("prices"), list) else []
@@ -6933,6 +6966,7 @@ def create_app() -> FastAPI:
             "next_step": str(form.get("next_step") or "").strip(),
             "probability": _crm_probability_value(form.get("probability")),
             "note": str(form.get("note") or "").strip(),
+            "lost_reason": str(form.get("lost_reason") or "").strip()[:300],
             "tags": clean_tags(form.get("tags")),
         }
         if data["priority"] not in CRM_PRIORITY_LABELS:
@@ -6946,6 +6980,10 @@ def create_app() -> FastAPI:
         tags = [str(item or "").strip() for item in data.get("tags", []) if str(item or "").strip()] if isinstance(data.get("tags"), list) else []
         amount_value = _sales_decimal(row.amount)
         amount_input = str(amount_value.normalize()) if amount_value else ""
+        activity_log = [item for item in data.get("activity_log", []) if isinstance(item, dict)] if isinstance(data.get("activity_log"), list) else []
+        if not activity_log:
+            created_at = row.created_at.isoformat() if row.created_at else ""
+            activity_log = [{"at": created_at, "action": "Карточка создана", "actor": "UPOS", "detail": ""}]
         return {
             "id": row.id,
             "title": row.title,
@@ -6970,6 +7008,8 @@ def create_app() -> FastAPI:
             "probability": probability,
             "probability_label": f"{probability}%" if probability else "",
             "note": str(data.get("note") or ""),
+            "lost_reason": str(data.get("lost_reason") or ""),
+            "activity_log": list(reversed(activity_log[-50:])),
             "tags": tags[:8],
             "tags_text": ", ".join(tags[:8]),
             "amount": _sales_money_label(row.amount),
@@ -7001,6 +7041,7 @@ def create_app() -> FastAPI:
             "currency",
             "next_step",
             "note",
+            "lost_reason",
             "tags",
         )
         payload: dict[str, str] = {}
@@ -8848,6 +8889,7 @@ def create_app() -> FastAPI:
             "today_count": 0,
             "won_count": 0,
             "conversion_rate": "0%",
+            "missing_next_step_count": 0,
         }
         summary_pipeline_total = Decimal("0")
         summary_won = 0
@@ -9007,6 +9049,8 @@ def create_app() -> FastAPI:
                         crm_summary["today_count"] += 1
                     if item["due_date"] or item["next_step"]:
                         crm_next_actions.append(item)
+                    if item["item_type"] in {"deal", "task"} and (not item["due_date"] or not item["next_step"]):
+                        crm_summary["missing_next_step_count"] += 1
                     if isinstance(item["kanban_amount_value"], Decimal):
                         summary_pipeline_total += item["kanban_amount_value"]
                 if item["status"] == "won":
@@ -10396,6 +10440,12 @@ def create_app() -> FastAPI:
         data, amount, currency = _crm_record_payload(form)
         stages = _crm_workspace_stages(wid)
         _crm_apply_stage(data, stages)
+        status = str(form.get("status") or "new").strip() or "new"
+        validation_error = _crm_open_record_error(data, status, stages)
+        if validation_error:
+            target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
+            return RedirectResponse(url=f"/crm?error={quote(validation_error)}#{target_hash}", status_code=302)
+        _crm_append_activity(data, "Карточка создана", _crm_actor_name(request))
         with session_scope() as session:
             counterparty_id = None
             if data["client"]:
@@ -10407,7 +10457,7 @@ def create_app() -> FastAPI:
                 item_type=str(data.get("item_type") or "task"),
                 title=title,
                 counterparty_id=counterparty_id,
-                status=str(form.get("status") or "new").strip() or "new",
+                status=status,
                 due_date=str(data.get("due_date") or ""),
                 amount=amount,
                 currency=currency,
@@ -10434,6 +10484,11 @@ def create_app() -> FastAPI:
         data, amount, currency = _crm_record_payload(form)
         stages = _crm_workspace_stages(wid)
         _crm_apply_stage(data, stages)
+        status = str(form.get("status") or "new").strip() or "new"
+        validation_error = _crm_open_record_error(data, status, stages)
+        if validation_error:
+            target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
+            return RedirectResponse(url=f"/crm?error={quote(validation_error)}#{target_hash}", status_code=302)
         with session_scope() as session:
             row = session.get(CrmRecord, record_id)
             if not row or row.workspace_owner_id != wid:
@@ -10442,10 +10497,20 @@ def create_app() -> FastAPI:
             if data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
                 counterparty_id = counterparty.id if counterparty else None
+            old_data = _json_object(row.data)
+            old_stage = str(old_data.get("stage") or "")
+            old_log = old_data.get("activity_log") if isinstance(old_data.get("activity_log"), list) else []
+            data["activity_log"] = list(old_log)
+            change_bits = []
+            if row.title != title:
+                change_bits.append("название")
+            if old_stage != str(data.get("stage") or ""):
+                change_bits.append(f"этап: {old_stage or '-'} → {data.get('stage') or '-'}")
+            _crm_append_activity(data, "Карточка изменена", _crm_actor_name(request), ", ".join(change_bits))
             row.title = title
             row.item_type = str(data.get("item_type") or "task")
             row.counterparty_id = counterparty_id
-            row.status = str(form.get("status") or "new").strip() or "new"
+            row.status = status
             row.due_date = str(data.get("due_date") or "")
             row.amount = amount
             row.currency = currency
@@ -10473,11 +10538,22 @@ def create_app() -> FastAPI:
                 result = str(form.get("result") or "").strip()
                 if row.item_type == "deal":
                     row.status = "lost" if result == "lost" else "won"
+                    if row.status == "lost":
+                        lost_reason = str(form.get("lost_reason") or "").strip()
+                        if not lost_reason:
+                            return RedirectResponse(url="/crm?error=" + quote("Укажите причину потери сделки") + "#deals", status_code=302)
+                        data["lost_reason"] = lost_reason[:300]
                     target_stage = _crm_stage_for_client_status("lost" if row.status == "lost" else "our_client", stages)
                     _crm_apply_stage(data, stages, target_stage["id"])
                 else:
                     row.status = "done"
                 data["next_step"] = ""
+                _crm_append_activity(
+                    data,
+                    "Сделка потеряна" if row.status == "lost" else ("Сделка выиграна" if row.status == "won" else "Задача завершена"),
+                    _crm_actor_name(request),
+                    str(data.get("lost_reason") or ""),
+                )
                 row.data = data
                 flag_modified(row, "data")
                 if row.item_type == "deal":
@@ -10514,13 +10590,21 @@ def create_app() -> FastAPI:
         stage_id = str(form.get("stage_id") or "").strip()
         stages = _crm_workspace_stages(wid)
         stage = _crm_stage_for_value(stage_id, stages)
+        lost_reason = str(form.get("lost_reason") or "").strip()
+        if _client_crm_status_from_stage(stage) == "lost" and not lost_reason:
+            return JSONResponse({"ok": False, "error": "lost_reason_required"}, status_code=400)
         with session_scope() as session:
             row = session.get(CrmRecord, record_id)
             if not row or row.workspace_owner_id != wid:
                 return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
             data = _json_object(row.data).copy()
+            previous_stage = str(data.get("stage") or "")
             _crm_apply_stage(data, stages, stage["id"])
+            if lost_reason:
+                data["lost_reason"] = lost_reason[:300]
+            _crm_append_activity(data, "Этап изменён", _crm_actor_name(request), f"{previous_stage or '-'} → {stage['title']}")
             row.data = data
+            flag_modified(row, "data")
             if stage["id"] == "won":
                 row.status = "won"
             elif stage["id"] == "lost":
@@ -10544,11 +10628,35 @@ def create_app() -> FastAPI:
             if not row or row.workspace_owner_id != wid:
                 return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
             data = _json_object(row.data).copy()
+            data["archived_status"] = row.status
             data["archived_at"] = datetime.now(timezone.utc).isoformat()
+            _crm_append_activity(data, "Перенесено в архив", _crm_actor_name(request))
             row.status = "archived"
             row.data = data
             flag_modified(row, "data")
         return JSONResponse({"ok": True})
+
+    @app.post("/crm/{record_id}/restore", name="crm_restore")
+    async def crm_restore(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/crm?err=csrf#deals", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return RedirectResponse(url="/crm?error=" + quote("CRM-запись не найдена") + "#deals", status_code=302)
+            data = _json_object(row.data).copy()
+            restored_status = str(data.pop("archived_status", "in_progress") or "in_progress")
+            data.pop("archived_at", None)
+            _crm_append_activity(data, "Восстановлено из архива", _crm_actor_name(request))
+            row.status = restored_status if restored_status != "archived" else "in_progress"
+            row.data = data
+            flag_modified(row, "data")
+        return RedirectResponse(url="/crm?msg=saved#deals", status_code=302)
 
     @app.post("/crm/{record_id}/tag", name="crm_tag_add")
     async def crm_tag_add(request: Request, record_id: str):
@@ -10571,6 +10679,7 @@ def create_app() -> FastAPI:
             if tag.casefold() not in {item.casefold() for item in tags}:
                 tags.append(tag)
             data["tags"] = tags[:8]
+            _crm_append_activity(data, "Добавлен тег", _crm_actor_name(request), tag)
             row.data = data
             flag_modified(row, "data")
         return JSONResponse({"ok": True, "tags": tags[:8]})
