@@ -3814,8 +3814,8 @@ def create_app() -> FastAPI:
         if touched.tzinfo is None:
             touched = touched.replace(tzinfo=timezone.utc)
         age_hours = max((now - touched).total_seconds() / 3600, 0)
-        age_days = max(1, math.ceil(age_hours / 24))
-        age_label = f"{age_days}д прошло"
+        age_days = math.floor(age_hours / 24)
+        age_label = "NEW" if age_days < 1 else f"{age_days}д прошло"
         yellow_at = max(settings.get("yellow_hours", 24), 1)
         red_at = max(settings.get("red_hours", 48), yellow_at + 1)
         if age_hours >= red_at:
