@@ -7897,6 +7897,39 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-variant-numeric: tabular-nums;
 }
 
+/* Emphasize operational values in sale and order entry forms. */
+.sales-form,
+.sales-form input:not([type="hidden"]),
+.sales-form select,
+.sales-form textarea,
+.sales-form output,
+.sales-form .sales-combo-option {
+  font-weight: 750;
+}
+
+.sales-form label,
+.sales-form .sales-client-label-line,
+.sales-lines-table td,
+.sales-lines-table input,
+.sales-lines-table select,
+.sales-lines-table .sales-combo-option strong {
+  font-weight: 800;
+}
+
+.sales-lines-table td strong,
+.sales-lines-table td output,
+.sales-lines-table td:nth-last-child(2),
+.sales-form .sales-total-bar,
+.sales-form .sales-total-bar output,
+.sales-form .sales-payment-breakdown strong {
+  font-weight: 900;
+}
+
+.sales-form input::placeholder,
+.sales-form textarea::placeholder {
+  font-weight: 650;
+}
+
 .warehouse-purchase-entry {
   width: 100%;
 }
