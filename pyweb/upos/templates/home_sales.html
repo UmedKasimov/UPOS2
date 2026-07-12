@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Продажи{% endblock %}
 
-{% set sales_default_tab = 'journal' if flash_ok in ['saved', 'paid'] else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))) %}
+{% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'paid'] %}
+{% set sales_default_tab = 'journal' if flash_ok in sales_saved_messages else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else '')))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
 {% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
 {% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
+{% set sales_form_save_label = 'Сохранить возврат' if sales_form_doc_type == 'return' else ('Сохранить заказ' if sales_form_doc_type == 'order' else 'Сохранить продажу') %}
 
 {% block page_header %}
   <div class="general-page-header">
@@ -19,12 +21,16 @@
     data-workspace-tabs
     data-workspace-key="sales"
     data-workspace-default-tab="{{ sales_default_tab }}"
-    data-workspace-force-tab="{{ 'journal' if flash_ok in ['saved', 'paid'] else '' }}"
-    data-workspace-close-tabs-on-load="{{ 'new' if flash_ok == 'saved' else '' }}"
+    data-workspace-force-tab="{{ 'journal' if flash_ok in sales_saved_messages else '' }}"
+    data-workspace-close-tabs-on-load="{{ 'new' if flash_ok in ['saved', 'order_saved', 'return_saved'] else '' }}"
     data-workspace-home-href="{{ url_for('sales_get') }}"
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Успешно продано. Продажа добавлена в журнал.</div>
+    {% elif flash_ok == "order_saved" %}
+      <div class="flash ok settings-ios-flash">Заказ сохранён и добавлен в журнал продаж.</div>
+    {% elif flash_ok == "return_saved" %}
+      <div class="flash ok settings-ios-flash">Возврат сохранён и добавлен в журнал продаж.</div>
     {% elif flash_ok == "paid" %}
       <div class="flash ok settings-ios-flash">Оплата внесена. Продажа обновлена.</div>
     {% elif flash_ok == "deleted" %}
@@ -39,7 +45,7 @@
     </nav>
 
     <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher>
-      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="Новая продажа" data-workspace-tab-hash="sales-form">
+      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <path d="M5 5h14v14H5z" />
@@ -47,7 +53,7 @@
             <path d="M17 17h3M18.5 15.5v3" />
           </svg>
         </span>
-        <span>Новая продажа</span>
+        <span>{{ sales_form_title }}</span>
         <small>Счёт, заказ или реализация</small>
       </a>
       <a class="general-report-card" href="#sales-journal" data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal">
@@ -467,10 +473,17 @@
           </div>
         </header>
         <script type="application/json" id="sales-form-options">{{ sales_options | tojson }}</script>
-        <form method="post" action="{{ url_for('sales_save') }}" class="product-form sales-form" data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}">
+        <form
+          method="post"
+          action="{{ url_for('sales_save') }}"
+          class="product-form sales-form"
+          data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
+          data-sales-prefill-client="{{ sales_prefill.client|e }}"
+        >
           {% include "_csrf_field.html" %}
 
           <input type="hidden" name="doc_type" value="{{ sales_form_doc_type }}" />
+          <input type="hidden" name="crm_record_id" value="{{ sales_prefill.crm_record_id|e }}" />
 
           <div class="product-form-grid">
             <label><span>ID</span><input name="number" value="{{ sales_options.next_numbers[sales_form_doc_type] }}" readonly data-sales-auto-number aria-readonly="true" /></label>
@@ -485,7 +498,7 @@
                 <span class="sales-client-balance" data-sales-client-balance hidden></span>
               </span>
               <div class="sales-lock-field">
-                <input name="client" required autocomplete="off" placeholder="Выберите или введите клиента" data-sales-combo-input />
+                <input name="client" required autocomplete="off" value="{{ sales_prefill.client|e }}" placeholder="Выберите или введите клиента" data-sales-combo-input />
                 <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить клиента" title="Сменить клиента" hidden>✎</button>
               </div>
               <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
@@ -682,7 +695,7 @@
             <button type="button" class="btn sales-payment-add-btn" data-sales-payment-open>+ Добавить оплату</button>
             <div class="product-form-actions">
               <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
-              <button class="btn" type="submit">Сохранить продажу</button>
+              <button class="btn" type="submit">{{ sales_form_save_label }}</button>
             </div>
           </div>
         </form>
@@ -860,5 +873,5 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=7" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=49" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=50" defer></script>
 {% endblock %}

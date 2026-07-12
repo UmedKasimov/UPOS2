@@ -5737,6 +5737,7 @@ def create_app() -> FastAPI:
             "payment_lines": payment_lines,
             "manager": str(form.get("manager") or "").strip(),
             "note": str(form.get("note") or "").strip(),
+            "crm_record_id": str(form.get("crm_record_id") or "").strip(),
             "lines": lines,
         }
         return data, amount, currency
@@ -5997,6 +5998,7 @@ def create_app() -> FastAPI:
         doc_type: str = "all",
         status: str = "all",
         client: str = "",
+        crm_record_id: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -6019,8 +6021,20 @@ def create_app() -> FastAPI:
         price_type_options: list[dict[str, Any]] = []
         payment_accounts: list[dict[str, str]] = []
         next_numbers: dict[str, str] = {}
+        sales_prefill = {"crm_record_id": "", "client": ""}
         usd_rate = _workspace_usd_uzs_rate(wid)
         with session_scope() as session:
+            requested_crm_id = str(crm_record_id or "").strip()
+            if requested_crm_id:
+                crm_row = session.get(CrmRecord, requested_crm_id)
+                if crm_row and crm_row.workspace_owner_id == wid and crm_row.item_type in {"deal", "task"}:
+                    crm_data = _json_object(crm_row.data)
+                    crm_client = str(crm_data.get("client") or "").strip()
+                    if not crm_client and crm_row.counterparty_id:
+                        crm_counterparty = session.get(Counterparty, crm_row.counterparty_id)
+                        if crm_counterparty and crm_counterparty.workspace_owner_id == wid:
+                            crm_client = str(crm_counterparty.name or "").strip()
+                    sales_prefill = {"crm_record_id": crm_row.id, "client": crm_client}
             rows = list(
                 session.execute(
                     select(SaleDocument)
@@ -6202,6 +6216,7 @@ def create_app() -> FastAPI:
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
             sales_saved_id=request.query_params.get("saved_id") or "",
+            sales_prefill=sales_prefill,
         )
 
     @app.post("/sales/products/quick-save", name="sales_product_quick_save")
@@ -6293,6 +6308,21 @@ def create_app() -> FastAPI:
         saved_sale_id = ""
         saved_sale_number = ""
         with session_scope() as session:
+            linked_crm_row = None
+            linked_crm_id = str(data.get("crm_record_id") or "").strip()
+            if linked_crm_id:
+                candidate = session.get(CrmRecord, linked_crm_id)
+                if candidate and candidate.workspace_owner_id == wid and candidate.item_type in {"deal", "task"}:
+                    candidate_data = _json_object(candidate.data)
+                    candidate_client = str(candidate_data.get("client") or "").strip()
+                    if candidate_client and candidate_client.casefold() != str(data.get("client") or "").strip().casefold():
+                        return RedirectResponse(
+                            url=f"/sales?doc_type={quote(str(data.get('doc_type') or 'order'))}&crm_record_id={quote(candidate.id)}&error={quote('Клиент заказа не совпадает с карточкой CRM')}#sales-form",
+                            status_code=302,
+                        )
+                    linked_crm_row = candidate
+                else:
+                    data["crm_record_id"] = ""
             try:
                 client_row = _ensure_counterparty(
                     session,
@@ -6339,6 +6369,19 @@ def create_app() -> FastAPI:
             session.add(row)
             saved_sale_id = doc_id
             saved_sale_number = number
+            if linked_crm_row is not None:
+                crm_data = _json_object(linked_crm_row.data).copy()
+                crm_data["related_sale_id"] = doc_id
+                crm_data["related_sale_number"] = number
+                crm_data["related_sale_type"] = str(data.get("doc_type") or "order")
+                _crm_append_activity(
+                    crm_data,
+                    "Заказ добавлен" if data.get("doc_type") == "order" else "Продажа добавлена",
+                    _crm_actor_name(request),
+                    f"{number} · {_sales_money_label(amount)} {currency}",
+                )
+                linked_crm_row.data = crm_data
+                flag_modified(linked_crm_row, "data")
         try:
             _sync_sales_cash_transactions(
                 wid,
@@ -6355,7 +6398,8 @@ def create_app() -> FastAPI:
                 url="/sales?error=" + quote("Продажа сохранена, но операция кассы не записалась") + "#sales-form",
                 status_code=302,
             )
-        return RedirectResponse(url=f"/sales?msg=saved&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
+        saved_message = "order_saved" if data.get("doc_type") == "order" else "return_saved" if data.get("doc_type") == "return" else "saved"
+        return RedirectResponse(url=f"/sales?msg={saved_message}&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/delete", name="sales_delete")
     async def sales_delete(request: Request, sale_id: str):
@@ -8914,6 +8958,7 @@ def create_app() -> FastAPI:
             counterparty_by_id = {row.id: row for row in counterparty_rows}
             counterparty_by_name = {row.name.strip().lower(): row for row in counterparty_rows if row.name}
             sale_by_key: dict[str, dict[str, Any]] = {}
+            sale_by_id: dict[str, dict[str, Any]] = {}
             for sale_row in session.execute(
                 select(SaleDocument)
                 .where(SaleDocument.workspace_owner_id == wid)
@@ -8922,6 +8967,7 @@ def create_app() -> FastAPI:
                 sale_data = _json_object(sale_row.data)
                 sale_item = _sales_document_data(sale_row)
                 sale_item["amount_value"] = _sales_decimal(sale_row.amount)
+                sale_by_id[str(sale_row.id)] = sale_item
                 keys = {
                     str(sale_data.get("counterparty_id") or sale_row.counterparty_id or "").strip(),
                     str(sale_data.get("client") or "").strip().lower(),
@@ -8992,7 +9038,12 @@ def create_app() -> FastAPI:
                 else:
                     item["client_id"] = ""
                     item["client_href"] = ""
-                linked_sale = sale_by_key.get(str(item.get("counterparty_id") or "")) or sale_by_key.get(str(item["client"] or "").strip().lower())
+                record_data = _json_object(row.data)
+                linked_sale = (
+                    sale_by_id.get(str(record_data.get("related_sale_id") or ""))
+                    or sale_by_key.get(str(item.get("counterparty_id") or ""))
+                    or sale_by_key.get(str(item["client"] or "").strip().lower())
+                )
                 item["order_number"] = str(linked_sale.get("number") or "") if linked_sale else ""
                 item["order_amount"] = str(linked_sale.get("amount") or "") if linked_sale else ""
                 item["order_currency"] = str(linked_sale.get("currency") or item["currency"] or "UZS") if linked_sale else item["currency"]

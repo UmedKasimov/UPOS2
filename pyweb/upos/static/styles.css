@@ -5367,6 +5367,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+.crm-card-detail-order-btn {
+  min-height: 2rem;
+  padding: 0.32rem 0.65rem;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+
 .crm-card-detail-chatbox {
   display: grid;
   gap: 0.3rem;

@@ -782,7 +782,7 @@
 
   function isSalesSavedPage() {
     try {
-      return new URLSearchParams(window.location.search).get("msg") === "saved";
+      return ["saved", "order_saved", "return_saved"].indexOf(new URLSearchParams(window.location.search).get("msg")) >= 0;
     } catch (_) {
       return false;
     }
@@ -2031,7 +2031,16 @@
         addServiceLine(root, options);
       });
     }
-    if (isSalesSavedPage()) {
+    var prefillClient = String(root.dataset.salesPrefillClient || "").trim();
+    if (prefillClient) {
+      clearSalesDraft();
+      var prefillCombo = root.querySelector('[data-sales-combobox="client"]');
+      if (prefillCombo) commitCombo(prefillCombo, prefillClient);
+      var prefillClientRow = (options.client_rows || []).find(function (item) {
+        return normalize(item.name) === normalize(prefillClient);
+      });
+      updateClientBalance(root, prefillClientRow || prefillClient);
+    } else if (isSalesSavedPage()) {
       clearSalesDraft();
     } else {
       restoreSalesDraft(root, options);

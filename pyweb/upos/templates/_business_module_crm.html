@@ -177,6 +177,7 @@
               data-crm-detail-next-step="{{ row.next_step|e }}"
               data-crm-detail-note="{{ row.note|e }}"
               data-crm-detail-lost-reason="{{ row.lost_reason|e }}"
+              data-crm-detail-order-href="{{ url_for('sales_get') }}?doc_type=order&amp;crm_record_id={{ row.id|urlencode }}#sales-form"
               data-crm-detail-chat="{{ row.chat_label|e }}"
               data-crm-tags="{{ row.tags_text|e }}"
               data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
@@ -476,7 +477,10 @@
         </dl>
       </section>
       <section class="crm-card-detail-panel crm-card-detail-panel--timeline">
-        <h3>Чат и история</h3>
+        <div class="crm-card-detail-panel-head">
+          <h3>Чат и история</h3>
+          <a class="btn crm-card-detail-order-btn" href="#" data-crm-card-detail-order hidden>+ Добавить заказ</a>
+        </div>
         <div class="crm-card-detail-chatbox">
           <span>Чат</span>
           <strong data-crm-card-detail-chat>Не привязан</strong>

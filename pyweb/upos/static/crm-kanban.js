@@ -290,6 +290,7 @@
     const client = dialog.querySelector("[data-crm-card-detail-client]");
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
+    const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
     const detailTags = dialog.querySelector("[data-crm-card-detail-tags]");
@@ -337,6 +338,15 @@
         const payload = data.crmEditPayload || "";
         editButton.hidden = !payload;
         editButton.dataset.crmEditPayload = payload;
+      }
+      if (orderButton) {
+        if (data.crmDetailOrderHref) {
+          orderButton.href = data.crmDetailOrderHref;
+          orderButton.hidden = false;
+        } else {
+          orderButton.hidden = true;
+          orderButton.removeAttribute("href");
+        }
       }
       setText(chat, data.crmDetailChat || "Не привязан");
       setText(fields.title, data.crmDetailTitle);
