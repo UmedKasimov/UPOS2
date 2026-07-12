@@ -2207,6 +2207,76 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   font-weight: 900;
 }
 
+.reports-stock-analysis-tools {
+  display: grid;
+  justify-items: end;
+  gap: 0.55rem;
+}
+
+.reports-currency-switch {
+  display: inline-flex;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+}
+
+.reports-currency-switch button {
+  min-width: 3.5rem;
+  min-height: 2rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 850;
+}
+
+.reports-currency-switch button.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.reports-sort-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 2.55rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  padding: 0.48rem 0.78rem;
+}
+
+.reports-sort-button:hover,
+.reports-sort-button:focus-visible {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--foreground);
+  outline: none;
+}
+
+.reports-sort-icon {
+  flex: 0 0 auto;
+  color: var(--primary);
+  font-size: var(--text-base);
+  font-weight: 900;
+}
+
+.reports-stock-analysis-table th:nth-child(n + 2) .reports-sort-button,
+.reports-sales-table th:nth-child(n + 6):nth-child(-n + 10) .reports-sort-button,
+.reports-stock-movement-table th:nth-child(n + 2) .reports-sort-button {
+  justify-content: flex-end;
+}
+
 .reports-stock-negative-total,
 .reports-stock-negative-total b {
   color: #dc2626 !important;
@@ -2223,6 +2293,10 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 @media (max-width: 720px) {
+  .reports-stock-analysis-tools {
+    justify-items: start;
+  }
+
   .reports-sales-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

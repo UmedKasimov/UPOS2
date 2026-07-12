@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=24" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=28" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=29" />
 {% endblock %}
 
 {% block page_header %}
@@ -377,12 +377,18 @@
             <h2>Анализ остатков</h2>
             <p>Остатки по товарам, средняя себестоимость и ожидаемая выручка.</p>
           </div>
-          <div class="reports-balance-total">
-            <span><b>{{ business_reports.stock_analysis.summary.cost_total or "0 UZS" }}</b> себестоимость</span>
-            <span><b>{{ business_reports.stock_analysis.summary.revenue_total or "0 UZS" }}</b> выручка</span>
-            {% if business_reports.stock_analysis.summary.negative_count %}
-              <span class="reports-stock-negative-total"><b>{{ business_reports.stock_analysis.summary.negative_count }}</b> отрицательных остатков</span>
-            {% endif %}
+          <div class="reports-stock-analysis-tools">
+            <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
+              <button type="button" class="active" data-stock-currency="UZS" aria-pressed="true">UZS</button>
+              <button type="button" data-stock-currency="USD" aria-pressed="false">USD</button>
+            </div>
+            <div class="reports-balance-total">
+              <span><b data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.cost_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.cost_total or "0 UZS" }}</b> себестоимость</span>
+              <span><b data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.revenue_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.revenue_total or "0 UZS" }}</b> выручка</span>
+              {% if business_reports.stock_analysis.summary.negative_count %}
+                <span class="reports-stock-negative-total"><b>{{ business_reports.stock_analysis.summary.negative_count }}</b> отрицательных остатков</span>
+              {% endif %}
+            </div>
           </div>
         </header>
         <div class="reports-stock-filterbar">
@@ -407,7 +413,7 @@
             <tbody>
               {% for row in business_reports.stock_analysis.rows %}
                 <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %}>
-                  <td>
+                  <td data-sort-value="{{ row.product }}">
                     <div class="reports-stock-product">
                       <span class="reports-stock-thumb">
                         {% if row.photo_url %}
@@ -422,10 +428,10 @@
                       </span>
                     </div>
                   </td>
-                  <td>{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
-                  <td>{{ row.avg_cost }}</td>
-                  <td>{{ row.cost_sum }}</td>
-                  <td>{{ row.expected_revenue }}</td>
+                  <td data-sort-value="{{ row.quantity_raw }}">{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
+                  <td data-sort-value="{{ row.avg_cost_uzs }}"><span data-stock-money data-money-uzs="{{ row.avg_cost_uzs }}">{{ row.avg_cost }}</span></td>
+                  <td data-sort-value="{{ row.cost_sum_uzs }}"><span data-stock-money data-money-uzs="{{ row.cost_sum_uzs }}">{{ row.cost_sum }}</span></td>
+                  <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}">{{ row.expected_revenue }}</span></td>
                 </tr>
               {% else %}
                 <tr><td colspan="5" class="reports-empty-cell">Остатков пока нет.</td></tr>
@@ -436,8 +442,8 @@
                 <td>Итого</td>
                 <td>{{ business_reports.stock_analysis.summary.quantity }}</td>
                 <td></td>
-                <td>{{ business_reports.stock_analysis.summary.cost_total }}</td>
-                <td>{{ business_reports.stock_analysis.summary.revenue_total }}</td>
+                <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.cost_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.cost_total }}</span></td>
+                <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.revenue_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.revenue_total }}</span></td>
               </tr>
             </tfoot>
           </table>
@@ -593,6 +599,7 @@
   const launcher = document.querySelector('.org-report-launcher');
   const root = document.querySelector('[data-org-reports-root]');
   if (!tabsShell || !homeTab || !launcher || !root) return;
+  const stockUsdRate = Number({{ reports_usd_rate|default('12000')|tojson }}) || 12000;
 
   const reportMeta = {
     'courier-debts': 'Долги доставщиков',
@@ -619,6 +626,7 @@
   let courierDebtLimitSaving = false;
   let courierDebtLimitStatus = '';
   let courierBalanceView = 'bars';
+  let stockCurrency = 'UZS';
   try {
     shipments = JSON.parse(dataNode?.textContent || '[]');
   } catch {
@@ -647,6 +655,61 @@
   function money(value, currency) {
     const amount = Number(value || 0);
     return `${numberFormatter.format(amount)} ${currency || 'UZS'}`;
+  }
+
+  function renderStockCurrency() {
+    document.querySelectorAll('[data-stock-money]').forEach((node) => {
+      const amountUzs = Number(node.getAttribute('data-money-uzs') || 0);
+      const amount = stockCurrency === 'USD' ? amountUzs / stockUsdRate : amountUzs;
+      node.textContent = `${numberFormatter.format(amount)} ${stockCurrency}`;
+    });
+    document.querySelectorAll('[data-stock-currency]').forEach((button) => {
+      const active = button.getAttribute('data-stock-currency') === stockCurrency;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function sortableCellValue(cell) {
+    const raw = String(cell?.getAttribute('data-sort-value') || cell?.textContent || '').trim();
+    const numberLike = /^[!▲+\-]?\s*[\d\s.,]+\s*(?:UZS|USD|RUB|EUR|pcs|шт)?$/i.test(raw);
+    if (numberLike) {
+      const parsed = Number(raw.replace(/[!▲\s]/g, '').replace(',', '.').replace(/(?:UZS|USD|RUB|EUR|pcs|шт)$/i, ''));
+      if (Number.isFinite(parsed)) return {type: 'number', value: parsed};
+    }
+    return {type: 'text', value: raw.toLocaleLowerCase('ru-RU')};
+  }
+
+  function sortReportTable(table, columnIndex, direction) {
+    const body = table.tBodies[0];
+    if (!body) return;
+    const rows = Array.from(body.rows).filter((row) => !row.querySelector('.reports-empty-cell'));
+    rows.sort((left, right) => {
+      const a = sortableCellValue(left.cells[columnIndex]);
+      const b = sortableCellValue(right.cells[columnIndex]);
+      const result = a.type === 'number' && b.type === 'number'
+        ? a.value - b.value
+        : String(a.value).localeCompare(String(b.value), 'ru', {numeric: true, sensitivity: 'base'});
+      return direction === 'desc' ? -result : result;
+    });
+    rows.forEach((row) => body.appendChild(row));
+  }
+
+  function enhanceSortableTables() {
+    document.querySelectorAll('.reports-data-table').forEach((table) => {
+      table.querySelectorAll('thead th').forEach((header, columnIndex) => {
+        if (header.querySelector('.reports-sort-button') || !header.textContent.trim()) return;
+        const label = header.textContent.trim();
+        header.textContent = '';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'reports-sort-button';
+        button.setAttribute('data-report-sort-column', String(columnIndex));
+        button.setAttribute('aria-label', `${label}: сортировать от большего к меньшему`);
+        button.innerHTML = `<span>${label}</span><span class="reports-sort-icon" aria-hidden="true">↕</span>`;
+        header.appendChild(button);
+      });
+    });
   }
 
   function percent(value, max) {
@@ -1352,6 +1415,8 @@
     });
     if (activeTab === 'courier-reconcile') renderReconcilePanel();
     if (activeTab === 'courier-balance') renderCourierBalancePanel();
+    enhanceSortableTables();
+    renderStockCurrency();
     saveState();
   }
 
@@ -1376,6 +1441,27 @@
     render();
   });
   document.addEventListener('click', (event) => {
+    const currencyButton = event.target.closest('[data-stock-currency]');
+    if (currencyButton) {
+      stockCurrency = currencyButton.getAttribute('data-stock-currency') === 'USD' ? 'USD' : 'UZS';
+      renderStockCurrency();
+      return;
+    }
+    const sortButton = event.target.closest('[data-report-sort-column]');
+    if (sortButton) {
+      const table = sortButton.closest('table');
+      if (!table) return;
+      const nextDirection = sortButton.getAttribute('data-sort-direction') === 'desc' ? 'asc' : 'desc';
+      table.querySelectorAll('[data-report-sort-column]').forEach((button) => {
+        button.removeAttribute('data-sort-direction');
+        button.querySelector('.reports-sort-icon').textContent = '↕';
+      });
+      sortButton.setAttribute('data-sort-direction', nextDirection);
+      sortButton.querySelector('.reports-sort-icon').textContent = nextDirection === 'desc' ? '↓' : '↑';
+      sortButton.setAttribute('aria-label', `${sortButton.firstElementChild.textContent}: сортировать ${nextDirection === 'desc' ? 'от меньшего к большему' : 'от большего к меньшему'}`);
+      sortReportTable(table, Number(sortButton.getAttribute('data-report-sort-column')), nextDirection);
+      return;
+    }
     const balanceViewButton = event.target.closest('[data-courier-balance-view]');
     if (balanceViewButton) {
       courierBalanceView = balanceViewButton.getAttribute('data-courier-balance-view') || 'bars';

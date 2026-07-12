@@ -11115,6 +11115,7 @@ def create_app() -> FastAPI:
             "receivables": {"summary": {}, "rows": []},
             "calls": {"summary": {}, "rows": []},
         }
+        reports_usd_rate = PRODUCT_USD_RATE
 
         def _report_date(data: dict[str, Any], created_at: Any) -> str:
             raw = str(data.get("date") or data.get("created_at") or "").strip()
@@ -11200,6 +11201,7 @@ def create_app() -> FastAPI:
                     )
 
                 report_rate = _workspace_usd_uzs_rate(wid)
+                reports_usd_rate = report_rate
 
                 def report_to_primary(value: Any, currency: str) -> Decimal:
                     return _convert_product_currency(
@@ -11445,7 +11447,12 @@ def create_app() -> FastAPI:
                     avg_cost = cost / cost_count if cost_count else _sales_decimal(data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price"))
                     sale_price = _sales_decimal(item.get("sale_price"))
                     cost_sum = qty * avg_cost
-                    revenue_sum = qty * sale_price
+                    revenue_sum = _convert_product_currency(
+                        qty * sale_price,
+                        item.get("sale_currency") or "UZS",
+                        "UZS",
+                        report_rate,
+                    )
                     stock_analysis_qty_total += qty
                     stock_analysis_cost_total += cost_sum
                     stock_analysis_revenue_total += revenue_sum
@@ -11454,10 +11461,14 @@ def create_app() -> FastAPI:
                             "product": item["name"],
                             "photo_url": item["photo_url"],
                             "quantity": f"{_sales_money_label(qty)} {item['unit']}",
+                            "quantity_raw": _decimal_plain_text(qty),
                             "warehouse": stock_warehouses,
                             "avg_cost": _report_money(avg_cost, "UZS"),
+                            "avg_cost_uzs": _decimal_plain_text(avg_cost),
                             "cost_sum": _report_money(cost_sum, "UZS"),
-                            "expected_revenue": _report_money(revenue_sum, item.get("sale_currency") or "UZS"),
+                            "cost_sum_uzs": _decimal_plain_text(cost_sum),
+                            "expected_revenue": _report_money(revenue_sum, "UZS"),
+                            "expected_revenue_uzs": _decimal_plain_text(revenue_sum),
                             "category": item["category"],
                             "group": item["group"],
                             "brand": item["brand"],
@@ -11475,7 +11486,9 @@ def create_app() -> FastAPI:
                         "items": len(stock_analysis_rows),
                         "quantity": f"{_sales_money_label(stock_analysis_qty_total)} шт",
                         "cost_total": _report_money(stock_analysis_cost_total, "UZS"),
-                        "revenue_total": _report_money(stock_analysis_revenue_total, primary_currency),
+                        "cost_total_uzs": _decimal_plain_text(stock_analysis_cost_total),
+                        "revenue_total": _report_money(stock_analysis_revenue_total, "UZS"),
+                        "revenue_total_uzs": _decimal_plain_text(stock_analysis_revenue_total),
                         "negative_count": sum(1 for item in stock_analysis_rows if item.get("is_negative")),
                         "critical_count": sum(1 for item in stock_analysis_rows if item.get("is_critical")),
                     },
@@ -11552,6 +11565,7 @@ def create_app() -> FastAPI:
             delivery_shipment_totals=delivery_shipment_totals,
             courier_debt_limits=courier_debt_limits,
             business_reports=business_reports,
+            reports_usd_rate=_decimal_plain_text(reports_usd_rate),
         )
 
     @app.get("/adjustments", response_class=HTMLResponse, name="home_adjustments")
