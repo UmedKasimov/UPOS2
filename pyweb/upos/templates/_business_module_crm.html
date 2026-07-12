@@ -258,6 +258,18 @@
                   </article>
                 {% endfor %}
               </template>
+              <template data-crm-card-messengers>
+                {% for messenger in row.messenger_channels %}
+                  <a class="crm-card-detail-messenger" href="{{ messenger.href }}">
+                    <span class="crm-card-detail-messenger-icon" aria-hidden="true">{{ messenger.channel[:1] }}</span>
+                    <span>
+                      <strong>{{ messenger.channel }}</strong>
+                      <small>{{ messenger.contact or messenger.topic or "Канал клиента" }}</small>
+                    </span>
+                    {% if messenger.status_label %}<em>{{ messenger.status_label }}</em>{% endif %}
+                  </a>
+                {% endfor %}
+              </template>
               <template data-crm-card-tasks>
                 {% for event in row.activity_log if event.kind == "task" %}
                   <article class="crm-card-detail-event crm-card-detail-event--task">
@@ -516,7 +528,9 @@
           <button type="button" data-crm-detail-tab="comments">Комментарии</button>
         </nav>
         <div class="crm-card-detail-chatbox" data-crm-detail-pane="chat" hidden>
-          <span>Чат</span>
+          <span>Каналы общения</span>
+          <div class="crm-card-detail-messengers" data-crm-card-detail-messengers></div>
+          <span>Текущий чат</span>
           <strong data-crm-card-detail-chat>Не привязан</strong>
           <div class="crm-card-detail-feed" data-crm-card-detail-chat-feed></div>
           <form class="crm-card-detail-activity-form" data-crm-activity-form="chat">

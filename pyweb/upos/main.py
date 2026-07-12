@@ -8943,6 +8943,11 @@ def create_app() -> FastAPI:
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_activity_settings = _crm_activity_settings(crm_workspace_settings)
         crm_stage_map = {stage["id"]: {**stage, "records": [], "total_value": Decimal("0"), "total": "0"} for stage in crm_stages}
+        messenger_threads_by_client: dict[str, list[dict[str, Any]]] = {}
+        for thread in _messenger_threads_from_sources(wid):
+            client_key = str(thread.get("client") or "").strip().casefold()
+            if client_key:
+                messenger_threads_by_client.setdefault(client_key, []).append(thread)
         today_iso = datetime.now(timezone.utc).date().isoformat()
         with session_scope() as session:
             counterparty_rows = list(
@@ -9053,6 +9058,54 @@ def create_app() -> FastAPI:
                 item["kanban_amount"] = item["order_amount"] if linked_sale else item["amount"]
                 item["kanban_amount_value"] = linked_sale.get("amount_value", Decimal("0")) if linked_sale else item["amount_value"]
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
+                messenger_channels: list[dict[str, str]] = []
+                seen_channels: set[str] = set()
+
+                def add_messenger_channel(channel: str, contact: str = "", topic: str = "", status_label: str = "") -> None:
+                    channel_clean = str(channel or "").strip()
+                    if not channel_clean:
+                        return
+                    channel_key = channel_clean.casefold()
+                    if channel_key in seen_channels:
+                        return
+                    seen_channels.add(channel_key)
+                    channel_slug = {
+                        "telegram": "telegram",
+                        "instagram": "instagram",
+                        "whatsapp": "whatsapp",
+                        "facebook": "facebook",
+                        "сайт": "site",
+                        "site": "site",
+                    }.get(channel_key, "all")
+                    messenger_channels.append(
+                        {
+                            "channel": channel_clean,
+                            "contact": str(contact or item["chat_label"] or "").strip(),
+                            "topic": str(topic or "").strip(),
+                            "status_label": str(status_label or "").strip(),
+                            "href": f"/messengers?channel={quote(channel_slug)}#messages",
+                        }
+                    )
+
+                for thread in messenger_threads_by_client.get(str(item["client"] or "").strip().casefold(), []):
+                    add_messenger_channel(
+                        str(thread.get("channel") or ""),
+                        str(thread.get("contact") or thread.get("username") or thread.get("phone") or ""),
+                        str(thread.get("topic") or ""),
+                        str(thread.get("status_label") or ""),
+                    )
+                inferred_channel_text = " ".join([item["lead_source"], item["contact_type"], item["chat_label"]]).casefold()
+                inferred_channels = (
+                    ("Telegram", "telegram"),
+                    ("Instagram", "instagram"),
+                    ("WhatsApp", "whatsapp"),
+                    ("Facebook", "facebook"),
+                    ("Сайт", "сайт"),
+                )
+                for channel_label, channel_token in inferred_channels:
+                    if channel_token in inferred_channel_text:
+                        add_messenger_channel(channel_label, item["chat_label"])
+                item["messenger_channels"] = messenger_channels
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
                 item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
                 item["edit_payload"] = _crm_record_edit_payload(item)
