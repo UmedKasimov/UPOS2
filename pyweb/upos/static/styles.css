@@ -8328,18 +8328,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-journal-filter .products-catalog-search {
   position: relative;
   padding: 0.28rem;
-  border: 1px solid color-mix(in oklch, var(--primary), white 48%);
+  border: 1px solid #eab308;
   border-radius: 8px;
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), white 92%), color-mix(in oklch, var(--primary), white 96%));
+    linear-gradient(180deg, #fef9c3, #fffbea);
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent),
-    0 8px 18px color-mix(in srgb, var(--primary) 8%, transparent);
+    0 0 0 3px rgb(250 204 21 / 24%),
+    0 8px 18px rgb(234 179 8 / 12%);
 }
 
 .sales-journal-filter .products-catalog-search span {
   padding-left: 0.08rem;
-  color: color-mix(in oklch, var(--primary), black 22%);
+  color: #854d0e;
 }
 
 .sales-journal-filter .products-catalog-search input {
