@@ -407,6 +407,7 @@
 
   function returnDraftFromSale(sale) {
     var draft = {
+      sourceSaleId: sale.id || "",
       client: sale.client || "",
       currency: sale.currency || "UZS",
       priceTypeId: sale.price_type_id || sale.priceTypeId || "",
@@ -430,7 +431,7 @@
   }
 
   function openReturnFromSale(sale) {
-    if (!sale || textValue(sale.doc_type).toLowerCase() === "return") return;
+    if (!sale || textValue(sale.doc_type).toLowerCase() !== "sale") return;
     saveSalesDraftText(JSON.stringify(returnDraftFromSale(sale)));
     window.location.href = RETURN_FORM_URL;
   }
@@ -438,11 +439,11 @@
   function updateReturnButton(panel, sale) {
     var button = panel.querySelector("[data-sales-detail-return]");
     if (!button) return;
-    var isReturn = textValue(sale.doc_type).toLowerCase() === "return";
-    button.hidden = isReturn;
-    button.dataset.saleId = isReturn ? "" : String(sale.id || "");
+    var canReturn = textValue(sale.doc_type).toLowerCase() === "sale";
+    button.hidden = !canReturn;
+    button.dataset.saleId = canReturn ? String(sale.id || "") : "";
     panel.querySelectorAll("[data-sales-detail-menu-return]").forEach(function (menuButton) {
-      menuButton.hidden = isReturn;
+      menuButton.hidden = !canReturn;
     });
   }
 

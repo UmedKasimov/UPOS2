@@ -223,7 +223,7 @@
                         <option value="paid" {% if sale.status == 'paid' %}selected{% endif %}>Оплачен</option>
                         <option value="partial" {% if sale.status == 'partial' %}selected{% endif %}>Частично</option>
                         <option value="debt" {% if sale.status == 'debt' %}selected{% endif %}>Долг</option>
-                        <option value="return" {% if sale.status == 'return' %}selected{% endif %}>Возврат</option>
+                        {% if sale.doc_type == 'return' %}<option value="return" selected>Возврат</option>{% endif %}
                       </select>
                     </form>
                   </td>
@@ -484,6 +484,7 @@
 
           <input type="hidden" name="doc_type" value="{{ sales_form_doc_type }}" />
           <input type="hidden" name="crm_record_id" value="{{ sales_prefill.crm_record_id|e }}" />
+          <input type="hidden" name="source_sale_id" value="" />
 
           <div class="product-form-grid">
             <label><span>ID</span><input name="number" value="{{ sales_options.next_numbers[sales_form_doc_type] }}" readonly data-sales-auto-number aria-readonly="true" /></label>
@@ -872,6 +873,6 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=11" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=50" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=12" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=51" defer></script>
 {% endblock %}

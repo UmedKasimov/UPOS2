@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=24" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=25" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=27" />
 {% endblock %}
 
 {% block page_header %}
@@ -236,13 +236,60 @@
         <header class="reports-panel-head">
           <div>
             <p class="reports-section-kicker">Продажи</p>
-            <h2>Продажи за период</h2>
-            <p>{{ business_reports.sales.summary.period }} · документов: {{ business_reports.sales.summary.count or 0 }}</p>
+            <h2>Отчёт по продажам</h2>
+            <p>{{ business_reports.sales.summary.period }} · продаж: {{ business_reports.sales.summary.count or 0 }} · возвратов: {{ business_reports.sales.summary.return_count or 0 }}</p>
           </div>
           <div class="reports-balance-total">
-            <span><b>{{ business_reports.sales.summary.amount or "0 UZS" }}</b> сумма продаж</span>
+            <span><b>{{ business_reports.sales.summary.amount or "0 UZS" }}</b> чистая выручка</span>
           </div>
         </header>
+        <div class="reports-sales-kpis">
+          <article><span>Валовые продажи</span><strong>{{ business_reports.sales.summary.gross_sales or "0 UZS" }}</strong></article>
+          <article class="is-return"><span>Возвраты</span><strong>{{ business_reports.sales.summary.returns or "0 UZS" }}</strong></article>
+          <article><span>Оплачено</span><strong>{{ business_reports.sales.summary.paid or "0 UZS" }}</strong></article>
+          <article class="is-debt"><span>Долг клиентов</span><strong>{{ business_reports.sales.summary.debt or "0 UZS" }}</strong></article>
+          <article><span>Себестоимость</span><strong>{{ business_reports.sales.summary.cost or "0 UZS" }}</strong></article>
+          <article class="is-profit"><span>Прибыль</span><strong>{{ business_reports.sales.summary.profit or "0 UZS" }}</strong></article>
+          <article class="is-order"><span>Заказы</span><strong>{{ business_reports.sales.summary.orders or "0 UZS" }}</strong><small>{{ business_reports.sales.summary.order_count or 0 }} документов</small></article>
+        </div>
+        <div class="reports-table-wrap reports-sales-table-wrap">
+          <table class="reports-data-table reports-sales-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Тип</th>
+                <th>Клиент</th>
+                <th>Склад</th>
+                <th>Сумма</th>
+                <th>Оплачено</th>
+                <th>Долг</th>
+                <th>Себестоимость</th>
+                <th>Прибыль</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.sales.rows %}
+                <tr class="reports-sales-row reports-sales-row--{{ row.type_key }}">
+                  <td>{{ row.date }}</td>
+                  <td><strong>{{ row.number }}</strong>{% if row.source_sale_number %}<small>из {{ row.source_sale_number }}</small>{% endif %}</td>
+                  <td><span class="reports-sales-type">{{ row.type }}</span></td>
+                  <td>{{ row.client }}</td>
+                  <td>{{ row.warehouse }}</td>
+                  <td><strong>{{ row.amount }}</strong></td>
+                  <td>{{ row.paid }}</td>
+                  <td>{{ row.debt }}</td>
+                  <td>{{ row.cost }}</td>
+                  <td><strong>{{ row.profit }}</strong></td>
+                  <td>{{ row.status }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="11" class="reports-empty-cell">Продаж за выбранный период пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
         <div class="reports-analysis-grid">
           <article class="reports-flow">
             <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Топ-10 клиентов</h3><p>По сумме продаж</p></div></div>
@@ -333,6 +380,9 @@
           <div class="reports-balance-total">
             <span><b>{{ business_reports.stock_analysis.summary.cost_total or "0 UZS" }}</b> себестоимость</span>
             <span><b>{{ business_reports.stock_analysis.summary.revenue_total or "0 UZS" }}</b> выручка</span>
+            {% if business_reports.stock_analysis.summary.negative_count %}
+              <span class="reports-stock-negative-total"><b>{{ business_reports.stock_analysis.summary.negative_count }}</b> отрицательных остатков</span>
+            {% endif %}
           </div>
         </header>
         <div class="reports-stock-filterbar">
@@ -356,7 +406,7 @@
             </thead>
             <tbody>
               {% for row in business_reports.stock_analysis.rows %}
-                <tr>
+                <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %}>
                   <td>
                     <div class="reports-stock-product">
                       <span class="reports-stock-thumb">
@@ -372,7 +422,7 @@
                       </span>
                     </div>
                   </td>
-                  <td>{% if row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
+                  <td>{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
                   <td>{{ row.avg_cost }}</td>
                   <td>{{ row.cost_sum }}</td>
                   <td>{{ row.expected_revenue }}</td>

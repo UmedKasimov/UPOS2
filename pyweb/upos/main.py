@@ -3484,6 +3484,76 @@ def create_app() -> FastAPI:
             )
         return resolved_lines
 
+    def _sales_return_quantity_map(lines: list[dict[str, Any]], default_warehouse: str = "") -> dict[tuple[str, str], Decimal]:
+        quantities: dict[tuple[str, str], Decimal] = {}
+        for raw_line in lines:
+            if not isinstance(raw_line, dict):
+                continue
+            product_name = str(raw_line.get("product") or raw_line.get("product_name") or "").strip().casefold()
+            if not product_name:
+                continue
+            warehouse = str(raw_line.get("warehouse") or default_warehouse or "Основной склад").strip().casefold()
+            quantity = _sales_decimal(raw_line.get("quantity"))
+            if quantity <= 0:
+                continue
+            key = (product_name, warehouse)
+            quantities[key] = quantities.get(key, Decimal("0")) + quantity
+        return quantities
+
+    def _validate_sales_return(session: Any, workspace_owner_id: str, data: dict[str, Any]) -> None:
+        source_sale_id = str(data.get("source_sale_id") or "").strip()
+        if not source_sale_id:
+            raise ValueError("Создайте возврат из исходной продажи в журнале продаж")
+        source_row = session.get(SaleDocument, source_sale_id)
+        if not source_row or source_row.workspace_owner_id != workspace_owner_id:
+            raise ValueError("Исходная продажа для возврата не найдена")
+        source_data = _json_object(source_row.data)
+        if str(source_data.get("doc_type") or "sale") != "sale":
+            raise ValueError("Возврат можно оформить только из продажи")
+        source_client = str(source_data.get("client") or "").strip().casefold()
+        return_client = str(data.get("client") or "").strip().casefold()
+        if source_client and source_client != return_client:
+            raise ValueError("Клиент возврата не совпадает с исходной продажей")
+        source_quantities = _sales_return_quantity_map(
+            list(source_data.get("lines") or []),
+            str(source_data.get("warehouse") or "Основной склад"),
+        )
+        returned_quantities: dict[tuple[str, str], Decimal] = {}
+        for return_row in session.execute(
+            select(SaleDocument).where(SaleDocument.workspace_owner_id == workspace_owner_id)
+        ).scalars():
+            return_data = _json_object(return_row.data)
+            if str(return_data.get("doc_type") or "") != "return":
+                continue
+            if str(return_data.get("source_sale_id") or "") != source_sale_id:
+                continue
+            for key, quantity in _sales_return_quantity_map(
+                list(return_data.get("lines") or []),
+                str(return_data.get("warehouse") or "Основной склад"),
+            ).items():
+                returned_quantities[key] = returned_quantities.get(key, Decimal("0")) + quantity
+        requested_quantities = _sales_return_quantity_map(
+            list(data.get("lines") or []),
+            str(data.get("warehouse") or "Основной склад"),
+        )
+        for key, requested in requested_quantities.items():
+            sold = source_quantities.get(key, Decimal("0"))
+            already_returned = returned_quantities.get(key, Decimal("0"))
+            available = max(Decimal("0"), sold - already_returned)
+            if requested > available:
+                product_name = next(
+                    (
+                        str(line.get("product") or line.get("product_name") or "Товар")
+                        for line in data.get("lines") or []
+                        if str(line.get("product") or line.get("product_name") or "").strip().casefold() == key[0]
+                    ),
+                    "Товар",
+                )
+                raise ValueError(
+                    f"Нельзя вернуть {requested.normalize()} {product_name}: доступно к возврату {available.normalize()}"
+                )
+        data["source_sale_number"] = source_row.number
+
     def _apply_product_price_change(row: Product, price_type: dict[str, Any], price: Any, currency: str) -> None:
         price_value = _sales_decimal(price)
         if price_value <= 0:
@@ -5738,6 +5808,7 @@ def create_app() -> FastAPI:
             "manager": str(form.get("manager") or "").strip(),
             "note": str(form.get("note") or "").strip(),
             "crm_record_id": str(form.get("crm_record_id") or "").strip(),
+            "source_sale_id": str(form.get("source_sale_id") or "").strip(),
             "lines": lines,
         }
         return data, amount, currency
@@ -6339,6 +6410,8 @@ def create_app() -> FastAPI:
                     line_warehouse = str(line.get("warehouse") or "").strip()
                     if line_warehouse and line_warehouse != warehouse_row.name:
                         _ensure_warehouse(session, wid, name=line_warehouse)
+                if data["doc_type"] == "return":
+                    _validate_sales_return(session, wid, data)
                 delta_sign = -1 if data["doc_type"] == "sale" else 1 if data["doc_type"] == "return" else 0
                 data["lines"] = _sync_product_lines(
                     session,
@@ -6347,7 +6420,7 @@ def create_app() -> FastAPI:
                     lines=list(data.get("lines") or []),
                     delta_sign=delta_sign,
                     op_date=str(data.get("date") or ""),
-                    allow_negative_stock=data["doc_type"] == "sale",
+                    allow_negative_stock=False,
                 )
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = client_row.id
@@ -6453,6 +6526,11 @@ def create_app() -> FastAPI:
             row = session.get(SaleDocument, sale_id)
             if row and row.workspace_owner_id == wid:
                 data = _json_object(row.data)
+                if status == "return" and str(data.get("doc_type") or "sale") != "return":
+                    return RedirectResponse(
+                        url="/sales?error=" + quote("Оформите возврат отдельным документом из продажи") + "#sales-journal",
+                        status_code=302,
+                    )
                 data["status"] = status
                 data["status_manual"] = True
                 row.data = data
@@ -11098,31 +11176,99 @@ def create_app() -> FastAPI:
                         .order_by(CrmRecord.created_at.desc())
                     ).scalars().all()
 
-                sale_docs = []
+                product_by_id = {str(product.id): product for product in products}
+                product_by_name = {str(product.name or "").strip().casefold(): product for product in products if product.name}
+
+                def report_product_unit_cost(line: dict[str, Any]) -> Decimal:
+                    product = product_by_id.get(str(line.get("product_id") or ""))
+                    if product is None:
+                        product = product_by_name.get(str(line.get("product") or "").strip().casefold())
+                    if product is None or not _product_uses_stock(product):
+                        return Decimal("0")
+                    product_data = _json_object(product.data)
+                    stock_prices = [
+                        _sales_decimal(stock.get("price"))
+                        for stock in product_data.get("stocks", [])
+                        if isinstance(stock, dict) and _sales_decimal(stock.get("price")) > 0
+                    ]
+                    if stock_prices:
+                        return sum(stock_prices, Decimal("0")) / Decimal(len(stock_prices))
+                    return _sales_decimal(
+                        product_data.get("purchase_price")
+                        or product_data.get("cost")
+                        or product_data.get("last_purchase_price")
+                    )
+
+                report_rate = _workspace_usd_uzs_rate(wid)
+
+                def report_to_primary(value: Any, currency: str) -> Decimal:
+                    return _convert_product_currency(
+                        _sales_decimal(value),
+                        str(currency or primary_currency).upper(),
+                        primary_currency,
+                        report_rate,
+                    )
+
+                sale_docs: list[SaleDocument] = []
+                sales_report_rows: list[dict[str, Any]] = []
                 top_clients: dict[str, Decimal] = {}
                 top_products: dict[str, Decimal] = {}
                 day_totals: dict[str, Decimal] = {}
                 receivables: dict[str, dict[str, Any]] = {}
+                gross_sales_total = Decimal("0")
+                returns_total = Decimal("0")
+                orders_total = Decimal("0")
+                paid_total = Decimal("0")
+                debt_total = Decimal("0")
+                cost_total = Decimal("0")
+                profit_total = Decimal("0")
+                sale_count = 0
+                return_count = 0
+                order_count = 0
                 for row in sales_rows:
                     data = _json_object(row.data)
                     doc_date = _report_date(data, row.created_at)
                     if not _report_in_period(doc_date):
                         continue
                     doc_type = str(data.get("doc_type") or "sale")
-                    if doc_type == "return":
-                        continue
                     amount = _sales_decimal(row.amount)
                     currency = str(row.currency or data.get("currency") or "UZS").upper()
+                    amount_primary = report_to_primary(amount, currency)
                     client = str(data.get("client") or "Без клиента").strip() or "Без клиента"
-                    sale_docs.append(row)
-                    top_clients[client] = top_clients.get(client, Decimal("0")) + amount
-                    day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount
+                    paid_amount = min(amount, _sales_decimal(data.get("paid_amount")))
+                    debt_amount = max(Decimal("0"), amount - paid_amount)
+                    lines = data.get("lines") if isinstance(data.get("lines"), list) else []
+                    document_cost_uzs = sum(
+                        (_sales_decimal(line.get("quantity")) * report_product_unit_cost(line) for line in lines if isinstance(line, dict)),
+                        Decimal("0"),
+                    )
+                    document_cost = report_to_primary(document_cost_uzs, "UZS")
+                    sign = Decimal("-1") if doc_type == "return" else Decimal("1")
+                    if doc_type == "sale":
+                        sale_count += 1
+                        sale_docs.append(row)
+                        gross_sales_total += amount_primary
+                        paid_total += report_to_primary(paid_amount, currency)
+                        debt_total += report_to_primary(debt_amount, currency)
+                        cost_total += document_cost
+                        profit_total += amount_primary - document_cost
+                        top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
+                        day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
+                    elif doc_type == "return":
+                        return_count += 1
+                        returns_total += amount_primary
+                        cost_total -= document_cost
+                        profit_total -= amount_primary - document_cost
+                        top_clients[client] = top_clients.get(client, Decimal("0")) - amount_primary
+                        day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) - amount_primary
+                    else:
+                        order_count += 1
+                        orders_total += amount_primary
                     for line in data.get("lines") if isinstance(data.get("lines"), list) else []:
                         product_name = str(line.get("product") or "Без товара").strip() or "Без товара"
-                        top_products[product_name] = top_products.get(product_name, Decimal("0")) + _sales_decimal(line.get("quantity"))
-                    paid_amount = _sales_decimal(data.get("paid_amount"))
-                    debt_amount = amount - paid_amount
-                    if debt_amount > 0:
+                        if doc_type in {"sale", "return"}:
+                            top_products[product_name] = top_products.get(product_name, Decimal("0")) + sign * _sales_decimal(line.get("quantity"))
+                    if doc_type == "sale" and debt_amount > 0:
                         rec = receivables.setdefault(
                             client,
                             {
@@ -11135,22 +11281,51 @@ def create_app() -> FastAPI:
                         )
                         rec["debt"] += debt_amount
                         rec["last_sale_date"] = max(str(rec.get("last_sale_date") or ""), doc_date)
+                    view = _sales_document_data(row)
+                    sales_report_rows.append(
+                        {
+                            "date": doc_date or "-",
+                            "number": row.number,
+                            "type": _sales_doc_type_label(doc_type),
+                            "type_key": doc_type,
+                            "client": client,
+                            "warehouse": str(data.get("warehouse") or "Основной склад"),
+                            "amount": _report_money(amount, currency),
+                            "paid": _report_money(paid_amount, currency) if doc_type == "sale" else "-",
+                            "debt": _report_money(debt_amount, currency) if doc_type == "sale" else "-",
+                            "cost": _report_money(document_cost, primary_currency) if doc_type in {"sale", "return"} else "-",
+                            "profit": _report_money(sign * (amount_primary - document_cost), primary_currency) if doc_type in {"sale", "return"} else "-",
+                            "status": view.get("status_label") or "-",
+                            "source_sale_number": str(data.get("source_sale_number") or ""),
+                        }
+                    )
 
-                sales_total = sum((top_clients.values()), Decimal("0"))
+                net_sales_total = gross_sales_total - returns_total
                 max_day = max((float(value) for value in day_totals.values()), default=0.0)
                 business_reports["sales"] = {
                     "summary": {
                         "period": report_data["period_label"],
-                        "amount": _report_money(sales_total, primary_currency),
-                        "count": len(sale_docs),
+                        "amount": _report_money(net_sales_total, primary_currency),
+                        "gross_sales": _report_money(gross_sales_total, primary_currency),
+                        "returns": _report_money(returns_total, primary_currency),
+                        "orders": _report_money(orders_total, primary_currency),
+                        "paid": _report_money(paid_total, primary_currency),
+                        "debt": _report_money(debt_total, primary_currency),
+                        "cost": _report_money(cost_total, primary_currency),
+                        "profit": _report_money(profit_total, primary_currency),
+                        "count": sale_count,
+                        "return_count": return_count,
+                        "order_count": order_count,
                     },
                     "top_clients": [
                         {"name": name, "amount": _report_money(amount, primary_currency)}
                         for name, amount in sorted(top_clients.items(), key=lambda item: item[1], reverse=True)[:10]
+                        if amount > 0
                     ],
                     "top_products": [
                         {"name": name, "quantity": _sales_money_label(quantity)}
                         for name, quantity in sorted(top_products.items(), key=lambda item: item[1], reverse=True)[:10]
+                        if quantity > 0
                     ],
                     "days": [
                         {
@@ -11160,6 +11335,7 @@ def create_app() -> FastAPI:
                         }
                         for date, amount in sorted(day_totals.items())
                     ],
+                    "rows": sales_report_rows[:200],
                 }
 
                 stock_movements: dict[str, dict[str, Any]] = {}
@@ -11234,9 +11410,14 @@ def create_app() -> FastAPI:
                     data = _json_object(product.data)
                     item = _product_data(product)
                     qty = _sales_decimal(item.get("quantity"))
-                    if qty <= 0:
-                        continue
                     stocks = item.get("stocks") if isinstance(item.get("stocks"), list) else []
+                    negative_stocks = [
+                        stock
+                        for stock in stocks
+                        if isinstance(stock, dict) and _sales_decimal(stock.get("quantity")) < 0
+                    ]
+                    if qty == 0 and not negative_stocks:
+                        continue
                     stock_warehouses = ", ".join(
                         sorted(
                             {
@@ -11246,6 +11427,12 @@ def create_app() -> FastAPI:
                             }
                         )
                     ) or "Основной склад"
+                    if negative_stocks:
+                        negative_details = ", ".join(
+                            f"{str(stock.get('warehouse') or 'Основной склад')} ({_sales_money_label(stock.get('quantity'))})"
+                            for stock in negative_stocks
+                        )
+                        stock_warehouses = f"{stock_warehouses}. Отрицательный остаток: {negative_details}"
                     cost = Decimal("0")
                     cost_count = Decimal("0")
                     for stock in stocks:
@@ -11274,6 +11461,7 @@ def create_app() -> FastAPI:
                             "category": item["category"],
                             "group": item["group"],
                             "brand": item["brand"],
+                            "is_negative": bool(negative_stocks),
                             "is_critical": bool(_sales_decimal(item.get("min_stock")) > 0 and qty <= _sales_decimal(item.get("min_stock"))),
                         }
                     )
@@ -11288,6 +11476,8 @@ def create_app() -> FastAPI:
                         "quantity": f"{_sales_money_label(stock_analysis_qty_total)} шт",
                         "cost_total": _report_money(stock_analysis_cost_total, "UZS"),
                         "revenue_total": _report_money(stock_analysis_revenue_total, primary_currency),
+                        "negative_count": sum(1 for item in stock_analysis_rows if item.get("is_negative")),
+                        "critical_count": sum(1 for item in stock_analysis_rows if item.get("is_critical")),
                     },
                     "rows": stock_analysis_rows[:200],
                 }

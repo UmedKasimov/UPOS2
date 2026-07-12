@@ -747,6 +747,7 @@
   function collectSalesDraft(root) {
     return {
       number: root.querySelector('input[name="number"]')?.value || "",
+      sourceSaleId: root.querySelector('input[name="source_sale_id"]')?.value || "",
       date: root.querySelector('input[name="date"]')?.value || "",
       dateTo: root.querySelector('input[name="date_to"]')?.value || "",
       client: root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]')?.value || "",
@@ -842,6 +843,7 @@
     if (!draft || typeof draft !== "object") return false;
     root.dataset.salesRestoringDraft = "1";
     setDraftField(root, 'input[name="number"]', draft.number);
+    setDraftField(root, 'input[name="source_sale_id"]', draft.sourceSaleId);
     setDraftField(root, 'input[name="date"]', draft.date);
     setDraftField(root, 'input[name="date_to"]', draft.dateTo);
     setDraftField(root, 'select[name="currency"]', draft.currency);

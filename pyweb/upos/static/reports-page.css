@@ -2097,3 +2097,103 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
     justify-items: start;
   }
 }
+
+.reports-sales-kpis {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(9rem, 1fr));
+  gap: 0.55rem;
+}
+
+.reports-sales-kpis article {
+  display: grid;
+  align-content: center;
+  gap: 0.22rem;
+  min-height: 5.2rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid #2563eb;
+  border-radius: 7px;
+  background: var(--card);
+}
+
+.reports-sales-kpis span,
+.reports-sales-kpis small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.reports-sales-kpis strong {
+  color: var(--foreground);
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+}
+
+.reports-sales-kpis .is-return {
+  border-left-color: #dc2626;
+}
+
+.reports-sales-kpis .is-debt,
+.reports-sales-kpis .is-order {
+  border-left-color: #eab308;
+}
+
+.reports-sales-kpis .is-profit {
+  border-left-color: #16a34a;
+}
+
+.reports-sales-table-wrap {
+  padding: 0;
+  overflow: auto;
+}
+
+.reports-sales-table {
+  min-width: 86rem;
+}
+
+.reports-sales-table td small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted-foreground);
+}
+
+.reports-sales-row--sale td {
+  background: color-mix(in srgb, #22c55e 8%, var(--card));
+}
+
+.reports-sales-row--return td {
+  background: color-mix(in srgb, #ef4444 8%, var(--card));
+}
+
+.reports-sales-row--order td {
+  background: color-mix(in srgb, #facc15 11%, var(--card));
+}
+
+.reports-sales-type {
+  display: inline-flex;
+  padding: 0.22rem 0.45rem;
+  border-radius: 999px;
+  background: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 850;
+}
+
+.reports-stock-negative-total,
+.reports-stock-negative-total b {
+  color: #dc2626 !important;
+}
+
+.reports-stock-row--negative td {
+  background: color-mix(in srgb, #ef4444 9%, var(--card));
+}
+
+@media (max-width: 1280px) {
+  .reports-sales-kpis {
+    grid-template-columns: repeat(4, minmax(9rem, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .reports-sales-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
