@@ -478,6 +478,7 @@
           action="{{ url_for('sales_save') }}"
           class="product-form sales-form"
           data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
+          data-sales-client-card-url-template="{{ url_for('sales_client_card_api', client_id='__client_id__') }}"
           data-sales-prefill-client="{{ sales_prefill.client|e }}"
         >
           {% include "_csrf_field.html" %}
@@ -866,6 +867,25 @@
             </div>
           </form>
         </dialog>
+
+        <dialog class="settings-profile-modal sales-client-card-dialog" data-sales-client-card-dialog>
+          <div class="settings-profile-modal-surface sales-client-card-surface">
+            <header class="settings-profile-modal-head sales-client-card-head">
+              <div>
+                <p class="settings-profile-modal-sub">Карточка клиента</p>
+                <h2 class="settings-profile-modal-title" data-sales-client-card-title>Клиент</h2>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-client-card-close aria-label="Закрыть">×</button>
+            </header>
+            <div class="sales-client-card-loading" data-sales-client-card-loading>Загрузка данных...</div>
+            <div class="sales-client-card-content" data-sales-client-card-content hidden>
+              <div class="sales-client-card-metrics" data-sales-client-card-metrics></div>
+              <nav class="sales-client-card-tabs" aria-label="Разделы карточки клиента" data-sales-client-card-tabs></nav>
+              <div class="sales-client-card-panels" data-sales-client-card-panels></div>
+            </div>
+            <div class="sales-client-card-error" data-sales-client-card-error hidden>Не удалось загрузить карточку клиента.</div>
+          </div>
+        </dialog>
       </aside>
     </div>
     </div>
@@ -874,5 +894,5 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=12" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=51" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=53" defer></script>
 {% endblock %}

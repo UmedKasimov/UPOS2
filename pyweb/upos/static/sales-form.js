@@ -312,9 +312,139 @@
     }
     var kind = item ? String(item.balance_kind || "zero") : "zero";
     var text = item && kind !== "zero" ? clientBalanceText(item) : "";
+    var clientInput = root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]');
+    if (clientInput) {
+      if (item && item.id) clientInput.dataset.salesClientId = String(item.id);
+      else if (!item) delete clientInput.dataset.salesClientId;
+    }
     node.dataset.balanceKind = kind;
     node.hidden = !text;
     node.textContent = text ? String(item.balance_note || "Баланс") + ": " + text : "";
+  }
+
+  function clientCardTable(headers, rows, emptyText) {
+    return (
+      '<div class="sales-client-card-table-wrap"><table class="sales-client-card-table"><thead><tr>' +
+      headers.map(function (header) { return "<th>" + escapeHtml(header) + "</th>"; }).join("") +
+      "</tr></thead><tbody>" +
+      (rows.length ? rows.join("") : '<tr><td colspan="' + headers.length + '" class="sales-client-card-empty">' + escapeHtml(emptyText) + "</td></tr>") +
+      "</tbody></table></div>"
+    );
+  }
+
+  function renderSalesClientCard(dialog, card) {
+    var title = dialog.querySelector("[data-sales-client-card-title]");
+    var metrics = dialog.querySelector("[data-sales-client-card-metrics]");
+    var tabs = dialog.querySelector("[data-sales-client-card-tabs]");
+    var panels = dialog.querySelector("[data-sales-client-card-panels]");
+    var content = dialog.querySelector("[data-sales-client-card-content]");
+    var loading = dialog.querySelector("[data-sales-client-card-loading]");
+    var error = dialog.querySelector("[data-sales-client-card-error]");
+    var summary = card.summary || {};
+    var balanceLines = Array.isArray(card.balance_lines) ? card.balance_lines : [];
+    if (title) title.textContent = card.name || "Клиент";
+    if (metrics) {
+      var balance = balanceLines.length
+        ? balanceLines.map(function (line) { return escapeHtml(line.amount_abs || line.amount || "0") + " " + escapeHtml(line.currency || "UZS"); }).join(" / ")
+        : escapeHtml(card.balance_abs || "0") + " UZS";
+      metrics.innerHTML = [
+        ["Баланс", balance, escapeHtml(card.balance_note || "")],
+        ["Продажи", escapeHtml(summary.sales || "0") + " UZS", ""],
+        ["Оплачено", escapeHtml(summary.paid || "0") + " UZS", ""],
+        ["Заказы / задачи", escapeHtml(summary.orders_count || 0) + " / " + escapeHtml(summary.tasks_count || 0), ""],
+      ].map(function (item) {
+        return '<div><span>' + item[0] + '</span><strong>' + item[1] + '</strong><small>' + item[2] + '</small></div>';
+      }).join("");
+    }
+
+    var documents = [].concat(card.orders || [], card.sales || [], card.returns || []);
+    var documentRows = documents.map(function (row) {
+      return '<tr><td><strong>' + escapeHtml(row.number || "-") + '</strong></td><td>' + escapeHtml(row.doc_type_label || "-") + '</td><td>' + escapeHtml(row.date || "-") + '</td><td>' + escapeHtml(row.amount || "0") + " " + escapeHtml(row.currency || "UZS") + '</td><td>' + escapeHtml(row.status_label || "-") + '</td></tr>';
+    });
+    var reconciliationRows = (card.reconciliation || []).map(function (row) {
+      return '<tr><td>' + escapeHtml(row.date || "-") + '</td><td><strong>' + escapeHtml(row.document || "-") + '</strong></td><td>' + escapeHtml(row.debit || "0") + " " + escapeHtml(row.currency || "UZS") + '</td><td>' + escapeHtml(row.credit || "0") + " " + escapeHtml(row.currency || "UZS") + '</td><td>' + escapeHtml(row.balance || "0") + " " + escapeHtml(row.currency || "UZS") + '</td></tr>';
+    });
+    var taskRows = (card.tasks || []).map(function (row) {
+      return '<tr><td><strong>' + escapeHtml(row.title || "-") + '</strong><small>' + escapeHtml(row.note || row.stage || "") + '</small></td><td>' + escapeHtml(row.responsible || "-") + '</td><td>' + escapeHtml(row.due_date || row.date || "-") + '</td><td>' + escapeHtml(row.status_label || "-") + '</td></tr>';
+    });
+    var conversationItems = [].concat(card.conversations || [], card.correspondence || [], card.calls || []);
+    var conversationHtml = conversationItems.length ? conversationItems.map(function (row) {
+      return '<article class="sales-client-card-event"><strong>' + escapeHtml(row.channel || row.direction_label || "CRM") + '</strong><span>' + escapeHtml(row.title || row.phone || row.username || "Контакт") + '</span><small>' + escapeHtml(row.started_at || row.note || row.status || row.status_label || "") + '</small></article>';
+    }).join("") : '<p class="sales-client-card-empty">Переписок и звонков пока нет.</p>';
+    var historyHtml = (card.history || []).length ? (card.history || []).map(function (row) {
+      return '<article class="sales-client-card-event"><time>' + escapeHtml(row.date || "-") + '</time><strong>' + escapeHtml(row.title || "Событие") + '</strong><span>' + escapeHtml(row.detail || "") + '</span><small>' + escapeHtml([row.amount, row.status].filter(Boolean).join(" · ")) + '</small></article>';
+    }).join("") : '<p class="sales-client-card-empty">История пока пуста.</p>';
+    var infoFields = [
+      ["Официальное название", card.official_name], ["Телефон", card.phone], ["Telegram", card.telegram_phone || card.telegram],
+      ["Email", card.email], ["ИНН", card.inn || card.tax_id], ["ПИНФЛ", card.pinfl], ["Категория", card.category],
+      ["Территория", card.territory], ["Маршрут", card.route], ["Адрес", card.address], ["Прайс-лист", card.price_type],
+      ["Кредитный лимит", card.credit_limit], ["CRM статус", card.crm_status_label], ["Статус", card.status],
+      ["Отрасль", card.industry], ["Код", card.code], ["Координаты", card.latitude && card.longitude ? card.latitude + ", " + card.longitude : ""],
+      ["Последний документ", card.last_date], ["Создан", card.created_at],
+    ];
+    var infoHtml = '<dl class="sales-client-card-info">' + infoFields.map(function (item) {
+      return '<div><dt>' + item[0] + '</dt><dd>' + escapeHtml(item[1] || "-") + '</dd></div>';
+    }).join("") + '</dl>';
+    var sections = [
+      ["info", "Информация", infoHtml],
+      ["documents", "Документы", clientCardTable(["№", "Тип", "Дата", "Сумма", "Статус"], documentRows, "Документов пока нет.")],
+      ["reconciliation", "Акт сверки", clientCardTable(["Дата", "Документ", "Дебит", "Кредит", "Баланс"], reconciliationRows, "Операций пока нет.")],
+      ["tasks", "Задачи", clientCardTable(["Задача", "Исполнитель", "Срок", "Статус"], taskRows, "Задач пока нет.")],
+      ["messages", "Переписка", '<div class="sales-client-card-events">' + conversationHtml + '</div>'],
+      ["notes", "Заметки", '<div class="sales-client-card-note">' + escapeHtml(card.comment || card.note || "Заметок пока нет.") + '</div>'],
+      ["history", "История", '<div class="sales-client-card-events">' + historyHtml + '</div>'],
+    ];
+    if (tabs) tabs.innerHTML = sections.map(function (section, index) {
+      return '<button type="button" data-sales-client-card-tab="' + section[0] + '" class="' + (index === 0 ? "active" : "") + '" aria-selected="' + (index === 0 ? "true" : "false") + '">' + section[1] + '</button>';
+    }).join("");
+    if (panels) panels.innerHTML = sections.map(function (section, index) {
+      return '<section data-sales-client-card-panel="' + section[0] + '"' + (index === 0 ? "" : " hidden") + '>' + section[2] + '</section>';
+    }).join("");
+    if (loading) loading.hidden = true;
+    if (error) error.hidden = true;
+    if (content) content.hidden = false;
+  }
+
+  function activateSalesClientCardTab(dialog, tabName) {
+    dialog.querySelectorAll("[data-sales-client-card-tab]").forEach(function (button) {
+      var active = button.getAttribute("data-sales-client-card-tab") === tabName;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    dialog.querySelectorAll("[data-sales-client-card-panel]").forEach(function (panel) {
+      panel.hidden = panel.getAttribute("data-sales-client-card-panel") !== tabName;
+    });
+  }
+
+  function closeSalesClientCard(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+
+  function openSalesClientCard(root, clientId) {
+    var dialog = document.querySelector("[data-sales-client-card-dialog]");
+    var template = String(root.dataset.salesClientCardUrlTemplate || "");
+    if (!dialog || !clientId || !template) return;
+    var loading = dialog.querySelector("[data-sales-client-card-loading]");
+    var content = dialog.querySelector("[data-sales-client-card-content]");
+    var error = dialog.querySelector("[data-sales-client-card-error]");
+    if (loading) loading.hidden = false;
+    if (content) content.hidden = true;
+    if (error) error.hidden = true;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    fetch(template.replace("__client_id__", encodeURIComponent(clientId)), {headers: {Accept: "application/json"}})
+      .then(function (response) {
+        if (!response.ok) throw new Error("client_card");
+        return response.json();
+      })
+      .then(function (card) { renderSalesClientCard(dialog, card || {}); })
+      .catch(function () {
+        if (loading) loading.hidden = true;
+        if (content) content.hidden = true;
+        if (error) error.hidden = false;
+      });
   }
 
   function rowProductValue(row) {
@@ -2006,6 +2136,23 @@
     var root = document.querySelector(".sales-form");
     if (!root) return;
     var options = readOptions();
+    var clientCardDialog = document.querySelector("[data-sales-client-card-dialog]");
+    var clientInput = root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]');
+    if (clientInput) {
+      clientInput.addEventListener("dblclick", function () {
+        openSalesClientCard(root, clientInput.dataset.salesClientId || "");
+      });
+    }
+    if (clientCardDialog) {
+      clientCardDialog.querySelector("[data-sales-client-card-close]")?.addEventListener("click", function () {
+        closeSalesClientCard(clientCardDialog);
+      });
+      clientCardDialog.addEventListener("click", function (event) {
+        var tab = event.target.closest("[data-sales-client-card-tab]");
+        if (tab) activateSalesClientCardTab(clientCardDialog, tab.getAttribute("data-sales-client-card-tab") || "info");
+        if (event.target === clientCardDialog) closeSalesClientCard(clientCardDialog);
+      });
+    }
     root.querySelectorAll("[data-sales-combobox]").forEach(function (combo) {
       wireCombo(root, combo, options);
     });

@@ -6290,6 +6290,42 @@ def create_app() -> FastAPI:
             sales_prefill=sales_prefill,
         )
 
+    @app.get("/api/sales/clients/{client_id}/card", name="sales_client_card_api")
+    def sales_client_card_api(request: Request, client_id: str):
+        wid, redir = _product_workspace_owner(request)
+        if redir or not wid:
+            return JSONResponse({"error": "workspace"}, status_code=403)
+        with session_scope() as session:
+            balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
+            balance_currency_by_id, balance_currency_by_name = _sales_rollup_currency_maps(session, wid)
+            crm_rows = list(
+                session.execute(
+                    select(CrmRecord)
+                    .where(CrmRecord.workspace_owner_id == wid)
+                    .order_by(CrmRecord.updated_at.desc())
+                ).scalars()
+            )
+            crm_status_by_id, crm_status_by_name = _crm_status_maps_from_records(
+                crm_rows,
+                _crm_workspace_stages(wid),
+            )
+            card = _client_card_context(
+                session,
+                wid,
+                client_id,
+                balance_by_id=balance_by_id,
+                balance_by_name=balance_by_name,
+                last_date_by_id=last_date_by_id,
+                last_date_by_name=last_date_by_name,
+                balance_currency_by_id=balance_currency_by_id,
+                balance_currency_by_name=balance_currency_by_name,
+                crm_status_by_id=crm_status_by_id,
+                crm_status_by_name=crm_status_by_name,
+            )
+        if not card:
+            return JSONResponse({"error": "client_not_found"}, status_code=404)
+        return card
+
     @app.post("/sales/products/quick-save", name="sales_product_quick_save")
     async def sales_product_quick_save(request: Request):
         form = await request.form()
