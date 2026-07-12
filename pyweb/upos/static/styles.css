@@ -8327,23 +8327,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-journal-filter .products-catalog-search {
   position: relative;
-  padding: 0.28rem;
-  border: 1px solid #eab308;
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, #fef9c3, #fffbea);
-  box-shadow:
-    0 0 0 3px rgb(250 204 21 / 24%),
-    0 8px 18px rgb(234 179 8 / 12%);
-}
-
-.sales-journal-filter .products-catalog-search span {
-  padding-left: 0.08rem;
-  color: #854d0e;
-}
-
-.sales-journal-filter .products-catalog-search input {
-  background: var(--card);
 }
 
 .sales-journal-filter .products-catalog-search::before {
@@ -8352,6 +8335,15 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-journal-filter .products-catalog-search::after {
   left: 1.67rem;
+}
+
+.sales-journal-search-match {
+  padding: 0.05em 0.12em;
+  border-radius: 3px;
+  background: #fde047;
+  color: #422006;
+  font-weight: 900;
+  box-shadow: 0 0 0 1px rgb(202 138 4 / 30%);
 }
 
 .workspace-module-root--sales .workspace-module-stack {

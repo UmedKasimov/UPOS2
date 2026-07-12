@@ -659,9 +659,48 @@
     }
   }
 
+  function highlightSalesJournalMatches(scope) {
+    var table = scope.querySelector("#sales-journal-table");
+    if (!table) return;
+    var query = String(new URLSearchParams(window.location.search).get("q") || "").trim();
+    if (!query) return;
+    var needle = query.toLocaleLowerCase("ru-RU");
+    table.querySelectorAll("tbody tr").forEach(function (row) {
+      [row.cells[1], row.cells[4]].forEach(function (cell) {
+        if (!cell) return;
+        Array.from(cell.childNodes).forEach(function highlightNode(node) {
+          if (node.nodeType === 3) {
+            var text = node.nodeValue || "";
+            var lower = text.toLocaleLowerCase("ru-RU");
+            var start = lower.indexOf(needle);
+            if (start < 0) return;
+            var fragment = document.createDocumentFragment();
+            var cursor = 0;
+            while (start >= 0) {
+              fragment.appendChild(document.createTextNode(text.slice(cursor, start)));
+              var mark = document.createElement("mark");
+              mark.className = "sales-journal-search-match";
+              mark.textContent = text.slice(start, start + query.length);
+              fragment.appendChild(mark);
+              cursor = start + query.length;
+              start = lower.indexOf(needle, cursor);
+            }
+            fragment.appendChild(document.createTextNode(text.slice(cursor)));
+            node.replaceWith(fragment);
+            return;
+          }
+          if (node.nodeType === 1 && node.tagName !== "MARK") {
+            Array.from(node.childNodes).forEach(highlightNode);
+          }
+        });
+      });
+    });
+  }
+
   function init(root) {
     var scope = root || document;
     bindSalesJournalFilter(scope);
+    highlightSalesJournalMatches(scope);
     initStatusSelects(scope);
     scope.querySelectorAll("[data-sales-journal-open]").forEach(function (trigger) {
       if (trigger.dataset.salesJournalOpenReady === "1") return;
