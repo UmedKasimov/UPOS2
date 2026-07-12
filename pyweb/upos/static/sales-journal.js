@@ -698,9 +698,68 @@
     });
   }
 
+  function salesJournalSortValue(row, columnIndex, kind) {
+    var cell = row.cells[columnIndex];
+    if (!cell) return kind === "text" ? "" : 0;
+    var raw = cell.dataset.sortValue || cell.textContent || "";
+    if (kind === "number") return amountNumber(raw);
+    if (kind === "date") {
+      var timestamp = Date.parse(String(raw).trim());
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+    return String(raw).trim().toLocaleLowerCase("ru-RU");
+  }
+
+  function bindSalesJournalSort(scope) {
+    var table = scope.querySelector("#sales-journal-table");
+    if (!table || table.dataset.salesJournalSortReady === "1") return;
+    table.dataset.salesJournalSortReady = "1";
+    var numericColumns = new Set([6, 7]);
+    var dateColumns = new Set([2]);
+
+    table.querySelectorAll("thead .sales-journal-sort-btn").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var header = button.closest("th");
+        var body = table.tBodies[0];
+        if (!header || !body) return;
+        var columnIndex = header.cellIndex;
+        var kind = numericColumns.has(columnIndex) ? "number" : dateColumns.has(columnIndex) ? "date" : "text";
+        var direction = header.getAttribute("aria-sort") === "descending" ? "ascending" : "descending";
+        var rows = Array.from(body.querySelectorAll("tr[data-sales-journal-row]"));
+
+        rows.forEach(function (row, index) {
+          row.dataset.salesOriginalIndex = row.dataset.salesOriginalIndex || String(index);
+        });
+        rows.sort(function (left, right) {
+          var leftValue = salesJournalSortValue(left, columnIndex, kind);
+          var rightValue = salesJournalSortValue(right, columnIndex, kind);
+          var result = kind === "text"
+            ? leftValue.localeCompare(rightValue, "ru-RU", { numeric: true, sensitivity: "base" })
+            : leftValue - rightValue;
+          if (result === 0) {
+            result = Number(left.dataset.salesOriginalIndex) - Number(right.dataset.salesOriginalIndex);
+          }
+          return direction === "ascending" ? result : -result;
+        });
+
+        table.querySelectorAll("thead th[aria-sort]").forEach(function (item) {
+          item.setAttribute("aria-sort", item === header ? direction : "none");
+          var arrow = item.querySelector(".org-shipments-sort-arrow");
+          if (arrow) arrow.textContent = item === header ? (direction === "ascending" ? "↑" : "↓") : "↕";
+        });
+        rows.forEach(function (row, index) {
+          body.appendChild(row);
+          var indexCell = row.querySelector(".sales-journal-row-index");
+          if (indexCell) indexCell.textContent = String(index + 1);
+        });
+      });
+    });
+  }
+
   function init(root) {
     var scope = root || document;
     bindSalesJournalFilter(scope);
+    bindSalesJournalSort(scope);
     highlightSalesJournalMatches(scope);
     initStatusSelects(scope);
     scope.querySelectorAll("[data-sales-journal-open]").forEach(function (trigger) {

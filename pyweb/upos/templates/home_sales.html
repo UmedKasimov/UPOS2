@@ -199,15 +199,15 @@
             </thead>
             <tbody>
               {% for sale in sales %}
-                <tr class="sales-table-row--{{ sale.doc_type }}{% if sales_saved_id and sales_saved_id == sale.id %} sales-table-row--saved{% endif %}">
+                <tr class="sales-table-row--{{ sale.doc_type }}{% if sales_saved_id and sales_saved_id == sale.id %} sales-table-row--saved{% endif %}" data-sales-journal-row>
                   <td class="sales-journal-row-index">{{ loop.index }}</td>
                   <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0"><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
-                  <td>{{ sale.date_label or sale.date or "-" }}</td>
+                  <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
                   <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
                   <td>{{ sale.client or "-" }}</td>
                   <td>{{ sale.warehouse or "-" }}</td>
-                  <td>{{ sale.amount }} {{ sale.currency }}</td>
-                  <td><span>{{ sale.paid_amount }} {{ sale.currency }}</span><small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small></td>
+                  <td data-sort-value="{{ sale.amount_value }}">{{ sale.amount }} {{ sale.currency }}</td>
+                  <td data-sort-value="{{ sale.paid_value }}"><span>{{ sale.paid_amount }} {{ sale.currency }}</span><small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small></td>
                   <td>
                     {% set status_style = 'confirmed' if sale.status == 'paid' else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['reserved', 'partial', 'debt'] else 'draft')) %}
                     <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">
@@ -893,6 +893,6 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=12" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=13" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=53" defer></script>
 {% endblock %}
