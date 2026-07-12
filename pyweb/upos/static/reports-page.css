@@ -2177,6 +2177,36 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   font-weight: 850;
 }
 
+/* Keep inventory and money values readable across every operational report. */
+.reports-balance-total b,
+.reports-kpi-value {
+  font-size: var(--text-xl);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.reports-data-table td strong,
+.reports-data-table:not(.reports-sales-table):not(.reports-stock-analysis-table) td:nth-child(n + 5),
+.reports-sales-table td:nth-child(n + 6):nth-child(-n + 10),
+.reports-stock-movement-table td:nth-child(n + 2),
+.reports-stock-analysis-table td:nth-child(n + 2),
+.reports-receivables-table td:nth-child(2),
+.reports-stock-analysis-table tfoot td {
+  font-size: var(--text-md);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.reports-stock-analysis-table td:nth-child(2) {
+  font-size: var(--text-lg);
+  font-weight: 900;
+}
+
+.reports-stock-row--negative td:nth-child(n + 2) {
+  color: var(--destructive, #c62828);
+  font-weight: 900;
+}
+
 .reports-stock-negative-total,
 .reports-stock-negative-total b {
   color: #dc2626 !important;
