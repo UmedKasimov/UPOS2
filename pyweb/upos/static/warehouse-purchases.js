@@ -1620,6 +1620,11 @@
       );
     }
     highlight(root);
+    const requestedPurchaseId = new URLSearchParams(window.location.search).get("purchase_id") || "";
+    if (requestedPurchaseId && document.body.dataset.openedPurchaseId !== requestedPurchaseId) {
+      document.body.dataset.openedPurchaseId = requestedPurchaseId;
+      openDetail(root, requestedPurchaseId);
+    }
   }
 
   if (document.readyState === "loading") {

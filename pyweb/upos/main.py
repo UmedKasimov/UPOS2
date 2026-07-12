@@ -11161,6 +11161,11 @@ def create_app() -> FastAPI:
                         .where(SaleDocument.workspace_owner_id == wid)
                         .order_by(SaleDocument.created_at.desc())
                     ).scalars().all()
+                    purchase_rows = session.execute(
+                        select(PurchaseDocument)
+                        .where(PurchaseDocument.workspace_owner_id == wid)
+                        .order_by(PurchaseDocument.created_at.desc())
+                    ).scalars().all()
                     operations = session.execute(
                         select(WarehouseOperation)
                         .where(WarehouseOperation.workspace_owner_id == wid)
@@ -11394,6 +11399,62 @@ def create_app() -> FastAPI:
                 stock_analysis_cost_total = Decimal("0")
                 stock_analysis_revenue_total = Decimal("0")
                 stock_analysis_qty_total = Decimal("0")
+                product_id_by_name = {
+                    str(product.name or "").strip().casefold(): str(product.id)
+                    for product in products
+                    if str(product.name or "").strip()
+                }
+                purchase_history_by_product: dict[str, list[dict[str, Any]]] = {}
+                for purchase in purchase_rows:
+                    purchase_data = _json_object(purchase.data)
+                    purchase_date = _report_date(purchase_data, purchase.created_at)
+                    purchase_currency = str(purchase.currency or purchase_data.get("currency") or "UZS").upper()
+                    document_products: dict[str, dict[str, Any]] = {}
+                    for raw_line in purchase_data.get("lines") or []:
+                        if not isinstance(raw_line, dict):
+                            continue
+                        product_id = str(raw_line.get("product_id") or "").strip()
+                        if not product_id:
+                            product_id = product_id_by_name.get(
+                                str(raw_line.get("product") or raw_line.get("product_name") or "").strip().casefold(),
+                                "",
+                            )
+                        if not product_id:
+                            continue
+                        quantity = _sales_decimal(raw_line.get("quantity"))
+                        price = _sales_decimal(raw_line.get("price"))
+                        document_product = document_products.setdefault(
+                            product_id,
+                            {
+                                "quantity": Decimal("0"),
+                                "amount": Decimal("0"),
+                                "unit": str(raw_line.get("unit") or "Штука"),
+                                "warehouses": set(),
+                            },
+                        )
+                        document_product["quantity"] += quantity
+                        document_product["amount"] += quantity * price
+                        document_product["warehouses"].add(
+                            str(raw_line.get("warehouse") or purchase_data.get("warehouse") or "Основной склад")
+                        )
+                    for product_id, document_product in document_products.items():
+                        quantity = _sales_decimal(document_product.get("quantity"))
+                        amount = _sales_decimal(document_product.get("amount"))
+                        average_price = amount / quantity if quantity else Decimal("0")
+                        purchase_history_by_product.setdefault(product_id, []).append(
+                            {
+                                "purchase_id": str(purchase.id),
+                                "number": str(purchase.number or "-"),
+                                "date": purchase_date or "-",
+                                "supplier": str(purchase_data.get("supplier") or "Без поставщика"),
+                                "warehouse": ", ".join(sorted(document_product.get("warehouses") or {"Основной склад"})),
+                                "quantity": _sales_money_label(quantity),
+                                "unit": str(document_product.get("unit") or "Штука"),
+                                "price": _report_money(average_price, purchase_currency),
+                                "amount": _report_money(amount, purchase_currency),
+                                "url": f"/warehouse?purchase_id={purchase.id}#purchases",
+                            }
+                        )
                 for row in stock_movements.values():
                     total = _sales_decimal(row.get("end")) * _sales_decimal(row.get("cost"))
                     stock_total += total
@@ -11459,6 +11520,7 @@ def create_app() -> FastAPI:
                     stock_analysis_rows.append(
                         {
                             "product": item["name"],
+                            "product_id": str(item["id"]),
                             "photo_url": item["photo_url"],
                             "quantity": f"{_sales_money_label(qty)} {item['unit']}",
                             "quantity_raw": _decimal_plain_text(qty),
@@ -11493,6 +11555,7 @@ def create_app() -> FastAPI:
                         "critical_count": sum(1 for item in stock_analysis_rows if item.get("is_critical")),
                     },
                     "rows": stock_analysis_rows[:200],
+                    "history": purchase_history_by_product,
                 }
 
                 today = datetime.now(timezone.utc).date()

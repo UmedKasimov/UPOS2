@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=24" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=29" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=30" />
 {% endblock %}
 
 {% block page_header %}
@@ -414,7 +414,7 @@
               {% for row in business_reports.stock_analysis.rows %}
                 <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %}>
                   <td data-sort-value="{{ row.product }}">
-                    <div class="reports-stock-product">
+                    <button type="button" class="reports-stock-product" data-stock-history-product="{{ row.product_id }}" data-stock-history-name="{{ row.product }}" aria-label="Показать историю приходов: {{ row.product }}">
                       <span class="reports-stock-thumb">
                         {% if row.photo_url %}
                           <img src="{{ row.photo_url }}" alt="" loading="lazy" />
@@ -426,7 +426,7 @@
                         <strong>{{ row.product }}</strong>
                         <small>{{ row.warehouse }}</small>
                       </span>
-                    </div>
+                    </button>
                   </td>
                   <td data-sort-value="{{ row.quantity_raw }}">{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
                   <td data-sort-value="{{ row.avg_cost_uzs }}"><span data-stock-money data-money-uzs="{{ row.avg_cost_uzs }}">{{ row.avg_cost }}</span></td>
@@ -449,6 +449,19 @@
           </table>
         </div>
       </section>
+
+      <div class="reports-stock-history-backdrop" data-stock-history-close hidden></div>
+      <aside class="reports-stock-history-drawer" data-stock-history-drawer hidden aria-labelledby="reports-stock-history-title">
+        <header class="reports-stock-history-head">
+          <div>
+            <p>История приходов</p>
+            <h2 id="reports-stock-history-title" data-stock-history-title>Товар</h2>
+          </div>
+          <button type="button" class="reports-stock-history-close" data-stock-history-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="reports-stock-history-summary" data-stock-history-summary></div>
+        <div class="reports-stock-history-list" data-stock-history-list></div>
+      </aside>
 
       <section class="reports-panel" id="report-receivables" data-org-report-panel="receivables" hidden>
         <header class="reports-panel-head">
@@ -583,6 +596,7 @@
     <script type="application/json" id="delivery-payments-report-data">{{ delivery_payments|tojson }}</script>
     <script type="application/json" id="delivery-debts-report-data">{{ delivery_debts|tojson }}</script>
     <script type="application/json" id="delivery-debt-limits-data">{{ courier_debt_limits|tojson }}</script>
+    <script type="application/json" id="stock-purchase-history-data">{{ business_reports.stock_analysis.history|default({})|tojson }}</script>
   </div>
 {% endblock %}
 
@@ -594,6 +608,7 @@
   const paymentsNode = document.getElementById('delivery-payments-report-data');
   const debtsNode = document.getElementById('delivery-debts-report-data');
   const debtLimitsNode = document.getElementById('delivery-debt-limits-data');
+  const stockHistoryNode = document.getElementById('stock-purchase-history-data');
   const tabsShell = document.querySelector('[data-org-report-open-tabs]');
   const homeTab = document.querySelector('[data-org-report-home-tab]');
   const launcher = document.querySelector('.org-report-launcher');
@@ -627,6 +642,7 @@
   let courierDebtLimitStatus = '';
   let courierBalanceView = 'bars';
   let stockCurrency = 'UZS';
+  let stockPurchaseHistory = {};
   try {
     shipments = JSON.parse(dataNode?.textContent || '[]');
   } catch {
@@ -646,6 +662,11 @@
     courierDebtLimits = JSON.parse(debtLimitsNode?.textContent || '{}') || {};
   } catch {
     courierDebtLimits = {};
+  }
+  try {
+    stockPurchaseHistory = JSON.parse(stockHistoryNode?.textContent || '{}') || {};
+  } catch {
+    stockPurchaseHistory = {};
   }
 
   const numberFormatter = new Intl.NumberFormat('ru-RU', {
@@ -667,6 +688,48 @@
       const active = button.getAttribute('data-stock-currency') === stockCurrency;
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function closeStockHistory() {
+    const drawer = document.querySelector('[data-stock-history-drawer]');
+    const backdrop = document.querySelector('.reports-stock-history-backdrop');
+    drawer?.classList.remove('is-open');
+    backdrop?.classList.remove('is-open');
+    window.setTimeout(() => {
+      if (drawer) drawer.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+    }, 180);
+  }
+
+  function openStockHistory(productId, productName) {
+    const drawer = document.querySelector('[data-stock-history-drawer]');
+    const backdrop = document.querySelector('.reports-stock-history-backdrop');
+    const title = document.querySelector('[data-stock-history-title]');
+    const summary = document.querySelector('[data-stock-history-summary]');
+    const list = document.querySelector('[data-stock-history-list]');
+    if (!drawer || !backdrop || !title || !summary || !list) return;
+    const history = Array.isArray(stockPurchaseHistory[productId]) ? stockPurchaseHistory[productId] : [];
+    title.textContent = productName || 'Товар';
+    summary.textContent = history.length
+      ? `${history.length} ${history.length === 1 ? 'документ прихода' : 'документов прихода'}`
+      : 'Документы прихода не найдены';
+    list.innerHTML = history.length ? history.map((item) => `
+      <a class="reports-stock-history-row" href="${escapeHtml(item.url || '/warehouse#purchases')}">
+        <span class="reports-stock-history-date">${escapeHtml(item.date || '-')}</span>
+        <strong>${escapeHtml(item.number || '-')}</strong>
+        <span>${escapeHtml(item.supplier || 'Без поставщика')}</span>
+        <span>${escapeHtml(item.warehouse || 'Основной склад')}</span>
+        <span class="reports-stock-history-quantity">${escapeHtml(item.quantity || '0')} ${escapeHtml(item.unit || '')}</span>
+        <span class="reports-stock-history-price">${escapeHtml(item.price || '0 UZS')}</span>
+        <b>${escapeHtml(item.amount || '0 UZS')}</b>
+      </a>
+    `).join('') : '<div class="reports-stock-history-empty">Для этого товара пока нет сохранённых закупок.</div>';
+    drawer.hidden = false;
+    backdrop.hidden = false;
+    window.requestAnimationFrame(() => {
+      drawer.classList.add('is-open');
+      backdrop.classList.add('is-open');
     });
   }
 
@@ -1441,6 +1504,18 @@
     render();
   });
   document.addEventListener('click', (event) => {
+    const historyProduct = event.target.closest('[data-stock-history-product]');
+    if (historyProduct) {
+      openStockHistory(
+        historyProduct.getAttribute('data-stock-history-product') || '',
+        historyProduct.getAttribute('data-stock-history-name') || historyProduct.textContent.trim(),
+      );
+      return;
+    }
+    if (event.target.closest('[data-stock-history-close]')) {
+      closeStockHistory();
+      return;
+    }
     const currencyButton = event.target.closest('[data-stock-currency]');
     if (currencyButton) {
       stockCurrency = currencyButton.getAttribute('data-stock-currency') === 'USD' ? 'USD' : 'UZS';
@@ -1527,6 +1602,10 @@
       reconcilePeriod = 'custom';
       renderReconcilePanel();
     }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeStockHistory();
   });
 
   restoreState();
