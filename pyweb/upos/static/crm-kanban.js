@@ -56,6 +56,25 @@
     });
   }
 
+  function postActivity(root, recordId, payload) {
+    const template = root.dataset.crmActivityUrlTemplate || "/crm/__record__/activity";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    Object.entries(payload).forEach(([key, value]) => body.set(key, String(value || "")));
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: body.toString(),
+    }).then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    });
+  }
+
   function normalizeTags(tags) {
     if (Array.isArray(tags)) return tags.map((item) => String(item || "").trim()).filter(Boolean);
     return String(tags || "")
@@ -295,6 +314,12 @@
     const history = dialog.querySelector("[data-crm-card-detail-history]");
     const detailTags = dialog.querySelector("[data-crm-card-detail-tags]");
     const detailTagForm = dialog.querySelector("[data-crm-card-detail-tag-form]");
+    const detailTabs = Array.from(dialog.querySelectorAll("[data-crm-detail-tab]"));
+    const detailPanes = Array.from(dialog.querySelectorAll("[data-crm-detail-pane]"));
+    const chatFeed = dialog.querySelector("[data-crm-card-detail-chat-feed]");
+    const taskFeed = dialog.querySelector("[data-crm-card-detail-task-feed]");
+    const commentFeed = dialog.querySelector("[data-crm-card-detail-comment-feed]");
+    const activityForms = Array.from(dialog.querySelectorAll("[data-crm-activity-form]"));
     let detailCard = null;
     const fields = {
       title: dialog.querySelector('[data-crm-card-detail-field="title"]'),
@@ -316,6 +341,31 @@
 
     const setText = (node, value) => {
       if (node) node.textContent = valueOrDash(value);
+    };
+
+    const showDetailPane = (name) => {
+      detailTabs.forEach((button) => button.classList.toggle("is-active", button.dataset.crmDetailTab === name));
+      detailPanes.forEach((pane) => {
+        pane.hidden = pane.dataset.crmDetailPane !== name;
+      });
+    };
+
+    const fillFeed = (feed, card, selector, emptyText) => {
+      if (!feed) return;
+      const template = card.querySelector(selector);
+      const content = template?.innerHTML?.trim() || "";
+      feed.innerHTML = content || `<p class="crm-card-detail-empty">${escapeHtml(emptyText)}</p>`;
+    };
+
+    const renderActivityEvent = (event, kind) => {
+      const at = String(event?.at || "-").slice(0, 16).replace("T", " ");
+      const actor = String(event?.actor || "UPOS");
+      const detail = String(event?.detail || "");
+      if (kind === "task") {
+        const meta = `${event?.due_date || at.slice(0, 10)} · ${event?.assignee || actor || "Без ответственного"}`;
+        return `<article class="crm-card-detail-event crm-card-detail-event--task"><strong>${escapeHtml(detail)}</strong><span>${escapeHtml(meta)}</span></article>`;
+      }
+      return `<article class="crm-card-detail-event crm-card-detail-event--${kind}"><strong>${escapeHtml(at)}</strong><span>${escapeHtml(actor)}</span><p>${escapeHtml(detail)}</p></article>`;
     };
 
     const openDetails = (card) => {
@@ -370,6 +420,10 @@
         const content = historyTemplate?.innerHTML?.trim() || "";
         history.innerHTML = content || '<p class="crm-card-detail-empty">История по клиенту пока пустая.</p>';
       }
+      fillFeed(chatFeed, card, "template[data-crm-card-chat]", "Сообщений пока нет.");
+      fillFeed(taskFeed, card, "template[data-crm-card-tasks]", "Задач пока нет.");
+      fillFeed(commentFeed, card, "template[data-crm-card-comments]", "Комментариев пока нет.");
+      showDetailPane("history");
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {
@@ -404,6 +458,47 @@
       const raw = editButton.dataset.crmEditPayload || "{}";
       closeDetails();
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
+    });
+    detailTabs.forEach((button) => {
+      button.addEventListener("click", () => showDetailPane(button.dataset.crmDetailTab || "history"));
+    });
+    activityForms.forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const root = document.querySelector("[data-crm-activity-url-template]");
+        const recordId = detailCard?.dataset.crmRecordId || "";
+        const kind = form.dataset.crmActivityForm || "comment";
+        const textInput = form.querySelector('[name="text"]');
+        const payload = {
+          kind,
+          text: String(textInput?.value || "").trim(),
+          due_date: String(form.querySelector('[name="due_date"]')?.value || ""),
+          assignee: String(form.querySelector('[name="assignee"]')?.value || "").trim(),
+        };
+        if (!root || !recordId || !payload.text || form.classList.contains("is-saving")) return;
+        form.classList.add("is-saving");
+        postActivity(root, recordId, payload)
+          .then((result) => {
+            if (!result?.ok) throw new Error(result?.error || "activity_failed");
+            const eventData = result.event || payload;
+            const feed = kind === "chat" ? chatFeed : kind === "task" ? taskFeed : commentFeed;
+            const html = renderActivityEvent(eventData, kind);
+            if (feed) {
+              feed.querySelector(".crm-card-detail-empty")?.remove();
+              feed.insertAdjacentHTML("afterbegin", html);
+            }
+            const templateSelector = kind === "chat" ? "template[data-crm-card-chat]" : kind === "task" ? "template[data-crm-card-tasks]" : "template[data-crm-card-comments]";
+            const cardTemplate = detailCard?.querySelector(templateSelector);
+            if (cardTemplate) cardTemplate.innerHTML = html + cardTemplate.innerHTML;
+            if (history) {
+              history.querySelector(".crm-card-detail-empty")?.remove();
+              history.insertAdjacentHTML("afterbegin", renderActivityEvent(eventData, kind));
+            }
+            form.reset();
+          })
+          .catch(() => window.location.reload())
+          .finally(() => form.classList.remove("is-saving"));
+      });
     });
     detailTagForm?.addEventListener("submit", (event) => {
       event.preventDefault();

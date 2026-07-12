@@ -9047,8 +9047,11 @@ def create_app() -> FastAPI:
                 item["order_number"] = str(linked_sale.get("number") or "") if linked_sale else ""
                 item["order_amount"] = str(linked_sale.get("amount") or "") if linked_sale else ""
                 item["order_currency"] = str(linked_sale.get("currency") or item["currency"] or "UZS") if linked_sale else item["currency"]
-                item["kanban_amount"] = item["amount"] if item["amount_value"] else item["order_amount"]
-                item["kanban_amount_value"] = item["amount_value"] if item["amount_value"] else (linked_sale.get("amount_value") if linked_sale else Decimal("0"))
+                linked_doc_type = str(linked_sale.get("doc_type") or "sale") if linked_sale else ""
+                item["related_document_type"] = linked_doc_type
+                item["related_document_label"] = {"order": "Заказ", "return": "Возврат"}.get(linked_doc_type, "Продажа") if linked_sale else ""
+                item["kanban_amount"] = item["order_amount"] if linked_sale else item["amount"]
+                item["kanban_amount_value"] = linked_sale.get("amount_value", Decimal("0")) if linked_sale else item["amount_value"]
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
                 item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
@@ -10734,6 +10737,47 @@ def create_app() -> FastAPI:
             row.data = data
             flag_modified(row, "data")
         return JSONResponse({"ok": True, "tags": tags[:8]})
+
+    @app.post("/crm/{record_id}/activity", name="crm_activity_add")
+    async def crm_activity_add(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        kind = str(form.get("kind") or "comment").strip().lower()
+        if kind not in {"chat", "task", "comment"}:
+            return JSONResponse({"ok": False, "error": "invalid_kind"}, status_code=400)
+        text = re.sub(r"\s+", " ", str(form.get("text") or "")).strip()[:500]
+        if not text:
+            return JSONResponse({"ok": False, "error": "empty"}, status_code=400)
+        due_date = str(form.get("due_date") or "").strip()[:10]
+        assignee = re.sub(r"\s+", " ", str(form.get("assignee") or "")).strip()[:120]
+        actor = _crm_actor_name(request)
+        action = {"chat": "Сообщение", "task": "Задача", "comment": "Комментарий"}[kind]
+        event = {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "action": action,
+            "actor": actor,
+            "detail": text,
+            "kind": kind,
+            "due_date": due_date,
+            "assignee": assignee,
+        }
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            data = _json_object(row.data).copy()
+            raw = data.get("activity_log") if isinstance(data.get("activity_log"), list) else []
+            events = [item for item in raw if isinstance(item, dict)][-99:]
+            events.append(event)
+            data["activity_log"] = events
+            row.data = data
+            flag_modified(row, "data")
+        return JSONResponse({"ok": True, "event": event})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
     async def crm_delete(request: Request, record_id: str):

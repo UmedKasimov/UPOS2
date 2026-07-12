@@ -134,6 +134,7 @@
     data-crm-stage-url-template="/crm/__record__/stage"
     data-crm-archive-url-template="/crm/__record__/archive"
     data-crm-tag-url-template="/crm/__record__/tag"
+    data-crm-activity-url-template="/crm/__record__/activity"
   >
     {% for column in crm_kanban_columns %}
       <section
@@ -178,6 +179,7 @@
               data-crm-detail-note="{{ row.note|e }}"
               data-crm-detail-lost-reason="{{ row.lost_reason|e }}"
               data-crm-detail-order-href="{{ url_for('sales_get') }}?doc_type=order&amp;crm_record_id={{ row.id|urlencode }}#sales-form"
+              data-crm-detail-document-label="{{ row.related_document_label|e }}"
               data-crm-detail-chat="{{ row.chat_label|e }}"
               data-crm-tags="{{ row.tags_text|e }}"
               data-crm-edit-payload='{{ row.edit_payload|tojson|forceescape }}'
@@ -214,7 +216,7 @@
                 {% else %}
                   <span>Сумма не указана</span>
                 {% endif %}
-                {% if row.order_number %}<small>Заказ {{ row.order_number }}</small>{% endif %}
+                {% if row.order_number %}<small>{{ row.related_document_label }} {{ row.order_number }}</small>{% endif %}
               </div>
               {% if row.chat_label %}
                 <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
@@ -234,7 +236,7 @@
                 {% endfor %}
                 {% if row.order_number %}
                   <article class="crm-card-detail-event crm-card-detail-event--sale">
-                    <strong>Продажа {{ row.order_number }}</strong>
+                    <strong>{{ row.related_document_label }} {{ row.order_number }}</strong>
                     <span>Связанный документ</span>
                     <p>{{ row.order_amount }} {{ row.order_currency or row.currency }}</p>
                   </article>
@@ -244,6 +246,32 @@
                     <strong>{{ history.date or history.due_date or "-" }}</strong>
                     <span>{{ history.contact_type or history.lead_source or history.item_type_label }}</span>
                     <p>{{ history.note or history.next_step or history.status_label }}</p>
+                  </article>
+                {% endfor %}
+              </template>
+              <template data-crm-card-chat>
+                {% for event in row.activity_log if event.kind == "chat" %}
+                  <article class="crm-card-detail-event crm-card-detail-event--chat">
+                    <strong>{{ (event.at or "-")[:16]|replace("T", " ") }}</strong>
+                    <span>{{ event.actor or "UPOS" }}</span>
+                    <p>{{ event.detail }}</p>
+                  </article>
+                {% endfor %}
+              </template>
+              <template data-crm-card-tasks>
+                {% for event in row.activity_log if event.kind == "task" %}
+                  <article class="crm-card-detail-event crm-card-detail-event--task">
+                    <strong>{{ event.detail }}</strong>
+                    <span>{{ event.due_date or (event.at or "-")[:10] }} · {{ event.assignee or event.actor or "Без ответственного" }}</span>
+                  </article>
+                {% endfor %}
+              </template>
+              <template data-crm-card-comments>
+                {% for event in row.activity_log if event.kind == "comment" %}
+                  <article class="crm-card-detail-event crm-card-detail-event--comment">
+                    <strong>{{ (event.at or "-")[:16]|replace("T", " ") }}</strong>
+                    <span>{{ event.actor or "UPOS" }}</span>
+                    <p>{{ event.detail }}</p>
                   </article>
                 {% endfor %}
               </template>
@@ -478,15 +506,42 @@
       </section>
       <section class="crm-card-detail-panel crm-card-detail-panel--timeline">
         <div class="crm-card-detail-panel-head">
-          <h3>Чат и история</h3>
+          <h3>Работа с клиентом</h3>
           <a class="btn crm-card-detail-order-btn" href="#" data-crm-card-detail-order hidden>+ Добавить заказ</a>
         </div>
-        <div class="crm-card-detail-chatbox">
+        <nav class="crm-card-detail-tabs" aria-label="Разделы карточки">
+          <button type="button" class="is-active" data-crm-detail-tab="history">История</button>
+          <button type="button" data-crm-detail-tab="chat">Чат</button>
+          <button type="button" data-crm-detail-tab="tasks">Задачи</button>
+          <button type="button" data-crm-detail-tab="comments">Комментарии</button>
+        </nav>
+        <div class="crm-card-detail-chatbox" data-crm-detail-pane="chat" hidden>
           <span>Чат</span>
           <strong data-crm-card-detail-chat>Не привязан</strong>
+          <div class="crm-card-detail-feed" data-crm-card-detail-chat-feed></div>
+          <form class="crm-card-detail-activity-form" data-crm-activity-form="chat">
+            <input name="text" maxlength="500" placeholder="Написать сообщение" required />
+            <button class="btn" type="submit">Отправить</button>
+          </form>
         </div>
-        <div class="crm-card-detail-history" data-crm-card-detail-history>
+        <div class="crm-card-detail-history" data-crm-card-detail-history data-crm-detail-pane="history">
           <p class="crm-card-detail-empty">История по клиенту пока пустая.</p>
+        </div>
+        <div class="crm-card-detail-work-pane" data-crm-detail-pane="tasks" hidden>
+          <div class="crm-card-detail-feed" data-crm-card-detail-task-feed></div>
+          <form class="crm-card-detail-activity-form crm-card-detail-task-form" data-crm-activity-form="task">
+            <input name="text" maxlength="500" placeholder="Название задачи" required />
+            <input name="due_date" type="date" required />
+            <input name="assignee" list="crm-responsible-list" placeholder="Ответственный" required />
+            <button class="btn" type="submit">Добавить задачу</button>
+          </form>
+        </div>
+        <div class="crm-card-detail-work-pane" data-crm-detail-pane="comments" hidden>
+          <div class="crm-card-detail-feed" data-crm-card-detail-comment-feed></div>
+          <form class="crm-card-detail-activity-form" data-crm-activity-form="comment">
+            <textarea name="text" maxlength="500" rows="3" placeholder="Добавить комментарий" required></textarea>
+            <button class="btn" type="submit">Добавить комментарий</button>
+          </form>
         </div>
       </section>
     </div>
