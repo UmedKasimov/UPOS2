@@ -628,8 +628,40 @@
     });
   }
 
+  function bindSalesJournalFilter(scope) {
+    var form = scope.querySelector("#sales-journal-filter");
+    if (!form || form.dataset.salesJournalFilterReady === "1") return;
+    form.dataset.salesJournalFilterReady = "1";
+    var navigate = function () {
+      var params = new URLSearchParams();
+      ["q", "doc_type", "client", "status"].forEach(function (name) {
+        var field = form.querySelector("[name=\"" + name + "\"]");
+        var value = field ? String(field.value || "").trim() : "";
+        if (!value) return;
+        params.set(name, value);
+      });
+      if (!params.has("doc_type")) params.set("doc_type", "all");
+      if (!params.has("status")) params.set("status", "all");
+      var query = params.toString();
+      window.location.href = "/sales" + (query ? "?" + query : "") + "#sales-journal";
+    };
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      navigate();
+    });
+    var search = form.querySelector("input[name=\"q\"]");
+    if (search) {
+      search.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        navigate();
+      });
+    }
+  }
+
   function init(root) {
     var scope = root || document;
+    bindSalesJournalFilter(scope);
     initStatusSelects(scope);
     scope.querySelectorAll("[data-sales-journal-open]").forEach(function (trigger) {
       if (trigger.dataset.salesJournalOpenReady === "1") return;

@@ -100,7 +100,7 @@
     </section>
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
-    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}" data-workspace-view="journal order return debt" hidden>
+    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}#sales-journal" data-workspace-view="journal order return debt" hidden>
       <label class="products-catalog-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
@@ -131,7 +131,7 @@
         </select>
       </label>
       <button class="btn btn-secondary" type="submit">Применить</button>
-      <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Очистить</a>
+      <a class="btn btn-secondary" href="{{ url_for('sales_get') }}#sales-journal">Очистить</a>
     </form>
 
     <datalist id="sales-client-list">
@@ -872,6 +872,6 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=7" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=10" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=50" defer></script>
 {% endblock %}
