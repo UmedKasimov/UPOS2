@@ -8269,6 +8269,35 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--primary) 11%, var(--card));
 }
 
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
+  background: color-mix(in srgb, #22c55e 14%, var(--card));
+}
+
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--order td {
+  background: color-mix(in srgb, #facc15 19%, var(--card));
+}
+
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale:hover td {
+  background: color-mix(in srgb, #22c55e 21%, var(--card));
+}
+
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--order:hover td {
+  background: color-mix(in srgb, #facc15 27%, var(--card));
+}
+
+.sales-journal-doc-type-cell {
+  font-size: 0.92rem !important;
+  font-weight: 900;
+}
+
+.sales-table-row--sale .sales-journal-doc-type-cell {
+  color: #087a35;
+}
+
+.sales-table-row--order .sales-journal-doc-type-cell {
+  color: #8a5a00;
+}
+
 .sales-journal-create-btn {
   justify-self: end;
   width: auto;
