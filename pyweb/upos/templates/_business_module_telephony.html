@@ -213,8 +213,8 @@
           {% for row in telephony_calls %}
             <tr>
               <td class="telephony-account-cell"><strong>{{ row.account_label }}</strong><small>{{ row.operator_name }}</small></td>
-              <td><strong>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
-              <td>{{ row.phone }}</td>
+              <td><strong data-telephony-search-highlight>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
+              <td data-telephony-search-highlight>{{ row.phone }}</td>
               <td>
                 <span class="telephony-direction telephony-direction--{{ row.direction or 'outgoing' }}">
                   <span aria-hidden="true">{% if row.direction == 'incoming' %}&#8601;{% else %}&#8599;{% endif %}</span>

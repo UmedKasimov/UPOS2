@@ -21991,6 +21991,15 @@ body.is-sidebar-collapsed .upos-floating-phone,
   display: block;
 }
 
+.telephony-search-hit {
+  padding: 0.04em 0.14em;
+  border: 1px solid #eab308;
+  border-radius: 3px;
+  background: #fef08a;
+  color: #1f2937;
+  font: inherit;
+}
+
 .telephony-date-filter {
   display: flex;
   flex: 0 0 auto;

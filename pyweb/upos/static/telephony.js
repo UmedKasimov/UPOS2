@@ -23,6 +23,31 @@
     return local.toISOString().slice(0, 16);
   }
 
+  function highlightCallSearchMatches() {
+    var query = String(new URLSearchParams(window.location.search).get("q") || "").trim();
+    if (!query) return;
+    var needle = query.toLocaleLowerCase("ru-RU");
+    document.querySelectorAll("[data-telephony-search-highlight]").forEach(function (node) {
+      var text = node.textContent || "";
+      var lower = text.toLocaleLowerCase("ru-RU");
+      var start = lower.indexOf(needle);
+      if (start < 0) return;
+      var fragment = document.createDocumentFragment();
+      var cursor = 0;
+      while (start >= 0) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor, start)));
+        var mark = document.createElement("mark");
+        mark.className = "telephony-search-hit";
+        mark.textContent = text.slice(start, start + query.length);
+        fragment.appendChild(mark);
+        cursor = start + query.length;
+        start = lower.indexOf(needle, cursor);
+      }
+      fragment.appendChild(document.createTextNode(text.slice(cursor)));
+      node.replaceChildren(fragment);
+    });
+  }
+
   function showIncomingCallPopup(detail) {
     var data = detail || {};
     var popup = document.querySelector("[data-telephony-incoming-popup]");
@@ -65,6 +90,8 @@
         }
       });
     }
+
+    highlightCallSearchMatches();
 
     document.querySelectorAll("[data-telephony-open-call]").forEach(function (button) {
       button.addEventListener("click", function () {
