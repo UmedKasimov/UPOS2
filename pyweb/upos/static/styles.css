@@ -3863,6 +3863,40 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 92rem;
 }
 
+.clients-table.products-catalog-table th:nth-child(3),
+.clients-table.products-catalog-table td:nth-child(3) {
+  min-width: 8rem;
+}
+
+.clients-table.products-catalog-table [data-client-column="name"] {
+  min-width: 14rem;
+}
+
+.clients-table-sort-btn {
+  justify-content: flex-start;
+  min-width: max-content;
+  font-size: var(--text-sm);
+}
+
+.clients-table-movable-column {
+  cursor: grab;
+  user-select: none;
+  transition: background-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.clients-table-movable-column:active {
+  cursor: grabbing;
+}
+
+.clients-table-movable-column.is-client-column-dragging {
+  opacity: 0.48;
+}
+
+.clients-table-movable-column.is-client-column-drop-target {
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
 .clients-table.products-catalog-table td {
   height: 3.9rem;
   min-height: 3.9rem;

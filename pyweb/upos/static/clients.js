@@ -616,6 +616,226 @@
     });
   }
 
+  const CLIENT_DIRECTORY_COLUMNS = [
+    { key: "select", sortable: false, movable: false },
+    { key: "id", kind: "number" },
+    { key: "name", kind: "text" },
+    { key: "official_name", kind: "text" },
+    { key: "balance", kind: "number" },
+    { key: "last_date", kind: "date" },
+    { key: "telegram", kind: "text" },
+    { key: "created_at", kind: "date" },
+    { key: "phone", kind: "text" },
+    { key: "category", kind: "text" },
+    { key: "inn", kind: "text" },
+    { key: "pinfl", kind: "text" },
+    { key: "address", kind: "text" },
+    { key: "code", kind: "text" },
+    { key: "actions", sortable: false, movable: false },
+  ];
+
+  function clientDirectoryCells(row) {
+    return [...(row?.children || [])].filter((cell) => !cell.classList.contains("upos-table-column-control-cell"));
+  }
+
+  function clientColumnOrderKey(table) {
+    return `upos.clientsColumnOrder:${location.pathname}:${table.id || "directory"}`;
+  }
+
+  function readClientColumnOrder(table) {
+    const fallback = CLIENT_DIRECTORY_COLUMNS.map((column) => column.key);
+    try {
+      const saved = JSON.parse(localStorage.getItem(clientColumnOrderKey(table)) || "[]");
+      if (!Array.isArray(saved) || saved.length !== fallback.length) return fallback;
+      const known = new Set(fallback);
+      if (saved.some((key) => !known.has(key)) || new Set(saved).size !== fallback.length) return fallback;
+      return saved;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function saveClientColumnOrder(table, order) {
+    try {
+      localStorage.setItem(clientColumnOrderKey(table), JSON.stringify(order));
+    } catch {
+      /* localStorage may be unavailable. */
+    }
+  }
+
+  function clientColumnRows(table) {
+    return [
+      ...Array.from(table.tHead?.rows || []),
+      ...Array.from(table.tBodies || []).flatMap((body) => Array.from(body.rows || [])),
+    ].filter((row) => clientDirectoryCells(row).length === CLIENT_DIRECTORY_COLUMNS.length);
+  }
+
+  function applyClientColumnOrder(table, order) {
+    clientColumnRows(table).forEach((row) => {
+      const cells = new Map(clientDirectoryCells(row).map((cell) => [cell.dataset.clientColumn, cell]));
+      const control = row.querySelector(":scope > .upos-table-column-control-cell");
+      order.forEach((key) => {
+        const cell = cells.get(key);
+        if (cell) row.insertBefore(cell, control || null);
+      });
+    });
+  }
+
+  function clientNumericValue(cell, key) {
+    const raw = (cell?.textContent || "").replace(/\u00a0/g, " ").replace(/[^0-9,.-]/g, "").replace(",", ".");
+    const value = Number.parseFloat(raw) || 0;
+    if (key === "balance" && cell?.querySelector(".client-balance-pill--advance")) return -Math.abs(value);
+    return value;
+  }
+
+  function clientSortValue(row, key, kind) {
+    const cell = row.querySelector(`[data-client-column="${key}"]`);
+    if (kind === "number") return clientNumericValue(cell, key);
+    const text = (cell?.textContent || "").replace(/\s+/g, " ").trim();
+    if (kind === "date") {
+      const timestamp = Date.parse(text);
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+    return text.toLocaleLowerCase("ru");
+  }
+
+  function updateClientSortButtons(table, activeKey, direction) {
+    table.querySelectorAll("[data-clients-sort]").forEach((button) => {
+      const active = button.dataset.clientsSort === activeKey;
+      button.classList.toggle("is-active", active);
+      button.closest("th")?.setAttribute("aria-sort", active ? (direction === "asc" ? "ascending" : "descending") : "none");
+      const arrow = button.querySelector(".org-shipments-sort-arrow");
+      if (arrow) arrow.textContent = active ? (direction === "asc" ? "↑" : "↓") : "↕";
+    });
+  }
+
+  function sortClientDirectory(table, key, kind) {
+    const tbody = table.tBodies[0];
+    if (!tbody) return;
+    const currentKey = table.dataset.clientsSortKey;
+    const currentDirection = table.dataset.clientsSortDirection;
+    const direction = currentKey === key && currentDirection === "desc" ? "asc" : "desc";
+    const rows = [...tbody.rows].filter((row) => clientDirectoryCells(row).length === CLIENT_DIRECTORY_COLUMNS.length);
+    rows.forEach((row, index) => {
+      if (!row.dataset.clientsOriginalIndex) row.dataset.clientsOriginalIndex = String(index);
+    });
+    rows.sort((left, right) => {
+      const a = clientSortValue(left, key, kind);
+      const b = clientSortValue(right, key, kind);
+      const result = kind === "text"
+        ? String(a).localeCompare(String(b), "ru", { numeric: true, sensitivity: "base" })
+        : a - b;
+      return (result || Number(left.dataset.clientsOriginalIndex) - Number(right.dataset.clientsOriginalIndex)) * (direction === "asc" ? 1 : -1);
+    });
+    rows.forEach((row) => tbody.append(row));
+    table.dataset.clientsSortKey = key;
+    table.dataset.clientsSortDirection = direction;
+    updateClientSortButtons(table, key, direction);
+  }
+
+  function moveClientColumn(table, sourceKey, targetKey, after = false) {
+    if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+    const order = clientDirectoryCells(table.tHead?.rows?.[0]).map((cell) => cell.dataset.clientColumn);
+    const sourceIndex = order.indexOf(sourceKey);
+    if (sourceIndex < 0) return;
+    order.splice(sourceIndex, 1);
+    const targetIndex = order.indexOf(targetKey);
+    if (targetIndex < 0) return;
+    order.splice(targetIndex + (after ? 1 : 0), 0, sourceKey);
+    applyClientColumnOrder(table, order);
+    saveClientColumnOrder(table, order);
+  }
+
+  function initClientDirectoryTable(table) {
+    if (!table || table.dataset.clientsDirectoryReady === "1") return;
+    const header = table.tHead?.rows?.[0];
+    const headerCells = clientDirectoryCells(header);
+    if (headerCells.length !== CLIENT_DIRECTORY_COLUMNS.length) return;
+
+    table.dataset.clientsDirectoryReady = "1";
+    headerCells.forEach((cell, index) => {
+      const definition = CLIENT_DIRECTORY_COLUMNS[index];
+      cell.dataset.clientColumn = definition.key;
+      cell.dataset.columnKey = definition.key;
+      cell.scope = "col";
+      if (definition.movable !== false) {
+        cell.draggable = true;
+        cell.classList.add("clients-table-movable-column");
+        cell.title = "Перетащить столбец";
+      }
+      if (definition.sortable === false) return;
+      const label = cell.textContent.trim();
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "org-shipments-sort-btn products-sort-btn clients-table-sort-btn";
+      button.dataset.clientsSort = definition.key;
+      button.innerHTML = `<span>${label}</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>`;
+      button.addEventListener("click", () => {
+        if (Date.now() - Number(table.dataset.clientsDraggedAt || 0) < 300) return;
+        sortClientDirectory(table, definition.key, definition.kind);
+      });
+      button.addEventListener("keydown", (event) => {
+        if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        const cells = clientDirectoryCells(header);
+        const currentIndex = cells.indexOf(cell);
+        const target = cells[currentIndex + (event.key === "ArrowLeft" ? -1 : 1)];
+        if (!target || !target.classList.contains("clients-table-movable-column")) return;
+        event.preventDefault();
+        moveClientColumn(table, definition.key, target.dataset.clientColumn, event.key === "ArrowRight");
+        button.focus();
+      });
+      cell.replaceChildren(button);
+    });
+
+    Array.from(table.tBodies || []).forEach((tbody) => {
+      Array.from(tbody.rows || []).forEach((row) => {
+        const cells = clientDirectoryCells(row);
+        if (cells.length !== CLIENT_DIRECTORY_COLUMNS.length) return;
+        cells.forEach((cell, index) => {
+          cell.dataset.clientColumn = CLIENT_DIRECTORY_COLUMNS[index].key;
+        });
+      });
+    });
+
+    applyClientColumnOrder(table, readClientColumnOrder(table));
+
+    header.addEventListener("dragstart", (event) => {
+      const cell = event.target.closest("th.clients-table-movable-column");
+      if (!cell) return;
+      table.dataset.clientsDraggingColumn = cell.dataset.clientColumn;
+      cell.classList.add("is-client-column-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", cell.dataset.clientColumn);
+    });
+    header.addEventListener("dragover", (event) => {
+      const cell = event.target.closest("th.clients-table-movable-column");
+      if (!cell || !table.dataset.clientsDraggingColumn) return;
+      event.preventDefault();
+      header.querySelectorAll(".is-client-column-drop-target").forEach((item) => item.classList.remove("is-client-column-drop-target"));
+      cell.classList.add("is-client-column-drop-target");
+      event.dataTransfer.dropEffect = "move";
+    });
+    header.addEventListener("drop", (event) => {
+      const cell = event.target.closest("th.clients-table-movable-column");
+      const sourceKey = table.dataset.clientsDraggingColumn;
+      if (!cell || !sourceKey) return;
+      event.preventDefault();
+      const rect = cell.getBoundingClientRect();
+      moveClientColumn(table, sourceKey, cell.dataset.clientColumn, event.clientX > rect.left + rect.width / 2);
+      table.dataset.clientsDraggedAt = String(Date.now());
+    });
+    header.addEventListener("dragend", () => {
+      delete table.dataset.clientsDraggingColumn;
+      header.querySelectorAll(".is-client-column-dragging, .is-client-column-drop-target").forEach((cell) => {
+        cell.classList.remove("is-client-column-dragging", "is-client-column-drop-target");
+      });
+    });
+  }
+
+  function initializeClientDirectoryTables(root = document) {
+    root.querySelectorAll("[data-clients-directory-table]").forEach(initClientDirectoryTable);
+  }
+
   function locate(form) {
     ensureMap(form);
     if (!navigator.geolocation) {
@@ -733,6 +953,7 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
+    initializeClientDirectoryTables();
     showClientSection();
     initializeMaps();
     setTimeout(refreshMaps, 250);

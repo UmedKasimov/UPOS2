@@ -25,6 +25,7 @@
   function columns(table) {
     return directCells(headerRow(table)).map((cell, index) => ({
       index,
+      key: cell.dataset.columnKey || String(index),
       label: cleanLabel(cell.getAttribute('data-column-label') || cell.textContent, `Столбец ${index + 1}`),
     }));
   }
@@ -42,7 +43,16 @@
   function readHidden(table) {
     try {
       const raw = JSON.parse(localStorage.getItem(storageKey(table)) || '[]');
-      return new Set(Array.isArray(raw) ? raw.map(Number).filter(Number.isFinite) : []);
+      if (!Array.isArray(raw)) return new Set();
+      const list = columns(table);
+      const keys = new Set(list.map((column) => column.key));
+      return new Set(raw.map((value) => {
+        if (typeof value === 'number') return list[value]?.key || null;
+        const key = String(value);
+        if (keys.has(key)) return key;
+        const legacyIndex = Number(key);
+        return Number.isInteger(legacyIndex) ? list[legacyIndex]?.key || null : null;
+      }).filter(Boolean));
     } catch {
       return new Set();
     }
@@ -50,14 +60,14 @@
 
   function saveHidden(table, hidden) {
     try {
-      localStorage.setItem(storageKey(table), JSON.stringify([...hidden].sort((a, b) => a - b)));
+      localStorage.setItem(storageKey(table), JSON.stringify([...hidden]));
     } catch {
       /* localStorage may be unavailable. */
     }
   }
 
   function visibleCount(table, hidden) {
-    return Math.max(1, columns(table).filter((column) => !hidden.has(column.index)).length);
+    return Math.max(1, columns(table).filter((column) => !hidden.has(column.key)).length);
   }
 
   function syncPlaceholder(row, table, hidden) {
@@ -83,6 +93,7 @@
 
   function applyVisibility(table) {
     const hidden = readHidden(table);
+    const list = columns(table);
     const rows = [
       ...Array.from(table.tHead?.rows || []),
       ...Array.from(table.tBodies || []).flatMap((body) => Array.from(body.rows || [])),
@@ -91,7 +102,7 @@
     rows.forEach((row) => {
       if (syncPlaceholder(row, table, hidden)) return;
       directCells(row).forEach((cell, index) => {
-        cell.classList.toggle(HIDDEN_CLASS, hidden.has(index));
+        cell.classList.toggle(HIDDEN_CLASS, hidden.has(list[index]?.key || String(index)));
       });
     });
   }
@@ -140,8 +151,8 @@
       label.className = 'upos-table-column-choice';
       const input = document.createElement('input');
       input.type = 'checkbox';
-      input.checked = !hidden.has(column.index);
-      input.dataset.uposColumnIndex = String(column.index);
+      input.checked = !hidden.has(column.key);
+      input.dataset.uposColumnKey = column.key;
       const text = document.createElement('span');
       text.textContent = column.label;
       label.append(input, text);
@@ -239,14 +250,14 @@
   });
 
   document.addEventListener('change', (event) => {
-    const input = event.target.closest('[data-upos-column-index]');
+    const input = event.target.closest('[data-upos-column-key]');
     if (!input) return;
     const table = input.closest('[data-upos-column-menu]')?._uposColumnTable || input.closest('table');
     if (!table) return;
     const hidden = readHidden(table);
-    const index = Number(input.dataset.uposColumnIndex);
-    if (input.checked) hidden.delete(index);
-    else hidden.add(index);
+    const key = input.dataset.uposColumnKey;
+    if (input.checked) hidden.delete(key);
+    else hidden.add(key);
     saveHidden(table, hidden);
     applyVisibility(table);
   });
