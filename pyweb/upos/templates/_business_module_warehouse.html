@@ -261,6 +261,7 @@
             <th>Дата ↑</th>
             <th>Поставщик</th>
             <th>Сумма</th>
+            <th>Оплачено</th>
             <th>Статус</th>
             <th class="warehouse-purchases-actions-col"></th>
           </tr>
@@ -284,7 +285,9 @@
               <td><a class="warehouse-purchase-supplier" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
               <td class="warehouse-purchase-money" data-warehouse-purchase-highlight>
                 <strong>{{ doc.amount }} {{ doc.currency }}</strong>
-                <span class="warehouse-purchase-paid-chip">Оплачено {{ doc.paid_amount }} {{ doc.currency }}</span>
+              </td>
+              <td class="warehouse-purchase-money warehouse-purchase-paid" data-warehouse-purchase-highlight>
+                <span class="warehouse-purchase-paid-chip">{{ doc.paid_amount }} {{ doc.currency }}</span>
               </td>
               <td>
                 <form class="warehouse-purchase-status-form" method="post" action="{{ url_for('warehouse_purchase_status', purchase_id=doc.id) }}">
@@ -332,7 +335,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="7">Документов закупки пока нет.</td></tr>
+            <tr><td colspan="8">Документов закупки пока нет.</td></tr>
           {% endfor %}
         </tbody>
         {% if warehouse_purchase_totals %}
@@ -341,6 +344,11 @@
               <td colspan="4"></td>
               <td class="warehouse-purchase-money warehouse-purchase-total">
                 {% for total in warehouse_purchase_totals %}
+                  <div>{{ total.amount }} {{ total.currency }}</div>
+                {% endfor %}
+              </td>
+              <td class="warehouse-purchase-money warehouse-purchase-total warehouse-purchase-paid-total">
+                {% for total in warehouse_purchase_paid_totals %}
                   <div>{{ total.amount }} {{ total.currency }}</div>
                 {% endfor %}
               </td>

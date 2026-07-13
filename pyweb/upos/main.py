@@ -8178,6 +8178,7 @@ def create_app() -> FastAPI:
         supplier_names: list[str] = []
         warehouse_stock_total = Decimal("0")
         warehouse_purchase_totals: dict[str, Decimal] = {}
+        warehouse_purchase_paid_totals: dict[str, Decimal] = {}
         warehouse_purchase_edit: dict[str, Any] | None = None
         with session_scope() as session:
             warehouse_rows = list(
@@ -8286,6 +8287,10 @@ def create_app() -> FastAPI:
                 warehouse_purchases.append(item)
                 currency = str(row.currency or item["currency"] or "UZS").upper()
                 warehouse_purchase_totals[currency] = warehouse_purchase_totals.get(currency, Decimal("0")) + _sales_decimal(row.amount)
+                warehouse_purchase_paid_totals[currency] = (
+                    warehouse_purchase_paid_totals.get(currency, Decimal("0"))
+                    + _sales_decimal(item.get("paid_amount"))
+                )
         price_types = _workspace_price_types(wid)
         purchase_price_types = [
             item
@@ -8354,6 +8359,10 @@ def create_app() -> FastAPI:
             warehouse_purchase_totals=[
                 {"currency": currency, "amount": _sales_money_label(amount)}
                 for currency, amount in sorted(warehouse_purchase_totals.items())
+            ],
+            warehouse_purchase_paid_totals=[
+                {"currency": currency, "amount": _sales_money_label(amount)}
+                for currency, amount in sorted(warehouse_purchase_paid_totals.items())
             ],
             warehouse_operation_preset=operation_preset,
             today=datetime.now(timezone.utc).date().isoformat(),
