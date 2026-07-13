@@ -6525,6 +6525,30 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .purchase-document-detail-table {
   min-width: 54rem;
+  table-layout: fixed;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .warehouse-purchase-detail-table-wrap {
+  border-color: var(--products-table-blue-strong, var(--primary));
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table th,
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table td {
+  border-color: color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 30%, var(--border));
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table thead th {
+  background: var(--products-table-head-bg, color-mix(in srgb, var(--primary) 12%, var(--card)));
+  font-size: var(--text-sm);
+  font-weight: 900;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table tbody td {
+  min-height: 3rem;
+  font-size: var(--text-sm);
+  font-weight: 650;
 }
 
 .purchase-document-payment-table td:nth-child(1),
@@ -6570,9 +6594,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .purchase-document-note-table td {
-  min-height: 7rem;
+  height: 9rem;
   line-height: 1.55;
   white-space: pre-wrap;
+  vertical-align: top;
 }
 
 .document-detail-payment-actions {

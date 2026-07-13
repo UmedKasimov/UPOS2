@@ -6778,11 +6778,12 @@ def create_app() -> FastAPI:
                 continue
             safe_lines.append(
                 {
+                    "product_id": str(line.get("product_id") or ""),
                     "product": str(line.get("product") or ""),
                     "quantity": _purchase_quantity_label(line.get("quantity")),
-                    "price": str(line.get("price") or ""),
-                    "sale_price": str(line.get("sale_price") or ""),
-                    "total": str(line.get("total") or ""),
+                    "price": _decimal_plain_text(_sales_decimal(line.get("price"))),
+                    "sale_price": _decimal_plain_text(_sales_decimal(line.get("sale_price"))),
+                    "total": _decimal_plain_text(_sales_decimal(line.get("total"))),
                 }
             )
         item = {
@@ -6799,6 +6800,11 @@ def create_app() -> FastAPI:
             "status_label": _purchase_status_label(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "payment_status": str(data.get("payment_status") or ("paid" if paid_amount >= _sales_decimal(row.amount) and _sales_decimal(row.amount) > 0 else "partial" if paid_amount > 0 else "unpaid")),
             "payment_type": str(data.get("payment_type") or ""),
+            "payment_lines": [
+                dict(payment)
+                for payment in (data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else [])
+                if isinstance(payment, dict)
+            ],
             "price_type_id": str(data.get("price_type_id") or ""),
             "price_type_name": str(data.get("price_type_name") or ""),
             "price_type_currency": str(data.get("price_type_currency") or row.currency or "UZS"),
@@ -6820,6 +6826,7 @@ def create_app() -> FastAPI:
             "status_label": str(item["status_label"] or "Заказан"),
             "payment_status": str(item["payment_status"] or "unpaid"),
             "payment_type": str(item["payment_type"] or ""),
+            "payment_lines": item["payment_lines"],
             "price_type_id": str(item["price_type_id"] or ""),
             "price_type_name": str(item["price_type_name"] or ""),
             "price_type_currency": str(item["price_type_currency"] or item["currency"] or "UZS"),
@@ -7913,6 +7920,102 @@ def create_app() -> FastAPI:
             session.add(row)
         return RedirectResponse(url=f"{base_url}?msg=saved#purchases", status_code=302)
 
+    def _purchase_update_redirect(
+        form: Any,
+        purchase_id: str,
+        workspace_owner_id: str,
+        base_url: str,
+    ) -> RedirectResponse:
+        try:
+            data, amount, currency = _purchase_document_payload(form)
+            if not data["supplier"]:
+                raise ValueError("Поставщик обязателен")
+            with session_scope() as session:
+                row = session.get(PurchaseDocument, purchase_id)
+                if not row or row.workspace_owner_id != workspace_owner_id:
+                    raise ValueError("Закупка не найдена")
+                old_data = _json_object(row.data)
+                workflow_status = _purchase_workflow_status(
+                    str(old_data.get("workflow_status") or old_data.get("status") or "ordered")
+                )
+                if workflow_status in {"partial_return", "returned"}:
+                    raise ValueError("Сначала верните документ из возврата в статус «Куплен»")
+
+                supplier_row = _ensure_counterparty(
+                    session,
+                    workspace_owner_id,
+                    name=data["supplier"],
+                    role="supplier",
+                )
+                warehouse_row = _ensure_warehouse(
+                    session,
+                    workspace_owner_id,
+                    name=data["warehouse"],
+                )
+                _sync_product_lines(
+                    session,
+                    workspace_owner_id,
+                    warehouse_name=str(old_data.get("warehouse") or "Основной склад"),
+                    lines=list(old_data.get("lines") or []),
+                    delta_sign=-1,
+                    op_date=str(old_data.get("date") or ""),
+                )
+                data["lines"] = _sync_product_lines(
+                    session,
+                    workspace_owner_id,
+                    warehouse_name=warehouse_row.name,
+                    lines=list(data.get("lines") or []),
+                    delta_sign=1,
+                    op_date=str(data.get("date") or ""),
+                    require_stock_product=True,
+                )
+
+                price_types = _workspace_price_types(workspace_owner_id)
+                selected_price_type = next(
+                    (item for item in price_types if str(item.get("id") or "") == str(data.get("price_type_id") or "")),
+                    None,
+                )
+                if selected_price_type:
+                    data["price_type_name"] = str(selected_price_type.get("name") or data.get("price_type_name") or "")
+                    price_currency = str(selected_price_type.get("convert_to_currency") or currency or "UZS").strip().upper() or "UZS"
+                    data["price_type_currency"] = price_currency
+                if selected_price_type and data.get("save_prices_to_price_type"):
+                    for line in data["lines"]:
+                        sale_price = _sales_decimal(line.get("sale_price"))
+                        product_id = str(line.get("product_id") or "").strip()
+                        if sale_price <= 0 or not product_id:
+                            continue
+                        converted_price = _convert_product_currency(
+                            sale_price,
+                            currency,
+                            price_currency,
+                            _workspace_usd_uzs_rate(workspace_owner_id),
+                        )
+                        product_row = session.get(Product, product_id)
+                        if product_row and product_row.workspace_owner_id == workspace_owner_id:
+                            _apply_product_price_change(product_row, selected_price_type, converted_price, price_currency)
+
+                for key in ("paid_amount", "payment_type", "payment_lines", "payment_status"):
+                    data[key] = old_data.get(key, data.get(key))
+                data["status"] = workflow_status
+                data["workflow_status"] = workflow_status
+                data["status_history"] = old_data.get("status_history", [])
+                data["warehouse_id"] = warehouse_row.id
+                data["counterparty_id"] = supplier_row.id
+                row.number = str(form.get("number") or "").strip() or row.number
+                row.amount = amount
+                row.currency = currency
+                row.counterparty_id = supplier_row.id
+                row.data = data
+                flag_modified(row, "data")
+                session.add(row)
+        except ValueError as exc:
+            return RedirectResponse(
+                url=f"{base_url}?edit_purchase={quote(purchase_id)}&error=" + quote(str(exc)) + "#purchase-edit",
+                status_code=302,
+            )
+        return RedirectResponse(url=f"{base_url}?msg=updated#purchases", status_code=302)
+
     def _purchase_status_redirect(
         purchase_id: str,
         workspace_owner_id: str,
@@ -8002,7 +8105,7 @@ def create_app() -> FastAPI:
             session.delete(row)
         return RedirectResponse(url=f"{base_url}?msg=deleted#purchases", status_code=302)
 
-    def _purchase_pay_redirect(purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+    def _purchase_pay_redirect(form: Any, purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
         with session_scope() as session:
             row = session.get(PurchaseDocument, purchase_id)
             if not row or row.workspace_owner_id != workspace_owner_id:
@@ -8050,6 +8153,7 @@ def create_app() -> FastAPI:
         op_type: str = "all",
         critical: str = "",
         op: str = "",
+        edit_purchase: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -8074,6 +8178,7 @@ def create_app() -> FastAPI:
         supplier_names: list[str] = []
         warehouse_stock_total = Decimal("0")
         warehouse_purchase_totals: dict[str, Decimal] = {}
+        warehouse_purchase_edit: dict[str, Any] | None = None
         with session_scope() as session:
             warehouse_rows = list(
                 session.execute(
@@ -8164,6 +8269,8 @@ def create_app() -> FastAPI:
                 warehouse_operations.append(item)
             for row in purchase_rows:
                 item = _purchase_document_data(row)
+                if str(row.id) == str(edit_purchase or ""):
+                    warehouse_purchase_edit = item
                 line_products = " ".join(
                     str(line.get("product") or "")
                     for line in item["lines"]
@@ -8243,6 +8350,7 @@ def create_app() -> FastAPI:
             warehouse_stock_total=_sales_money_label(warehouse_stock_total),
             warehouse_operations=warehouse_operations,
             warehouse_purchases=warehouse_purchases,
+            warehouse_purchase_edit=warehouse_purchase_edit,
             warehouse_purchase_totals=[
                 {"currency": currency, "amount": _sales_money_label(amount)}
                 for currency, amount in sorted(warehouse_purchase_totals.items())
@@ -8419,6 +8527,17 @@ def create_app() -> FastAPI:
         assert wid is not None
         return _purchase_save_redirect(form, wid, "/warehouse")
 
+    @app.post("/warehouse/purchases/{purchase_id}/update", name="warehouse_purchase_update")
+    async def warehouse_purchase_update(request: Request, purchase_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url=f"/warehouse?edit_purchase={quote(purchase_id)}&err=csrf#purchase-edit", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        return _purchase_update_redirect(form, purchase_id, wid, "/warehouse")
+
     @app.post("/warehouse/purchases/{purchase_id}/status", name="warehouse_purchase_status")
     async def warehouse_purchase_status(request: Request, purchase_id: str):
         form = await request.form()
@@ -8456,7 +8575,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_pay_redirect(purchase_id, wid, "/warehouse")
+        return _purchase_pay_redirect(form, purchase_id, wid, "/warehouse")
 
     @app.get("/clients", response_class=HTMLResponse, name="clients_get")
     def clients_get(

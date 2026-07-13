@@ -1606,10 +1606,11 @@
       });
       panel.querySelector("[data-purchase-detail-edit]")?.addEventListener("click", () => {
         const purchaseId = panel.dataset.purchaseId || "";
-        closeDetail(root);
-        const statusSelect = root.querySelector(`[data-purchase-status-select][data-purchase-id="${CSS.escape(purchaseId)}"]`);
-        statusSelect?.scrollIntoView({ behavior: "smooth", block: "center" });
-        window.setTimeout(() => statusSelect?.focus(), 220);
+        if (!purchaseId) return;
+        const target = new URL("/warehouse", window.location.origin);
+        target.searchParams.set("edit_purchase", purchaseId);
+        target.hash = "purchase-edit";
+        window.location.assign(target.toString());
       });
     });
     const paymentDialog = detailPaymentDialog(root);

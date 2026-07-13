@@ -477,7 +477,7 @@
       </section>
       <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-purchase-detail-pane="note" hidden>
         <div class="warehouse-purchase-detail-table-wrap">
-          <table class="warehouse-purchase-detail-table purchase-document-note-table">
+          <table class="warehouse-purchase-detail-table purchase-document-detail-table purchase-document-note-table">
             <thead>
               <tr>
                 <th>Комментарий</th>
@@ -556,54 +556,65 @@
     </dialog>
   </article>
 
-  <article class="warehouse-purchase-entry product-form-panel" data-workspace-view="adjustments" hidden>
+  {% if warehouse_purchase_edit %}
+    <span
+      hidden
+      data-workspace-trigger="purchase-edit-{{ warehouse_purchase_edit.id }}"
+      data-workspace-tab-id="purchase-edit-{{ warehouse_purchase_edit.id }}"
+      data-workspace-view-id="purchase_edit"
+      data-workspace-tab-title="Закупка {{ warehouse_purchase_edit.number }}"
+      data-workspace-tab-hash="purchase-edit"
+      data-workspace-tab-href="{{ url_for('warehouse_get') }}?edit_purchase={{ warehouse_purchase_edit.id }}"
+    ></span>
+  {% endif %}
+  <article class="warehouse-purchase-entry product-form-panel" data-workspace-view="adjustments purchase_edit" hidden>
     <header class="products-panel-head warehouse-purchase-entry-head">
       <div>
-        <h2>Новая закупка</h2>
-        <span>Закупка сразу попадет в остатки склада.</span>
+        <h2>{{ 'Редактирование закупки ' ~ warehouse_purchase_edit.number if warehouse_purchase_edit else 'Новая закупка' }}</h2>
+        <span>{{ 'Изменения заменят текущие позиции документа и пересчитают остатки.' if warehouse_purchase_edit else 'Закупка сразу попадет в остатки склада.' }}</span>
       </div>
     </header>
-    <form method="post" action="{{ url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}">
+    <form method="post" action="{{ url_for('warehouse_purchase_update', purchase_id=warehouse_purchase_edit.id) if warehouse_purchase_edit else url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-purchase-edit-id="{{ warehouse_purchase_edit.id if warehouse_purchase_edit else '' }}" data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}">
       {% include "_csrf_field.html" %}
       <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
-      <input type="hidden" name="paid_amount" value="0" data-purchase-paid-amount />
-      <input type="hidden" name="payment_type" value="" data-purchase-payment-type />
-      <input type="hidden" name="payment_lines" value="[]" data-purchase-payment-lines />
+      <input type="hidden" name="paid_amount" value="{{ warehouse_purchase_edit.paid_amount if warehouse_purchase_edit else '0' }}" data-purchase-paid-amount />
+      <input type="hidden" name="payment_type" value="{{ warehouse_purchase_edit.payment_type if warehouse_purchase_edit else '' }}" data-purchase-payment-type />
+      <input type="hidden" name="payment_lines" value='{{ warehouse_purchase_edit.payment_lines|tojson|forceescape if warehouse_purchase_edit else "[]" }}' data-purchase-payment-lines />
       <input type="hidden" name="status" value="new" data-purchase-status />
 
       <div class="product-form-grid warehouse-purchase-entry-grid">
         <label>
           <span>ID</span>
-          <input name="number" placeholder="Авто" autocomplete="off" />
+          <input name="number" value="{{ warehouse_purchase_edit.number if warehouse_purchase_edit else '' }}" placeholder="Авто" autocomplete="off" />
         </label>
         <label>
           <span>Дата</span>
-          <input name="date" type="date" value="{{ today }}" />
+          <input name="date" type="date" value="{{ warehouse_purchase_edit.date if warehouse_purchase_edit and warehouse_purchase_edit.date else today }}" />
         </label>
-        <label class="sales-combobox warehouse-supplier-picker" data-warehouse-supplier-picker>
+        <label class="sales-combobox warehouse-supplier-picker{{ ' is-locked' if warehouse_purchase_edit else '' }}" data-warehouse-supplier-picker>
           <span>Поставщик*</span>
           <div class="sales-lock-field">
-            <input name="supplier" placeholder="Выберите или введите поставщика" autocomplete="off" required data-warehouse-supplier-input />
-            <button type="button" class="sales-combo-edit" data-warehouse-supplier-edit aria-label="Сменить поставщика" title="Сменить поставщика" hidden>✎</button>
+            <input name="supplier" value="{{ warehouse_purchase_edit.supplier if warehouse_purchase_edit else '' }}" placeholder="Выберите или введите поставщика" autocomplete="off" required data-warehouse-supplier-input {{ 'readonly aria-readonly=true' if warehouse_purchase_edit else '' }} />
+            <button type="button" class="sales-combo-edit" data-warehouse-supplier-edit aria-label="Сменить поставщика" title="Сменить поставщика" {{ 'hidden' if not warehouse_purchase_edit else '' }}>✎</button>
           </div>
           <div class="sales-combo-panel" data-warehouse-supplier-panel hidden></div>
         </label>
         <label>
           <span>Склад*</span>
-          <input name="warehouse" list="warehouse-name-list" value="Основной склад" autocomplete="off" required />
+          <input name="warehouse" list="warehouse-name-list" value="{{ warehouse_purchase_edit.warehouse if warehouse_purchase_edit else 'Основной склад' }}" autocomplete="off" required />
         </label>
         <label>
           <span>Валюта</span>
           <select name="currency" data-purchase-entry-currency>
-            <option value="UZS">UZS</option>
-            <option value="USD">USD</option>
+            <option value="UZS" {{ 'selected' if not warehouse_purchase_edit or warehouse_purchase_edit.currency == 'UZS' else '' }}>UZS</option>
+            <option value="USD" {{ 'selected' if warehouse_purchase_edit and warehouse_purchase_edit.currency == 'USD' else '' }}>USD</option>
           </select>
         </label>
         <label>
           <span>Прайс</span>
           <select name="purchase_price_type_id" data-purchase-price-type>
             {% for price_type in warehouse_options.price_types %}
-              <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+              <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}" {{ 'selected' if warehouse_purchase_edit and warehouse_purchase_edit.price_type_id == price_type.id else '' }}>{{ price_type.name }}</option>
             {% endfor %}
           </select>
           <input type="hidden" name="purchase_price_type_name" data-purchase-price-type-name />
@@ -632,25 +643,27 @@
               </tr>
             </thead>
             <tbody data-purchase-entry-lines>
+              {% set purchase_entry_lines = (warehouse_purchase_edit.lines + [none]) if warehouse_purchase_edit and warehouse_purchase_edit.lines else [none] %}
+              {% for purchase_line in purchase_entry_lines %}
               <tr class="sales-line-grid sales-line-grid--compact" data-purchase-entry-row>
-                <td class="warehouse-purchase-entry-row-number">1</td>
+                <td class="warehouse-purchase-entry-row-number">{{ loop.index }}</td>
                 <td>
-                  <label class="sales-combobox sales-product-picker warehouse-product-picker" data-warehouse-product-picker>
+                  <label class="sales-combobox sales-product-picker warehouse-product-picker{{ ' is-locked' if purchase_line else '' }}" data-warehouse-product-picker {% if purchase_line %}data-product-id="{{ purchase_line.product_id }}"{% endif %}>
                     <div class="sales-lock-field">
-                      <input name="line_product" placeholder="Товар или услуга" autocomplete="off" data-warehouse-product-input />
-                      <button type="button" class="sales-combo-edit" data-warehouse-product-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                      <input name="line_product" value="{{ purchase_line.product if purchase_line else '' }}" placeholder="Товар или услуга" autocomplete="off" data-warehouse-product-input {{ 'readonly aria-readonly=true' if purchase_line else '' }} />
+                      <button type="button" class="sales-combo-edit" data-warehouse-product-edit aria-label="Сменить товар" title="Сменить товар" {{ 'hidden' if not purchase_line else '' }}>✎</button>
                     </div>
                     <div class="sales-combo-panel sales-combo-panel--wide" data-warehouse-product-panel hidden></div>
                   </label>
                 </td>
                 <td>
-                  <input name="line_quantity" inputmode="decimal" placeholder="К-во" data-purchase-entry-number />
+                  <input name="line_quantity" value="{{ purchase_line.quantity if purchase_line else '' }}" inputmode="decimal" placeholder="К-во" data-purchase-entry-number />
                 </td>
                 <td>
-                  <input name="line_price" inputmode="decimal" placeholder="Цена" data-purchase-entry-number />
+                  <input name="line_price" value="{{ purchase_line.price if purchase_line else '' }}" inputmode="decimal" placeholder="Цена" data-purchase-entry-number />
                 </td>
                 <td>
-                  <input name="line_sale_price" inputmode="decimal" placeholder="Продажная цена" data-purchase-entry-sale-price />
+                  <input name="line_sale_price" value="{{ purchase_line.sale_price if purchase_line else '' }}" inputmode="decimal" placeholder="Продажная цена" data-purchase-entry-sale-price />
                 </td>
                 <td>
                   <strong data-purchase-entry-line-total>0 UZS</strong>
@@ -659,6 +672,7 @@
                   <button type="button" class="sales-line-remove warehouse-purchase-entry-line-remove" data-purchase-entry-remove aria-label="Удалить строку">×</button>
                 </td>
               </tr>
+              {% endfor %}
             </tbody>
             <tfoot>
               <tr class="warehouse-purchase-entry-summary-row">
@@ -693,13 +707,13 @@
 
       <label class="wide warehouse-purchase-entry-note">
         <span>Комментарий</span>
-        <textarea name="note" rows="2" autocomplete="off" placeholder="Комментарий к закупке"></textarea>
+        <textarea name="note" rows="2" autocomplete="off" placeholder="Комментарий к закупке">{{ warehouse_purchase_edit.note if warehouse_purchase_edit else '' }}</textarea>
       </label>
 
       <div class="product-form-actions warehouse-purchase-entry-footer">
         <button type="button" class="btn sales-payment-add-btn" data-purchase-payment-open>+ Добавить оплату</button>
         <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#purchases">Отмена</a>
-        <button class="btn" type="submit">Сохранить закупку</button>
+        <button class="btn" type="submit">{{ 'Сохранить изменения' if warehouse_purchase_edit else 'Сохранить закупку' }}</button>
       </div>
     </form>
 

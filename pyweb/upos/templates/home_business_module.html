@@ -62,6 +62,7 @@
     data-workspace-home-href="{{ module_home_url }}"
     {% if active == "clients" and selected_client_card %}data-workspace-default-tab="client-{{ selected_client_card.id }}"{% endif %}
     {% if active == "suppliers" and selected_supplier_card %}data-workspace-default-tab="supplier-{{ selected_supplier_card.id }}"{% endif %}
+    {% if active == "warehouse" and warehouse_purchase_edit %}data-workspace-default-tab="purchase-edit-{{ warehouse_purchase_edit.id }}"{% endif %}
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Изменения сохранены.</div>
