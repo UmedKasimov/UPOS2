@@ -196,6 +196,7 @@
 
   function initContactDirectory() {
     var search = document.querySelector("[data-telephony-contact-search]");
+    var category = document.querySelector("[data-telephony-contact-category]");
     var state = document.querySelector("[data-telephony-contact-state]");
     var clear = document.querySelector("[data-telephony-contact-clear]");
     var rows = Array.from(document.querySelectorAll("[data-telephony-contact-open]"));
@@ -209,12 +210,15 @@
 
     function applyFilters() {
       var query = normalizedSearchValue(search ? search.value : "");
+      var selectedCategory = normalizedSearchValue(category ? category.value : "all");
       var selectedState = state ? state.value : "all";
       var visible = 0;
       rows.forEach(function (row) {
         var matchesText = !query || normalizedSearchValue(row.dataset.contactSearch).includes(query);
+        var matchesCategory = selectedCategory === "all" ||
+          normalizedSearchValue(row.dataset.contactCategory) === selectedCategory;
         var matchesState = selectedState === "all" || row.dataset.contactState === selectedState;
-        var show = matchesText && matchesState;
+        var show = matchesText && matchesCategory && matchesState;
         row.hidden = !show;
         if (show) visible += 1;
         row.querySelectorAll("[data-telephony-contact-highlight]").forEach(function (node) {
@@ -238,10 +242,12 @@
       });
     });
     if (search) search.addEventListener("input", applyFilters);
+    if (category) category.addEventListener("change", applyFilters);
     if (state) state.addEventListener("change", applyFilters);
     if (clear) {
       clear.addEventListener("click", function () {
         if (search) search.value = "";
+        if (category) category.value = "all";
         if (state) state.value = "all";
         applyFilters();
         if (search) search.focus();

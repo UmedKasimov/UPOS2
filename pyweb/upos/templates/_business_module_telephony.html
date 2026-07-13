@@ -261,6 +261,15 @@
         <input type="search" placeholder="Имя или номер телефона" autocomplete="off" data-telephony-contact-search />
       </label>
       <label>
+        <span>Категория</span>
+        <select data-telephony-contact-category>
+          <option value="all">Все категории</option>
+          {% for category in telephony_options.contact_categories|default([]) %}
+            <option value="{{ category }}">{{ category }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
         <span>Статус</span>
         <select data-telephony-contact-state>
           <option value="all">Все контакты</option>
@@ -290,14 +299,15 @@
               tabindex="0"
               role="button"
               data-telephony-contact-open="{{ contact.id }}"
-              data-contact-search="{{ (contact.name ~ ' ' ~ contact.phone)|lower }}"
+              data-contact-search="{{ (contact.name ~ ' ' ~ contact.phone ~ ' ' ~ contact.category)|lower }}"
+              data-contact-category="{{ contact.category }}"
               data-contact-state="{{ contact.state }}"
             >
               <td>
                 <span class="telephony-contact-avatar" aria-hidden="true">{{ contact.name[:1]|upper }}</span>
                 <span class="telephony-contact-identity">
                   <strong data-telephony-contact-highlight>{{ contact.name }}</strong>
-                  <small>{{ contact.calls_count }} звонков</small>
+                  <small>{{ contact.category }} · {{ contact.calls_count }} звонков</small>
                 </span>
               </td>
               <td data-telephony-contact-highlight>{{ contact.phone or "Номер не подтвержден" }}</td>

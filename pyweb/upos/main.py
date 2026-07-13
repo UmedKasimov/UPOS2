@@ -9774,6 +9774,7 @@ def create_app() -> FastAPI:
                 is_synced_contact = str(row.external_source or "").strip() == "upos-sip"
                 is_confirmed = bool(extra.get("telephony_confirmed"))
                 is_pending = not phone or (is_synced_contact and not is_confirmed)
+                category = str(extra.get("category") or "").strip() or "Без категории"
                 contacts.append(
                     {
                         "id": str(row.id),
@@ -9783,6 +9784,7 @@ def create_app() -> FastAPI:
                         "state": "pending" if is_pending else "confirmed",
                         "state_label": "????? ???????????" if is_pending else "???????????",
                         "source": str(extra.get("source") or row.external_source or "manual"),
+                        "category": category,
                         "created_at": row.created_at.isoformat() if row.created_at else "",
                         "last_call_at": matching_calls[0]["started_at"] if matching_calls else "",
                         "calls_count": len(matching_calls),
@@ -10073,6 +10075,11 @@ def create_app() -> FastAPI:
                     "telephony_synced_at": now_iso,
                     "email": str(_telephony_first(payload, "email", "mail") or extra.get("email") or "").strip(),
                     "telegram": str(_telephony_first(payload, "telegram", "telegram_username") or extra.get("telegram") or "").strip(),
+                    "category": str(
+                        _telephony_first(payload, "category", "group", "contact_category")
+                        or extra.get("category")
+                        or ""
+                    ).strip(),
                     "address": str(_telephony_first(payload, "address", "location") or extra.get("address") or "").strip(),
                     "note": str(_telephony_first(payload, "note", "comment", "description") or extra.get("note") or "").strip(),
                 }
@@ -10857,6 +10864,10 @@ def create_app() -> FastAPI:
                 "providers": provider_options,
                 "responsibles": responsible_options,
                 "clients": client_options,
+                "contact_categories": sorted(
+                    {str(item.get("category") or "Без категории") for item in contacts},
+                    key=str.casefold,
+                ),
             },
             telephony_calls=_telephony_filter_rows(calls, filters, kind="call"),
             telephony_contacts=contacts,
