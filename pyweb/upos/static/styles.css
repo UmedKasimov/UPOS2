@@ -22029,6 +22029,40 @@ body.is-sidebar-collapsed .upos-floating-phone,
   color: #a16207;
 }
 
+.telephony-calls-table th:nth-child(7) {
+  background: #e8f1ff;
+  color: #1e3a5f;
+  font-weight: 900;
+}
+
+.telephony-calls-table .telephony-call-status-cell {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.telephony-calls-table .telephony-call-status-cell--answered {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.telephony-calls-table .telephony-call-status-cell--missed,
+.telephony-calls-table .telephony-call-status-cell--blocked {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.telephony-calls-table .telephony-call-status-cell--planned {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.telephony-calls-table .telephony-call-status-cell--unknown {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .billing-telephony-mini {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

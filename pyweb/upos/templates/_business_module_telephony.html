@@ -211,7 +211,9 @@
                 {% endif %}
               </td>
               <td>{{ row.responsible or "-" }}</td>
-              <td>{{ row.status_label or row.status or "-" }}</td>
+              <td class="telephony-call-status-cell telephony-call-status-cell--{{ row.status or 'unknown' }}">
+                {{ row.status_label or row.status or "-" }}
+              </td>
             </tr>
           {% else %}
             <tr><td colspan="7">Звонков пока нет. Нажмите «+ Звонок», чтобы добавить входящий, исходящий или запланированный контакт.</td></tr>
