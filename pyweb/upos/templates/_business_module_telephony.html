@@ -6,6 +6,7 @@
 {% set telephony_devices = telephony_devices|default([]) %}
 {% set telephony_recordings = telephony_recordings|default([]) %}
 {% set telephony_dashboard = telephony_dashboard|default({}) %}
+{% set telephony_status_counts = telephony_status_counts|default({'all': 0, 'answered': 0, 'missed': 0, 'planned': 0, 'blocked': 0}) %}
 
 <div class="business-module-toolbar" data-workspace-view="dashboard calls numbers integrations" hidden>
   <div>
@@ -15,8 +16,8 @@
   <button type="button" class="btn" data-telephony-open-call>{{ module.action }}</button>
 </div>
 
-<form class="business-module-filters" method="get" action="/telephony" data-workspace-view="calls numbers integrations" hidden>
-  <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Клиент, номер, сотрудник" /></label>
+<form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls numbers integrations" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Аккаунт, клиент, номер, сотрудник" /></label>
   <label>
     <span>Провайдер</span>
     <input name="provider" list="telephony-provider-list" value="{{ telephony_filters.provider }}" placeholder="SIP / АТС" />
@@ -36,7 +37,7 @@
     </select>
   </label>
   <button class="btn btn-secondary" type="submit">Применить</button>
-  <a class="btn btn-secondary" href="/telephony">Очистить</a>
+  <a class="btn btn-secondary" href="/telephony#calls">Очистить</a>
 </form>
 
 <datalist id="telephony-provider-list">
@@ -174,22 +175,33 @@
       </div>
       <button type="button" class="btn" data-telephony-open-call>+ Звонок</button>
     </header>
+    <form class="telephony-status-filters" method="get" action="/telephony#calls" aria-label="Фильтр звонков по статусу">
+      <input type="hidden" name="q" value="{{ telephony_filters.q }}" />
+      <input type="hidden" name="provider" value="{{ telephony_filters.provider }}" />
+      <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
+      <button type="submit" name="status" value="all" class="telephony-status-filter{% if telephony_filters.status == 'all' %} is-active{% endif %}">Все <strong>{{ telephony_status_counts.all }}</strong></button>
+      <button type="submit" name="status" value="answered" class="telephony-status-filter telephony-status-filter--answered{% if telephony_filters.status == 'answered' %} is-active{% endif %}">Отвеченные <strong>{{ telephony_status_counts.answered }}</strong></button>
+      <button type="submit" name="status" value="missed" class="telephony-status-filter telephony-status-filter--missed{% if telephony_filters.status == 'missed' %} is-active{% endif %}">Пропущенные <strong>{{ telephony_status_counts.missed }}</strong></button>
+      <button type="submit" name="status" value="planned" class="telephony-status-filter telephony-status-filter--planned{% if telephony_filters.status == 'planned' %} is-active{% endif %}">Запланированные <strong>{{ telephony_status_counts.planned }}</strong></button>
+      <button type="submit" name="status" value="blocked" class="telephony-status-filter telephony-status-filter--blocked{% if telephony_filters.status == 'blocked' %} is-active{% endif %}">Заблокированные <strong>{{ telephony_status_counts.blocked }}</strong></button>
+    </form>
     <div class="products-table-wrap">
       <table class="products-table telephony-calls-table">
         <thead>
           <tr>
+            <th>Аккаунт / оператор</th>
             <th>Клиент</th>
             <th>Номер</th>
             <th>Направление</th>
             <th>Дата и время</th>
             <th>Запись</th>
-            <th>Ответственный</th>
             <th>Статус</th>
           </tr>
         </thead>
         <tbody>
           {% for row in telephony_calls %}
             <tr>
+              <td class="telephony-account-cell"><strong>{{ row.account_label }}</strong><small>{{ row.operator_name }}</small></td>
               <td><strong>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
               <td>{{ row.phone }}</td>
               <td>
@@ -210,7 +222,6 @@
                   <span class="telephony-recording-empty">Нет записи</span>
                 {% endif %}
               </td>
-              <td>{{ row.responsible or "-" }}</td>
               <td class="telephony-call-status-cell telephony-call-status-cell--{{ row.status or 'unknown' }}">
                 {{ row.status_label or row.status or "-" }}
               </td>

@@ -9419,6 +9419,88 @@ def create_app() -> FastAPI:
             out.append(item)
         return out
 
+    def _telephony_calls_with_accounts(
+        rows: list[dict[str, Any]],
+        data: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        providers = [row for row in (data.get("telephony_providers") or []) if isinstance(row, dict)]
+        devices = [row for row in (data.get("telephony_devices") or []) if isinstance(row, dict)]
+
+        def account_key(value: Any) -> str:
+            clean = str(value or "").strip().casefold()
+            if clean.startswith("account "):
+                clean = clean[8:].strip()
+            return clean
+
+        enriched: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            device_id = str(item.get("device_id") or "").strip()
+            device = next(
+                (
+                    device_row
+                    for device_row in devices
+                    if device_id
+                    and device_id
+                    in {
+                        str(device_row.get("device_id") or "").strip(),
+                        str(device_row.get("id") or "").strip(),
+                    }
+                ),
+                {},
+            )
+            raw_account = str(item.get("account") or device.get("account") or "").strip()
+            lookup_key = account_key(raw_account)
+            provider = next(
+                (
+                    provider_row
+                    for provider_row in providers
+                    if lookup_key
+                    and lookup_key
+                    in {
+                        account_key(provider_row.get("id")),
+                        account_key(provider_row.get("login")),
+                        account_key(provider_row.get("account")),
+                        account_key(provider_row.get("extension")),
+                        account_key(provider_row.get("auth_id")),
+                        account_key(provider_row.get("label")),
+                    }
+                ),
+                {},
+            )
+            if not provider and len(providers) == 1:
+                provider = providers[0]
+            if not raw_account and provider:
+                raw_account = str(
+                    provider.get("account")
+                    or provider.get("extension")
+                    or provider.get("login")
+                    or provider.get("label")
+                    or ""
+                ).strip()
+
+            responsible = str(item.get("responsible") or "").strip()
+            account_operator = str(
+                device.get("operator")
+                or provider.get("employee")
+                or provider.get("display_name")
+                or responsible
+                or ""
+            ).strip()
+            if responsible and responsible.casefold() not in {"upos sip", "u-pos sip"}:
+                account_operator = responsible
+
+            item["account_label"] = (
+                raw_account
+                if raw_account.casefold().startswith("account ")
+                else f"Account {raw_account}"
+                if raw_account
+                else "Без аккаунта"
+            )
+            item["operator_name"] = account_operator or "Не назначен"
+            enriched.append(item)
+        return enriched
+
     def _telephony_filter_rows(
         rows: list[dict[str, Any]],
         filters: dict[str, str],
@@ -9821,7 +9903,19 @@ def create_app() -> FastAPI:
             "id": device_id,
             "device_id": raw_device_id,
             "name": str(payload.get("device_name") or payload.get("machine") or payload.get("machine_name") or "Upos Sip").strip(),
-            "account": str(payload.get("account") or payload.get("sip_account") or "").strip(),
+            "account": str(
+                _telephony_first(
+                    payload,
+                    "account",
+                    "account_name",
+                    "account_label",
+                    "selected_account",
+                    "sip_account",
+                    "sip_user",
+                    "extension",
+                    "exten",
+                )
+            ).strip(),
             "status": str(payload.get("device_status") or "online").strip() or "online",
             "last_seen_at": now_iso,
             "app_version": str(payload.get("app_version") or "").strip(),
@@ -9862,7 +9956,19 @@ def create_app() -> FastAPI:
             "started_at": str(call_item.get("started_at") or _telephony_first(payload, "started_at", "start_time", "timestamp") or "").strip(),
             "created_at": str(_telephony_first(payload, "recording_created_at", "record_created_at") or now_iso).strip(),
             "device_id": str(_telephony_first(payload, "device_id", "app_instance_id", "machine", "machine_name")).strip(),
-            "account": str(_telephony_first(payload, "account", "sip_account", "extension", "exten")).strip(),
+            "account": str(
+                _telephony_first(
+                    payload,
+                    "account",
+                    "account_name",
+                    "account_label",
+                    "selected_account",
+                    "sip_account",
+                    "sip_user",
+                    "extension",
+                    "exten",
+                )
+            ).strip(),
             "updated_at": now_iso,
         }
         existing_index = next((idx for idx, row in enumerate(recordings) if str(row.get("id") or "") == item["id"]), None)
@@ -9965,7 +10071,19 @@ def create_app() -> FastAPI:
             "status": status,
             "note": str(_telephony_first(payload, "note", "comment", "description")).strip(),
             "source": "upos-sip",
-            "account": str(_telephony_first(payload, "account", "sip_account", "extension", "exten")).strip(),
+            "account": str(
+                _telephony_first(
+                    payload,
+                    "account",
+                    "account_name",
+                    "account_label",
+                    "selected_account",
+                    "sip_account",
+                    "sip_user",
+                    "extension",
+                    "exten",
+                )
+            ).strip(),
             "device_id": str(_telephony_first(payload, "device_id", "app_instance_id", "machine", "machine_name")).strip(),
             "device_name": str((device or {}).get("name") or _telephony_first(payload, "device_name", "machine", "machine_name")).strip(),
             "recording_path": str(
@@ -10418,7 +10536,10 @@ def create_app() -> FastAPI:
         integration_context = _telephony_integration_context(request, wid, data)
         providers = _telephony_rows_with_labels(list(data.get("telephony_providers") or []), "provider")
         numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
-        calls = _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call")
+        calls = _telephony_calls_with_accounts(
+            _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call"),
+            data,
+        )
         devices = list(data.get("telephony_devices") or [])
         recordings = []
         for raw_recording in list(data.get("telephony_recordings") or []):
@@ -10444,6 +10565,18 @@ def create_app() -> FastAPI:
             - {""}
         )
         client_options = _telephony_client_options(wid)
+        calls_without_status_filter = _telephony_filter_rows(
+            calls,
+            {**filters, "status": "all"},
+            kind="call",
+        )
+        telephony_status_counts = {
+            "all": len(calls_without_status_filter),
+            "answered": sum(1 for item in calls_without_status_filter if item.get("status") == "answered"),
+            "missed": sum(1 for item in calls_without_status_filter if item.get("status") == "missed"),
+            "planned": sum(1 for item in calls_without_status_filter if item.get("status") == "planned"),
+            "blocked": sum(1 for item in calls_without_status_filter if item.get("status") == "blocked"),
+        }
         return tpl(
             request,
             "home_business_module.html",
@@ -10457,6 +10590,7 @@ def create_app() -> FastAPI:
                 "clients": client_options,
             },
             telephony_calls=_telephony_filter_rows(calls, filters, kind="call"),
+            telephony_status_counts=telephony_status_counts,
             telephony_numbers=_telephony_filter_rows(numbers, filters, kind="number"),
             telephony_providers=_telephony_filter_rows(providers, filters, kind="provider"),
             telephony_devices=devices,
