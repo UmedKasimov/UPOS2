@@ -1106,6 +1106,8 @@ def create_app() -> FastAPI:
             or path.startswith("/billing")
             or path.startswith("/api/telegram/webhook/")
             or path == "/api/telephony/calls/ingest"
+            or path == "/api/telephony/contacts/sync"
+            or path == "/api/telephony/recordings/upload"
             or path == "/api/telephony/config"
             or path == "/api/telephony/softphone/login"
         ):
@@ -9394,6 +9396,15 @@ def create_app() -> FastAPI:
     def _telephony_direction_label(value: str) -> str:
         return {"incoming": "Входящий", "outgoing": "Исходящий"}.get(str(value or "").strip(), value or "-")
 
+    def _telephony_recording_public_url(value: Any) -> str:
+        raw = str(value or "").strip()
+        if raw.startswith("/static/uploads/telephony/"):
+            return raw
+        parsed = urlparse(raw)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return raw
+        return ""
+
     def _telephony_rows_with_labels(rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for row in rows:
@@ -9401,6 +9412,10 @@ def create_app() -> FastAPI:
             item["status_label"] = _telephony_status_label(kind, str(item.get("status") or ""))
             if kind == "call":
                 item["direction_label"] = _telephony_direction_label(str(item.get("direction") or ""))
+                item["recording_url"] = _telephony_recording_public_url(
+                    item.get("recording_url") or item.get("recording_path")
+                )
+                item["has_recording"] = bool(item["recording_url"] or item.get("recording_path"))
             out.append(item)
         return out
 
@@ -9463,10 +9478,15 @@ def create_app() -> FastAPI:
         return token, True
 
     def _telephony_public_base_url(request: Request) -> str:
+        request_base = str(request.base_url).strip().rstrip("/")
         configured = str(get_settings().auth_url or "").strip().rstrip("/")
-        if configured and "your-app.up.railway.app" not in configured:
+        if request_base and "up.railway.app" not in request_base and "localhost" not in request_base and "127.0.0.1" not in request_base:
+            return request_base
+        if configured and not configured.startswith(("http://", "https://")):
+            configured = "https://" + configured
+        if configured and "your-app.up.railway.app" not in configured and "up.railway.app" not in configured:
             return configured
-        return str(request.base_url).strip().rstrip("/")
+        return request_base
 
     def _telephony_integration_context(request: Request, workspace_owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
         token, changed = _telephony_webhook_token(data)
@@ -9474,10 +9494,14 @@ def create_app() -> FastAPI:
             save_workspace_settings(workspace_owner_id, data)
         base_url = _telephony_public_base_url(request)
         endpoint_url = f"{base_url}/api/telephony/calls/ingest"
+        contacts_sync_url = f"{base_url}/api/telephony/contacts/sync"
+        recording_upload_url = f"{base_url}/api/telephony/recordings/upload"
         webhook_url = f"{endpoint_url}?workspace_owner_id={quote(workspace_owner_id)}&token={quote(token)}"
         return {
             "workspace_owner_id": workspace_owner_id,
             "endpoint_url": endpoint_url,
+            "contacts_sync_url": contacts_sync_url,
+            "recording_upload_url": recording_upload_url,
             "webhook_url": webhook_url,
             "token": token,
             "token_header": "X-UPOS-SIP-Token",
@@ -9599,6 +9623,171 @@ def create_app() -> FastAPI:
     def _telephony_normalized_phone(value: Any) -> str:
         return re.sub(r"\D+", "", str(value or ""))
 
+    def _telephony_phone_matches(left: Any, right: Any) -> bool:
+        left_digits = _telephony_normalized_phone(left)
+        right_digits = _telephony_normalized_phone(right)
+        if not left_digits or not right_digits:
+            return False
+        if len(left_digits) >= 9 and len(right_digits) >= 9:
+            return left_digits[-9:] == right_digits[-9:]
+        return left_digits == right_digits
+
+    def _telephony_upsert_web_client(
+        workspace_owner_id: str,
+        payload: dict[str, Any],
+        *,
+        phone: str = "",
+        name: str = "",
+    ) -> dict[str, Any] | None:
+        phone_value: Any = phone or _telephony_first(
+            payload,
+            "phone",
+            "mobile",
+            "phone_number",
+            "telephone",
+            "remote_ext",
+            "caller",
+            "caller_id",
+            "from",
+        )
+        if not phone_value:
+            phone_list = payload.get("phones") or payload.get("phone_numbers") or payload.get("phoneNumbers") or payload.get("numbers")
+            if isinstance(phone_list, list) and phone_list:
+                first_phone = phone_list[0]
+                if isinstance(first_phone, dict):
+                    phone_value = _telephony_first(first_phone, "number", "phone", "value", "normalized_number")
+                else:
+                    phone_value = first_phone
+        if isinstance(phone_value, dict):
+            phone_value = _telephony_first(phone_value, "number", "phone", "value", "normalized_number")
+        raw_phone = str(
+            phone_value
+            or ""
+        ).strip()
+        clean_phone = _telephony_normalized_phone(raw_phone)
+        if not clean_phone:
+            return None
+        clean_name = str(
+            name
+            or _telephony_first(payload, "client", "client_name", "display_name", "name", "contact_name", "full_name")
+            or ""
+        ).strip()
+        generated_name = f"Контакт +{clean_phone}"
+        display_name = clean_name or generated_name
+        external_id = f"phone:{clean_phone}"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        created = False
+        with session_scope() as session:
+            row = session.execute(
+                select(Counterparty).where(
+                    Counterparty.workspace_owner_id == workspace_owner_id,
+                    Counterparty.external_source == "upos-sip",
+                    Counterparty.external_id == external_id,
+                )
+            ).scalars().first()
+            if row is None:
+                candidates = session.execute(
+                    select(Counterparty)
+                    .where(Counterparty.workspace_owner_id == workspace_owner_id)
+                    .order_by(Counterparty.updated_at.desc())
+                ).scalars().all()
+                row = next(
+                    (
+                        candidate
+                        for candidate in candidates
+                        if _telephony_phone_matches(
+                            candidate.phone or _counterparty_extra(candidate).get("phone"),
+                            clean_phone,
+                        )
+                    ),
+                    None,
+                )
+            if row is None:
+                created = True
+                row = Counterparty(
+                    id=str(uuid.uuid4()),
+                    workspace_owner_id=workspace_owner_id,
+                    kind="client",
+                    name=display_name,
+                    phone=raw_phone[:64],
+                    tax_id="",
+                    external_source="upos-sip",
+                    external_id=external_id,
+                    data={},
+                )
+                session.add(row)
+            else:
+                has_client, has_supplier = _counterparty_role_flags(row.kind)
+                row.kind = _counterparty_kind_from_flags(True, has_supplier)
+                current_name = str(row.name or "").strip()
+                if clean_name and (
+                    not current_name
+                    or current_name == str(row.phone or "").strip()
+                    or current_name.startswith("Контакт +")
+                ):
+                    row.name = clean_name
+                row.phone = raw_phone[:64] or row.phone
+            extra = _counterparty_extra(row)
+            extra.update(
+                {
+                    "phone": raw_phone,
+                    "is_client": True,
+                    "source": "telephony",
+                    "telephony_synced_at": now_iso,
+                    "email": str(_telephony_first(payload, "email", "mail") or extra.get("email") or "").strip(),
+                    "telegram": str(_telephony_first(payload, "telegram", "telegram_username") or extra.get("telegram") or "").strip(),
+                    "address": str(_telephony_first(payload, "address", "location") or extra.get("address") or "").strip(),
+                    "note": str(_telephony_first(payload, "note", "comment", "description") or extra.get("note") or "").strip(),
+                }
+            )
+            row.data = extra
+            flag_modified(row, "data")
+            session.flush()
+            return {
+                "id": row.id,
+                "name": str(row.name or display_name).strip(),
+                "phone": str(row.phone or raw_phone).strip(),
+                "created": created,
+            }
+
+    def _telephony_contact_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_contacts: Any = payload.get("contacts") or payload.get("items") or payload.get("clients")
+        if isinstance(raw_contacts, str):
+            try:
+                raw_contacts = json.loads(raw_contacts)
+            except (TypeError, ValueError):
+                raw_contacts = []
+        if isinstance(raw_contacts, dict):
+            mapped_contacts: list[dict[str, Any]] = []
+            for key, value in raw_contacts.items():
+                if isinstance(value, dict):
+                    item = dict(value)
+                    item.setdefault("phone", str(key))
+                else:
+                    item = {"phone": str(key), "name": str(value or "")}
+                mapped_contacts.append(item)
+            raw_contacts = mapped_contacts
+        if isinstance(raw_contacts, list):
+            return [dict(item) for item in raw_contacts if isinstance(item, dict)]
+        return [payload]
+
+    def _telephony_sync_contacts(workspace_owner_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        synced: list[dict[str, Any]] = []
+        skipped = 0
+        for contact in _telephony_contact_rows(payload):
+            item = _telephony_upsert_web_client(workspace_owner_id, contact)
+            if item is None:
+                skipped += 1
+            else:
+                synced.append(item)
+        return {
+            "synced": len(synced),
+            "created": sum(1 for item in synced if item.get("created")),
+            "updated": sum(1 for item in synced if not item.get("created")),
+            "skipped": skipped,
+            "clients": synced,
+        }
+
     def _telephony_client_name_by_phone(workspace_owner_id: str, phone: str) -> str:
         clean_phone = _telephony_normalized_phone(phone)
         if not clean_phone:
@@ -9612,7 +9801,7 @@ def create_app() -> FastAPI:
             for client in clients:
                 extra = _counterparty_extra(client)
                 client_phone = _telephony_normalized_phone(client.phone or extra.get("phone") or "")
-                if client_phone and clean_phone.endswith(client_phone[-9:]):
+                if _telephony_phone_matches(clean_phone, client_phone):
                     return str(client.name or "").strip()
         return ""
 
@@ -9693,7 +9882,18 @@ def create_app() -> FastAPI:
         calls = data.get("telephony_calls") if isinstance(data.get("telephony_calls"), list) else []
         call_id = str(_telephony_first(payload, "call_id", "id", "uuid", "call_uuid", "callid", "uniqueid", "linkedid")).strip()
         external_id = f"upos-sip:{call_id}" if call_id else str(uuid.uuid4())
+        existing_index = next(
+            (idx for idx, row in enumerate(calls) if str(row.get("external_id") or row.get("id") or "") == external_id),
+            None,
+        )
+        existing_call = dict(calls[existing_index]) if existing_index is not None else {}
         direction = _telephony_normalize_direction(payload)
+        event_name = str(payload.get("event") or "").strip().lower()
+        has_direction_signal = any(
+            payload.get(key) not in (None, "") for key in ("direction", "dir", "call_direction", "type", "inout")
+        ) or any(marker in event_name for marker in ("incoming", "inbound", "outgoing", "outbound"))
+        if existing_call and not has_direction_signal:
+            direction = str(existing_call.get("direction") or direction)
         raw_phone = str(
             _telephony_first(
                 payload,
@@ -9709,12 +9909,34 @@ def create_app() -> FastAPI:
         ).strip()
         if direction == "outgoing":
             raw_phone = str(_telephony_first(payload, "phone", "remote_ext", "to", "dst", "destination", "callee", "called", "from", "src")).strip()
+        raw_phone = raw_phone or str(existing_call.get("phone") or "").strip()
         clean_name = str(_telephony_first(payload, "client", "client_name", "display_name", "name", "contact_name")).strip()
+        synced_client = _telephony_upsert_web_client(workspace_owner_id, payload, phone=raw_phone, name=clean_name)
+        if synced_client:
+            clean_name = str(synced_client.get("name") or clean_name).strip()
         if not clean_name:
-            clean_name = _telephony_client_name_by_phone(workspace_owner_id, raw_phone)
+            clean_name = str(existing_call.get("client") or "").strip() or _telephony_client_name_by_phone(workspace_owner_id, raw_phone)
 
         now_iso = datetime.now(timezone.utc).isoformat()
         status = _telephony_normalize_status(payload)
+        has_status_signal = any(
+            payload.get(key) not in (None, "")
+            for key in ("status", "call_status", "disposition", "result", "duration", "duration_sec", "billsec", "seconds")
+        ) or event_name in {
+            "answered",
+            "connected",
+            "completed",
+            "ended",
+            "hangup",
+            "missed",
+            "no_answer",
+            "busy",
+            "failed",
+            "cancelled",
+            "rejected",
+        }
+        if existing_call and not has_status_signal:
+            status = str(existing_call.get("status") or status)
         device = _telephony_upsert_device_entry(data, payload, now_iso)
         item = {
             "id": external_id,
@@ -9722,24 +9944,37 @@ def create_app() -> FastAPI:
             "client": clean_name or raw_phone or "Неизвестный клиент",
             "phone": raw_phone,
             "direction": direction,
-            "started_at": _telephony_iso_time(_telephony_first(payload, "started_at", "start_time", "call_start", "timestamp", "time", "date", "created_at"), now_iso),
-            "ended_at": _telephony_iso_time(_telephony_first(payload, "ended_at", "end_time", "call_end", "finished_at"), ""),
-            "duration": str(_telephony_first(payload, "duration", "duration_sec", "billsec", "seconds")).strip(),
-            "responsible": str(_telephony_first(payload, "responsible", "operator", "employee", "agent", "manager") or "Upos Sip").strip(),
+            "started_at": _telephony_iso_time(
+                _telephony_first(payload, "started_at", "start_time", "call_start", "timestamp", "time", "date", "created_at"),
+                str(existing_call.get("started_at") or now_iso),
+            ),
+            "ended_at": _telephony_iso_time(
+                _telephony_first(payload, "ended_at", "end_time", "call_end", "finished_at"),
+                str(existing_call.get("ended_at") or ""),
+            ),
+            "duration": str(
+                _telephony_first(payload, "duration", "duration_sec", "billsec", "seconds")
+                or existing_call.get("duration")
+                or ""
+            ).strip(),
+            "responsible": str(
+                _telephony_first(payload, "responsible", "operator", "employee", "agent", "manager")
+                or existing_call.get("responsible")
+                or "Upos Sip"
+            ).strip(),
             "status": status,
             "note": str(_telephony_first(payload, "note", "comment", "description")).strip(),
             "source": "upos-sip",
             "account": str(_telephony_first(payload, "account", "sip_account", "extension", "exten")).strip(),
             "device_id": str(_telephony_first(payload, "device_id", "app_instance_id", "machine", "machine_name")).strip(),
             "device_name": str((device or {}).get("name") or _telephony_first(payload, "device_name", "machine", "machine_name")).strip(),
-            "recording_path": str(_telephony_first(payload, "recording_path", "recording_url", "record_url", "recording")).strip(),
+            "recording_path": str(
+                _telephony_first(payload, "recording_path", "recording_url", "record_url", "recording")
+                or existing_call.get("recording_path")
+                or ""
+            ).strip(),
             "updated_at": now_iso,
         }
-
-        existing_index = next(
-            (idx for idx, row in enumerate(calls) if str(row.get("external_id") or row.get("id") or "") == external_id),
-            None,
-        )
         if existing_index is None:
             item["created_at"] = now_iso
             calls.insert(0, item)
@@ -9756,6 +9991,7 @@ def create_app() -> FastAPI:
         save_workspace_settings(workspace_owner_id, data)
         item["direction_label"] = _telephony_direction_label(item["direction"])
         item["status_label"] = _telephony_status_label("call", item["status"])
+        item["recording_url"] = _telephony_recording_public_url(item.get("recording_path"))
         return item
 
     def _telephony_parse_sip_host(raw_host: Any, raw_port: Any = "5060") -> tuple[str, int, str]:
@@ -10184,7 +10420,11 @@ def create_app() -> FastAPI:
         numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
         calls = _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call")
         devices = list(data.get("telephony_devices") or [])
-        recordings = list(data.get("telephony_recordings") or [])
+        recordings = []
+        for raw_recording in list(data.get("telephony_recordings") or []):
+            recording = dict(raw_recording)
+            recording["recording_url"] = _telephony_recording_public_url(recording.get("path"))
+            recordings.append(recording)
         provider_options = sorted(
             {
                 "SIP",
@@ -10240,6 +10480,7 @@ def create_app() -> FastAPI:
         phone = str(form.get("phone") or "").strip()
         if not client or not phone:
             return RedirectResponse(url="/telephony?error=" + quote("Клиент и номер телефона обязательны") + "#calls", status_code=302)
+        _telephony_upsert_web_client(wid, {"name": client, "phone": phone}, phone=phone, name=client)
         _telephony_save_item(
             wid,
             "telephony_calls",
@@ -10360,14 +10601,103 @@ def create_app() -> FastAPI:
         event = str(payload.get("event") or "").strip().lower()
         if event == "test":
             return JSONResponse({"ok": True, "workspace_owner_id": wid, "message": "connected"})
+        if event in {"contacts", "contacts_sync", "sync_contacts", "contact_created", "contact_updated"}:
+            result = _telephony_sync_contacts(wid, payload)
+            return JSONResponse({"ok": True, "workspace_owner_id": wid, **result})
         if event in {"heartbeat", "device_heartbeat", "ping"}:
             data = _telephony_settings_payload(wid)
             device = _telephony_upsert_device_entry(data, payload, datetime.now(timezone.utc).isoformat())
             save_workspace_settings(wid, data)
-            return JSONResponse({"ok": True, "workspace_owner_id": wid, "device": device})
+            contacts_result = _telephony_sync_contacts(wid, payload) if payload.get("contacts") else None
+            return JSONResponse({"ok": True, "workspace_owner_id": wid, "device": device, "contacts": contacts_result})
 
         call_item = _telephony_upsert_call_from_payload(wid, payload)
         return JSONResponse({"ok": True, "workspace_owner_id": wid, "call": call_item})
+
+    @app.post("/api/telephony/contacts/sync", name="telephony_contacts_sync_api")
+    async def telephony_contacts_sync_api(request: Request):
+        payload: dict[str, Any] = {key: value for key, value in request.query_params.items()}
+        try:
+            if "application/json" in str(request.headers.get("content-type") or "").lower():
+                body = await request.json()
+                if isinstance(body, list):
+                    payload["contacts"] = body
+                elif isinstance(body, dict):
+                    payload.update(body)
+            else:
+                form = await request.form()
+                payload.update({str(key): value for key, value in form.items()})
+        except Exception:
+            return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
+        wid = str(_telephony_first(payload, "workspace_owner_id", "workspace_id", "owner_id", "account_id")).strip()
+        if not valid_workspace_owner_id(wid):
+            wid = _telephony_default_workspace_owner_id()
+        if not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
+        if not _telephony_token_allowed(wid, _telephony_request_token(payload, request)):
+            return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+        result = _telephony_sync_contacts(wid, payload)
+        return JSONResponse({"ok": True, "workspace_owner_id": wid, **result})
+
+    @app.post("/api/telephony/recordings/upload", name="telephony_recording_upload_api")
+    async def telephony_recording_upload_api(request: Request):
+        try:
+            form = await request.form()
+        except Exception:
+            return JSONResponse({"ok": False, "error": "invalid_multipart"}, status_code=400)
+        payload = {str(key): value for key, value in form.items() if key not in {"file", "recording_file", "audio"}}
+        wid = str(_telephony_first(payload, "workspace_owner_id", "workspace_id", "owner_id", "account_id")).strip()
+        if not valid_workspace_owner_id(wid):
+            wid = _telephony_default_workspace_owner_id()
+        if not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
+        if not _telephony_token_allowed(wid, _telephony_request_token(payload, request)):
+            return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+        if not _telephony_first(payload, "call_id", "id", "uuid", "call_uuid", "callid", "uniqueid", "linkedid") and not _telephony_first(
+            payload, "phone", "remote_ext", "caller", "caller_id", "to", "from", "src", "dst"
+        ):
+            return JSONResponse({"ok": False, "error": "call_reference_required"}, status_code=400)
+        upload = form.get("file") or form.get("recording_file") or form.get("audio")
+        filename = str(getattr(upload, "filename", "") or "").strip()
+        if not upload or not filename or not hasattr(upload, "read"):
+            return JSONResponse({"ok": False, "error": "recording_required"}, status_code=400)
+        suffix = Path(filename).suffix.lower()
+        content_type = str(getattr(upload, "content_type", "") or "").lower()
+        suffix_by_type = {
+            "audio/mpeg": ".mp3",
+            "audio/mp4": ".m4a",
+            "audio/ogg": ".ogg",
+            "audio/wav": ".wav",
+            "audio/x-wav": ".wav",
+            "audio/webm": ".webm",
+        }
+        if suffix not in {".mp3", ".m4a", ".ogg", ".wav", ".webm"}:
+            suffix = suffix_by_type.get(content_type, "")
+        if not suffix:
+            return JSONResponse({"ok": False, "error": "unsupported_recording"}, status_code=415)
+        content = await upload.read(50 * 1024 * 1024 + 1)
+        if not content:
+            return JSONResponse({"ok": False, "error": "empty_recording"}, status_code=400)
+        if len(content) > 50 * 1024 * 1024:
+            return JSONResponse({"ok": False, "error": "recording_too_large"}, status_code=413)
+        workspace_dir = re.sub(r"[^a-zA-Z0-9_-]", "_", wid)
+        target_dir = BASE_DIR / "static" / "uploads" / "telephony" / workspace_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / f"{uuid.uuid4().hex}{suffix}"
+        target.write_bytes(content)
+        recording_url = f"/static/uploads/telephony/{workspace_dir}/{target.name}"
+        payload["recording_url"] = recording_url
+        payload["recording_path"] = recording_url
+        payload["event"] = str(payload.get("event") or "recording")
+        call_item = _telephony_upsert_call_from_payload(wid, payload)
+        return JSONResponse(
+            {
+                "ok": True,
+                "workspace_owner_id": wid,
+                "recording_url": recording_url,
+                "call": call_item,
+            }
+        )
 
     @app.get("/api/telephony/config", name="telephony_softphone_config_api")
     def telephony_softphone_config_api(request: Request):
@@ -10391,6 +10721,8 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "workspace_owner_id": wid,
                 "endpoint_url": integration["endpoint_url"],
+                "contacts_sync_url": integration["contacts_sync_url"],
+                "recording_upload_url": integration["recording_upload_url"],
                 "token": integration["token"],
                 "accounts": _telephony_sip_accounts_for_softphone(data),
             }
@@ -10424,6 +10756,8 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "workspace_owner_id": wid,
                 "endpoint_url": integration["endpoint_url"],
+                "contacts_sync_url": integration["contacts_sync_url"],
+                "recording_upload_url": integration["recording_upload_url"],
                 "config_url": f"{_telephony_public_base_url(request)}/api/telephony/config",
                 "token": integration["token"],
                 "token_header": integration["token_header"],
@@ -10458,6 +10792,9 @@ def create_app() -> FastAPI:
         raw_phone = str(payload.get("phone") or payload.get("from") or payload.get("caller") or "").strip()
         clean_phone = re.sub(r"\D+", "", raw_phone)
         client_name = str(payload.get("client") or "").strip()
+        synced_client = _telephony_upsert_web_client(wid, payload, phone=raw_phone, name=client_name)
+        if synced_client:
+            client_name = str(synced_client.get("name") or client_name).strip()
         with session_scope() as session:
             if not client_name and clean_phone:
                 clients = session.execute(

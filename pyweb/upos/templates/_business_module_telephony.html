@@ -139,12 +139,22 @@
             </tr>
           </thead>
           <tbody>
-            {% for row in telephony_dashboard.recordings|default([]) %}
+            {% for row in telephony_recordings %}
               <tr>
                 <td><strong>{{ row.client or "Без имени" }}</strong></td>
                 <td>{{ row.phone or "-" }}</td>
                 <td>{{ row.duration or "-" }}</td>
-                <td><small>{{ row.path or "-" }}</small></td>
+                <td>
+                  {% if row.recording_url %}
+                    <audio class="telephony-recording-player" controls preload="none" src="{{ row.recording_url }}">
+                      Ваш браузер не поддерживает аудио.
+                    </audio>
+                  {% elif row.path %}
+                    <span class="telephony-recording-pending" title="{{ row.path }}">Запись ожидает загрузки</span>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
                 <td>{{ row.started_at or row.created_at or "-" }}</td>
               </tr>
             {% else %}
@@ -165,13 +175,14 @@
       <button type="button" class="btn" data-telephony-open-call>+ Звонок</button>
     </header>
     <div class="products-table-wrap">
-      <table class="products-table">
+      <table class="products-table telephony-calls-table">
         <thead>
           <tr>
             <th>Клиент</th>
             <th>Номер</th>
             <th>Направление</th>
             <th>Дата и время</th>
+            <th>Запись</th>
             <th>Ответственный</th>
             <th>Статус</th>
           </tr>
@@ -181,13 +192,29 @@
             <tr>
               <td><strong>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
               <td>{{ row.phone }}</td>
-              <td>{{ row.direction_label or row.direction }}</td>
+              <td>
+                <span class="telephony-direction telephony-direction--{{ row.direction or 'outgoing' }}">
+                  <span aria-hidden="true">{% if row.direction == 'incoming' %}&#8601;{% else %}&#8599;{% endif %}</span>
+                  {{ row.direction_label or row.direction }}
+                </span>
+              </td>
               <td>{{ row.started_at or "-" }}</td>
+              <td>
+                {% if row.recording_url %}
+                  <audio class="telephony-recording-player" controls preload="none" src="{{ row.recording_url }}">
+                    Ваш браузер не поддерживает аудио.
+                  </audio>
+                {% elif row.has_recording %}
+                  <span class="telephony-recording-pending">Ожидает загрузки</span>
+                {% else %}
+                  <span class="telephony-recording-empty">Нет записи</span>
+                {% endif %}
+              </td>
               <td>{{ row.responsible or "-" }}</td>
               <td>{{ row.status_label or row.status or "-" }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="6">Звонков пока нет. Нажмите «+ Звонок», чтобы добавить входящий, исходящий или запланированный контакт.</td></tr>
+            <tr><td colspan="7">Звонков пока нет. Нажмите «+ Звонок», чтобы добавить входящий, исходящий или запланированный контакт.</td></tr>
           {% endfor %}
         </tbody>
       </table>
