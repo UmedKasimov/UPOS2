@@ -4127,12 +4127,14 @@ def create_app() -> FastAPI:
         group: str = "",
         brand: str = "",
         folder: str = "",
+        catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
         category_values: list[str] | None = None,
         group_values: list[str] | None = None,
         brand_values: list[str] | None = None,
         folder_values: list[str] | None = None,
+        catalog_price_list_values: list[str] | None = None,
         status_values: list[str] | None = None,
         kind_values: list[str] | None = None,
     ) -> dict[str, Any]:
@@ -4158,18 +4160,21 @@ def create_app() -> FastAPI:
         selected_group = clean_values(group_values, group)
         selected_brand = clean_values(brand_values, brand)
         selected_folder = clean_values(folder_values, folder)
+        selected_catalog_price_list = clean_values(catalog_price_list_values, catalog_price_list)
         return {
             "q": q.strip(),
             "category": selected_category[0] if selected_category else "",
             "group": selected_group[0] if selected_group else "",
             "brand": selected_brand[0] if selected_brand else "",
             "folder": selected_folder[0] if selected_folder else "",
+            "catalog_price_list": selected_catalog_price_list[0] if selected_catalog_price_list else "",
             "status": selected_status[0] if selected_status else "active",
             "kind": selected_kind[0] if selected_kind else "product",
             "category_values": selected_category,
             "group_values": selected_group,
             "brand_values": selected_brand,
             "folder_values": selected_folder,
+            "catalog_price_list_values": selected_catalog_price_list,
             "status_values": selected_status,
             "kind_values": selected_kind,
         }
@@ -4565,13 +4570,20 @@ def create_app() -> FastAPI:
     def _collect_products_view_data(
         session: Any,
         workspace_owner_id: str,
-        filters: dict[str, str],
+        filters: dict[str, Any],
         *,
         edit: str = "",
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, dict[str, list[str]]]:
         products: list[dict[str, Any]] = []
         all_items: list[dict[str, Any]] = []
         edit_product = None
+        settings_payload = load_workspace_settings(workspace_owner_id)
+        price_lists = _workspace_price_types(workspace_owner_id)
+        selected_price_list_ids = {
+            str(value)
+            for value in filters.get("catalog_price_list_values", [])
+            if str(value)
+        }
         rows = list(
             session.execute(
                 select(Product)
@@ -4581,8 +4593,33 @@ def create_app() -> FastAPI:
         )
         for row in rows:
             item = _product_data(row)
+            catalog_prices: list[dict[str, Any]] = []
+            for price_type in price_lists:
+                price, currency = _calculated_product_price(item, price_type, price_lists)
+                catalog_prices.append(
+                    {
+                        "id": str(price_type.get("id") or ""),
+                        "name": str(price_type.get("name") or "?????"),
+                        "price": price,
+                        "currency": currency,
+                        "has_price": bool(price),
+                    }
+                )
+            display_prices = [
+                price
+                for price in catalog_prices
+                if not selected_price_list_ids or price["id"] in selected_price_list_ids
+            ]
+            item["catalog_prices"] = catalog_prices
+            item["display_prices"] = display_prices
+            item["price_sort_value"] = next(
+                (price["price"] for price in display_prices if price["has_price"]),
+                "0",
+            )
             all_items.append(item)
             if not _product_matches_filters(item, filters):
+                continue
+            if selected_price_list_ids and not any(price["has_price"] for price in display_prices):
                 continue
             products.append(item)
             if edit and row.id == edit:
@@ -4591,8 +4628,6 @@ def create_app() -> FastAPI:
             found = session.get(Product, edit)
             if found and found.workspace_owner_id == workspace_owner_id:
                 edit_product = _product_data(found)
-        settings_payload = load_workspace_settings(workspace_owner_id)
-        price_lists = _workspace_price_types(workspace_owner_id)
         for price_type in price_lists:
             rows_with_price = _price_type_product_rows(all_items, price_type, price_lists)
             price_type["product_count"] = sum(1 for row in rows_with_price if row["has_price"])
@@ -4706,6 +4741,7 @@ def create_app() -> FastAPI:
         group: str = "",
         brand: str = "",
         folder: str = "",
+        catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
         msg: str = "",
@@ -4716,6 +4752,7 @@ def create_app() -> FastAPI:
         group_values: list[str] | None = None,
         brand_values: list[str] | None = None,
         folder_values: list[str] | None = None,
+        catalog_price_list_values: list[str] | None = None,
         status_values: list[str] | None = None,
         kind_values: list[str] | None = None,
         **_unused: Any,
@@ -4739,6 +4776,7 @@ def create_app() -> FastAPI:
         selected_group = values_or_single(group_values, group)
         selected_brand = values_or_single(brand_values, brand)
         selected_folder = values_or_single(folder_values, folder)
+        selected_catalog_price_list = values_or_single(catalog_price_list_values, catalog_price_list)
         selected_status = values_or_single(status_values, status.strip() or "active")
         selected_kind = values_or_single(kind_values, kind.strip() or "product")
         if selected_category:
@@ -4749,6 +4787,8 @@ def create_app() -> FastAPI:
             query["brand"] = selected_brand
         if selected_folder:
             query["folder"] = selected_folder
+        if selected_catalog_price_list:
+            query["catalog_price_list"] = selected_catalog_price_list
         if selected_status:
             query["status"] = selected_status
         if selected_kind:
@@ -4771,6 +4811,7 @@ def create_app() -> FastAPI:
         group: str = "",
         brand: str = "",
         folder: str = "",
+        catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
         page_size: str = "100",
@@ -4795,12 +4836,14 @@ def create_app() -> FastAPI:
             group,
             brand,
             folder,
+            catalog_price_list,
             status,
             kind,
             category_values=query.getlist("category"),
             group_values=query.getlist("group"),
             brand_values=query.getlist("brand"),
             folder_values=query.getlist("folder"),
+            catalog_price_list_values=query.getlist("catalog_price_list"),
             status_values=query.getlist("status"),
             kind_values=query.getlist("kind"),
         )
@@ -4930,6 +4973,7 @@ def create_app() -> FastAPI:
         group: str = "",
         brand: str = "",
         folder: str = "",
+        catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
     ):
@@ -4944,12 +4988,14 @@ def create_app() -> FastAPI:
             group,
             brand,
             folder,
+            catalog_price_list,
             status,
             kind,
             category_values=query.getlist("category"),
             group_values=query.getlist("group"),
             brand_values=query.getlist("brand"),
             folder_values=query.getlist("folder"),
+            catalog_price_list_values=query.getlist("catalog_price_list"),
             status_values=query.getlist("status"),
             kind_values=query.getlist("kind"),
         )
@@ -5494,12 +5540,14 @@ def create_app() -> FastAPI:
             str(form.get("group") or ""),
             str(form.get("brand") or ""),
             str(form.get("folder") or ""),
+            str(form.get("catalog_price_list") or ""),
             str(form.get("status") or "active"),
             str(form.get("kind") or "product"),
             category_values=[str(item or "") for item in form.getlist("category")],
             group_values=[str(item or "") for item in form.getlist("group")],
             brand_values=[str(item or "") for item in form.getlist("brand")],
             folder_values=[str(item or "") for item in form.getlist("folder")],
+            catalog_price_list_values=[str(item or "") for item in form.getlist("catalog_price_list")],
             status_values=[str(item or "") for item in form.getlist("status")],
             kind_values=[str(item or "") for item in form.getlist("kind")],
         )

@@ -1599,10 +1599,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .products-catalog-filter {
   display: grid;
   grid-template-columns:
-    minmax(14rem, 1.7fr)
-    minmax(7rem, 0.8fr)
-    repeat(4, minmax(7.5rem, 1fr))
-    minmax(7.5rem, 0.9fr)
+    minmax(13rem, 1.55fr)
+    repeat(7, minmax(7rem, 1fr))
     2.2rem;
   grid-area: filters;
   gap: 0.55rem;
@@ -1718,9 +1716,55 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   box-shadow: 0 16px 36px rgb(15 23 42 / 0.18);
 }
 
-.products-catalog-status .products-multi-filter-menu {
+.products-catalog-status .products-multi-filter-menu,
+.products-catalog-price-list .products-multi-filter-menu {
   right: 0;
   left: auto;
+}
+
+.products-price-list-cell {
+  min-width: 14rem;
+}
+
+.products-price-list-values {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.products-price-list-value {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.65rem;
+  min-width: 0;
+  padding-bottom: 0.22rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+}
+
+.products-price-list-value:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.products-price-list-value small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.products-price-list-value strong {
+  color: var(--primary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.products-price-list-value.is-empty strong,
+.products-price-list-empty {
+  color: var(--muted-foreground);
+  font-weight: 650;
 }
 
 .products-multi-filter-menu label {
@@ -1896,7 +1940,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 @media (max-width: 1500px) {
   .products-catalog-filter {
-    grid-template-columns: minmax(14rem, 1.7fr) minmax(7rem, 0.8fr) repeat(3, minmax(7.5rem, 1fr)) 2.2rem;
+    grid-template-columns: minmax(14rem, 1.7fr) repeat(4, minmax(7rem, 1fr)) 2.2rem;
   }
 }
 

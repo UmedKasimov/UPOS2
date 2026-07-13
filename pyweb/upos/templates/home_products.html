@@ -116,6 +116,7 @@
                 {% for item in product_filters.group_values %}<input type="hidden" name="group" value="{{ item }}" />{% endfor %}
                 {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
                 {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.catalog_price_list_values %}<input type="hidden" name="catalog_price_list" value="{{ item }}" />{% endfor %}
                 {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
                 <button class="btn btn-secondary" type="submit">Экспорт Excel</button>
               </form>
@@ -209,6 +210,23 @@
                 </div>
               </details>
             </label>
+            <label class="products-catalog-price-list">
+              <span>Прайс-листы</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Прайс-листы</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.price_lists %}
+                    <label>
+                      <input type="checkbox" name="catalog_price_list" value="{{ item.id }}" {% if item.id in product_filters.catalog_price_list_values %}checked{% endif %} />
+                      <span>{{ item.name }}</span>
+                    </label>
+                  {% else %}
+                    <p>Нет прайс-листов</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
             <label class="products-catalog-status">
               <span>Статус</span>
               <details class="products-multi-filter" data-products-multi-filter>
@@ -238,6 +256,7 @@
           {% for item in product_filters.group_values %}<input type="hidden" name="group" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.catalog_price_list_values %}<input type="hidden" name="catalog_price_list" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
           <input type="hidden" name="page_size" value="{{ product_page_size }}" />
@@ -316,9 +335,9 @@
                     <span>На складе</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
-                <th data-column-label="Цена продажи" aria-sort="none">
+                <th data-column-label="Прайс-листы" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price">
-                    <span>Цена продажи</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                    <span>Прайс-листы</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
                 <th data-column-label="Категория" aria-sort="none">
@@ -345,7 +364,7 @@
                   data-sort-barcode="{{ (product.barcode or '')|lower }}"
                   data-sort-unit="{{ (product.unit or '')|lower }}"
                   data-sort-quantity="{{ product.quantity or 0 }}"
-                  data-sort-price="{{ product.sale_price or 0 }}"
+                  data-sort-price="{{ product.price_sort_value or 0 }}"
                   data-sort-category="{{ (product.category or '')|lower }}"
                   data-sort-status="{{ product.status or '' }}"
                 >
@@ -406,9 +425,17 @@
                   <td>{{ product.barcode or "-" }}</td>
                   <td>{{ product.unit or "-" }}</td>
                   <td>{{ product.quantity }}</td>
-                  <td>
-                    {% if product.sale_price %}{{ product.sale_price }} {{ product.sale_currency }}{% else %}-{% endif %}
-                    {% if product.prices|length > 1 %}<small>Все ({{ product.prices|length }})</small>{% endif %}
+                  <td class="products-price-list-cell">
+                    <div class="products-price-list-values">
+                      {% for price in product.display_prices %}
+                        <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
+                          <small>{{ price.name }}</small>
+                          <strong>{% if price.has_price %}{{ price.price }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
+                        </div>
+                      {% else %}
+                        <span class="products-price-list-empty">Нет прайс-листов</span>
+                      {% endfor %}
+                    </div>
                   </td>
                   <td>{{ product.category or "-" }}</td>
                   <td>{{ "Активный" if product.status == "active" else "Неактивный" }}</td>
