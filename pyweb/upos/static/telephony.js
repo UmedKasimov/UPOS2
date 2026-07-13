@@ -203,10 +203,73 @@
     var noResults = document.querySelector("[data-telephony-contact-no-results]");
     var total = document.querySelector("[data-telephony-contact-total]");
     var dialog = document.getElementById("telephony-contact-dialog");
+    var selectAll = document.querySelector("[data-telephony-contact-select-all]");
+    var selectors = Array.from(document.querySelectorAll("[data-telephony-contact-select]"));
+    var bulkDelete = document.querySelector("[data-telephony-contact-bulk-delete]");
+    var selectedCount = document.querySelector("[data-telephony-contact-selected-count]");
+    var deleteButtons = Array.from(document.querySelectorAll("[data-telephony-contact-delete]"));
+    var deleteDialog = document.getElementById("telephony-contact-delete-dialog");
+    var deleteMessage = document.querySelector("[data-telephony-contact-delete-message]");
+    var deleteInputs = document.querySelector("[data-telephony-contact-delete-inputs]");
+    var deleteCancel = document.querySelector("[data-telephony-contact-delete-cancel]");
     var contacts = telephonyContacts();
     var contactsById = new Map(contacts.map(function (contact) {
       return [String(contact.id || ""), contact];
     }));
+
+    function checkedContactIds() {
+      return selectors.filter(function (input) {
+        return input.checked;
+      }).map(function (input) {
+        return input.value;
+      });
+    }
+
+    function visibleSelectors() {
+      return selectors.filter(function (input) {
+        var row = input.closest("[data-telephony-contact-open]");
+        return row && !row.hidden;
+      });
+    }
+
+    function updateSelectionState() {
+      var checkedIds = checkedContactIds();
+      var visible = visibleSelectors();
+      var checkedVisible = visible.filter(function (input) {
+        return input.checked;
+      }).length;
+      if (bulkDelete) bulkDelete.disabled = checkedIds.length === 0;
+      if (selectedCount) selectedCount.textContent = String(checkedIds.length);
+      if (selectAll) {
+        selectAll.checked = visible.length > 0 && checkedVisible === visible.length;
+        selectAll.indeterminate = checkedVisible > 0 && checkedVisible < visible.length;
+        selectAll.disabled = visible.length === 0;
+      }
+    }
+
+    function prepareDelete(contactIds, contactName) {
+      if (!deleteDialog || !deleteInputs) return;
+      var uniqueIds = Array.from(new Set(contactIds.filter(Boolean)));
+      if (!uniqueIds.length) return;
+      deleteInputs.replaceChildren();
+      uniqueIds.forEach(function (contactId) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "contact_ids";
+        input.value = contactId;
+        deleteInputs.appendChild(input);
+      });
+      if (deleteMessage) {
+        if (uniqueIds.length === 1 && contactName) {
+          deleteMessage.textContent = "Удалить контакт «" + contactName + "»? Это действие нельзя отменить.";
+        } else if (uniqueIds.length === 1) {
+          deleteMessage.textContent = "Удалить выбранный контакт? Это действие нельзя отменить.";
+        } else {
+          deleteMessage.textContent = "Удалить выбранные контакты (" + uniqueIds.length + ")? Это действие нельзя отменить.";
+        }
+      }
+      openDialog(deleteDialog);
+    }
 
     function applyFilters() {
       var query = normalizedSearchValue(search ? search.value : "");
@@ -227,20 +290,54 @@
       });
       if (noResults) noResults.hidden = visible !== 0;
       if (total) total.textContent = String(visible);
+      updateSelectionState();
     }
 
     rows.forEach(function (row) {
       function showContact() {
         openContactDialog(dialog, contactsById.get(String(row.dataset.telephonyContactOpen || "")));
       }
-      row.addEventListener("click", showContact);
+      row.addEventListener("click", function (event) {
+        if (event.target.closest("button, input, select, a, label")) return;
+        showContact();
+      });
       row.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" || event.key === " ") {
+        if (event.target === row && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
           showContact();
         }
       });
     });
+    selectors.forEach(function (input) {
+      input.addEventListener("click", function (event) {
+        event.stopPropagation();
+      });
+      input.addEventListener("change", updateSelectionState);
+    });
+    if (selectAll) {
+      selectAll.addEventListener("change", function () {
+        visibleSelectors().forEach(function (input) {
+          input.checked = selectAll.checked;
+        });
+        updateSelectionState();
+      });
+    }
+    deleteButtons.forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        event.stopPropagation();
+        prepareDelete([button.dataset.contactId || ""], button.dataset.contactName || "");
+      });
+    });
+    if (bulkDelete) {
+      bulkDelete.addEventListener("click", function () {
+        prepareDelete(checkedContactIds(), "");
+      });
+    }
+    if (deleteCancel) {
+      deleteCancel.addEventListener("click", function () {
+        closeDialog(deleteDialog);
+      });
+    }
     if (search) search.addEventListener("input", applyFilters);
     if (category) category.addEventListener("change", applyFilters);
     if (state) state.addEventListener("change", applyFilters);

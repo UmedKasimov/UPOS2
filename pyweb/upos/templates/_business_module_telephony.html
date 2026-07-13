@@ -252,8 +252,18 @@
         <h2>Контакты</h2>
         <span>Всего: <b data-telephony-contact-total>{{ telephony_contacts|length }}</b> · требуют подтверждения: {{ telephony_contacts|selectattr('pending')|list|length }}</span>
       </div>
-      <button type="button" class="btn btn-secondary" data-telephony-open-number>+ Рабочий номер</button>
+      <div class="telephony-contacts-head-actions">
+        <button type="button" class="btn btn-danger-ghost" data-telephony-contact-bulk-delete disabled>
+          Удалить выбранные <span data-telephony-contact-selected-count>0</span>
+        </button>
+        <button type="button" class="btn btn-secondary" data-telephony-open-number>+ Рабочий номер</button>
+      </div>
     </header>
+
+    <form method="post" action="/telephony/contacts/delete" id="telephony-contact-delete-form" data-telephony-contact-delete-form hidden>
+      {% include "_csrf_field.html" %}
+      <span data-telephony-contact-delete-inputs></span>
+    </form>
 
     <div class="telephony-contact-filters" role="search">
       <label class="telephony-contact-search">
@@ -284,12 +294,16 @@
       <table class="products-table telephony-contacts-table">
         <thead>
           <tr>
+            <th class="telephony-contact-select-cell">
+              <input type="checkbox" aria-label="Выбрать все видимые контакты" data-telephony-contact-select-all />
+            </th>
             <th>Контакт</th>
             <th>Телефон</th>
             <th>Входящие</th>
             <th>Исходящие</th>
             <th>Последний звонок</th>
             <th>Статус</th>
+            <th aria-label="Действия"></th>
           </tr>
         </thead>
         <tbody data-telephony-contact-list>
@@ -303,6 +317,14 @@
               data-contact-category="{{ contact.category }}"
               data-contact-state="{{ contact.state }}"
             >
+              <td class="telephony-contact-select-cell">
+                <input
+                  type="checkbox"
+                  value="{{ contact.id }}"
+                  aria-label="Выбрать контакт {{ contact.name }}"
+                  data-telephony-contact-select
+                />
+              </td>
               <td>
                 <span class="telephony-contact-avatar" aria-hidden="true">{{ contact.name[:1]|upper }}</span>
                 <span class="telephony-contact-identity">
@@ -315,9 +337,18 @@
               <td><strong class="telephony-contact-call-count outgoing">{{ contact.outgoing_count }}</strong></td>
               <td>{{ contact.last_call_at or "Звонков пока нет" }}</td>
               <td><span class="telephony-contact-state telephony-contact-state--{{ contact.state }}">{{ contact.state_label }}</span></td>
+              <td class="telephony-contact-action-cell">
+                <button
+                  type="button"
+                  class="btn btn-danger-ghost btn-xs telephony-contact-delete"
+                  data-telephony-contact-delete
+                  data-contact-id="{{ contact.id }}"
+                  data-contact-name="{{ contact.name }}"
+                >Удалить</button>
+              </td>
             </tr>
           {% else %}
-            <tr data-telephony-contact-empty><td colspan="6">Контактов пока нет. Новый звонок автоматически создаст контакт.</td></tr>
+            <tr data-telephony-contact-empty><td colspan="8">Контактов пока нет. Новый звонок автоматически создаст контакт.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -561,6 +592,25 @@
 </dialog>
 
 <script type="application/json" id="telephony-contacts-data">{{ telephony_contacts|tojson }}</script>
+
+<dialog class="settings-profile-modal telephony-dialog telephony-contact-delete-dialog" id="telephony-contact-delete-dialog" aria-labelledby="telephony-contact-delete-title">
+  <div class="settings-profile-modal-surface telephony-contact-delete-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="telephony-contact-delete-title" class="settings-profile-modal-title">Удалить контакт?</h2>
+        <p class="settings-profile-modal-sub">Контакт исчезнет из телефонной книги, а история останется в системе.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll telephony-contact-delete-dialog-body">
+      <p data-telephony-contact-delete-message>Подтвердите удаление контакта.</p>
+      <div class="product-form-actions">
+        <button type="button" class="btn btn-secondary" data-telephony-contact-delete-cancel>Отмена</button>
+        <button type="submit" class="btn btn-danger" form="telephony-contact-delete-form">Удалить</button>
+      </div>
+    </div>
+  </div>
+</dialog>
 
 <dialog class="settings-profile-modal telephony-dialog" id="telephony-number-dialog" aria-labelledby="telephony-number-title">
   <div class="settings-profile-modal-surface telephony-dialog-surface">

@@ -335,6 +335,7 @@ TELEPHONY_SETTING_LIST_KEYS = (
     "telephony_providers",
     "telephony_devices",
     "telephony_recordings",
+    "telephony_deleted_contacts",
 )
 
 
@@ -4599,7 +4600,7 @@ def create_app() -> FastAPI:
                 catalog_prices.append(
                     {
                         "id": str(price_type.get("id") or ""),
-                        "name": str(price_type.get("name") or "?????"),
+                        "name": str(price_type.get("name") or "Прайс"),
                         "price": price,
                         "currency": currency,
                         "has_price": bool(price),
@@ -9864,7 +9865,9 @@ def create_app() -> FastAPI:
             ).scalars().all()
             for row in rows:
                 extra = _counterparty_extra(row)
-                name = str(row.name or "??? ?????").strip()
+                if extra.get("telephony_deleted") is True:
+                    continue
+                name = str(row.name or "Без имени").strip()
                 phone = str(row.phone or extra.get("phone") or "").strip()
                 matching_calls: list[dict[str, Any]] = []
                 for call in call_rows:
@@ -9910,7 +9913,7 @@ def create_app() -> FastAPI:
                         "phone": phone,
                         "pending": is_pending,
                         "state": "pending" if is_pending else "confirmed",
-                        "state_label": "????? ???????????" if is_pending else "???????????",
+                        "state_label": "Нужно подтвердить" if is_pending else "Подтвержден",
                         "source": str(extra.get("source") or row.external_source or "manual"),
                         "category": category,
                         "created_at": row.created_at.isoformat() if row.created_at else "",
@@ -10105,6 +10108,7 @@ def create_app() -> FastAPI:
         *,
         phone: str = "",
         name: str = "",
+        blocked_external_ids: set[str] | None = None,
     ) -> dict[str, Any] | None:
         phone_value: Any = phone or _telephony_first(
             payload,
@@ -10142,6 +10146,8 @@ def create_app() -> FastAPI:
         generated_name = f"Контакт +{clean_phone}"
         display_name = clean_name or generated_name
         external_id = f"phone:{clean_phone}"
+        if blocked_external_ids and external_id in blocked_external_ids:
+            return None
         now_iso = datetime.now(timezone.utc).isoformat()
         created = False
         with session_scope() as session:
@@ -10255,8 +10261,19 @@ def create_app() -> FastAPI:
     def _telephony_sync_contacts(workspace_owner_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         synced: list[dict[str, Any]] = []
         skipped = 0
+        settings_data = _telephony_settings_payload(workspace_owner_id)
+        deleted_contacts = settings_data.get("telephony_deleted_contacts")
+        blocked_external_ids = {
+            str(item.get("external_id") or "").strip()
+            for item in deleted_contacts
+            if isinstance(item, dict) and str(item.get("external_id") or "").strip()
+        } if isinstance(deleted_contacts, list) else set()
         for contact in _telephony_contact_rows(payload):
-            item = _telephony_upsert_web_client(workspace_owner_id, contact)
+            item = _telephony_upsert_web_client(
+                workspace_owner_id,
+                contact,
+                blocked_external_ids=blocked_external_ids,
+            )
             if item is None:
                 skipped += 1
             else:
@@ -11085,7 +11102,7 @@ def create_app() -> FastAPI:
         phone = str(form.get("phone") or "").strip()
         if not contact_id or not name or len(_telephony_normalized_phone(phone)) < 7:
             return RedirectResponse(
-                url="/telephony?error=" + quote("??????? ??? ? ?????????? ????? ????????") + "#numbers",
+                url="/telephony?error=" + quote("Укажите имя и корректный номер телефона") + "#numbers",
                 status_code=302,
             )
         previous_name = ""
@@ -11094,7 +11111,7 @@ def create_app() -> FastAPI:
             row = session.get(Counterparty, contact_id)
             if not row or row.workspace_owner_id != wid or row.kind not in {"client", "both"}:
                 return RedirectResponse(
-                    url="/telephony?error=" + quote("??????? ?? ??????") + "#numbers",
+                    url="/telephony?error=" + quote("Контакт не найден") + "#numbers",
                     status_code=302,
                 )
             candidates = session.execute(
@@ -11108,7 +11125,7 @@ def create_app() -> FastAPI:
                 for candidate in candidates
             ):
                 return RedirectResponse(
-                    url="/telephony?error=" + quote("???? ????? ??? ???????? ? ??????? ????????") + "#numbers",
+                    url="/telephony?error=" + quote("Этот номер уже сохранен у другого контакта") + "#numbers",
                     status_code=302,
                 )
             previous_name = str(row.name or "").strip()
@@ -11146,6 +11163,86 @@ def create_app() -> FastAPI:
             data["telephony_calls"] = stored_calls
             save_workspace_settings(wid, data)
         return RedirectResponse(url="/telephony?msg=saved#numbers", status_code=302)
+
+    @app.post("/telephony/contacts/delete", name="telephony_contacts_delete")
+    async def telephony_contacts_delete(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#numbers", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        contact_ids = list(
+            dict.fromkeys(
+                str(value or "").strip()
+                for value in form.getlist("contact_ids")
+                if str(value or "").strip()
+            )
+        )[:2000]
+        if not contact_ids:
+            return RedirectResponse(
+                url="/telephony?error=" + quote("Выберите хотя бы один контакт") + "#numbers",
+                status_code=302,
+            )
+
+        deleted_at = datetime.now(timezone.utc).isoformat()
+        deleted_by = _telephony_user_name(request)
+        deleted_rows: list[dict[str, Any]] = []
+        with session_scope() as session:
+            rows = session.execute(
+                select(Counterparty).where(
+                    Counterparty.workspace_owner_id == wid,
+                    Counterparty.kind.in_(["client", "both"]),
+                    Counterparty.id.in_(contact_ids),
+                )
+            ).scalars().all()
+            for row in rows:
+                extra = _counterparty_extra(row)
+                phone = str(row.phone or extra.get("phone") or "").strip()
+                normalized_phone = _telephony_normalized_phone(phone)
+                external_id = f"phone:{normalized_phone}" if normalized_phone else f"contact:{row.id}"
+                extra.update(
+                    {
+                        "telephony_deleted": True,
+                        "telephony_deleted_at": deleted_at,
+                        "telephony_deleted_by": deleted_by,
+                    }
+                )
+                row.data = extra
+                flag_modified(row, "data")
+                deleted_rows.append(
+                    {
+                        "contact_id": str(row.id),
+                        "external_id": external_id,
+                        "phone": phone,
+                        "name": str(row.name or "").strip(),
+                        "deleted_at": deleted_at,
+                        "deleted_by": deleted_by,
+                    }
+                )
+
+        if not deleted_rows:
+            return RedirectResponse(
+                url="/telephony?error=" + quote("Выбранные контакты не найдены") + "#numbers",
+                status_code=302,
+            )
+
+        data = _telephony_settings_payload(wid)
+        existing_rows = data.get("telephony_deleted_contacts")
+        merged: dict[str, dict[str, Any]] = {}
+        if isinstance(existing_rows, list):
+            for item in existing_rows:
+                if not isinstance(item, dict):
+                    continue
+                key = str(item.get("external_id") or item.get("contact_id") or "").strip()
+                if key:
+                    merged[key] = dict(item)
+        for item in deleted_rows:
+            merged[str(item["external_id"])] = item
+        data["telephony_deleted_contacts"] = list(merged.values())[-5000:]
+        save_workspace_settings(wid, data)
+        return RedirectResponse(url="/telephony?msg=deleted#numbers", status_code=302)
 
     @app.post("/telephony/providers/save", name="telephony_provider_save")
     async def telephony_provider_save(request: Request):
