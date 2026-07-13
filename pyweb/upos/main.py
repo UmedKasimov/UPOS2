@@ -6724,13 +6724,30 @@ def create_app() -> FastAPI:
             )
         return RedirectResponse(url=f"/sales?msg=paid&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
 
+    _PURCHASE_WORKFLOW_STATUSES = {
+        "ordered": "Заказан",
+        "purchased": "Куплен",
+        "partial_return": "Ч/возврат",
+        "returned": "Возврат",
+    }
+
+    def _purchase_workflow_status(status: str) -> str:
+        clean_status = str(status or "").strip().lower()
+        if clean_status in _PURCHASE_WORKFLOW_STATUSES:
+            return clean_status
+        if clean_status in {"paid", "partial", "debt"}:
+            return "purchased"
+        return "ordered"
+
     def _purchase_status_label(status: str) -> str:
-        return {
-            "new": "Новый",
-            "partial": "Частично",
-            "paid": "Оплачен",
-            "debt": "Долг",
-        }.get(str(status or ""), "Новый")
+        workflow_status = _purchase_workflow_status(status)
+        return _PURCHASE_WORKFLOW_STATUSES[workflow_status]
+
+    def _purchase_quantity_label(value: Any) -> str:
+        quantity = _sales_decimal(value)
+        if quantity == quantity.to_integral_value():
+            return str(int(quantity))
+        return _decimal_plain_text(quantity.normalize())
 
     def _purchase_document_data(row: PurchaseDocument) -> dict[str, Any]:
         data = _json_object(row.data)
@@ -6744,7 +6761,7 @@ def create_app() -> FastAPI:
             safe_lines.append(
                 {
                     "product": str(line.get("product") or ""),
-                    "quantity": str(line.get("quantity") or ""),
+                    "quantity": _purchase_quantity_label(line.get("quantity")),
                     "price": str(line.get("price") or ""),
                     "sale_price": str(line.get("sale_price") or ""),
                     "total": str(line.get("total") or ""),
@@ -6760,8 +6777,9 @@ def create_app() -> FastAPI:
             "currency": row.currency,
             "paid_amount": _sales_money_label(paid_amount),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
-            "status": str(data.get("status") or "new"),
-            "status_label": _purchase_status_label(str(data.get("status") or "new")),
+            "status": _purchase_workflow_status(str(data.get("workflow_status") or data.get("status") or "ordered")),
+            "status_label": _purchase_status_label(str(data.get("workflow_status") or data.get("status") or "ordered")),
+            "payment_status": str(data.get("payment_status") or ("paid" if paid_amount >= _sales_decimal(row.amount) and _sales_decimal(row.amount) > 0 else "partial" if paid_amount > 0 else "unpaid")),
             "payment_type": str(data.get("payment_type") or ""),
             "price_type_id": str(data.get("price_type_id") or ""),
             "price_type_name": str(data.get("price_type_name") or ""),
@@ -6780,8 +6798,9 @@ def create_app() -> FastAPI:
             "currency": str(item["currency"] or "UZS"),
             "paid_amount": str(item["paid_amount"] or "0"),
             "debt_amount": str(item["debt_amount"] or "0"),
-            "status": str(item["status"] or "new"),
-            "status_label": str(item["status_label"] or "Новый"),
+            "status": str(item["status"] or "ordered"),
+            "status_label": str(item["status_label"] or "Заказан"),
+            "payment_status": str(item["payment_status"] or "unpaid"),
             "payment_type": str(item["payment_type"] or ""),
             "price_type_id": str(item["price_type_id"] or ""),
             "price_type_name": str(item["price_type_name"] or ""),
@@ -6859,9 +6878,7 @@ def create_app() -> FastAPI:
                             "amount": str(payment_amount.normalize() if payment_amount else "0"),
                         }
                     )
-        status = str(form.get("status") or "").strip()
-        if not status:
-            status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "new"
+        payment_status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "unpaid"
         payment_type = str(form.get("payment_type") or "").strip()
         if not payment_type and payment_lines:
             payment_type = ", ".join(
@@ -6871,7 +6888,9 @@ def create_app() -> FastAPI:
             "date": str(form.get("date") or "").strip(),
             "supplier": str(form.get("supplier") or "").strip(),
             "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
-            "status": status,
+            "status": "ordered",
+            "workflow_status": "ordered",
+            "payment_status": payment_status,
             "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
             "payment_type": payment_type,
             "payment_lines": payment_lines,
@@ -7876,23 +7895,93 @@ def create_app() -> FastAPI:
             session.add(row)
         return RedirectResponse(url=f"{base_url}?msg=saved#purchases", status_code=302)
 
-    def _purchase_delete_redirect(purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+    def _purchase_status_redirect(
+        purchase_id: str,
+        workspace_owner_id: str,
+        base_url: str,
+        next_status: str,
+        actor: dict[str, Any] | None = None,
+    ) -> RedirectResponse:
+        clean_status = _purchase_workflow_status(next_status)
+        if clean_status != str(next_status or "").strip().lower():
+            return RedirectResponse(url=f"{base_url}?error=" + quote("Неизвестный статус закупки") + "#purchases", status_code=302)
+        allowed_transitions = {
+            "ordered": {"ordered", "purchased"},
+            "purchased": {"ordered", "purchased", "partial_return", "returned"},
+            "partial_return": {"purchased", "partial_return", "returned"},
+            "returned": {"purchased", "returned"},
+        }
         with session_scope() as session:
             row = session.get(PurchaseDocument, purchase_id)
-            if row and row.workspace_owner_id == workspace_owner_id:
-                data = _json_object(row.data)
-                try:
-                    _sync_product_lines(
-                        session,
-                        workspace_owner_id,
-                        warehouse_name=str(data.get("warehouse") or "Основной склад"),
-                        lines=list(data.get("lines") or []),
-                        delta_sign=-1,
-                        op_date=str(data.get("date") or ""),
-                    )
-                except ValueError as exc:
-                    return RedirectResponse(url=f"{base_url}?error=" + quote(str(exc)) + "#purchases", status_code=302)
-                session.delete(row)
+            if not row or row.workspace_owner_id != workspace_owner_id:
+                return RedirectResponse(url=f"{base_url}?error=" + quote("Закупка не найдена") + "#purchases", status_code=302)
+            data = _json_object(row.data)
+            current_status = _purchase_workflow_status(str(data.get("workflow_status") or data.get("status") or "ordered"))
+            if clean_status not in allowed_transitions[current_status]:
+                return RedirectResponse(
+                    url=f"{base_url}?error=" + quote(f"Нельзя изменить статус «{_purchase_status_label(current_status)}» на «{_purchase_status_label(clean_status)}»") + "#purchases",
+                    status_code=302,
+                )
+            if current_status != clean_status:
+                history = data.get("status_history") if isinstance(data.get("status_history"), list) else []
+                history.append(
+                    {
+                        "from": current_status,
+                        "to": clean_status,
+                        "changed_at": datetime.now(timezone.utc).isoformat(),
+                        "changed_by": str((actor or {}).get("name") or (actor or {}).get("username") or ""),
+                    }
+                )
+                data["status_history"] = history[-50:]
+                data["workflow_status"] = clean_status
+                data["status"] = clean_status
+                row.data = data
+                flag_modified(row, "data")
+                session.add(row)
+        return RedirectResponse(url=f"{base_url}?msg=status_saved#purchases", status_code=302)
+
+    def _purchase_delete_redirect(
+        purchase_id: str,
+        workspace_owner_id: str,
+        base_url: str,
+        actor: dict[str, Any] | None = None,
+    ) -> RedirectResponse:
+        if not _can_modify_transactions(actor):
+            return RedirectResponse(
+                url=f"{base_url}?error=" + quote("Недостаточно прав для удаления закупки") + "#purchases",
+                status_code=302,
+            )
+        with session_scope() as session:
+            row = session.get(PurchaseDocument, purchase_id)
+            if not row or row.workspace_owner_id != workspace_owner_id:
+                return RedirectResponse(url=f"{base_url}?error=" + quote("Закупка не найдена") + "#purchases", status_code=302)
+            data = _json_object(row.data)
+            workflow_status = _purchase_workflow_status(str(data.get("workflow_status") or data.get("status") or "ordered"))
+            if _sales_decimal(data.get("paid_amount")) > 0:
+                return RedirectResponse(
+                    url=f"{base_url}?error=" + quote("Удаление запрещено: у закупки есть оплаты. Сначала удалите связанные оплаты.") + "#purchases",
+                    status_code=302,
+                )
+            if workflow_status != "ordered":
+                return RedirectResponse(
+                    url=f"{base_url}?error=" + quote("Удаление запрещено: документ уже прошёл этапы. Сначала верните статус «Заказан».") + "#purchases",
+                    status_code=302,
+                )
+            try:
+                _sync_product_lines(
+                    session,
+                    workspace_owner_id,
+                    warehouse_name=str(data.get("warehouse") or "Основной склад"),
+                    lines=list(data.get("lines") or []),
+                    delta_sign=-1,
+                    op_date=str(data.get("date") or ""),
+                )
+            except ValueError as exc:
+                return RedirectResponse(
+                    url=f"{base_url}?error=" + quote(f"Удаление запрещено: {exc}. Сначала удалите связанные складские этапы.") + "#purchases",
+                    status_code=302,
+                )
+            session.delete(row)
         return RedirectResponse(url=f"{base_url}?msg=deleted#purchases", status_code=302)
 
     def _purchase_pay_redirect(purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
@@ -7928,7 +8017,7 @@ def create_app() -> FastAPI:
             data["paid_amount"] = _decimal_plain_text(next_paid_amount)
             data["payment_type"] = payment_type or str(data.get("payment_type") or "Оплата")
             data["payment_lines"] = payment_lines
-            data["status"] = "paid" if next_paid_amount >= amount else "partial"
+            data["payment_status"] = "paid" if next_paid_amount >= amount else "partial"
             row.data = data
             flag_modified(row, "data")
             session.add(row)
@@ -8312,6 +8401,23 @@ def create_app() -> FastAPI:
         assert wid is not None
         return _purchase_save_redirect(form, wid, "/warehouse")
 
+    @app.post("/warehouse/purchases/{purchase_id}/status", name="warehouse_purchase_status")
+    async def warehouse_purchase_status(request: Request, purchase_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/warehouse?err=csrf#purchases", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        return _purchase_status_redirect(
+            purchase_id,
+            wid,
+            "/warehouse",
+            str(form.get("status") or ""),
+            request.session.get("user") or {},
+        )
+
     @app.post("/warehouse/purchases/{purchase_id}/delete", name="warehouse_purchase_delete")
     async def warehouse_purchase_delete(request: Request, purchase_id: str):
         form = await request.form()
@@ -8321,7 +8427,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_delete_redirect(purchase_id, wid, "/warehouse")
+        return _purchase_delete_redirect(purchase_id, wid, "/warehouse", request.session.get("user") or {})
 
     @app.post("/warehouse/purchases/{purchase_id}/pay", name="warehouse_purchase_pay")
     async def warehouse_purchase_pay(request: Request, purchase_id: str):
@@ -9071,7 +9177,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_delete_redirect(purchase_id, wid, "/suppliers")
+        return _purchase_delete_redirect(purchase_id, wid, "/suppliers", request.session.get("user") or {})
 
     @app.post("/suppliers/purchases/{purchase_id}/pay", name="suppliers_purchase_pay")
     async def suppliers_purchase_pay(request: Request, purchase_id: str):

@@ -49,6 +49,21 @@
     return purchaseEntryMoney(purchaseEntryNumber(value), code);
   }
 
+  function quantityText(value) {
+    const quantity = purchaseEntryNumber(value);
+    return new Intl.NumberFormat("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3,
+    }).format(quantity);
+  }
+
+  function paymentStatusText(value) {
+    const status = String(value || "").toLowerCase();
+    if (status === "paid") return "Оплачен";
+    if (status === "partial") return "Частично оплачен";
+    return "Не оплачен";
+  }
+
   function purchaseEntryNumber(value) {
     const compact = String(value || "")
       .replace(/\s+/g, "")
@@ -1428,17 +1443,17 @@
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
     const lines = Array.isArray(purchase.lines) ? purchase.lines : [];
     setText(panel, "[data-purchase-detail-title]", `Закупка: ${purchase.number || "-"}`);
-    setText(panel, "[data-purchase-detail-date]", purchase.date ? `${purchase.date} · ${purchase.status_label || "Новый"}` : purchase.status_label || "Новый");
+    setText(panel, "[data-purchase-detail-date]", purchase.date ? `${purchase.date} · ${purchase.status_label || "Заказан"}` : purchase.status_label || "Заказан");
     setText(panel, "[data-purchase-detail-supplier]", purchase.supplier || "Поставщик не указан");
     setText(panel, "[data-purchase-detail-warehouse]", purchase.warehouse || "Основной склад");
-    setText(panel, "[data-purchase-detail-status]", purchase.status_label || "Новый");
+    setText(panel, "[data-purchase-detail-status]", purchase.status_label || "Заказан");
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-detail-debt]", moneyWithCurrency(purchase.debt_amount, currency));
     setText(panel, "[data-purchase-detail-total]", moneyWithCurrency(purchase.amount, currency));
     setText(panel, "[data-purchase-payment-total]", moneyWithCurrency(purchase.amount, currency));
     setText(panel, "[data-purchase-payment-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-payment-debt]", moneyWithCurrency(purchase.debt_amount, currency));
-    setText(panel, "[data-purchase-payment-status]", purchase.status_label || "Новый");
+    setText(panel, "[data-purchase-payment-status]", paymentStatusText(purchase.payment_status));
     setText(panel, "[data-purchase-payment-type]", purchase.payment_type || "Не указано");
     setText(panel, "[data-purchase-payment-date]", purchase.date || "-");
     setText(panel, "[data-purchase-payment-supplier]", purchase.supplier || "Поставщик не указан");
@@ -1447,6 +1462,11 @@
     if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
     updatePurchasePaymentButton(panel, purchase);
     setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
+    setText(
+      panel,
+      "[data-purchase-detail-quantity-total]",
+      quantityText(lines.reduce((total, line) => total + purchaseEntryNumber(line.quantity), 0)),
+    );
     if (!linesRoot) return;
     linesRoot.replaceChildren();
     const appendCell = (row, value) => {
@@ -1468,7 +1488,7 @@
     }
     lines.forEach((line, index) => {
       const row = document.createElement("tr");
-      const qty = String(line.quantity || "-");
+      const qty = quantityText(line.quantity);
       const price = line.price ? moneyWithCurrency(line.price, currency) : "-";
       const salePrice = line.sale_price ? moneyWithCurrency(line.sale_price, purchase.price_type_currency || currency) : "-";
       const total = line.total ? moneyWithCurrency(line.total, currency) : "-";
@@ -1487,6 +1507,7 @@
     const backdrop = root.querySelector(".warehouse-purchase-detail-backdrop");
     const purchase = readPurchase(purchaseId);
     if (!panel || !purchase) return;
+    panel.dataset.purchaseId = purchaseId;
     renderDetail(panel, purchase);
     activatePurchaseDetailTab(panel, "items");
     panel.hidden = false;
@@ -1501,6 +1522,10 @@
     const panel = root.querySelector("[data-warehouse-purchase-detail]");
     const backdrop = root.querySelector(".warehouse-purchase-detail-backdrop");
     if (!panel) return;
+    const menu = panel.querySelector("[data-purchase-detail-menu]");
+    const menuToggle = panel.querySelector("[data-purchase-detail-menu-toggle]");
+    if (menu) menu.hidden = true;
+    menuToggle?.setAttribute("aria-expanded", "false");
     panel.classList.remove("is-open");
     if (backdrop) backdrop.classList.remove("is-open");
     window.setTimeout(() => {
@@ -1551,6 +1576,19 @@
       trigger.dataset.warehousePurchaseCloseReady = "1";
       trigger.addEventListener("click", () => closeDetail(root));
     });
+    root.querySelectorAll("[data-purchase-status-select]").forEach((select) => {
+      if (select.dataset.purchaseStatusReady === "1") return;
+      select.dataset.purchaseStatusReady = "1";
+      select.addEventListener("change", () => select.form?.requestSubmit());
+    });
+    root.querySelectorAll("[data-purchase-delete-form]").forEach((form) => {
+      if (form.dataset.purchaseDeleteReady === "1") return;
+      form.dataset.purchaseDeleteReady = "1";
+      form.addEventListener("submit", (event) => {
+        const number = form.dataset.purchaseNumber || "эту закупку";
+        if (!window.confirm(`Вы точно хотите удалить закупку ${number}?`)) event.preventDefault();
+      });
+    });
     root.querySelectorAll("[data-warehouse-purchase-detail]").forEach((panel) => {
       if (panel.dataset.purchaseDetailTabsReady === "1") return;
       panel.dataset.purchaseDetailTabsReady = "1";
@@ -1558,6 +1596,20 @@
         button.addEventListener("click", () => {
           activatePurchaseDetailTab(panel, button.getAttribute("data-purchase-detail-tab"));
         });
+      });
+      const menu = panel.querySelector("[data-purchase-detail-menu]");
+      const menuToggle = panel.querySelector("[data-purchase-detail-menu-toggle]");
+      menuToggle?.addEventListener("click", () => {
+        if (!menu) return;
+        menu.hidden = !menu.hidden;
+        menuToggle.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
+      });
+      panel.querySelector("[data-purchase-detail-edit]")?.addEventListener("click", () => {
+        const purchaseId = panel.dataset.purchaseId || "";
+        closeDetail(root);
+        const statusSelect = root.querySelector(`[data-purchase-status-select][data-purchase-id="${CSS.escape(purchaseId)}"]`);
+        statusSelect?.scrollIntoView({ behavior: "smooth", block: "center" });
+        window.setTimeout(() => statusSelect?.focus(), 220);
       });
     });
     const paymentDialog = detailPaymentDialog(root);

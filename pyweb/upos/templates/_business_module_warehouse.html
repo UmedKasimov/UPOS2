@@ -282,8 +282,27 @@
               </td>
               <td data-warehouse-purchase-highlight>{{ doc.date or "-" }}</td>
               <td><a class="warehouse-purchase-supplier" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
-              <td class="warehouse-purchase-money" data-warehouse-purchase-highlight>{{ doc.amount }} {{ doc.currency }}</td>
-              <td><span class="warehouse-purchase-status">{{ doc.status_label }} <span aria-hidden="true">✎</span></span></td>
+              <td class="warehouse-purchase-money" data-warehouse-purchase-highlight>
+                <strong>{{ doc.amount }} {{ doc.currency }}</strong>
+                <span class="warehouse-purchase-paid-chip">Оплачено {{ doc.paid_amount }} {{ doc.currency }}</span>
+              </td>
+              <td>
+                <form class="warehouse-purchase-status-form" method="post" action="{{ url_for('warehouse_purchase_status', purchase_id=doc.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <select
+                    class="warehouse-purchase-status warehouse-purchase-status--{{ doc.status }}"
+                    name="status"
+                    aria-label="Статус закупки {{ doc.number }}"
+                    data-purchase-status-select
+                    data-purchase-id="{{ doc.id }}"
+                  >
+                    <option value="ordered" {% if doc.status == "ordered" %}selected{% endif %}>Заказан</option>
+                    <option value="purchased" {% if doc.status == "purchased" %}selected{% endif %}>Куплен</option>
+                    <option value="partial_return" {% if doc.status == "partial_return" %}selected{% endif %}>Ч/возврат</option>
+                    <option value="returned" {% if doc.status == "returned" %}selected{% endif %}>Возврат</option>
+                  </select>
+                </form>
+              </td>
               <td class="warehouse-purchase-row-actions">
                 <a
                   class="products-action-icon products-action-icon--edit"
@@ -298,7 +317,7 @@
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                   </svg>
                 </a>
-                <form method="post" action="{{ url_for('warehouse_purchase_delete', purchase_id=doc.id) }}">
+                <form method="post" action="{{ url_for('warehouse_purchase_delete', purchase_id=doc.id) }}" data-purchase-delete-form data-purchase-number="{{ doc.number }}">
                   {% include "_csrf_field.html" %}
                   <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить" aria-label="Удалить {{ doc.number }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -368,7 +387,12 @@
           <button class="warehouse-purchases-icon" type="button" title="Печать" aria-label="Печать">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
           </button>
-          <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню">⋮</button>
+          <div class="warehouse-purchase-detail-menu-wrap">
+            <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню" aria-expanded="false" data-purchase-detail-menu-toggle>⋮</button>
+            <div class="warehouse-purchase-detail-menu" data-purchase-detail-menu hidden>
+              <button type="button" data-purchase-detail-edit>Редактировать</button>
+            </div>
+          </div>
           <button class="warehouse-purchase-detail-close" type="button" data-warehouse-purchase-close aria-label="Закрыть">×</button>
         </div>
       </header>
@@ -405,6 +429,17 @@
               </tr>
             </thead>
             <tbody data-purchase-detail-lines></tbody>
+            <tfoot>
+              <tr class="warehouse-purchase-detail-totals">
+                <td colspan="2"><strong>Итого</strong></td>
+                <td><strong data-purchase-detail-quantity-total>0</strong></td>
+                <td colspan="2">
+                  <span>Оплачено <strong data-purchase-detail-paid></strong></span>
+                  <span>Долг <strong data-purchase-detail-debt></strong></span>
+                </td>
+                <td><strong data-purchase-detail-total></strong></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </section>
@@ -456,20 +491,6 @@
           </table>
         </div>
       </section>
-      <footer class="warehouse-purchase-detail-footer">
-        <div>
-          <span>Оплачено</span>
-          <strong data-purchase-detail-paid></strong>
-        </div>
-        <div>
-          <span>Долг</span>
-          <strong data-purchase-detail-debt></strong>
-        </div>
-        <div class="warehouse-purchase-detail-total">
-          <span>Итого</span>
-          <strong data-purchase-detail-total></strong>
-        </div>
-      </footer>
     </aside>
     <dialog class="settings-profile-modal sales-payment-dialog warehouse-purchase-detail-payment-dialog" data-purchase-detail-payment-dialog>
       <form class="settings-profile-modal-surface sales-payment-dialog-surface" method="post" action="" data-purchase-detail-payment-modal-form>
