@@ -1723,7 +1723,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .products-price-list-cell {
-  min-width: 14rem;
+  min-width: 11rem;
 }
 
 .products-price-list-values {
@@ -1732,11 +1732,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .products-price-list-value {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: baseline;
-  gap: 0.65rem;
   min-width: 0;
+  min-height: 1.65rem;
   padding-bottom: 0.22rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
 }
@@ -1746,18 +1745,28 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-bottom: 0;
 }
 
-.products-price-list-value small {
+.products-price-list-name-cell .products-price-list-value strong {
   min-width: 0;
   overflow: hidden;
-  color: var(--muted-foreground);
-  font-weight: 700;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.products-price-list-value strong {
+.products-price-value-cell .products-price-list-value strong {
   color: var(--primary);
-  font-size: var(--text-sm);
+  font-size: max(15px, var(--text-base));
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.products-catalog-number {
+  color: var(--foreground);
+  font-size: max(15px, var(--text-base)) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 820;
   white-space: nowrap;
 }
 

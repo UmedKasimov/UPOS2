@@ -17,7 +17,7 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=9" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=10" defer></script>
 {% endblock %}
 
 {% block main %}
@@ -335,9 +335,14 @@
                     <span>На складе</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
-                <th data-column-label="Прайс-листы" aria-sort="none">
+                <th data-column-label="Прайс-лист" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price-list">
+                    <span>Прайс-лист</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Цена" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price">
-                    <span>Прайс-листы</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                    <span>Цена</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
                 <th data-column-label="Категория" aria-sort="none">
@@ -364,6 +369,7 @@
                   data-sort-barcode="{{ (product.barcode or '')|lower }}"
                   data-sort-unit="{{ (product.unit or '')|lower }}"
                   data-sort-quantity="{{ product.quantity or 0 }}"
+                  data-sort-price-list="{{ (product.display_prices|map(attribute='name')|join(' '))|lower }}"
                   data-sort-price="{{ product.price_sort_value or 0 }}"
                   data-sort-category="{{ (product.category or '')|lower }}"
                   data-sort-status="{{ product.status or '' }}"
@@ -424,16 +430,26 @@
                   <td data-products-search-highlight>{{ product.sku or "-" }}</td>
                   <td>{{ product.barcode or "-" }}</td>
                   <td>{{ product.unit or "-" }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td class="products-price-list-cell">
+                  <td class="products-catalog-number">{{ product.quantity_display }}</td>
+                  <td class="products-price-list-cell products-price-list-name-cell">
                     <div class="products-price-list-values">
                       {% for price in product.display_prices %}
                         <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
-                          <small>{{ price.name }}</small>
-                          <strong>{% if price.has_price %}{{ price.price }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
+                          <strong>{{ price.name }}</strong>
                         </div>
                       {% else %}
                         <span class="products-price-list-empty">Нет прайс-листов</span>
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td class="products-price-list-cell products-price-value-cell">
+                    <div class="products-price-list-values">
+                      {% for price in product.display_prices %}
+                        <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
+                          <strong>{% if price.has_price %}{{ price.price_display }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
+                        </div>
+                      {% else %}
+                        <span class="products-price-list-empty">-</span>
                       {% endfor %}
                     </div>
                   </td>

@@ -4612,6 +4612,9 @@ def create_app() -> FastAPI:
             ]
             item["catalog_prices"] = catalog_prices
             item["display_prices"] = display_prices
+            item["quantity_display"] = _catalog_number_text(item.get("quantity"), empty="0")
+            for display_price in item["display_prices"]:
+                display_price["price_display"] = _catalog_number_text(display_price.get("price"))
             item["price_sort_value"] = next(
                 (price["price"] for price in display_prices if price["has_price"]),
                 "0",
@@ -4687,6 +4690,21 @@ def create_app() -> FastAPI:
         if "." in text:
             text = text.rstrip("0").rstrip(".")
         return text
+
+    def _catalog_number_text(raw: Any, *, empty: str = "") -> str:
+        raw_text = str(raw or "").strip()
+        if not raw_text:
+            return empty
+        value = _sales_decimal(raw_text)
+        plain = format(value, "f")
+        if "." in plain:
+            plain = plain.rstrip("0").rstrip(".")
+        whole, separator, fraction = plain.partition(".")
+        try:
+            grouped = f"{int(whole):,}".replace(",", " ")
+        except (TypeError, ValueError):
+            return raw_text
+        return f"{grouped},{fraction}" if separator and fraction else grouped
 
     def _product_excel_decimal_text(raw: Any) -> str:
         value = _sales_decimal(raw)
