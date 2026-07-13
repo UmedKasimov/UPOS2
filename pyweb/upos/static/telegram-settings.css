@@ -668,6 +668,43 @@
   overflow: hidden;
 }
 
+.tg-telephony-group-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0.75rem 1rem;
+}
+
+.tg-telephony-group-field > span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.tg-telephony-group-field strong {
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 800;
+}
+
+.tg-telephony-group-field small {
+  color: var(--muted-foreground, var(--text-muted));
+  font-size: var(--text-sm);
+}
+
+.tg-telephony-group-field select {
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .tg-telephony-group-field {
+    grid-template-columns: 1fr;
+  }
+}
+
 .tg-telephony-setting {
   display: flex;
   align-items: center;

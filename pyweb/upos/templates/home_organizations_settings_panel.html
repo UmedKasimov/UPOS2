@@ -479,6 +479,15 @@
                     <span>SMS, записи звонков и информирование</span>
                   </div>
                 </header>
+                <label class="tg-telephony-group-field">
+                  <span>
+                    <strong>Группа Telegram</strong>
+                    <small>В эту группу будут отправляться уведомления и записи звонков</small>
+                  </span>
+                  <select class="settings-ios-select settings-compact-select" data-tg-route-target="telephony" data-tg-telephony-target {% if not telegram_can_manage %}disabled{% endif %}>
+                    <option value="">Все включенные группы</option>
+                  </select>
+                </label>
                 <div class="tg-telephony-settings">
                   <label class="tg-telephony-setting">
                     <span class="tg-telephony-setting-copy">
@@ -545,7 +554,7 @@
   <script src="{{ url_for('static', path='org-settings-tabs.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=25" defer></script>
   {% if settings_default_tab | default('general') == 'telegram' %}
-    <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=11" />
-    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=21" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=12" />
+    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=22" defer></script>
   {% endif %}
 {% endblock %}

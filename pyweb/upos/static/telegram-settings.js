@@ -120,6 +120,7 @@
     var approvedEmpty = root.querySelector("[data-tg-approved-empty]");
     var pendingCount = root.querySelector("[data-tg-pending-count]");
     var approvedCount = root.querySelector("[data-tg-approved-count]");
+    var telephonyTargetSelect = root.querySelector("[data-tg-telephony-target]");
     var tokenSavedEl = root.querySelector("[data-tg-token-saved]");
     var webhookHintEl = root.querySelector("[data-tg-webhook-hint]");
     var eventSource = null;
@@ -354,6 +355,7 @@
           input.checked = !!telephony[key];
         }
       });
+      renderTelephonyTarget();
       var limits = prefs.limits || {};
       var incomeLimit = limits.income || {};
       var expenseLimit = limits.expense || {};
@@ -423,6 +425,14 @@
           );
         });
       return options.join("");
+    }
+
+    function renderTelephonyTarget() {
+      if (!telephonyTargetSelect) return;
+      var prefs = state.notification_prefs || {};
+      var targets = prefs.targets || {};
+      telephonyTargetSelect.innerHTML = chatOptionsHtml(targets.telephony);
+      telephonyTargetSelect.value = String(targets.telephony || "");
     }
 
     function renderRoutingPrefs() {
@@ -624,6 +634,7 @@
       });
       updateChatCounts();
       renderRoutingPrefs();
+      renderTelephonyTarget();
     }
 
     function renderSubscribers(pending, approved) {
@@ -632,6 +643,7 @@
       if (pendingList) pendingList.innerHTML = "";
       if (approvedList) approvedList.innerHTML = "";
       state.pending.forEach(function (sub) {
+        if (!pendingList) return;
         var row = document.createElement("div");
         row.className = "tg-row";
         row.setAttribute("data-sub-id", sub.id);
@@ -639,6 +651,7 @@
         pendingList.appendChild(row);
       });
       state.approved.forEach(function (sub) {
+        if (!approvedList) return;
         var row = document.createElement("div");
         row.className = "tg-row";
         row.setAttribute("data-sub-id", sub.id);

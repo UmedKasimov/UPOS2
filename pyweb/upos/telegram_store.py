@@ -71,6 +71,7 @@ DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
         "weekly": "",
         "monthly": "",
         "balance": "",
+        "telephony": "",
     },
     "schedule": {
         "daily_hour": 21,
