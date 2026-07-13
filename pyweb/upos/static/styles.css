@@ -46,13 +46,13 @@
   --control-border: oklch(0.86 0.014 264);
   --control-placeholder: oklch(0.46 0.028 264);
 
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 20px;
-  --text-xl: 24px;
-  --text-2xl: 30px;
+  --text-xs: 13px;
+  --text-sm: 15px;
+  --text-base: 16px;
+  --text-md: 18px;
+  --text-lg: 22px;
+  --text-xl: 26px;
+  --text-2xl: 32px;
 }
 
 html.dark {
@@ -182,7 +182,7 @@ html.emerald.dark {
 
 body {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--background);
@@ -4507,6 +4507,20 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   grid-template-columns: minmax(13rem, 1.35fr) repeat(4, minmax(9rem, 0.9fr)) repeat(4, auto);
   gap: 0.75rem;
   align-items: end;
+}
+
+@media (max-width: 1500px) {
+  .crm-pipeline-head--filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crm-kanban-filters {
+    grid-template-columns: minmax(16rem, 2fr) repeat(4, minmax(9rem, 1fr));
+  }
+
+  .crm-archive-toggle {
+    justify-self: end;
+  }
 }
 
 .crm-kanban-filters label,
