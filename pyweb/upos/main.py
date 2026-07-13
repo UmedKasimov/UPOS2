@@ -5813,21 +5813,14 @@ def create_app() -> FastAPI:
         }
         return data, amount, currency
 
-    def _sales_payment_account_id(workspace_owner_id: str, account_id: str = "", account_label: str = "") -> str:
-        clean_id = str(account_id or "").strip()
-        clean_label = str(account_label or "").strip().lower()
+    def _normalize_sales_payment_lines(
+        workspace_owner_id: str,
+        payment_lines: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        if not payment_lines:
+            return []
         with session_scope() as session:
-            if clean_id:
-                row = session.execute(
-                    select(FinanceAccount).where(
-                        FinanceAccount.id == clean_id,
-                        FinanceAccount.workspace_owner_id == workspace_owner_id,
-                        FinanceAccount.is_active == True,  # noqa: E712
-                    )
-                ).scalars().first()
-                if row:
-                    return row.id
-            rows = list(
+            accounts = list(
                 session.execute(
                     select(FinanceAccount)
                     .where(
@@ -5837,11 +5830,36 @@ def create_app() -> FastAPI:
                     .order_by(FinanceAccount.created_at.asc())
                 ).scalars()
             )
-            if clean_label:
-                for row in rows:
-                    if str(row.name or "").strip().lower() == clean_label:
-                        return row.id
-            return rows[0].id if rows else ""
+        if not accounts:
+            raise ValueError("Создайте активный финансовый счёт перед добавлением оплаты")
+
+        accounts_by_id = {str(account.id): account for account in accounts}
+        accounts_by_name = {
+            str(account.name or "").strip().casefold(): account
+            for account in accounts
+            if str(account.name or "").strip()
+        }
+        normalized: list[dict[str, Any]] = []
+        for payment in payment_lines:
+            if not isinstance(payment, dict) or _sales_decimal(payment.get("amount")) <= 0:
+                continue
+            clean_id = str(payment.get("account_id") or "").strip()
+            clean_label = str(payment.get("account") or payment.get("type") or "").strip()
+            account = accounts_by_id.get(clean_id) if clean_id else None
+            if account is None and clean_label:
+                account = accounts_by_name.get(clean_label.casefold())
+            if clean_id and account is None:
+                raise ValueError("Выбранный счёт оплаты не найден или отключён")
+            if account is None:
+                # Legacy demo payments used generic labels such as cash/bank.
+                account = accounts[0]
+
+            item = dict(payment)
+            item["account_id"] = str(account.id)
+            item["account"] = str(account.name or clean_label)
+            item["type"] = str(payment.get("type") or account.name or "Оплата").strip() or "Оплата"
+            normalized.append(item)
+        return normalized
 
     def _document_payment_entries_from_form(
         form: Any,
@@ -5909,6 +5927,13 @@ def create_app() -> FastAPI:
                 }
             )
             paid_in_document_currency = debt_amount
+        payment_lines = [
+            {
+                **item,
+                "amount": _decimal_plain_text(_sales_decimal(item.get("amount"))),
+            }
+            for item in _normalize_sales_payment_lines(workspace_owner_id, payment_lines)
+        ]
         payment_type = ", ".join(
             dict.fromkeys(str(item.get("type") or "").strip() for item in payment_lines if str(item.get("type") or "").strip())
         )
@@ -5941,7 +5966,6 @@ def create_app() -> FastAPI:
         currency: str,
         user: dict[str, Any] | None = None,
     ) -> None:
-        _delete_sales_cash_transactions(workspace_owner_id, sale_id)
         doc_type = str(data.get("doc_type") or "sale").strip()
         payment_rows: list[dict[str, Any]] = []
         for payment in data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []:
@@ -5972,17 +5996,13 @@ def create_app() -> FastAPI:
             )
         if not payment_rows:
             return
+        payment_rows = _normalize_sales_payment_lines(workspace_owner_id, payment_rows)
+        _delete_sales_cash_transactions(workspace_owner_id, sale_id)
         tx_type = "expense" if doc_type == "return" else "income"
         actor_name = str((user or {}).get("name") or (user or {}).get("username") or "").strip()
         employee_id = str((user or {}).get("user_id") or (user or {}).get("id") or "").strip()
         for idx, payment in enumerate(payment_rows, start=1):
-            account_id = _sales_payment_account_id(
-                workspace_owner_id,
-                str(payment.get("account_id") or ""),
-                str(payment.get("account") or ""),
-            )
-            if not account_id:
-                continue
+            account_id = str(payment.get("account_id") or "").strip()
             tx_data: dict[str, Any] = {
                 "amount": payment["amount"],
                 "currency": str(payment.get("currency") or currency or "UZS").strip().upper() or "UZS",
@@ -6002,6 +6022,8 @@ def create_app() -> FastAPI:
                     "sales_amount": _decimal_plain_text(amount),
                     "payment_index": idx,
                     "payment_type": str(payment.get("type") or ""),
+                    "payment_account_id": account_id,
+                    "payment_account": str(payment.get("account") or ""),
                     "manager": actor_name,
                 },
             }
@@ -6406,6 +6428,10 @@ def create_app() -> FastAPI:
         assert wid is not None
         try:
             data, amount, currency = _sales_document_payload(form)
+            data["payment_lines"] = _normalize_sales_payment_lines(
+                wid,
+                list(data.get("payment_lines") or []),
+            )
         except ValueError as exc:
             return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-form", status_code=302)
         session_user = request.session.get("user") or {}
