@@ -75,6 +75,11 @@ DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
     "schedule": {
         "daily_hour": 21,
     },
+    "telephony": {
+        "sms_enabled": False,
+        "recording_enabled": True,
+        "information_enabled": True,
+    },
     "templates": {
         "transactions": "{text}",
         "income": "{text}",
@@ -357,6 +362,7 @@ def merge_notification_prefs(raw: dict[str, Any] | None) -> dict[str, Any]:
         "reports": dict(DEFAULT_NOTIFICATION_PREFS["reports"]),
         "targets": dict(DEFAULT_NOTIFICATION_PREFS["targets"]),
         "schedule": dict(DEFAULT_NOTIFICATION_PREFS["schedule"]),
+        "telephony": dict(DEFAULT_NOTIFICATION_PREFS["telephony"]),
         "templates": dict(DEFAULT_NOTIFICATION_PREFS["templates"]),
         "limits": {
             "enabled": False,
@@ -383,6 +389,11 @@ def merge_notification_prefs(raw: dict[str, Any] | None) -> dict[str, Any]:
             base["schedule"]["daily_hour"] = max(0, min(23, hour))
         except (TypeError, ValueError):
             pass
+    telephony_in = raw.get("telephony")
+    if isinstance(telephony_in, dict):
+        for key in base["telephony"]:
+            if key in telephony_in:
+                base["telephony"][key] = bool(telephony_in[key])
     templates_in = raw.get("templates")
     if isinstance(templates_in, dict):
         for key in base["templates"]:
@@ -439,6 +450,10 @@ def save_notification_prefs(workspace_owner_id: str, patch: dict[str, Any]) -> d
                 current["schedule"]["daily_hour"] = max(0, min(23, hour))
             except (TypeError, ValueError):
                 pass
+        telephony_patch = patch.get("telephony") if isinstance(patch.get("telephony"), dict) else {}
+        for key in current["telephony"]:
+            if key in telephony_patch:
+                current["telephony"][key] = bool(telephony_patch[key])
         templates_patch = patch.get("templates") if isinstance(patch.get("templates"), dict) else {}
         for key in current["templates"]:
             if key in templates_patch:

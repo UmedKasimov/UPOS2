@@ -347,6 +347,13 @@
       if (dailyHourSelect && prefs.schedule && prefs.schedule.daily_hour != null) {
         dailyHourSelect.value = String(prefs.schedule.daily_hour);
       }
+      var telephony = prefs.telephony || {};
+      root.querySelectorAll("[data-tg-telephony-pref]").forEach(function (input) {
+        var key = input.getAttribute("data-tg-telephony-pref");
+        if (key && Object.prototype.hasOwnProperty.call(telephony, key)) {
+          input.checked = !!telephony[key];
+        }
+      });
       var limits = prefs.limits || {};
       var incomeLimit = limits.income || {};
       var expenseLimit = limits.expense || {};
@@ -469,7 +476,18 @@
       });
       var hour = dailyHourSelect ? parseInt(dailyHourSelect.value, 10) : 21;
       if (!Number.isFinite(hour)) hour = 21;
-      var result = { reports: reports, targets: targets, templates: templates, schedule: { daily_hour: hour } };
+      var telephony = {};
+      root.querySelectorAll("[data-tg-telephony-pref]").forEach(function (input) {
+        var key = input.getAttribute("data-tg-telephony-pref");
+        if (key) telephony[key] = !!input.checked;
+      });
+      var result = {
+        reports: reports,
+        targets: targets,
+        templates: templates,
+        schedule: { daily_hour: hour },
+        telephony: telephony,
+      };
       if (
         limitEnabledInput ||
         limitIncomeEnabledInput ||

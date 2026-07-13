@@ -393,6 +393,7 @@
               <button type="button" class="tg-rules-tab active" data-tg-rules-tab="notifications">Уведомления</button>
               <button type="button" class="tg-rules-tab" data-tg-rules-tab="reports">Отчеты</button>
               <button type="button" class="tg-rules-tab" data-tg-rules-tab="limits">Ограничение</button>
+              <button type="button" class="tg-rules-tab" data-tg-rules-tab="telephony">Телефония</button>
             </nav>
             <div class="tg-rules-content">
               <div class="tg-rules-panel" data-tg-rules-panel="notifications">
@@ -471,6 +472,46 @@
                   <div class="tg-rule-body" hidden></div>
                 </div>
               </div>
+              <div class="tg-rules-panel" id="telegram-telephony" data-tg-rules-panel="telephony" hidden>
+                <header class="tg-telephony-head">
+                  <div>
+                    <strong>Телефония</strong>
+                    <span>SMS, записи звонков и информирование</span>
+                  </div>
+                </header>
+                <div class="tg-telephony-settings">
+                  <label class="tg-telephony-setting">
+                    <span class="tg-telephony-setting-copy">
+                      <strong>SMS-уведомления</strong>
+                      <small>Отправлять клиенту SMS по событиям звонка</small>
+                    </span>
+                    <span class="settings-ios-toggle">
+                      <input type="checkbox" data-tg-telephony-pref="sms_enabled" {% if not telegram_can_manage %}disabled{% endif %} />
+                      <span class="settings-ios-toggle-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                  <label class="tg-telephony-setting">
+                    <span class="tg-telephony-setting-copy">
+                      <strong>Отправка записи</strong>
+                      <small>Отправлять запись завершенного звонка в Telegram</small>
+                    </span>
+                    <span class="settings-ios-toggle">
+                      <input type="checkbox" data-tg-telephony-pref="recording_enabled" checked {% if not telegram_can_manage %}disabled{% endif %} />
+                      <span class="settings-ios-toggle-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                  <label class="tg-telephony-setting">
+                    <span class="tg-telephony-setting-copy">
+                      <strong>Информирование</strong>
+                      <small>Уведомлять о входящих, исходящих и пропущенных звонках</small>
+                    </span>
+                    <span class="settings-ios-toggle">
+                      <input type="checkbox" data-tg-telephony-pref="information_enabled" checked {% if not telegram_can_manage %}disabled{% endif %} />
+                      <span class="settings-ios-toggle-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                </div>
+              </div>
               <div class="tg-rules-foot">
                 <span class="tg-prefs-status" data-tg-prefs-status hidden role="status"></span>
                 <button type="button" class="btn btn-sm" data-tg-prefs-save>Сохранить</button>
@@ -504,7 +545,7 @@
   <script src="{{ url_for('static', path='org-settings-tabs.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=25" defer></script>
   {% if settings_default_tab | default('general') == 'telegram' %}
-    <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=10" />
-    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=20" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=11" />
+    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=21" defer></script>
   {% endif %}
 {% endblock %}

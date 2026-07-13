@@ -633,6 +633,66 @@
   display: none !important;
 }
 
+.tg-telephony-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.8rem;
+  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 90%);
+  padding: 0.9rem 1rem;
+}
+
+.tg-telephony-head > div,
+.tg-telephony-setting-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.tg-telephony-head strong {
+  font-size: var(--text-lg);
+  font-weight: 900;
+}
+
+.tg-telephony-head span,
+.tg-telephony-setting-copy small {
+  color: var(--muted-foreground, var(--text-muted));
+  font-size: var(--text-sm);
+}
+
+.tg-telephony-settings {
+  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border-radius: 8px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.tg-telephony-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.25rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+}
+
+.tg-telephony-setting:last-child {
+  border-bottom: 0;
+}
+
+.tg-telephony-setting-copy strong {
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 800;
+}
+
+.tg-telephony-setting > .settings-ios-toggle {
+  flex: 0 0 auto;
+}
+
 .tg-rule {
   border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
   border-radius: 8px;
