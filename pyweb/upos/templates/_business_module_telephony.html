@@ -1,6 +1,7 @@
 {% set telephony_filters = telephony_filters|default({'q': '', 'provider': '', 'responsible': '', 'status': 'all', 'date_from': '', 'date_to': ''}) %}
 {% set telephony_options = telephony_options|default({'providers': [], 'responsibles': [], 'clients': []}) %}
 {% set telephony_calls = telephony_calls|default([]) %}
+{% set telephony_contacts = telephony_contacts|default([]) %}
 {% set telephony_numbers = telephony_numbers|default([]) %}
 {% set telephony_providers = telephony_providers|default([]) %}
 {% set telephony_devices = telephony_devices|default([]) %}
@@ -16,7 +17,7 @@
   <button type="button" class="btn" data-telephony-open-call>{{ module.action }}</button>
 </div>
 
-<form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls numbers integrations" hidden>
+<form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls integrations" hidden>
   <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
   <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
   <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Аккаунт, клиент, номер, сотрудник" /></label>
@@ -245,42 +246,105 @@
     </div>
   </article>
 
-  <article class="products-list-panel" data-workspace-view="numbers" hidden>
-    <header class="products-panel-head">
+  <article class="products-list-panel telephony-contacts-panel" data-workspace-view="numbers" hidden>
+    <header class="products-panel-head telephony-contacts-head">
       <div>
-        <h2>Номера</h2>
-        <span>Всего: {{ telephony_numbers|length }}</span>
+        <h2>Контакты</h2>
+        <span>Всего: <b data-telephony-contact-total>{{ telephony_contacts|length }}</b> · требуют подтверждения: {{ telephony_contacts|selectattr('pending')|list|length }}</span>
       </div>
-      <button type="button" class="btn" data-telephony-open-number>+ Номер</button>
+      <button type="button" class="btn btn-secondary" data-telephony-open-number>+ Рабочий номер</button>
     </header>
-    <div class="products-table-wrap">
-      <table class="products-table">
+
+    <div class="telephony-contact-filters" role="search">
+      <label class="telephony-contact-search">
+        <span>Поиск контакта</span>
+        <input type="search" placeholder="Имя или номер телефона" autocomplete="off" data-telephony-contact-search />
+      </label>
+      <label>
+        <span>Статус</span>
+        <select data-telephony-contact-state>
+          <option value="all">Все контакты</option>
+          <option value="pending">Нужно подтвердить</option>
+          <option value="confirmed">Подтвержденные</option>
+        </select>
+      </label>
+      <button type="button" class="btn btn-secondary telephony-contact-clear" data-telephony-contact-clear>Очистить</button>
+    </div>
+
+    <div class="products-table-wrap telephony-contacts-table-wrap">
+      <table class="products-table telephony-contacts-table">
         <thead>
           <tr>
-            <th>Номер</th>
-            <th>Провайдер</th>
-            <th>Сотрудник</th>
-            <th>Режим</th>
-            <th>Переадресация</th>
+            <th>Контакт</th>
+            <th>Телефон</th>
+            <th>Входящие</th>
+            <th>Исходящие</th>
+            <th>Последний звонок</th>
             <th>Статус</th>
           </tr>
         </thead>
-        <tbody>
-          {% for row in telephony_numbers %}
-            <tr>
-              <td><strong>{{ row.number }}</strong><small>{{ row.label or row.line or "-" }}</small></td>
-              <td>{{ row.provider or "-" }}</td>
-              <td>{{ row.employee or row.responsible or "-" }}</td>
-              <td>{{ row.mode or "-" }}</td>
-              <td>{{ row.forwarding or "-" }}</td>
-              <td>{{ row.status_label or row.status or "-" }}</td>
+        <tbody data-telephony-contact-list>
+          {% for contact in telephony_contacts %}
+            <tr
+              class="telephony-contact-row{% if contact.pending %} is-pending{% endif %}"
+              tabindex="0"
+              role="button"
+              data-telephony-contact-open="{{ contact.id }}"
+              data-contact-search="{{ (contact.name ~ ' ' ~ contact.phone)|lower }}"
+              data-contact-state="{{ contact.state }}"
+            >
+              <td>
+                <span class="telephony-contact-avatar" aria-hidden="true">{{ contact.name[:1]|upper }}</span>
+                <span class="telephony-contact-identity">
+                  <strong data-telephony-contact-highlight>{{ contact.name }}</strong>
+                  <small>{{ contact.calls_count }} звонков</small>
+                </span>
+              </td>
+              <td data-telephony-contact-highlight>{{ contact.phone or "Номер не подтвержден" }}</td>
+              <td><strong class="telephony-contact-call-count incoming">{{ contact.incoming_count }}</strong></td>
+              <td><strong class="telephony-contact-call-count outgoing">{{ contact.outgoing_count }}</strong></td>
+              <td>{{ contact.last_call_at or "Звонков пока нет" }}</td>
+              <td><span class="telephony-contact-state telephony-contact-state--{{ contact.state }}">{{ contact.state_label }}</span></td>
             </tr>
           {% else %}
-            <tr><td colspan="6">Номера пока не подключены. Добавьте SIP/АТС-номер и привяжите его к сотруднику.</td></tr>
+            <tr data-telephony-contact-empty><td colspan="6">Контактов пока нет. Новый звонок автоматически создаст контакт.</td></tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="empty-hint telephony-contact-no-results" data-telephony-contact-no-results hidden>По вашему запросу контакты не найдены.</p>
     </div>
+
+    <details class="telephony-lines-section">
+      <summary>Рабочие номера <span>{{ telephony_numbers|length }}</span></summary>
+      <div class="products-table-wrap">
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>Номер</th>
+              <th>Провайдер</th>
+              <th>Сотрудник</th>
+              <th>Режим</th>
+              <th>Переадресация</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in telephony_numbers %}
+              <tr>
+                <td><strong>{{ row.number }}</strong><small>{{ row.label or row.line or "-" }}</small></td>
+                <td>{{ row.provider or "-" }}</td>
+                <td>{{ row.employee or row.responsible or "-" }}</td>
+                <td>{{ row.mode or "-" }}</td>
+                <td>{{ row.forwarding or "-" }}</td>
+                <td>{{ row.status_label or row.status or "-" }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6">Рабочие номера пока не подключены.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
   </article>
 
   <article class="products-list-panel telephony-integrations-panel" data-workspace-view="integrations" hidden>
@@ -447,6 +511,46 @@
     </div>
   </div>
 </dialog>
+
+<dialog class="settings-profile-modal telephony-dialog telephony-contact-dialog" id="telephony-contact-dialog" aria-labelledby="telephony-contact-title">
+  <div class="settings-profile-modal-surface telephony-contact-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="telephony-contact-title" class="settings-profile-modal-title" data-telephony-contact-title>Контакт</h2>
+        <p class="settings-profile-modal-sub" data-telephony-contact-subtitle>История входящих и исходящих звонков</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll telephony-contact-dialog-body">
+      <aside class="telephony-contact-profile">
+        <div class="telephony-contact-profile-state" data-telephony-contact-profile-state></div>
+        <form method="post" action="/telephony/contacts/confirm" class="product-form" data-telephony-contact-form>
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="contact_id" data-telephony-contact-id />
+          <label><span>Имя клиента</span><input name="name" required data-telephony-contact-name /></label>
+          <label><span>Номер телефона</span><input name="phone" required placeholder="+998 ..." data-telephony-contact-phone /></label>
+          <button class="btn" type="submit" data-telephony-contact-save>Подтвердить и сохранить</button>
+        </form>
+        <dl class="telephony-contact-summary">
+          <div><dt>Все звонки</dt><dd data-telephony-contact-calls>0</dd></div>
+          <div><dt>Входящие</dt><dd data-telephony-contact-incoming>0</dd></div>
+          <div><dt>Исходящие</dt><dd data-telephony-contact-outgoing>0</dd></div>
+        </dl>
+      </aside>
+      <section class="telephony-contact-history">
+        <header>
+          <div>
+            <h3>История звонков</h3>
+            <p>Все входящие и исходящие звонки этого контакта.</p>
+          </div>
+        </header>
+        <div class="telephony-contact-history-list" data-telephony-contact-history></div>
+      </section>
+    </div>
+  </div>
+</dialog>
+
+<script type="application/json" id="telephony-contacts-data">{{ telephony_contacts|tojson }}</script>
 
 <dialog class="settings-profile-modal telephony-dialog" id="telephony-number-dialog" aria-labelledby="telephony-number-title">
   <div class="settings-profile-modal-surface telephony-dialog-surface">

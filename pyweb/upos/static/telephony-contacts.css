@@ -1,0 +1,402 @@
+.telephony-contacts-panel {
+  min-height: min(45rem, calc(100vh - 9rem));
+}
+
+.telephony-contacts-head b {
+  color: var(--foreground);
+}
+
+.telephony-contact-filters {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1fr) minmax(12rem, 0.32fr) auto;
+  align-items: end;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 86%, #eaf4ff);
+}
+
+.telephony-contact-filters label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.telephony-contact-filters label > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+
+.telephony-contact-filters input,
+.telephony-contact-filters select {
+  width: 100%;
+  min-height: 2.35rem;
+}
+
+.telephony-contact-clear {
+  min-height: 2.35rem;
+}
+
+.telephony-contacts-table-wrap {
+  min-height: 20rem;
+  max-height: calc(100vh - 20rem);
+}
+
+.telephony-contacts-table {
+  min-width: 62rem;
+  table-layout: fixed;
+}
+
+.telephony-contacts-table th:nth-child(1) { width: 28%; }
+.telephony-contacts-table th:nth-child(2) { width: 18%; }
+.telephony-contacts-table th:nth-child(3),
+.telephony-contacts-table th:nth-child(4) { width: 9%; }
+.telephony-contacts-table th:nth-child(5) { width: 21%; }
+.telephony-contacts-table th:nth-child(6) { width: 15%; }
+
+.telephony-contact-row {
+  cursor: pointer;
+}
+
+.telephony-contact-row td {
+  height: 3.65rem;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.telephony-contact-row:hover td,
+.telephony-contact-row:focus td {
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.telephony-contact-row:focus {
+  outline: none;
+}
+
+.telephony-contact-row:focus td:first-child {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.telephony-contact-row.is-pending td {
+  background: color-mix(in srgb, #94a3b8 13%, var(--card));
+  border-top-color: color-mix(in srgb, #64748b 45%, var(--border));
+  border-bottom-color: color-mix(in srgb, #64748b 45%, var(--border));
+}
+
+.telephony-contact-row.is-pending td:first-child {
+  box-shadow: inset 3px 0 0 #64748b;
+}
+
+.telephony-contact-row.is-pending:hover td,
+.telephony-contact-row.is-pending:focus td {
+  background: color-mix(in srgb, #94a3b8 21%, var(--card));
+}
+
+.telephony-contact-row td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.telephony-contact-avatar {
+  display: inline-grid;
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 850;
+}
+
+.telephony-contact-row.is-pending .telephony-contact-avatar {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.telephony-contact-identity {
+  display: grid;
+  min-width: 0;
+}
+
+.telephony-contact-identity strong,
+.telephony-contact-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telephony-contact-identity small {
+  color: var(--muted-foreground);
+}
+
+.telephony-contact-call-count {
+  font-size: var(--text-base);
+}
+
+.telephony-contact-call-count.incoming {
+  color: #087a35;
+}
+
+.telephony-contact-call-count.outgoing {
+  color: #1463c9;
+}
+
+.telephony-contact-state,
+.telephony-contact-profile-state {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.48rem;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.telephony-contact-state--confirmed,
+.telephony-contact-profile-state--confirmed {
+  background: #dcfce7;
+  color: #087a35;
+}
+
+.telephony-contact-state--pending,
+.telephony-contact-profile-state--pending {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.telephony-contact-no-results {
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+
+.telephony-lines-section {
+  margin: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.telephony-lines-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.telephony-lines-section > summary span {
+  color: var(--muted-foreground);
+}
+
+.settings-profile-modal.telephony-contact-dialog {
+  width: min(72rem, calc(100vw - 2rem));
+  max-width: none;
+}
+
+.telephony-contact-dialog .telephony-contact-dialog-surface {
+  width: min(72rem, calc(100vw - 2rem));
+  height: min(44rem, calc(100vh - 2rem));
+  max-height: none;
+}
+
+.telephony-contact-dialog-body {
+  display: grid;
+  grid-template-columns: minmax(17rem, 0.36fr) minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.telephony-contact-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 1rem;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 88%, #eef6ff);
+}
+
+.telephony-contact-profile form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.telephony-contact-profile form label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.telephony-contact-profile form label span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+
+.telephony-contact-profile form input {
+  width: 100%;
+}
+
+.telephony-contact-summary {
+  display: grid;
+  gap: 0;
+  margin: 0.25rem 0 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.telephony-contact-summary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.telephony-contact-summary > div:last-child {
+  border-bottom: 0;
+}
+
+.telephony-contact-summary dt {
+  color: var(--muted-foreground);
+}
+
+.telephony-contact-summary dd {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 850;
+}
+
+.telephony-contact-history {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.telephony-contact-history > header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.telephony-contact-history h3,
+.telephony-contact-history p {
+  margin: 0;
+}
+
+.telephony-contact-history p {
+  margin-top: 0.2rem;
+  color: var(--muted-foreground);
+}
+
+.telephony-contact-history-list {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  min-height: 0;
+  padding: 0.8rem;
+  overflow: auto;
+  background: color-mix(in srgb, var(--background) 85%, #f8fafc);
+}
+
+.telephony-contact-history-item {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid #1463c9;
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.telephony-contact-history-item--incoming {
+  border-left-color: #16a34a;
+}
+
+.telephony-contact-history-direction {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #1463c9;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.telephony-contact-history-item--incoming .telephony-contact-history-direction {
+  background: #dcfce7;
+  color: #087a35;
+}
+
+.telephony-contact-history-item > div:nth-child(2) {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.telephony-contact-history-item span,
+.telephony-contact-history-item small {
+  color: var(--muted-foreground);
+}
+
+.telephony-contact-history-item p {
+  margin-top: 0.25rem;
+  color: var(--foreground);
+}
+
+.telephony-contact-history-status {
+  display: grid;
+  justify-items: end;
+  gap: 0.45rem;
+}
+
+.telephony-contact-history-status .telephony-call-status-cell {
+  padding: 0.2rem 0.48rem;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+@media (max-width: 980px) {
+  .telephony-contact-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .telephony-contact-dialog-body {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .telephony-contact-profile {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .telephony-contact-history-list {
+    max-height: 28rem;
+  }
+
+  .telephony-contact-history-item {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+
+  .telephony-contact-history-status {
+    grid-column: 2;
+    justify-items: start;
+  }
+}

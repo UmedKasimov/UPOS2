@@ -9595,6 +9595,81 @@ def create_app() -> FastAPI:
             ).scalars()
             return [row.name for row in rows if row.name]
 
+    def _telephony_contact_directory(
+        workspace_owner_id: str,
+        calls: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        call_rows = [dict(item) for item in calls if isinstance(item, dict)]
+        contacts: list[dict[str, Any]] = []
+        with session_scope() as session:
+            rows = session.execute(
+                select(Counterparty)
+                .where(
+                    Counterparty.workspace_owner_id == workspace_owner_id,
+                    Counterparty.kind.in_(["client", "both"]),
+                )
+                .order_by(Counterparty.name.asc())
+            ).scalars().all()
+            for row in rows:
+                extra = _counterparty_extra(row)
+                name = str(row.name or "??? ?????").strip()
+                phone = str(row.phone or extra.get("phone") or "").strip()
+                matching_calls: list[dict[str, Any]] = []
+                for call in call_rows:
+                    call_phone = str(call.get("phone") or "").strip()
+                    call_client = str(call.get("client") or "").strip()
+                    if not (
+                        (phone and _telephony_phone_matches(phone, call_phone))
+                        or (name and call_client and name.casefold() == call_client.casefold())
+                    ):
+                        continue
+                    matching_calls.append(
+                        {
+                            "id": str(call.get("id") or call.get("external_id") or ""),
+                            "phone": call_phone or phone,
+                            "direction": str(call.get("direction") or "outgoing"),
+                            "direction_label": str(
+                                call.get("direction_label")
+                                or _telephony_direction_label(str(call.get("direction") or ""))
+                            ),
+                            "status": str(call.get("status") or ""),
+                            "status_label": str(
+                                call.get("status_label")
+                                or _telephony_status_label("call", str(call.get("status") or ""))
+                            ),
+                            "started_at": str(call.get("started_at") or call.get("created_at") or ""),
+                            "duration": str(call.get("duration") or ""),
+                            "responsible": str(call.get("responsible") or call.get("operator_name") or ""),
+                            "note": str(call.get("note") or call.get("comment") or ""),
+                            "recording_url": _telephony_recording_public_url(
+                                call.get("recording_url") or call.get("recording_path")
+                            ),
+                        }
+                    )
+                matching_calls.sort(key=lambda item: item["started_at"], reverse=True)
+                is_synced_contact = str(row.external_source or "").strip() == "upos-sip"
+                is_confirmed = bool(extra.get("telephony_confirmed"))
+                is_pending = not phone or (is_synced_contact and not is_confirmed)
+                contacts.append(
+                    {
+                        "id": str(row.id),
+                        "name": name,
+                        "phone": phone,
+                        "pending": is_pending,
+                        "state": "pending" if is_pending else "confirmed",
+                        "state_label": "????? ???????????" if is_pending else "???????????",
+                        "source": str(extra.get("source") or row.external_source or "manual"),
+                        "created_at": row.created_at.isoformat() if row.created_at else "",
+                        "last_call_at": matching_calls[0]["started_at"] if matching_calls else "",
+                        "calls_count": len(matching_calls),
+                        "incoming_count": sum(1 for item in matching_calls if item["direction"] == "incoming"),
+                        "outgoing_count": sum(1 for item in matching_calls if item["direction"] == "outgoing"),
+                        "calls": matching_calls,
+                    }
+                )
+        contacts.sort(key=lambda item: (not item["pending"], item["name"].casefold()))
+        return contacts
+
     def _telephony_save_item(workspace_owner_id: str, key: str, item: dict[str, Any]) -> None:
         data = _telephony_settings_payload(workspace_owner_id)
         items = data.get(key)
@@ -9878,6 +9953,15 @@ def create_app() -> FastAPI:
                     "note": str(_telephony_first(payload, "note", "comment", "description") or extra.get("note") or "").strip(),
                 }
             )
+            if "telephony_confirmed" in payload:
+                raw_confirmed = payload.get("telephony_confirmed")
+                extra["telephony_confirmed"] = (
+                    raw_confirmed
+                    if isinstance(raw_confirmed, bool)
+                    else str(raw_confirmed or "").strip().casefold() in {"1", "true", "yes", "on"}
+                )
+            elif created:
+                extra.setdefault("telephony_confirmed", False)
             row.data = extra
             flag_modified(row, "data")
             session.flush()
@@ -10625,6 +10709,7 @@ def create_app() -> FastAPI:
             - {""}
         )
         client_options = _telephony_client_options(wid)
+        contacts = _telephony_contact_directory(wid, calls)
         calls_without_status_filter = _telephony_filter_rows(
             calls,
             {**filters, "status": "all"},
@@ -10650,6 +10735,7 @@ def create_app() -> FastAPI:
                 "clients": client_options,
             },
             telephony_calls=_telephony_filter_rows(calls, filters, kind="call"),
+            telephony_contacts=contacts,
             telephony_status_counts=telephony_status_counts,
             telephony_numbers=_telephony_filter_rows(numbers, filters, kind="number"),
             telephony_providers=_telephony_filter_rows(providers, filters, kind="provider"),
@@ -10674,7 +10760,12 @@ def create_app() -> FastAPI:
         phone = str(form.get("phone") or "").strip()
         if not client or not phone:
             return RedirectResponse(url="/telephony?error=" + quote("Клиент и номер телефона обязательны") + "#calls", status_code=302)
-        _telephony_upsert_web_client(wid, {"name": client, "phone": phone}, phone=phone, name=client)
+        _telephony_upsert_web_client(
+            wid,
+            {"name": client, "phone": phone, "telephony_confirmed": True},
+            phone=phone,
+            name=client,
+        )
         _telephony_save_item(
             wid,
             "telephony_calls",
@@ -10715,6 +10806,82 @@ def create_app() -> FastAPI:
                 "status": "active",
             },
         )
+        return RedirectResponse(url="/telephony?msg=saved#numbers", status_code=302)
+
+    @app.post("/telephony/contacts/confirm", name="telephony_contact_confirm")
+    async def telephony_contact_confirm(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#numbers", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        contact_id = str(form.get("contact_id") or "").strip()
+        name = str(form.get("name") or "").strip()
+        phone = str(form.get("phone") or "").strip()
+        if not contact_id or not name or len(_telephony_normalized_phone(phone)) < 7:
+            return RedirectResponse(
+                url="/telephony?error=" + quote("??????? ??? ? ?????????? ????? ????????") + "#numbers",
+                status_code=302,
+            )
+        previous_name = ""
+        previous_phone = ""
+        with session_scope() as session:
+            row = session.get(Counterparty, contact_id)
+            if not row or row.workspace_owner_id != wid or row.kind not in {"client", "both"}:
+                return RedirectResponse(
+                    url="/telephony?error=" + quote("??????? ?? ??????") + "#numbers",
+                    status_code=302,
+                )
+            candidates = session.execute(
+                select(Counterparty).where(
+                    Counterparty.workspace_owner_id == wid,
+                    Counterparty.id != row.id,
+                )
+            ).scalars().all()
+            if any(
+                _telephony_phone_matches(phone, candidate.phone or _counterparty_extra(candidate).get("phone"))
+                for candidate in candidates
+            ):
+                return RedirectResponse(
+                    url="/telephony?error=" + quote("???? ????? ??? ???????? ? ??????? ????????") + "#numbers",
+                    status_code=302,
+                )
+            previous_name = str(row.name or "").strip()
+            previous_phone = str(row.phone or _counterparty_extra(row).get("phone") or "").strip()
+            row.name = name[:255]
+            row.phone = phone[:64]
+            extra = _counterparty_extra(row)
+            extra.update(
+                {
+                    "phone": phone,
+                    "is_client": True,
+                    "telephony_confirmed": True,
+                    "telephony_confirmed_at": datetime.now(timezone.utc).isoformat(),
+                    "telephony_confirmed_by": _telephony_user_name(request),
+                }
+            )
+            row.data = extra
+            flag_modified(row, "data")
+
+        data = _telephony_settings_payload(wid)
+        stored_calls = data.get("telephony_calls") if isinstance(data.get("telephony_calls"), list) else []
+        changed = False
+        for call in stored_calls:
+            if not isinstance(call, dict):
+                continue
+            call_phone = str(call.get("phone") or "").strip()
+            call_client = str(call.get("client") or "").strip()
+            if (previous_phone and _telephony_phone_matches(previous_phone, call_phone)) or (
+                previous_name and call_client.casefold() == previous_name.casefold()
+            ):
+                call["client"] = name
+                call["phone"] = phone
+                changed = True
+        if changed:
+            data["telephony_calls"] = stored_calls
+            save_workspace_settings(wid, data)
         return RedirectResponse(url="/telephony?msg=saved#numbers", status_code=302)
 
     @app.post("/telephony/providers/save", name="telephony_provider_save")
