@@ -53,6 +53,18 @@
     var callDialog = document.getElementById("telephony-call-dialog");
     var numberDialog = document.getElementById("telephony-number-dialog");
     var callDate = callDialog ? callDialog.querySelector('input[name="started_at"]') : null;
+    var dateFilter = document.querySelector("[data-telephony-date-filter]");
+    var dateFrom = dateFilter ? dateFilter.querySelector('input[name="date_from"]') : null;
+
+    if (dateFilter && dateFrom) {
+      dateFrom.addEventListener("change", function () {
+        if (typeof dateFilter.requestSubmit === "function") {
+          dateFilter.requestSubmit();
+        } else {
+          dateFilter.submit();
+        }
+      });
+    }
 
     document.querySelectorAll("[data-telephony-open-call]").forEach(function (button) {
       button.addEventListener("click", function () {

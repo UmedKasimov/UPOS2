@@ -21991,6 +21991,45 @@ body.is-sidebar-collapsed .upos-floating-phone,
   display: block;
 }
 
+.telephony-date-filter {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-self: end;
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+}
+
+.telephony-date-filter .upos-date-auto,
+.telephony-date-filter .upos-date {
+  max-width: 100%;
+}
+
+.telephony-date-filter .upos-date {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.telephony-date-filter .upos-date-trigger {
+  min-height: 34px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: none;
+}
+
+.telephony-date-filter .upos-date-summary {
+  min-width: 112px;
+  padding: 0 10px 0 2px;
+  color: #334155;
+  font-weight: 800;
+}
+
 .telephony-account-cell strong {
   color: #1d4ed8;
   font-size: 14px;

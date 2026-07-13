@@ -9511,6 +9511,8 @@ def create_app() -> FastAPI:
         provider = filters.get("provider", "").casefold()
         responsible = filters.get("responsible", "").casefold()
         status = filters.get("status", "all")
+        date_from = filters.get("date_from", "")
+        date_to = filters.get("date_to", "")
         result: list[dict[str, Any]] = []
         for row in rows:
             haystack = " ".join(str(row.get(key) or "") for key in row.keys()).casefold()
@@ -9522,6 +9524,12 @@ def create_app() -> FastAPI:
                 continue
             if status and status != "all" and str(row.get("status") or "") != status:
                 continue
+            if kind == "call" and (date_from or date_to):
+                row_date = str(row.get("started_at") or row.get("created_at") or "")[:10]
+                if date_from and (not row_date or row_date < date_from):
+                    continue
+                if date_to and (not row_date or row_date > date_to):
+                    continue
             result.append(row)
         if kind == "call":
             result.sort(key=lambda item: str(item.get("started_at") or item.get("created_at") or ""), reverse=True)
@@ -10520,6 +10528,8 @@ def create_app() -> FastAPI:
         provider: str = "",
         responsible: str = "",
         status: str = "all",
+        date_from: str = "",
+        date_to: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -10530,6 +10540,8 @@ def create_app() -> FastAPI:
             "provider": provider.strip(),
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
+            "date_from": date_from.strip(),
+            "date_to": date_to.strip(),
         }
         user_name = _telephony_user_name(request)
         data = _telephony_settings_payload(wid)

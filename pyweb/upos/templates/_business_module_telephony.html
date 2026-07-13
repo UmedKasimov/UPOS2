@@ -1,4 +1,4 @@
-{% set telephony_filters = telephony_filters|default({'q': '', 'provider': '', 'responsible': '', 'status': 'all'}) %}
+{% set telephony_filters = telephony_filters|default({'q': '', 'provider': '', 'responsible': '', 'status': 'all', 'date_from': '', 'date_to': ''}) %}
 {% set telephony_options = telephony_options|default({'providers': [], 'responsibles': [], 'clients': []}) %}
 {% set telephony_calls = telephony_calls|default([]) %}
 {% set telephony_numbers = telephony_numbers|default([]) %}
@@ -17,6 +17,8 @@
 </div>
 
 <form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls numbers integrations" hidden>
+  <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
+  <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
   <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Аккаунт, клиент, номер, сотрудник" /></label>
   <label>
     <span>Провайдер</span>
@@ -173,12 +175,21 @@
         <h2>Журнал звонков</h2>
         <span>Всего: {{ telephony_calls|length }}</span>
       </div>
-      <button type="button" class="btn" data-telephony-open-call>+ Звонок</button>
+      <form class="telephony-date-filter" method="get" action="/telephony#calls" data-telephony-date-filter aria-label="Период звонков">
+        <input type="hidden" name="q" value="{{ telephony_filters.q }}" />
+        <input type="hidden" name="provider" value="{{ telephony_filters.provider }}" />
+        <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
+        <input type="hidden" name="status" value="{{ telephony_filters.status }}" />
+        <input name="date_from" type="date" value="{{ telephony_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" aria-label="Дата звонков от и до" />
+        <input name="date_to" type="hidden" value="{{ telephony_filters.date_to }}" />
+      </form>
     </header>
     <form class="telephony-status-filters" method="get" action="/telephony#calls" aria-label="Фильтр звонков по статусу">
       <input type="hidden" name="q" value="{{ telephony_filters.q }}" />
       <input type="hidden" name="provider" value="{{ telephony_filters.provider }}" />
       <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
+      <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
+      <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
       <button type="submit" name="status" value="all" class="telephony-status-filter{% if telephony_filters.status == 'all' %} is-active{% endif %}">Все <strong>{{ telephony_status_counts.all }}</strong></button>
       <button type="submit" name="status" value="answered" class="telephony-status-filter telephony-status-filter--answered{% if telephony_filters.status == 'answered' %} is-active{% endif %}">Отвеченные <strong>{{ telephony_status_counts.answered }}</strong></button>
       <button type="submit" name="status" value="missed" class="telephony-status-filter telephony-status-filter--missed{% if telephony_filters.status == 'missed' %} is-active{% endif %}">Пропущенные <strong>{{ telephony_status_counts.missed }}</strong></button>
