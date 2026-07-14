@@ -100,7 +100,7 @@
     </section>
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
-    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}#sales-journal" data-workspace-view="journal order return debt" hidden>
+    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-workspace-view="journal order return debt" hidden>
       <label class="products-catalog-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
@@ -145,7 +145,136 @@
     </datalist>
 
     <div class="sales-layout products-layout">
-      <article class="products-list-panel" id="sales-journal" data-workspace-view="journal order return debt" hidden>
+      <article class="products-list-panel sales-debt-workspace" id="debt" data-workspace-view="debt" hidden>
+        <header class="products-panel-head sales-debt-head">
+          <div>
+            <h2>Дебиторская задолженность</h2>
+            <span>{{ sales_debt_workspace.clients_count }} клиентов · {{ sales_debt_workspace.documents_count }} документов</span>
+          </div>
+          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
+        </header>
+        <section class="sales-debt-summary" aria-label="Сводка долгов">
+          <div class="sales-debt-metric sales-debt-metric--total">
+            <span>Общий долг</span>
+            <strong>
+              {% for total in sales_debt_workspace.totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.clients_count }} клиентов</small>
+          </div>
+          <div class="sales-debt-metric sales-debt-metric--overdue">
+            <span>Просрочено</span>
+            <strong>
+              {% for total in sales_debt_workspace.overdue_totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.overdue_documents_count }} документов</small>
+          </div>
+          <div class="sales-debt-metric sales-debt-metric--today">
+            <span>Срок сегодня</span>
+            <strong>
+              {% for total in sales_debt_workspace.due_today_totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.due_today_documents_count }} документов</small>
+          </div>
+          <div class="sales-debt-metric sales-debt-metric--upcoming">
+            <span>Предстоящие</span>
+            <strong>
+              {% for total in sales_debt_workspace.upcoming_totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.upcoming_documents_count }} документов</small>
+          </div>
+        </section>
+        <div class="sales-debt-table-wrap">
+          <table class="products-table products-catalog-table sales-debt-table">
+            <thead>
+              <tr>
+                <th>Клиент</th>
+                <th>Долг</th>
+                <th>Документы</th>
+                <th>Ближайший срок</th>
+                <th>Просрочка</th>
+                <th>Ответственный</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for debt_client in sales_debt_workspace.clients %}
+                <tr class="sales-debt-client-row sales-debt-client-row--{{ debt_client.status }}">
+                  <td>
+                    <details class="sales-debt-client" {% if loop.first %}open{% endif %}>
+                      <summary>
+                        <strong>{{ debt_client.client }}</strong>
+                        <span>{{ debt_client.documents_count }} неоплаченных продаж</span>
+                      </summary>
+                      <div class="sales-debt-documents">
+                        {% for sale in debt_client.documents %}
+                          <div class="sales-debt-document sales-debt-document--{{ sale.state }}" data-sales-debt-document>
+                            <button type="button" class="sales-debt-document-main" data-sales-journal-open data-sale-id="{{ sale.id }}">
+                              <strong>{{ sale.number }}</strong>
+                              <span>{{ sale.date_label or sale.date or "-" }}</span>
+                              <small>{{ sale.warehouse or "-" }}</small>
+                            </button>
+                            <div class="sales-debt-document-money">
+                              <strong>{{ sale.debt_label }} {{ sale.currency }}</strong>
+                              <small>из {{ sale.amount }} {{ sale.currency }}</small>
+                            </div>
+                            <div class="sales-debt-document-due">
+                              <span class="sales-debt-pill sales-debt-pill--{{ sale.state }}">{{ sale.state_label }}</span>
+                              <small>{{ sale.due_label }}</small>
+                            </div>
+                            <div class="sales-debt-document-aging">
+                              <span>{{ sale.aging_label }}</span>
+                              <small>{{ sale.manager or "Без ответственного" }}</small>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm sales-debt-pay-btn" data-sales-debt-pay data-sale-id="{{ sale.id }}">Оплатить</button>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </details>
+                  </td>
+                  <td>
+                    {% for total in debt_client.totals_list %}
+                      <strong class="sales-debt-money">{{ total.amount }} {{ total.currency }}</strong>
+                    {% endfor %}
+                  </td>
+                  <td>{{ debt_client.documents_count }}</td>
+                  <td>{{ debt_client.nearest_due_label }}</td>
+                  <td>
+                    {% if debt_client.max_days_overdue %}
+                      {{ debt_client.max_days_overdue }} дн.
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td>{{ debt_client.manager }}</td>
+                  <td><span class="sales-debt-pill sales-debt-pill--{{ debt_client.status }}">{{ debt_client.status_label }}</span></td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="7">Долгов по текущим фильтрам нет.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="products-list-panel{% if sales_filters.status == 'debt' %} sales-journal-support{% endif %}" id="sales-journal" data-workspace-view="journal order return debt" hidden>
         <header class="products-panel-head">
           <div>
             <h2>Журнал продаж</h2>

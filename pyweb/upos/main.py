@@ -11,7 +11,7 @@ import secrets
 import socket
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
@@ -5754,6 +5754,207 @@ def create_app() -> FastAPI:
         }
         return item
 
+    def _sales_debt_timing(due_date: str, today: date) -> dict[str, Any]:
+        clean_due_date = str(due_date or "").strip()
+        try:
+            due = datetime.strptime(clean_due_date[:10], "%Y-%m-%d").date() if clean_due_date else None
+        except ValueError:
+            due = None
+        if not due:
+            return {
+                "due_date": clean_due_date,
+                "due_label": clean_due_date or "Без срока",
+                "days_overdue": 0,
+                "days_until": None,
+                "state": "none",
+                "state_label": "Без срока",
+                "aging": "none",
+                "aging_label": "Без срока",
+                "priority": 3,
+                "sort_date": "9999-12-31",
+            }
+        days = (due - today).days
+        if days < 0:
+            overdue = abs(days)
+            if overdue <= 7:
+                aging = "1-7"
+            elif overdue <= 30:
+                aging = "8-30"
+            else:
+                aging = "31+"
+            return {
+                "due_date": clean_due_date,
+                "due_label": clean_due_date,
+                "days_overdue": overdue,
+                "days_until": days,
+                "state": "overdue",
+                "state_label": f"Просрочено {overdue} дн.",
+                "aging": aging,
+                "aging_label": f"{aging} дн.",
+                "priority": 0,
+                "sort_date": clean_due_date,
+            }
+        if days == 0:
+            return {
+                "due_date": clean_due_date,
+                "due_label": "Сегодня",
+                "days_overdue": 0,
+                "days_until": 0,
+                "state": "today",
+                "state_label": "Срок сегодня",
+                "aging": "today",
+                "aging_label": "Сегодня",
+                "priority": 1,
+                "sort_date": clean_due_date,
+            }
+        return {
+            "due_date": clean_due_date,
+            "due_label": clean_due_date,
+            "days_overdue": 0,
+            "days_until": days,
+            "state": "upcoming",
+            "state_label": f"Через {days} дн.",
+            "aging": "future",
+            "aging_label": "Предстоящий",
+            "priority": 2,
+            "sort_date": clean_due_date,
+        }
+
+    def _sales_debt_workspace(rows: list[SaleDocument], filters: dict[str, str], q_clean: str, today: date) -> dict[str, Any]:
+        clients_map: dict[str, dict[str, Any]] = {}
+        totals_by_currency: dict[str, Decimal] = {}
+        overdue_by_currency: dict[str, Decimal] = {}
+        due_today_by_currency: dict[str, Decimal] = {}
+        upcoming_by_currency: dict[str, Decimal] = {}
+        documents_count = 0
+        overdue_documents_count = 0
+        due_today_documents_count = 0
+        upcoming_documents_count = 0
+
+        for row in rows:
+            item = _sales_document_data(row)
+            if item["doc_type"] != "sale":
+                continue
+            debt_value = _sales_decimal(item.get("debt_value"))
+            if debt_value <= 0:
+                continue
+            if filters["client"] and item["client"] != filters["client"]:
+                continue
+            hay = " ".join(
+                [
+                    str(item.get("number") or ""),
+                    str(item.get("client") or ""),
+                    str(item.get("warehouse") or ""),
+                    str(item.get("manager") or ""),
+                    str(item.get("status_label") or ""),
+                    str(item.get("doc_type_label") or ""),
+                ]
+            ).lower()
+            if q_clean and q_clean not in hay:
+                continue
+
+            timing = _sales_debt_timing(str(item.get("date_to") or item.get("date") or ""), today)
+            currency = str(item.get("currency") or "UZS").upper()
+            client_name = str(item.get("client") or "").strip() or "Клиент не указан"
+            client_key = client_name.casefold()
+            client_bucket = clients_map.setdefault(
+                client_key,
+                {
+                    "client": client_name,
+                    "documents": [],
+                    "totals": {},
+                    "managers": {},
+                    "documents_count": 0,
+                    "overdue_count": 0,
+                    "due_today_count": 0,
+                    "upcoming_count": 0,
+                    "nearest_due": "",
+                    "nearest_due_label": "Без срока",
+                    "priority": 3,
+                    "max_days_overdue": 0,
+                },
+            )
+            doc = {
+                **item,
+                **timing,
+                "debt_label": _sales_money_label(debt_value),
+            }
+            client_bucket["documents"].append(doc)
+            client_bucket["documents_count"] += 1
+            client_bucket["totals"][currency] = client_bucket["totals"].get(currency, Decimal("0")) + debt_value
+            if item.get("manager"):
+                manager = str(item.get("manager") or "")
+                client_bucket["managers"][manager] = client_bucket["managers"].get(manager, 0) + 1
+            client_bucket["priority"] = min(client_bucket["priority"], timing["priority"])
+            if timing["sort_date"] != "9999-12-31":
+                if not client_bucket["nearest_due"] or timing["sort_date"] < client_bucket["nearest_due"]:
+                    client_bucket["nearest_due"] = timing["sort_date"]
+                    client_bucket["nearest_due_label"] = timing["due_label"]
+            client_bucket["max_days_overdue"] = max(client_bucket["max_days_overdue"], int(timing["days_overdue"] or 0))
+
+            totals_by_currency[currency] = totals_by_currency.get(currency, Decimal("0")) + debt_value
+            documents_count += 1
+            if timing["state"] == "overdue":
+                overdue_documents_count += 1
+                client_bucket["overdue_count"] += 1
+                overdue_by_currency[currency] = overdue_by_currency.get(currency, Decimal("0")) + debt_value
+            elif timing["state"] == "today":
+                due_today_documents_count += 1
+                client_bucket["due_today_count"] += 1
+                due_today_by_currency[currency] = due_today_by_currency.get(currency, Decimal("0")) + debt_value
+            else:
+                upcoming_documents_count += 1
+                client_bucket["upcoming_count"] += 1
+                upcoming_by_currency[currency] = upcoming_by_currency.get(currency, Decimal("0")) + debt_value
+
+        clients_view: list[dict[str, Any]] = []
+        for bucket in clients_map.values():
+            bucket["documents"].sort(key=lambda doc: (doc["priority"], doc["sort_date"], str(doc.get("number") or "")))
+            managers = sorted(bucket["managers"].items(), key=lambda item: (-item[1], item[0]))
+            bucket["manager"] = managers[0][0] if managers else "Без ответственного"
+            bucket["totals_list"] = [
+                {"currency": currency, "amount": _sales_money_label(amount), "amount_value": str(amount)}
+                for currency, amount in sorted(bucket["totals"].items())
+                if amount
+            ]
+            bucket["status"] = "overdue" if bucket["overdue_count"] else "today" if bucket["due_today_count"] else "upcoming"
+            bucket["status_label"] = (
+                f"Просрочено: {bucket['overdue_count']}"
+                if bucket["overdue_count"]
+                else f"Срок сегодня: {bucket['due_today_count']}"
+                if bucket["due_today_count"]
+                else "В графике"
+            )
+            clients_view.append(bucket)
+        clients_view.sort(
+            key=lambda bucket: (
+                bucket["priority"],
+                -int(bucket["max_days_overdue"] or 0),
+                bucket["nearest_due"] or "9999-12-31",
+                str(bucket["client"]).casefold(),
+            )
+        )
+
+        def money_list(source: dict[str, Decimal]) -> list[dict[str, str]]:
+            return [
+                {"currency": currency, "amount": _sales_money_label(amount), "amount_value": str(amount)}
+                for currency, amount in sorted(source.items())
+                if amount
+            ]
+
+        return {
+            "clients": clients_view,
+            "clients_count": len(clients_view),
+            "documents_count": documents_count,
+            "overdue_documents_count": overdue_documents_count,
+            "due_today_documents_count": due_today_documents_count,
+            "upcoming_documents_count": upcoming_documents_count,
+            "totals": money_list(totals_by_currency),
+            "overdue_totals": money_list(overdue_by_currency),
+            "due_today_totals": money_list(due_today_by_currency),
+            "upcoming_totals": money_list(upcoming_by_currency),
+        }
+
     def _sales_product_option(
         row: Product,
         active_sales_price_types: list[dict[str, Any]],
@@ -6185,6 +6386,7 @@ def create_app() -> FastAPI:
         next_numbers: dict[str, str] = {}
         sales_prefill = {"crm_record_id": "", "client": ""}
         usd_rate = _workspace_usd_uzs_rate(wid)
+        today_date = datetime.now(timezone.utc).date()
         with session_scope() as session:
             requested_crm_id = str(crm_record_id or "").strip()
             if requested_crm_id:
@@ -6208,7 +6410,10 @@ def create_app() -> FastAPI:
                 item = _sales_document_data(row)
                 if filters["doc_type"] != "all" and item["doc_type"] != filters["doc_type"]:
                     continue
-                if filters["status"] != "all" and item["status"] != filters["status"]:
+                if filters["status"] == "debt":
+                    if item["doc_type"] != "sale" or _sales_decimal(item.get("debt_value")) <= 0:
+                        continue
+                elif filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
                     continue
@@ -6216,6 +6421,7 @@ def create_app() -> FastAPI:
                 if q_clean and q_clean not in hay:
                     continue
                 sales.append(item)
+            sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)
             sales_journal_totals_by_currency: dict[str, dict[str, Decimal]] = {}
             for item in sales:
                 currency = str(item.get("currency") or "UZS").upper()
@@ -6360,6 +6566,7 @@ def create_app() -> FastAPI:
             active="sales",
             sales=sales,
             sales_journal_totals=sales_journal_totals,
+            sales_debt_workspace=sales_debt_workspace,
             sales_filters=filters,
             sales_options={
                 "clients": clients,
@@ -6374,7 +6581,7 @@ def create_app() -> FastAPI:
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
             },
-            today=datetime.now(timezone.utc).date().isoformat(),
+            today=today_date.isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
             sales_saved_id=request.query_params.get("saved_id") or "",
