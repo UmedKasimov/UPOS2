@@ -238,6 +238,8 @@
     switch (key) {
       case "quantity":
         return parseNumber(row.dataset.sortQuantity);
+      case "purchase-price":
+        return parseNumber(row.dataset.sortPurchasePrice);
       case "price-list":
         return normalizeText(row.dataset.sortPriceList);
       case "price":

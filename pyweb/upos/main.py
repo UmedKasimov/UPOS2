@@ -4131,11 +4131,13 @@ def create_app() -> FastAPI:
         catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
+        catalog_currency: str = "",
         category_values: list[str] | None = None,
         group_values: list[str] | None = None,
         brand_values: list[str] | None = None,
         folder_values: list[str] | None = None,
         catalog_price_list_values: list[str] | None = None,
+        catalog_currency_values: list[str] | None = None,
         status_values: list[str] | None = None,
         kind_values: list[str] | None = None,
     ) -> dict[str, Any]:
@@ -4162,6 +4164,10 @@ def create_app() -> FastAPI:
         selected_brand = clean_values(brand_values, brand)
         selected_folder = clean_values(folder_values, folder)
         selected_catalog_price_list = clean_values(catalog_price_list_values, catalog_price_list)
+        selected_catalog_currency = [
+            value.upper()
+            for value in clean_values(catalog_currency_values, catalog_currency)
+        ]
         return {
             "q": q.strip(),
             "category": selected_category[0] if selected_category else "",
@@ -4169,6 +4175,7 @@ def create_app() -> FastAPI:
             "brand": selected_brand[0] if selected_brand else "",
             "folder": selected_folder[0] if selected_folder else "",
             "catalog_price_list": selected_catalog_price_list[0] if selected_catalog_price_list else "",
+            "catalog_currency": selected_catalog_currency[0] if selected_catalog_currency else "",
             "status": selected_status[0] if selected_status else "active",
             "kind": selected_kind[0] if selected_kind else "product",
             "category_values": selected_category,
@@ -4176,6 +4183,7 @@ def create_app() -> FastAPI:
             "brand_values": selected_brand,
             "folder_values": selected_folder,
             "catalog_price_list_values": selected_catalog_price_list,
+            "catalog_currency_values": selected_catalog_currency,
             "status_values": selected_status,
             "kind_values": selected_kind,
         }
@@ -4464,6 +4472,33 @@ def create_app() -> FastAPI:
             return value / rate
         return value
 
+    def _product_weighted_purchase_cost(
+        product: dict[str, Any],
+        usd_rate: Decimal,
+        document_quantity: Decimal = Decimal("0"),
+        document_amount_uzs: Decimal = Decimal("0"),
+    ) -> Decimal:
+        if document_quantity > 0 and document_amount_uzs > 0:
+            return document_amount_uzs / document_quantity
+
+        for source_key in ("purchase_history", "stocks"):
+            rows = product.get(source_key) if isinstance(product.get(source_key), list) else []
+            total_quantity = Decimal("0")
+            total_amount_uzs = Decimal("0")
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                quantity = _sales_decimal(row.get("quantity"))
+                price = _sales_decimal(row.get("price"))
+                if quantity <= 0 or price <= 0:
+                    continue
+                currency = str(row.get("currency") or "UZS").upper()
+                total_quantity += quantity
+                total_amount_uzs += quantity * _convert_product_currency(price, currency, "UZS", usd_rate)
+            if total_quantity > 0 and total_amount_uzs > 0:
+                return total_amount_uzs / total_quantity
+        return Decimal("0")
+
     def _round_product_price(value: Decimal, step_raw: Any) -> Decimal:
         step = _sales_decimal(step_raw)
         if step <= 0:
@@ -4580,11 +4615,52 @@ def create_app() -> FastAPI:
         edit_product = None
         settings_payload = load_workspace_settings(workspace_owner_id)
         price_lists = _workspace_price_types(workspace_owner_id)
-        selected_price_list_ids = {
+        explicit_price_list_ids = {
             str(value)
             for value in filters.get("catalog_price_list_values", [])
             if str(value)
         }
+        display_price_list_ids = set(explicit_price_list_ids)
+        default_price_list = next(
+            (item for item in price_lists if str(item.get("id") or "") == "1"),
+            None,
+        ) or next(
+            (
+                item
+                for item in price_lists
+                if item.get("is_active") and item.get("is_for_sales")
+            ),
+            price_lists[0] if price_lists else None,
+        )
+        if not display_price_list_ids and price_lists:
+            default_price_list_id = str((default_price_list or {}).get("id") or "").strip()
+            if default_price_list_id:
+                display_price_list_ids = {default_price_list_id}
+                filters["catalog_price_list"] = default_price_list_id
+                filters["catalog_price_list_values"] = [default_price_list_id]
+
+        selected_currencies = {
+            str(value).upper()
+            for value in filters.get("catalog_currency_values", [])
+            if str(value).strip()
+        }
+        if not selected_currencies:
+            selected_price_type = next(
+                (
+                    item
+                    for item in price_lists
+                    if str(item.get("id") or "") in display_price_list_ids
+                ),
+                default_price_list,
+            )
+            default_currency = str(
+                (selected_price_type or {}).get("convert_to_currency") or "UZS"
+            ).upper()
+            selected_currencies = {default_currency}
+            filters["catalog_currency"] = default_currency
+            filters["catalog_currency_values"] = [default_currency]
+
+        usd_rate = _workspace_usd_uzs_rate(workspace_owner_id)
         rows = list(
             session.execute(
                 select(Product)
@@ -4592,6 +4668,42 @@ def create_app() -> FastAPI:
                 .order_by(Product.updated_at.desc())
             ).scalars()
         )
+        product_id_by_name = {
+            str(row.name or "").strip().casefold(): str(row.id)
+            for row in rows
+            if str(row.name or "").strip()
+        }
+        purchase_costs: dict[str, dict[str, Decimal]] = {}
+        purchase_documents = list(
+            session.execute(
+                select(PurchaseDocument).where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
+            ).scalars()
+        )
+        for document in purchase_documents:
+            document_data = _json_object(document.data)
+            document_currency = str(document.currency or document_data.get("currency") or "UZS").upper()
+            for raw_line in document_data.get("lines") or []:
+                if not isinstance(raw_line, dict):
+                    continue
+                product_id = str(raw_line.get("product_id") or "").strip()
+                if not product_id:
+                    product_id = product_id_by_name.get(str(raw_line.get("product") or "").strip().casefold(), "")
+                quantity = _sales_decimal(raw_line.get("quantity"))
+                price = _sales_decimal(raw_line.get("price"))
+                if not product_id or quantity <= 0 or price <= 0:
+                    continue
+                line_currency = str(raw_line.get("currency") or document_currency).upper()
+                bucket = purchase_costs.setdefault(
+                    product_id,
+                    {"quantity": Decimal("0"), "amount_uzs": Decimal("0")},
+                )
+                bucket["quantity"] += quantity
+                bucket["amount_uzs"] += quantity * _convert_product_currency(
+                    price,
+                    line_currency,
+                    "UZS",
+                    usd_rate,
+                )
         for row in rows:
             item = _product_data(row)
             catalog_prices: list[dict[str, Any]] = []
@@ -4609,7 +4721,8 @@ def create_app() -> FastAPI:
             display_prices = [
                 price
                 for price in catalog_prices
-                if not selected_price_list_ids or price["id"] in selected_price_list_ids
+                if (not display_price_list_ids or price["id"] in display_price_list_ids)
+                and price["currency"] in selected_currencies
             ]
             item["catalog_prices"] = catalog_prices
             item["display_prices"] = display_prices
@@ -4620,10 +4733,37 @@ def create_app() -> FastAPI:
                 (price["price"] for price in display_prices if price["has_price"]),
                 "0",
             )
+            purchase_cost = purchase_costs.get(str(item.get("id") or ""), {})
+            average_purchase_price_uzs = _product_weighted_purchase_cost(
+                item,
+                usd_rate,
+                purchase_cost.get("quantity", Decimal("0")),
+                purchase_cost.get("amount_uzs", Decimal("0")),
+            )
+            item["purchase_price_sort_value"] = _decimal_plain_text(average_purchase_price_uzs) or "0"
+            item["purchase_prices"] = []
+            for currency in sorted(selected_currencies, key=lambda value: (value != "UZS", value)):
+                converted_price = _convert_product_currency(
+                    average_purchase_price_uzs,
+                    "UZS",
+                    currency,
+                    usd_rate,
+                )
+                item["purchase_prices"].append(
+                    {
+                        "currency": currency,
+                        "price": _decimal_plain_text(converted_price),
+                        "price_display": _catalog_number_text(converted_price),
+                        "has_price": converted_price > 0,
+                    }
+                )
             all_items.append(item)
             if not _product_matches_filters(item, filters):
                 continue
-            if selected_price_list_ids and not any(price["has_price"] for price in display_prices):
+            if explicit_price_list_ids and not any(
+                price["has_price"] and price["id"] in explicit_price_list_ids
+                for price in catalog_prices
+            ):
                 continue
             products.append(item)
             if edit and row.id == edit:
@@ -4667,8 +4807,67 @@ def create_app() -> FastAPI:
                 }
             ),
             "price_lists": sorted(price_lists, key=lambda item: (int(item.get("sort_order") or 0), str(item.get("name") or ""))),
+            "currencies": sorted(
+                {
+                    "UZS",
+                    "USD",
+                    *(
+                        str(item.get("convert_to_currency") or "UZS").upper()
+                        for item in price_lists
+                    ),
+                },
+                key=lambda value: (value != "UZS", value),
+            ),
         }
         return products, edit_product, options
+
+    def _product_catalog_totals(products: list[dict[str, Any]]) -> dict[str, list[dict[str, str]]]:
+        quantities: dict[str, Decimal] = {}
+        purchase_values: dict[str, Decimal] = {}
+        price_values: dict[tuple[str, str], dict[str, Any]] = {}
+        for product in products:
+            quantity = _sales_decimal(product.get("quantity"))
+            unit = str(product.get("unit") or "Ед.").strip() or "Ед."
+            quantities[unit] = quantities.get(unit, Decimal("0")) + quantity
+            for purchase_price in product.get("purchase_prices") or []:
+                if not isinstance(purchase_price, dict) or not purchase_price.get("has_price"):
+                    continue
+                currency = str(purchase_price.get("currency") or "UZS").upper()
+                purchase_values[currency] = purchase_values.get(currency, Decimal("0")) + (
+                    quantity * _sales_decimal(purchase_price.get("price"))
+                )
+            for price in product.get("display_prices") or []:
+                if not isinstance(price, dict) or not price.get("has_price"):
+                    continue
+                currency = str(price.get("currency") or "UZS").upper()
+                key = (str(price.get("id") or price.get("name") or ""), currency)
+                bucket = price_values.setdefault(
+                    key,
+                    {
+                        "name": str(price.get("name") or "Прайс"),
+                        "currency": currency,
+                        "amount": Decimal("0"),
+                    },
+                )
+                bucket["amount"] += quantity * _sales_decimal(price.get("price"))
+        return {
+            "quantities": [
+                {"unit": unit, "value": _catalog_number_text(amount, empty="0")}
+                for unit, amount in sorted(quantities.items())
+            ],
+            "purchase_values": [
+                {"currency": currency, "value": _catalog_number_text(amount, empty="0")}
+                for currency, amount in sorted(purchase_values.items(), key=lambda item: (item[0] != "UZS", item[0]))
+            ],
+            "price_values": [
+                {
+                    "name": str(bucket["name"]),
+                    "currency": str(bucket["currency"]),
+                    "value": _catalog_number_text(bucket["amount"], empty="0"),
+                }
+                for _, bucket in sorted(price_values.items(), key=lambda item: (item[0][0], item[0][1]))
+            ],
+        }
 
     def _save_product_categories(workspace_owner_id: str, names: list[str]) -> None:
         clean = sorted({str(name or "").strip() for name in names if str(name or "").strip()})
@@ -4763,6 +4962,7 @@ def create_app() -> FastAPI:
         catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
+        catalog_currency: str = "",
         msg: str = "",
         count: int = 0,
         error: str = "",
@@ -4772,6 +4972,7 @@ def create_app() -> FastAPI:
         brand_values: list[str] | None = None,
         folder_values: list[str] | None = None,
         catalog_price_list_values: list[str] | None = None,
+        catalog_currency_values: list[str] | None = None,
         status_values: list[str] | None = None,
         kind_values: list[str] | None = None,
         **_unused: Any,
@@ -4796,6 +4997,10 @@ def create_app() -> FastAPI:
         selected_brand = values_or_single(brand_values, brand)
         selected_folder = values_or_single(folder_values, folder)
         selected_catalog_price_list = values_or_single(catalog_price_list_values, catalog_price_list)
+        selected_catalog_currency = [
+            value.upper()
+            for value in values_or_single(catalog_currency_values, catalog_currency)
+        ]
         selected_status = values_or_single(status_values, status.strip() or "active")
         selected_kind = values_or_single(kind_values, kind.strip() or "product")
         if selected_category:
@@ -4808,6 +5013,8 @@ def create_app() -> FastAPI:
             query["folder"] = selected_folder
         if selected_catalog_price_list:
             query["catalog_price_list"] = selected_catalog_price_list
+        if selected_catalog_currency:
+            query["catalog_currency"] = selected_catalog_currency
         if selected_status:
             query["status"] = selected_status
         if selected_kind:
@@ -4833,6 +5040,7 @@ def create_app() -> FastAPI:
         catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
+        catalog_currency: str = "",
         page_size: str = "100",
         page: str = "1",
         edit: str = "",
@@ -4858,11 +5066,13 @@ def create_app() -> FastAPI:
             catalog_price_list,
             status,
             kind,
+            catalog_currency,
             category_values=query.getlist("category"),
             group_values=query.getlist("group"),
             brand_values=query.getlist("brand"),
             folder_values=query.getlist("folder"),
             catalog_price_list_values=query.getlist("catalog_price_list"),
+            catalog_currency_values=query.getlist("catalog_currency"),
             status_values=query.getlist("status"),
             kind_values=query.getlist("kind"),
         )
@@ -4878,6 +5088,7 @@ def create_app() -> FastAPI:
                 ).scalars()
             ]
         products_total = len(products)
+        catalog_totals = _product_catalog_totals(products)
         product_total_pages = max(1, math.ceil(products_total / product_page_size))
         product_page = min(_positive_int(page, 1), product_total_pages)
         product_page_start = (product_page - 1) * product_page_size
@@ -4976,6 +5187,7 @@ def create_app() -> FastAPI:
             product_page_urls={page_no: product_page_url(page_no) for page_no in product_pagination_pages},
             product_filters=filters,
             product_options=options,
+            catalog_totals=catalog_totals,
             price_type_state=price_type_state,
             edit_product=edit_product,
             flash_ok=request.query_params.get("msg"),
@@ -4995,6 +5207,7 @@ def create_app() -> FastAPI:
         catalog_price_list: str = "",
         status: str = "active",
         kind: str = "product",
+        catalog_currency: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -5010,11 +5223,13 @@ def create_app() -> FastAPI:
             catalog_price_list,
             status,
             kind,
+            catalog_currency,
             category_values=query.getlist("category"),
             group_values=query.getlist("group"),
             brand_values=query.getlist("brand"),
             folder_values=query.getlist("folder"),
             catalog_price_list_values=query.getlist("catalog_price_list"),
+            catalog_currency_values=query.getlist("catalog_currency"),
             status_values=query.getlist("status"),
             kind_values=query.getlist("kind"),
         )
@@ -5562,11 +5777,13 @@ def create_app() -> FastAPI:
             str(form.get("catalog_price_list") or ""),
             str(form.get("status") or "active"),
             str(form.get("kind") or "product"),
+            str(form.get("catalog_currency") or ""),
             category_values=[str(item or "") for item in form.getlist("category")],
             group_values=[str(item or "") for item in form.getlist("group")],
             brand_values=[str(item or "") for item in form.getlist("brand")],
             folder_values=[str(item or "") for item in form.getlist("folder")],
             catalog_price_list_values=[str(item or "") for item in form.getlist("catalog_price_list")],
+            catalog_currency_values=[str(item or "") for item in form.getlist("catalog_currency")],
             status_values=[str(item or "") for item in form.getlist("status")],
             kind_values=[str(item or "") for item in form.getlist("kind")],
         )

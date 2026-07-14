@@ -1600,7 +1600,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: grid;
   grid-template-columns:
     minmax(13rem, 1.55fr)
-    repeat(7, minmax(7rem, 1fr))
+    repeat(8, minmax(7rem, 1fr))
     2.2rem;
   grid-area: filters;
   gap: 0.55rem;
@@ -1717,7 +1717,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .products-catalog-status .products-multi-filter-menu,
-.products-catalog-price-list .products-multi-filter-menu {
+.products-catalog-price-list .products-multi-filter-menu,
+.products-catalog-currency .products-multi-filter-menu {
   right: 0;
   left: auto;
 }
@@ -1759,6 +1760,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--primary);
   font-size: max(15px, var(--text-base));
   font-weight: 850;
+  white-space: nowrap;
+}
+
+.products-purchase-price-cell strong {
+  display: block;
+  color: color-mix(in srgb, var(--foreground) 86%, var(--primary));
+  font-size: max(14px, var(--text-sm));
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -2284,7 +2293,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   --products-table-head-bg: color-mix(in srgb, var(--products-table-blue) 22%, var(--card));
   --products-table-row-alt-bg: color-mix(in srgb, var(--products-table-blue) 8%, var(--card));
   --products-table-row-hover-bg: color-mix(in srgb, var(--products-table-blue-strong) 10%, var(--card));
-  min-width: 76rem;
+  min-width: 86rem;
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 26%, var(--workbench-line, var(--border)));
   background: var(--card);
 }
@@ -3914,6 +3923,40 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .clients-table.products-catalog-table {
   min-width: 92rem;
+}
+
+#products-catalog-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  height: auto;
+  min-height: 0;
+  border-top: 2px solid color-mix(in srgb, var(--products-table-blue-strong) 36%, var(--border));
+  background: color-mix(in srgb, var(--products-table-blue) 14%, var(--card));
+  box-shadow: 0 -5px 12px rgb(15 23 42 / 0.05);
+  vertical-align: top;
+}
+
+.products-catalog-total-row td:first-child {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.products-catalog-total-row td > span,
+.products-catalog-total-row td > strong,
+.products-catalog-total-row td > small {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.products-catalog-total-row td > :last-child {
+  margin-bottom: 0;
+}
+
+.products-catalog-total-row small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 650;
 }
 
 .clients-table.products-catalog-table th:nth-child(3),

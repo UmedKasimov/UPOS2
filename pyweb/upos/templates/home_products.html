@@ -17,7 +17,7 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=10" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=11" defer></script>
 {% endblock %}
 
 {% block main %}
@@ -117,6 +117,7 @@
                 {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
                 {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
                 {% for item in product_filters.catalog_price_list_values %}<input type="hidden" name="catalog_price_list" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.catalog_currency_values %}<input type="hidden" name="catalog_currency" value="{{ item }}" />{% endfor %}
                 {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
                 <button class="btn btn-secondary" type="submit">Экспорт Excel</button>
               </form>
@@ -227,6 +228,21 @@
                 </div>
               </details>
             </label>
+            <label class="products-catalog-currency">
+              <span>Валюта</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Валюта</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.currencies %}
+                    <label>
+                      <input type="checkbox" name="catalog_currency" value="{{ item }}" {% if item in product_filters.catalog_currency_values %}checked{% endif %} />
+                      <span>{{ item }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
             <label class="products-catalog-status">
               <span>Статус</span>
               <details class="products-multi-filter" data-products-multi-filter>
@@ -257,6 +273,7 @@
           {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.catalog_price_list_values %}<input type="hidden" name="catalog_price_list" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.catalog_currency_values %}<input type="hidden" name="catalog_currency" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
           <input type="hidden" name="page_size" value="{{ product_page_size }}" />
@@ -335,6 +352,11 @@
                     <span>На складе</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
+                <th data-column-label="Приходная цена" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="purchase-price">
+                    <span>Приходная цена</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="Прайс-лист" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price-list">
                     <span>Прайс-лист</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -369,6 +391,7 @@
                   data-sort-barcode="{{ (product.barcode or '')|lower }}"
                   data-sort-unit="{{ (product.unit or '')|lower }}"
                   data-sort-quantity="{{ product.quantity or 0 }}"
+                  data-sort-purchase-price="{{ product.purchase_price_sort_value or 0 }}"
                   data-sort-price-list="{{ (product.display_prices|map(attribute='name')|join(' '))|lower }}"
                   data-sort-price="{{ product.price_sort_value or 0 }}"
                   data-sort-category="{{ (product.category or '')|lower }}"
@@ -431,6 +454,15 @@
                   <td>{{ product.barcode or "-" }}</td>
                   <td>{{ product.unit or "-" }}</td>
                   <td class="products-catalog-number">{{ product.quantity_display }}</td>
+                  <td class="products-price-list-cell products-purchase-price-cell">
+                    <div class="products-price-list-values">
+                      {% for price in product.purchase_prices %}
+                        <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
+                          <strong>{% if price.has_price %}{{ price.price_display }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </td>
                   <td class="products-price-list-cell products-price-list-name-cell">
                     <div class="products-price-list-values">
                       {% for price in product.display_prices %}
@@ -496,10 +528,39 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="11">Пока нет товаров. Создайте первый товар справа.</td>
+                  <td colspan="13">Пока нет товаров. Создайте первый товар справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
+            {% if products_total %}
+              <tfoot>
+                <tr class="products-catalog-total-row">
+                  <td colspan="6"><strong>Итого по выбранному каталогу</strong></td>
+                  <td class="products-catalog-number">
+                    {% for total in catalog_totals.quantities %}
+                      <span>{{ total.value }} {{ total.unit }}</span>
+                    {% else %}
+                      <span>0</span>
+                    {% endfor %}
+                  </td>
+                  <td class="products-price-list-cell products-purchase-price-cell">
+                    <small>Себестоимость остатка</small>
+                    {% for total in catalog_totals.purchase_values %}
+                      <strong>{{ total.value }} {{ total.currency }}</strong>
+                    {% else %}
+                      <strong>0</strong>
+                    {% endfor %}
+                  </td>
+                  <td class="products-price-list-cell products-price-list-name-cell">
+                    {% for total in catalog_totals.price_values %}<strong>{{ total.name }}</strong>{% endfor %}
+                  </td>
+                  <td class="products-price-list-cell products-price-value-cell">
+                    {% for total in catalog_totals.price_values %}<strong>{{ total.value }} {{ total.currency }}</strong>{% endfor %}
+                  </td>
+                  <td colspan="3"></td>
+                </tr>
+              </tfoot>
+            {% endif %}
           </table>
         </div>
         <footer class="products-catalog-footer">
