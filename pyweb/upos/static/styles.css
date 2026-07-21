@@ -22440,7 +22440,7 @@ body.is-sidebar-collapsed .upos-floating-phone,
 
 .telephony-calls-table {
   table-layout: fixed;
-  min-width: 1240px;
+  min-width: 1400px;
 }
 
 .telephony-calls-table th:nth-child(1),
@@ -22455,7 +22455,15 @@ body.is-sidebar-collapsed .upos-floating-phone,
 
 .telephony-calls-table th:nth-child(3),
 .telephony-calls-table td:nth-child(3) {
-  width: 12%;
+  width: 16%;
+}
+
+.telephony-calls-table .telephony-call-phone {
+  color: #0f172a;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.05;
+  white-space: nowrap;
 }
 
 .telephony-calls-table th:nth-child(4),

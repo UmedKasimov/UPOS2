@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import calendar
+import io
 import json
 import logging
-import io
 import math
 import os
 import re
@@ -10130,6 +10132,16 @@ def create_app() -> FastAPI:
             return raw
         return ""
 
+    def _telephony_call_reference(value: Any) -> str:
+        raw = str(value or "").strip()
+        while raw.casefold().startswith("upos-sip:"):
+            raw = raw.split(":", 1)[1].strip()
+        return raw
+
+    def _telephony_external_call_id(value: Any) -> str:
+        reference = _telephony_call_reference(value)
+        return f"upos-sip:{reference}" if reference else ""
+
     def _telephony_rows_with_labels(rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for row in rows:
@@ -10141,6 +10153,13 @@ def create_app() -> FastAPI:
                     item.get("recording_url") or item.get("recording_path")
                 )
                 item["has_recording"] = bool(item["recording_url"] or item.get("recording_path"))
+                item["recording_state"] = (
+                    "ready"
+                    if item["recording_url"]
+                    else "pending"
+                    if item.get("recording_path")
+                    else "none"
+                )
             out.append(item)
         return out
 
@@ -10792,6 +10811,7 @@ def create_app() -> FastAPI:
             "client": str(call_item.get("client") or "").strip(),
             "phone": str(call_item.get("phone") or "").strip(),
             "path": recording_path,
+            "state": "ready" if _telephony_recording_public_url(recording_path) else "pending",
             "duration": str(call_item.get("duration") or _telephony_first(payload, "duration_sec", "duration", "billsec") or "").strip(),
             "started_at": str(call_item.get("started_at") or _telephony_first(payload, "started_at", "start_time", "timestamp") or "").strip(),
             "created_at": str(_telephony_first(payload, "recording_created_at", "record_created_at") or now_iso).strip(),
@@ -10823,23 +10843,119 @@ def create_app() -> FastAPI:
         data["telephony_recordings"] = recordings[:500]
         return item
 
+    def _telephony_recording_upload_from_form(form: Any) -> tuple[dict[str, Any], Any]:
+        payload: dict[str, Any] = {}
+        upload = None
+        file_keys = {"file", "recording_file", "audio", "record", "voice", "recording"}
+        items = form.multi_items() if hasattr(form, "multi_items") else form.items()
+        for key, value in items:
+            clean_key = str(key)
+            if clean_key in file_keys and hasattr(value, "read"):
+                upload = upload or value
+                continue
+            payload[clean_key] = value
+        return payload, upload
+
+    async def _telephony_store_recording_upload(
+        workspace_owner_id: str,
+        payload: dict[str, Any],
+        upload: Any = None,
+    ) -> tuple[str, str, int, int]:
+        content = b""
+        filename = str(
+            getattr(upload, "filename", "")
+            or _telephony_first(payload, "filename", "file_name", "recording_name")
+            or ""
+        ).strip()
+        content_type = str(
+            getattr(upload, "content_type", "")
+            or _telephony_first(payload, "content_type", "mime_type", "recording_content_type")
+            or ""
+        ).split(";", 1)[0].strip().lower()
+
+        if upload is not None and hasattr(upload, "read"):
+            content = await upload.read(50 * 1024 * 1024 + 1)
+        else:
+            encoded = str(
+                _telephony_first(
+                    payload,
+                    "recording_base64",
+                    "audio_base64",
+                    "file_base64",
+                    "record_base64",
+                )
+                or ""
+            ).strip()
+            if encoded.startswith("data:") and "," in encoded:
+                header, encoded = encoded.split(",", 1)
+                if not content_type:
+                    content_type = header[5:].split(";", 1)[0].strip().lower()
+            if encoded:
+                try:
+                    compact = re.sub(r"\s+", "", encoded)
+                    compact += "=" * (-len(compact) % 4)
+                    content = base64.b64decode(compact, altchars=b"-_", validate=True)
+                except (binascii.Error, ValueError):
+                    return "", "invalid_recording_base64", 400, 0
+
+        if not content:
+            return "", "recording_required", 400, 0
+        if len(content) > 50 * 1024 * 1024:
+            return "", "recording_too_large", 413, 0
+
+        suffix_by_type = {
+            "audio/aac": ".aac",
+            "audio/flac": ".flac",
+            "audio/mpeg": ".mp3",
+            "audio/mp4": ".m4a",
+            "audio/ogg": ".ogg",
+            "audio/opus": ".opus",
+            "audio/wav": ".wav",
+            "audio/x-wav": ".wav",
+            "audio/webm": ".webm",
+        }
+        allowed_suffixes = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".webm"}
+        suffix = Path(filename).suffix.lower()
+        if suffix not in allowed_suffixes:
+            suffix = suffix_by_type.get(content_type, "")
+        if not suffix:
+            format_hint = str(_telephony_first(payload, "format", "extension", "file_ext") or "").strip().lower()
+            if format_hint:
+                suffix = "." + format_hint.lstrip(".")
+        if suffix not in allowed_suffixes:
+            return "", "unsupported_recording", 415, 0
+
+        workspace_dir = re.sub(r"[^a-zA-Z0-9_-]", "_", workspace_owner_id)
+        target_dir = BASE_DIR / "static" / "uploads" / "telephony" / workspace_dir
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / f"{uuid.uuid4().hex}{suffix}"
+            target.write_bytes(content)
+        except OSError:
+            logger.exception("[telephony] failed to store recording; workspace=%s", workspace_owner_id)
+            return "", "recording_store_failed", 500, 0
+        return f"/static/uploads/telephony/{workspace_dir}/{target.name}", "", 200, len(content)
+
     def _telephony_upsert_call_from_payload(workspace_owner_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         data = _telephony_settings_payload(workspace_owner_id)
         calls = data.get("telephony_calls") if isinstance(data.get("telephony_calls"), list) else []
         call_id = str(_telephony_first(payload, "call_id", "id", "uuid", "call_uuid", "callid", "uniqueid", "linkedid")).strip()
-        external_id = f"upos-sip:{call_id}" if call_id else str(uuid.uuid4())
+        call_reference = _telephony_call_reference(call_id)
+        external_id = _telephony_external_call_id(call_reference)
         existing_index = next(
-            (idx for idx, row in enumerate(calls) if str(row.get("external_id") or row.get("id") or "") == external_id),
+            (
+                idx
+                for idx, row in enumerate(calls)
+                if call_reference
+                and _telephony_call_reference(row.get("external_id") or row.get("id")) == call_reference
+            ),
             None,
         )
-        existing_call = dict(calls[existing_index]) if existing_index is not None else {}
         direction = _telephony_normalize_direction(payload)
         event_name = str(payload.get("event") or "").strip().lower()
         has_direction_signal = any(
             payload.get(key) not in (None, "") for key in ("direction", "dir", "call_direction", "type", "inout")
         ) or any(marker in event_name for marker in ("incoming", "inbound", "outgoing", "outbound"))
-        if existing_call and not has_direction_signal:
-            direction = str(existing_call.get("direction") or direction)
         raw_phone = str(
             _telephony_first(
                 payload,
@@ -10855,6 +10971,30 @@ def create_app() -> FastAPI:
         ).strip()
         if direction == "outgoing":
             raw_phone = str(_telephony_first(payload, "phone", "remote_ext", "to", "dst", "destination", "callee", "called", "from", "src")).strip()
+
+        recording_signal = bool(
+            "record" in event_name
+            or _telephony_recording_public_url(_telephony_first(payload, "recording_url", "recording_path"))
+        )
+        if existing_index is None and raw_phone and recording_signal:
+            payload_device = str(
+                _telephony_first(payload, "device_id", "app_instance_id", "machine", "machine_name") or ""
+            ).strip()
+            for idx, row in enumerate(calls):
+                if not _telephony_phone_matches(raw_phone, row.get("phone")):
+                    continue
+                row_device = str(row.get("device_id") or "").strip()
+                if payload_device and row_device and payload_device != row_device:
+                    continue
+                existing_index = idx
+                break
+
+        existing_call = dict(calls[existing_index]) if existing_index is not None else {}
+        if existing_call:
+            external_id = str(existing_call.get("external_id") or existing_call.get("id") or external_id).strip()
+        external_id = external_id or str(uuid.uuid4())
+        if existing_call and not has_direction_signal:
+            direction = str(existing_call.get("direction") or direction)
         raw_phone = raw_phone or str(existing_call.get("phone") or "").strip()
         clean_name = str(_telephony_first(payload, "client", "client_name", "display_name", "name", "contact_name")).strip()
         synced_client = _telephony_upsert_web_client(workspace_owner_id, payload, phone=raw_phone, name=clean_name)
@@ -10884,6 +11024,21 @@ def create_app() -> FastAPI:
         if existing_call and not has_status_signal:
             status = str(existing_call.get("status") or status)
         device = _telephony_upsert_device_entry(data, payload, now_iso)
+        incoming_recording_path = str(
+            _telephony_first(payload, "recording_path", "recording_url", "record_url", "recording") or ""
+        ).strip()
+        recording_path = str(
+            incoming_recording_path
+            or existing_call.get("recording_path")
+            or ""
+        ).strip()
+        recording_state = (
+            "ready"
+            if _telephony_recording_public_url(recording_path)
+            else "pending"
+            if recording_path
+            else str(existing_call.get("recording_state") or "none")
+        )
         item = {
             "id": external_id,
             "external_id": external_id,
@@ -10926,11 +11081,13 @@ def create_app() -> FastAPI:
             ).strip(),
             "device_id": str(_telephony_first(payload, "device_id", "app_instance_id", "machine", "machine_name")).strip(),
             "device_name": str((device or {}).get("name") or _telephony_first(payload, "device_name", "machine", "machine_name")).strip(),
-            "recording_path": str(
-                _telephony_first(payload, "recording_path", "recording_url", "record_url", "recording")
-                or existing_call.get("recording_path")
-                or ""
-            ).strip(),
+            "recording_path": recording_path,
+            "recording_state": recording_state,
+            "recording_updated_at": (
+                now_iso
+                if incoming_recording_path
+                else str(existing_call.get("recording_updated_at") or "")
+            ),
             "updated_at": now_iso,
         }
         if existing_index is None:
@@ -11720,6 +11877,7 @@ def create_app() -> FastAPI:
     @app.api_route("/api/telephony/calls/ingest", methods=["GET", "POST"], name="telephony_calls_ingest_api")
     async def telephony_calls_ingest_api(request: Request):
         payload: dict[str, Any] = {key: value for key, value in request.query_params.items()}
+        recording_upload = None
         if request.method == "POST":
             content_type = str(request.headers.get("content-type") or "").lower()
             try:
@@ -11729,7 +11887,8 @@ def create_app() -> FastAPI:
                         payload.update(body)
                 else:
                     form = await request.form()
-                    payload.update({str(key): value for key, value in form.items()})
+                    form_payload, recording_upload = _telephony_recording_upload_from_form(form)
+                    payload.update(form_payload)
             except Exception:
                 logger.exception("[telephony] failed to parse webhook payload")
 
@@ -11756,8 +11915,46 @@ def create_app() -> FastAPI:
             contacts_result = _telephony_sync_contacts(wid, payload) if payload.get("contacts") else None
             return JSONResponse({"ok": True, "workspace_owner_id": wid, "device": device, "contacts": contacts_result})
 
+        if recording_upload is not None or _telephony_first(
+            payload,
+            "recording_base64",
+            "audio_base64",
+            "file_base64",
+            "record_base64",
+        ):
+            recording_url, recording_error, error_status, recording_size = await _telephony_store_recording_upload(
+                wid,
+                payload,
+                recording_upload,
+            )
+            if recording_error:
+                logger.warning(
+                    "[telephony] recording in call ingest rejected; workspace=%s error=%s",
+                    wid,
+                    recording_error,
+                )
+                return JSONResponse({"ok": False, "error": recording_error}, status_code=error_status)
+            payload["recording_url"] = recording_url
+            payload["recording_path"] = recording_url
+            payload["event"] = str(payload.get("event") or "recording")
+            logger.info(
+                "[telephony] recording received with call event; workspace=%s call=%s bytes=%s",
+                wid,
+                _telephony_call_reference(_telephony_first(payload, "call_id", "id", "uuid", "call_uuid")),
+                recording_size,
+            )
+
         call_item = _telephony_upsert_call_from_payload(wid, payload)
-        return JSONResponse({"ok": True, "workspace_owner_id": wid, "call": call_item})
+        integration = _telephony_integration_context(request, wid, _telephony_settings_payload(wid))
+        return JSONResponse(
+            {
+                "ok": True,
+                "workspace_owner_id": wid,
+                "call": call_item,
+                "recording_upload_url": integration["recording_upload_url"],
+                "recording_required": call_item.get("recording_state") == "pending",
+            }
+        )
 
     @app.post("/api/telephony/contacts/sync", name="telephony_contacts_sync_api")
     async def telephony_contacts_sync_api(request: Request):
@@ -11786,11 +11983,21 @@ def create_app() -> FastAPI:
 
     @app.post("/api/telephony/recordings/upload", name="telephony_recording_upload_api")
     async def telephony_recording_upload_api(request: Request):
+        payload: dict[str, Any] = {key: value for key, value in request.query_params.items()}
+        upload = None
         try:
-            form = await request.form()
+            if "application/json" in str(request.headers.get("content-type") or "").lower():
+                body = await request.json()
+                if not isinstance(body, dict):
+                    raise ValueError("invalid json payload")
+                payload.update(body)
+            else:
+                form = await request.form()
+                form_payload, upload = _telephony_recording_upload_from_form(form)
+                payload.update(form_payload)
         except Exception:
-            return JSONResponse({"ok": False, "error": "invalid_multipart"}, status_code=400)
-        payload = {str(key): value for key, value in form.items() if key not in {"file", "recording_file", "audio"}}
+            logger.exception("[telephony] failed to parse recording upload")
+            return JSONResponse({"ok": False, "error": "invalid_recording_payload"}, status_code=400)
         wid = str(_telephony_first(payload, "workspace_owner_id", "workspace_id", "owner_id", "account_id")).strip()
         if not valid_workspace_owner_id(wid):
             wid = _telephony_default_workspace_owner_id()
@@ -11802,39 +12009,28 @@ def create_app() -> FastAPI:
             payload, "phone", "remote_ext", "caller", "caller_id", "to", "from", "src", "dst"
         ):
             return JSONResponse({"ok": False, "error": "call_reference_required"}, status_code=400)
-        upload = form.get("file") or form.get("recording_file") or form.get("audio")
-        filename = str(getattr(upload, "filename", "") or "").strip()
-        if not upload or not filename or not hasattr(upload, "read"):
-            return JSONResponse({"ok": False, "error": "recording_required"}, status_code=400)
-        suffix = Path(filename).suffix.lower()
-        content_type = str(getattr(upload, "content_type", "") or "").lower()
-        suffix_by_type = {
-            "audio/mpeg": ".mp3",
-            "audio/mp4": ".m4a",
-            "audio/ogg": ".ogg",
-            "audio/wav": ".wav",
-            "audio/x-wav": ".wav",
-            "audio/webm": ".webm",
-        }
-        if suffix not in {".mp3", ".m4a", ".ogg", ".wav", ".webm"}:
-            suffix = suffix_by_type.get(content_type, "")
-        if not suffix:
-            return JSONResponse({"ok": False, "error": "unsupported_recording"}, status_code=415)
-        content = await upload.read(50 * 1024 * 1024 + 1)
-        if not content:
-            return JSONResponse({"ok": False, "error": "empty_recording"}, status_code=400)
-        if len(content) > 50 * 1024 * 1024:
-            return JSONResponse({"ok": False, "error": "recording_too_large"}, status_code=413)
-        workspace_dir = re.sub(r"[^a-zA-Z0-9_-]", "_", wid)
-        target_dir = BASE_DIR / "static" / "uploads" / "telephony" / workspace_dir
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / f"{uuid.uuid4().hex}{suffix}"
-        target.write_bytes(content)
-        recording_url = f"/static/uploads/telephony/{workspace_dir}/{target.name}"
+        recording_url, recording_error, error_status, recording_size = await _telephony_store_recording_upload(
+            wid,
+            payload,
+            upload,
+        )
+        if recording_error:
+            logger.warning(
+                "[telephony] recording upload rejected; workspace=%s error=%s",
+                wid,
+                recording_error,
+            )
+            return JSONResponse({"ok": False, "error": recording_error}, status_code=error_status)
         payload["recording_url"] = recording_url
         payload["recording_path"] = recording_url
         payload["event"] = str(payload.get("event") or "recording")
         call_item = _telephony_upsert_call_from_payload(wid, payload)
+        logger.info(
+            "[telephony] recording upload completed; workspace=%s call=%s bytes=%s",
+            wid,
+            _telephony_call_reference(call_item.get("external_id") or call_item.get("id")),
+            recording_size,
+        )
         return JSONResponse(
             {
                 "ok": True,

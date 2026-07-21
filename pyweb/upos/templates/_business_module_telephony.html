@@ -215,7 +215,7 @@
             <tr>
               <td class="telephony-account-cell"><strong>{{ row.account_label }}</strong><small>{{ row.operator_name }}</small></td>
               <td><strong data-telephony-search-highlight>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
-              <td data-telephony-search-highlight>{{ row.phone }}</td>
+              <td class="telephony-call-phone" data-telephony-search-highlight>{{ row.phone }}</td>
               <td>
                 <span class="telephony-direction telephony-direction--{{ row.direction or 'outgoing' }}">
                   <span aria-hidden="true">{% if row.direction == 'incoming' %}&#8601;{% else %}&#8599;{% endif %}</span>
@@ -229,7 +229,7 @@
                     Ваш браузер не поддерживает аудио.
                   </audio>
                 {% elif row.has_recording %}
-                  <span class="telephony-recording-pending">Ожидает загрузки</span>
+                  <span class="telephony-recording-pending" title="Upos Sip сообщил о записи, но аудиофайл еще не отправлен на сервер">Ожидает файл от Upos Sip</span>
                 {% else %}
                   <span class="telephony-recording-empty">Нет записи</span>
                 {% endif %}
