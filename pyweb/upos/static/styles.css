@@ -5860,8 +5860,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .telephony-provider-connection-head,
 .telephony-provider-connection {
-  width: 5.5rem;
+  width: 6.75rem;
   text-align: center;
+  white-space: nowrap;
+}
+
+.telephony-provider-password {
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.telephony-provider-password.is-missing {
+  color: #dc2626;
+  font-family: inherit;
 }
 
 .telephony-provider-connected {
@@ -5889,6 +5902,35 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: #94a3b8;
   font-size: 18px;
   font-weight: 800;
+}
+
+.telephony-provider-edit {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  margin-left: 0.4rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+  color: var(--primary);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.telephony-provider-edit:hover,
+.telephony-provider-edit:focus-visible {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  outline: none;
+}
+
+.telephony-sip-form label > small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.25;
 }
 
 .settings-profile-modal.telephony-dialog {

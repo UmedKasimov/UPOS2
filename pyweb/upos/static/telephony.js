@@ -450,6 +450,10 @@
     var callDialog = document.getElementById("telephony-call-dialog");
     var numberDialog = document.getElementById("telephony-number-dialog");
     var providerDialog = document.getElementById("telephony-provider-dialog");
+    var providerForm = providerDialog ? providerDialog.querySelector("[data-telephony-provider-form]") : null;
+    var providerTitle = providerDialog ? providerDialog.querySelector("[data-telephony-provider-title]") : null;
+    var providerSubmit = providerDialog ? providerDialog.querySelector("[data-telephony-provider-submit]") : null;
+    var providerPasswordHelp = providerDialog ? providerDialog.querySelector("[data-telephony-provider-password-help]") : null;
     var callDate = callDialog ? callDialog.querySelector('input[name="started_at"]') : null;
     var dateFilter = document.querySelector("[data-telephony-date-filter]");
     var dateFrom = dateFilter ? dateFilter.querySelector('input[name="date_from"]') : null;
@@ -482,8 +486,65 @@
       });
     });
 
+    function setProviderField(name, value) {
+      var field = providerForm ? providerForm.querySelector('[name="' + name + '"]') : null;
+      if (field) field.value = value == null ? "" : String(value);
+    }
+
+    function prepareNewProvider() {
+      if (!providerForm) return;
+      providerForm.reset();
+      setProviderField("provider_id", "");
+      setProviderField("port", "5060");
+      var password = providerForm.querySelector('[name="password"]');
+      if (password) {
+        password.required = true;
+        password.placeholder = "";
+      }
+      if (providerTitle) providerTitle.textContent = "Новое SIP-подключение";
+      if (providerSubmit) providerSubmit.textContent = "Сохранить SIP";
+      if (providerPasswordHelp) providerPasswordHelp.textContent = "Обязателен для подключения телефона.";
+    }
+
+    function prepareProviderEdit(button) {
+      if (!providerForm) return;
+      var data = button.dataset;
+      providerForm.reset();
+      setProviderField("provider_id", data.providerId);
+      setProviderField("name", data.providerName);
+      setProviderField("host", data.providerHost);
+      setProviderField("port", data.providerPort || "5060");
+      setProviderField("login", data.providerLogin);
+      setProviderField("password", "");
+      setProviderField("codec", data.providerCodec || "G711");
+      setProviderField("transport", data.providerTransport || "UDP");
+      setProviderField("employee", data.providerEmployee);
+      setProviderField("note", data.providerNote);
+      var hasPassword = data.providerHasPassword === "1";
+      var password = providerForm.querySelector('[name="password"]');
+      if (password) {
+        password.required = !hasPassword;
+        password.placeholder = hasPassword ? "Оставьте пустым, чтобы не менять" : "Введите пароль";
+      }
+      if (providerTitle) providerTitle.textContent = "Редактирование SIP-подключения";
+      if (providerSubmit) providerSubmit.textContent = "Сохранить изменения";
+      if (providerPasswordHelp) {
+        providerPasswordHelp.textContent = hasPassword
+          ? "Пароль сохранён. Заполните поле только для замены."
+          : "Пароль обязателен для подключения телефона.";
+      }
+    }
+
     document.querySelectorAll("[data-telephony-open-provider]").forEach(function (button) {
       button.addEventListener("click", function () {
+        prepareNewProvider();
+        openDialog(providerDialog);
+      });
+    });
+
+    document.querySelectorAll("[data-telephony-edit-provider]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        prepareProviderEdit(button);
         openDialog(providerDialog);
       });
     });

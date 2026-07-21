@@ -408,6 +408,8 @@
           <thead>
             <tr>
               <th>Провайдер</th>
+              <th>Логин</th>
+              <th>Пароль</th>
               <th>Адрес</th>
               <th>Кодек</th>
               <th>Сотрудник</th>
@@ -419,11 +421,13 @@
           <tbody>
             {% for row in telephony_providers %}
               <tr>
-                <td><strong>{{ row.name }}</strong><small>{{ row.login or row.account or row.note }}</small></td>
+                <td><strong>{{ row.name }}</strong><small>{{ row.note or "SIP" }}</small></td>
+                <td><strong>{{ row.login or row.account or "-" }}</strong></td>
+                <td><span class="telephony-provider-password{% if not row.has_password %} is-missing{% endif %}">{{ row.password_mask }}</span></td>
                 <td>{{ row.endpoint or row.host or "-" }}</td>
                 <td>{{ row.codec or "-" }} / {{ row.transport or "UDP" }}</td>
                 <td>{{ row.employee or "-" }}</td>
-                <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.last_test_message or "" }}</small></td>
+                <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.connection_message }}</small></td>
                 <td>
                   <form method="post" action="/telephony/providers/test" class="inline-form">
                     {% include "_csrf_field.html" %}
@@ -432,17 +436,34 @@
                   </form>
                 </td>
                 <td class="telephony-provider-connection">
-                  {% if row.status == "online" %}
+                  {% if row.connected %}
                     <span class="telephony-provider-connected" role="img" aria-label="Соединение установлено" title="Соединение установлено">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
                     </span>
                   {% else %}
-                    <span class="telephony-provider-not-connected" aria-label="Нет подтверждённого соединения" title="Нет подтверждённого соединения">—</span>
+                    <span class="telephony-provider-not-connected" aria-label="Нет подтверждённого соединения" title="{{ row.connection_message }}">—</span>
                   {% endif %}
+                  <button
+                    type="button"
+                    class="telephony-provider-edit"
+                    aria-label="Редактировать {{ row.name }}"
+                    title="Редактировать"
+                    data-telephony-edit-provider
+                    data-provider-id="{{ row.id }}"
+                    data-provider-name="{{ row.name }}"
+                    data-provider-host="{{ row.host or '' }}"
+                    data-provider-port="{{ row.port or '5060' }}"
+                    data-provider-login="{{ row.login or row.account or '' }}"
+                    data-provider-has-password="{{ '1' if row.has_password else '0' }}"
+                    data-provider-codec="{{ row.codec or 'G711' }}"
+                    data-provider-transport="{{ row.transport or 'UDP' }}"
+                    data-provider-employee="{{ row.employee or '' }}"
+                    data-provider-note="{{ row.note or '' }}"
+                  >✎</button>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="7">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки.</td></tr>
+              <tr><td colspan="9">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -455,20 +476,25 @@
   <div class="settings-profile-modal-surface telephony-provider-dialog-surface">
     <header class="settings-profile-modal-head">
       <div class="settings-profile-modal-head-text">
-        <h2 id="telephony-provider-title" class="settings-profile-modal-title">Новое SIP-подключение</h2>
+        <h2 id="telephony-provider-title" class="settings-profile-modal-title" data-telephony-provider-title>Новое SIP-подключение</h2>
         <p class="settings-profile-modal-sub">Данные провайдера, учётной записи и транспортного протокола.</p>
       </div>
       <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
     </header>
     <div class="settings-profile-modal-scroll">
-      <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form">
+      <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form" data-telephony-provider-form>
         {% include "_csrf_field.html" %}
+        <input type="hidden" name="provider_id" value="" />
         <div class="product-form-grid">
           <label><span>Название*</span><input name="name" required placeholder="U-POS SIP" /></label>
           <label><span>SIP-сервер*</span><input name="host" required placeholder="sip.example.com" /></label>
           <label><span>Порт</span><input name="port" inputmode="numeric" value="5060" /></label>
           <label><span>Логин*</span><input name="login" required autocomplete="username" /></label>
-          <label><span>Пароль</span><input name="password" type="password" autocomplete="new-password" /></label>
+          <label>
+            <span>Пароль*</span>
+            <input name="password" type="password" autocomplete="new-password" />
+            <small data-telephony-provider-password-help>Обязателен для подключения телефона.</small>
+          </label>
           <label>
             <span>Кодек</span>
             <select name="codec">
@@ -489,7 +515,7 @@
           <label class="wide"><span>Комментарий</span><input name="note" placeholder="Номер, правила маршрутизации, часы работы" /></label>
         </div>
         <div class="product-form-actions">
-          <button class="btn" type="submit">Сохранить SIP</button>
+          <button class="btn" type="submit" data-telephony-provider-submit>Сохранить SIP</button>
           <button class="btn btn-secondary" type="button" data-telephony-close-dialog>Отмена</button>
         </div>
       </form>

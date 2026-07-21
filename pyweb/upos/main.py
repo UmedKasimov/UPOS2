@@ -340,6 +340,26 @@ TELEPHONY_SETTING_LIST_KEYS = (
     "telephony_deleted_contacts",
 )
 
+TELEPHONY_PROVIDER_CONNECTION_TTL_SECONDS = 300
+
+
+def telephony_provider_is_connected(item: dict[str, Any], now: datetime | None = None) -> bool:
+    if not str(item.get("login") or item.get("account") or "").strip():
+        return False
+    if not str(item.get("password") or "").strip():
+        return False
+    raw_seen_at = str(item.get("last_connected_at") or "").strip()
+    if not raw_seen_at:
+        return False
+    try:
+        seen_at = datetime.fromisoformat(raw_seen_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if seen_at.tzinfo is None:
+        seen_at = seen_at.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    return 0 <= (current - seen_at).total_seconds() <= TELEPHONY_PROVIDER_CONNECTION_TTL_SECONDS
+
 
 def telephony_account_dashboard(workspace_owner_id: str) -> dict[str, Any]:
     data = load_workspace_settings(workspace_owner_id)
@@ -366,7 +386,7 @@ def telephony_account_dashboard(workspace_owner_id: str) -> dict[str, Any]:
     incoming = sum(1 for row in calls if str(row.get("direction") or "") == "incoming")
     outgoing = sum(1 for row in calls if str(row.get("direction") or "") == "outgoing")
     connected_devices = sum(1 for row in devices if is_online(row))
-    online_providers = sum(1 for row in providers if is_online(row))
+    online_providers = sum(1 for row in providers if telephony_provider_is_connected(row))
 
     return {
         "total_calls": len(calls),
@@ -10163,6 +10183,104 @@ def create_app() -> FastAPI:
             out.append(item)
         return out
 
+    def _telephony_account_key(value: Any) -> str:
+        clean = str(value or "").strip().casefold()
+        if clean.startswith("account "):
+            clean = clean[8:].strip()
+        return clean
+
+    def _telephony_provider_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_rows = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        rows: list[dict[str, Any]] = []
+        for raw_row in raw_rows:
+            if not isinstance(raw_row, dict):
+                continue
+            item = dict(raw_row)
+            has_password = bool(str(item.get("password") or "").strip())
+            connected = telephony_provider_is_connected(item)
+            stored_status = str(item.get("status") or "draft").strip().lower()
+            if connected:
+                status_value = "online"
+                connection_message = "U-POS Sip авторизован"
+            elif not str(item.get("login") or item.get("account") or "").strip() or not has_password:
+                status_value = "draft"
+                connection_message = "Укажите логин и пароль"
+            elif stored_status == "testing":
+                status_value = "testing"
+                connection_message = "Ожидается вход U-POS Sip"
+            else:
+                status_value = "offline"
+                connection_message = "Телефон не авторизован"
+            item["connected"] = connected
+            item["has_password"] = has_password
+            item["password_mask"] = "••••••••" if has_password else "Не задан"
+            item["status"] = status_value
+            item["status_label"] = _telephony_status_label("provider", status_value)
+            item["connection_message"] = connection_message
+            item.pop("password", None)
+            rows.append(item)
+        return rows
+
+    def _telephony_mark_provider_connection(
+        data: dict[str, Any],
+        payload: dict[str, Any],
+        now_iso: str,
+        device: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        softphone_auth = data.get("telephony_softphone_auth")
+        if not isinstance(softphone_auth, dict) or not str(softphone_auth.get("authenticated_at") or "").strip():
+            return None
+        providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        raw_provider_id = str(_telephony_first(payload, "provider_id", "sip_provider_id")).strip()
+        raw_account = str(
+            (device or {}).get("account")
+            or _telephony_first(
+                payload,
+                "account",
+                "account_name",
+                "account_label",
+                "selected_account",
+                "sip_account",
+                "sip_user",
+                "extension",
+                "exten",
+            )
+        ).strip()
+        account_key = _telephony_account_key(raw_account)
+        if not raw_provider_id and not account_key:
+            return None
+
+        for provider in providers:
+            if not isinstance(provider, dict):
+                continue
+            provider_id = str(provider.get("id") or "").strip()
+            provider_keys = {
+                _telephony_account_key(provider.get("login")),
+                _telephony_account_key(provider.get("account")),
+                _telephony_account_key(provider.get("extension")),
+                _telephony_account_key(provider.get("name")),
+            } - {""}
+            if not (
+                (raw_provider_id and raw_provider_id == provider_id)
+                or (account_key and account_key in provider_keys)
+            ):
+                continue
+            if not str(provider.get("login") or provider.get("account") or "").strip():
+                return None
+            if not str(provider.get("password") or "").strip():
+                return None
+            provider["status"] = "online"
+            provider["last_connected_at"] = now_iso
+            provider["last_connected_device_id"] = str((device or {}).get("device_id") or payload.get("device_id") or "").strip()
+            provider["last_connected_device_name"] = str((device or {}).get("name") or payload.get("device_name") or "U-POS Sip").strip()
+            provider["last_connected_user"] = str(
+                payload.get("upos_login") or payload.get("user_login") or payload.get("operator") or ""
+            ).strip()
+            provider["last_test_message"] = "U-POS Sip авторизован и передаёт heartbeat"
+            data["telephony_providers"] = providers
+            return provider
+        return None
+
     def _telephony_calls_with_accounts(
         rows: list[dict[str, Any]],
         data: dict[str, Any],
@@ -11145,14 +11263,15 @@ def create_app() -> FastAPI:
             target["port"] = str(port)
             target["endpoint"] = endpoint
         transport = str(target.get("transport") or "UDP").strip().upper()
-        status = "offline"
+        is_connected = telephony_provider_is_connected(target)
+        status = "online" if is_connected else "offline"
         message = "Не указан SIP-сервер"
         if host:
             try:
                 if transport in {"TCP", "TLS"}:
                     with socket.create_connection((host, port), timeout=3):
                         pass
-                    message = f"{transport} соединение с {host}:{port} установлено"
+                    message = f"{transport} адрес {host}:{port} доступен. Ожидается вход U-POS Sip"
                 else:
                     probe = (
                         f"REGISTER sip:{host} SIP/2.0\r\n"
@@ -11167,10 +11286,12 @@ def create_app() -> FastAPI:
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                         sock.settimeout(3)
                         sock.sendto(probe.encode("utf-8"), (host, port))
-                    message = f"Тест REGISTER отправлен на {host}:{port}"
-                status = "online"
+                    message = f"Тест REGISTER отправлен на {host}:{port}. Ожидается вход U-POS Sip"
+                target["last_probe_ok"] = True
+                status = "online" if is_connected else "testing"
             except OSError as exc:
                 message = str(exc) or "SIP-сервер не отвечает"
+                target["last_probe_ok"] = False
         target["status"] = status
         target["last_test_message"] = message
         target["last_test_at"] = datetime.now(timezone.utc).isoformat()
@@ -11535,7 +11656,7 @@ def create_app() -> FastAPI:
         user_name = _telephony_user_name(request)
         data = _telephony_settings_payload(wid)
         integration_context = _telephony_integration_context(request, wid, data)
-        providers = _telephony_rows_with_labels(list(data.get("telephony_providers") or []), "provider")
+        providers = _telephony_provider_rows(data)
         numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
         calls = _telephony_calls_with_accounts(
             _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call"),
@@ -11834,31 +11955,61 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        provider_id = str(form.get("provider_id") or "").strip()
         name = str(form.get("name") or "").strip()
         raw_host = str(form.get("host") or "").strip()
         host, port, endpoint = _telephony_parse_sip_host(raw_host, form.get("port") or "5060")
         login = str(form.get("login") or "").strip()
         if not name or not host or not login:
             return RedirectResponse(url="/telephony?error=" + quote("Название, SIP-сервер и логин обязательны") + "#integrations", status_code=302)
-        _telephony_save_item(
-            wid,
-            "telephony_providers",
-            {
-                "name": name,
-                "kind": "SIP",
-                "host": host,
-                "port": str(port),
-                "endpoint": endpoint,
-                "login": login,
-                "account": login,
-                "password": str(form.get("password") or "").strip(),
-                "codec": str(form.get("codec") or "G711").strip(),
-                "transport": str(form.get("transport") or "UDP").strip(),
-                "employee": str(form.get("employee") or "").strip(),
-                "status": "draft",
-                "note": str(form.get("note") or "").strip(),
-            },
+        data = _telephony_settings_payload(wid)
+        providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        existing_index = next(
+            (index for index, item in enumerate(providers) if str(item.get("id") or "") == provider_id),
+            None,
         )
+        existing = dict(providers[existing_index]) if existing_index is not None else {}
+        password = str(form.get("password") or "").strip() or str(existing.get("password") or "").strip()
+        if not password:
+            return RedirectResponse(url="/telephony?error=" + quote("Пароль SIP-аккаунта обязателен") + "#integrations", status_code=302)
+
+        updated = {
+            **existing,
+            "id": provider_id or str(uuid.uuid4()),
+            "name": name,
+            "kind": "SIP",
+            "host": host,
+            "port": str(port),
+            "endpoint": endpoint,
+            "login": login,
+            "account": login,
+            "password": password,
+            "codec": str(form.get("codec") or "G711").strip(),
+            "transport": str(form.get("transport") or "UDP").strip().upper(),
+            "employee": str(form.get("employee") or "").strip(),
+            "note": str(form.get("note") or "").strip(),
+            "created_at": existing.get("created_at") or datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        connection_fields = ("host", "port", "login", "password", "transport")
+        connection_changed = not existing or any(
+            str(existing.get(key) or "") != str(updated.get(key) or "") for key in connection_fields
+        )
+        if connection_changed:
+            updated["status"] = "draft"
+            for key in (
+                "last_connected_at",
+                "last_connected_device_id",
+                "last_connected_device_name",
+                "last_connected_user",
+            ):
+                updated.pop(key, None)
+        if existing_index is None:
+            providers.insert(0, updated)
+        else:
+            providers[existing_index] = updated
+        data["telephony_providers"] = providers[:500]
+        save_workspace_settings(wid, data)
         return RedirectResponse(url="/telephony?msg=saved#integrations", status_code=302)
 
     @app.post("/telephony/providers/test", name="telephony_provider_test")
@@ -11871,7 +12022,7 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         status_value, message = _telephony_update_provider_test(wid, str(form.get("provider_id") or ""))
-        key = "saved" if status_value == "online" else "sip_test_failed"
+        key = "saved" if status_value in {"online", "testing"} else "sip_test_failed"
         return RedirectResponse(url=f"/telephony?msg={quote(key)}&note={quote(message)}#integrations", status_code=302)
 
     @app.api_route("/api/telephony/calls/ingest", methods=["GET", "POST"], name="telephony_calls_ingest_api")
@@ -11910,10 +12061,21 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": True, "workspace_owner_id": wid, **result})
         if event in {"heartbeat", "device_heartbeat", "ping"}:
             data = _telephony_settings_payload(wid)
-            device = _telephony_upsert_device_entry(data, payload, datetime.now(timezone.utc).isoformat())
+            now_iso = datetime.now(timezone.utc).isoformat()
+            device = _telephony_upsert_device_entry(data, payload, now_iso)
+            provider = _telephony_mark_provider_connection(data, payload, now_iso, device)
             save_workspace_settings(wid, data)
             contacts_result = _telephony_sync_contacts(wid, payload) if payload.get("contacts") else None
-            return JSONResponse({"ok": True, "workspace_owner_id": wid, "device": device, "contacts": contacts_result})
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "workspace_owner_id": wid,
+                    "device": device,
+                    "provider_id": str((provider or {}).get("id") or ""),
+                    "connected": bool(provider),
+                    "contacts": contacts_result,
+                }
+            )
 
         if recording_upload is not None or _telephony_first(
             payload,
@@ -12091,6 +12253,19 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
         data = _telephony_settings_payload(wid)
         integration = _telephony_integration_context(request, wid, data)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        data["telephony_softphone_auth"] = {
+            "authenticated_at": now_iso,
+            "user_id": str(user.get("user_id") or ""),
+            "login": str(user.get("username") or login_value),
+            "device_id": str(payload.get("device_id") or payload.get("app_instance_id") or "").strip(),
+        }
+        provider = _telephony_mark_provider_connection(
+            data,
+            {**payload, "upos_login": str(user.get("username") or login_value)},
+            now_iso,
+        )
+        save_workspace_settings(wid, data)
         accounts = _telephony_sip_accounts_for_softphone(data)
         return JSONResponse(
             {
@@ -12108,6 +12283,8 @@ def create_app() -> FastAPI:
                     "name": str(user.get("name") or login_value),
                     "role": str(user.get("role") or ""),
                 },
+                "provider_id": str((provider or {}).get("id") or ""),
+                "connected": bool(provider),
                 "accounts": accounts,
             }
         )
