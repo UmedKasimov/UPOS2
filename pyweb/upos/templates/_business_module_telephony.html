@@ -399,52 +399,68 @@
         <h2>Интеграции АТС и SIP</h2>
         <span>Всего: {{ telephony_providers|length }}</span>
       </div>
+      <button type="button" class="btn" data-telephony-open-provider>+ SIP</button>
     </header>
 
-    {% set ti = telephony_integration|default({}) %}
-    <section class="telephony-webhook-panel">
-      <div class="telephony-webhook-copy">
-        <h3>Подключение на Railway</h3>
-        <p>Укажите этот webhook в SIP/АТС или в U-POS SIP. Звонки будут попадать в историю, устройства и записи.</p>
-      </div>
-      <div class="telephony-webhook-fields">
-        <label>
-          <span>Webhook URL</span>
-          <div class="telephony-copy-field">
-            <input readonly value="{{ ti.webhook_url or '' }}" data-telephony-copy-value />
-            <button class="btn btn-secondary" type="button" data-telephony-copy>Копировать</button>
-          </div>
-        </label>
-        <label>
-          <span>Token header</span>
-          <div class="telephony-copy-field">
-            <input readonly value="{{ ti.token_header or 'X-UPOS-SIP-Token' }}: {{ ti.token or '' }}" data-telephony-copy-value />
-            <button class="btn btn-secondary" type="button" data-telephony-copy>Копировать</button>
-          </div>
-        </label>
-        <label>
-          <span>Workspace ID</span>
-          <div class="telephony-copy-field">
-            <input readonly value="{{ ti.workspace_owner_id or '' }}" data-telephony-copy-value />
-            <button class="btn btn-secondary" type="button" data-telephony-copy>Копировать</button>
-          </div>
-        </label>
-      </div>
-      <details class="telephony-webhook-example">
-        <summary>Пример POST JSON</summary>
-        <pre>{
-  "token": "{{ ti.token or '' }}",
-  "workspace_owner_id": "{{ ti.workspace_owner_id or '' }}",
-  "event": "ended",
-  "direction": "incoming",
-  "caller_id": "+998901234567",
-  "status": "answered",
-  "duration_sec": 42
-}</pre>
-      </details>
-    </section>
-
     <div class="telephony-integrations-grid">
+      <div class="products-table-wrap telephony-provider-table">
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>Провайдер</th>
+              <th>Адрес</th>
+              <th>Кодек</th>
+              <th>Сотрудник</th>
+              <th>Статус</th>
+              <th></th>
+              <th class="telephony-provider-connection-head">Связь</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in telephony_providers %}
+              <tr>
+                <td><strong>{{ row.name }}</strong><small>{{ row.login or row.account or row.note }}</small></td>
+                <td>{{ row.endpoint or row.host or "-" }}</td>
+                <td>{{ row.codec or "-" }} / {{ row.transport or "UDP" }}</td>
+                <td>{{ row.employee or "-" }}</td>
+                <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.last_test_message or "" }}</small></td>
+                <td>
+                  <form method="post" action="/telephony/providers/test" class="inline-form">
+                    {% include "_csrf_field.html" %}
+                    <input type="hidden" name="provider_id" value="{{ row.id }}" />
+                    <button class="btn btn-secondary" type="submit">Проверить соединение</button>
+                  </form>
+                </td>
+                <td class="telephony-provider-connection">
+                  {% if row.status == "online" %}
+                    <span class="telephony-provider-connected" role="img" aria-label="Соединение установлено" title="Соединение установлено">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+                    </span>
+                  {% else %}
+                    <span class="telephony-provider-not-connected" aria-label="Нет подтверждённого соединения" title="Нет подтверждённого соединения">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </article>
+</div>
+
+<dialog class="settings-profile-modal telephony-dialog" id="telephony-provider-dialog" aria-labelledby="telephony-provider-title">
+  <div class="settings-profile-modal-surface telephony-provider-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="telephony-provider-title" class="settings-profile-modal-title">Новое SIP-подключение</h2>
+        <p class="settings-profile-modal-sub">Данные провайдера, учётной записи и транспортного протокола.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll">
       <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form">
         {% include "_csrf_field.html" %}
         <div class="product-form-grid">
@@ -474,46 +490,12 @@
         </div>
         <div class="product-form-actions">
           <button class="btn" type="submit">Сохранить SIP</button>
+          <button class="btn btn-secondary" type="button" data-telephony-close-dialog>Отмена</button>
         </div>
       </form>
-
-      <div class="products-table-wrap telephony-provider-table">
-        <table class="products-table">
-          <thead>
-            <tr>
-              <th>Провайдер</th>
-              <th>Адрес</th>
-              <th>Кодек</th>
-              <th>Сотрудник</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in telephony_providers %}
-              <tr>
-                <td><strong>{{ row.name }}</strong><small>{{ row.login or row.account or row.note }}</small></td>
-                <td>{{ row.endpoint or row.host or "-" }}</td>
-                <td>{{ row.codec or "-" }} / {{ row.transport or "UDP" }}</td>
-                <td>{{ row.employee or "-" }}</td>
-                <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.last_test_message or "" }}</small></td>
-                <td>
-                  <form method="post" action="/telephony/providers/test" class="inline-form">
-                    {% include "_csrf_field.html" %}
-                    <input type="hidden" name="provider_id" value="{{ row.id }}" />
-                    <button class="btn btn-secondary" type="submit">Проверить соединение</button>
-                  </form>
-                </td>
-              </tr>
-            {% else %}
-              <tr><td colspan="6">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки и webhooks.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
     </div>
-  </article>
-</div>
+  </div>
+</dialog>
 
 <dialog class="settings-profile-modal telephony-dialog" id="telephony-call-dialog" aria-labelledby="telephony-call-title">
   <div class="settings-profile-modal-surface telephony-dialog-surface">

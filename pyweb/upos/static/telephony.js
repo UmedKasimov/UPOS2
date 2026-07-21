@@ -449,6 +449,7 @@
   function init() {
     var callDialog = document.getElementById("telephony-call-dialog");
     var numberDialog = document.getElementById("telephony-number-dialog");
+    var providerDialog = document.getElementById("telephony-provider-dialog");
     var callDate = callDialog ? callDialog.querySelector('input[name="started_at"]') : null;
     var dateFilter = document.querySelector("[data-telephony-date-filter]");
     var dateFrom = dateFilter ? dateFilter.querySelector('input[name="date_from"]') : null;
@@ -480,6 +481,21 @@
         openDialog(numberDialog);
       });
     });
+
+    document.querySelectorAll("[data-telephony-open-provider]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        openDialog(providerDialog);
+      });
+    });
+
+    if (
+      providerDialog &&
+      window.location.hash === "#integrations" &&
+      (new URLSearchParams(window.location.search).has("error") ||
+        new URLSearchParams(window.location.search).has("err"))
+    ) {
+      openDialog(providerDialog);
+    }
 
     document.querySelectorAll("[data-telephony-close-dialog]").forEach(function (button) {
       button.addEventListener("click", function () {
