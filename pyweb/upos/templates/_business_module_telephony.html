@@ -414,6 +414,7 @@
               <th>Кодек</th>
               <th>Сотрудник</th>
               <th>Статус</th>
+              <th>Устройство</th>
               <th></th>
               <th class="telephony-provider-connection-head">Связь</th>
             </tr>
@@ -428,6 +429,36 @@
                 <td>{{ row.codec or "-" }} / {{ row.transport or "UDP" }}</td>
                 <td>{{ row.employee or "-" }}</td>
                 <td><strong>{{ row.status_label or row.status or "-" }}</strong><small>{{ row.connection_message }}</small></td>
+                <td class="telephony-provider-device-cell">
+                  {% if row.bound_devices %}
+                    {% for device in row.bound_devices %}
+                      <div class="telephony-provider-device">
+                        <span class="telephony-provider-device-copy">
+                          <strong>{{ device.name }}</strong>
+                          <small>
+                            {% if device.platform %}{{ device.platform }}{% endif %}
+                            {% if device.platform and device.app_version %} · {% endif %}
+                            {% if device.app_version %}v{{ device.app_version }}{% endif %}
+                          </small>
+                        </span>
+                        <form method="post" action="/telephony/providers/device/unbind" class="inline-form" data-telephony-device-unbind data-device-name="{{ device.name }}">
+                          {% include "_csrf_field.html" %}
+                          <input type="hidden" name="provider_id" value="{{ row.id }}" />
+                          <input type="hidden" name="device_id" value="{{ device.device_id }}" />
+                          <button type="submit" class="telephony-provider-unbind" aria-label="Отвязать {{ device.name }}" title="Отвязать устройство">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+                              <path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1" />
+                              <path d="m4 4 16 16" />
+                            </svg>
+                          </button>
+                        </form>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="telephony-provider-device-empty">Не привязано</span>
+                  {% endif %}
+                </td>
                 <td>
                   <form method="post" action="/telephony/providers/test" class="inline-form">
                     {% include "_csrf_field.html" %}
@@ -463,7 +494,7 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="9">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки.</td></tr>
+              <tr><td colspan="10">Интеграции пока не настроены. Добавьте SIP-провайдера, чтобы подключить звонки.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -482,7 +513,7 @@
       <button type="button" class="settings-profile-modal-close" data-telephony-close-dialog aria-label="Закрыть">×</button>
     </header>
     <div class="settings-profile-modal-scroll">
-      <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form" data-telephony-provider-form>
+      <form method="post" action="/telephony/providers/save" class="product-form telephony-sip-form" data-telephony-provider-form data-password-url="/telephony/providers/password">
         {% include "_csrf_field.html" %}
         <input type="hidden" name="provider_id" value="" />
         <div class="product-form-grid">
@@ -492,7 +523,15 @@
           <label><span>Логин*</span><input name="login" required autocomplete="username" /></label>
           <label>
             <span>Пароль*</span>
-            <input name="password" type="password" autocomplete="new-password" />
+            <span class="telephony-password-wrap">
+              <input name="password" type="password" autocomplete="new-password" />
+              <button type="button" class="telephony-password-toggle" data-telephony-password-toggle aria-label="Показать пароль" aria-pressed="false" title="Показать пароль">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </span>
             <small data-telephony-provider-password-help>Обязателен для подключения телефона.</small>
           </label>
           <label>

@@ -8,7 +8,7 @@
     <script src="{{ url_for('static', path='crm-kanban.js') }}?v=26" defer></script>
   {% elif active == "telephony" %}
     <link rel="stylesheet" href="{{ url_for('static', path='telephony-contacts.css') }}?v=3" />
-    <script src="{{ url_for('static', path='telephony.js') }}?v=11" defer></script>
+    <script src="{{ url_for('static', path='telephony.js') }}?v=12" defer></script>
   {% elif active == "warehouse" %}
     <script src="{{ url_for('static', path='warehouse.js') }}?v=1" defer></script>
   {% elif active == "clients" %}
@@ -66,6 +66,8 @@
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Изменения сохранены.</div>
+    {% elif flash_ok == "device_unbound" %}
+      <div class="flash ok settings-ios-flash">Телефон отвязан от SIP-линии.</div>
     {% elif flash_ok == "deleted" %}
       <div class="flash ok settings-ios-flash">Запись удалена.</div>
     {% endif %}

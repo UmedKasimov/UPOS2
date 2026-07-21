@@ -5877,6 +5877,76 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-family: inherit;
 }
 
+.telephony-provider-device-cell {
+  min-width: 13rem;
+}
+
+.telephony-provider-device {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.telephony-provider-device + .telephony-provider-device {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.telephony-provider-device-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.telephony-provider-device-copy strong,
+.telephony-provider-device-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telephony-provider-device-copy small,
+.telephony-provider-device-empty {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.telephony-provider-device .inline-form {
+  margin-left: auto;
+}
+
+.telephony-provider-unbind {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, #dc2626 35%, var(--border));
+  border-radius: 5px;
+  background: color-mix(in srgb, #dc2626 6%, var(--card));
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.telephony-provider-unbind:hover,
+.telephony-provider-unbind:focus-visible {
+  border-color: #dc2626;
+  background: color-mix(in srgb, #dc2626 13%, var(--card));
+  outline: none;
+}
+
+.telephony-provider-unbind svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .telephony-provider-connected {
   display: inline-grid;
   width: 28px;
@@ -5931,6 +6001,57 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
   line-height: 1.25;
+}
+
+.telephony-password-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.telephony-password-wrap input {
+  width: 100%;
+  padding-right: 2.6rem;
+}
+
+.telephony-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  display: inline-grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.telephony-password-toggle:hover,
+.telephony-password-toggle:focus-visible,
+.telephony-password-toggle.is-visible {
+  background: var(--accent);
+  color: var(--foreground);
+  outline: none;
+}
+
+.telephony-password-toggle:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.telephony-password-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .settings-profile-modal.telephony-dialog {

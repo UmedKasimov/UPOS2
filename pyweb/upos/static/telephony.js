@@ -454,6 +454,7 @@
     var providerTitle = providerDialog ? providerDialog.querySelector("[data-telephony-provider-title]") : null;
     var providerSubmit = providerDialog ? providerDialog.querySelector("[data-telephony-provider-submit]") : null;
     var providerPasswordHelp = providerDialog ? providerDialog.querySelector("[data-telephony-provider-password-help]") : null;
+    var providerPasswordToggle = providerDialog ? providerDialog.querySelector("[data-telephony-password-toggle]") : null;
     var callDate = callDialog ? callDialog.querySelector('input[name="started_at"]') : null;
     var dateFilter = document.querySelector("[data-telephony-date-filter]");
     var dateFrom = dateFilter ? dateFilter.querySelector('input[name="date_from"]') : null;
@@ -491,6 +492,24 @@
       if (field) field.value = value == null ? "" : String(value);
     }
 
+    function setProviderPasswordVisibility(show) {
+      if (!providerForm) return;
+      var password = providerForm.querySelector('[name="password"]');
+      if (!password) return;
+      password.type = show ? "text" : "password";
+      if (providerPasswordToggle) {
+        providerPasswordToggle.setAttribute("aria-pressed", show ? "true" : "false");
+        providerPasswordToggle.setAttribute("aria-label", show ? "Скрыть пароль" : "Показать пароль");
+        providerPasswordToggle.title = show ? "Скрыть пароль" : "Показать пароль";
+        providerPasswordToggle.classList.toggle("is-visible", show);
+      }
+    }
+
+    function resetProviderPassword() {
+      setProviderPasswordVisibility(false);
+      if (providerPasswordToggle) providerPasswordToggle.disabled = false;
+    }
+
     function prepareNewProvider() {
       if (!providerForm) return;
       providerForm.reset();
@@ -501,6 +520,7 @@
         password.required = true;
         password.placeholder = "";
       }
+      resetProviderPassword();
       if (providerTitle) providerTitle.textContent = "Новое SIP-подключение";
       if (providerSubmit) providerSubmit.textContent = "Сохранить SIP";
       if (providerPasswordHelp) providerPasswordHelp.textContent = "Обязателен для подключения телефона.";
@@ -524,16 +544,71 @@
       var password = providerForm.querySelector('[name="password"]');
       if (password) {
         password.required = !hasPassword;
-        password.placeholder = hasPassword ? "Оставьте пустым, чтобы не менять" : "Введите пароль";
+        password.placeholder = hasPassword ? "Нажмите глаз, чтобы показать" : "Введите пароль";
       }
+      resetProviderPassword();
       if (providerTitle) providerTitle.textContent = "Редактирование SIP-подключения";
       if (providerSubmit) providerSubmit.textContent = "Сохранить изменения";
       if (providerPasswordHelp) {
         providerPasswordHelp.textContent = hasPassword
-          ? "Пароль сохранён. Заполните поле только для замены."
+          ? "Пароль сохранён. Нажмите глаз, чтобы увидеть его."
           : "Пароль обязателен для подключения телефона.";
       }
     }
+
+    if (providerPasswordToggle && providerForm) {
+      providerPasswordToggle.addEventListener("click", function () {
+        var password = providerForm.querySelector('[name="password"]');
+        var providerId = providerForm.querySelector('[name="provider_id"]');
+        if (!password) return;
+        if (password.value) {
+          setProviderPasswordVisibility(password.type === "password");
+          return;
+        }
+        if (!providerId || !providerId.value) {
+          password.focus();
+          if (providerPasswordHelp) providerPasswordHelp.textContent = "Введите пароль для нового SIP-подключения.";
+          return;
+        }
+        var csrf = providerForm.querySelector('[name="csrf_token"]');
+        var body = new FormData();
+        body.append("provider_id", providerId.value);
+        body.append("csrf_token", csrf ? csrf.value : "");
+        providerPasswordToggle.disabled = true;
+        fetch(providerForm.dataset.passwordUrl || "/telephony/providers/password", {
+          method: "POST",
+          body: body,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (response) {
+            if (!response.ok) throw new Error("password_load_failed");
+            return response.json();
+          })
+          .then(function (result) {
+            if (!result || !result.ok || !result.password) throw new Error("password_missing");
+            password.value = result.password;
+            setProviderPasswordVisibility(true);
+            if (providerPasswordHelp) providerPasswordHelp.textContent = "Текущий пароль показан. Его можно изменить и сохранить.";
+          })
+          .catch(function () {
+            setProviderPasswordVisibility(false);
+            if (providerPasswordHelp) providerPasswordHelp.textContent = "Не удалось показать пароль. Обновите страницу и попробуйте снова.";
+          })
+          .finally(function () {
+            providerPasswordToggle.disabled = false;
+          });
+      });
+    }
+
+    document.querySelectorAll("[data-telephony-device-unbind]").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        var deviceName = form.dataset.deviceName || "U-POS Sip";
+        if (!window.confirm('Отвязать устройство «' + deviceName + '»? Телефону потребуется повторный вход.')) {
+          event.preventDefault();
+        }
+      });
+    });
 
     document.querySelectorAll("[data-telephony-open-provider]").forEach(function (button) {
       button.addEventListener("click", function () {
@@ -560,7 +635,9 @@
 
     document.querySelectorAll("[data-telephony-close-dialog]").forEach(function (button) {
       button.addEventListener("click", function () {
-        closeDialog(button.closest("dialog"));
+        var dialog = button.closest("dialog");
+        if (dialog === providerDialog) resetProviderPassword();
+        closeDialog(dialog);
       });
     });
 

@@ -10242,6 +10242,52 @@ def create_app() -> FastAPI:
 
     def _telephony_provider_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
         raw_rows = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        devices = [item for item in (data.get("telephony_devices") or []) if isinstance(item, dict)]
+        sessions = data.get("telephony_softphone_sessions")
+        session_rows = [item for item in sessions.values() if isinstance(item, dict)] if isinstance(sessions, dict) else []
+        legacy_auth = data.get("telephony_softphone_auth")
+        if isinstance(legacy_auth, dict):
+            session_rows.append(legacy_auth)
+
+        def provider_devices(provider: dict[str, Any]) -> list[dict[str, str]]:
+            provider_id = str(provider.get("id") or "").strip()
+            device_ids = {
+                str(session.get("device_id") or "").strip()
+                for session in session_rows
+                if str(session.get("provider_id") or "").strip() == provider_id
+            } - {""}
+            fallback_device_id = str(provider.get("last_connected_device_id") or "").strip()
+            if fallback_device_id and provider_id and not device_ids and telephony_provider_is_connected(provider):
+                device_ids.add(fallback_device_id)
+            result: list[dict[str, str]] = []
+            for device_id in sorted(device_ids):
+                device = next(
+                    (
+                        item
+                        for item in devices
+                        if device_id
+                        in {
+                            str(item.get("device_id") or "").strip(),
+                            str(item.get("id") or "").strip().removeprefix("upos-sip:"),
+                        }
+                    ),
+                    {},
+                )
+                result.append(
+                    {
+                        "device_id": device_id,
+                        "name": str(
+                            device.get("name")
+                            or provider.get("last_connected_device_name")
+                            or "U-POS Sip"
+                        ).strip(),
+                        "platform": str(device.get("platform") or "").strip(),
+                        "app_version": str(device.get("app_version") or "").strip(),
+                        "last_seen_at": str(device.get("last_seen_at") or provider.get("last_connected_at") or "").strip(),
+                    }
+                )
+            return result
+
         rows: list[dict[str, Any]] = []
         for raw_row in raw_rows:
             if not isinstance(raw_row, dict):
@@ -10268,9 +10314,23 @@ def create_app() -> FastAPI:
             item["status"] = status_value
             item["status_label"] = _telephony_status_label("provider", status_value)
             item["connection_message"] = connection_message
+            item["bound_devices"] = provider_devices(item)
             item.pop("password", None)
             rows.append(item)
         return rows
+
+    def _telephony_device_is_revoked(data: dict[str, Any], payload: dict[str, Any]) -> bool:
+        device_id = str(
+            payload.get("device_id")
+            or payload.get("app_instance_id")
+            or payload.get("machine")
+            or payload.get("machine_name")
+            or ""
+        ).strip()
+        if not device_id:
+            return False
+        revoked = data.get("telephony_revoked_devices")
+        return isinstance(revoked, dict) and device_id in revoked
 
     def _telephony_mark_provider_connection(
         data: dict[str, Any],
@@ -10966,6 +11026,7 @@ def create_app() -> FastAPI:
             "app_version": str(payload.get("app_version") or "").strip(),
             "platform": str(payload.get("platform") or "").strip(),
             "operator": str(payload.get("operator") or payload.get("responsible") or "").strip(),
+            "provider_id": str(_telephony_first(payload, "provider_id", "sip_provider_id") or "").strip(),
         }
         existing_index = next((idx for idx, row in enumerate(devices) if str(row.get("id") or "") == device_id), None)
         if existing_index is None:
@@ -12014,6 +12075,126 @@ def create_app() -> FastAPI:
         save_workspace_settings(wid, data)
         return RedirectResponse(url="/telephony?msg=deleted#numbers", status_code=302)
 
+    @app.post("/telephony/providers/password", name="telephony_provider_password")
+    async def telephony_provider_password(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir or not valid_workspace_owner_id(wid):
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        provider_id = str(form.get("provider_id") or "").strip()
+        data = _telephony_settings_payload(str(wid))
+        provider = next(
+            (
+                item
+                for item in (data.get("telephony_providers") or [])
+                if isinstance(item, dict) and str(item.get("id") or "").strip() == provider_id
+            ),
+            None,
+        )
+        if provider is None:
+            return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+        response = JSONResponse({"ok": True, "password": str(provider.get("password") or "")})
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.post("/telephony/providers/device/unbind", name="telephony_provider_device_unbind")
+    async def telephony_provider_device_unbind(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#integrations", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        provider_id = str(form.get("provider_id") or "").strip()
+        device_id = str(form.get("device_id") or "").strip()
+        if not provider_id or not device_id:
+            return RedirectResponse(
+                url="/telephony?error=" + quote("Не удалось определить SIP-линию или устройство") + "#integrations",
+                status_code=302,
+            )
+
+        data = _telephony_settings_payload(wid)
+        providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        provider = next(
+            (
+                item
+                for item in providers
+                if isinstance(item, dict) and str(item.get("id") or "").strip() == provider_id
+            ),
+            None,
+        )
+        if provider is None:
+            return RedirectResponse(
+                url="/telephony?error=" + quote("SIP-линия не найдена") + "#integrations",
+                status_code=302,
+            )
+
+        sessions = data.get("telephony_softphone_sessions")
+        if isinstance(sessions, dict):
+            remaining_sessions = {
+                key: value
+                for key, value in sessions.items()
+                if not (
+                    isinstance(value, dict)
+                    and str(value.get("provider_id") or "").strip() == provider_id
+                    and str(value.get("device_id") or key).strip() == device_id
+                )
+            }
+            data["telephony_softphone_sessions"] = remaining_sessions
+        else:
+            remaining_sessions = {}
+        legacy_auth = data.get("telephony_softphone_auth")
+        if isinstance(legacy_auth, dict) and (
+            str(legacy_auth.get("provider_id") or "").strip() == provider_id
+            and str(legacy_auth.get("device_id") or "").strip() == device_id
+        ):
+            data.pop("telephony_softphone_auth", None)
+
+        devices = data.get("telephony_devices") if isinstance(data.get("telephony_devices"), list) else []
+        data["telephony_devices"] = [
+            item
+            for item in devices
+            if not (
+                isinstance(item, dict)
+                and device_id
+                in {
+                    str(item.get("device_id") or "").strip(),
+                    str(item.get("id") or "").strip().removeprefix("upos-sip:"),
+                }
+            )
+        ]
+        revoked = data.get("telephony_revoked_devices")
+        if not isinstance(revoked, dict):
+            revoked = {}
+        revoked[device_id] = {
+            "provider_id": provider_id,
+            "revoked_at": datetime.now(timezone.utc).isoformat(),
+        }
+        data["telephony_revoked_devices"] = dict(list(revoked.items())[-200:])
+
+        provider_still_bound = any(
+            isinstance(value, dict) and str(value.get("provider_id") or "").strip() == provider_id
+            for value in remaining_sessions.values()
+        )
+        if not provider_still_bound:
+            provider["status"] = "offline"
+            provider["last_disconnected_at"] = datetime.now(timezone.utc).isoformat()
+            provider["last_test_message"] = "Устройство отвязано от SIP-линии"
+            for key in (
+                "last_connected_at",
+                "last_connected_device_id",
+                "last_connected_device_name",
+                "last_connected_user",
+            ):
+                provider.pop(key, None)
+        data["telephony_providers"] = providers
+        save_workspace_settings(wid, data)
+        return RedirectResponse(url="/telephony?msg=device_unbound#integrations", status_code=302)
+
     @app.post("/telephony/providers/save", name="telephony_provider_save")
     async def telephony_provider_save(request: Request):
         form = await request.form()
@@ -12120,6 +12301,9 @@ def create_app() -> FastAPI:
         provided_token = _telephony_request_token(payload, request)
         if not _telephony_token_allowed(wid, provided_token):
             return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+        integration_data = _telephony_settings_payload(wid)
+        if _telephony_device_is_revoked(integration_data, payload):
+            return JSONResponse({"ok": False, "error": "device_unbound"}, status_code=401)
 
         event = str(payload.get("event") or "").strip().lower()
         if event == "test":
@@ -12161,7 +12345,7 @@ def create_app() -> FastAPI:
                 }
             )
         if event in {"heartbeat", "device_heartbeat", "ping"}:
-            data = _telephony_settings_payload(wid)
+            data = integration_data
             now_iso = datetime.now(timezone.utc).isoformat()
             device = _telephony_upsert_device_entry(data, payload, now_iso)
             provider = _telephony_mark_provider_connection(data, payload, now_iso, device)
@@ -12241,6 +12425,8 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
         if not _telephony_token_allowed(wid, _telephony_request_token(payload, request)):
             return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+        if _telephony_device_is_revoked(_telephony_settings_payload(wid), payload):
+            return JSONResponse({"ok": False, "error": "device_unbound"}, status_code=401)
         result = _telephony_sync_contacts(wid, payload)
         return JSONResponse({"ok": True, "workspace_owner_id": wid, **result})
 
@@ -12268,6 +12454,8 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=400)
         if not _telephony_token_allowed(wid, _telephony_request_token(payload, request)):
             return JSONResponse({"ok": False, "error": "bad_token"}, status_code=401)
+        if _telephony_device_is_revoked(_telephony_settings_payload(wid), payload):
+            return JSONResponse({"ok": False, "error": "device_unbound"}, status_code=401)
         if not _telephony_first(payload, "call_id", "id", "uuid", "call_uuid", "callid", "uniqueid", "linkedid") and not _telephony_first(
             payload, "phone", "remote_ext", "caller", "caller_id", "to", "from", "src", "dst"
         ):
@@ -12359,6 +12547,13 @@ def create_app() -> FastAPI:
         now_iso = datetime.now(timezone.utc).isoformat()
         provider_id = str(provider.get("id") or "").strip()
         device_id = str(payload.get("device_id") or payload.get("app_instance_id") or "").strip()
+        revoked = data.get("telephony_revoked_devices")
+        if isinstance(revoked, dict) and device_id:
+            revoked.pop(device_id, None)
+            if revoked:
+                data["telephony_revoked_devices"] = revoked
+            else:
+                data.pop("telephony_revoked_devices", None)
         auth_entry = {
             "authenticated_at": now_iso,
             "provider_id": provider_id,
