@@ -23,6 +23,73 @@
     return local.toISOString().slice(0, 16);
   }
 
+  function submitTelephonyFilters(form) {
+    if (!form) return;
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+    } else {
+      form.submit();
+    }
+  }
+
+  function initAutomaticFilters() {
+    document.querySelectorAll("[data-telephony-filter-form]").forEach(function (form) {
+      var timer = null;
+      var inputs = Array.from(form.querySelectorAll('input:not([type="hidden"]), select'));
+      inputs.forEach(function (input) {
+        if (input.tagName === "SELECT") {
+          input.addEventListener("change", function () {
+            window.clearTimeout(timer);
+            submitTelephonyFilters(form);
+          });
+          return;
+        }
+        input.addEventListener("input", function () {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(function () {
+            submitTelephonyFilters(form);
+          }, 350);
+        });
+        input.addEventListener("change", function () {
+          window.clearTimeout(timer);
+          submitTelephonyFilters(form);
+        });
+      });
+    });
+  }
+
+  function dialWithUposSip(phone, client) {
+    var normalizedPhone = String(phone || "").trim().replace(/[^\d+*#]/g, "");
+    if (!normalizedPhone) return;
+    var detail = { phone: normalizedPhone, client: String(client || "").trim() };
+    if (typeof window.UPOS_TELEPHONY_DIAL === "function") {
+      window.UPOS_TELEPHONY_DIAL(detail);
+      return;
+    }
+    var event = new CustomEvent("upos:dial", { detail: detail, cancelable: true });
+    if (!window.dispatchEvent(event)) return;
+    window.location.href = "sip:" + encodeURIComponent(normalizedPhone);
+  }
+
+  function initClickToDial() {
+    document.querySelectorAll("[data-telephony-dial-phone]").forEach(function (phoneCell) {
+      var call = function () {
+        var row = phoneCell.closest("tr");
+        var client = row ? row.querySelector(".telephony-call-client strong") : null;
+        dialWithUposSip(phoneCell.dataset.telephonyDialPhone, client ? client.textContent : "");
+      };
+      phoneCell.addEventListener("dblclick", function (event) {
+        event.preventDefault();
+        call();
+      });
+      phoneCell.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        call();
+      });
+    });
+  }
+
   function highlightCallSearchMatches() {
     var query = String(new URLSearchParams(window.location.search).get("q") || "").trim();
     if (!query) return;
@@ -397,6 +464,8 @@
     }
 
     highlightCallSearchMatches();
+    initAutomaticFilters();
+    initClickToDial();
     initContactDirectory();
 
     document.querySelectorAll("[data-telephony-open-call]").forEach(function (button) {

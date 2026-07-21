@@ -22464,6 +22464,20 @@ body.is-sidebar-collapsed .upos-floating-phone,
   font-weight: 900;
   line-height: 1.05;
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.telephony-calls-table .telephony-call-phone:focus-visible {
+  outline: 2px solid var(--primary, #2563eb);
+  outline-offset: -3px;
+}
+
+.telephony-calls-table .telephony-call-client strong {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.2;
 }
 
 .telephony-calls-table th:nth-child(4),

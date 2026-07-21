@@ -17,7 +17,7 @@
   <button type="button" class="btn" data-telephony-open-call>{{ module.action }}</button>
 </div>
 
-<form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls integrations" hidden>
+<form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls integrations" data-telephony-filter-form hidden>
   <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
   <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
   <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Аккаунт, клиент, номер, сотрудник" /></label>
@@ -39,8 +39,6 @@
       <option value="blocked" {% if telephony_filters.status == 'blocked' %}selected{% endif %}>Заблокирован</option>
     </select>
   </label>
-  <button class="btn btn-secondary" type="submit">Применить</button>
-  <a class="btn btn-secondary" href="/telephony#calls">Очистить</a>
 </form>
 
 <datalist id="telephony-provider-list">
@@ -214,8 +212,15 @@
           {% for row in telephony_calls %}
             <tr>
               <td class="telephony-account-cell"><strong>{{ row.account_label }}</strong><small>{{ row.operator_name }}</small></td>
-              <td><strong data-telephony-search-highlight>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
-              <td class="telephony-call-phone" data-telephony-search-highlight>{{ row.phone }}</td>
+              <td class="telephony-call-client"><strong data-telephony-search-highlight>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
+              <td
+                class="telephony-call-phone"
+                data-telephony-search-highlight
+                data-telephony-dial-phone="{{ row.phone }}"
+                role="button"
+                tabindex="0"
+                title="Двойной щелчок — позвонить через Upos Sip"
+              >{{ row.phone }}</td>
               <td>
                 <span class="telephony-direction telephony-direction--{{ row.direction or 'outgoing' }}">
                   <span aria-hidden="true">{% if row.direction == 'incoming' %}&#8601;{% else %}&#8599;{% endif %}</span>
