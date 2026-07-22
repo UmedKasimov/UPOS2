@@ -6716,6 +6716,75 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 650;
 }
 
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table {
+  min-width: 56rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th,
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td {
+  padding: 0.62rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 54%, var(--border));
+  background: var(--card);
+  vertical-align: middle;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table thead th {
+  background: var(--products-table-head-bg, color-mix(in srgb, var(--primary) 12%, var(--card)));
+  color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
+  font-weight: 850;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table tbody tr:nth-child(even) td {
+  background: var(--products-table-row-alt-bg, color-mix(in srgb, var(--primary) 4%, var(--card)));
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table tbody tr:hover td {
+  background: var(--products-table-row-hover-bg, color-mix(in srgb, var(--primary) 7%, var(--card)));
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(1),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(1) {
+  width: 3rem;
+  text-align: center;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(2),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(2) {
+  width: 34%;
+  text-align: left;
+  white-space: normal;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(3),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(3) {
+  width: 6rem;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(4),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(4),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(5),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(5),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(6),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(6) {
+  width: 10.5rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(6) {
+  color: var(--primary);
+  font-weight: 850;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table tfoot td {
+  border-color: color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 54%, var(--border));
+  background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 12%, var(--card));
+}
+
 .purchase-document-payment-table td:nth-child(1),
 .purchase-document-payment-table td:nth-child(2),
 .purchase-document-payment-table td:nth-child(3),
