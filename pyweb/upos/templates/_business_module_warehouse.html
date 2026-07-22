@@ -452,30 +452,17 @@
         </div>
       </section>
       <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-purchase-detail-pane="payment" hidden>
-        <div class="warehouse-purchase-detail-table-wrap">
+        <div class="warehouse-purchase-detail-table-wrap" data-purchase-payment-list hidden>
           <table class="warehouse-purchase-detail-table purchase-document-detail-table purchase-document-payment-table">
             <thead>
               <tr>
-                <th>Итого заказа</th>
-                <th>Оплачено</th>
-                <th>Осталось оплатить</th>
-                <th>Статус</th>
+                <th>№</th>
+                <th>Счёт</th>
                 <th>Тип оплаты</th>
-                <th>Дата закупки</th>
-                <th>Поставщик</th>
+                <th>Сумма</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td><strong data-purchase-payment-total></strong></td>
-                <td><strong data-purchase-payment-paid></strong></td>
-                <td><strong data-purchase-payment-debt></strong></td>
-                <td data-purchase-payment-status></td>
-                <td data-purchase-payment-type></td>
-                <td data-purchase-payment-date></td>
-                <td data-purchase-payment-supplier></td>
-              </tr>
-            </tbody>
+            <tbody data-purchase-payment-lines></tbody>
           </table>
         </div>
         <form class="document-detail-payment-actions" method="post" action="" data-purchase-payment-form data-purchase-payment-url-template="{{ url_for('warehouse_purchase_pay', purchase_id='__purchase_id__') }}" hidden>

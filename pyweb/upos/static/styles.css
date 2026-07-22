@@ -6785,37 +6785,23 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 12%, var(--card));
 }
 
-.purchase-document-payment-table td:nth-child(1),
-.purchase-document-payment-table td:nth-child(2),
-.purchase-document-payment-table td:nth-child(3),
-.purchase-document-payment-table th:nth-child(1),
-.purchase-document-payment-table th:nth-child(2),
-.purchase-document-payment-table th:nth-child(3) {
+.purchase-document-payment-table {
+  min-width: 34rem;
+}
+
+.purchase-document-payment-table th,
+.purchase-document-payment-table td {
+  text-align: left;
+}
+
+.purchase-document-payment-table th:last-child,
+.purchase-document-payment-table td:last-child {
   text-align: right;
   white-space: nowrap;
 }
 
-.purchase-document-payment-table td:nth-child(4),
-.purchase-document-payment-table td:nth-child(5),
-.purchase-document-payment-table td:nth-child(6),
-.purchase-document-payment-table td:nth-child(7),
-.purchase-document-payment-table th:nth-child(4),
-.purchase-document-payment-table th:nth-child(5),
-.purchase-document-payment-table th:nth-child(6),
-.purchase-document-payment-table th:nth-child(7) {
-  text-align: left;
-}
-
-.purchase-document-payment-table td:nth-child(1) strong {
+.purchase-document-payment-table td:last-child strong {
   color: var(--primary);
-}
-
-.warehouse-purchase-payment-pane[data-payment-state="debt"] .purchase-document-payment-table td:nth-child(3) strong {
-  color: #c42121;
-}
-
-.warehouse-purchase-payment-pane[data-payment-state="paid"] .purchase-document-payment-table td:nth-child(3) strong {
-  color: #178239;
 }
 
 .purchase-document-note-table {

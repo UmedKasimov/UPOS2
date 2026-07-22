@@ -57,13 +57,6 @@
     }).format(quantity);
   }
 
-  function paymentStatusText(value) {
-    const status = String(value || "").toLowerCase();
-    if (status === "paid") return "Оплачен";
-    if (status === "partial") return "Частично оплачен";
-    return "Не оплачен";
-  }
-
   function purchaseEntryNumber(value) {
     const compact = String(value || "")
       .replace(/\s+/g, "")
@@ -1438,6 +1431,49 @@
     button.textContent = canPay ? `Оплатить ${moneyWithCurrency(debt, purchase.currency || "UZS")}` : "Оплачено";
   }
 
+  function renderPurchasePayments(panel, purchase) {
+    const paymentList = panel.querySelector("[data-purchase-payment-list]");
+    const paymentLinesRoot = panel.querySelector("[data-purchase-payment-lines]");
+    if (!paymentList || !paymentLinesRoot) return;
+
+    const currency = String(purchase.currency || "UZS").toUpperCase();
+    const paymentLines = (Array.isArray(purchase.payment_lines) ? purchase.payment_lines : [])
+      .filter((payment) => purchaseEntryNumber(payment?.amount) > 0)
+      .map((payment) => ({
+        account: String(payment.account || payment.type || "Оплата").trim() || "Оплата",
+        type: String(payment.type || payment.account || "Оплата").trim() || "Оплата",
+        amount: payment.amount,
+        currency: String(payment.currency || currency).toUpperCase(),
+      }));
+
+    const paidAmount = purchaseEntryNumber(purchase.paid_amount);
+    if (!paymentLines.length && paidAmount > 0) {
+      paymentLines.push({
+        account: String(purchase.payment_type || "Оплата").trim() || "Оплата",
+        type: String(purchase.payment_type || "Оплата").trim() || "Оплата",
+        amount: paidAmount,
+        currency,
+      });
+    }
+
+    paymentLinesRoot.replaceChildren();
+    paymentList.hidden = paymentLines.length === 0;
+    paymentLines.forEach((payment, index) => {
+      const row = document.createElement("tr");
+      [index + 1, payment.account, payment.type].forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = String(value);
+        row.append(cell);
+      });
+      const amountCell = document.createElement("td");
+      const amount = document.createElement("strong");
+      amount.textContent = moneyWithCurrency(payment.amount, payment.currency);
+      amountCell.append(amount);
+      row.append(amountCell);
+      paymentLinesRoot.append(row);
+    });
+  }
+
   function renderDetail(panel, purchase) {
     const currency = purchase.currency || "UZS";
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
@@ -1450,16 +1486,10 @@
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-detail-debt]", moneyWithCurrency(purchase.debt_amount, currency));
     setText(panel, "[data-purchase-detail-total]", moneyWithCurrency(purchase.amount, currency));
-    setText(panel, "[data-purchase-payment-total]", moneyWithCurrency(purchase.amount, currency));
-    setText(panel, "[data-purchase-payment-paid]", moneyWithCurrency(purchase.paid_amount, currency));
-    setText(panel, "[data-purchase-payment-debt]", moneyWithCurrency(purchase.debt_amount, currency));
-    setText(panel, "[data-purchase-payment-status]", paymentStatusText(purchase.payment_status));
-    setText(panel, "[data-purchase-payment-type]", purchase.payment_type || "Не указано");
-    setText(panel, "[data-purchase-payment-date]", purchase.date || "-");
-    setText(panel, "[data-purchase-payment-supplier]", purchase.supplier || "Поставщик не указан");
     setText(panel, "[data-purchase-detail-note]", purchase.note || "Комментарий не указан");
     const paymentPane = panel.querySelector('[data-purchase-detail-pane="payment"]');
     if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
+    renderPurchasePayments(panel, purchase);
     updatePurchasePaymentButton(panel, purchase);
     setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
     setText(
