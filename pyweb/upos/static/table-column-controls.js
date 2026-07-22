@@ -271,17 +271,19 @@
   }
 
   const observer = new MutationObserver((records) => {
+    const tablesToRefresh = new Set();
     records.forEach((record) => {
       record.addedNodes.forEach((node) => {
         if (!(node instanceof Element)) return;
         if (node.matches(TABLE_SELECTOR)) initTable(node);
         initAll(node);
         const table = node.closest?.(TABLE_SELECTOR);
-        if (table?.getAttribute(READY_ATTR) === '1') {
-          ensureBodyControlCells(table);
-          applyVisibility(table);
-        }
+        if (table?.getAttribute(READY_ATTR) === '1') tablesToRefresh.add(table);
       });
+    });
+    tablesToRefresh.forEach((table) => {
+      ensureBodyControlCells(table);
+      applyVisibility(table);
     });
   });
 

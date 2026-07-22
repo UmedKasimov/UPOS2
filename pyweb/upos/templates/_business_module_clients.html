@@ -27,7 +27,7 @@
     <header class="products-panel-head clients-panel-head">
       <div class="products-panel-titleline">
         <h2>Клиенты</h2>
-        <span>Всего: {{ clients_records|length }}</span>
+        <span>Всего: {{ clients_total }}</span>
       </div>
 
       <div class="products-panel-top-actions">
@@ -54,7 +54,7 @@
         <button type="button" class="btn btn-secondary" disabled>⋮</button>
       </div>
 
-      <form id="clients-filter-form" class="products-catalog-filter clients-filter-form" method="get" action="{{ url_for('clients_get') }}">
+      <form id="clients-filter-form" class="products-catalog-filter clients-filter-form" method="get" action="{{ url_for('clients_get') }}#clients">
         <label class="products-catalog-search">
           <span>Поиск</span>
           <input name="q" value="{{ client_filters.q }}" placeholder="Клиент, телефон, ИНН, код" />
@@ -114,7 +114,7 @@
             {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
             <tr>
               <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select aria-label="Выбрать {{ client.name }}" /></td>
-              <td><span class="client-id-badge">#{{ loop.index }}</span></td>
+              <td><span class="client-id-badge">#{{ clients_page_from + loop.index0 }}</span></td>
               <td>
                 <a
                   class="client-open-link product-cell-main product-cell-meta"
@@ -176,6 +176,30 @@
         </tfoot>
       </table>
     </div>
+    <footer class="products-catalog-footer clients-catalog-footer">
+      <nav class="products-pagination" aria-label="Страницы клиентов">
+        <a class="products-page-link {% if clients_page <= 1 %}disabled{% endif %}" href="{{ clients_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+        {% for page_no in clients_pagination_pages %}
+          <a class="products-page-link {% if page_no == clients_page %}active{% endif %}" href="{{ clients_page_urls[page_no] }}" {% if page_no == clients_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+        {% endfor %}
+        <a class="products-page-link {% if clients_page >= clients_total_pages %}disabled{% endif %}" href="{{ clients_next_page_url }}" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. {{ clients_page }} из {{ clients_total_pages }}</span>
+      </nav>
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по списку клиентов">
+          <span>Всего: {{ clients_total }}</span>
+          <span>Показано: {{ clients_page_from }}-{{ clients_page_to }}</span>
+        </div>
+        <label class="products-page-size products-page-size--footer">
+          <span>Показать</span>
+          <select name="page_size" form="clients-filter-form" onchange="this.form.requestSubmit()">
+            {% for size in [50, 100, 250] %}
+              <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </footer>
   </article>
 
 </div>
@@ -845,7 +869,7 @@
     <header class="products-panel-head">
       <div>
         <h2>Должники</h2>
-        <span>Всего: {{ client_balances|length }}</span>
+        <span>Всего: {{ client_balances_total }}</span>
       </div>
     </header>
     <div class="products-table-wrap">
@@ -876,6 +900,20 @@
         </tbody>
       </table>
     </div>
+    <footer class="products-catalog-footer clients-catalog-footer">
+      <nav class="products-pagination" aria-label="Страницы должников">
+        <a class="products-page-link {% if client_balances_page <= 1 %}disabled{% endif %}" href="{{ client_balances_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+        {% for page_no in client_balances_pagination_pages %}
+          <a class="products-page-link {% if page_no == client_balances_page %}active{% endif %}" href="{{ client_balances_page_urls[page_no] }}" {% if page_no == client_balances_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+        {% endfor %}
+        <a class="products-page-link {% if client_balances_page >= client_balances_total_pages %}disabled{% endif %}" href="{{ client_balances_next_page_url }}" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. {{ client_balances_page }} из {{ client_balances_total_pages }}</span>
+      </nav>
+      <div class="products-panel-stats" aria-label="Информация по списку должников">
+        <span>Всего: {{ client_balances_total }}</span>
+        <span>Показано: {{ client_balances_page_from }}-{{ client_balances_page_to }}</span>
+      </div>
+    </footer>
   </article>
 
   <article class="products-list-panel" data-workspace-view="routes" hidden>

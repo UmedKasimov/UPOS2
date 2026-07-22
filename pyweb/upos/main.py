@@ -9042,6 +9042,9 @@ def create_app() -> FastAPI:
         program: str = "",
         route: str = "",
         status: str = "all",
+        page_size: str = "100",
+        page: str = "1",
+        balance_page: str = "1",
         client: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
@@ -9234,28 +9237,71 @@ def create_app() -> FastAPI:
                 for key, value in sorted(route_map.items())
             ]
             client_balances.sort(key=lambda item: item["balance_value"], reverse=True)
+        all_clients_records = clients_records
+        clients_total = len(all_clients_records)
         clients_debt_total = sum(
-            (item["balance_value"] for item in clients_records if item["balance_value"] > 0),
+            (item["balance_value"] for item in all_clients_records if item["balance_value"] > 0),
             Decimal("0"),
         )
         clients_advance_total = sum(
-            (abs(item["balance_value"]) for item in clients_records if item["balance_value"] < 0),
+            (abs(item["balance_value"]) for item in all_clients_records if item["balance_value"] < 0),
             Decimal("0"),
         )
         clients_balance_summary = {
             "debt": _sales_money_label(clients_debt_total),
             "advance": _sales_money_label(clients_advance_total),
             "net": _sales_money_label(clients_debt_total - clients_advance_total),
-            "debt_count": sum(1 for item in clients_records if item["balance_value"] > 0),
-            "advance_count": sum(1 for item in clients_records if item["balance_value"] < 0),
+            "debt_count": sum(1 for item in all_clients_records if item["balance_value"] > 0),
+            "advance_count": sum(1 for item in all_clients_records if item["balance_value"] < 0),
         }
         client_options = {
-            "territories": sorted({item["territory"] for item in clients_records if item["territory"]}),
-            "categories": sorted({item["category"] for item in clients_records if item["category"]}),
-            "programs": sorted({program for item in clients_records for program in item["programs"] if program}),
-            "routes": sorted({item["route"] for item in clients_records if item["route"]}),
-            "clients": sorted({item["name"] for item in clients_records if item["name"]}),
+            "territories": sorted({item["territory"] for item in all_clients_records if item["territory"]}),
+            "categories": sorted({item["category"] for item in all_clients_records if item["category"]}),
+            "programs": sorted({program for item in all_clients_records for program in item["programs"] if program}),
+            "routes": sorted({item["route"] for item in all_clients_records if item["route"]}),
+            "clients": sorted({item["name"] for item in all_clients_records if item["name"]}),
         }
+
+        try:
+            clients_page_size = int(str(page_size or "100").strip())
+        except Exception:
+            clients_page_size = 100
+        if clients_page_size not in {50, 100, 250}:
+            clients_page_size = 100
+
+        clients_total_pages = max(1, math.ceil(clients_total / clients_page_size))
+        clients_page = min(_positive_int(page, 1), clients_total_pages)
+        clients_page_start = (clients_page - 1) * clients_page_size
+        clients_page_end = clients_page_start + clients_page_size
+        clients_records = all_clients_records[clients_page_start:clients_page_end]
+
+        client_balances_total = len(client_balances)
+        client_balances_total_pages = max(1, math.ceil(client_balances_total / clients_page_size))
+        client_balances_page = min(_positive_int(balance_page, 1), client_balances_total_pages)
+        client_balances_start = (client_balances_page - 1) * clients_page_size
+        client_balances_end = client_balances_start + clients_page_size
+        client_balances = client_balances[client_balances_start:client_balances_end]
+
+        def clients_page_url(target_page: int, *, anchor: str = "clients", page_key: str = "page") -> str:
+            pairs = [
+                (str(key), str(value))
+                for key, value in request.query_params.multi_items()
+                if str(key) != page_key
+            ]
+            pairs.append((page_key, str(target_page)))
+            return f"{request.url.path}?{urlencode(pairs, doseq=True)}#{anchor}"
+
+        clients_pagination_pages = [
+            page_no
+            for page_no in range(max(1, clients_page - 2), min(clients_total_pages, clients_page + 2) + 1)
+        ]
+        client_balances_pagination_pages = [
+            page_no
+            for page_no in range(
+                max(1, client_balances_page - 2),
+                min(client_balances_total_pages, client_balances_page + 2) + 1,
+            )
+        ]
         return tpl(
             request,
             "home_business_module.html",
@@ -9265,9 +9311,37 @@ def create_app() -> FastAPI:
             client_filters=filters,
             client_options=client_options,
             clients_records=clients_records,
+            clients_total=clients_total,
+            clients_page=clients_page,
+            clients_page_size=clients_page_size,
+            clients_total_pages=clients_total_pages,
+            clients_page_from=clients_page_start + 1 if clients_total else 0,
+            clients_page_to=min(clients_page_end, clients_total),
+            clients_pagination_pages=clients_pagination_pages,
+            clients_page_urls={page_no: clients_page_url(page_no) for page_no in clients_pagination_pages},
+            clients_prev_page_url=clients_page_url(max(1, clients_page - 1)),
+            clients_next_page_url=clients_page_url(min(clients_total_pages, clients_page + 1)),
             clients_balance_summary=clients_balance_summary,
             client_routes=client_routes,
             client_balances=client_balances,
+            client_balances_total=client_balances_total,
+            client_balances_page=client_balances_page,
+            client_balances_total_pages=client_balances_total_pages,
+            client_balances_page_from=client_balances_start + 1 if client_balances_total else 0,
+            client_balances_page_to=min(client_balances_end, client_balances_total),
+            client_balances_pagination_pages=client_balances_pagination_pages,
+            client_balances_page_urls={
+                page_no: clients_page_url(page_no, anchor="balances", page_key="balance_page")
+                for page_no in client_balances_pagination_pages
+            },
+            client_balances_prev_page_url=clients_page_url(
+                max(1, client_balances_page - 1), anchor="balances", page_key="balance_page"
+            ),
+            client_balances_next_page_url=clients_page_url(
+                min(client_balances_total_pages, client_balances_page + 1),
+                anchor="balances",
+                page_key="balance_page",
+            ),
             selected_client_card=selected_client_card,
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
