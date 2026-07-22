@@ -6313,7 +6313,35 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 900;
 }
 
+.warehouse-purchase-paid {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.warehouse-purchase-paid::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 auto 0 0;
+  width: var(--purchase-paid-progress, 0%);
+  border-right: 1px solid color-mix(in srgb, #16a34a 48%, transparent);
+  background: color-mix(in srgb, #22c55e 23%, transparent);
+  content: "";
+  pointer-events: none;
+  transition: width 420ms ease;
+}
+
+.warehouse-purchase-paid[data-payment-progress="0"]::before {
+  border-right: 0;
+}
+
+.warehouse-purchase-paid[data-payment-progress="100"]::before {
+  background: color-mix(in srgb, #22c55e 30%, transparent);
+}
+
 .warehouse-purchase-paid-chip {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   margin-top: 0.28rem;
   padding: 0.24rem 0.48rem;

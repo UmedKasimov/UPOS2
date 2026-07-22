@@ -286,7 +286,13 @@
               <td class="warehouse-purchase-money" data-warehouse-purchase-highlight>
                 <strong>{{ doc.amount }} {{ doc.currency }}</strong>
               </td>
-              <td class="warehouse-purchase-money warehouse-purchase-paid" data-warehouse-purchase-highlight>
+              <td
+                class="warehouse-purchase-money warehouse-purchase-paid"
+                data-warehouse-purchase-highlight
+                data-payment-progress="{{ doc.payment_progress }}"
+                style="--purchase-paid-progress: {{ doc.payment_progress }}%;"
+                title="{{ doc.payment_progress }}%"
+              >
                 <span class="warehouse-purchase-paid-chip">{{ doc.paid_amount }} {{ doc.currency }}</span>
               </td>
               <td>

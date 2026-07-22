@@ -7217,7 +7217,16 @@ def create_app() -> FastAPI:
     def _purchase_document_data(row: PurchaseDocument) -> dict[str, Any]:
         data = _json_object(row.data)
         paid_amount = _sales_decimal(data.get("paid_amount"))
-        debt_amount = _sales_decimal(row.amount) - paid_amount
+        amount_value = _sales_decimal(row.amount)
+        debt_amount = amount_value - paid_amount
+        payment_progress = 0
+        if amount_value > 0:
+            paid_for_progress = max(Decimal("0"), min(paid_amount, amount_value))
+            payment_progress = int(
+                ((paid_for_progress / amount_value) * Decimal("100")).quantize(
+                    Decimal("1"), rounding=ROUND_HALF_UP
+                )
+            )
         raw_lines = data.get("lines") if isinstance(data.get("lines"), list) else []
         safe_lines: list[dict[str, str]] = []
         for line in raw_lines:
@@ -7243,6 +7252,7 @@ def create_app() -> FastAPI:
             "currency": row.currency,
             "paid_amount": _sales_money_label(paid_amount),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
+            "payment_progress": payment_progress,
             "status": _purchase_workflow_status(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "status_label": _purchase_status_label(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "payment_status": str(data.get("payment_status") or ("paid" if paid_amount >= _sales_decimal(row.amount) and _sales_decimal(row.amount) > 0 else "partial" if paid_amount > 0 else "unpaid")),
