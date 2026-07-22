@@ -4750,7 +4750,10 @@ def create_app() -> FastAPI:
             item["display_prices"] = display_prices
             item["quantity_display"] = _catalog_number_text(item.get("quantity"), empty="0")
             for display_price in item["display_prices"]:
-                display_price["price_display"] = _catalog_number_text(display_price.get("price"))
+                display_price["price_display"] = _catalog_number_text(
+                    display_price.get("price"),
+                    decimal_places=2,
+                )
             item["price_sort_value"] = next(
                 (price["price"] for price in display_prices if price["has_price"]),
                 "0",
@@ -4775,7 +4778,10 @@ def create_app() -> FastAPI:
                     {
                         "currency": currency,
                         "price": _decimal_plain_text(converted_price),
-                        "price_display": _catalog_number_text(converted_price),
+                        "price_display": _catalog_number_text(
+                            converted_price,
+                            decimal_places=2,
+                        ),
                         "has_price": converted_price > 0,
                     }
                 )
@@ -4878,14 +4884,21 @@ def create_app() -> FastAPI:
                 for unit, amount in sorted(quantities.items())
             ],
             "purchase_values": [
-                {"currency": currency, "value": _catalog_number_text(amount, empty="0")}
+                {
+                    "currency": currency,
+                    "value": _catalog_number_text(amount, empty="0", decimal_places=2),
+                }
                 for currency, amount in sorted(purchase_values.items(), key=lambda item: (item[0] != "UZS", item[0]))
             ],
             "price_values": [
                 {
                     "name": str(bucket["name"]),
                     "currency": str(bucket["currency"]),
-                    "value": _catalog_number_text(bucket["amount"], empty="0"),
+                    "value": _catalog_number_text(
+                        bucket["amount"],
+                        empty="0",
+                        decimal_places=2,
+                    ),
                 }
                 for _, bucket in sorted(price_values.items(), key=lambda item: (item[0][0], item[0][1]))
             ],
@@ -4913,11 +4926,21 @@ def create_app() -> FastAPI:
             text = text.rstrip("0").rstrip(".")
         return text
 
-    def _catalog_number_text(raw: Any, *, empty: str = "") -> str:
+    def _catalog_number_text(
+        raw: Any,
+        *,
+        empty: str = "",
+        decimal_places: int | None = None,
+    ) -> str:
         raw_text = str(raw or "").strip()
         if not raw_text:
             return empty
         value = _sales_decimal(raw_text)
+        if decimal_places is not None:
+            value = value.quantize(
+                Decimal("1").scaleb(-decimal_places),
+                rounding=ROUND_HALF_UP,
+            )
         plain = format(value, "f")
         if "." in plain:
             plain = plain.rstrip("0").rstrip(".")
