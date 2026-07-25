@@ -6339,6 +6339,23 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, #22c55e 30%, transparent);
 }
 
+.warehouse-purchase-paid-age {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  color: #166534;
+  font-size: var(--text-xs);
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 .warehouse-purchase-paid-chip {
   position: relative;
   z-index: 1;

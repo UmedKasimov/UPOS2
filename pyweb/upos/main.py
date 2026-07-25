@@ -7237,6 +7237,27 @@ def create_app() -> FastAPI:
             return str(int(quantity))
         return _decimal_plain_text(quantity.normalize())
 
+    def _purchase_elapsed_days_label(value: Any) -> str:
+        raw_date = str(value or "").strip()[:10]
+        if not raw_date:
+            return ""
+        try:
+            purchase_date = date.fromisoformat(raw_date)
+        except ValueError:
+            return ""
+        days = max(0, (datetime.now(ZoneInfo("Asia/Tashkent")).date() - purchase_date).days)
+        remainder_100 = days % 100
+        remainder_10 = days % 10
+        if 11 <= remainder_100 <= 14:
+            unit = "дней"
+        elif remainder_10 == 1:
+            unit = "день"
+        elif 2 <= remainder_10 <= 4:
+            unit = "дня"
+        else:
+            unit = "дней"
+        return f"{days} {unit}"
+
     def _purchase_document_data(row: PurchaseDocument) -> dict[str, Any]:
         data = _json_object(row.data)
         paid_amount = _sales_decimal(data.get("paid_amount"))
@@ -7250,6 +7271,9 @@ def create_app() -> FastAPI:
                     Decimal("1"), rounding=ROUND_HALF_UP
                 )
             )
+        payment_age_label = ""
+        if amount_value > 0 and Decimal("0") < paid_amount < amount_value:
+            payment_age_label = _purchase_elapsed_days_label(data.get("date"))
         raw_lines = data.get("lines") if isinstance(data.get("lines"), list) else []
         safe_lines: list[dict[str, str]] = []
         for line in raw_lines:
@@ -7276,6 +7300,7 @@ def create_app() -> FastAPI:
             "paid_amount": _sales_money_label(paid_amount),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "payment_progress": payment_progress,
+            "payment_age_label": payment_age_label,
             "status": _purchase_workflow_status(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "status_label": _purchase_status_label(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "payment_status": str(data.get("payment_status") or ("paid" if paid_amount >= _sales_decimal(row.amount) and _sales_decimal(row.amount) > 0 else "partial" if paid_amount > 0 else "unpaid")),

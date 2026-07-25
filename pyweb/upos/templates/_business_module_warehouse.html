@@ -291,8 +291,14 @@
                 data-warehouse-purchase-highlight
                 data-payment-progress="{{ doc.payment_progress }}"
                 style="--purchase-paid-progress: {{ doc.payment_progress }}%;"
-                title="{{ doc.payment_progress }}%"
+                title="{{ doc.payment_progress }}%{% if doc.payment_age_label %} · {{ doc.payment_age_label }} после закупки{% endif %}"
               >
+                {% if doc.payment_age_label %}
+                  <span
+                    class="warehouse-purchase-paid-age"
+                    aria-label="{{ doc.payment_age_label }} после закупки"
+                  >{{ doc.payment_age_label }}</span>
+                {% endif %}
                 <span class="warehouse-purchase-paid-chip">{{ doc.paid_amount }} {{ doc.currency }}</span>
               </td>
               <td>
