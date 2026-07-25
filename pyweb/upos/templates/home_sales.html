@@ -336,7 +336,16 @@
                   <td>{{ sale.client or "-" }}</td>
                   <td>{{ sale.warehouse or "-" }}</td>
                   <td data-sort-value="{{ sale.amount_value }}">{{ sale.amount }} {{ sale.currency }}</td>
-                  <td data-sort-value="{{ sale.paid_value }}"><span>{{ sale.paid_amount }} {{ sale.currency }}</span><small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small></td>
+                  <td
+                    class="sales-journal-payment-progress"
+                    data-payment-progress="{{ sale.payment_progress }}"
+                    data-sort-value="{{ sale.paid_value }}"
+                    style="--sales-payment-progress: {{ sale.payment_progress }}%;"
+                    title="Оплачено: {{ sale.payment_progress }}%"
+                  >
+                    <span>{{ sale.paid_amount }} {{ sale.currency }}</span>
+                    <small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small>
+                  </td>
                   <td>
                     {% set status_style = 'confirmed' if sale.status == 'paid' else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['reserved', 'partial', 'debt'] else 'draft')) %}
                     <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">

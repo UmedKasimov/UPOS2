@@ -5979,6 +5979,14 @@ def create_app() -> FastAPI:
         paid_amount = _sales_decimal(data.get("paid_amount"))
         amount_value = _sales_decimal(row.amount)
         debt_amount = amount_value - paid_amount
+        payment_progress = 0
+        if amount_value > 0:
+            paid_for_progress = max(Decimal("0"), min(paid_amount, amount_value))
+            payment_progress = int(
+                ((paid_for_progress / amount_value) * Decimal("100")).quantize(
+                    Decimal("1"), rounding=ROUND_HALF_UP
+                )
+            )
         doc_type = str(data.get("doc_type") or "sale")
         status = str(data.get("status") or ("return" if doc_type == "return" else "new"))
         date_from = str(data.get("date") or "")
@@ -6001,6 +6009,7 @@ def create_app() -> FastAPI:
             "paid_value": str(paid_amount),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "debt_value": str(debt_amount if debt_amount > 0 else 0),
+            "payment_progress": payment_progress,
             "payment_type": str(data.get("payment_type") or ""),
             "status": status,
             "status_label": _sales_status_label(status),

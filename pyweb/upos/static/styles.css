@@ -9257,16 +9257,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--primary) 11%, var(--card));
 }
 
-.sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
-  background: color-mix(in srgb, #22c55e 14%, var(--card));
-}
-
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--order td {
   background: color-mix(in srgb, #facc15 19%, var(--card));
-}
-
-.sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale:hover td {
-  background: color-mix(in srgb, #22c55e 21%, var(--card));
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--order:hover td {
@@ -9775,6 +9767,38 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
   font-weight: 700;
+}
+
+.sales-journal-payment-progress {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.sales-journal-payment-progress::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 auto 0 0;
+  width: var(--sales-payment-progress, 0%);
+  border-right: 1px solid color-mix(in srgb, #16a34a 48%, transparent);
+  background: color-mix(in srgb, #22c55e 23%, transparent);
+  content: "";
+  pointer-events: none;
+  transition: width 420ms ease;
+}
+
+.sales-journal-payment-progress[data-payment-progress="0"]::before {
+  border-right: 0;
+}
+
+.sales-journal-payment-progress[data-payment-progress="100"]::before {
+  background: color-mix(in srgb, #22c55e 30%, transparent);
+}
+
+.sales-journal-payment-progress > span,
+.sales-journal-payment-progress > small {
+  position: relative;
+  z-index: 1;
 }
 
 .sales-journal-total-row td {
