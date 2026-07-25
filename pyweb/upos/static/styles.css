@@ -1392,8 +1392,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .sales-payment-breakdown-row {
-  display: grid;
-  grid-template-columns: minmax(5rem, 0.32fr) minmax(8rem, 1fr) minmax(7rem, 0.75fr);
+  display: flex;
+  justify-content: space-between;
   gap: 0.75rem;
   align-items: center;
   min-height: 1.9rem;
@@ -1412,16 +1412,51 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   white-space: nowrap;
 }
 
-.sales-payment-breakdown-row em {
-  color: var(--foreground);
-  font-style: normal;
-  font-weight: 850;
-  text-align: right;
-}
-
 .sales-payment-breakdown-row--total {
   padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.sales-payment-breakdown-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.sales-payment-breakdown-row--paid,
+.sales-payment-breakdown-row--debt {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.sales-payment-breakdown-row--paid strong {
+  color: #168a43;
+}
+
+.sales-payment-breakdown-row--debt strong {
+  color: #c2410c;
+}
+
+.sales-payment-breakdown-lines {
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.sales-payment-breakdown-row--line {
+  min-height: 1.65rem;
+  padding: 0 0.15rem;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 720px) {
+  .sales-payment-breakdown-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .sales-add-service-btn[hidden] {

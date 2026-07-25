@@ -814,6 +814,16 @@
               <span>Сумма</span>
               <strong data-sales-payment-breakdown-total>0 UZS</strong>
             </div>
+            <div class="sales-payment-breakdown-summary">
+              <div class="sales-payment-breakdown-row sales-payment-breakdown-row--paid">
+                <span>Оплачено</span>
+                <strong data-sales-payment-breakdown-paid>0 UZS</strong>
+              </div>
+              <div class="sales-payment-breakdown-row sales-payment-breakdown-row--debt">
+                <span>Остаток долга</span>
+                <strong data-sales-payment-breakdown-debt>0 UZS</strong>
+              </div>
+            </div>
             <div class="sales-payment-breakdown-lines" data-sales-payment-breakdown-lines></div>
           </div>
 
@@ -1023,5 +1033,5 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=14" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=53" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=54" defer></script>
 {% endblock %}

@@ -1774,12 +1774,16 @@
     return String((select && select.value) || (root ? selectedCurrency(root) : "UZS") || "UZS").toUpperCase();
   }
 
-  function paymentTotalInCurrency(root, targetCurrency) {
+  function paymentListTotalInCurrency(payments, targetCurrency) {
     var options = readOptions();
-    var target = String(targetCurrency || selectedCurrency(root) || "UZS").toUpperCase();
-    return collectPayments(root).reduce(function (sum, item) {
+    var target = String(targetCurrency || "UZS").toUpperCase();
+    return (Array.isArray(payments) ? payments : []).reduce(function (sum, item) {
       return sum + convertPrice(item.amount, item.currency || target, target, options);
     }, 0);
+  }
+
+  function paymentTotalInCurrency(root, targetCurrency) {
+    return paymentListTotalInCurrency(collectPayments(root), targetCurrency || selectedCurrency(root));
   }
 
   function convertPaymentLineCurrency(root, row, nextCurrency) {
@@ -1895,26 +1899,29 @@
     var items = Array.isArray(payments) ? payments : parsePaymentLines(root);
     var currency = selectedCurrency(root);
     var total = rowsTotal(root, false);
+    var paid = paymentListTotalInCurrency(items, currency);
+    var debt = Math.max(0, total - paid);
     var totalOutput = box.querySelector("[data-sales-payment-breakdown-total]");
+    var paidOutput = box.querySelector("[data-sales-payment-breakdown-paid]");
+    var debtOutput = box.querySelector("[data-sales-payment-breakdown-debt]");
     var lines = box.querySelector("[data-sales-payment-breakdown-lines]");
     if (totalOutput) totalOutput.textContent = formatMoney(total, currency) + " " + currency;
+    if (paidOutput) paidOutput.textContent = formatMoney(paid, currency) + " " + currency;
+    if (debtOutput) debtOutput.textContent = formatMoney(debt, currency) + " " + currency;
     if (lines) {
       lines.innerHTML = "";
       items.forEach(function (item, index) {
         var amount = numberValue(item.amount);
         if (!amount) return;
         var row = document.createElement("div");
-        row.className = "sales-payment-breakdown-row";
+        row.className = "sales-payment-breakdown-row sales-payment-breakdown-row--line";
         var label = document.createElement("span");
-        label.textContent = index === 0 ? "Оплата" : "";
+        label.textContent = item.account || item.type || "Оплата " + String(index + 1);
         var value = document.createElement("strong");
         var itemCurrency = String(item.currency || currency).toUpperCase();
         value.textContent = formatMoney(amount, itemCurrency) + " " + itemCurrency;
-        var method = document.createElement("em");
-        method.textContent = item.account || item.type || "";
         row.appendChild(label);
         row.appendChild(value);
-        row.appendChild(method);
         lines.appendChild(row);
       });
     }
@@ -1981,7 +1988,9 @@
       if (amount && values.amount) amount.value = formatMoney(numberValue(values.amount), values.currency || selectedCurrency(root));
       row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
     } else {
+      var defaultAccount = row.querySelector("[data-sales-payment-account]");
       var defaultCurrency = row.querySelector("[data-sales-payment-currency]");
+      if (defaultAccount && defaultAccount.options.length) defaultAccount.selectedIndex = 0;
       setPaymentSelect(defaultCurrency, selectedCurrency(root));
       row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
     }
@@ -1989,6 +1998,53 @@
     wirePaymentLine(root, row);
     updatePaymentSummary(root);
     return row;
+  }
+
+  function resetPaymentLine(root, row) {
+    if (!row) return;
+    var amount = row.querySelector("[data-sales-payment-amount]");
+    var account = row.querySelector("[data-sales-payment-account]");
+    var currency = row.querySelector("[data-sales-payment-currency]");
+    if (amount) amount.value = "";
+    if (account && account.options.length) account.selectedIndex = 0;
+    if (currency) {
+      setPaymentSelect(currency, selectedCurrency(root));
+      row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+    }
+  }
+
+  function fillPaymentLine(root, row, values) {
+    if (!row) return;
+    var account = row.querySelector("[data-sales-payment-account]");
+    var currency = row.querySelector("[data-sales-payment-currency]");
+    var amount = row.querySelector("[data-sales-payment-amount]");
+    var paymentCurrencyValue = String((values && values.currency) || selectedCurrency(root)).toUpperCase();
+    setPaymentSelect(account, values ? values.account_id || values.account : "");
+    setPaymentSelect(currency, paymentCurrencyValue);
+    if (amount) {
+      amount.value = values && numberValue(values.amount)
+        ? formatMoney(numberValue(values.amount), paymentCurrencyValue)
+        : "";
+    }
+    row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+  }
+
+  function hydratePaymentRows(root, payments) {
+    var savedPayments = (Array.isArray(payments) ? payments : []).filter(function (item) {
+      return item && numberValue(item.amount);
+    });
+    var first = ensureSingleEmptyPaymentLine(root);
+    removeExtraPaymentLines(root);
+    if (!first) return [];
+    if (!savedPayments.length) {
+      resetPaymentLine(root, first);
+      return [first];
+    }
+    fillPaymentLine(root, first, savedPayments[0]);
+    savedPayments.slice(1).forEach(function (item) {
+      addPaymentLine(root, item);
+    });
+    return paymentRows(root);
   }
 
   function ensureSingleEmptyPaymentLine(root) {
@@ -2006,15 +2062,21 @@
   function openPaymentDialog(root) {
     var dialog = paymentDialog(root);
     if (!dialog) return;
-    removeExtraPaymentLines(root);
-    var first = ensureSingleEmptyPaymentLine(root);
-    var amountInput = first ? first.querySelector("[data-sales-payment-amount]") : null;
-    var currencyInput = first ? first.querySelector("[data-sales-payment-currency]") : null;
+    var savedPayments = parsePaymentLines(root);
+    var rows = hydratePaymentRows(root, savedPayments);
+    var first = rows[0] || ensureSingleEmptyPaymentLine(root);
     var currentPaid = numberValue(root.querySelector("[data-sales-paid-amount]")?.value || "");
     var total = rowsTotal(root, false);
-    if (currencyInput && !currentPaid) setPaymentSelect(currencyInput, selectedCurrency(root));
-    if (first) first.dataset.salesPaymentCurrency = paymentCurrency(first, root);
-    if (amountInput && !currentPaid && total) amountInput.value = formatMoney(total, selectedCurrency(root));
+    var amountInput;
+    if (savedPayments.length) {
+      var extraRow = addPaymentLine(root, null);
+      amountInput = extraRow ? extraRow.querySelector("[data-sales-payment-amount]") : null;
+    } else {
+      amountInput = first ? first.querySelector("[data-sales-payment-amount]") : null;
+      if (first) first.dataset.salesPaymentCurrency = paymentCurrency(first, root);
+      if (amountInput && currentPaid) amountInput.value = formatMoney(currentPaid, selectedCurrency(root));
+      else if (amountInput && total) amountInput.value = formatMoney(total, selectedCurrency(root));
+    }
     updatePaymentSummary(root);
     if (typeof dialog.showModal === "function") {
       try {
@@ -2194,6 +2256,8 @@
     } else {
       restoreSalesDraft(root, options);
     }
+    hydratePaymentRows(root, parsePaymentLines(root));
+    updatePaymentBreakdown(root);
     root.addEventListener("input", function () {
       scheduleSalesDraft(root);
     });
