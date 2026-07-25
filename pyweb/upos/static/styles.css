@@ -6419,23 +6419,49 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: #b91c1c;
 }
 
+.warehouse-purchases-actions-col,
 .warehouse-purchase-row-actions {
   width: 6.5rem;
   min-width: 6.5rem;
+  max-width: 6.5rem;
+}
+
+.warehouse-purchase-row-actions {
   padding-inline: 0.45rem !important;
   text-align: center;
   vertical-align: middle;
   white-space: nowrap;
+}
+
+.warehouse-purchase-row-actions-inner {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.24rem;
 }
 
-.warehouse-purchase-row-actions form {
+.warehouse-purchase-row-actions-inner form {
   display: inline-flex;
   margin: 0;
   line-height: 1;
+}
+
+.warehouse-purchases-table .upos-table-column-control-cell {
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  width: 3rem;
+  min-width: 3rem;
+  max-width: 3rem;
+  padding: 0.3rem !important;
+  background: color-mix(in oklch, var(--card), var(--primary) 6%);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.warehouse-purchases-table thead .upos-table-column-control-cell {
+  z-index: 8;
+  background: var(--products-table-head-bg);
 }
 
 .warehouse-purchase-detail-backdrop {
@@ -6707,13 +6733,16 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .warehouse-purchase-detail-totals td:nth-child(3) {
-  display: grid;
-  gap: 0.25rem;
   text-align: right;
   white-space: nowrap;
 }
 
-.warehouse-purchase-detail-totals td:nth-child(3) span {
+.warehouse-purchase-detail-payment-summary {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.warehouse-purchase-detail-payment-summary span {
   display: flex;
   justify-content: space-between;
   gap: 0.8rem;
