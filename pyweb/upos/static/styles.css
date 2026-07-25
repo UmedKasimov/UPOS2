@@ -6401,22 +6401,16 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin: 0;
 }
 
+.warehouse-purchase-status--draft {
+  border-color: color-mix(in srgb, #64748b 32%, var(--border));
+  background: color-mix(in srgb, #f1f5f9 82%, var(--card));
+  color: #475569;
+}
+
 .warehouse-purchase-status--purchased {
   border-color: color-mix(in srgb, #16a34a 38%, var(--border));
   background: color-mix(in srgb, #dcfce7 72%, var(--card));
   color: #15803d;
-}
-
-.warehouse-purchase-status--partial_return {
-  border-color: color-mix(in srgb, #d97706 38%, var(--border));
-  background: color-mix(in srgb, #fef3c7 76%, var(--card));
-  color: #b45309;
-}
-
-.warehouse-purchase-status--returned {
-  border-color: color-mix(in srgb, #dc2626 38%, var(--border));
-  background: color-mix(in srgb, #fee2e2 76%, var(--card));
-  color: #b91c1c;
 }
 
 .warehouse-purchases-actions-col,

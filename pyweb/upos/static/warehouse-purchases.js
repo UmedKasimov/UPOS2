@@ -1479,10 +1479,10 @@
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
     const lines = Array.isArray(purchase.lines) ? purchase.lines : [];
     setText(panel, "[data-purchase-detail-title]", `Закупка: ${purchase.number || "-"}`);
-    setText(panel, "[data-purchase-detail-date]", purchase.date ? `${purchase.date} · ${purchase.status_label || "Заказан"}` : purchase.status_label || "Заказан");
+    setText(panel, "[data-purchase-detail-date]", purchase.date ? `${purchase.date} · ${purchase.status_label || "Заказ"}` : purchase.status_label || "Заказ");
     setText(panel, "[data-purchase-detail-supplier]", purchase.supplier || "Поставщик не указан");
     setText(panel, "[data-purchase-detail-warehouse]", purchase.warehouse || "Основной склад");
-    setText(panel, "[data-purchase-detail-status]", purchase.status_label || "Заказан");
+    setText(panel, "[data-purchase-detail-status]", purchase.status_label || "Заказ");
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-detail-debt]", moneyWithCurrency(purchase.debt_amount, currency));
     setText(panel, "[data-purchase-detail-total]", moneyWithCurrency(purchase.amount, currency));

@@ -310,10 +310,9 @@
                     data-purchase-status-select
                     data-purchase-id="{{ doc.id }}"
                   >
-                    <option value="ordered" {% if doc.status == "ordered" %}selected{% endif %}>Заказан</option>
-                    <option value="purchased" {% if doc.status == "purchased" %}selected{% endif %}>Куплен</option>
-                    <option value="partial_return" {% if doc.status == "partial_return" %}selected{% endif %}>Ч/возврат</option>
-                    <option value="returned" {% if doc.status == "returned" %}selected{% endif %}>Возврат</option>
+                    <option value="ordered" {% if doc.status == "ordered" %}selected{% endif %}>Заказ</option>
+                    <option value="draft" {% if doc.status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="purchased" {% if doc.status == "purchased" %}selected{% endif %}>Завершён</option>
                   </select>
                 </form>
               </td>

@@ -7213,14 +7213,21 @@ def create_app() -> FastAPI:
         return RedirectResponse(url=f"/sales?msg=paid&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
 
     _PURCHASE_WORKFLOW_STATUSES = {
-        "ordered": "Заказан",
-        "purchased": "Куплен",
-        "partial_return": "Ч/возврат",
-        "returned": "Возврат",
+        "draft": "Черновик",
+        "ordered": "Заказ",
+        "purchased": "Завершён",
+    }
+
+    # Historical purchase records may still use return-specific workflow values.
+    # Those states are now shown as a completed purchase without rewriting data.
+    _PURCHASE_WORKFLOW_STATUS_ALIASES = {
+        "partial_return": "purchased",
+        "returned": "purchased",
     }
 
     def _purchase_workflow_status(status: str) -> str:
         clean_status = str(status or "").strip().lower()
+        clean_status = _PURCHASE_WORKFLOW_STATUS_ALIASES.get(clean_status, clean_status)
         if clean_status in _PURCHASE_WORKFLOW_STATUSES:
             return clean_status
         if clean_status in {"paid", "partial", "debt"}:
@@ -8443,9 +8450,6 @@ def create_app() -> FastAPI:
                 workflow_status = _purchase_workflow_status(
                     str(old_data.get("workflow_status") or old_data.get("status") or "ordered")
                 )
-                if workflow_status in {"partial_return", "returned"}:
-                    raise ValueError("Сначала верните документ из возврата в статус «Куплен»")
-
                 supplier_row = _ensure_counterparty(
                     session,
                     workspace_owner_id,
@@ -8532,10 +8536,9 @@ def create_app() -> FastAPI:
         if clean_status != str(next_status or "").strip().lower():
             return RedirectResponse(url=f"{base_url}?error=" + quote("Неизвестный статус закупки") + "#purchases", status_code=302)
         allowed_transitions = {
-            "ordered": {"ordered", "purchased"},
-            "purchased": {"ordered", "purchased", "partial_return", "returned"},
-            "partial_return": {"purchased", "partial_return", "returned"},
-            "returned": {"purchased", "returned"},
+            "draft": {"draft", "ordered", "purchased"},
+            "ordered": {"draft", "ordered", "purchased"},
+            "purchased": {"draft", "ordered", "purchased"},
         }
         with session_scope() as session:
             row = session.get(PurchaseDocument, purchase_id)
@@ -8588,9 +8591,9 @@ def create_app() -> FastAPI:
                     url=f"{base_url}?error=" + quote("Удаление запрещено: у закупки есть оплаты. Сначала удалите связанные оплаты.") + "#purchases",
                     status_code=302,
                 )
-            if workflow_status != "ordered":
+            if workflow_status not in {"draft", "ordered"}:
                 return RedirectResponse(
-                    url=f"{base_url}?error=" + quote("Удаление запрещено: документ уже прошёл этапы. Сначала верните статус «Заказан».") + "#purchases",
+                    url=f"{base_url}?error=" + quote("Удаление запрещено: документ уже завершён. Сначала переведите его в статус «Черновик» или «Заказ».") + "#purchases",
                     status_code=302,
                 )
             try:
