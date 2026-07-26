@@ -539,6 +539,67 @@
     button.textContent = canPay ? "Оплатить " + moneyWithCurrency(debt, sale.currency || "UZS") : "Оплачено";
   }
 
+  function renderSalesPayments(panel, sale) {
+    var paymentList = panel.querySelector("[data-sales-payment-list]");
+    var paymentLinesRoot = panel.querySelector("[data-sales-payment-lines]");
+    if (!paymentList || !paymentLinesRoot) return;
+
+    var currency = String(sale.currency || "UZS").toUpperCase();
+    var paymentLines = (Array.isArray(sale.payment_lines) ? sale.payment_lines : [])
+      .filter(function (payment) {
+        return amountNumber(payment && payment.amount) > 0;
+      })
+      .map(function (payment) {
+        return {
+          account: String(payment.account || payment.type || "Оплата").trim() || "Оплата",
+          type: String(payment.type || payment.account || "Оплата").trim() || "Оплата",
+          amount: payment.amount,
+          currency: String(payment.currency || currency).toUpperCase(),
+        };
+      });
+
+    var paidAmount = amountNumber(sale.paid_amount || sale.paid_value);
+    if (!paymentLines.length && paidAmount > 0) {
+      paymentLines.push({
+        account: String(sale.payment_type || "Оплата").trim() || "Оплата",
+        type: String(sale.payment_type || "Оплата").trim() || "Оплата",
+        amount: paidAmount,
+        currency: currency,
+      });
+    }
+
+    paymentLinesRoot.replaceChildren();
+    paymentList.hidden = paymentLines.length === 0;
+    paymentLines.forEach(function (payment, index) {
+      var row = document.createElement("tr");
+      [index + 1, payment.account, payment.type].forEach(function (value) {
+        var cell = document.createElement("td");
+        cell.textContent = String(value);
+        row.append(cell);
+      });
+      var amountCell = document.createElement("td");
+      var amount = document.createElement("strong");
+      amount.textContent = moneyWithCurrency(payment.amount, payment.currency);
+      amountCell.append(amount);
+      row.append(amountCell);
+      paymentLinesRoot.append(row);
+    });
+  }
+
+  function renderSalesPaymentSummary(panel, sale) {
+    var summary = panel.querySelector("[data-sales-payment-summary]");
+    if (!summary) return;
+
+    var currency = String(sale.currency || "UZS").toUpperCase();
+    var total = amountNumber(sale.amount || sale.amount_value);
+    var paid = amountNumber(sale.paid_amount || sale.paid_value);
+    var debt = Math.max(0, amountNumber(sale.debt_amount || sale.debt_value));
+    setText(summary, "[data-sales-payment-total]", moneyWithCurrency(total, currency));
+    setText(summary, "[data-sales-payment-paid]", moneyWithCurrency(paid, currency));
+    setText(summary, "[data-sales-payment-debt]", moneyWithCurrency(debt, currency));
+    summary.dataset.paymentState = debt > 0 ? (paid > 0 ? "partial" : "debt") : "paid";
+  }
+
   function renderDetail(panel, sale) {
     var currency = sale.currency || "UZS";
     var dateText = sale.date_label || sale.date || "";
@@ -551,18 +612,13 @@
     setText(panel, "[data-sales-detail-paid]", moneyWithCurrency(sale.paid_amount, currency));
     setText(panel, "[data-sales-detail-debt]", moneyWithCurrency(sale.debt_amount, currency));
     setText(panel, "[data-sales-detail-total]", moneyWithCurrency(sale.amount, currency));
-    setText(panel, "[data-sales-payment-total]", moneyWithCurrency(sale.amount, currency));
-    setText(panel, "[data-sales-payment-paid]", moneyWithCurrency(sale.paid_amount, currency));
-    setText(panel, "[data-sales-payment-debt]", moneyWithCurrency(sale.debt_amount, currency));
-    setText(panel, "[data-sales-payment-status]", sale.status_label || "Новый");
-    setText(panel, "[data-sales-payment-type]", sale.payment_type || "Не указано");
-    setText(panel, "[data-sales-payment-date]", sale.date_label || sale.date || "-");
-    setText(panel, "[data-sales-payment-client]", sale.client || "Клиент не указан");
     setText(panel, "[data-sales-detail-note]", sale.note || "Комментарий не указан");
     var paymentPane = panel.querySelector('[data-sales-detail-pane="payment"]');
     if (paymentPane) {
       paymentPane.dataset.paymentState = amountNumber(sale.debt_amount || sale.debt_value) > 0 ? "debt" : "paid";
     }
+    renderSalesPayments(panel, sale);
+    renderSalesPaymentSummary(panel, sale);
     updatePaymentButton(panel, sale);
     updateReturnButton(panel, sale);
     renderLines(panel, sale);

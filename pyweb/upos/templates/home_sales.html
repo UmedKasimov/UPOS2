@@ -477,32 +477,33 @@
             </div>
           </section>
           <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-sales-detail-pane="payment" hidden>
-            <div class="warehouse-purchase-detail-table-wrap">
-              <table class="warehouse-purchase-detail-table sales-document-detail-table sales-document-payment-table">
+            <div class="warehouse-purchase-detail-table-wrap" data-sales-payment-list hidden>
+              <table class="warehouse-purchase-detail-table purchase-document-payment-table sales-document-payment-table">
                 <thead>
                   <tr>
-                    <th>Итого продажи</th>
-                    <th>Оплачено</th>
-                    <th>Осталось оплатить</th>
-                    <th>Статус</th>
+                    <th>№</th>
+                    <th>Счёт</th>
                     <th>Тип оплаты</th>
-                    <th>Дата продажи</th>
-                    <th>Клиент</th>
+                    <th>Сумма</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <td><strong data-sales-payment-total></strong></td>
-                    <td><strong data-sales-payment-paid></strong></td>
-                    <td><strong data-sales-payment-debt></strong></td>
-                    <td data-sales-payment-status></td>
-                    <td data-sales-payment-type></td>
-                    <td data-sales-payment-date></td>
-                    <td data-sales-payment-client></td>
-                  </tr>
-                </tbody>
+                <tbody data-sales-payment-lines></tbody>
               </table>
             </div>
+            <section class="purchase-document-payment-summary sales-document-payment-summary" data-sales-payment-summary aria-label="Сводка по оплате">
+              <div class="purchase-document-payment-summary-item">
+                <span>Сумма продажи</span>
+                <strong data-sales-payment-total>0 UZS</strong>
+              </div>
+              <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--paid">
+                <span>Оплачено</span>
+                <strong data-sales-payment-paid>0 UZS</strong>
+              </div>
+              <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--debt">
+                <span>Остаток долга</span>
+                <strong data-sales-payment-debt>0 UZS</strong>
+              </div>
+            </section>
             <form class="document-detail-payment-actions" method="post" action="" data-sales-payment-form data-sales-payment-url-template="{{ url_for('sales_pay', sale_id='__sale_id__') }}" hidden>
               {% include "_csrf_field.html" %}
               <button class="btn document-detail-payment-pay-btn" type="button" data-sales-payment-pay>Оплатить</button>

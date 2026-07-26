@@ -6011,6 +6011,11 @@ def create_app() -> FastAPI:
             "debt_value": str(debt_amount if debt_amount > 0 else 0),
             "payment_progress": payment_progress,
             "payment_type": str(data.get("payment_type") or ""),
+            "payment_lines": [
+                dict(payment)
+                for payment in (data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else [])
+                if isinstance(payment, dict)
+            ],
             "status": status,
             "status_label": _sales_status_label(status),
             "manager": str(data.get("manager") or ""),

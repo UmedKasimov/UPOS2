@@ -1474,6 +1474,20 @@
     });
   }
 
+  function renderPurchasePaymentSummary(panel, purchase) {
+    const summary = panel.querySelector("[data-purchase-payment-summary]");
+    if (!summary) return;
+
+    const currency = String(purchase.currency || "UZS").toUpperCase();
+    const total = purchaseEntryNumber(purchase.amount);
+    const paid = purchaseEntryNumber(purchase.paid_amount);
+    const debt = Math.max(0, purchaseEntryNumber(purchase.debt_amount));
+    setText(summary, "[data-purchase-payment-total]", moneyWithCurrency(total, currency));
+    setText(summary, "[data-purchase-payment-paid]", moneyWithCurrency(paid, currency));
+    setText(summary, "[data-purchase-payment-debt]", moneyWithCurrency(debt, currency));
+    summary.dataset.paymentState = debt > 0 ? (paid > 0 ? "partial" : "debt") : "paid";
+  }
+
   function renderDetail(panel, purchase) {
     const currency = purchase.currency || "UZS";
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
@@ -1490,6 +1504,7 @@
     const paymentPane = panel.querySelector('[data-purchase-detail-pane="payment"]');
     if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
     renderPurchasePayments(panel, purchase);
+    renderPurchasePaymentSummary(panel, purchase);
     updatePurchasePaymentButton(panel, purchase);
     setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
     setText(

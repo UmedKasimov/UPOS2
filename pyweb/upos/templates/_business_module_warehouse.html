@@ -479,6 +479,20 @@
             <tbody data-purchase-payment-lines></tbody>
           </table>
         </div>
+        <section class="purchase-document-payment-summary" data-purchase-payment-summary aria-label="Сводка по оплате">
+          <div class="purchase-document-payment-summary-item">
+            <span>Сумма закупки</span>
+            <strong data-purchase-payment-total>0 UZS</strong>
+          </div>
+          <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--paid">
+            <span>Оплачено</span>
+            <strong data-purchase-payment-paid>0 UZS</strong>
+          </div>
+          <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--debt">
+            <span>Остаток долга</span>
+            <strong data-purchase-payment-debt>0 UZS</strong>
+          </div>
+        </section>
         <form class="document-detail-payment-actions" method="post" action="" data-purchase-payment-form data-purchase-payment-url-template="{{ url_for('warehouse_purchase_pay', purchase_id='__purchase_id__') }}" hidden>
           {% include "_csrf_field.html" %}
           <button class="btn document-detail-payment-pay-btn" type="button" data-purchase-payment-pay>Оплатить</button>
