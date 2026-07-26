@@ -1593,6 +1593,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0.2rem 0;
 }
 
+/* .products-catalog-filter реюзается вне .products-panel-head (например, журнал продаж
+   внутри .workspace-module-stack), где именованной grid-области "filters" нет — без сброса
+   браузер создаёт фантомную колонку/строку и уводит фильтр из потока. */
+.workspace-module-stack > .products-catalog-filter {
+  grid-area: auto;
+}
+
 .products-catalog-filter label {
   position: relative;
   display: block;
