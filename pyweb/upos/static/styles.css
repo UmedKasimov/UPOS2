@@ -1645,6 +1645,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0.2rem 0;
 }
 
+/* У поставщиков полей меньше, чем в каталоге товаров: без своей сетки они жались
+   к левому краю, оставляя половину строки пустой. */
+.suppliers-filter-form {
+  grid-template-columns:
+    minmax(13rem, 1.6fr)
+    minmax(8rem, 1fr)
+    minmax(8rem, 1fr)
+    auto
+    2.2rem;
+}
+
 /* .products-catalog-filter реюзается вне .products-panel-head (например, журнал продаж
    внутри .workspace-module-stack), где именованной grid-области "filters" нет — без сброса
    браузер создаёт фантомную строку/колонку по имени "filters" и уводит фильтр из потока. */
