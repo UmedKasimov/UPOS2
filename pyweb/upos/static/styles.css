@@ -6779,6 +6779,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-size: var(--text-xs);
 }
 
+.warehouse-purchase-detail-payment-summary .warehouse-purchase-detail-payment-debt strong {
+  color: var(--danger, oklch(0.58 0.18 25));
+}
+
 .warehouse-purchase-detail-totals td:nth-child(3) strong,
 .warehouse-purchase-detail-totals td:last-child strong {
   color: var(--foreground);
