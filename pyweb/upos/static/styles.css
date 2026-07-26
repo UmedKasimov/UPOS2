@@ -1658,7 +1658,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 0;
 }
 
-.products-catalog-filter label > span {
+/* Прячем текстовую подпись поля, оставляя её скринридерам. :not() нужен для
+   date-range-picker: он вставляет свой виджет тоже прямым <span> внутри label,
+   и без исключения тот схлопывался бы до 1px вместе с подписями. */
+.products-catalog-filter label > span:not(.upos-date-auto) {
   position: absolute;
   width: 1px;
   height: 1px;
