@@ -71,43 +71,69 @@
       </form>
     </header>
     <div class="products-table-wrap suppliers-table-wrap">
-      <table class="products-table products-catalog-table suppliers-table" data-upos-column-controls>
+      <table id="suppliers-directory-table" class="products-table products-catalog-table clients-table suppliers-table" data-upos-column-controls>
         <thead>
           <tr>
+            <th><input type="checkbox" aria-label="Выбрать всех поставщиков" /></th>
+            <th>ИД</th>
             <th>Название</th>
+            <th>Официальное название</th>
             <th>Баланс</th>
             <th>Последний документ</th>
             <th>Телефон</th>
             <th>Категория</th>
+            <th>ИНН</th>
+            <th>Адрес</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for supplier in supplier_records %}
+            {% set supplier_tab_href = url_for('suppliers_get') ~ '?supplier=' ~ supplier.id %}
             <tr>
-              {% set supplier_tab_href = url_for('suppliers_get') ~ '?supplier=' ~ supplier.id %}
+              <td class="products-check-col"><input type="checkbox" value="{{ supplier.id }}" aria-label="Выбрать {{ supplier.name }}" /></td>
+              <td><span class="client-id-badge">#{{ loop.index }}</span></td>
               <td>
                 <a
-                  class="client-open-link product-cell-meta"
+                  class="client-open-link product-cell-main product-cell-meta"
                   href="{{ supplier_tab_href }}#supplier-card"
+                  data-workspace-trigger="profile"
+                  data-workspace-tab-id="supplier-{{ supplier.id }}"
+                  data-workspace-view-id="profile"
+                  data-workspace-tab-title="{{ supplier.name }}"
+                  data-workspace-tab-hash="supplier-card"
+                  data-workspace-tab-href="{{ supplier_tab_href }}"
                 >
                   <strong>{{ supplier.name }}</strong>
-                  <small>{{ supplier.official_name or supplier.category or "Поставщик" }}</small>
+                  <small>{{ supplier.category or "Без категории" }}</small>
                 </a>
               </td>
-              <td>{{ supplier.balance }} UZS</td>
+              <td>{{ supplier.official_name or "-" }}</td>
+              <td>
+                <span class="client-balance-pill client-balance-pill--{{ supplier.balance_kind }}">{{ supplier.balance_abs }} UZS</span>
+                {# balance_note написан со стороны клиента («Нам должны»), а по закупкам
+                   долг обратный — должны мы поставщику. #}
+                <small>
+                  {%- if supplier.balance_kind == 'debt' -%}Мы должны
+                  {%- elif supplier.balance_kind == 'advance' -%}Аванс поставщику
+                  {%- else -%}Нет долга
+                  {%- endif -%}
+                </small>
+              </td>
               <td>{{ supplier.last_date or "-" }}</td>
               <td>{{ supplier.phone or "-" }}</td>
               <td>{{ supplier.category or "-" }}</td>
+              <td>{{ supplier.inn or "-" }}</td>
+              <td>{{ supplier.address or "-" }}</td>
               <td class="products-row-actions">
                 <form method="post" action="{{ url_for('suppliers_delete', counterparty_id=supplier.id) }}">
                   {% include "_csrf_field.html" %}
-                  <button type="submit">Удалить</button>
+                  <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить {{ supplier.name }}" aria-label="Удалить {{ supplier.name }}">🗑</button>
                 </form>
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="6">Поставщики пока не добавлены.</td></tr>
+            <tr><td colspan="11">Поставщики пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
       </table>

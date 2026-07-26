@@ -8283,6 +8283,8 @@ def create_app() -> FastAPI:
         balance_by_name: dict[str, Decimal],
         last_date_by_id: dict[str, str],
         last_date_by_name: dict[str, str],
+        balance_currency_by_id: dict[str, dict[str, Decimal]] | None = None,
+        balance_currency_by_name: dict[str, dict[str, Decimal]] | None = None,
     ) -> dict[str, Any] | None:
         row = session.get(Counterparty, supplier_id)
         if not row or row.workspace_owner_id != workspace_owner_id:
@@ -8296,6 +8298,8 @@ def create_app() -> FastAPI:
             balance_by_name=balance_by_name,
             last_date_by_id=last_date_by_id,
             last_date_by_name=last_date_by_name,
+            balance_currency_by_id=balance_currency_by_id,
+            balance_currency_by_name=balance_currency_by_name,
         )
         names = {
             str(supplier.get("name") or "").strip().lower(),
