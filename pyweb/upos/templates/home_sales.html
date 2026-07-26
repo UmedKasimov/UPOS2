@@ -119,6 +119,11 @@
         <input name="client" list="sales-client-list" value="{{ sales_filters.client }}" />
       </label>
       <label>
+        <span>Дата</span>
+        <input name="date_from" type="date" value="{{ sales_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" aria-label="Дата продажи от и до" />
+        <input name="date_to" type="hidden" value="{{ sales_filters.date_to }}" />
+      </label>
+      <label>
         <span>Статус</span>
         <select name="status">
           <option value="all" {% if sales_filters.status == 'all' %}selected{% endif %}>Все</option>

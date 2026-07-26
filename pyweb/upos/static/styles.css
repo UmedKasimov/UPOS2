@@ -9332,10 +9332,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-journal-filter {
   grid-area: auto;
   grid-template-columns:
-    minmax(14rem, 1.5fr)
-    minmax(8rem, 0.72fr)
-    minmax(11rem, 1fr)
-    minmax(8rem, 0.72fr)
+    minmax(12rem, 1.35fr)
+    minmax(7.5rem, 0.7fr)
+    minmax(9.5rem, 0.95fr)
+    minmax(9.5rem, 0.8fr)
+    minmax(7.5rem, 0.7fr)
     minmax(6.5rem, auto)
     minmax(6.5rem, auto);
   margin-bottom: 0.85rem;

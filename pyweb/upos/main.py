@@ -6637,6 +6637,8 @@ def create_app() -> FastAPI:
         doc_type: str = "all",
         status: str = "all",
         client: str = "",
+        date_from: str = "",
+        date_to: str = "",
         crm_record_id: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
@@ -6644,11 +6646,17 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         q_clean = q.strip().lower()
+        date_from_clean = date_from.strip()
+        date_to_clean = date_to.strip()
+        if date_from_clean and date_to_clean and date_from_clean > date_to_clean:
+            date_from_clean, date_to_clean = date_to_clean, date_from_clean
         filters = {
             "q": q.strip(),
             "doc_type": doc_type.strip() or "all",
             "status": status.strip() or "all",
             "client": client.strip(),
+            "date_from": date_from_clean,
+            "date_to": date_to_clean,
         }
         sales: list[dict[str, Any]] = []
         product_names: list[str] = []
@@ -6692,6 +6700,11 @@ def create_app() -> FastAPI:
                 elif filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
+                    continue
+                item_date = str(item.get("date") or "").strip()
+                if filters["date_from"] and (not item_date or item_date < filters["date_from"]):
+                    continue
+                if filters["date_to"] and (not item_date or item_date > filters["date_to"]):
                     continue
                 hay = " ".join([item["number"], item["client"], item["warehouse"], item["status_label"], item["doc_type_label"]]).lower()
                 if q_clean and q_clean not in hay:
