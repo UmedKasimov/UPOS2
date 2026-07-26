@@ -93,7 +93,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   padding: 0.35rem 0.65rem;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -134,7 +134,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   align-items: center;
   gap: 0.35rem;
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   color: var(--muted-foreground);
   flex-shrink: 0;
 }
@@ -151,7 +151,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   font: inherit;
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
@@ -163,7 +163,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .btn-secondary.reports-period-apply {
   min-height: 2rem;
   padding: 0.35rem 0.65rem;
-  font-weight: 650;
+  font-weight: 600;
   font-size: var(--text-sm);
   flex-shrink: 0;
 }
@@ -365,7 +365,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-panel {
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 13px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 96%), transparent 64%),
     color-mix(in oklch, var(--card), var(--primary) 2%);
@@ -468,7 +468,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-currency-line {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .reports-analysis-grid {
@@ -485,7 +485,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-flow {
   min-width: 0;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 18%), transparent 62%),
     var(--card);
@@ -530,7 +530,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   margin-top: 0.16rem;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .reports-category-list {
@@ -560,7 +560,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-category-main span {
   min-width: 0;
   color: var(--foreground);
-  font-weight: 750;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -573,7 +573,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-category-meta {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .reports-bar-track {
@@ -631,7 +631,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   background: var(--card);
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .reports-balance-total b {
@@ -667,7 +667,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 780;
+  font-weight: 800;
   letter-spacing: 0;
   padding: 0.38rem 0.68rem;
 }
@@ -709,7 +709,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-balance-total span {
   color: var(--primary);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -717,7 +717,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-balance-total strong {
   color: var(--foreground);
   font-size: var(--text-xl);
-  font-weight: 840;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
   line-height: 1.08;
 }
@@ -725,7 +725,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-balance-total small {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .reports-courier-balance-total div {
@@ -744,7 +744,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   background: color-mix(in oklch, var(--muted), transparent 72%);
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 760;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -781,7 +781,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   display: block;
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 820;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
@@ -810,7 +810,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-style: normal;
-  font-weight: 760;
+  font-weight: 800;
 }
 
 .reports-courier-balance-bar em {
@@ -885,7 +885,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   gap: 0.55rem;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 740;
+  font-weight: 700;
 }
 
 .reports-courier-stack-legend span {
@@ -926,7 +926,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   border-radius: 999px;
   background: color-mix(in oklch, var(--primary), transparent 86%);
   color: var(--primary);
-  font-weight: 820;
+  font-weight: 800;
 }
 
 .reports-courier-rank-bar {
@@ -949,7 +949,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-share-card strong {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 820;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
@@ -957,7 +957,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
   font-style: normal;
-  font-weight: 760;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -994,7 +994,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-share-ring span {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 840;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -1041,7 +1041,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-limit-toolbar strong {
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 840;
+  font-weight: 800;
 }
 
 .reports-courier-limit-toolbar span,
@@ -1049,7 +1049,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-style: normal;
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .reports-courier-limit-grid {
@@ -1088,7 +1088,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-limit-card small {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .reports-courier-limit-ring {
@@ -1112,7 +1112,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-limit-ring span {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 840;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -1148,7 +1148,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   gap: 0.25rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -1156,7 +1156,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-courier-limit-values b {
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 840;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
   text-transform: none;
 }
@@ -1170,7 +1170,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   color: var(--foreground);
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
   padding: 0.45rem 0.6rem;
 }
@@ -1233,7 +1233,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   margin-top: 0.18rem;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .reports-account-note {
@@ -1280,7 +1280,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   overflow: hidden;
   background: var(--card);
   font-size: var(--text-sm);
@@ -1333,7 +1333,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-stock-filterbar button {
   min-height: 2.55rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--muted-foreground);
   cursor: pointer;
@@ -1349,7 +1349,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-stock-analysis-table {
   min-width: 74rem;
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
 }
 
 .reports-stock-analysis-table th,
@@ -1394,7 +1394,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   bottom: 0;
   background: color-mix(in srgb, var(--muted) 38%, var(--card));
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .reports-stock-product {
@@ -1429,7 +1429,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-stock-product strong {
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -1437,7 +1437,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   margin-top: 0.15rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .reports-stock-thumb {
@@ -1447,7 +1447,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   min-width: 2.35rem;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--primary) 7%, var(--card));
   overflow: hidden;
 }
@@ -1474,7 +1474,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-empty-cell {
   color: var(--muted-foreground);
-  font-weight: 650;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -1482,7 +1482,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   padding: 1rem;
   color: var(--muted-foreground);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .reports-empty-state--large {
@@ -1648,7 +1648,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-category-main strong,
 .reports-balance-entry strong {
   font-variant-numeric: tabular-nums lining-nums;
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -1666,7 +1666,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   background: var(--workbench-muted-surface, color-mix(in oklch, var(--muted), transparent 64%));
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -1693,7 +1693,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   color: var(--foreground);
   cursor: pointer;
   font: inherit;
-  font-weight: 760;
+  font-weight: 800;
   letter-spacing: 0;
   padding: 0.28rem 0.42rem;
   text-align: left;
@@ -1721,7 +1721,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   gap: 0.28rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -1892,7 +1892,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   }
 
   .reports-panel {
-    border-radius: 10px;
+    border-radius: var(--workbench-radius-sm, 10px);
   }
 
   .reports-panel-head {
@@ -2130,7 +2130,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-left: 3px solid #2563eb;
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -2192,7 +2192,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   border-radius: 999px;
   background: var(--muted);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 /* Keep inventory and money values readable across every operational report. */
@@ -2211,7 +2211,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-receivables-table td:nth-child(2),
 .reports-stock-analysis-table tfoot td {
   font-size: var(--text-md);
-  font-weight: 850;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -2235,7 +2235,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   display: inline-flex;
   padding: 0.2rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--muted) 55%, var(--card));
 }
 
@@ -2243,13 +2243,13 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   min-width: 3.5rem;
   min-height: 2rem;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .reports-currency-switch button.active {
@@ -2353,7 +2353,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   flex: 0 0 2.25rem;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   cursor: pointer;
@@ -2366,7 +2366,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   background: color-mix(in srgb, var(--primary) 5%, var(--card));
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .reports-stock-history-list {
