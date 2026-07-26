@@ -42,6 +42,8 @@
   {% set module_stack_views = module_views ~ " client_create client_edit clients_map" %}
 {% elif active == "suppliers" and selected_supplier_card %}
   {% set module_stack_views = module_views ~ " profile" %}
+{% elif active == "warehouse" and warehouse_purchase_edit %}
+  {% set module_stack_views = module_views ~ " purchase_edit" %}
 {% else %}
   {% set module_stack_views = module_views %}
 {% endif %}
