@@ -7194,7 +7194,10 @@ def create_app() -> FastAPI:
                         "account_id": "",
                     }
                 )
-            new_payment_lines, payment_amount, payment_type = _document_payment_entries_from_form(form, currency, debt_amount, wid)
+            try:
+                new_payment_lines, payment_amount, payment_type = _document_payment_entries_from_form(form, currency, debt_amount, wid)
+            except ValueError as exc:
+                return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-journal", status_code=302)
             payment_lines.extend(new_payment_lines)
             next_paid_amount = paid_amount + payment_amount
             if next_paid_amount > amount:
@@ -8652,7 +8655,10 @@ def create_app() -> FastAPI:
                         "account_id": "",
                     }
                 )
-            new_payment_lines, payment_amount, payment_type = _document_payment_entries_from_form(form, currency, debt_amount, workspace_owner_id)
+            try:
+                new_payment_lines, payment_amount, payment_type = _document_payment_entries_from_form(form, currency, debt_amount, workspace_owner_id)
+            except ValueError as exc:
+                return RedirectResponse(url=f"{base_url}?error=" + quote(str(exc)) + "#purchases", status_code=302)
             payment_lines.extend(new_payment_lines)
             next_paid_amount = paid_amount + payment_amount
             if next_paid_amount > amount:
