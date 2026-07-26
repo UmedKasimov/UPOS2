@@ -6502,6 +6502,26 @@ def create_app() -> FastAPI:
         for tx_id in tx_ids:
             delete_transaction(workspace_owner_id, str(tx_id))
 
+    def _document_created_at_with_time(workspace_owner_id: str, raw_date: Any) -> str:
+        """Дата документа плюс фактическое время.
+
+        В кассу уходила голая дата «YYYY-MM-DD», и все операции показывали 00:00.
+        Дату оставляем документной — по ней считают периоды и отчёты, — а время
+        берём текущее в часовом поясе воркспейса, чтобы колонка «Дата создания»
+        показывала реальный момент проведения.
+        """
+        value = str(raw_date or "").strip()
+        if not value or "T" in value:
+            return value
+        tz_id = normalize_workspace_timezone(
+            str(load_workspace_settings(workspace_owner_id).get("timezone") or "")
+        )
+        try:
+            now_local = datetime.now(ZoneInfo(tz_id))
+        except Exception:
+            now_local = datetime.now(timezone.utc)
+        return f"{value}T{now_local:%H:%M:%S}"
+
     def _sync_sales_cash_transactions(
         workspace_owner_id: str,
         *,
@@ -6558,7 +6578,7 @@ def create_app() -> FastAPI:
                 "category": "Возврат продажи" if doc_type == "return" else "Продажа",
                 "client": str(data.get("client") or ""),
                 "employee_id": employee_id,
-                "created_at": str(data.get("date") or ""),
+                "created_at": _document_created_at_with_time(workspace_owner_id, data.get("date")),
                 "note": f"{'Возврат' if doc_type == 'return' else 'Продажа'} {sale_number}",
                 "data": {
                     "source": "sales",
