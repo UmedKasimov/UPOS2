@@ -81,7 +81,7 @@
   margin-top: 0.85rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--surface-bg, rgba(0, 0, 0, 0.03));
 }
 
@@ -130,7 +130,7 @@
 
 .tg-section-title {
   font-size: var(--text-md);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .tg-list {
@@ -143,7 +143,7 @@
   min-height: 3.25rem;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--surface-bg, rgba(0, 0, 0, 0.03));
 }
 
@@ -243,7 +243,7 @@
 .tg-hub-name {
   margin: 0;
   font-size: var(--text-md);
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
@@ -430,7 +430,7 @@
 .tg-modal-title {
   margin: 0;
   font-size: var(--text-md);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .tg-modal-sub {
@@ -561,7 +561,7 @@
 
 .tg-pref-label {
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tg-pref-hint {
@@ -573,7 +573,7 @@
 .tg-pref-select {
   min-width: 5.5rem;
   padding: 0.35rem 0.5rem;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--foreground);
@@ -607,7 +607,7 @@
   width: 100%;
   min-height: 2.5rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   color: var(--accent-primary, #2563eb);
   cursor: pointer;
@@ -635,7 +635,7 @@
 
 .tg-rule {
   border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   overflow: hidden;
   background: var(--card);
 }
@@ -644,7 +644,7 @@
   display: grid;
   gap: 0.25rem;
   border: 1px solid color-mix(in oklch, var(--accent-primary, #2563eb), transparent 72%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 93%);
   color: var(--foreground);
   padding: 0.85rem 1rem;
@@ -652,7 +652,7 @@
 
 .tg-report-note strong {
   font-size: var(--text-base);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .tg-report-note span {
@@ -707,7 +707,7 @@
   align-items: center;
   gap: 0.55rem;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tg-route-check input {
@@ -722,13 +722,13 @@
   gap: 0.35rem;
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tg-route-field select {
   min-height: 2.55rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 12%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -741,7 +741,7 @@
   gap: 0.35rem;
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tg-route-template textarea {
@@ -749,7 +749,7 @@
   min-height: 7.5rem;
   resize: vertical;
   border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 12%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -769,7 +769,7 @@
   display: grid;
   gap: 0.9rem;
   border: 1px solid color-mix(in oklch, var(--accent-primary, #2563eb), transparent 72%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 94%);
   padding: 0.95rem 1rem;
 }
@@ -788,7 +788,7 @@
 
 .tg-limit-card-head strong {
   font-size: var(--text-base);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .tg-limit-card-head span {
@@ -814,13 +814,13 @@
   gap: 0.35rem;
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tg-limit-field input {
   min-height: 2.55rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 12%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;

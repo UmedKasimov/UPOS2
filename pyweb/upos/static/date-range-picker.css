@@ -31,7 +31,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
   letter-spacing: 0;
   padding: 0.45rem 0.72rem;
   box-shadow: var(--shadow-sm);
@@ -51,7 +51,7 @@
 .upos-date-summary {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -86,7 +86,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.45rem 0.55rem;
   text-align: left;
 }
@@ -138,7 +138,7 @@
   margin-bottom: 0.55rem;
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
   text-align: center;
 }
 
@@ -154,7 +154,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
   padding: 0.2rem 0.45rem;
 }
@@ -196,7 +196,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -232,7 +232,7 @@
 .upos-date-weekday {
   border-bottom: 1px solid var(--workbench-line, var(--border));
   color: var(--foreground);
-  font-weight: 820;
+  font-weight: 800;
 }
 
 .upos-date-day {
@@ -264,7 +264,7 @@
 .upos-date-day.is-end {
   background: var(--primary);
   color: var(--primary-foreground);
-  font-weight: 820;
+  font-weight: 800;
 }
 
 .upos-date-day.is-start::after,
@@ -297,7 +297,7 @@
 .upos-date-selected {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .upos-date-actions {
@@ -313,7 +313,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
   padding: 0.45rem 0.8rem;
 }
 

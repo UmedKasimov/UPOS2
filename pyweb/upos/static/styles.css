@@ -1,9 +1,9 @@
 /* UPOS FINANCE — дизайн-система в духе прежнего UI (shadcn / legacy globals.css) */
 
 :root {
-  --radius: 0.625rem;
-  --radius-lg: calc(var(--radius) * 1.25);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --radius: 0.7rem;
+  --radius-lg: calc(var(--radius) * 1.3);
+  --radius-xl: calc(var(--radius) * 1.55);
   --brand-navy: #141d2e;
   --brand-box: #2d6cdf;
   --brand-accent: #5eb8ff;
@@ -31,13 +31,13 @@
   --sidebar-border: oklch(0.89 0.015 264);
   --sidebar-ring: oklch(0.52 0.18 258);
 
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.045);
   --shadow-md:
-    0 4px 6px -1px oklch(0 0 0 / 0.07),
-    0 2px 4px -2px oklch(0 0 0 / 0.05);
+    0 6px 16px -4px oklch(0 0 0 / 0.08),
+    0 2px 6px -2px oklch(0 0 0 / 0.05);
   --shadow-lg:
-    0 10px 15px -3px oklch(0 0 0 / 0.08),
-    0 4px 6px -4px oklch(0 0 0 / 0.05);
+    0 16px 32px -8px oklch(0 0 0 / 0.1),
+    0 4px 10px -4px oklch(0 0 0 / 0.06);
   --card-ring: color-mix(in oklch, var(--border), transparent 15%);
 
   /* Form controls: neutral surface + readable text (fixes light-blue autofill etc.) */
@@ -46,13 +46,7 @@
   --control-border: oklch(0.86 0.014 264);
   --control-placeholder: oklch(0.46 0.028 264);
 
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 20px;
-  --text-xl: 24px;
-  --text-2xl: 30px;
+  /* Итоговая шкала --text-* задана ниже, в блоке "Product-wide finance workbench standardization" — она главная и переопределяет эти значения. */
 }
 
 html.dark {
@@ -78,13 +72,13 @@ html.dark {
   --sidebar-accent-foreground: oklch(0.94 0.015 264);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.62 0.16 252);
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.22);
   --shadow-md:
-    0 4px 6px -1px oklch(0 0 0 / 0.35),
-    0 2px 4px -2px oklch(0 0 0 / 0.25);
+    0 6px 16px -4px oklch(0 0 0 / 0.38),
+    0 2px 6px -2px oklch(0 0 0 / 0.26);
   --shadow-lg:
-    0 10px 15px -3px oklch(0 0 0 / 0.4),
-    0 4px 6px -4px oklch(0 0 0 / 0.3);
+    0 16px 32px -8px oklch(0 0 0 / 0.42),
+    0 4px 10px -4px oklch(0 0 0 / 0.3);
   --card-ring: oklch(1 0 0 / 14%);
 
   --control-bg: oklch(0.26 0.036 264);
@@ -1025,7 +1019,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
     0 1px 0 rgb(255 255 255 / 0.72) inset,
     0 0 0 1px rgb(255 255 255 / 0.5);
   font-size: 0.58rem;
-  font-weight: 950;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -1090,7 +1084,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.9rem;
   padding: 0.9rem 1rem;
   border: 1px solid color-mix(in oklch, var(--channel-brand), white 58%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(90deg, color-mix(in oklch, var(--channel-brand-soft), white 15%), var(--card) 62%),
     var(--card);
@@ -1137,7 +1131,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: white;
   box-shadow: 0 12px 24px color-mix(in oklch, var(--channel-brand), transparent 78%);
   font-size: 0.78rem;
-  font-weight: 950;
+  font-weight: 900;
 }
 
 .messenger-channel-overview[data-channel-brand="facebook"] .messenger-channel-overview-mark {
@@ -1164,7 +1158,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-channel-overview-copy p {
   color: var(--channel-brand-strong);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -1188,7 +1182,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 5.25rem;
   padding: 0.55rem 0.7rem;
   border: 1px solid color-mix(in oklch, var(--channel-brand), white 72%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: rgb(255 255 255 / 0.74);
 }
 
@@ -1202,7 +1196,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin-top: 0.18rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .business-module-grid {
@@ -1362,7 +1356,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 1.65rem;
   height: 1.65rem;
   border: 1px solid color-mix(in oklch, #ef4444, transparent 55%);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, #ef4444, white 92%);
   color: #b91c1c;
   font-size: 1rem;
@@ -1385,24 +1379,24 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   align-items: center;
   min-height: 1.9rem;
   color: var(--foreground);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .sales-payment-breakdown-row span {
   color: var(--muted-foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .sales-payment-breakdown-row strong {
   color: var(--brand-box, #2d6cdf);
-  font-weight: 950;
+  font-weight: 900;
   white-space: nowrap;
 }
 
 .sales-payment-breakdown-row em {
   color: var(--foreground);
   font-style: normal;
-  font-weight: 850;
+  font-weight: 800;
   text-align: right;
 }
 
@@ -1455,7 +1449,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .workspace-module-root .business-module-logic,
 .workspace-module-root .business-module-filters {
   border-color: var(--workbench-line);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--card), white 10%), var(--card));
   box-shadow: var(--workspace-module-panel-shadow);
@@ -1568,7 +1562,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 2rem;
   padding: 0.25rem 0.58rem;
   border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--primary) 5%, var(--card));
   color: var(--muted-foreground);
   white-space: nowrap;
@@ -1621,7 +1615,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2.55rem;
   min-height: 2.55rem;
   border: 1px solid color-mix(in srgb, var(--control-border, var(--border)) 84%, #b9c4d3);
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--control-bg, var(--background)), white 5%);
   color: var(--foreground);
   box-shadow:
@@ -1645,7 +1639,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 2.55rem;
   padding: 0.45rem 2rem 0.45rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--control-border, var(--border)) 84%, #b9c4d3);
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--control-bg, var(--background)), white 5%);
   color: var(--foreground);
   box-shadow:
@@ -1700,7 +1694,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow: auto;
   padding: 0.45rem;
   border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 16px 36px rgb(15 23 42 / 0.18);
 }
@@ -1718,7 +1712,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0.32rem 0.38rem;
   border-radius: 4px;
   color: var(--foreground);
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -1818,7 +1812,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   align-items: center;
   justify-content: center;
   height: 2.55rem;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   font-weight: 900;
   line-height: 1;
   text-decoration: none;
@@ -2011,7 +2005,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2rem;
   padding: 0 0.48rem;
   border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font-weight: 800;
@@ -2038,7 +2032,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .products-page-count {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 @media (max-width: 860px) {
@@ -2190,7 +2184,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 2.45rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--control-border, var(--border));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--control-bg, var(--background));
   color: var(--foreground);
   font: inherit;
@@ -2250,7 +2244,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: var(--products-table-head-bg);
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -2348,7 +2342,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-telegram-subscribers,
 .social-telegram-card {
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: linear-gradient(180deg, color-mix(in oklch, var(--card), white 10%), var(--card));
   box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
 }
@@ -2379,7 +2373,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in oklch, var(--muted), transparent 30%);
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .messenger-telegram-token {
@@ -2391,7 +2385,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in oklch, var(--primary), white 90%);
   color: var(--primary);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .messenger-telegram-head [data-variant="ok"],
@@ -2492,7 +2486,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: linear-gradient(180deg, #2ea3f2, #1d74d8);
   color: white;
   font-size: 0.72rem;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .messenger-telegram-chat-main {
@@ -2551,7 +2545,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   align-items: center;
   gap: 0.45rem;
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .messenger-telegram-toggle input {
@@ -2711,7 +2705,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-telegram-settings-grid > *,
 .messenger-workspace-grid > * {
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
 }
@@ -2760,7 +2754,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-radius: 999px;
   background: color-mix(in oklch, var(--primary), white 84%);
   color: var(--primary);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .messenger-dialog-search {
@@ -2770,7 +2764,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-dialog-search span {
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
   color: var(--muted-foreground);
 }
 
@@ -2831,7 +2825,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: linear-gradient(180deg, #2ea3f2, #1d74d8);
   color: white;
   font-size: 0.72rem;
-  font-weight: 850;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -2911,7 +2905,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-dialog-item em {
   font-style: normal;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .messenger-dialog-side {
@@ -2945,7 +2939,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: white;
   cursor: pointer;
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .messenger-dialog-chat-top h3 {
@@ -2959,7 +2953,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin-top: 0.22rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .messenger-thread-presence::before {
@@ -3127,7 +3121,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: min(24rem, calc(100vw - 2rem));
   padding: 1.15rem;
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 24px 70px rgb(15 23 42 / 0.28);
   text-align: center;
@@ -3142,12 +3136,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 2rem;
   height: 2rem;
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   cursor: pointer;
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .messenger-photo-preview {
@@ -3189,7 +3183,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-telegram-settings-grid form > label span {
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
   color: var(--muted-foreground);
 }
 
@@ -3203,7 +3197,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--primary);
   cursor: pointer;
   font: inherit;
-  font-weight: 750;
+  font-weight: 700;
   padding: 0;
 }
 
@@ -3222,7 +3216,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   max-width: min(28rem, calc(100vw - 2rem));
   padding: 0.85rem 0.95rem;
   border: 1px solid color-mix(in oklch, var(--primary), white 55%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: linear-gradient(180deg, color-mix(in oklch, var(--primary), white 88%), var(--card));
   box-shadow: 0 18px 42px rgb(15 23 42 / 0.18);
 }
@@ -3364,7 +3358,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.55rem;
   color: var(--foreground);
   font-size: 1.2rem;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .client-profile-breadcrumb a {
@@ -3387,7 +3381,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: rgba(37, 99, 235, 0.1);
   color: var(--primary);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -3451,7 +3445,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: grid;
   place-items: center;
   height: 8rem;
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: #e5e7eb;
   overflow: hidden;
 }
@@ -3557,7 +3551,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-profile-menu a.active {
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   border-bottom-color: transparent;
   background: var(--primary);
   color: #fff;
@@ -3615,7 +3609,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-card-metrics span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .client-card-metrics strong {
@@ -3708,7 +3702,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-top: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 28%, var(--workbench-line, var(--border)));
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .client-act-total-row td:last-child {
@@ -3761,7 +3755,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in oklch, var(--primary), transparent 90%);
   color: var(--primary);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .client-card-empty {
@@ -3802,7 +3796,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-history-item time {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .client-history-item div {
@@ -3818,7 +3812,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-history-item small {
   justify-self: end;
   white-space: nowrap;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .client-history-item--payment::before {
@@ -3868,7 +3862,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 0;
   padding-block: 0.7rem;
   background: color-mix(in srgb, var(--products-table-blue) 16%, var(--card));
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .clients-total-row td:first-child {
@@ -3915,7 +3909,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
   border-radius: 0.35rem;
   color: var(--primary);
-  font-weight: 850;
+  font-weight: 800;
   background: color-mix(in oklch, var(--primary), transparent 92%);
 }
 
@@ -3926,7 +3920,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 1.5rem;
   padding: 0.18rem 0.55rem;
   border-radius: 999px;
-  font-weight: 850;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -3984,7 +3978,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-location-status {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .client-location-map {
@@ -4115,7 +4109,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: rgba(255, 255, 255, 0.88);
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
   text-align: center;
   box-shadow: 0 0.75rem 1.7rem rgba(37, 99, 235, 0.12);
 }
@@ -4236,7 +4230,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .clients-overview-map .leaflet-popup-content strong {
   margin-bottom: 0.25rem;
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .clients-overview-map .leaflet-popup-content span {
@@ -4295,12 +4289,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .clients-map-list span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .clients-map-list a {
   color: var(--primary);
-  font-weight: 850;
+  font-weight: 800;
   text-decoration: none;
 }
 
@@ -4702,7 +4696,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .warehouse-purchases-board {
   overflow: hidden;
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: var(--workspace-module-panel-shadow);
 }
@@ -4736,7 +4730,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2.35rem;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--muted-foreground);
   cursor: pointer;
@@ -4773,7 +4767,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2.45rem;
   min-height: 2.45rem;
   border: 1px solid color-mix(in srgb, var(--control-border, var(--border)) 84%, #b9c4d3);
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--control-bg, var(--background)), white 5%);
   color: var(--foreground);
   box-shadow:
@@ -4819,7 +4813,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2.45rem;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--primary) 55%, var(--border));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--primary) 8%, var(--card));
   color: var(--primary);
   cursor: pointer;
@@ -4868,7 +4862,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: var(--products-table-head-bg);
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
@@ -4919,7 +4913,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 1.9rem;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 26%, var(--border));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--products-table-blue) 12%, var(--card));
   color: var(--products-table-blue-strong);
   font-weight: 900;
@@ -4960,7 +4954,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 22%, var(--border));
   background: color-mix(in srgb, var(--products-table-blue) 13%, var(--card));
   color: var(--products-table-blue-strong);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .warehouse-purchase-row-actions {
@@ -5031,14 +5025,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .warehouse-purchase-detail-head p {
   margin: 0.18rem 0 0;
   color: var(--muted-foreground);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .warehouse-purchase-detail-head h2 {
   margin: 0;
   color: var(--foreground);
   font-size: 1.12rem;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .warehouse-purchase-detail-actions {
@@ -5061,7 +5055,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 12rem;
   padding: 0.35rem;
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 22%, var(--workbench-line, var(--border)));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
 }
@@ -5073,7 +5067,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-document-detail-menu button {
   width: 100%;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   color: var(--foreground);
   cursor: pointer;
@@ -5111,7 +5105,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 2.25rem;
   height: 2.25rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--muted-foreground);
   cursor: pointer;
@@ -5126,7 +5120,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin: 0.95rem 1rem 0;
   padding: 0.8rem;
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 16%, var(--workbench-line, var(--border)));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--products-table-blue) 5%, var(--card));
 }
 
@@ -5140,7 +5134,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .warehouse-purchase-detail-footer span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -5148,7 +5142,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow: hidden;
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 850;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -5203,7 +5197,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: var(--products-table-head-bg);
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -5252,7 +5246,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-document-detail .warehouse-purchase-detail-table th {
   background: var(--products-table-head-bg, color-mix(in srgb, var(--primary) 12%, var(--card)));
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
-  font-weight: 850;
+  font-weight: 800;
   letter-spacing: 0;
   white-space: nowrap;
 }
@@ -5297,7 +5291,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-document-detail-table td:nth-child(6) {
   color: var(--primary);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .warehouse-purchase-detail-footer {
@@ -5319,7 +5313,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .warehouse-purchase-detail-footer strong {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .warehouse-purchase-detail-total strong {
@@ -5541,7 +5535,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 24px 70px rgb(15 23 42 / 0.28);
 }
@@ -5597,7 +5591,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   max-width: 100%;
   max-height: min(72vh, 40rem);
   object-fit: contain;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
 }
 
 .products-row-actions {
@@ -5682,7 +5676,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .products-dictionary-head p {
   margin: 0.25rem 0 0;
   color: var(--muted-foreground);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .products-dictionary-table {
@@ -5705,7 +5699,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--brand-accent, var(--primary)) 12%, var(--card));
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 18%);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -5750,7 +5744,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   flex-direction: column;
   width: 100%;
   border: 1px solid color-mix(in srgb, var(--brand-box, var(--primary)) 18%, var(--workbench-line, var(--border)));
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   box-shadow: 0 22px 54px rgba(15, 23, 42, 0.22);
@@ -5765,14 +5759,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin: 0 0 0.3rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .products-category-dialog .settings-profile-modal-head h2 {
   margin: 0;
   color: var(--foreground);
   font-size: 1.05rem;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .products-category-dialog .products-bulk-dialog-body,
@@ -5790,7 +5784,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 2.45rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--control-border, var(--border));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -6171,7 +6165,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   place-items: center;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 20%, var(--workbench-line, var(--border)));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 12%, var(--card));
   color: var(--brand-box, #2d6cdf);
   cursor: pointer;
@@ -6245,7 +6239,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: var(--products-table-head-bg);
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -6352,11 +6346,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 2.15rem;
   height: 2.05rem;
   border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 26%, var(--workbench-line, var(--border)));
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
   color: var(--brand-box, #2d6cdf);
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -6375,7 +6369,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   appearance: none;
   padding-inline: 0.35rem;
   color: var(--brand-box, #2d6cdf);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .sales-discount-menu {
@@ -6386,7 +6380,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 9.5rem;
   padding: 0.25rem;
   border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 24%, var(--workbench-line, var(--border)));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 16px 34px rgb(15 23 42 / 0.18);
 }
@@ -6401,11 +6395,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 2.05rem;
   padding: 0.42rem 0.58rem;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   color: var(--foreground);
   font: inherit;
-  font-weight: 780;
+  font-weight: 800;
   text-align: left;
   cursor: pointer;
 }
@@ -6461,11 +6455,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin: 0 0 0.3rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 20%, var(--workbench-line, var(--border)));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 12%, var(--card));
   color: var(--brand-box, #2d6cdf);
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -6571,7 +6565,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-line-category {
   color: var(--muted-foreground);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .sales-line-remove-cell {
@@ -6585,7 +6579,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 1.85rem;
   height: 1.85rem;
   border: 1px solid color-mix(in srgb, #a62626 20%, var(--workbench-line, var(--border)));
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, #a62626 6%, var(--card));
   color: #a62626;
   font: inherit;
@@ -6612,7 +6606,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 18%, var(--workbench-line, var(--border)));
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
   text-transform: uppercase;
   cursor: pointer;
   user-select: none;
@@ -6757,7 +6751,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-top: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 28%, var(--workbench-line, var(--border)));
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -6802,7 +6796,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 1rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
   text-align: right;
   text-decoration: line-through;
@@ -7005,7 +6999,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.25rem;
   padding: 0.55rem 0.65rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -7078,7 +7072,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   margin-bottom: 0.85rem;
   padding: 0.65rem;
   border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--card), white 10%), var(--card));
   box-shadow: var(--workspace-module-panel-shadow);
@@ -7214,7 +7208,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-journal-table td:nth-child(7),
 .sales-journal-table td:nth-child(8) span {
   color: var(--brand-box, #2d6cdf);
-  font-weight: 850;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -7260,7 +7254,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2rem;
   min-width: 2rem;
   min-height: 2rem;
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, #f02d3a 8%, var(--card));
 }
 
@@ -7558,7 +7552,7 @@ html.dark .sidebar-user {
 }
 
 .sidebar-foot .who {
-  font-weight: 650;
+  font-weight: 600;
   font-size: var(--text-base);
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -8649,7 +8643,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   gap: 6px 14px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -8722,7 +8716,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   overflow: auto;
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--background);
   box-shadow: var(--shadow-lg);
 }
@@ -8736,7 +8730,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   margin: -4px 0 10px auto;
   padding: 10px 14px;
   border: 1px solid color-mix(in srgb, #16a34a 44%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, #dcfce7 86%, white);
   color: #14532d;
   font-weight: 800;
@@ -8804,7 +8798,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -8857,7 +8851,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   align-items: center;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -9277,7 +9271,7 @@ html.dark .employees-page-wrap {
 
 .settings-account-showcase-role {
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: color-mix(in oklch, var(--primary), var(--muted-foreground) 15%);
@@ -9350,7 +9344,7 @@ html.dark .employees-page-wrap {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
   padding: 0.55rem 0.9rem;
   border-radius: var(--settings-ios-radius-sm, 0.65rem);
@@ -9680,7 +9674,7 @@ html.dark .employees-page-wrap {
 
 .settings-profile-field-label {
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted-foreground);
@@ -10063,7 +10057,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   align-items: stretch;
   padding: 1.15rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: var(--shadow-sm);
 }
@@ -10110,7 +10104,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   min-height: 2.55rem;
   padding: 0.55rem 0.7rem;
   border: 1px solid color-mix(in oklch, var(--border), transparent 28%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--background), var(--card) 45%);
 }
 
@@ -10126,7 +10120,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   overflow-wrap: anywhere;
   text-align: right;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -10140,7 +10134,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   min-width: 0;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: var(--shadow-sm);
 }
@@ -10183,17 +10177,17 @@ html.dark .settings-tab.settings-tab--rail.active {
 
 .settings-business-panel .settings-ios-select {
   min-height: 2.65rem;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
 }
 
 .settings-business-panel .theme-picker-ios {
   border: 1px solid color-mix(in oklch, var(--border), transparent 25%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--muted), transparent 55%);
 }
 
 .settings-business-panel .theme-picker-ios .theme-chip-face {
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   letter-spacing: 0;
 }
 
@@ -10263,7 +10257,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   height: 1.9rem;
   flex: 0 0 1.9rem;
   border: 1px solid color-mix(in oklch, var(--primary), transparent 76%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--primary), transparent 91%);
   color: var(--primary);
 }
@@ -10276,7 +10270,7 @@ html.dark .settings-tab.settings-tab--rail.active {
 .settings-pref-title {
   min-width: 0;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -10308,7 +10302,7 @@ html.dark .settings-tab.settings-tab--rail.active {
 .settings-compact-select {
   min-height: 2.32rem;
   padding: 0.5rem 2.15rem 0.5rem 0.75rem;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   border-color: color-mix(in oklch, var(--border), transparent 18%);
   background: var(--control-bg);
   color: var(--control-fg);
@@ -10355,7 +10349,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   min-height: 2.32rem;
   padding: 0.5rem 2.15rem 0.5rem 0.72rem;
   border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--control-bg);
   color: var(--control-fg);
   font: inherit;
@@ -10395,7 +10389,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   gap: 0.15rem;
   padding: 0.25rem;
   border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: var(--shadow-md);
 }
@@ -10412,7 +10406,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   min-height: 2.15rem;
   padding: 0.45rem 0.5rem;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -10469,7 +10463,7 @@ html.dark .settings-tab.settings-tab--rail.active {
   min-height: 2.18rem;
   padding: 0.42rem 0.45rem;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -10854,7 +10848,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   margin: 0.15rem 0 0;
   color: var(--foreground);
   font-size: var(--text-lg);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .settings-employees-table-wrap {
@@ -10883,7 +10877,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   color: var(--muted-foreground);
   background: color-mix(in oklch, var(--muted), transparent 55%);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .settings-employees-table tbody tr:last-child td {
@@ -10908,7 +10902,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: color-mix(in oklch, var(--primary), transparent 82%);
   color: var(--primary);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .settings-employee-person strong,
@@ -10919,7 +10913,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .settings-employee-person strong {
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .settings-employee-person small {
@@ -11187,7 +11181,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: color-mix(in oklch, var(--muted), transparent 48%);
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -11292,7 +11286,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .employees-add-btn {
   flex-shrink: 0;
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.5rem 1.1rem;
   border-radius: var(--settings-ios-radius-sm, 0.65rem);
 }
@@ -11375,7 +11369,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 .employee-card-role {
   flex-shrink: 0;
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: color-mix(in oklch, var(--primary), var(--muted-foreground) 15%);
@@ -11424,7 +11418,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: rgba(219, 234, 254, 0.72);
   color: #1e3a8a;
   font-size: var(--text-sm);
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1.2;
   padding: 0.18rem 0.5rem;
 }
@@ -11507,7 +11501,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 .employees-access-account-title {
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .employees-access-check input {
@@ -11616,7 +11610,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .employees-access-check--account:has(input:checked) .employees-access-account-title {
   color: var(--primary);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .employees-access-check--account:has(input:checked) .employees-access-account-title::after {
@@ -11629,7 +11623,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: color-mix(in oklch, var(--primary), transparent 84%);
   color: var(--primary);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
   vertical-align: middle;
 }
@@ -11654,7 +11648,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: color-mix(in oklch, var(--primary), transparent 90%);
   color: color-mix(in oklch, var(--primary), var(--foreground) 22%);
   font-size: var(--text-sm);
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -12316,7 +12310,7 @@ html.dark .organizations-page-wrap {
   margin-top: 0.35rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -12704,7 +12698,7 @@ html.dark .organization-edit-form {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--director-line);
-  border-radius: 13px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 64%),
     var(--card);
@@ -12761,7 +12755,7 @@ html.dark .organization-edit-form {
   min-height: 5.25rem;
   padding: 0.78rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 94%), transparent 56%),
     color-mix(in oklch, var(--card), var(--muted) 5%);
@@ -12869,7 +12863,7 @@ html.dark .organization-edit-form {
 
 .org-balance-table-empty td {
   border-inline: 1px solid color-mix(in oklch, var(--border), transparent 20%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   color: var(--muted-foreground);
   background: color-mix(in oklch, var(--muted), transparent 56%);
   text-align: left;
@@ -12877,19 +12871,19 @@ html.dark .organization-edit-form {
 
 .org-balance-table td.org-balance-table-amount {
   border-inline: 1px solid color-mix(in oklch, var(--primary), transparent 73%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   text-align: right;
 }
 
 .org-balance-table-value {
-  font-weight: 760;
+  font-weight: 800;
 }
 
 .org-balance-table-currency {
   margin-left: 0.28rem;
   color: color-mix(in oklch, var(--foreground), var(--primary) 20%);
   font-size: var(--text-sm);
-  font-weight: 820;
+  font-weight: 800;
 }
 
 .director-org-actions {
@@ -12903,7 +12897,7 @@ html.dark .organization-edit-form {
 .director-nav-card {
   min-width: 0;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 60%),
     color-mix(in oklch, var(--card), var(--muted) 4%);
@@ -12963,11 +12957,11 @@ html.dark .organization-edit-form {
 .organization-edit-form textarea {
   min-height: 2.72rem;
   border-color: color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 88%), transparent),
     color-mix(in oklch, var(--background), var(--primary) 3%);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .director-create-form textarea,
@@ -12981,7 +12975,7 @@ html.dark .organization-edit-form {
   min-width: 8.5rem;
   min-height: 2.72rem;
   margin: 0;
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
 }
 
 .director-nav-card {
@@ -13010,7 +13004,7 @@ html.dark .organization-edit-form {
   width: 2.35rem;
   height: 2.35rem;
   border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   color: var(--primary);
   background: color-mix(in oklch, var(--primary), transparent 90%);
 }
@@ -13024,7 +13018,7 @@ html.dark .organization-edit-form {
 .director-nav-card small {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -13234,7 +13228,7 @@ html.dark .organization-edit-form {
   min-width: 0;
   padding: 0.58rem 0.65rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   background: color-mix(in oklch, var(--background), var(--primary) 3%);
 }
 
@@ -13272,7 +13266,7 @@ html.dark .organization-edit-form {
 
 .director-org-card-actions .btn {
   min-height: 2.28rem;
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   font-weight: 600;
 }
 
@@ -13303,7 +13297,7 @@ html.dark .organization-edit-form {
   width: min(28rem, calc(100vw - 2rem));
   padding: 0.85rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 18%);
-  border-radius: 13px;
+  border-radius: var(--workbench-radius, 14px);
   background: var(--card);
   box-shadow: 0 20px 42px color-mix(in oklch, black, transparent 86%);
 }
@@ -13408,7 +13402,7 @@ html.dark .organization-edit-form {
   gap: 0.45rem;
   min-height: 2.45rem;
   width: 100%;
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   font-weight: 600;
   cursor: pointer;
 }
@@ -13431,7 +13425,7 @@ html.dark .organization-edit-form {
   margin-top: 0.65rem;
   padding: 0.75rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 96%), transparent),
     color-mix(in oklch, var(--card), var(--muted) 4%);
@@ -13454,13 +13448,13 @@ html.dark .organization-edit-form {
 .director-create-panel textarea {
   min-height: 2.55rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--background), var(--primary) 3%);
   color: var(--foreground);
   padding: 0.58rem 0.68rem;
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .director-create-panel textarea {
@@ -13469,7 +13463,7 @@ html.dark .organization-edit-form {
 
 .director-create-panel .btn {
   min-height: 2.55rem;
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   font-weight: 600;
 }
 
@@ -13484,7 +13478,7 @@ html.dark .organization-edit-form {
   min-height: 6rem;
   padding: 0.78rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 56%),
     color-mix(in oklch, var(--card), var(--muted) 4%);
@@ -13577,7 +13571,7 @@ html.dark .organization-edit-form {
   min-width: 0;
   padding: 0.52rem 0.58rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--background), var(--primary) 3%);
 }
 
@@ -13661,7 +13655,7 @@ html.dark .organization-edit-form {
   margin-top: 0.55rem;
   padding: 0.7rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background: color-mix(in oklch, var(--background), var(--primary) 3%);
   box-shadow: none;
 }
@@ -13669,7 +13663,7 @@ html.dark .organization-edit-form {
 .director-org-edit--inline .organization-edit-form .btn {
   justify-self: stretch;
   min-height: 2.38rem;
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   font-weight: 600;
 }
 
@@ -13710,7 +13704,7 @@ html.dark .organization-edit-form {
   gap: 1rem;
   padding: 1.1rem;
   border: 1px solid var(--director-line);
-  border-radius: 13px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 62%),
     var(--card);
@@ -13772,7 +13766,7 @@ html.dark .organization-edit-form {
 .director-currency-form select {
   min-height: 2.55rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   padding: 0.5rem 0.65rem;
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 88%), transparent),
@@ -13799,7 +13793,7 @@ html.dark .organization-edit-form {
   min-height: 5.2rem;
   padding: 0.78rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background:
     linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 58%),
     color-mix(in oklch, var(--card), var(--muted) 4%);
@@ -13838,7 +13832,7 @@ html.dark .organization-edit-form {
   justify-content: center;
   gap: 0.4rem;
   min-height: 2.35rem;
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   font-weight: 600;
 }
 
@@ -13867,7 +13861,7 @@ html.dark .organization-edit-form {
   width: 2.15rem;
   height: 2.15rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   color: var(--primary);
   background: color-mix(in oklch, var(--primary), transparent 92%);
   cursor: pointer;
@@ -13927,7 +13921,7 @@ html.dark .organization-edit-form {
   width: 2.2rem;
   height: 2.2rem;
   border: 1px solid color-mix(in oklch, var(--border), transparent 14%);
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   color: var(--muted-foreground);
   background: color-mix(in oklch, var(--muted), transparent 58%);
   cursor: pointer;
@@ -13955,13 +13949,13 @@ html.dark .organization-edit-form {
   width: 100%;
   min-height: 2.72rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   background: color-mix(in oklch, var(--background), var(--primary) 3%);
   color: var(--foreground);
   padding: 0.62rem 0.72rem;
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .director-modal-form textarea {
@@ -13978,7 +13972,7 @@ html.dark .organization-edit-form {
 
 .director-modal-actions .btn {
   min-height: 2.45rem;
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   font-weight: 600;
 }
 
@@ -14100,7 +14094,7 @@ html.dark .organization-edit-form {
   width: 100%;
   max-width: none;
   padding: 3px;
-  border-radius: 11px;
+  border-radius: var(--workbench-radius, 14px);
   background: color-mix(in oklch, var(--muted), transparent 38%);
 }
 
@@ -14118,7 +14112,7 @@ html.dark .organization-edit-form {
   margin: 0;
   padding: 0.52rem 0.35rem;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: transparent;
   box-shadow: none;
   font-size: var(--text-sm);
@@ -14496,7 +14490,7 @@ body[data-shell="admin"] .sidebar {
 
 .upos-ccy-select-btn-code {
   margin-left: 0.15rem;
-  font-weight: 650;
+  font-weight: 600;
   opacity: 0.88;
 }
 
@@ -14575,7 +14569,7 @@ body[data-shell="admin"] .sidebar {
   margin-left: 0.45rem;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   text-align: right;
 }
 
@@ -14653,7 +14647,7 @@ body[data-shell="admin"] .sidebar {
 .ccy-add-label {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ccy-add-row {
@@ -15046,7 +15040,7 @@ button.settings-cat-icon:hover {
   display: flex;
   background: var(--surface-bg);
   padding: 4px;
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   border: 1px solid var(--border-color);
 }
 
@@ -15054,7 +15048,7 @@ button.settings-cat-icon:hover {
   padding: 6px 16px;
   border: none;
   background: none;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-muted);
@@ -15158,7 +15152,7 @@ button.settings-cat-icon:hover {
   padding: 16px;
   background: var(--surface-bg);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
 }
 
 .balance-item-header {
@@ -15376,18 +15370,18 @@ body:has(dialog[open]) {
   margin: 0;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .settings-fx-rate-card input {
   min-height: 2.35rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 22%, var(--border));
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .settings-fx-rate-card small {
@@ -15556,7 +15550,7 @@ body:has(dialog[open]) {
   flex: 0 0 auto;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .employees-permission-chevron {
@@ -15629,7 +15623,7 @@ body:has(dialog[open]) {
   justify-self: end;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -15827,7 +15821,7 @@ body:has(dialog[open]) {
 .general-management-settings-shell {
   padding: clamp(1rem, 2vw, 1.4rem);
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 13px;
+  border-radius: var(--workbench-radius, 14px);
   background: var(--card);
   box-shadow: 0 14px 30px color-mix(in oklch, black, transparent 95%);
 }
@@ -15871,7 +15865,7 @@ body:has(dialog[open]) {
   gap: 0.9rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: var(--shadow-sm);
 }
@@ -15892,7 +15886,7 @@ body:has(dialog[open]) {
   min-width: 0;
   padding: 0.82rem 0.9rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--background), var(--primary) 3%);
 }
 
@@ -15909,7 +15903,7 @@ body:has(dialog[open]) {
   margin-top: 0.25rem;
   color: var(--foreground);
   font-size: var(--text-xl);
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1.08;
   font-variant-numeric: tabular-nums;
 }
@@ -15937,7 +15931,7 @@ body:has(dialog[open]) {
 .org-ops-table select {
   min-height: 2.32rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -15953,7 +15947,7 @@ body:has(dialog[open]) {
   width: 100%;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -16031,7 +16025,7 @@ body:has(dialog[open]) {
   background: color-mix(in oklch, var(--primary), var(--card) 88%);
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -16073,7 +16067,7 @@ body:has(dialog[open]) {
   box-shadow: none;
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.42rem 0.72rem;
 }
 
@@ -16126,11 +16120,11 @@ body:has(dialog[open]) {
 .org-hr-form textarea {
   min-height: 2.55rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .org-hr-form textarea {
@@ -16148,7 +16142,7 @@ body:has(dialog[open]) {
   min-height: 2.65rem;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--muted) 18%);
   color: var(--foreground);
   font-weight: 800;
@@ -16199,7 +16193,7 @@ body:has(dialog[open]) {
   place-items: center;
   padding: 2rem;
   border: 1px dashed color-mix(in oklch, var(--border), var(--primary) 18%);
-  border-radius: 12px;
+  border-radius: var(--workbench-radius, 14px);
   background: color-mix(in oklch, var(--card), var(--primary) 3%);
   color: var(--muted-foreground);
   text-align: center;
@@ -16218,7 +16212,7 @@ body:has(dialog[open]) {
   width: 100%;
   min-width: 8rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   padding: 0.48rem 0.6rem;
   background: var(--card);
   color: var(--foreground);
@@ -16327,7 +16321,7 @@ body:has(dialog[open]) {
     color-mix(in oklch, var(--primary), transparent 89%);
   color: var(--primary);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -16376,7 +16370,7 @@ body:has(dialog[open]) {
 .org-hr-employee-name-btn:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
 }
 
 .org-hr-salary-name-link {
@@ -16399,7 +16393,7 @@ body:has(dialog[open]) {
 .org-hr-salary-name-link:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
 }
 
 .org-hr-actions-col,
@@ -16415,7 +16409,7 @@ body:has(dialog[open]) {
   width: 2.25rem;
   height: 2.25rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 74%),
     color-mix(in oklch, var(--card), var(--primary) 4%);
@@ -16436,11 +16430,11 @@ body:has(dialog[open]) {
   place-items: center;
   width: 2.8rem;
   height: 2.8rem;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   object-fit: cover;
   background: color-mix(in oklch, var(--primary) 12%, var(--card));
   color: var(--primary);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-modal#hr-employee-card-modal {
@@ -16466,7 +16460,7 @@ body:has(dialog[open]) {
   gap: 0.75rem;
   padding: 0.75rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--muted), transparent 82%);
 }
 
@@ -16481,14 +16475,14 @@ body:has(dialog[open]) {
 .org-hr-card-balance span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
 .org-hr-card-filter input {
   min-height: 2.6rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -16503,7 +16497,7 @@ body:has(dialog[open]) {
 .org-hr-card-filter p {
   margin: 0;
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-card-layout {
@@ -16531,7 +16525,7 @@ body:has(dialog[open]) {
   gap: 0.85rem;
   padding: 0.9rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 10%), transparent 78%),
     color-mix(in oklch, var(--muted), transparent 76%);
@@ -16543,7 +16537,7 @@ body:has(dialog[open]) {
   width: 4.4rem;
   height: 4.4rem;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--primary) 12%, var(--card));
   color: var(--primary);
   font-size: 1.35rem;
@@ -16570,7 +16564,7 @@ body:has(dialog[open]) {
   margin-top: 0.2rem;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .org-hr-card-stats {
@@ -16584,7 +16578,7 @@ body:has(dialog[open]) {
   min-width: 0;
   padding: 0.72rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -16593,7 +16587,7 @@ body:has(dialog[open]) {
   display: block;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 760;
+  font-weight: 800;
 }
 
 .org-hr-card-stats strong,
@@ -16617,7 +16611,7 @@ body:has(dialog[open]) {
   gap: 0.55rem;
   padding: 0.75rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
 }
 
@@ -16649,11 +16643,11 @@ body:has(dialog[open]) {
   margin: 0;
   padding: 0.38rem 0.48rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 8%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--primary) 4%);
   color: var(--foreground);
   font-size: var(--text-xs);
-  font-weight: 920;
+  font-weight: 900;
 }
 
 .org-hr-card-ledger-month-body {
@@ -16669,7 +16663,7 @@ body:has(dialog[open]) {
   align-items: start;
   padding: 0.62rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 8%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--muted), transparent 88%);
 }
 
@@ -16714,13 +16708,13 @@ body:has(dialog[open]) {
   gap: 0.75rem;
   padding: 0.85rem 1rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--muted), transparent 84%);
 }
 
 .org-hr-card-balance strong {
   font-size: 1rem;
-  font-weight: 950;
+  font-weight: 900;
 }
 
 .org-hr-card-balance.is-due strong {
@@ -16738,11 +16732,11 @@ body:has(dialog[open]) {
 .org-hr-card-state {
   padding: 0.65rem 0.8rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--primary), transparent 93%);
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
 }
 
 @media (max-width: 980px) {
@@ -16760,7 +16754,7 @@ body:has(dialog[open]) {
   margin-top: 0.14rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .org-hr-calendar-panel .director-section-head {
@@ -16772,7 +16766,7 @@ body:has(dialog[open]) {
   margin: 0.8rem 0 0.7rem;
   padding: 0.6rem 0.72rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--muted), transparent 78%);
   color: var(--muted-foreground);
   font-size: var(--text-sm);
@@ -16805,7 +16799,7 @@ body:has(dialog[open]) {
   min-width: 2.25rem;
   width: 2.25rem;
   text-align: center;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-calendar-day.is-present {
@@ -16843,7 +16837,7 @@ body:has(dialog[open]) {
   min-height: 2rem;
   padding: 0.38rem 0.7rem;
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -16882,7 +16876,7 @@ body:has(dialog[open]) {
 .org-hr-rollcall-form,
 .org-hr-rollcall-picked {
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 18%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 30%) inset;
 }
@@ -16904,7 +16898,7 @@ body:has(dialog[open]) {
   margin: 0.75rem 0 0.45rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   text-align: center;
 }
 
@@ -16914,11 +16908,11 @@ body:has(dialog[open]) {
   place-items: center;
   min-height: 3.4rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 8%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--primary) 2%);
   color: var(--foreground);
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 button.org-hr-month-day {
@@ -16958,7 +16952,7 @@ button.org-hr-month-day:hover {
   background: #16a34a;
   color: white;
   font-size: 0.72rem;
-  font-weight: 950;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -16974,7 +16968,7 @@ button.org-hr-month-day:hover {
   background: color-mix(in oklch, var(--muted-foreground), white 64%);
   color: white;
   font-size: 0.78rem;
-  font-weight: 950;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -17021,7 +17015,7 @@ button.org-hr-month-day:hover {
   border-radius: 999px;
   background: color-mix(in oklch, var(--muted), transparent 72%);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-rollcall-filters {
@@ -17041,7 +17035,7 @@ button.org-hr-month-day:hover {
   min-width: 0;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -17055,7 +17049,7 @@ button.org-hr-month-day:hover {
   min-height: 2.45rem;
   box-sizing: border-box;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 18%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
 }
@@ -17073,7 +17067,7 @@ button.org-hr-month-day:hover {
   background: transparent;
   color: var(--foreground);
   font: inherit;
-  font-weight: 760;
+  font-weight: 800;
 }
 
 .org-hr-rollcall-searchbox button {
@@ -17109,7 +17103,7 @@ button.org-hr-month-day:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-position-clear-marks {
@@ -17147,7 +17141,7 @@ button.org-hr-month-day:hover {
   width: min(22rem, 86vw);
   padding: 0.45rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 18%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 18px 45px color-mix(in oklch, var(--foreground), transparent 88%);
 }
@@ -17169,10 +17163,10 @@ button.org-hr-month-day:hover {
   gap: 0.6rem;
   min-height: 2.25rem;
   padding: 0.38rem 0.48rem;
-  border-radius: 5px;
+  border-radius: var(--workbench-radius-sm, 10px);
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 780;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -17180,7 +17174,7 @@ button.org-hr-month-day:hover {
   margin-bottom: 0.25rem;
   border-bottom: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
   background: color-mix(in oklch, var(--primary), transparent 94%);
-  font-weight: 930;
+  font-weight: 900;
 }
 
 .org-hr-position-option:hover {
@@ -17325,7 +17319,7 @@ button.org-hr-month-day:hover {
   min-width: 0;
   min-height: 2rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -17338,7 +17332,7 @@ button.org-hr-month-day:hover {
   align-items: center;
   min-height: 2rem;
   color: var(--muted-foreground);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-picked-status {
@@ -17369,7 +17363,7 @@ button.org-hr-month-day:hover {
   width: 1.9rem;
   height: 1.9rem;
   border: 1px solid color-mix(in oklch, #dc2626, transparent 45%);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, #dc2626, transparent 91%);
   color: #b91c1c;
   cursor: pointer;
@@ -17392,11 +17386,11 @@ button.org-hr-month-day:hover {
   width: 100%;
   min-height: 2.45rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
-  font-weight: 760;
+  font-weight: 800;
   padding: 0.45rem 2.55rem 0.45rem 0.6rem;
 }
 
@@ -17434,11 +17428,11 @@ button.org-hr-month-day:hover {
   width: 100%;
   min-height: 2.45rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.45rem 0.6rem;
 }
 
@@ -17486,13 +17480,13 @@ button.org-hr-month-day:hover {
   height: 2.1rem;
   min-height: 2.1rem;
   border: 1px solid color-mix(in oklch, var(--destructive), transparent 38%);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--destructive), transparent 92%);
   color: var(--destructive);
   cursor: pointer;
   font: inherit;
   font-size: 1.15rem;
-  font-weight: 950;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -17534,7 +17528,7 @@ button.org-hr-month-day:hover {
   min-height: 3.2rem;
   padding: 0.5rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--primary) 1.5%);
 }
 
@@ -17571,7 +17565,7 @@ button.org-hr-month-day:hover {
   border-radius: 999px;
   background: var(--card);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -17615,7 +17609,7 @@ button.org-hr-month-day:hover {
   border-top: 1px solid var(--border);
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .org-hr-salary-act {
@@ -17632,7 +17626,7 @@ button.org-hr-month-day:hover {
   gap: 0.75rem;
   padding: 0.75rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--primary) 2%);
 }
 
@@ -17641,7 +17635,7 @@ button.org-hr-month-day:hover {
   align-items: center;
   gap: 0.45rem;
   margin: 0;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-hr-salary-toolbar input[type="checkbox"],
@@ -17682,7 +17676,7 @@ button.org-hr-month-day:hover {
 .org-hr-salary-detail-summary > div {
   padding: 0.75rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--primary) 2%);
 }
 
@@ -17772,7 +17766,7 @@ button.org-hr-month-day:hover {
   background: color-mix(in oklch, var(--muted) 24%, var(--card));
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .org-hr-pill.is-present {
@@ -17991,7 +17985,7 @@ button.org-hr-month-day:hover {
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 22%) inset,
     0 1px 2px color-mix(in oklch, black, transparent 94%);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .general-module-tab:hover {
@@ -18025,7 +18019,7 @@ button.org-hr-month-day:hover {
 .org-ops-panel {
   position: relative;
   overflow: hidden;
-  border-radius: 13px;
+  border-radius: var(--workbench-radius, 14px);
 }
 
 .org-ops-panel::before {
@@ -18065,17 +18059,17 @@ button.org-hr-month-day:hover {
   --text-lg: 18px;
   --text-xl: 22px;
   --text-2xl: 26px;
-  --workbench-radius: 13px;
-  --workbench-radius-sm: 8px;
-  --workbench-field-height: 36px;
+  --workbench-radius: 14px;
+  --workbench-radius-sm: 10px;
+  --workbench-field-height: 38px;
   --workbench-table-head-height: 41px;
   --workbench-table-row-height: 64px;
   --workbench-line: color-mix(in oklch, var(--border), var(--primary) 10%);
   --workbench-surface: var(--card);
   --workbench-muted-surface: color-mix(in oklch, var(--muted), transparent 64%);
   --workbench-shadow:
-    0 12px 30px color-mix(in oklch, var(--primary), transparent 93%),
-    0 1px 0 color-mix(in oklch, white, transparent 46%) inset;
+    0 16px 36px color-mix(in oklch, var(--primary), transparent 94%),
+    0 1px 0 color-mix(in oklch, white, transparent 40%) inset;
 }
 
 html,
@@ -18109,7 +18103,7 @@ body {
 
 .page-title {
   font-size: var(--text-2xl);
-  font-weight: 680;
+  font-weight: 700;
   line-height: 1.16;
   letter-spacing: 0;
 }
@@ -18119,7 +18113,7 @@ body {
 .reports-eyebrow,
 .settings-ios-footnote {
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -18292,7 +18286,7 @@ textarea::placeholder {
   background: var(--workbench-muted-surface);
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
   white-space: nowrap;
@@ -18339,7 +18333,7 @@ textarea::placeholder {
 .org-ops-table strong,
 .dash-kpi-value {
   font-variant-numeric: tabular-nums lining-nums;
-  font-weight: 780;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -18541,7 +18535,7 @@ button.general-module-tab {
 .org-hr-modal .org-position-inline input,
 .org-hr-modal .org-position-save,
 .org-hr-modal .director-modal-actions .btn {
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
 }
 
 .org-position-select {
@@ -18563,7 +18557,7 @@ button.general-module-tab {
   color: var(--control-fg);
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
   box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 42%) inset;
 }
@@ -18631,7 +18625,7 @@ button.general-module-tab {
   padding: 0.52rem 0.7rem;
   text-align: left;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -18649,7 +18643,7 @@ button.general-module-tab {
   height: 2rem;
   color: var(--muted-foreground);
   font-size: var(--text-base);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .org-position-action:hover {
@@ -18668,7 +18662,7 @@ button.general-module-tab {
   color: var(--primary);
   text-align: left;
   font-size: var(--text-base);
-  font-weight: 750;
+  font-weight: 700;
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 12%), transparent 78%),
     color-mix(in oklch, var(--primary), transparent 96%);
@@ -18689,7 +18683,7 @@ button.general-module-tab {
 .org-position-inline > span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 780;
+  font-weight: 800;
 }
 
 .org-position-inline-controls {
@@ -18714,7 +18708,7 @@ button.general-module-tab {
   min-height: 2.15rem;
   background: var(--primary);
   color: var(--primary-foreground);
-  font-weight: 850;
+  font-weight: 800;
   box-shadow: var(--shadow-sm);
 }
 
@@ -18763,7 +18757,7 @@ button.general-module-tab {
   background: var(--shipments-table-head-bg);
   color: color-mix(in oklch, var(--brand-navy), var(--muted-foreground) 20%);
   font-size: var(--text-xs);
-  font-weight: 820;
+  font-weight: 800;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -18805,7 +18799,7 @@ button.general-module-tab {
   box-shadow: none;
   color: var(--foreground);
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.42rem 0.72rem;
 }
 
@@ -18851,7 +18845,7 @@ button.general-module-tab {
   min-height: 2rem;
   margin: 0 0.12rem;
   border: 1px solid color-mix(in oklch, var(--workbench-line, var(--border)), var(--primary) 12%);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 76%),
     var(--card);
@@ -18859,7 +18853,7 @@ button.general-module-tab {
   cursor: pointer;
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
   box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 42%) inset;
 }
@@ -18881,7 +18875,7 @@ button.general-module-tab {
 }
 
 .org-ops-table.org-ops-table--shipments-entry input[type="search"][data-shipment-employee-search] {
-  font-weight: 760;
+  font-weight: 800;
   padding-right: 2.55rem;
 }
 
@@ -18898,7 +18892,7 @@ button.general-module-tab {
   gap: 0.55rem;
   padding: 0.72rem;
   border: 1px solid color-mix(in oklch, var(--workbench-line, var(--border)), var(--primary) 14%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background:
     linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 76%),
     color-mix(in oklch, var(--card), var(--primary) 3%);
@@ -18916,7 +18910,7 @@ button.general-module-tab {
 .org-shipments-order-title strong {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .org-shipments-order-title span,
@@ -18939,11 +18933,11 @@ button.general-module-tab {
   min-width: 0;
   padding: 0.45rem 0.65rem;
   border: 1px solid color-mix(in oklch, var(--workbench-line, var(--border)), var(--primary) 10%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .org-shipments-order-status[data-status="ok"] {
@@ -18971,7 +18965,7 @@ button.general-module-tab {
   height: 1.65rem;
   min-height: 1.65rem;
   border: 1px solid color-mix(in oklch, var(--workbench-line, var(--border)), var(--primary) 16%);
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--muted-foreground);
   cursor: pointer;
@@ -19102,7 +19096,7 @@ button.general-module-tab {
   width: 100%;
   min-height: 2.2rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -19253,7 +19247,7 @@ button.general-module-tab {
   gap: 0.45rem;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  font-weight: 850;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -19295,7 +19289,7 @@ button.general-module-tab {
   width: 2rem;
   height: 2rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   cursor: pointer;
@@ -19584,7 +19578,7 @@ button.general-module-tab {
   width: 2rem;
   height: 2rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 22%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--card), var(--primary) 8%);
   color: var(--primary);
   cursor: pointer;
@@ -19615,7 +19609,7 @@ button.general-module-tab {
   padding: 0.65rem;
   overflow: auto;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 18%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
   box-shadow:
@@ -19633,7 +19627,7 @@ button.general-module-tab {
   padding: 0.15rem 0.2rem 0.35rem;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .upos-table-column-choice {
@@ -19643,10 +19637,10 @@ button.general-module-tab {
   align-items: center;
   min-height: 2rem;
   padding: 0.3rem 0.35rem;
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 760;
+  font-weight: 800;
   line-height: 1.25;
   cursor: pointer;
 }
@@ -19665,12 +19659,12 @@ button.general-module-tab {
   min-height: 2rem;
   margin-top: 0.25rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
-  border-radius: 7px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in oklch, var(--muted), transparent 62%);
   color: var(--foreground);
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 820;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -19693,7 +19687,7 @@ button.general-module-tab {
 .price-type-card {
   border: 1px solid rgba(24, 119, 242, 0.22);
   background: linear-gradient(180deg, #ffffff 0%, #f2f8ff 100%);
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   padding: 12px;
   box-shadow: 0 10px 24px rgba(31, 86, 140, 0.08);
 }
@@ -19743,7 +19737,7 @@ button.general-module-tab {
 }
 .price-type-products-panel {
   border: 1px solid #b7d1f3;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   background: #fff;
   overflow: hidden;
 }
@@ -19763,7 +19757,7 @@ button.general-module-tab {
   min-width: 120px;
   width: 100%;
   border: 1px solid #b7d1f3;
-  border-radius: 6px;
+  border-radius: var(--workbench-radius-sm, 10px);
   padding: 8px 10px;
 }
 .price-type-dialog-grid {
@@ -19780,7 +19774,7 @@ button.general-module-tab {
   align-items: center;
   gap: 6px;
   border: 1px solid #c9d9ef;
-  border-radius: 8px;
+  border-radius: var(--workbench-radius-sm, 10px);
   padding: 8px 10px;
   background: #f7fbff;
   font-weight: 700;
