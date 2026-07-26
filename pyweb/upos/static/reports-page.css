@@ -328,7 +328,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2;
+  stroke-width: 2.25;
 }
 
 .reports-kpi-label,
@@ -1463,7 +1463,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   height: 1.2rem;
   fill: none;
   stroke: var(--primary);
-  stroke-width: 1.8;
+  stroke-width: 2.25;
 }
 
 .reports-stock-alert {
