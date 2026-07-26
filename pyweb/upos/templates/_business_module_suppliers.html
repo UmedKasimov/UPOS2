@@ -280,36 +280,77 @@
   <section class="client-card-shell" id="supplier-card" data-workspace-view="profile" hidden>
     <header class="client-card-header">
       <div>
-        <span class="client-card-kicker">Акт сверки поставщика</span>
-        <h2>{{ selected_supplier_card.name }}</h2>
+        <div class="client-profile-breadcrumb">
+          <a href="{{ url_for('suppliers_get') }}#suppliers">← Поставщики</a>
+          <span>›</span>
+          <strong>{{ selected_supplier_card.name }}</strong>
+        </div>
         <p>{{ selected_supplier_card.official_name or selected_supplier_card.category or "Поставщик и закупки" }}</p>
       </div>
       <div class="client-card-actions">
-        <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}#purchases">Закупки</a>
-        <a class="btn" href="{{ url_for('suppliers_get') }}#payables">Кредиторка</a>
+        <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}#payables">Кредиторка</a>
+        <a class="btn" href="{{ url_for('suppliers_get') }}#purchases">+ Новая закупка</a>
       </div>
     </header>
 
-    <div class="client-card-metrics" aria-label="Ключевые показатели поставщика">
-      <div>
-        <span>Кредиторка</span>
-        <strong>{{ selected_supplier_card.summary.payable }} UZS</strong>
-      </div>
-      <div>
-        <span>Закупки</span>
-        <strong>{{ selected_supplier_card.summary.purchases }} UZS</strong>
-      </div>
-      <div>
-        <span>Оплачено</span>
-        <strong>{{ selected_supplier_card.summary.paid }} UZS</strong>
-      </div>
-      <div>
-        <span>Документов</span>
-        <strong>{{ selected_supplier_card.summary.purchase_count }}</strong>
-      </div>
-    </div>
+    <div class="client-profile-layout">
+      <aside class="client-profile-side">
+        <div class="client-profile-photo" aria-hidden="true">
+          {% if selected_supplier_card.photo_url %}
+            <img src="{{ selected_supplier_card.photo_url }}" alt="" loading="lazy" />
+          {% else %}
+            <span></span>
+          {% endif %}
+        </div>
+        <nav class="client-profile-menu" aria-label="Разделы поставщика">
+          <a class="active" href="#info" data-client-section-nav="info">Информация</a>
+          <a href="#act" data-client-section-nav="act">Акт сверки</a>
+          <a href="#purchases-history" data-client-section-nav="purchases-history">Закупки</a>
+          <a href="#payables-list" data-client-section-nav="payables-list">Кредиторка</a>
+        </nav>
+      </aside>
 
-    <article class="client-card-panel client-card-panel--wide">
+      <main class="client-profile-main">
+        <div class="client-card-metrics" id="info" data-client-section-panel="info" aria-label="Ключевые показатели поставщика">
+          <div>
+            <span>Кредиторка</span>
+            <strong>{{ selected_supplier_card.summary.payable }} UZS</strong>
+          </div>
+          <div>
+            <span>Закупки</span>
+            <strong>{{ selected_supplier_card.summary.purchases }} UZS</strong>
+          </div>
+          <div>
+            <span>Оплачено</span>
+            <strong>{{ selected_supplier_card.summary.paid }} UZS</strong>
+          </div>
+          <div>
+            <span>Документов</span>
+            <strong>{{ selected_supplier_card.summary.purchase_count }}</strong>
+          </div>
+        </div>
+
+        <article class="client-card-panel client-card-panel--wide" id="info-details" data-client-section-panel="info">
+          <header>
+            <div>
+              <h3>Информация</h3>
+              <span>Контакты, адрес и реквизиты</span>
+            </div>
+          </header>
+          <dl class="client-card-info">
+            <div><dt>Телефон</dt><dd>{{ selected_supplier_card.phone or "-" }}</dd></div>
+            <div><dt>Email</dt><dd>{{ selected_supplier_card.email or "-" }}</dd></div>
+            <div><dt>ИНН</dt><dd>{{ selected_supplier_card.inn or "-" }}</dd></div>
+            <div><dt>Официальное название</dt><dd>{{ selected_supplier_card.official_name or "-" }}</dd></div>
+            <div><dt>Категория</dt><dd>{{ selected_supplier_card.category or "-" }}</dd></div>
+            <div><dt>Адрес</dt><dd>{{ selected_supplier_card.address or "-" }}</dd></div>
+            <div><dt>Код</dt><dd>{{ selected_supplier_card.code or "-" }}</dd></div>
+            <div><dt>Статус</dt><dd>{{ "Активный" if selected_supplier_card.status == "active" else "Неактивный" }}</dd></div>
+            <div><dt>Комментарий</dt><dd>{{ selected_supplier_card.comment or "-" }}</dd></div>
+          </dl>
+        </article>
+
+    <article class="client-card-panel client-card-panel--wide" id="act" data-client-section-panel="act" hidden>
       <header>
         <div>
           <h3>Акт сверки</h3>
@@ -358,7 +399,7 @@
     </article>
 
     <div class="client-card-grid client-card-grid--even">
-      <article class="client-card-panel">
+      <article class="client-card-panel" id="purchases-history" data-client-section-panel="purchases-history" hidden>
         <header>
           <div>
             <h3>История закупок</h3>
@@ -393,7 +434,7 @@
         </div>
       </article>
 
-      <article class="client-card-panel">
+      <article class="client-card-panel" id="payables-list" data-client-section-panel="payables-list" hidden>
         <header>
           <div>
             <h3>Кредиторка</h3>
@@ -426,6 +467,8 @@
           </table>
         </div>
       </article>
+        </div>
+      </main>
     </div>
   </section>
 {% endif %}
