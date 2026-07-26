@@ -245,7 +245,7 @@
     </label>
     <button class="btn btn-secondary" type="button" data-clients-map-clear>Очистить</button>
   </div>
-  {% set map_clients = clients_records %}
+  {% set map_clients = clients_map_records %}
   <div class="clients-map-layout">
     <div class="clients-map-frame">
       {% set first_map_client = map_clients|selectattr('latitude')|first %}
