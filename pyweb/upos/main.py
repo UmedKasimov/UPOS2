@@ -6830,11 +6830,9 @@ def create_app() -> FastAPI:
                     "template_id": str(pocket.get("template_id") or "").strip(),
                 }
             )
-        if not payment_accounts:
-            payment_accounts = [
-                {"id": "cash", "label": "Наличные", "template_id": "cash"},
-                {"id": "card", "label": "Карта", "template_id": "card"},
-            ]
+        # Никаких заглушек «Наличные»/«Карта»: оплата сохраняется только на реальный
+        # FinanceAccount, поэтому выдуманный счёт довёл бы пользователя до формы оплаты
+        # и упал бы уже на сохранении.
         return tpl(
             request,
             "home_sales.html",
@@ -8844,11 +8842,7 @@ def create_app() -> FastAPI:
                     "template_id": str(pocket.get("template_id") or "").strip(),
                 }
             )
-        if not payment_accounts:
-            payment_accounts = [
-                {"id": "cash", "label": "Наличные", "template_id": "cash"},
-                {"id": "card", "label": "Карта", "template_id": "card"},
-            ]
+        # См. комментарий в sales_get: подставлять несуществующие счета нельзя.
         warehouse_options = {
             "warehouses": [item["name"] for item in warehouse_records] or ["Основной склад"],
             "products": product_names,

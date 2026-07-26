@@ -534,6 +534,8 @@
                 <select class="settings-profile-input" data-detail-payment-account>
                   {% for account in warehouse_options.payment_accounts %}
                     <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                  {% else %}
+                    <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
                   {% endfor %}
                 </select>
               </label>
@@ -830,6 +832,8 @@
                 <select class="settings-profile-input" data-purchase-payment-account>
                   {% for account in warehouse_options.payment_accounts %}
                     <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                  {% else %}
+                    <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
                   {% endfor %}
                 </select>
               </label>
