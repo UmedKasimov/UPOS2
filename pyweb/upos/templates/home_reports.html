@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=24" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=30" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=31" />
 {% endblock %}
 
 {% block page_header %}
@@ -338,36 +338,72 @@
             <span><b>{{ business_reports.stock.summary.total or "0 UZS" }}</b> сумма остатков</span>
           </div>
         </header>
-        <div class="reports-table-wrap">
-          <table class="reports-data-table reports-stock-movement-table">
-            <thead>
-              <tr>
-                <th>Товар</th>
-                <th>Начало</th>
-                <th>Приход</th>
-                <th>Списание</th>
-                <th>Конец</th>
-                <th>Себестоимость</th>
-                <th>Сумма</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in business_reports.stock.rows %}
+        <form method="post" action="{{ url_for('reports_stock_prices_save') }}" class="reports-stock-prices-form">
+          {% include "_csrf_field.html" %}
+          <div class="reports-table-wrap">
+            <table class="reports-data-table reports-stock-movement-table">
+              <thead>
                 <tr>
-                  <td>{{ row.product }}</td>
-                  <td>{{ row.begin }}</td>
-                  <td>{{ row.incoming }}</td>
-                  <td>{{ row.outgoing }}</td>
-                  <td>{{ row.end }}</td>
-                  <td>{{ row.cost }}</td>
-                  <td><strong>{{ row.total }}</strong></td>
+                  <th class="reports-stock-photo-col"></th>
+                  <th>Товар</th>
+                  <th>Начало</th>
+                  <th>Приход</th>
+                  <th>Списание</th>
+                  <th>Конец</th>
+                  <th>Приходная цена</th>
+                  <th>Продажная цена</th>
+                  <th>Себестоимость</th>
+                  <th>Сумма</th>
                 </tr>
-              {% else %}
-                <tr><td colspan="7" class="reports-empty-cell">Складских движений пока нет.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {% for row in business_reports.stock.rows %}
+                  <tr>
+                    <td class="reports-stock-photo-col">
+                      {% if row.photo_url %}
+                        <img class="product-thumb" src="{{ row.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      {% else %}
+                        <span class="product-thumb-frame" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                            <path d="m3.3 7 8.7 5 8.7-5" />
+                            <path d="M12 22V12" />
+                          </svg>
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td>{{ row.product }}</td>
+                    <td>{{ row.begin }}</td>
+                    <td>{{ row.incoming }}</td>
+                    <td>{{ row.outgoing }}</td>
+                    <td>{{ row.end }}</td>
+                    {% if row.product_id %}
+                      <input type="hidden" name="product_id" value="{{ row.product_id }}" />
+                      <td class="reports-stock-price-cell">
+                        <input name="purchase_price" value="{{ row.purchase_price_value }}" inputmode="decimal" aria-label="Приходная цена {{ row.product }}" />
+                      </td>
+                      <td class="reports-stock-price-cell">
+                        <input name="sale_price" value="{{ row.sale_price_value }}" inputmode="decimal" aria-label="Продажная цена {{ row.product }}" />
+                      </td>
+                    {% else %}
+                      <td>-</td>
+                      <td>-</td>
+                    {% endif %}
+                    <td>{{ row.cost }}</td>
+                    <td><strong>{{ row.total }}</strong></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="10" class="reports-empty-cell">Складских движений пока нет.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if business_reports.stock.rows %}
+            <div class="reports-stock-prices-actions">
+              <button class="btn" type="submit">Сохранить цены</button>
+            </div>
+          {% endif %}
+        </form>
       </section>
 
       <section class="reports-panel reports-stock-analysis" id="report-stock-analysis" data-org-report-panel="stock-analysis" hidden>

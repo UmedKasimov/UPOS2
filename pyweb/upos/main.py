@@ -13337,6 +13337,55 @@ def create_app() -> FastAPI:
                 return RedirectResponse(url=f"/crm?msg=deleted#{target_hash}", status_code=302)
         return RedirectResponse(url="/crm?msg=deleted#tasks", status_code=302)
 
+    @app.post("/reports/stock-prices", name="reports_stock_prices_save")
+    async def reports_stock_prices_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/reports?err=csrf#report-stock-movement", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        product_ids = list(form.getlist("product_id"))
+        purchase_values = list(form.getlist("purchase_price"))
+        sale_values = list(form.getlist("sale_price"))
+        saved = 0
+        with session_scope() as session:
+            for idx, raw_id in enumerate(product_ids):
+                product_id = str(raw_id or "").strip()
+                if not product_id:
+                    continue
+                row = session.get(Product, product_id)
+                if not row or row.workspace_owner_id != wid:
+                    continue
+                data = dict(row.data if isinstance(row.data, dict) else {})
+                purchase_raw = str(purchase_values[idx] if idx < len(purchase_values) else "").strip()
+                sale_raw = str(sale_values[idx] if idx < len(sale_values) else "").strip()
+                changed = False
+                if purchase_raw:
+                    data["purchase_price"] = purchase_raw
+                    changed = True
+                if sale_raw:
+                    # Отчёт показывает prices[0] — правим её же, иначе введённое
+                    # значение сохранилось бы, но в таблицу не вернулось.
+                    prices = [dict(item) for item in data.get("prices") or [] if isinstance(item, dict)]
+                    if prices:
+                        prices[0]["price"] = sale_raw
+                    else:
+                        prices.append({"name": "ПРОДАЖНАЯ ЦЕНА", "price": sale_raw, "currency": "UZS"})
+                    data["prices"] = prices
+                    changed = True
+                if changed:
+                    row.data = data
+                    flag_modified(row, "data")
+                    saved += 1
+        if not saved:
+            return RedirectResponse(
+                url="/reports?error=" + quote("Не удалось сохранить цены") + "#report-stock-movement",
+                status_code=302,
+            )
+        return RedirectResponse(url="/reports?msg=prices_saved#report-stock-movement", status_code=302)
+
     @app.get("/reports", response_class=HTMLResponse)
     def home_reports(request: Request):
         u = request.session.get("user") or {}
@@ -13762,6 +13811,7 @@ def create_app() -> FastAPI:
                     for item in data.get("stocks") if isinstance(data.get("stocks"), list) else []:
                         current_qty += _sales_decimal(item.get("quantity"))
                     cost = _sales_decimal(data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price"))
+                    product_item = _product_data(product)
                     stock_movements[product.name] = {
                         "product": product.name,
                         "incoming": Decimal("0"),
@@ -13770,6 +13820,10 @@ def create_app() -> FastAPI:
                         "end": current_qty,
                         "cost": cost,
                         "currency": str(data.get("currency") or "UZS").upper(),
+                        "product_id": product.id,
+                        "photo_url": product_item.get("photo_url") or "",
+                        "purchase_price_value": _decimal_plain_text(cost) if cost else "",
+                        "sale_price_value": product_item.get("sale_price") or "",
                     }
                 for op in operations:
                     data = _json_object(op.data)
@@ -13877,6 +13931,13 @@ def create_app() -> FastAPI:
                             "end": _sales_money_label(row.get("end")),
                             "cost": _report_money(row.get("cost"), row.get("currency")),
                             "total": _report_money(total, row.get("currency")),
+                            # Для строки, собранной из складской операции без карточки товара,
+                            # редактировать нечего — product_id останется пустым.
+                            "product_id": row.get("product_id") or "",
+                            "photo_url": row.get("photo_url") or "",
+                            "purchase_price_value": row.get("purchase_price_value") or "",
+                            "sale_price_value": row.get("sale_price_value") or "",
+                            "currency": row.get("currency") or "UZS",
                         }
                     )
                 for product in products:
