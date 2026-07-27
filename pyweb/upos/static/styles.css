@@ -9382,7 +9382,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border-bottom: 0;
 }
 
-.warehouse-purchase-expense-row input {
+.warehouse-purchase-expense-row input,
+.warehouse-purchase-expense-row select {
   width: 100%;
   min-width: 0;
   height: 2.7rem;
@@ -9401,8 +9402,9 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border-right: 1px solid var(--border);
 }
 
-.warehouse-purchase-expense-type-field input {
+.warehouse-purchase-expense-type-field select {
   border-right: 0;
+  cursor: pointer;
 }
 
 .warehouse-purchase-expense-type-add {
@@ -9426,7 +9428,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   color: #fff;
 }
 
-.warehouse-purchase-expense-row input:focus {
+.warehouse-purchase-expense-row input:focus,
+.warehouse-purchase-expense-row select:focus {
   outline: 2px solid color-mix(in srgb, var(--primary) 72%, transparent);
   outline-offset: -2px;
 }

@@ -429,14 +429,21 @@
     const options = readPurchaseOptions();
     options.expense_types = Array.isArray(items) ? items : [];
     writePurchaseOptions(options);
-    const datalist = document.getElementById("warehouse-purchase-expense-types");
-    if (datalist) {
-      datalist.replaceChildren(...options.expense_types.map((item) => {
+    document.querySelectorAll('select[name="extra_expense_name"]').forEach((select) => {
+      const currentValue = String(select.value || "").trim();
+      const selectOptions = [new Option("Выберите вид расхода", "")];
+      options.expense_types.forEach((item) => {
         const option = document.createElement("option");
         option.value = String(item.name || "");
-        return option;
-      }));
-    }
+        option.textContent = String(item.name || "");
+        selectOptions.push(option);
+      });
+      if (currentValue && !options.expense_types.some((item) => String(item.name || "") === currentValue)) {
+        selectOptions.push(new Option(currentValue, currentValue));
+      }
+      select.replaceChildren(...selectOptions);
+      select.value = currentValue;
+    });
   }
 
   function closeExpenseTypeDialog(entryForm) {
@@ -1378,16 +1385,16 @@
           amount.value = value ? purchaseEntryFormatCurrency(value, currency()) : "";
           recalc();
         });
-        row.querySelector('input[name="extra_expense_name"]')?.addEventListener("input", recalc);
+        row.querySelector('select[name="extra_expense_name"]')?.addEventListener("change", recalc);
         row.querySelector("[data-purchase-expense-type-open]")?.addEventListener("click", () => {
-          openExpenseTypeDialog(form, row.querySelector('input[name="extra_expense_name"]'));
+          openExpenseTypeDialog(form, row.querySelector('select[name="extra_expense_name"]'));
         });
         row.querySelector("[data-purchase-expense-remove]")?.addEventListener("click", () => {
           if (expenseRows().length > 1) {
             row.remove();
           } else {
-            row.querySelectorAll("input").forEach((input) => {
-              input.value = "";
+            row.querySelectorAll("input, select").forEach((control) => {
+              control.value = "";
             });
           }
           recalc();
@@ -1399,8 +1406,8 @@
         if (!expenseLines || !source) return null;
         const row = source.cloneNode(true);
         delete row.dataset.purchaseExpenseReady;
-        row.querySelectorAll("input").forEach((input) => {
-          input.value = "";
+        row.querySelectorAll("input, select").forEach((control) => {
+          control.value = "";
         });
         expenseLines.append(row);
         wireExpenseRow(row);
@@ -1485,7 +1492,7 @@
       expenseRows().forEach(wireExpenseRow);
       form.querySelector("[data-purchase-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
-        row?.querySelector('input[name="extra_expense_name"]')?.focus();
+        row?.querySelector('select[name="extra_expense_name"]')?.focus();
       });
       paymentRows().forEach(wirePurchasePaymentLine);
       form.querySelector("[data-purchase-payment-open]")?.addEventListener("click", openPurchasePaymentDialog);

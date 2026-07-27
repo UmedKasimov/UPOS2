@@ -758,7 +758,17 @@
           {% for expense in purchase_extra_expenses %}
             <div class="warehouse-purchase-expense-row" data-purchase-expense-row>
               <div class="warehouse-purchase-expense-type-field">
-                <input name="extra_expense_name" value="{{ expense.name if expense else '' }}" placeholder="Название расхода" autocomplete="off" list="warehouse-purchase-expense-types" />
+                <select name="extra_expense_name" data-purchase-expense-type-select>
+                  <option value="" {% if not expense %}selected{% endif %}>Выберите вид расхода</option>
+                  {% if expense %}
+                    <option value="{{ expense.name }}" selected>{{ expense.name }}</option>
+                  {% endif %}
+                  {% for expense_type in warehouse_options.expense_types %}
+                    {% if not expense or expense_type.name != expense.name %}
+                      <option value="{{ expense_type.name }}">{{ expense_type.name }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
                 <button type="button" class="warehouse-purchase-expense-type-add" data-purchase-expense-type-open aria-label="Создать вид расхода" title="Создать вид расхода">+</button>
               </div>
               <input name="extra_expense_amount" value="{{ expense.amount if expense else '' }}" placeholder="Сумма" inputmode="decimal" data-purchase-expense-amount />
@@ -767,11 +777,6 @@
             </div>
           {% endfor %}
         </div>
-        <datalist id="warehouse-purchase-expense-types">
-          {% for expense_type in warehouse_options.expense_types %}
-            <option value="{{ expense_type.name }}"></option>
-          {% endfor %}
-        </datalist>
         <div class="warehouse-purchase-expenses-summary">
           <span>Товары <strong data-purchase-expense-goods-total>0 UZS</strong></span>
           <span>Доп. расходы <strong data-purchase-expense-total>0 UZS</strong></span>
