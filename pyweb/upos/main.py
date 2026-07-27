@@ -17777,8 +17777,10 @@ def create_app() -> FastAPI:
             return ("" if value is None else str(value)).replace("\x00", "").strip()[:limit]
 
         raw_meta = source.get("meta") if isinstance(source.get("meta"), dict) else {}
-        default_headers = ["№", "TOVAR NOMI", "RASMI", "SONI", "NARXI", "CHEGIRMA", "JAMI"]
+        default_headers = ["№", "TOVAR NOMI", "KATEGORIYA", "RASMI", "SONI", "NARXI", "CHEGIRMA", "JAMI"]
         raw_headers = source.get("headers") if isinstance(source.get("headers"), list) else []
+        if len(raw_headers) == 7:
+            raw_headers = [raw_headers[0], raw_headers[1], "KATEGORIYA", *raw_headers[2:]]
         headers = [
             clean_text(raw_headers[index], 40)
             if index < len(raw_headers) and clean_text(raw_headers[index], 40)
@@ -17794,6 +17796,7 @@ def create_app() -> FastAPI:
             rows.append(
                 {
                     "name": clean_text(row.get("name"), 300),
+                    "category": clean_text(row.get("category"), 160),
                     "image": image if image in allowed_images else "empty",
                     "qty": clean_text(row.get("qty"), 40),
                     "price": clean_text(row.get("price"), 50),
@@ -17805,6 +17808,7 @@ def create_app() -> FastAPI:
             rows.append(
                 {
                     "name": "Новый товар",
+                    "category": "",
                     "image": "empty",
                     "qty": "1 шт",
                     "price": "0",
@@ -17812,16 +17816,61 @@ def create_app() -> FastAPI:
                     "total": "0",
                 }
             )
+        raw_visible = source.get("visible") if isinstance(source.get("visible"), dict) else {}
+        default_visible = {
+            "logo": True,
+            "title": True,
+            "table": True,
+            "name": True,
+            "category": False,
+            "photo": True,
+            "qty": True,
+            "price": True,
+            "discount": True,
+            "custom_text": False,
+            "seller": True,
+            "customer": True,
+            "date": True,
+            "id": True,
+            "seller_phone": True,
+            "customer_phone": True,
+            "address": False,
+            "comment": True,
+        }
+
+        def clean_bool(value: object, fallback: bool) -> bool:
+            if isinstance(value, bool):
+                return value
+            if value is None:
+                return fallback
+            return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+        visible = {
+            key: clean_bool(raw_visible.get(key), fallback)
+            for key, fallback in default_visible.items()
+        }
+        logo = clean_text(source.get("logo"), 2_000_000)
+        if logo and not re.fullmatch(
+            r"data:image/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+",
+            logo,
+        ):
+            logo = ""
         return {
+            "version": 2,
             "title": clean_text(source.get("title"), 120) or "BIZNES DASTURLASH TAKLIFI",
+            "logo": logo,
+            "visible": visible,
             "meta": {
                 "date": clean_text(raw_meta.get("date"), 160),
+                "id": clean_text(raw_meta.get("id"), 120),
                 "customer": clean_text(raw_meta.get("customer"), 200),
                 "customer_phone": clean_text(raw_meta.get("customer_phone"), 80),
                 "seller": clean_text(raw_meta.get("seller"), 160),
                 "seller_phone": clean_text(raw_meta.get("seller_phone"), 80),
+                "address": clean_text(raw_meta.get("address"), 300),
             },
             "headers": headers,
+            "custom_text": clean_text(source.get("custom_text"), 1000),
             "total_label": clean_text(source.get("total_label"), 80) or "Umumiy:",
             "note": clean_text(source.get("note"), 500) or "IZOH:",
             "rows": rows,

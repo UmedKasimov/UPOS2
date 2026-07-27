@@ -13772,11 +13772,140 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   color: #c43333;
 }
 
+.price-template-builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 270px;
+  gap: 0.8rem;
+  align-items: start;
+}
+
 .price-template-workbook {
+  min-width: 0;
   overflow: hidden;
   border: 1px solid color-mix(in oklch, var(--border), transparent 15%);
   border-radius: var(--radius-md);
   background: var(--background);
+}
+
+.price-template-builder-sidebar {
+  position: sticky;
+  top: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+  max-height: calc(100vh - 8rem);
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.price-template-builder-sidebar-head {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.1rem 0.15rem 0.35rem;
+}
+
+.price-template-builder-sidebar-head strong {
+  font-size: 0.92rem;
+}
+
+.price-template-builder-sidebar-head small {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.price-template-builder-group {
+  display: grid;
+  gap: 0.36rem;
+  padding: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--muted), transparent 70%);
+}
+
+.price-template-builder-group-title {
+  padding: 0 0.1rem 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.price-template-component-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.3rem 0.38rem;
+  border-radius: 5px;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.price-template-component-toggle:hover {
+  background: color-mix(in oklch, var(--primary), transparent 92%);
+}
+
+.price-template-component-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.price-template-toggle-face {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--muted), var(--background) 48%);
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.price-template-toggle-face::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--background);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 22%);
+  transition: transform 140ms ease;
+}
+
+.price-template-component-toggle input:checked + .price-template-toggle-face {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.price-template-component-toggle input:checked + .price-template-toggle-face::after {
+  transform: translateX(14px);
+  background: white;
+}
+
+.price-template-component-toggle input:focus-visible + .price-template-toggle-face {
+  outline: 2px solid color-mix(in oklch, var(--primary), transparent 45%);
+  outline-offset: 2px;
+}
+
+.price-template-logo-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.price-template-logo-actions .btn {
+  justify-content: center;
+  width: 100%;
 }
 
 .price-template-formula-bar {
@@ -13844,8 +13973,8 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-preview {
-  width: min(100%, 760px);
-  min-width: 680px;
+  width: min(100%, 800px);
+  min-width: 760px;
   margin: 0 auto;
   padding: 2.2rem 2rem 1.45rem;
   border: 1px solid #e4e4e4;
@@ -13859,16 +13988,68 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-top {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: 1.6rem;
   align-items: center;
   margin-bottom: 1rem;
 }
 
 .price-template-brand {
+  position: relative;
   display: grid;
   justify-items: center;
+  min-width: 190px;
+  min-height: 155px;
+  border: 1px dashed transparent;
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: transparent;
   color: #0f1d35;
+  cursor: pointer;
+}
+
+.price-template-brand:hover,
+.price-template-brand:focus-visible {
+  border-color: #1683e8;
+  outline: 0;
+  background: rgb(22 131 232 / 6%);
+}
+
+.price-template-default-logo {
+  display: grid;
+  justify-items: center;
+}
+
+.price-template-logo-image {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: 145px;
+  object-fit: contain;
+}
+
+.price-template-logo-image[hidden],
+.price-template-default-logo[hidden] {
+  display: none !important;
+}
+
+.price-template-logo-edit {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 4px;
+  background: #1683e8;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.price-template-brand:hover .price-template-logo-edit,
+.price-template-brand:focus-visible .price-template-logo-edit {
+  opacity: 1;
 }
 
 .price-template-mark {
@@ -13953,6 +14134,26 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   min-width: 2.5rem;
 }
 
+.price-template-custom-text {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #9aa6b2;
+  background: #f5f7f9;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.price-template-custom-text [contenteditable] {
+  display: block;
+  min-height: 20px;
+  outline: 0;
+}
+
+.price-template-preview [data-price-component][hidden] {
+  display: none !important;
+}
+
 .price-template-table {
   width: 100%;
   border-collapse: collapse;
@@ -13983,7 +14184,8 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-table [contenteditable],
 .price-template-meta [contenteditable],
-.price-template-note [contenteditable] {
+.price-template-note [contenteditable],
+.price-template-custom-text [contenteditable] {
   cursor: text;
   outline: 0;
 }
@@ -14002,7 +14204,8 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-table [data-price-cell].is-selected,
 .price-template-meta [data-price-cell].is-selected,
-.price-template-note [data-price-cell].is-selected {
+.price-template-note [data-price-cell].is-selected,
+.price-template-custom-text [data-price-cell].is-selected {
   border-radius: 1px;
   box-shadow: inset 0 0 0 3px #1683e8;
   background: rgb(22 131 232 / 8%);
@@ -14010,35 +14213,41 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-table th:nth-child(1),
 .price-template-table td:nth-child(1) {
-  width: 44px;
+  width: 36px;
 }
 
 .price-template-table th:nth-child(2),
 .price-template-table td:nth-child(2) {
-  width: 210px;
+  width: 170px;
 }
 
 .price-template-table th:nth-child(3),
 .price-template-table td:nth-child(3) {
-  width: 100px;
-  padding: 0;
+  width: 92px;
 }
 
 .price-template-table th:nth-child(4),
 .price-template-table td:nth-child(4) {
-  width: 48px;
+  width: 92px;
+  padding: 0;
 }
 
 .price-template-table th:nth-child(5),
-.price-template-table td:nth-child(5),
+.price-template-table td:nth-child(5) {
+  width: 46px;
+}
+
 .price-template-table th:nth-child(6),
 .price-template-table td:nth-child(6),
 .price-template-table th:nth-child(7),
-.price-template-table td:nth-child(7) {
-  width: 64px;
+.price-template-table td:nth-child(7),
+.price-template-table th:nth-child(8),
+.price-template-table td:nth-child(8) {
+  width: 58px;
 }
 
-.price-template-table tbody td:nth-child(2) {
+.price-template-table tbody td:nth-child(2),
+.price-template-table tbody td:nth-child(3) {
   font-family: Arial, Helvetica, sans-serif;
   font-size: 14px;
   line-height: 1.3;
@@ -14214,6 +14423,42 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   font-weight: 900;
 }
 
+html.dark .price-template-builder-sidebar {
+  border-color: var(--workbench-line);
+  background: var(--workbench-surface);
+  box-shadow: 0 14px 32px oklch(0 0 0 / 0.28);
+}
+
+html.dark .price-template-builder-group {
+  border-color: var(--workbench-line);
+  background: oklch(1 0 0 / 0.035);
+}
+
+html.dark .price-template-toggle-face {
+  border-color: var(--workbench-line);
+  background: oklch(1 0 0 / 0.07);
+}
+
+html.dark .price-template-toggle-face::after {
+  background: color-mix(in oklch, var(--foreground), var(--card) 32%);
+}
+
+@media (max-width: 1180px) {
+  .price-template-builder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .price-template-builder-sidebar {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: none;
+  }
+
+  .price-template-builder-sidebar-head {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 920px) {
   .price-template-head {
     align-items: flex-start;
@@ -14222,6 +14467,14 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
   .price-template-actions {
     justify-content: flex-start;
+  }
+
+  .price-template-builder-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .price-template-builder-sidebar-head {
+    grid-column: auto;
   }
 }
 
@@ -14259,6 +14512,15 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   }
 
   body:has(.price-template-preview) .price-template-row-number [data-price-template-remove-row] {
+    display: none !important;
+  }
+
+  body:has(.price-template-preview) .price-template-brand {
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+
+  body:has(.price-template-preview) .price-template-logo-edit {
     display: none !important;
   }
 

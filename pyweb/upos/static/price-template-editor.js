@@ -1,19 +1,56 @@
 (function () {
+  var DEFAULT_VISIBILITY = {
+    logo: true,
+    title: true,
+    table: true,
+    name: true,
+    category: false,
+    photo: true,
+    qty: true,
+    price: true,
+    discount: true,
+    custom_text: false,
+    seller: true,
+    customer: true,
+    date: true,
+    id: true,
+    seller_phone: true,
+    customer_phone: true,
+    address: false,
+    comment: true,
+  };
+
   var DEFAULT_TEMPLATE = {
+    version: 2,
     title: "BIZNES DASTURLASH TAKLIFI",
+    logo: "",
+    visible: DEFAULT_VISIBILITY,
     meta: {
-      date: "27-07-2026 № CLI-741751",
+      date: "27-07-2026",
+      id: "CLI-741751",
       customer: "dilshod aka gulchexra market",
       customer_phone: "",
       seller: "Расул Бабаев",
       seller_phone: "+998978910550",
+      address: "Ташкент",
     },
-    headers: ["№", "TOVAR NOMI", "RASMI", "SONI", "NARXI", "CHEGIRMA", "JAMI"],
+    headers: [
+      "№",
+      "TOVAR NOMI",
+      "KATEGORIYA",
+      "RASMI",
+      "SONI",
+      "NARXI",
+      "CHEGIRMA",
+      "JAMI",
+    ],
+    custom_text: "Дополнительный текст предложения",
     total_label: "Umumiy:",
     note: "IZOH:",
     rows: [
       {
         name: "MONOBLOK SMART I5 6A METALLIK WIFI",
+        category: "Моноблок",
         image: "monitor",
         qty: "1 шт",
         price: "350",
@@ -22,6 +59,7 @@
       },
       {
         name: "Весы без этикетор",
+        category: "Весы",
         image: "scale",
         qty: "1 шт",
         price: "220",
@@ -30,6 +68,7 @@
       },
       {
         name: "Чек Принтер XPRINTER 80C",
+        category: "Принтер",
         image: "printer",
         qty: "1 шт",
         price: "40",
@@ -69,17 +108,17 @@
     return input ? input.value || "" : "";
   }
 
-  function setEditableText(root, selector, value) {
+  function setNodeText(root, selector, value) {
     var node = root.querySelector(selector);
     if (node) node.textContent = text(value);
   }
 
-  function createEditableCell(field, value, oldPrice) {
+  function createEditableCell(field, value, options) {
     var span = document.createElement("span");
     span.contentEditable = "true";
     span.setAttribute("data-price-template-row-field", field);
     span.setAttribute("data-price-cell", "");
-    if (oldPrice) span.className = "price-template-old";
+    if (options && options.oldPrice) span.className = "price-template-old";
     span.textContent = text(value);
     return span;
   }
@@ -89,21 +128,23 @@
     var safeKind = allowed.indexOf(kind) >= 0 ? kind : "empty";
     var image = document.createElement("button");
     image.type = "button";
-    image.className =
-      "price-template-product-img price-template-product-img--" + safeKind;
+    image.className = "price-template-product-img price-template-product-img--" + safeKind;
     image.setAttribute("data-price-template-image", safeKind);
     image.setAttribute("aria-label", "Сменить вид изображения");
     image.title = "Нажмите, чтобы сменить изображение";
-    if (safeKind === "monitor") {
-      var monitorLabel = document.createElement("span");
-      monitorLabel.textContent = "Monoblok A2";
-      image.appendChild(monitorLabel);
-    } else if (safeKind === "printer") {
-      var printerLabel = document.createElement("span");
-      printerLabel.textContent = "XP-Q80AS";
-      image.appendChild(printerLabel);
+    if (safeKind === "monitor" || safeKind === "printer") {
+      var label = document.createElement("span");
+      label.textContent = safeKind === "monitor" ? "Monoblok A2" : "XP-Q80AS";
+      image.appendChild(label);
     }
     return image;
+  }
+
+  function createDataCell(component, child) {
+    var td = document.createElement("td");
+    if (component) td.setAttribute("data-price-component", component);
+    td.appendChild(child);
+    return td;
   }
 
   function createRow(row) {
@@ -123,60 +164,88 @@
     numberCell.appendChild(remove);
     tr.appendChild(numberCell);
 
-    var nameCell = document.createElement("td");
-    nameCell.appendChild(createEditableCell("name", row.name, false));
-    tr.appendChild(nameCell);
-
-    var imageCell = document.createElement("td");
-    imageCell.appendChild(createImage(text(row.image) || "empty"));
-    tr.appendChild(imageCell);
-
-    var qtyCell = document.createElement("td");
-    qtyCell.appendChild(createEditableCell("qty", row.qty, false));
-    tr.appendChild(qtyCell);
-
-    var priceCell = document.createElement("td");
-    priceCell.appendChild(createEditableCell("price", row.price, true));
-    tr.appendChild(priceCell);
-
-    var discountCell = document.createElement("td");
-    discountCell.appendChild(createEditableCell("discount", row.discount, false));
-    tr.appendChild(discountCell);
-
-    var totalCell = document.createElement("td");
-    totalCell.appendChild(createEditableCell("total", row.total, false));
-    tr.appendChild(totalCell);
-
+    tr.appendChild(createDataCell("name", createEditableCell("name", row.name)));
+    tr.appendChild(createDataCell("category", createEditableCell("category", row.category)));
+    tr.appendChild(createDataCell("photo", createImage(text(row.image) || "empty")));
+    tr.appendChild(createDataCell("qty", createEditableCell("qty", row.qty)));
+    tr.appendChild(
+      createDataCell("price", createEditableCell("price", row.price, { oldPrice: true })),
+    );
+    tr.appendChild(
+      createDataCell("discount", createEditableCell("discount", row.discount)),
+    );
+    tr.appendChild(createDataCell("", createEditableCell("total", row.total)));
     return tr;
+  }
+
+  function normalizeHeaders(rawHeaders) {
+    var defaults = DEFAULT_TEMPLATE.headers;
+    var headers = Array.isArray(rawHeaders) ? rawHeaders.slice(0, 8) : [];
+    if (headers.length === 7) {
+      headers = [headers[0], headers[1], defaults[2]].concat(headers.slice(2));
+    }
+    while (headers.length < 8) headers.push(defaults[headers.length]);
+    return headers.map(text);
   }
 
   function normalizeTemplate(raw) {
     var source = raw && typeof raw === "object" ? raw : {};
     var defaults = cloneDefault();
     var meta = source.meta && typeof source.meta === "object" ? source.meta : {};
-    var headers = Array.isArray(source.headers) ? source.headers.slice(0, 7) : [];
-    while (headers.length < 7) headers.push(defaults.headers[headers.length]);
-    var rows = Array.isArray(source.rows) && source.rows.length ? source.rows.slice(0, 50) : defaults.rows;
+    var date = text(meta.date != null ? meta.date : defaults.meta.date);
+    var id = text(meta.id != null ? meta.id : "");
+    if (!id && date.indexOf("№") >= 0) {
+      var dateParts = date.split("№");
+      date = dateParts.shift().trim();
+      id = dateParts.join("№").trim();
+    }
+    if (!id) id = defaults.meta.id;
+
+    var rawVisible =
+      source.visible && typeof source.visible === "object" ? source.visible : {};
+    var visible = {};
+    Object.keys(DEFAULT_VISIBILITY).forEach(function (key) {
+      visible[key] =
+        typeof rawVisible[key] === "boolean" ? rawVisible[key] : DEFAULT_VISIBILITY[key];
+    });
+
+    var rows =
+      Array.isArray(source.rows) && source.rows.length
+        ? source.rows.slice(0, 50)
+        : defaults.rows;
     return {
+      version: 2,
       title: text(source.title || defaults.title),
+      logo: /^data:image\/(?:png|jpeg|webp);base64,/i.test(text(source.logo))
+        ? text(source.logo)
+        : "",
+      visible: visible,
       meta: {
-        date: text(meta.date != null ? meta.date : defaults.meta.date),
+        date: date,
+        id: id,
         customer: text(meta.customer != null ? meta.customer : defaults.meta.customer),
         customer_phone: text(
-          meta.customer_phone != null ? meta.customer_phone : defaults.meta.customer_phone,
+          meta.customer_phone != null
+            ? meta.customer_phone
+            : defaults.meta.customer_phone,
         ),
         seller: text(meta.seller != null ? meta.seller : defaults.meta.seller),
         seller_phone: text(
           meta.seller_phone != null ? meta.seller_phone : defaults.meta.seller_phone,
         ),
+        address: text(meta.address != null ? meta.address : defaults.meta.address),
       },
-      headers: headers.map(text),
+      headers: normalizeHeaders(source.headers),
+      custom_text: text(
+        source.custom_text != null ? source.custom_text : defaults.custom_text,
+      ),
       total_label: text(source.total_label || defaults.total_label),
       note: text(source.note || defaults.note),
       rows: rows.map(function (row) {
         var item = row && typeof row === "object" ? row : {};
         return {
           name: text(item.name),
+          category: text(item.category),
           image: text(item.image || "empty"),
           qty: text(item.qty),
           price: text(item.price),
@@ -196,9 +265,14 @@
     var saveButton = document.querySelector("[data-price-template-save]");
     var addButton = document.querySelector("[data-price-template-add-row]");
     var resetButton = document.querySelector("[data-price-template-reset]");
+    var logoFile = root.querySelector("[data-price-template-logo-file]");
+    var logoImage = root.querySelector("[data-price-template-logo-image]");
+    var defaultLogo = root.querySelector("[data-price-template-default-logo]");
     if (!preview || !rowsRoot || !formula || !address) return;
 
     var selectedCell = null;
+    var currentLogo = "";
+    var visibility = Object.assign({}, DEFAULT_VISIBILITY);
     var dirty = false;
 
     function setStatus(message, state) {
@@ -213,19 +287,88 @@
       setStatus("Есть несохранённые изменения", "pending");
     }
 
+    function setLogo(value) {
+      currentLogo = /^data:image\/(?:png|jpeg|webp);base64,/i.test(text(value))
+        ? text(value)
+        : "";
+      if (logoImage) {
+        logoImage.hidden = !currentLogo;
+        if (currentLogo) logoImage.src = currentLogo;
+        else logoImage.removeAttribute("src");
+      }
+      if (defaultLogo) defaultLogo.hidden = Boolean(currentLogo);
+    }
+
     function updateRowAddresses() {
       var rows = rowsRoot.querySelectorAll("[data-price-template-row]");
+      var columns = {
+        name: "B",
+        category: "C",
+        qty: "E",
+        price: "F",
+        discount: "G",
+        total: "H",
+      };
       rows.forEach(function (row, index) {
         var rowNumber = index + 2;
         var number = row.querySelector("[data-price-template-number]");
         if (number) number.textContent = String(index + 1);
-        var columns = { name: "B", qty: "D", price: "E", discount: "F", total: "G" };
         Object.keys(columns).forEach(function (field) {
-          var cell = row.querySelector('[data-price-template-row-field="' + field + '"]');
+          var cell = row.querySelector(
+            '[data-price-template-row-field="' + field + '"]',
+          );
           if (cell) cell.setAttribute("data-cell-address", columns[field] + rowNumber);
         });
         var remove = row.querySelector("[data-price-template-remove-row]");
         if (remove) remove.disabled = rows.length <= 1;
+      });
+    }
+
+    function updateFooterLayout() {
+      var labelCell = preview.querySelector("[data-price-template-total-label-cell]");
+      var priceCell = preview.querySelector("[data-price-template-price-summary-cell]");
+      var qtyCell = preview.querySelector("[data-price-template-qty-total]");
+      var labelSpan =
+        1 +
+        (visibility.name ? 1 : 0) +
+        (visibility.category ? 1 : 0) +
+        (visibility.photo ? 1 : 0);
+      var priceSpan = (visibility.price ? 1 : 0) + (visibility.discount ? 1 : 0);
+      if (labelCell) labelCell.colSpan = Math.max(1, labelSpan);
+      if (qtyCell) qtyCell.hidden = !visibility.qty;
+      if (priceCell) {
+        priceCell.hidden = priceSpan === 0;
+        priceCell.colSpan = Math.max(1, priceSpan);
+      }
+    }
+
+    function applyVisibility(key, on) {
+      visibility[key] = Boolean(on);
+      preview
+        .querySelectorAll('[data-price-component="' + key + '"]')
+        .forEach(function (node) {
+          node.hidden = !visibility[key];
+        });
+      var toggle = root.querySelector(
+        '[data-price-template-visibility="' + key + '"]',
+      );
+      if (toggle) toggle.checked = visibility[key];
+      if (key === "discount") {
+        preview
+          .querySelectorAll(
+            '[data-price-template-row-field="price"], [data-price-template-price-total]',
+          )
+          .forEach(function (node) {
+            node.classList.toggle("price-template-old", visibility.discount);
+          });
+      }
+      if (selectedCell && selectedCell.closest("[hidden]")) selectCell(null);
+      updateFooterLayout();
+    }
+
+    function applyAllVisibility() {
+      Object.keys(DEFAULT_VISIBILITY).forEach(function (key) {
+        applyVisibility(key, visibility[key]);
       });
     }
 
@@ -234,19 +377,22 @@
       var priceTotal = 0;
       var grandTotal = 0;
       rowsRoot.querySelectorAll("[data-price-template-row]").forEach(function (row) {
-        qtyTotal += numericValue(
+        var qty = numericValue(
           row.querySelector('[data-price-template-row-field="qty"]').textContent,
         );
-        priceTotal += numericValue(
-          row.querySelector('[data-price-template-row-field="price"]').textContent,
-        );
+        qtyTotal += qty;
+        priceTotal +=
+          qty *
+          numericValue(
+            row.querySelector('[data-price-template-row-field="price"]').textContent,
+          );
         grandTotal += numericValue(
           row.querySelector('[data-price-template-row-field="total"]').textContent,
         );
       });
-      setEditableText(preview, "[data-price-template-qty-total]", numberText(qtyTotal));
-      setEditableText(preview, "[data-price-template-price-total]", numberText(priceTotal));
-      setEditableText(preview, "[data-price-template-grand-total]", numberText(grandTotal));
+      setNodeText(preview, "[data-price-template-qty-total]", numberText(qtyTotal));
+      setNodeText(preview, "[data-price-template-price-total]", numberText(priceTotal));
+      setNodeText(preview, "[data-price-template-grand-total]", numberText(grandTotal));
     }
 
     function recalculateRow(row) {
@@ -254,11 +400,11 @@
       var qty = numericValue(
         row.querySelector('[data-price-template-row-field="qty"]').textContent,
       );
-      var discount = numericValue(
-        row.querySelector('[data-price-template-row-field="discount"]').textContent,
+      var discountCell = row.querySelector(
+        '[data-price-template-row-field="discount"]',
       );
-      var discountText =
-        row.querySelector('[data-price-template-row-field="discount"]').textContent || "";
+      var discountText = discountCell.textContent || "";
+      var discount = numericValue(discountText);
       var price = numericValue(
         row.querySelector('[data-price-template-row-field="price"]').textContent,
       );
@@ -281,79 +427,135 @@
       selectedCell.classList.add("is-selected");
       formula.disabled = false;
       formula.value = selectedCell.textContent || "";
-      address.textContent = selectedCell.getAttribute("data-cell-address") || "Ячейка";
+      address.textContent =
+        selectedCell.getAttribute("data-cell-address") || "Ячейка";
     }
 
     function applyTemplate(payload) {
       var data = normalizeTemplate(payload);
-      setEditableText(preview, '[data-price-template-field="title"]', data.title);
-      setEditableText(preview, '[data-price-template-meta="date"]', data.meta.date);
-      setEditableText(preview, '[data-price-template-meta="customer"]', data.meta.customer);
-      setEditableText(
+      setNodeText(preview, '[data-price-template-field="title"]', data.title);
+      setNodeText(preview, '[data-price-template-meta="date"]', data.meta.date);
+      setNodeText(preview, '[data-price-template-meta="id"]', data.meta.id);
+      setNodeText(
+        preview,
+        '[data-price-template-meta="customer"]',
+        data.meta.customer,
+      );
+      setNodeText(
         preview,
         '[data-price-template-meta="customer_phone"]',
         data.meta.customer_phone,
       );
-      setEditableText(preview, '[data-price-template-meta="seller"]', data.meta.seller);
-      setEditableText(
+      setNodeText(preview, '[data-price-template-meta="seller"]', data.meta.seller);
+      setNodeText(
         preview,
         '[data-price-template-meta="seller_phone"]',
         data.meta.seller_phone,
       );
+      setNodeText(preview, '[data-price-template-meta="address"]', data.meta.address);
+      setNodeText(
+        preview,
+        '[data-price-template-field="custom_text"]',
+        data.custom_text,
+      );
       data.headers.forEach(function (header, index) {
-        setEditableText(
+        setNodeText(
           preview,
           '[data-price-template-header="' + index + '"]',
           header,
         );
       });
-      setEditableText(preview, '[data-price-template-field="total_label"]', data.total_label);
-      setEditableText(preview, '[data-price-template-field="note"]', data.note);
+      setNodeText(
+        preview,
+        '[data-price-template-field="total_label"]',
+        data.total_label,
+      );
+      setNodeText(preview, '[data-price-template-field="note"]', data.note);
       rowsRoot.replaceChildren();
       data.rows.forEach(function (row) {
         rowsRoot.appendChild(createRow(row));
       });
+      setLogo(data.logo);
+      visibility = Object.assign({}, data.visible);
       updateRowAddresses();
       recalculateTotals();
+      applyAllVisibility();
       selectCell(null);
     }
 
     function collectTemplate() {
       var headers = [];
-      preview.querySelectorAll("[data-price-template-header]").forEach(function (header) {
-        headers[Number(header.getAttribute("data-price-template-header"))] =
-          header.textContent || "";
-      });
+      preview
+        .querySelectorAll("[data-price-template-header]")
+        .forEach(function (header) {
+          headers[Number(header.getAttribute("data-price-template-header"))] =
+            header.textContent || "";
+        });
       var rows = [];
       rowsRoot.querySelectorAll("[data-price-template-row]").forEach(function (row) {
         var image = row.querySelector("[data-price-template-image]");
         rows.push({
-          name: row.querySelector('[data-price-template-row-field="name"]').textContent || "",
-          image: image ? image.getAttribute("data-price-template-image") || "empty" : "empty",
-          qty: row.querySelector('[data-price-template-row-field="qty"]').textContent || "",
-          price: row.querySelector('[data-price-template-row-field="price"]').textContent || "",
+          name:
+            row.querySelector('[data-price-template-row-field="name"]').textContent ||
+            "",
+          category:
+            row.querySelector('[data-price-template-row-field="category"]')
+              .textContent || "",
+          image: image
+            ? image.getAttribute("data-price-template-image") || "empty"
+            : "empty",
+          qty:
+            row.querySelector('[data-price-template-row-field="qty"]').textContent ||
+            "",
+          price:
+            row.querySelector('[data-price-template-row-field="price"]').textContent ||
+            "",
           discount:
-            row.querySelector('[data-price-template-row-field="discount"]').textContent || "",
-          total: row.querySelector('[data-price-template-row-field="total"]').textContent || "",
+            row.querySelector('[data-price-template-row-field="discount"]')
+              .textContent || "",
+          total:
+            row.querySelector('[data-price-template-row-field="total"]').textContent ||
+            "",
         });
       });
       return {
-        title: preview.querySelector('[data-price-template-field="title"]').textContent || "",
+        version: 2,
+        title:
+          preview.querySelector('[data-price-template-field="title"]').textContent ||
+          "",
+        logo: currentLogo,
+        visible: Object.assign({}, visibility),
         meta: {
-          date: preview.querySelector('[data-price-template-meta="date"]').textContent || "",
-          customer:
-            preview.querySelector('[data-price-template-meta="customer"]').textContent || "",
-          customer_phone:
-            preview.querySelector('[data-price-template-meta="customer_phone"]').textContent ||
+          date:
+            preview.querySelector('[data-price-template-meta="date"]').textContent ||
             "",
-          seller: preview.querySelector('[data-price-template-meta="seller"]').textContent || "",
+          id:
+            preview.querySelector('[data-price-template-meta="id"]').textContent || "",
+          customer:
+            preview.querySelector('[data-price-template-meta="customer"]')
+              .textContent || "",
+          customer_phone:
+            preview.querySelector('[data-price-template-meta="customer_phone"]')
+              .textContent || "",
+          seller:
+            preview.querySelector('[data-price-template-meta="seller"]').textContent ||
+            "",
           seller_phone:
-            preview.querySelector('[data-price-template-meta="seller_phone"]').textContent || "",
+            preview.querySelector('[data-price-template-meta="seller_phone"]')
+              .textContent || "",
+          address:
+            preview.querySelector('[data-price-template-meta="address"]').textContent ||
+            "",
         },
         headers: headers,
+        custom_text:
+          preview.querySelector('[data-price-template-field="custom_text"]')
+            .textContent || "",
         total_label:
-          preview.querySelector('[data-price-template-field="total_label"]').textContent || "",
-        note: preview.querySelector('[data-price-template-field="note"]').textContent || "",
+          preview.querySelector('[data-price-template-field="total_label"]')
+            .textContent || "",
+        note:
+          preview.querySelector('[data-price-template-field="note"]').textContent || "",
         rows: rows,
       };
     }
@@ -380,6 +582,43 @@
       } finally {
         saveButton.disabled = false;
       }
+    }
+
+    function readImageFile(file) {
+      return new Promise(function (resolve, reject) {
+        if (!file || !/^image\/(?:png|jpeg|webp)$/i.test(file.type)) {
+          reject(new Error("type"));
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          reject(new Error("size"));
+          return;
+        }
+        var reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = function () {
+          var image = new Image();
+          image.onerror = reject;
+          image.onload = function () {
+            var maxWidth = 640;
+            var maxHeight = 280;
+            var scale = Math.min(
+              1,
+              maxWidth / image.naturalWidth,
+              maxHeight / image.naturalHeight,
+            );
+            var canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            var context = canvas.getContext("2d");
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/png"));
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
     }
 
     var initial = {};
@@ -417,6 +656,20 @@
         return;
       }
 
+      if (
+        event.target.closest("[data-price-template-logo-trigger]") ||
+        event.target.closest("[data-price-template-logo-upload]")
+      ) {
+        if (logoFile) logoFile.click();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-logo-reset]")) {
+        setLogo("");
+        markDirty();
+        return;
+      }
+
       var cell = event.target.closest("[data-price-cell]");
       if (cell && root.contains(cell)) selectCell(cell);
     });
@@ -432,6 +685,14 @@
       } else if (row && field === "total") {
         recalculateTotals();
       }
+      markDirty();
+    });
+
+    root.addEventListener("change", function (event) {
+      var toggle = event.target.closest("[data-price-template-visibility]");
+      if (!toggle) return;
+      var key = toggle.getAttribute("data-price-template-visibility");
+      applyVisibility(key, toggle.checked);
       markDirty();
     });
 
@@ -456,6 +717,30 @@
       markDirty();
     });
 
+    if (logoFile) {
+      logoFile.addEventListener("change", async function () {
+        var file = logoFile.files && logoFile.files[0];
+        if (!file) return;
+        setStatus("Подготавливаем логотип…", "pending");
+        try {
+          var logo = await readImageFile(file);
+          setLogo(logo);
+          visibility.logo = true;
+          applyVisibility("logo", true);
+          markDirty();
+        } catch (error) {
+          setStatus(
+            error && error.message === "size"
+              ? "Файл логотипа должен быть меньше 5 МБ"
+              : "Выберите PNG, JPG или WEBP",
+            "error",
+          );
+        } finally {
+          logoFile.value = "";
+        }
+      });
+    }
+
     if (addButton) {
       addButton.addEventListener("click", function () {
         if (rowsRoot.children.length >= 50) {
@@ -465,6 +750,7 @@
         rowsRoot.appendChild(
           createRow({
             name: "Новый товар",
+            category: "",
             image: "empty",
             qty: "1 шт",
             price: "0",
@@ -472,14 +758,19 @@
             total: "0",
           }),
         );
+        visibility.table = true;
+        applyVisibility("table", true);
         updateRowAddresses();
         recalculateTotals();
+        applyAllVisibility();
         markDirty();
         var newCell = rowsRoot.lastElementChild.querySelector(
           '[data-price-template-row-field="name"]',
         );
-        selectCell(newCell);
-        newCell.focus();
+        if (!newCell.closest("[hidden]")) {
+          selectCell(newCell);
+          newCell.focus();
+        }
       });
     }
 
