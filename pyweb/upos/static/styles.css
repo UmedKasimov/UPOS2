@@ -14276,16 +14276,13 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
+  opacity: 1;
 }
 
 .price-template-table-wrap:hover > .price-template-layout-handle,
 .price-template-table-wrap.is-layout-selected > .price-template-layout-handle,
 .price-template-layout-handle:focus-visible {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .price-template-table th,
