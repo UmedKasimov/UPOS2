@@ -251,7 +251,15 @@
               </template>
               <template data-crm-card-documents>
                 {% for document in row.related_documents %}
-                  <article class="crm-card-detail-event crm-card-detail-event--sale">
+                  <article
+                    class="crm-card-detail-event crm-card-detail-event--sale crm-card-detail-document"
+                    role="button"
+                    tabindex="0"
+                    data-crm-document-open
+                    data-crm-document='{{ document.detail_json|tojson|forceescape }}'
+                    data-crm-document-label="{{ document.related_label|e }}"
+                    data-crm-document-href="{{ document.detail_href|e }}"
+                  >
                     <strong>{{ document.related_label }} {{ document.number }}</strong>
                     <span>{{ document.date_label or document.date or "-" }} · {{ document.status_label }}</span>
                     <p>{{ document.amount }} {{ document.currency }}</p>
@@ -259,31 +267,56 @@
                 {% endfor %}
               </template>
               <template data-crm-card-chat>
-                {% for event in row.activity_log if event.kind == "chat" %}
-                  <article class="crm-card-detail-event crm-card-detail-event--chat">
-                    <strong>{{ (event.at or "-")[:16]|replace("T", " ") }}</strong>
-                    <span>{{ event.actor or "UPOS" }}</span>
-                    <p>{{ event.detail }}</p>
-                  </article>
+                {% for thread in row.messenger_threads %}
+                  <div class="crm-card-detail-thread-chat" data-crm-thread-chat="{{ thread.id }}" {% if not loop.first %}hidden{% endif %}>
+                    <div class="crm-card-detail-thread-head">
+                      <strong>{{ thread.channel }} · {{ thread.contact }}</strong>
+                      <span>{{ thread.topic or thread.status_label or "Чат клиента" }}</span>
+                    </div>
+                    {% for message in thread.messages %}
+                      <article class="crm-card-detail-event crm-card-detail-event--chat">
+                        <strong>{{ message.author or thread.contact or thread.channel }}</strong>
+                        <p>{{ message.text }}</p>
+                      </article>
+                    {% else %}
+                      <p class="crm-card-detail-empty">Сообщений пока нет.</p>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="crm-card-detail-empty">Диалогов с клиентом пока нет.</p>
                 {% endfor %}
               </template>
               <template data-crm-card-messengers>
-                {% for messenger in row.messenger_channels %}
-                  <a class="crm-card-detail-messenger" href="{{ messenger.href }}">
-                    <span class="crm-card-detail-messenger-icon" aria-hidden="true">{{ messenger.channel[:1] }}</span>
-                    <span>
-                      <strong>{{ messenger.channel }}</strong>
-                      <small>{{ messenger.contact or messenger.topic or "Канал клиента" }}</small>
-                    </span>
-                    {% if messenger.status_label %}<em>{{ messenger.status_label }}</em>{% endif %}
-                  </a>
+                <nav class="messenger-channel-tabs crm-messenger-channel-tabs" aria-label="Каналы диалогов клиента">
+                {% for thread in row.messenger_threads %}
+                  <button
+                    type="button"
+                    class="messenger-channel-tab{% if loop.first %} active{% endif %}"
+                    data-channel-brand="{{ thread.channel|lower }}"
+                    data-crm-thread-tab="{{ thread.id }}"
+                    aria-pressed="{{ 'true' if loop.first else 'false' }}"
+                  >
+                    <span class="messenger-channel-logo" aria-hidden="true">{{ thread.channel[:2] }}</span>
+                    <span class="messenger-channel-label">{{ thread.channel }}</span>
+                    {% if thread.messages %}<b>{{ thread.messages|length }}</b>{% endif %}
+                  </button>
+                {% else %}
+                  <span class="crm-card-detail-empty">Нет привязанных мессенджеров.</span>
                 {% endfor %}
+                </nav>
               </template>
               <template data-crm-card-tasks>
                 {% for event in row.activity_log if event.kind == "task" %}
                   <article class="crm-card-detail-event crm-card-detail-event--task">
                     <strong>{{ event.detail }}</strong>
                     <span>{{ event.due_date or (event.at or "-")[:10] }} · {{ event.assignee or event.actor or "Без ответственного" }}</span>
+                  </article>
+                {% endfor %}
+                {% for task in crm_records if task.item_type == "task" and task.status == "done" and ((task.related_deal_id and task.related_deal_id == row.id) or (row.client and task.client == row.client)) %}
+                  <article class="crm-card-detail-event crm-card-detail-event--task crm-card-detail-event--done">
+                    <strong>{{ task.title }}</strong>
+                    <span>Выполнено · {{ task.responsible or "Без ответственного" }}{% if task.due_date or task.date %} · {{ task.due_date or task.date }}{% endif %}</span>
+                    {% if task.note or task.next_step %}<p>{{ task.note or task.next_step }}</p>{% endif %}
                   </article>
                 {% endfor %}
               </template>
@@ -419,6 +452,39 @@
   </div>
 </dialog>
 
+<dialog class="settings-profile-modal crm-document-detail-dialog" id="crm-document-detail-dialog" aria-labelledby="crm-document-detail-title">
+  <div class="settings-profile-modal-surface crm-document-detail-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-document-detail-title" class="settings-profile-modal-title" data-crm-document-title>Документ</h2>
+        <p class="settings-profile-modal-sub" data-crm-document-subtitle>Информация о заказе</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-document-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="crm-document-detail-body">
+      <dl class="crm-card-detail-list crm-document-detail-list">
+        <div><dt>Клиент</dt><dd data-crm-document-field="client">-</dd></div>
+        <div><dt>Дата</dt><dd data-crm-document-field="date">-</dd></div>
+        <div><dt>Статус</dt><dd data-crm-document-field="status">-</dd></div>
+        <div><dt>Склад</dt><dd data-crm-document-field="warehouse">-</dd></div>
+        <div><dt>Сумма</dt><dd class="crm-card-detail-money" data-crm-document-field="amount">-</dd></div>
+        <div><dt>Оплачено</dt><dd data-crm-document-field="paid">-</dd></div>
+        <div><dt>Долг</dt><dd data-crm-document-field="debt">-</dd></div>
+        <div><dt>Ответственный</dt><dd data-crm-document-field="manager">-</dd></div>
+        <div class="wide"><dt>Комментарий</dt><dd data-crm-document-field="note">-</dd></div>
+      </dl>
+      <div class="crm-document-lines">
+        <h3>Состав</h3>
+        <div data-crm-document-lines></div>
+      </div>
+    </div>
+    <footer class="settings-profile-modal-foot">
+      <button type="button" class="btn btn-secondary" data-crm-document-close>Закрыть</button>
+      <a class="btn" href="#" data-crm-document-go>Перейти</a>
+    </footer>
+  </div>
+</dialog>
+
 <dialog class="settings-profile-modal crm-lost-reason-dialog" id="crm-lost-reason-dialog" aria-labelledby="crm-lost-reason-title">
   <div class="settings-profile-modal-surface crm-lost-reason-surface">
     <header class="settings-profile-modal-head">
@@ -538,10 +604,8 @@
           <button type="button" data-crm-detail-tab="comments">Комментарии</button>
         </nav>
         <div class="crm-card-detail-chatbox" data-crm-detail-pane="chat" hidden>
-          <span>Каналы общения</span>
           <div class="crm-card-detail-messengers" data-crm-card-detail-messengers></div>
-          <span>Текущий чат</span>
-          <strong data-crm-card-detail-chat>Не привязан</strong>
+          <strong class="crm-card-detail-chat-title" data-crm-card-detail-chat>Не привязан</strong>
           <div class="crm-card-detail-feed" data-crm-card-detail-chat-feed></div>
           <form class="crm-card-detail-activity-form" data-crm-activity-form="chat">
             <input name="text" maxlength="500" placeholder="Написать сообщение" required />

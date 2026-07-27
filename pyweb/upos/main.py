@@ -10166,6 +10166,7 @@ def create_app() -> FastAPI:
                             {
                                 **document,
                                 "related_label": {"order": "Заказ", "return": "Возврат"}.get(str(document.get("doc_type") or "sale"), "Отгрузка"),
+                                "detail_href": f"/sales?q={quote(str(document.get('number') or ''))}&doc_type={quote(str(document.get('doc_type') or 'sale'))}#sales-journal",
                             }
                         )
                 item["related_documents"] = related_documents[:8]
@@ -10173,6 +10174,7 @@ def create_app() -> FastAPI:
                 item["kanban_amount_value"] = linked_sale.get("amount_value", Decimal("0")) if linked_sale else item["amount_value"]
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
                 messenger_channels: list[dict[str, str]] = []
+                messenger_threads = messenger_threads_by_client.get(str(item["client"] or "").strip().casefold(), [])
                 seen_channels: set[str] = set()
 
                 def add_messenger_channel(channel: str, contact: str = "", topic: str = "", status_label: str = "") -> None:
@@ -10201,25 +10203,15 @@ def create_app() -> FastAPI:
                         }
                     )
 
-                for thread in messenger_threads_by_client.get(str(item["client"] or "").strip().casefold(), []):
+                for thread in messenger_threads:
                     add_messenger_channel(
                         str(thread.get("channel") or ""),
                         str(thread.get("contact") or thread.get("username") or thread.get("phone") or ""),
                         str(thread.get("topic") or ""),
                         str(thread.get("status_label") or ""),
                     )
-                inferred_channel_text = " ".join([item["lead_source"], item["contact_type"], item["chat_label"]]).casefold()
-                inferred_channels = (
-                    ("Telegram", "telegram"),
-                    ("Instagram", "instagram"),
-                    ("WhatsApp", "whatsapp"),
-                    ("Facebook", "facebook"),
-                    ("Сайт", "сайт"),
-                )
-                for channel_label, channel_token in inferred_channels:
-                    if channel_token in inferred_channel_text:
-                        add_messenger_channel(channel_label, item["chat_label"])
                 item["messenger_channels"] = messenger_channels
+                item["messenger_threads"] = messenger_threads
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
                 item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
                 item["edit_payload"] = _crm_record_edit_payload(item)

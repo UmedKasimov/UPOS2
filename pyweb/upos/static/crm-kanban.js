@@ -322,6 +322,7 @@
     const taskFeed = dialog.querySelector("[data-crm-card-detail-task-feed]");
     const commentFeed = dialog.querySelector("[data-crm-card-detail-comment-feed]");
     const activityForms = Array.from(dialog.querySelectorAll("[data-crm-activity-form]"));
+    const documentDialog = document.getElementById("crm-document-detail-dialog");
     let detailCard = null;
     const fields = {
       title: dialog.querySelector('[data-crm-card-detail-field="title"]'),
@@ -357,6 +358,115 @@
       const template = card.querySelector(selector);
       const content = template?.innerHTML?.trim() || "";
       feed.innerHTML = content || `<p class="crm-card-detail-empty">${escapeHtml(emptyText)}</p>`;
+    };
+
+    const documentText = (value) => {
+      const normalized = String(value == null ? "" : value).trim();
+      return normalized || "-";
+    };
+
+    const documentMoney = (value, currency) => {
+      const amount = documentText(value);
+      const suffix = documentText(currency || "UZS");
+      return /\b(UZS|USD)\b/i.test(amount) ? amount : `${amount} ${suffix}`;
+    };
+
+    const lineValue = (line, names, fallback) => {
+      for (const name of names) {
+        const value = line && line[name];
+        if (value != null && String(value).trim() !== "") return value;
+      }
+      return fallback;
+    };
+
+    const renderDocumentLines = (root, documentData) => {
+      if (!root) return;
+      const lines = Array.isArray(documentData.lines) ? documentData.lines : [];
+      if (!lines.length) {
+        root.innerHTML = '<p class="crm-card-detail-empty">Состав документа не указан.</p>';
+        return;
+      }
+      root.innerHTML = lines.map((line, index) => {
+        const name = lineValue(line, ["product", "product_name", "name", "service", "title"], "Позиция");
+        const quantity = lineValue(line, ["quantity", "qty", "count"], "-");
+        const price = lineValue(line, ["price", "unit_price", "price_label"], "");
+        const total = lineValue(line, ["total", "sum", "amount", "line_total"], "");
+        return (
+          '<div class="crm-document-line">' +
+          `<span>${escapeHtml(index + 1)}</span>` +
+          `<strong>${escapeHtml(name)}</strong>` +
+          `<small>${escapeHtml(quantity)} × ${escapeHtml(price || "-")}</small>` +
+          `<b>${escapeHtml(total ? documentMoney(total, documentData.currency) : "-")}</b>` +
+          "</div>"
+        );
+      }).join("");
+    };
+
+    const setDocumentField = (name, value) => {
+      const node = documentDialog?.querySelector(`[data-crm-document-field="${name}"]`);
+      if (node) node.textContent = documentText(value);
+    };
+
+    const openDocumentDetail = (trigger) => {
+      if (!documentDialog || !trigger) return;
+      let documentData = {};
+      try {
+        documentData = JSON.parse(trigger.dataset.crmDocument || "{}");
+      } catch {
+        documentData = {};
+      }
+      const label = trigger.dataset.crmDocumentLabel || documentData.doc_type_label || "Документ";
+      const titleNode = documentDialog.querySelector("[data-crm-document-title]");
+      const subtitleNode = documentDialog.querySelector("[data-crm-document-subtitle]");
+      const goLink = documentDialog.querySelector("[data-crm-document-go]");
+      if (titleNode) titleNode.textContent = `${label} ${documentText(documentData.number)}`;
+      if (subtitleNode) subtitleNode.textContent = `${documentText(documentData.date_label || documentData.date)} · ${documentText(documentData.status_label)}`;
+      setDocumentField("client", documentData.client || "Клиент не указан");
+      setDocumentField("date", documentData.date_label || documentData.date);
+      setDocumentField("status", documentData.status_label);
+      setDocumentField("warehouse", documentData.warehouse);
+      setDocumentField("amount", documentMoney(documentData.amount, documentData.currency));
+      setDocumentField("paid", documentMoney(documentData.paid_amount, documentData.currency));
+      setDocumentField("debt", documentMoney(documentData.debt_amount, documentData.currency));
+      setDocumentField("manager", documentData.manager || "Без ответственного");
+      setDocumentField("note", documentData.note);
+      renderDocumentLines(documentDialog.querySelector("[data-crm-document-lines]"), documentData);
+      if (goLink) {
+        goLink.href = trigger.dataset.crmDocumentHref || "/sales#sales-journal";
+      }
+      if (typeof documentDialog.showModal === "function") {
+        documentDialog.showModal();
+      } else {
+        documentDialog.setAttribute("open", "");
+      }
+    };
+
+    const closeDocumentDetail = () => {
+      if (!documentDialog) return;
+      if (documentDialog.open && typeof documentDialog.close === "function") {
+        documentDialog.close();
+      } else {
+        documentDialog.removeAttribute("open");
+      }
+    };
+
+    const showMessengerThread = (threadId) => {
+      if (!messengerList || !chatFeed) return;
+      const tabs = Array.from(messengerList.querySelectorAll("[data-crm-thread-tab]"));
+      const panes = Array.from(chatFeed.querySelectorAll("[data-crm-thread-chat]"));
+      const fallbackId = tabs[0]?.dataset.crmThreadTab || panes[0]?.dataset.crmThreadChat || "";
+      const activeId = String(threadId || fallbackId || "");
+      tabs.forEach((tab) => {
+        const active = tab.dataset.crmThreadTab === activeId;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      panes.forEach((pane) => {
+        pane.hidden = pane.dataset.crmThreadChat !== activeId;
+      });
+      const activePane = panes.find((pane) => pane.dataset.crmThreadChat === activeId);
+      const heading = activePane?.querySelector(".crm-card-detail-thread-head strong")?.textContent || "Обычный чат";
+      setText(chat, heading);
     };
 
     const renderActivityEvent = (event, kind) => {
@@ -425,6 +535,7 @@
       fillFeed(chatFeed, card, "template[data-crm-card-chat]", "Сообщений пока нет.");
       fillFeed(documents, card, "template[data-crm-card-documents]", "Заказов и отгрузок по клиенту пока нет.");
       fillFeed(messengerList, card, "template[data-crm-card-messengers]", "Связанных мессенджеров пока нет.");
+      showMessengerThread("");
       fillFeed(taskFeed, card, "template[data-crm-card-tasks]", "Задач пока нет.");
       fillFeed(commentFeed, card, "template[data-crm-card-comments]", "Комментариев пока нет.");
       showDetailPane("history");
@@ -465,6 +576,34 @@
     });
     detailTabs.forEach((button) => {
       button.addEventListener("click", () => showDetailPane(button.dataset.crmDetailTab || "history"));
+    });
+    messengerList?.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-crm-thread-tab]");
+      if (tab) showMessengerThread(tab.dataset.crmThreadTab || "");
+    });
+    messengerList?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const tab = event.target.closest("[data-crm-thread-tab]");
+      if (!tab) return;
+      event.preventDefault();
+      showMessengerThread(tab.dataset.crmThreadTab || "");
+    });
+    documents?.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-crm-document-open]");
+      if (trigger) openDocumentDetail(trigger);
+    });
+    documents?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const trigger = event.target.closest("[data-crm-document-open]");
+      if (!trigger) return;
+      event.preventDefault();
+      openDocumentDetail(trigger);
+    });
+    documentDialog?.querySelectorAll("[data-crm-document-close]").forEach((button) => {
+      button.addEventListener("click", closeDocumentDetail);
+    });
+    documentDialog?.addEventListener("click", (event) => {
+      if (event.target === documentDialog) closeDocumentDetail();
     });
     activityForms.forEach((form) => {
       form.addEventListener("submit", (event) => {
