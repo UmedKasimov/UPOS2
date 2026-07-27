@@ -10658,8 +10658,21 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-debt-table th:nth-child(6),
 .sales-debt-table td:nth-child(6),
 .sales-debt-table th:nth-child(7),
-.sales-debt-table td:nth-child(7) {
+.sales-debt-table td:nth-child(7),
+.sales-debt-table th:nth-child(8),
+.sales-debt-table td:nth-child(8) {
   min-width: 10rem;
+}
+
+.sales-debt-table th:nth-child(8),
+.sales-debt-table td:nth-child(8) {
+  width: 8rem;
+  text-align: center;
+}
+
+.sales-debt-row-pay-btn {
+  min-width: 6.25rem;
+  white-space: nowrap;
 }
 
 .sales-debt-total-row td {

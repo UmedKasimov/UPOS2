@@ -236,6 +236,7 @@
                 <th>Просрочка</th>
                 <th>Ответственный</th>
                 <th>Статус</th>
+                <th>Оплата</th>
               </tr>
             </thead>
             <tbody>
@@ -289,10 +290,20 @@
                   </td>
                   <td>{{ debt_client.manager }}</td>
                   <td><span class="sales-debt-pill sales-debt-pill--{{ debt_client.status }}">{{ debt_client.status_label }}</span></td>
+                  <td>
+                    {% if debt_client.documents %}
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm sales-debt-row-pay-btn"
+                        data-sales-debt-pay
+                        data-sale-id="{{ debt_client.documents[0].id }}"
+                      >Оплатить</button>
+                    {% endif %}
+                  </td>
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="7">Долгов по текущим фильтрам нет.</td>
+                  <td colspan="8">Долгов по текущим фильтрам нет.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -310,7 +321,7 @@
                   {% endfor %}
                 </td>
                 <td><strong>{{ sales_debt_workspace.documents_count }}</strong></td>
-                <td colspan="4"></td>
+                <td colspan="5"></td>
               </tr>
             </tfoot>
           </table>
