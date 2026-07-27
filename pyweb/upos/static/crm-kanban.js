@@ -312,6 +312,7 @@
     const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
+    const documents = dialog.querySelector("[data-crm-card-detail-documents]");
     const detailTags = dialog.querySelector("[data-crm-card-detail-tags]");
     const detailTagForm = dialog.querySelector("[data-crm-card-detail-tag-form]");
     const detailTabs = Array.from(dialog.querySelectorAll("[data-crm-detail-tab]"));
@@ -422,6 +423,7 @@
         history.innerHTML = content || '<p class="crm-card-detail-empty">История по клиенту пока пустая.</p>';
       }
       fillFeed(chatFeed, card, "template[data-crm-card-chat]", "Сообщений пока нет.");
+      fillFeed(documents, card, "template[data-crm-card-documents]", "Заказов и отгрузок по клиенту пока нет.");
       fillFeed(messengerList, card, "template[data-crm-card-messengers]", "Связанных мессенджеров пока нет.");
       fillFeed(taskFeed, card, "template[data-crm-card-tasks]", "Задач пока нет.");
       fillFeed(commentFeed, card, "template[data-crm-card-comments]", "Комментариев пока нет.");

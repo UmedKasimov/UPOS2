@@ -10055,6 +10055,7 @@ def create_app() -> FastAPI:
             counterparty_by_id = {row.id: row for row in counterparty_rows}
             counterparty_by_name = {row.name.strip().lower(): row for row in counterparty_rows if row.name}
             sale_by_key: dict[str, dict[str, Any]] = {}
+            sales_by_key: dict[str, list[dict[str, Any]]] = {}
             sale_by_id: dict[str, dict[str, Any]] = {}
             for sale_row in session.execute(
                 select(SaleDocument)
@@ -10072,6 +10073,8 @@ def create_app() -> FastAPI:
                 for key in keys:
                     if key and key not in sale_by_key:
                         sale_by_key[key] = sale_item
+                    if key:
+                        sales_by_key.setdefault(key, []).append(sale_item)
             subscribers = list(
                 session.execute(
                     select(TelegramSubscriber)
@@ -10146,7 +10149,26 @@ def create_app() -> FastAPI:
                 item["order_currency"] = str(linked_sale.get("currency") or item["currency"] or "UZS") if linked_sale else item["currency"]
                 linked_doc_type = str(linked_sale.get("doc_type") or "sale") if linked_sale else ""
                 item["related_document_type"] = linked_doc_type
-                item["related_document_label"] = {"order": "Заказ", "return": "Возврат"}.get(linked_doc_type, "Продажа") if linked_sale else ""
+                item["related_document_label"] = {"order": "Заказ", "return": "Возврат"}.get(linked_doc_type, "Отгрузка") if linked_sale else ""
+                related_documents: list[dict[str, Any]] = []
+                related_seen: set[str] = set()
+                for key in (
+                    str(record_data.get("related_sale_id") or "").strip(),
+                    str(item.get("counterparty_id") or "").strip(),
+                    str(item["client"] or "").strip().lower(),
+                ):
+                    for document in ([sale_by_id[key]] if key and key in sale_by_id else sales_by_key.get(key, [])):
+                        document_id = str(document.get("id") or "")
+                        if not document_id or document_id in related_seen:
+                            continue
+                        related_seen.add(document_id)
+                        related_documents.append(
+                            {
+                                **document,
+                                "related_label": {"order": "Заказ", "return": "Возврат"}.get(str(document.get("doc_type") or "sale"), "Отгрузка"),
+                            }
+                        )
+                item["related_documents"] = related_documents[:8]
                 item["kanban_amount"] = item["order_amount"] if linked_sale else item["amount"]
                 item["kanban_amount_value"] = linked_sale.get("amount_value", Decimal("0")) if linked_sale else item["amount_value"]
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)

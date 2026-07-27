@@ -249,6 +249,15 @@
                   </article>
                 {% endfor %}
               </template>
+              <template data-crm-card-documents>
+                {% for document in row.related_documents %}
+                  <article class="crm-card-detail-event crm-card-detail-event--sale">
+                    <strong>{{ document.related_label }} {{ document.number }}</strong>
+                    <span>{{ document.date_label or document.date or "-" }} · {{ document.status_label }}</span>
+                    <p>{{ document.amount }} {{ document.currency }}</p>
+                  </article>
+                {% endfor %}
+              </template>
               <template data-crm-card-chat>
                 {% for event in row.activity_log if event.kind == "chat" %}
                   <article class="crm-card-detail-event crm-card-detail-event--chat">
@@ -523,6 +532,7 @@
         </div>
         <nav class="crm-card-detail-tabs" aria-label="Разделы карточки">
           <button type="button" class="is-active" data-crm-detail-tab="history">История</button>
+          <button type="button" data-crm-detail-tab="documents">Заказы/отгрузки</button>
           <button type="button" data-crm-detail-tab="chat">Чат</button>
           <button type="button" data-crm-detail-tab="tasks">Задачи</button>
           <button type="button" data-crm-detail-tab="comments">Комментарии</button>
@@ -540,6 +550,9 @@
         </div>
         <div class="crm-card-detail-history" data-crm-card-detail-history data-crm-detail-pane="history">
           <p class="crm-card-detail-empty">История по клиенту пока пустая.</p>
+        </div>
+        <div class="crm-card-detail-documents" data-crm-card-detail-documents data-crm-detail-pane="documents" hidden>
+          <p class="crm-card-detail-empty">Заказов и отгрузок по клиенту пока нет.</p>
         </div>
         <div class="crm-card-detail-work-pane" data-crm-detail-pane="tasks" hidden>
           <div class="crm-card-detail-feed" data-crm-card-detail-task-feed></div>
