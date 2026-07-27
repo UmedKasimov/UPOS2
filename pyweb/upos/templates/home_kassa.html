@@ -12,6 +12,7 @@
   </div>
 {% endblock %}
 {% block main %}
+  {% include "_finance_module_tabs.html" %}
   <div class="kassa-root" id="kassa-root" data-workspace-timezone="{{ workspace_timezone | default('Asia/Tashkent') | e }}" data-active-org-id="{{ ((user.get('active_org_id') if user else '') or '') | e }}">
     <div class="kassa-status" id="kassa-status" aria-live="polite"></div>
 

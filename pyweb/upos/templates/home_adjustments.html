@@ -69,6 +69,9 @@
 {% block main %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root adjustments-root">
     <nav class="general-module-tabs org-hr-tabs" aria-label="Разделы корректировок" data-adjustments-open-tabs>
+      {# Возврат к лаунчеру финансов. Без data-adjustments-* — adjustments-page.js
+         управляет только своими вкладками и эту ссылку не трогает. #}
+      <a class="general-module-tab" href="{{ url_for('home_finance') }}">Финансы</a>
       <button type="button" class="general-module-tab active" data-adjustments-home-tab data-adjustments-view="home" aria-current="page">Корректировки</button>
       <button type="button" class="general-module-sync" data-adjustments-sync title="Синхронизировать" aria-label="Синхронизировать">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

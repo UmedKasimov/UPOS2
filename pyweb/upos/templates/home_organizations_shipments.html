@@ -10,6 +10,7 @@
 
 {% block main %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    {% include "_finance_module_tabs.html" %}
     {% if flash_ok or flash_err or request.query_params.get("err") == "csrf" %}
       <div class="organizations-flash-group">
         {% if flash_ok == "shipments_created" %}

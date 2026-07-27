@@ -20,6 +20,7 @@
 {% endblock %}
 {% block main %}
   <script id="schet-bootstrap-json" type="application/json">{{ schet_bootstrap_json | safe }}</script>
+  {% include "_finance_module_tabs.html" %}
   <div id="schet-root" class="schet-root">
     <div class="schet-status" id="schet-status" aria-live="polite"></div>
 

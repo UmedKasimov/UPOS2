@@ -1,0 +1,23 @@
+{#
+  Полоса вкладок для страниц раздела «Финансы».
+
+  Разделы финансов — отдельные страницы, а не view внутри одного модуля, поэтому
+  вкладку текущего раздела рисуем по active, а не по списку открытых вкладок.
+#}
+{% set finance_tab_titles = {
+  'home_account': _('nav.account'),
+  'home_kassa': _('nav.kassa'),
+  'home_adjustments': 'Корректировки',
+  'home_shipments': 'Отгрузки',
+  'home_hr': 'HR',
+} %}
+{% set finance_tab_title = finance_tab_titles.get(active) %}
+<nav class="general-module-tabs workbench-open-tabs" aria-label="Открытые вкладки финансов">
+  <a class="general-module-tab" href="{{ url_for('home_finance') }}">Финансы</a>
+  {% if finance_tab_title %}
+    <span class="general-module-tab general-module-tab--report active">
+      <button type="button" class="general-module-tab-activate" aria-current="page">{{ finance_tab_title }}</button>
+      <a class="general-module-tab-close" href="{{ url_for('home_finance') }}" aria-label="Закрыть {{ finance_tab_title }}">×</a>
+    </span>
+  {% endif %}
+</nav>
