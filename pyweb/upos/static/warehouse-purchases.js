@@ -1322,6 +1322,13 @@
         let total = 0;
         let saleTotal = 0;
         rows().forEach((row) => {
+          const isSearchRow = !rowHasProduct(row);
+          const removeButton = row.querySelector("[data-purchase-entry-remove]");
+          row.classList.toggle("is-search-row", isSearchRow);
+          if (removeButton) {
+            removeButton.hidden = isSearchRow;
+            removeButton.disabled = isSearchRow;
+          }
           const value = rowTotal(row);
           const output = row.querySelector("[data-purchase-entry-line-total]");
           if (output) output.textContent = purchaseEntryMoney(value, currency());
@@ -1477,6 +1484,7 @@
           });
         });
         row.querySelector("[data-purchase-entry-remove]")?.addEventListener("click", () => {
+          if (!rowHasProduct(row)) return;
           if (rows().length > 1) {
             row.remove();
           } else {
@@ -1484,6 +1492,7 @@
               input.value = "";
             });
           }
+          ensureBlankLine();
           recalc();
         });
       };

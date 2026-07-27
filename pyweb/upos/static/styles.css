@@ -1356,9 +1356,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 100%;
   margin-top: 0.85rem;
   padding: 0.8rem 2.6rem 0.8rem 0.95rem;
-  border: 1px solid var(--workbench-line, var(--border));
+  border: 1px solid color-mix(in srgb, #16a34a 25%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 8px);
-  background: color-mix(in oklch, var(--primary), transparent 94%);
+  background: color-mix(in srgb, #22c55e 7%, var(--card));
 }
 
 .sales-payment-breakdown[hidden] {
@@ -1430,6 +1430,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
+}
+
+.sales-payment-breakdown-row--paid {
+  border-color: color-mix(in srgb, #16a34a 24%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #22c55e 7%, var(--card));
 }
 
 .sales-payment-breakdown-row--paid strong {
@@ -9225,6 +9230,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
+}
+
+.sales-line-grid.is-search-row .sales-line-remove {
+  display: none;
 }
 
 .sales-line-remove:hover,

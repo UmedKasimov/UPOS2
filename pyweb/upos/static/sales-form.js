@@ -456,7 +456,15 @@
 
   function syncRowState(row) {
     if (!row) return;
-    row.classList.toggle("is-empty", !rowProductValue(row));
+    var isEmpty = !rowProductValue(row);
+    var isProductSearch = isEmpty && (row.getAttribute("data-sales-line-kind") || "product") === "product";
+    var removeButton = row.querySelector("[data-sales-line-remove]");
+    row.classList.toggle("is-empty", isEmpty);
+    row.classList.toggle("is-search-row", isProductSearch);
+    if (removeButton) {
+      removeButton.hidden = isProductSearch;
+      removeButton.disabled = isProductSearch;
+    }
   }
 
   function resetCombo(combo) {
@@ -653,11 +661,18 @@
     if (!row) return;
     if (root.dataset.salesApplyingTotal !== "1") clearManualTotal(root, false);
     var kind = row.getAttribute("data-sales-line-kind") || "product";
+    if (kind === "product" && !rowProductValue(row)) return;
     var rows = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="' + kind + '"]'));
     if (kind === "product" && rows.length <= 1) {
       clearLine(row);
     } else {
       row.remove();
+    }
+    if (kind === "product") {
+      var productRows = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]'));
+      if (productRows.length && !productRows.some(function (item) { return !rowProductValue(item); })) {
+        cloneLine(root, productRows[productRows.length - 1], options);
+      }
     }
     syncServiceControls(root);
     updateTotal(root);
