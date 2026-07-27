@@ -407,6 +407,26 @@ def telephony_account_dashboard(workspace_owner_id: str) -> dict[str, Any]:
     }
 
 
+def _workspace_purchase_expense_types(workspace_owner_id: str) -> list[dict[str, str]]:
+    settings = load_workspace_settings(workspace_owner_id)
+    raw_items = settings.get("purchase_expense_types")
+    items: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+    for raw in raw_items if isinstance(raw_items, list) else []:
+        if isinstance(raw, dict):
+            name = str(raw.get("name") or "").strip()
+            item_id = str(raw.get("id") or "").strip()
+        else:
+            name = str(raw or "").strip()
+            item_id = ""
+        name_key = name.casefold()
+        if not name or name_key in seen_names:
+            continue
+        seen_names.add(name_key)
+        items.append({"id": item_id or str(uuid.uuid4()), "name": name})
+    return sorted(items, key=lambda item: item["name"].casefold())
+
+
 def billing_clients_context() -> list[dict[str, Any]]:
     clients = []
     for row in list_users_safe():
@@ -9138,6 +9158,7 @@ def create_app() -> FastAPI:
             ),
             "suppliers": supplier_names,
             "payment_accounts": payment_accounts,
+            "expense_types": _workspace_purchase_expense_types(wid),
             "fx": {"USD_UZS": _decimal_plain_text(_workspace_usd_uzs_rate(wid))},
         }
         return tpl(
@@ -10158,6 +10179,49 @@ def create_app() -> FastAPI:
                 "note": str(extra.get("note") or ""),
             }
         return JSONResponse({"ok": True, "supplier": supplier})
+
+    @app.post("/warehouse/purchase-expense-types/save", name="warehouse_purchase_expense_type_save")
+    async def warehouse_purchase_expense_type_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"error": "Форма устарела. Обновите страницу и повторите."}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "Нужно войти заново"}, status_code=401)
+        assert wid is not None
+        name = " ".join(str(form.get("name") or "").split())
+        if not name:
+            return JSONResponse({"error": "Введите название вида расхода"}, status_code=400)
+        if len(name) > 120:
+            return JSONResponse({"error": "Название не должно превышать 120 символов"}, status_code=400)
+        items = _workspace_purchase_expense_types(wid)
+        expense_type = next((item for item in items if item["name"].casefold() == name.casefold()), None)
+        if expense_type is None:
+            expense_type = {"id": str(uuid.uuid4()), "name": name}
+            items.append(expense_type)
+            items.sort(key=lambda item: item["name"].casefold())
+            settings = load_workspace_settings(wid)
+            settings["purchase_expense_types"] = items
+            save_workspace_settings(wid, settings)
+        return JSONResponse({"ok": True, "expense_type": expense_type, "expense_types": items})
+
+    @app.post("/warehouse/purchase-expense-types/delete", name="warehouse_purchase_expense_type_delete")
+    async def warehouse_purchase_expense_type_delete(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"error": "Форма устарела. Обновите страницу и повторите."}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "Нужно войти заново"}, status_code=401)
+        assert wid is not None
+        expense_type_id = str(form.get("expense_type_id") or "").strip()
+        items = _workspace_purchase_expense_types(wid)
+        filtered = [item for item in items if item["id"] != expense_type_id]
+        if len(filtered) != len(items):
+            settings = load_workspace_settings(wid)
+            settings["purchase_expense_types"] = filtered
+            save_workspace_settings(wid, settings)
+        return JSONResponse({"ok": True, "expense_types": filtered})
 
     @app.post("/suppliers/save", name="suppliers_save")
     async def suppliers_save(request: Request):

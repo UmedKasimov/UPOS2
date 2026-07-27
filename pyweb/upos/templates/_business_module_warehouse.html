@@ -616,7 +616,7 @@
         <span>{{ 'Изменения заменят текущие позиции документа и пересчитают остатки.' if warehouse_purchase_edit else 'Закупка сразу попадет в остатки склада.' }}</span>
       </div>
     </header>
-    <form method="post" action="{{ url_for('warehouse_purchase_update', purchase_id=warehouse_purchase_edit.id) if warehouse_purchase_edit else url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-purchase-edit-id="{{ warehouse_purchase_edit.id if warehouse_purchase_edit else '' }}" data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}">
+    <form method="post" action="{{ url_for('warehouse_purchase_update', purchase_id=warehouse_purchase_edit.id) if warehouse_purchase_edit else url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-purchase-edit-id="{{ warehouse_purchase_edit.id if warehouse_purchase_edit else '' }}" data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}" data-purchase-expense-type-save-url="{{ url_for('warehouse_purchase_expense_type_save') }}" data-purchase-expense-type-delete-url="{{ url_for('warehouse_purchase_expense_type_delete') }}">
       {% include "_csrf_field.html" %}
       <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
       <input type="hidden" name="paid_amount" value="{{ warehouse_purchase_edit.paid_amount if warehouse_purchase_edit else '0' }}" data-purchase-paid-amount />
@@ -757,13 +757,21 @@
           {% set purchase_extra_expenses = (warehouse_purchase_edit.extra_expenses + [none]) if warehouse_purchase_edit and warehouse_purchase_edit.extra_expenses else [none] %}
           {% for expense in purchase_extra_expenses %}
             <div class="warehouse-purchase-expense-row" data-purchase-expense-row>
-              <input name="extra_expense_name" value="{{ expense.name if expense else '' }}" placeholder="Название расхода" autocomplete="off" />
+              <div class="warehouse-purchase-expense-type-field">
+                <input name="extra_expense_name" value="{{ expense.name if expense else '' }}" placeholder="Название расхода" autocomplete="off" list="warehouse-purchase-expense-types" />
+                <button type="button" class="warehouse-purchase-expense-type-add" data-purchase-expense-type-open aria-label="Создать вид расхода" title="Создать вид расхода">+</button>
+              </div>
               <input name="extra_expense_amount" value="{{ expense.amount if expense else '' }}" placeholder="Сумма" inputmode="decimal" data-purchase-expense-amount />
               <span data-purchase-expense-currency>{{ warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS' }}</span>
               <button type="button" class="sales-line-remove" data-purchase-expense-remove aria-label="Удалить расход">×</button>
             </div>
           {% endfor %}
         </div>
+        <datalist id="warehouse-purchase-expense-types">
+          {% for expense_type in warehouse_options.expense_types %}
+            <option value="{{ expense_type.name }}"></option>
+          {% endfor %}
+        </datalist>
         <div class="warehouse-purchase-expenses-summary">
           <span>Товары <strong data-purchase-expense-goods-total>0 UZS</strong></span>
           <span>Доп. расходы <strong data-purchase-expense-total>0 UZS</strong></span>
@@ -998,6 +1006,33 @@
         <div class="settings-profile-modal-foot">
           <button type="button" class="btn btn-secondary" data-warehouse-supplier-dialog-cancel>Отмена</button>
           <button type="submit" class="btn" data-warehouse-supplier-submit>Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="settings-profile-modal warehouse-expense-type-dialog" data-purchase-expense-type-dialog>
+      <form class="settings-profile-modal-surface warehouse-expense-type-dialog-surface" data-purchase-expense-type-form>
+        {% include "_csrf_field.html" %}
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Виды расходов</h2>
+            <p class="settings-profile-modal-sub">Создайте вид один раз и выбирайте его в следующих закупках.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-purchase-expense-type-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body warehouse-expense-type-dialog-body">
+          <label class="settings-profile-field">
+            <span class="settings-profile-field-label">Новый вид расхода</span>
+            <div class="warehouse-expense-type-create">
+              <input class="settings-profile-input" name="name" maxlength="120" required placeholder="Например, доставка" data-purchase-expense-type-name />
+              <button type="submit" class="btn" data-purchase-expense-type-submit>Создать</button>
+            </div>
+          </label>
+          <p class="sales-product-dialog-status" data-purchase-expense-type-status aria-live="polite"></p>
+          <div class="warehouse-expense-type-list" data-purchase-expense-type-list></div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-purchase-expense-type-close>Готово</button>
         </div>
       </form>
     </dialog>

@@ -1,6 +1,7 @@
 (function () {
   let activeSupplierPicker = null;
   let activeProductPicker = null;
+  let activeExpenseTypeInput = null;
 
   function updateAction(form) {
     const hash = form.action.includes("#") ? form.action.slice(form.action.indexOf("#")) : "#purchases";
@@ -424,6 +425,163 @@
     if (node) node.textContent = JSON.stringify(options);
   }
 
+  function writeExpenseTypes(items) {
+    const options = readPurchaseOptions();
+    options.expense_types = Array.isArray(items) ? items : [];
+    writePurchaseOptions(options);
+    const datalist = document.getElementById("warehouse-purchase-expense-types");
+    if (datalist) {
+      datalist.replaceChildren(...options.expense_types.map((item) => {
+        const option = document.createElement("option");
+        option.value = String(item.name || "");
+        return option;
+      }));
+    }
+  }
+
+  function closeExpenseTypeDialog(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-purchase-expense-type-dialog]") || document.querySelector("[data-purchase-expense-type-dialog]");
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.hidden = true;
+    dialog.removeAttribute("open");
+    activeExpenseTypeInput = null;
+  }
+
+  function renderExpenseTypeList(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-purchase-expense-type-dialog]") || document.querySelector("[data-purchase-expense-type-dialog]");
+    const list = dialog?.querySelector("[data-purchase-expense-type-list]");
+    if (!list) return;
+    const items = readPurchaseOptions().expense_types || [];
+    list.innerHTML = items.length
+      ? items.map((item) => (
+        `<div class="warehouse-expense-type-item">` +
+        `<button type="button" class="warehouse-expense-type-select" data-expense-type-id="${escapeHtml(item.id || "")}">${escapeHtml(item.name || "")}</button>` +
+        `<button type="button" class="sales-line-remove" data-expense-type-delete="${escapeHtml(item.id || "")}" aria-label="Удалить ${escapeHtml(item.name || "")}" title="Удалить">×</button>` +
+        `</div>`
+      )).join("")
+      : '<p class="warehouse-expense-type-empty">Сохранённых видов пока нет.</p>';
+    list.querySelectorAll("[data-expense-type-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const item = items.find((candidate) => String(candidate.id || "") === button.dataset.expenseTypeId);
+        if (activeExpenseTypeInput && item) {
+          activeExpenseTypeInput.value = item.name || "";
+          activeExpenseTypeInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        closeExpenseTypeDialog(entryForm);
+      });
+    });
+    list.querySelectorAll("[data-expense-type-delete]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const form = dialog.querySelector("[data-purchase-expense-type-form]");
+        const data = new FormData();
+        data.set("csrf_token", form.querySelector('[name="csrf_token"]')?.value || "");
+        data.set("expense_type_id", button.dataset.expenseTypeDelete || "");
+        button.disabled = true;
+        fetch(entryForm.getAttribute("data-purchase-expense-type-delete-url") || "/warehouse/purchase-expense-types/delete", {
+          method: "POST",
+          body: data,
+          headers: { "Accept": "application/json" },
+        })
+          .then((response) => response.json().catch(() => ({})).then((body) => {
+            if (!response.ok || !Array.isArray(body.expense_types)) throw new Error(body.error || "Не удалось удалить");
+            return body.expense_types;
+          }))
+          .then((expenseTypes) => {
+            writeExpenseTypes(expenseTypes);
+            renderExpenseTypeList(entryForm);
+          })
+          .catch((error) => {
+            const status = form.querySelector("[data-purchase-expense-type-status]");
+            if (status) {
+              status.textContent = error.message || "Не удалось удалить";
+              status.dataset.variant = "err";
+            }
+            button.disabled = false;
+          });
+      });
+    });
+  }
+
+  function openExpenseTypeDialog(entryForm, input) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-purchase-expense-type-dialog]") || document.querySelector("[data-purchase-expense-type-dialog]");
+    const form = dialog?.querySelector("[data-purchase-expense-type-form]");
+    if (!dialog || !form) return;
+    activeExpenseTypeInput = input || null;
+    form.reset();
+    const nameInput = form.querySelector("[data-purchase-expense-type-name]");
+    if (nameInput) nameInput.value = String(input?.value || "").trim();
+    const status = form.querySelector("[data-purchase-expense-type-status]");
+    if (status) {
+      status.textContent = "";
+      status.dataset.variant = "";
+    }
+    renderExpenseTypeList(entryForm);
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.hidden = false;
+      dialog.setAttribute("open", "");
+    }
+    if (!dialog.open) dialog.setAttribute("open", "");
+    setTimeout(() => {
+      nameInput?.focus();
+      nameInput?.select();
+    }, 0);
+  }
+
+  function wireExpenseTypeDialog(entryForm) {
+    const dialog = entryForm?.parentElement?.querySelector("[data-purchase-expense-type-dialog]") || document.querySelector("[data-purchase-expense-type-dialog]");
+    const form = dialog?.querySelector("[data-purchase-expense-type-form]");
+    if (!dialog || !form || dialog.dataset.purchaseExpenseTypeReady === "1") return;
+    dialog.dataset.purchaseExpenseTypeReady = "1";
+    dialog.querySelectorAll("[data-purchase-expense-type-close]").forEach((button) => {
+      button.addEventListener("click", () => closeExpenseTypeDialog(entryForm));
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const submit = form.querySelector("[data-purchase-expense-type-submit]");
+      const status = form.querySelector("[data-purchase-expense-type-status]");
+      if (submit) submit.disabled = true;
+      if (status) {
+        status.textContent = "Сохраняю...";
+        status.dataset.variant = "";
+      }
+      fetch(entryForm.getAttribute("data-purchase-expense-type-save-url") || "/warehouse/purchase-expense-types/save", {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json" },
+      })
+        .then((response) => response.json().catch(() => ({})).then((body) => {
+          if (!response.ok || !body.expense_type || !Array.isArray(body.expense_types)) {
+            throw new Error(body.error || "Не удалось сохранить");
+          }
+          return body;
+        }))
+        .then((body) => {
+          writeExpenseTypes(body.expense_types);
+          if (activeExpenseTypeInput) {
+            activeExpenseTypeInput.value = body.expense_type.name || "";
+            activeExpenseTypeInput.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          closeExpenseTypeDialog(entryForm);
+        })
+        .catch((error) => {
+          if (status) {
+            status.textContent = error.message || "Не удалось сохранить";
+            status.dataset.variant = "err";
+          }
+        })
+        .finally(() => {
+          if (submit) submit.disabled = false;
+        });
+    });
+  }
+
   function closeSupplierDialog(entryForm) {
     const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-supplier-dialog]") || document.querySelector("[data-warehouse-supplier-dialog]");
     if (!dialog) return;
@@ -828,6 +986,7 @@
       wireSupplierPicker(form);
       wireSupplierDialog(form);
       wireProductDialog(form);
+      wireExpenseTypeDialog(form);
       syncPurchasePriceTitle(form);
 
       const rows = () => Array.from(body.querySelectorAll("[data-purchase-entry-row]"));
@@ -1220,6 +1379,9 @@
           recalc();
         });
         row.querySelector('input[name="extra_expense_name"]')?.addEventListener("input", recalc);
+        row.querySelector("[data-purchase-expense-type-open]")?.addEventListener("click", () => {
+          openExpenseTypeDialog(form, row.querySelector('input[name="extra_expense_name"]'));
+        });
         row.querySelector("[data-purchase-expense-remove]")?.addEventListener("click", () => {
           if (expenseRows().length > 1) {
             row.remove();

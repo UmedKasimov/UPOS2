@@ -9394,6 +9394,38 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   padding: 0.45rem 0.7rem;
 }
 
+.warehouse-purchase-expense-type-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.warehouse-purchase-expense-type-field input {
+  border-right: 0;
+}
+
+.warehouse-purchase-expense-type-add {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: auto;
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  color: var(--primary);
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.warehouse-purchase-expense-type-add:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
 .warehouse-purchase-expense-row input:focus {
   outline: 2px solid color-mix(in srgb, var(--primary) 72%, transparent);
   outline-offset: -2px;
@@ -9429,6 +9461,73 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-expenses-summary .warehouse-purchase-expenses-landed strong {
   color: var(--primary);
   font-size: var(--text-sm);
+}
+
+.warehouse-expense-type-dialog-surface {
+  width: min(34rem, calc(100vw - 2rem));
+}
+
+.warehouse-expense-type-dialog-body {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.warehouse-expense-type-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+
+.warehouse-expense-type-list {
+  display: grid;
+  max-height: min(19rem, 45vh);
+  overflow: auto;
+  border: 1px solid var(--border);
+}
+
+.warehouse-expense-type-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  align-items: center;
+  min-height: 2.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.warehouse-expense-type-item:last-child {
+  border-bottom: 0;
+}
+
+.warehouse-expense-type-select {
+  min-width: 0;
+  align-self: stretch;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.55rem 0.75rem;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.warehouse-expense-type-select:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.warehouse-expense-type-empty {
+  margin: 0;
+  padding: 1rem;
+  color: var(--muted-text);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .warehouse-expense-type-create {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
