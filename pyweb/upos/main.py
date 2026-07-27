@@ -1122,6 +1122,7 @@ def create_app() -> FastAPI:
             "/api/settings/preferences",
             "/api/settings/account",
             "/api/settings/roles",
+            "/api/settings/integrations",
             "/api/user/avatar",
         }:
             return False
@@ -1134,6 +1135,8 @@ def create_app() -> FastAPI:
         if path.startswith("/api/me/devices"):
             return False
         if path.startswith("/api/telegram"):
+            return False
+        if path.startswith("/api/integrations/ibox"):
             return False
         if path.startswith("/api/hr/"):
             return False
