@@ -35,6 +35,7 @@ from upos.smpro_store import (
     _ibox_payment_credit,
     _ibox_product_data,
     _ibox_price_type_rows,
+    _ibox_shipment_status,
     _shipment_document_data,
 )
 
@@ -77,7 +78,7 @@ class SMProStoreTests(unittest.TestCase):
         self.assertEqual(document["date"], "2026-07-27")
         self.assertEqual(document["client"], "Zaman Family park")
         self.assertEqual(document["warehouse"], "Основной склад")
-        self.assertEqual(document["status"], "shipped")
+        self.assertEqual(document["status"], "installation")
         self.assertEqual(document["workflow_version"], 2)
         self.assertFalse(document["inventory_applied"])
         self.assertEqual(document["manager"], "IBOX")
@@ -116,6 +117,12 @@ class SMProStoreTests(unittest.TestCase):
         self.assertEqual(document["lines"][0]["quantity"], "2.5")
         self.assertEqual(document["lines"][0]["price"], "12.4")
         self.assertEqual(document["lines"][0]["total"], "31")
+
+    def test_ibox_shipment_status_recognizes_debt_until_fully_paid(self) -> None:
+        self.assertEqual(_ibox_shipment_status("100", "0"), "installation")
+        self.assertEqual(_ibox_shipment_status("100", "40"), "installation")
+        self.assertEqual(_ibox_shipment_status("100", "100"), "completed")
+        self.assertEqual(_ibox_shipment_status("100", "120"), "completed")
 
     def test_stock_selection_becomes_product_price_and_stock(self) -> None:
         product = _ibox_product_data(

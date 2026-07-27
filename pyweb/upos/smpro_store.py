@@ -327,10 +327,17 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
     created_at = _created_at(payload)
     lines = _shipment_lines(payload)
     first_line = lines[0] if lines else {}
+    due_date = _scalar(
+        payload,
+        "due_date",
+        "payment_due_date",
+        "maturity_date",
+        "deadline",
+    )[:10]
     return {
         "doc_type": "sale",
         "date": created_at.date().isoformat(),
-        "date_to": created_at.date().isoformat(),
+        "date_to": due_date or created_at.date().isoformat(),
         "client": (
             _text(payload, "outlet_name", "client_name", "counterparty_name")
             or "Клиент IBOX"
@@ -340,7 +347,7 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
             or _text(payload, "warehouse_name")
             or "Основной склад"
         ),
-        "status": "shipped",
+        "status": _ibox_shipment_status(_money(payload), Decimal("0")),
         "workflow_version": 2,
         # IBOX remains the stock source of truth for imported shipments.
         "inventory_applied": False,
@@ -363,6 +370,12 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
         "ibox_status": payload.get("status"),
         "ibox_payload": payload,
     }
+
+
+def _ibox_shipment_status(amount: Any, paid: Any) -> str:
+    total = max(Decimal("0"), _decimal_value(amount))
+    paid_amount = max(Decimal("0"), _decimal_value(paid))
+    return "completed" if total <= 0 or paid_amount >= total else "installation"
 
 
 def _shipment_counterparty_id(
@@ -705,6 +718,14 @@ def _reconcile_ibox_payments(session, workspace_owner_id: str) -> None:
                 for item in payment_lines
                 if str(item.get("type") or "")
             )
+        )
+        data["status"] = _ibox_shipment_status(shipment.amount, paid)
+        data["payment_status"] = (
+            "paid"
+            if paid >= outstanding and outstanding > 0
+            else "partial"
+            if paid > 0
+            else "unpaid"
         )
         shipment.data = data
 
