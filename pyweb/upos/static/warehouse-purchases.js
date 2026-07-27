@@ -818,6 +818,10 @@
       const totalOutput = form.querySelector("[data-purchase-entry-total]");
       const totalDisplayOutput = form.querySelector("[data-purchase-entry-total-display]");
       const saleTotalOutput = form.querySelector("[data-purchase-entry-sale-total]");
+      const expenseLines = form.querySelector("[data-purchase-expense-lines]");
+      const expenseTotalOutput = form.querySelector("[data-purchase-expense-total]");
+      const expenseGoodsTotalOutput = form.querySelector("[data-purchase-expense-goods-total]");
+      const landedTotalOutput = form.querySelector("[data-purchase-landed-total]");
       const paymentDialog = form.parentElement ? form.parentElement.querySelector("[data-purchase-payment-dialog]") : null;
       const options = readPurchaseOptions();
       if (!body) return;
@@ -841,6 +845,39 @@
       const currency = () => currencyInput?.value || "UZS";
       const saleCurrency = () => currency();
       form.dataset.purchaseEntryCurrency = currency();
+      const expenseRows = () => Array.from(expenseLines?.querySelectorAll("[data-purchase-expense-row]") || []);
+      const expenseTotal = () => expenseRows().reduce((sum, row) => {
+        return sum + purchaseEntryNumber(row.querySelector("[data-purchase-expense-amount]")?.value || "");
+      }, 0);
+
+      const updateExpenseAllocation = (goodsTotal) => {
+        const extraTotal = expenseTotal();
+        const productRows = rows().filter(rowHasProduct);
+        const quantityTotal = productRows.reduce((sum, row) => {
+          return sum + (purchaseEntryNumber(row.querySelector('input[name="line_quantity"]')?.value || "1") || 0);
+        }, 0);
+        productRows.forEach((row) => {
+          const quantity = purchaseEntryNumber(row.querySelector('input[name="line_quantity"]')?.value || "1") || 0;
+          const price = purchaseEntryNumber(row.querySelector('input[name="line_price"]')?.value);
+          const baseTotal = quantity * price;
+          const basis = goodsTotal > 0 ? baseTotal : quantity;
+          const basisTotal = goodsTotal > 0 ? goodsTotal : quantityTotal;
+          const allocated = basisTotal > 0 ? extraTotal * basis / basisTotal : 0;
+          const costPrice = quantity > 0 ? (baseTotal + allocated) / quantity : 0;
+          const output = row.querySelector("[data-purchase-entry-cost-price]");
+          if (output) output.textContent = purchaseEntryMoney(costPrice, currency());
+        });
+        rows().filter((row) => !rowHasProduct(row)).forEach((row) => {
+          const output = row.querySelector("[data-purchase-entry-cost-price]");
+          if (output) output.textContent = purchaseEntryMoney(0, currency());
+        });
+        if (expenseGoodsTotalOutput) expenseGoodsTotalOutput.textContent = purchaseEntryMoney(goodsTotal, currency());
+        if (expenseTotalOutput) expenseTotalOutput.textContent = purchaseEntryMoney(extraTotal, currency());
+        if (landedTotalOutput) landedTotalOutput.textContent = purchaseEntryMoney(goodsTotal + extraTotal, currency());
+        form.querySelectorAll("[data-purchase-expense-currency]").forEach((node) => {
+          node.textContent = currency();
+        });
+      };
 
       const paymentRows = () => paymentDialog ? Array.from(paymentDialog.querySelectorAll("[data-purchase-payment-line]")) : [];
       const paymentLabel = (select) => {
@@ -1131,6 +1168,7 @@
         if (totalOutput) totalOutput.textContent = purchaseEntryMoney(total, currency());
         if (totalDisplayOutput) totalDisplayOutput.textContent = purchaseEntryMoney(total, currency());
         if (saleTotalOutput) saleTotalOutput.textContent = purchaseEntryMoney(saleTotal, saleCurrency());
+        updateExpenseAllocation(total);
         renumber();
         updatePurchasePaymentBreakdown();
         updatePurchasePaymentSummary();
@@ -1161,9 +1199,51 @@
         });
         const output = clone.querySelector("[data-purchase-entry-line-total]");
         if (output) output.textContent = purchaseEntryMoney(0, currency());
+        const costOutput = clone.querySelector("[data-purchase-entry-cost-price]");
+        if (costOutput) costOutput.textContent = purchaseEntryMoney(0, currency());
         body.append(clone);
         wireRow(clone);
         recalc();
+      };
+
+      const wireExpenseRow = (row) => {
+        if (!row || row.dataset.purchaseExpenseReady === "1") return;
+        row.dataset.purchaseExpenseReady = "1";
+        const amount = row.querySelector("[data-purchase-expense-amount]");
+        amount?.addEventListener("input", () => {
+          formatPurchasePriceInput(amount, currency());
+          recalc();
+        });
+        amount?.addEventListener("blur", () => {
+          const value = purchaseEntryNumber(amount.value);
+          amount.value = value ? purchaseEntryFormatCurrency(value, currency()) : "";
+          recalc();
+        });
+        row.querySelector('input[name="extra_expense_name"]')?.addEventListener("input", recalc);
+        row.querySelector("[data-purchase-expense-remove]")?.addEventListener("click", () => {
+          if (expenseRows().length > 1) {
+            row.remove();
+          } else {
+            row.querySelectorAll("input").forEach((input) => {
+              input.value = "";
+            });
+          }
+          recalc();
+        });
+      };
+
+      const addExpenseRow = () => {
+        const source = expenseRows()[0];
+        if (!expenseLines || !source) return null;
+        const row = source.cloneNode(true);
+        delete row.dataset.purchaseExpenseReady;
+        row.querySelectorAll("input").forEach((input) => {
+          input.value = "";
+        });
+        expenseLines.append(row);
+        wireExpenseRow(row);
+        recalc();
+        return row;
       };
 
       const convertVisiblePrices = (nextCurrency) => {
@@ -1180,6 +1260,15 @@
               ? purchaseEntryFormatCurrency(convertPurchaseCurrency(value, previousCurrency, targetCurrency, options), targetCurrency)
               : "";
           });
+        });
+        expenseRows().forEach((row) => {
+          const input = row.querySelector("[data-purchase-expense-amount]");
+          const value = purchaseEntryNumber(input?.value || "");
+          if (input) {
+            input.value = value
+              ? purchaseEntryFormatCurrency(convertPurchaseCurrency(value, previousCurrency, targetCurrency, options), targetCurrency)
+              : "";
+          }
         });
         form.dataset.purchaseEntryCurrency = targetCurrency;
         recalc();
@@ -1231,6 +1320,11 @@
       };
 
       rows().forEach(wireRow);
+      expenseRows().forEach(wireExpenseRow);
+      form.querySelector("[data-purchase-expense-add]")?.addEventListener("click", () => {
+        const row = addExpenseRow();
+        row?.querySelector('input[name="extra_expense_name"]')?.focus();
+      });
       paymentRows().forEach(wirePurchasePaymentLine);
       form.querySelector("[data-purchase-payment-open]")?.addEventListener("click", openPurchasePaymentDialog);
       paymentDialog?.querySelectorAll("[data-purchase-payment-close], [data-purchase-payment-cancel]").forEach((button) => {
@@ -1294,6 +1388,11 @@
             const value = purchaseEntryNumber(input.value);
             input.value = value ? String(value) : "";
           });
+        });
+        expenseRows().forEach((row) => {
+          const input = row.querySelector("[data-purchase-expense-amount]");
+          const value = purchaseEntryNumber(input?.value || "");
+          if (input) input.value = value ? String(value) : "";
         });
         recalc();
       });
@@ -1566,6 +1665,13 @@
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
     setText(panel, "[data-purchase-detail-debt]", moneyWithCurrency(purchase.debt_amount, currency));
     setText(panel, "[data-purchase-detail-total]", moneyWithCurrency(purchase.amount, currency));
+    const extraExpenseTotal = purchaseEntryNumber(purchase.extra_expense_total);
+    const landedCostTotal = purchaseEntryNumber(purchase.landed_cost_total || purchase.amount);
+    setText(panel, "[data-purchase-detail-extra-expenses]", moneyWithCurrency(extraExpenseTotal, currency));
+    setText(panel, "[data-purchase-detail-landed-total]", moneyWithCurrency(landedCostTotal, currency));
+    panel.querySelectorAll("[data-purchase-detail-cost-summary]").forEach((row) => {
+      row.hidden = extraExpenseTotal <= 0;
+    });
     setText(panel, "[data-purchase-detail-note]", purchase.note || "Комментарий не указан");
     const paymentPane = panel.querySelector('[data-purchase-detail-pane="payment"]');
     if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
@@ -1593,6 +1699,7 @@
       appendCell(row, "-");
       appendCell(row, "-");
       appendCell(row, "-");
+      appendCell(row, "-");
       appendCell(row, moneyWithCurrency(purchase.amount, currency));
       linesRoot.append(row);
       return;
@@ -1601,12 +1708,14 @@
       const row = document.createElement("tr");
       const qty = quantityText(line.quantity);
       const price = line.price ? moneyWithCurrency(line.price, currency) : "-";
+      const costPrice = line.cost_price ? moneyWithCurrency(line.cost_price, currency) : price;
       const salePrice = line.sale_price ? moneyWithCurrency(line.sale_price, purchase.price_type_currency || currency) : "-";
       const total = line.total ? moneyWithCurrency(line.total, currency) : "-";
       appendCell(row, index + 1);
       appendCell(row, line.product || "Товар");
       appendCell(row, qty);
       appendCell(row, price);
+      appendCell(row, costPrice);
       appendCell(row, salePrice);
       appendCell(row, total);
       linesRoot.append(row);

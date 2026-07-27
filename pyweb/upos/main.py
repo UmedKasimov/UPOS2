@@ -3513,7 +3513,7 @@ def create_app() -> FastAPI:
                 product_row,
                 line_warehouse,
                 Decimal(delta_sign) * quantity,
-                price=str(line.get("price") or ""),
+                price=str(line.get("cost_price") or line.get("price") or ""),
                 op_date=op_date,
                 allow_negative_stock=allow_negative_stock,
             )
@@ -4729,7 +4729,7 @@ def create_app() -> FastAPI:
                 if not product_id:
                     product_id = product_id_by_name.get(str(raw_line.get("product") or "").strip().casefold(), "")
                 quantity = _sales_decimal(raw_line.get("quantity"))
-                price = _sales_decimal(raw_line.get("price"))
+                price = _sales_decimal(raw_line.get("cost_price") or raw_line.get("price"))
                 if not product_id or quantity <= 0 or price <= 0:
                     continue
                 line_currency = str(raw_line.get("currency") or document_currency).upper()
@@ -7490,10 +7490,27 @@ def create_app() -> FastAPI:
                     "product": str(line.get("product") or ""),
                     "quantity": _purchase_quantity_label(line.get("quantity")),
                     "price": _decimal_plain_text(_sales_decimal(line.get("price"))),
+                    "extra_expense": _decimal_plain_text(_sales_decimal(line.get("extra_expense"))),
+                    "cost_price": _decimal_plain_text(
+                        _sales_decimal(line.get("cost_price") or line.get("price"))
+                    ),
+                    "cost_total": _decimal_plain_text(
+                        _sales_decimal(line.get("cost_total") or line.get("total"))
+                    ),
                     "sale_price": _decimal_plain_text(_sales_decimal(line.get("sale_price"))),
                     "total": _decimal_plain_text(_sales_decimal(line.get("total"))),
                 }
             )
+        extra_expenses = [
+            {
+                "name": str(expense.get("name") or ""),
+                "amount": _decimal_plain_text(_sales_decimal(expense.get("amount"))),
+            }
+            for expense in (data.get("extra_expenses") if isinstance(data.get("extra_expenses"), list) else [])
+            if isinstance(expense, dict) and _sales_decimal(expense.get("amount")) > 0
+        ]
+        extra_expense_total = _sales_decimal(data.get("extra_expense_total"))
+        landed_cost_total = _sales_decimal(data.get("landed_cost_total")) or amount_value + extra_expense_total
         item = {
             "id": row.id,
             "number": row.number,
@@ -7518,6 +7535,9 @@ def create_app() -> FastAPI:
             "price_type_id": str(data.get("price_type_id") or ""),
             "price_type_name": str(data.get("price_type_name") or ""),
             "price_type_currency": str(data.get("price_type_currency") or row.currency or "UZS"),
+            "extra_expenses": extra_expenses,
+            "extra_expense_total": _decimal_plain_text(extra_expense_total),
+            "landed_cost_total": _decimal_plain_text(landed_cost_total),
             "note": str(data.get("note") or ""),
             "lines": safe_lines,
             "updated_at": row.updated_at.isoformat() if row.updated_at else "",
@@ -7540,6 +7560,9 @@ def create_app() -> FastAPI:
             "price_type_id": str(item["price_type_id"] or ""),
             "price_type_name": str(item["price_type_name"] or ""),
             "price_type_currency": str(item["price_type_currency"] or item["currency"] or "UZS"),
+            "extra_expenses": item["extra_expenses"],
+            "extra_expense_total": str(item["extra_expense_total"] or "0"),
+            "landed_cost_total": str(item["landed_cost_total"] or item["amount"] or "0"),
             "note": str(item["note"] or ""),
             "lines": safe_lines,
             "updated_at": str(item["updated_at"] or ""),
@@ -7582,6 +7605,66 @@ def create_app() -> FastAPI:
                     "total": str(line_total.normalize() if line_total else "0"),
                 }
             )
+        expense_names = list(form.getlist("extra_expense_name"))
+        expense_amounts = list(form.getlist("extra_expense_amount"))
+        extra_expenses: list[dict[str, str]] = []
+        extra_expense_total = Decimal("0")
+        for idx in range(max(len(expense_names), len(expense_amounts), 0)):
+            expense_name = str(expense_names[idx] if idx < len(expense_names) else "").strip()
+            expense_amount = _sales_decimal_strict(
+                expense_amounts[idx] if idx < len(expense_amounts) else "",
+                "Дополнительный расход",
+            )
+            if expense_amount < 0:
+                raise ValueError("Дополнительный расход не может быть отрицательным")
+            if expense_amount <= 0:
+                continue
+            extra_expenses.append(
+                {
+                    "name": expense_name or "Дополнительный расход",
+                    "amount": _decimal_plain_text(expense_amount),
+                }
+            )
+            extra_expense_total += expense_amount
+
+        allocation_lines = [
+            line for line in lines
+            if _sales_decimal(line.get("quantity")) > 0
+        ]
+        allocation_total = sum(
+            (_sales_decimal(line.get("total")) for line in allocation_lines),
+            Decimal("0"),
+        )
+        use_quantity_basis = allocation_total <= 0
+        if use_quantity_basis:
+            allocation_total = sum(
+                (_sales_decimal(line.get("quantity")) for line in allocation_lines),
+                Decimal("0"),
+            )
+        remaining_expense = extra_expense_total
+        for idx, line in enumerate(allocation_lines):
+            quantity = _sales_decimal(line.get("quantity"))
+            line_total = _sales_decimal(line.get("total"))
+            basis = quantity if use_quantity_basis else line_total
+            if idx == len(allocation_lines) - 1:
+                allocated_expense = remaining_expense
+            elif allocation_total > 0 and extra_expense_total > 0:
+                allocated_expense = (
+                    (extra_expense_total * basis / allocation_total)
+                    .quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+                )
+                allocated_expense = min(remaining_expense, max(Decimal("0"), allocated_expense))
+                remaining_expense -= allocated_expense
+            else:
+                allocated_expense = Decimal("0")
+            cost_total = line_total + allocated_expense
+            cost_price = cost_total / quantity if quantity > 0 else Decimal("0")
+            line["extra_expense"] = _decimal_plain_text(allocated_expense)
+            line["cost_total"] = _decimal_plain_text(cost_total)
+            line["cost_price"] = _decimal_plain_text(
+                cost_price.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+            )
+
         manual_amount = _sales_decimal_strict(form.get("amount"), "Итог")
         amount = manual_amount if manual_amount else total
         paid_amount = _sales_decimal_strict(form.get("paid_amount"), "Оплачено")
@@ -7632,6 +7715,9 @@ def create_app() -> FastAPI:
             "price_type_id": str(form.get("purchase_price_type_id") or "").strip(),
             "price_type_name": str(form.get("purchase_price_type_name") or "").strip(),
             "save_prices_to_price_type": str(form.get("save_purchase_prices") or "").strip().lower() in {"1", "on", "true", "yes"},
+            "extra_expenses": extra_expenses,
+            "extra_expense_total": _decimal_plain_text(extra_expense_total),
+            "landed_cost_total": _decimal_plain_text(amount + extra_expense_total),
             "note": str(form.get("note") or "").strip(),
             "lines": lines,
         }
@@ -14126,7 +14212,7 @@ def create_app() -> FastAPI:
                         if not product_id:
                             continue
                         quantity = _sales_decimal(raw_line.get("quantity"))
-                        price = _sales_decimal(raw_line.get("price"))
+                        price = _sales_decimal(raw_line.get("cost_price") or raw_line.get("price"))
                         document_product = document_products.setdefault(
                             product_id,
                             {

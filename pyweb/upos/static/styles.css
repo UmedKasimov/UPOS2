@@ -7462,7 +7462,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table {
-  min-width: 56rem;
+  min-width: 68rem;
   table-layout: fixed;
   border-collapse: collapse;
 }
@@ -7514,13 +7514,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(5),
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(5),
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(6),
-.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(6) {
-  width: 10.5rem;
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(6),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th:nth-child(7),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(7) {
+  width: 9.5rem;
   text-align: right;
   white-space: nowrap;
 }
 
-.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(6) {
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td:nth-child(7) {
   color: var(--primary);
   font-weight: 800;
 }
@@ -7528,6 +7530,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table tfoot td {
   border-color: color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 54%, var(--border));
   background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 12%, var(--card));
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-cost-summary td {
+  text-align: right;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-cost-summary:last-child td {
+  color: var(--primary);
+  font-weight: 900;
 }
 
 .purchase-document-payment-table {
@@ -9245,21 +9256,26 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .warehouse-purchase-entry-table th:nth-child(4),
 .warehouse-purchase-entry-table td:nth-child(4) {
-  width: 12rem;
+  width: 10rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(5),
 .warehouse-purchase-entry-table td:nth-child(5) {
-  width: 12rem;
+  width: 11rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(6),
 .warehouse-purchase-entry-table td:nth-child(6) {
-  width: 12rem;
+  width: 10rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(7),
 .warehouse-purchase-entry-table td:nth-child(7) {
+  width: 10rem;
+}
+
+.warehouse-purchase-entry-table th:nth-child(8),
+.warehouse-purchase-entry-table td:nth-child(8) {
   width: 3.25rem;
   text-align: center;
 }
@@ -9320,6 +9336,104 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .warehouse-purchase-entry-total {
   margin-top: 1rem;
+}
+
+.warehouse-purchase-expenses {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.warehouse-purchase-expenses-head {
+  align-items: center;
+}
+
+.warehouse-purchase-expenses-head > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.warehouse-purchase-expenses-head h3,
+.warehouse-purchase-expenses-head span {
+  margin: 0;
+}
+
+.warehouse-purchase-expenses-head span {
+  color: var(--muted-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.warehouse-purchase-expenses-list {
+  display: grid;
+  border: 1px solid var(--border);
+}
+
+.warehouse-purchase-expense-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 14rem) 4rem 2.75rem;
+  align-items: center;
+  min-height: 2.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.warehouse-purchase-expense-row:last-child {
+  border-bottom: 0;
+}
+
+.warehouse-purchase-expense-row input {
+  width: 100%;
+  min-width: 0;
+  height: 2.7rem;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.45rem 0.7rem;
+}
+
+.warehouse-purchase-expense-row input:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 72%, transparent);
+  outline-offset: -2px;
+}
+
+.warehouse-purchase-expense-row [data-purchase-expense-currency] {
+  color: var(--muted-text);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-align: center;
+}
+
+.warehouse-purchase-expense-row .sales-line-remove {
+  justify-self: center;
+}
+
+.warehouse-purchase-expenses-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem 1.25rem;
+  color: var(--muted-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.warehouse-purchase-expenses-summary strong {
+  margin-left: 0.35rem;
+  color: var(--foreground);
+}
+
+.warehouse-purchase-expenses-summary .warehouse-purchase-expenses-landed strong {
+  color: var(--primary);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 760px) {
+  .warehouse-purchase-expense-row {
+    grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.6fr) 3.5rem 2.5rem;
+  }
 }
 
 .warehouse-purchase-entry-footer {

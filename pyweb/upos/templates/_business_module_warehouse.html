@@ -451,7 +451,8 @@
                 <th>#</th>
                 <th>Товар</th>
                 <th>К-во</th>
-                <th>Цена</th>
+                <th>Приходная цена</th>
+                <th>Цена после расходов</th>
                 <th data-purchase-detail-sale-price-title>Продажная цена</th>
                 <th>Сумма</th>
               </tr>
@@ -461,13 +462,21 @@
               <tr class="warehouse-purchase-detail-totals">
                 <td colspan="2"><strong>Итого</strong></td>
                 <td><strong data-purchase-detail-quantity-total>0</strong></td>
-                <td colspan="2">
+                <td colspan="3">
                   <div class="warehouse-purchase-detail-payment-summary">
                     <span>Оплачено <strong data-purchase-detail-paid></strong></span>
                     <span class="warehouse-purchase-detail-payment-debt">Долг <strong data-purchase-detail-debt></strong></span>
                   </div>
                 </td>
                 <td><strong data-purchase-detail-total></strong></td>
+              </tr>
+              <tr class="warehouse-purchase-detail-cost-summary" data-purchase-detail-cost-summary hidden>
+                <td colspan="5">Дополнительные расходы</td>
+                <td colspan="2"><strong data-purchase-detail-extra-expenses></strong></td>
+              </tr>
+              <tr class="warehouse-purchase-detail-cost-summary" data-purchase-detail-cost-summary hidden>
+                <td colspan="5">Себестоимость с расходами</td>
+                <td colspan="2"><strong data-purchase-detail-landed-total></strong></td>
               </tr>
             </tfoot>
           </table>
@@ -670,7 +679,8 @@
                 <th>№</th>
                 <th>Товар</th>
                 <th>К-во</th>
-                <th>Цена</th>
+                <th>Приходная цена</th>
+                <th>Цена после расходов</th>
                 <th data-purchase-sale-price-title>Продажная цена</th>
                 <th>Сумма</th>
                 <th></th>
@@ -697,6 +707,11 @@
                   <input name="line_price" value="{{ purchase_line.price if purchase_line else '' }}" inputmode="decimal" placeholder="Цена" data-purchase-entry-number />
                 </td>
                 <td>
+                  <strong data-purchase-entry-cost-price>
+                    {{ (purchase_line.cost_price ~ ' ' ~ warehouse_purchase_edit.currency) if purchase_line and purchase_line.cost_price else '0 ' ~ (warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS') }}
+                  </strong>
+                </td>
+                <td>
                   <input name="line_sale_price" value="{{ purchase_line.sale_price if purchase_line else '' }}" inputmode="decimal" placeholder="Продажная цена" data-purchase-entry-sale-price />
                 </td>
                 <td>
@@ -710,7 +725,7 @@
             </tbody>
             <tfoot>
               <tr class="warehouse-purchase-entry-summary-row">
-                <td colspan="4"></td>
+                <td colspan="5"></td>
                 <td>
                   <span>Продажная сумма</span>
                   <output data-purchase-entry-sale-total>0 UZS</output>
@@ -727,6 +742,32 @@
         <div class="sales-total-bar warehouse-purchase-entry-total">
           <span>ИТОГО</span>
           <output data-purchase-entry-total-display>0 UZS</output>
+        </div>
+      </section>
+
+      <section class="product-form-section warehouse-purchase-expenses" data-purchase-expenses>
+        <div class="sales-section-head warehouse-purchase-expenses-head">
+          <div>
+            <h3>Дополнительные расходы</h3>
+            <span>Доставка, таможня и другие расходы распределяются по себестоимости товаров.</span>
+          </div>
+          <button class="btn btn-secondary" type="button" data-purchase-expense-add>+ Расход</button>
+        </div>
+        <div class="warehouse-purchase-expenses-list" data-purchase-expense-lines>
+          {% set purchase_extra_expenses = (warehouse_purchase_edit.extra_expenses + [none]) if warehouse_purchase_edit and warehouse_purchase_edit.extra_expenses else [none] %}
+          {% for expense in purchase_extra_expenses %}
+            <div class="warehouse-purchase-expense-row" data-purchase-expense-row>
+              <input name="extra_expense_name" value="{{ expense.name if expense else '' }}" placeholder="Название расхода" autocomplete="off" />
+              <input name="extra_expense_amount" value="{{ expense.amount if expense else '' }}" placeholder="Сумма" inputmode="decimal" data-purchase-expense-amount />
+              <span data-purchase-expense-currency>{{ warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS' }}</span>
+              <button type="button" class="sales-line-remove" data-purchase-expense-remove aria-label="Удалить расход">×</button>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="warehouse-purchase-expenses-summary">
+          <span>Товары <strong data-purchase-expense-goods-total>0 UZS</strong></span>
+          <span>Доп. расходы <strong data-purchase-expense-total>0 UZS</strong></span>
+          <span class="warehouse-purchase-expenses-landed">Себестоимость <strong data-purchase-landed-total>0 UZS</strong></span>
         </div>
       </section>
 
