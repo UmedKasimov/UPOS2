@@ -1013,6 +1013,7 @@
 	          input.readOnly = toggle.checked;
 	          input.classList.toggle('is-automatic', toggle.checked);
 	          syncAllDependentPrices();
+	          window.setTimeout(syncAllDependentPrices, 0);
 	        };
 	        toggle.addEventListener('change', sync);
 	        sync();
