@@ -430,6 +430,30 @@
     return draft;
   }
 
+  function editDraftFromSale(sale) {
+    var draft = returnDraftFromSale(sale);
+    draft.documentId = sale.id || "";
+    draft.docType = textValue(sale.doc_type || "sale").toLowerCase() || "sale";
+    draft.number = sale.number || "";
+    draft.sourceSaleId = sale.source_sale_id || "";
+    draft.crmRecordId = sale.crm_record_id || "";
+    draft.date = sale.date || "";
+    draft.dateTo = sale.date_to || sale.date || "";
+    draft.priceTypeId = sale.price_type_id || "";
+    draft.paidAmount = numericText(sale.paid_value || sale.paid_amount || "");
+    draft.paymentType = sale.payment_type || "";
+    draft.paymentLines = JSON.stringify(Array.isArray(sale.payment_lines) ? sale.payment_lines : []);
+    draft.note = sale.note || "";
+    return draft;
+  }
+
+  function openEditFromSale(sale) {
+    if (!sale || !sale.id) return;
+    saveSalesDraftText(JSON.stringify(editDraftFromSale(sale)));
+    var docType = encodeURIComponent(textValue(sale.doc_type || "sale").toLowerCase() || "sale");
+    window.location.href = "/sales?doc_type=" + docType + "&edit_id=" + encodeURIComponent(sale.id) + "#sales-form";
+  }
+
   function openReturnFromSale(sale) {
     if (!sale || textValue(sale.doc_type).toLowerCase() !== "sale") return;
     saveSalesDraftText(JSON.stringify(returnDraftFromSale(sale)));
@@ -858,6 +882,13 @@
         event.stopPropagation();
       });
     });
+    scope.querySelectorAll("[data-sales-journal-edit]").forEach(function (trigger) {
+      if (trigger.dataset.salesJournalEditReady === "1") return;
+      trigger.dataset.salesJournalEditReady = "1";
+      trigger.addEventListener("click", function () {
+        openEditFromSale(readSale(trigger.dataset.saleId || ""));
+      });
+    });
     scope.querySelectorAll("[data-sales-detail-tab]").forEach(function (tab) {
       if (tab.dataset.salesDetailTabReady === "1") return;
       tab.dataset.salesDetailTabReady = "1";
@@ -933,6 +964,16 @@
         var panel = trigger.closest("[data-sales-journal-detail]");
         var sale = panel ? readSale(panel.dataset.saleId || "") : null;
         printSaleReceipt(sale);
+      });
+    });
+    scope.querySelectorAll("[data-sales-detail-menu-edit]").forEach(function (trigger) {
+      if (trigger.dataset.salesDetailMenuEditReady === "1") return;
+      trigger.dataset.salesDetailMenuEditReady = "1";
+      trigger.addEventListener("click", function () {
+        var panel = trigger.closest("[data-sales-journal-detail]");
+        var sale = panel ? readSale(panel.dataset.saleId || "") : null;
+        closeDetailMenu(scope);
+        openEditFromSale(sale);
       });
     });
     scope.querySelectorAll("[data-sales-detail-menu-close]").forEach(function (trigger) {

@@ -877,7 +877,10 @@
 
   function collectSalesDraft(root) {
     return {
+      documentId: root.querySelector('input[name="sale_id"]')?.value || "",
+      docType: root.querySelector('input[name="doc_type"]')?.value || "sale",
       number: root.querySelector('input[name="number"]')?.value || "",
+      crmRecordId: root.querySelector('input[name="crm_record_id"]')?.value || "",
       sourceSaleId: root.querySelector('input[name="source_sale_id"]')?.value || "",
       date: root.querySelector('input[name="date"]')?.value || "",
       dateTo: root.querySelector('input[name="date_to"]')?.value || "",
@@ -887,6 +890,7 @@
       paidAmount: root.querySelector("[data-sales-paid-amount]")?.value || "",
       paymentType: root.querySelector("[data-sales-payment-type]")?.value || "",
       paymentLines: root.querySelector("[data-sales-payment-lines]")?.value || "",
+      note: root.querySelector('textarea[name="note"]')?.value || "",
       manualOriginalTotal: root.dataset.salesManualOriginalTotal || "",
       products: Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).map(lineDraft).filter(hasDraftLine),
       services: serviceRows(root).map(lineDraft).filter(hasDraftLine)
@@ -914,7 +918,7 @@
 
   function isSalesSavedPage() {
     try {
-      return ["saved", "order_saved", "return_saved"].indexOf(new URLSearchParams(window.location.search).get("msg")) >= 0;
+      return ["saved", "order_saved", "return_saved", "updated"].indexOf(new URLSearchParams(window.location.search).get("msg")) >= 0;
     } catch (_) {
       return false;
     }
@@ -978,7 +982,10 @@
     }
     if (!draft || typeof draft !== "object") return false;
     root.dataset.salesRestoringDraft = "1";
+    setDraftField(root, 'input[name="sale_id"]', draft.documentId);
+    setDraftField(root, 'input[name="doc_type"]', draft.docType);
     setDraftField(root, 'input[name="number"]', draft.number);
+    setDraftField(root, 'input[name="crm_record_id"]', draft.crmRecordId);
     setDraftField(root, 'input[name="source_sale_id"]', draft.sourceSaleId);
     setDraftField(root, 'input[name="date"]', draft.date);
     setDraftField(root, 'input[name="date_to"]', draft.dateTo);
@@ -987,6 +994,7 @@
     setDraftField(root, "[data-sales-paid-amount]", draft.paidAmount);
     setDraftField(root, "[data-sales-payment-type]", draft.paymentType);
     setDraftField(root, "[data-sales-payment-lines]", draft.paymentLines);
+    setDraftField(root, 'textarea[name="note"]', draft.note);
     if (draft.manualOriginalTotal) root.dataset.salesManualOriginalTotal = draft.manualOriginalTotal;
     else delete root.dataset.salesManualOriginalTotal;
     var clientCombo = root.querySelector('[data-sales-combobox="client"]');
@@ -1013,6 +1021,13 @@
       return normalize(item.name) === normalize(draft.client);
     });
     updateClientBalance(root, matchedClient || (draft.client ? draft.client : null));
+    var editing = !!String(draft.documentId || "").trim();
+    var typeLabel = draft.docType === "order" ? "заказа" : draft.docType === "return" ? "возврата" : "продажи";
+    var title = root.closest("#sales-form")?.querySelector("[data-sales-form-title]");
+    var submit = root.querySelector("[data-sales-form-submit]");
+    if (editing && title) title.textContent = "Редактирование " + typeLabel + " " + (draft.number || "");
+    if (editing && submit) submit.textContent = "Сохранить изменения";
+    root.dataset.salesEditMode = editing ? "1" : "0";
     delete root.dataset.salesRestoringDraft;
     return true;
   }

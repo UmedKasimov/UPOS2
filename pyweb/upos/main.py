@@ -3534,7 +3534,13 @@ def create_app() -> FastAPI:
             quantities[key] = quantities.get(key, Decimal("0")) + quantity
         return quantities
 
-    def _validate_sales_return(session: Any, workspace_owner_id: str, data: dict[str, Any]) -> None:
+    def _validate_sales_return(
+        session: Any,
+        workspace_owner_id: str,
+        data: dict[str, Any],
+        *,
+        exclude_sale_id: str = "",
+    ) -> None:
         source_sale_id = str(data.get("source_sale_id") or "").strip()
         if not source_sale_id:
             raise ValueError("Создайте возврат из исходной продажи в журнале продаж")
@@ -3556,6 +3562,8 @@ def create_app() -> FastAPI:
         for return_row in session.execute(
             select(SaleDocument).where(SaleDocument.workspace_owner_id == workspace_owner_id)
         ).scalars():
+            if exclude_sale_id and return_row.id == exclude_sale_id:
+                continue
             return_data = _json_object(return_row.data)
             if str(return_data.get("doc_type") or "") != "return":
                 continue
@@ -6029,6 +6037,10 @@ def create_app() -> FastAPI:
             "status_label": _sales_status_label(status),
             "manager": str(data.get("manager") or ""),
             "note": str(data.get("note") or ""),
+            "price_type_id": str(data.get("price_type_id") or ""),
+            "price_type": str(data.get("price_type") or ""),
+            "crm_record_id": str(data.get("crm_record_id") or ""),
+            "source_sale_id": str(data.get("source_sale_id") or ""),
             "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
             "updated_at": row.updated_at,
         }
@@ -6569,10 +6581,11 @@ def create_app() -> FastAPI:
                     "currency": currency,
                 }
             )
+        if payment_rows:
+            payment_rows = _normalize_sales_payment_lines(workspace_owner_id, payment_rows)
+        _delete_sales_cash_transactions(workspace_owner_id, sale_id)
         if not payment_rows:
             return
-        payment_rows = _normalize_sales_payment_lines(workspace_owner_id, payment_rows)
-        _delete_sales_cash_transactions(workspace_owner_id, sale_id)
         tx_type = "expense" if doc_type == "return" else "income"
         actor_name = str((user or {}).get("name") or (user or {}).get("username") or "").strip()
         employee_id = str((user or {}).get("user_id") or (user or {}).get("id") or "").strip()
@@ -7018,6 +7031,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        editing_sale_id = str(form.get("sale_id") or "").strip()
         try:
             data, amount, currency = _sales_document_payload(form)
             data["payment_lines"] = _normalize_sales_payment_lines(
@@ -7033,9 +7047,26 @@ def create_app() -> FastAPI:
         saved_sale_id = ""
         saved_sale_number = ""
         with session_scope() as session:
+            editing_row = None
+            old_data: dict[str, Any] = {}
+            if editing_sale_id:
+                candidate_row = session.get(SaleDocument, editing_sale_id)
+                if not candidate_row or candidate_row.workspace_owner_id != wid:
+                    return RedirectResponse(
+                        url="/sales?error=" + quote("Документ продажи не найден") + "#sales-journal",
+                        status_code=302,
+                    )
+                editing_row = candidate_row
+                old_data = _json_object(candidate_row.data).copy()
+                old_doc_type = str(old_data.get("doc_type") or "sale")
+                data["doc_type"] = old_doc_type if old_doc_type in {"sale", "order", "return"} else "sale"
+                if not data.get("crm_record_id"):
+                    data["crm_record_id"] = str(old_data.get("crm_record_id") or "")
+                if not data.get("source_sale_id"):
+                    data["source_sale_id"] = str(old_data.get("source_sale_id") or "")
             linked_crm_row = None
             linked_crm_id = str(data.get("crm_record_id") or "").strip()
-            if linked_crm_id:
+            if linked_crm_id and editing_row is None:
                 candidate = session.get(CrmRecord, linked_crm_id)
                 if candidate and candidate.workspace_owner_id == wid and candidate.item_type in {"deal", "task"}:
                     candidate_data = _json_object(candidate.data)
@@ -7065,7 +7096,24 @@ def create_app() -> FastAPI:
                     if line_warehouse and line_warehouse != warehouse_row.name:
                         _ensure_warehouse(session, wid, name=line_warehouse)
                 if data["doc_type"] == "return":
-                    _validate_sales_return(session, wid, data)
+                    _validate_sales_return(
+                        session,
+                        wid,
+                        data,
+                        exclude_sale_id=editing_sale_id,
+                    )
+                if editing_row is not None:
+                    old_doc_type = str(old_data.get("doc_type") or "sale")
+                    old_delta_sign = 1 if old_doc_type == "sale" else -1 if old_doc_type == "return" else 0
+                    _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=str(old_data.get("warehouse") or "Основной склад"),
+                        lines=list(old_data.get("lines") or []),
+                        delta_sign=old_delta_sign,
+                        op_date=str(old_data.get("date") or ""),
+                        allow_negative_stock=False,
+                    )
                 delta_sign = -1 if data["doc_type"] == "sale" else 1 if data["doc_type"] == "return" else 0
                 data["lines"] = _sync_product_lines(
                     session,
@@ -7080,20 +7128,30 @@ def create_app() -> FastAPI:
                 data["counterparty_id"] = client_row.id
             except ValueError as exc:
                 return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-form", status_code=302)
-            number = _next_sales_document_number(session, wid, data["doc_type"])
-            doc_id = str(uuid.uuid4())
-            row = SaleDocument(
-                id=doc_id,
-                workspace_owner_id=wid,
-                number=number,
-                amount=amount,
-                currency=currency,
-                counterparty_id=client_row.id,
-                external_source="local",
-                external_id=doc_id,
-                data=data,
-            )
-            session.add(row)
+            if editing_row is not None:
+                row = editing_row
+                row.amount = amount
+                row.currency = currency
+                row.counterparty_id = client_row.id
+                row.data = data
+                flag_modified(row, "data")
+                doc_id = row.id
+                number = row.number
+            else:
+                number = _next_sales_document_number(session, wid, data["doc_type"])
+                doc_id = str(uuid.uuid4())
+                row = SaleDocument(
+                    id=doc_id,
+                    workspace_owner_id=wid,
+                    number=number,
+                    amount=amount,
+                    currency=currency,
+                    counterparty_id=client_row.id,
+                    external_source="local",
+                    external_id=doc_id,
+                    data=data,
+                )
+                session.add(row)
             saved_sale_id = doc_id
             saved_sale_number = number
             if linked_crm_row is not None:
@@ -7125,7 +7183,15 @@ def create_app() -> FastAPI:
                 url="/sales?error=" + quote("Продажа сохранена, но операция кассы не записалась") + "#sales-form",
                 status_code=302,
             )
-        saved_message = "order_saved" if data.get("doc_type") == "order" else "return_saved" if data.get("doc_type") == "return" else "saved"
+        saved_message = (
+            "updated"
+            if editing_sale_id
+            else "order_saved"
+            if data.get("doc_type") == "order"
+            else "return_saved"
+            if data.get("doc_type") == "return"
+            else "saved"
+        )
         return RedirectResponse(url=f"/sales?msg={saved_message}&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/delete", name="sales_delete")
