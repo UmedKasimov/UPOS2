@@ -8565,8 +8565,6 @@ def create_app() -> FastAPI:
                         if product_row and product_row.workspace_owner_id == workspace_owner_id:
                             _apply_product_price_change(product_row, selected_price_type, converted_price, price_currency)
 
-                for key in ("paid_amount", "payment_type", "payment_lines", "payment_status"):
-                    data[key] = old_data.get(key, data.get(key))
                 data["status"] = workflow_status
                 data["workflow_status"] = workflow_status
                 data["status_history"] = old_data.get("status_history", [])
@@ -8751,6 +8749,7 @@ def create_app() -> FastAPI:
         warehouse_stock_total = Decimal("0")
         warehouse_purchase_totals: dict[str, Decimal] = {}
         warehouse_purchase_paid_totals: dict[str, Decimal] = {}
+        warehouse_purchase_debt_totals: dict[str, Decimal] = {}
         warehouse_purchase_edit: dict[str, Any] | None = None
         with session_scope() as session:
             warehouse_rows = list(
@@ -8863,6 +8862,10 @@ def create_app() -> FastAPI:
                     warehouse_purchase_paid_totals.get(currency, Decimal("0"))
                     + _sales_decimal(item.get("paid_amount"))
                 )
+                warehouse_purchase_debt_totals[currency] = (
+                    warehouse_purchase_debt_totals.get(currency, Decimal("0"))
+                    + _sales_decimal(item.get("debt_amount"))
+                )
         price_types = _workspace_price_types(wid)
         purchase_price_types = [
             item
@@ -8931,6 +8934,10 @@ def create_app() -> FastAPI:
             warehouse_purchase_paid_totals=[
                 {"currency": currency, "amount": _sales_money_label(amount)}
                 for currency, amount in sorted(warehouse_purchase_paid_totals.items())
+            ],
+            warehouse_purchase_debt_totals=[
+                {"currency": currency, "amount": _sales_money_label(amount)}
+                for currency, amount in sorted(warehouse_purchase_debt_totals.items())
             ],
             warehouse_operation_preset=operation_preset,
             today=datetime.now(timezone.utc).date().isoformat(),

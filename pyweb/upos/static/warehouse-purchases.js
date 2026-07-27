@@ -906,9 +906,16 @@
         if (!box) return;
         const payments = Array.isArray(items) ? items : parsePurchasePaymentLines();
         const totalNode = box.querySelector("[data-purchase-payment-breakdown-total]");
+        const restNode = box.querySelector("[data-purchase-payment-breakdown-rest]");
         const linesNode = box.querySelector("[data-purchase-payment-breakdown-lines]");
         const state = updatePurchasePaymentStatus(payments);
         if (totalNode) totalNode.textContent = purchaseEntryMoney(state.paid, currency());
+        if (restNode) {
+          restNode.textContent = purchaseEntryMoney(
+            Math.max(0, state.total - state.paid),
+            currency(),
+          );
+        }
         if (linesNode) {
           linesNode.innerHTML = "";
           payments.forEach((item, index) => {
@@ -1021,16 +1028,65 @@
         updatePurchasePaymentSummary();
         return row;
       };
+      const fillPurchasePaymentLine = (row, payment) => {
+        if (!row || !payment) return;
+        const lineCurrency = String(payment.currency || currency()).toUpperCase();
+        const account = row.querySelector("[data-purchase-payment-account]");
+        const currencySelect = row.querySelector("[data-purchase-payment-currency]");
+        const input = row.querySelector("[data-purchase-payment-amount]");
+        setPaymentSelect(
+          account,
+          payment.account_id || payment.account || payment.type || "",
+        );
+        setPaymentSelect(currencySelect, lineCurrency);
+        row.dataset.purchasePaymentCurrency = lineCurrency;
+        if (input) {
+          input.value = purchaseEntryFormatCurrency(
+            purchaseEntryNumber(payment.amount),
+            lineCurrency,
+          );
+        }
+      };
       const openPurchasePaymentDialog = () => {
         if (!paymentDialog) return;
         paymentRows().forEach((row, index) => {
-          if (index > 0) row.remove();
+          if (index > 0) {
+            row.remove();
+          } else {
+            row.querySelectorAll("input").forEach((input) => {
+              input.value = "";
+            });
+          }
         });
         const first = paymentRows()[0] || addPurchasePaymentLine();
         const input = first?.querySelector("[data-purchase-payment-amount]");
-        setPaymentSelect(first?.querySelector("[data-purchase-payment-currency]"), currency());
-        if (first) first.dataset.purchasePaymentCurrency = currency();
-        if (input && !purchaseEntryNumber(paidInput?.value || "")) input.value = purchaseEntryFormatCurrency(currentPurchaseTotal(), currency());
+        const savedPayments = parsePurchasePaymentLines();
+        const legacyPaid = purchaseEntryNumber(paidInput?.value || "");
+        if (!savedPayments.length && legacyPaid > 0) {
+          savedPayments.push({
+            amount: String(legacyPaid),
+            currency: currency(),
+            type: paymentTypeInput?.value || "Оплата",
+          });
+        }
+        if (savedPayments.length) {
+          savedPayments.forEach((payment, index) => {
+            const row = index === 0 ? first : addPurchasePaymentLine();
+            fillPurchasePaymentLine(row, payment);
+          });
+        } else {
+          setPaymentSelect(
+            first?.querySelector("[data-purchase-payment-currency]"),
+            currency(),
+          );
+          if (first) first.dataset.purchasePaymentCurrency = currency();
+          if (input) {
+            input.value = purchaseEntryFormatCurrency(
+              currentPurchaseTotal(),
+              currency(),
+            );
+          }
+        }
         updatePurchasePaymentSummary();
         if (typeof paymentDialog.showModal === "function") {
           try {

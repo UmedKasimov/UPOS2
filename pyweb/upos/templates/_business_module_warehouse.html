@@ -298,7 +298,12 @@
                     aria-label="{{ doc.payment_age_label }} после закупки"
                   >{{ doc.payment_age_label }}</span>
                 {% endif %}
-                <span class="warehouse-purchase-paid-chip" data-warehouse-purchase-highlight>{{ doc.paid_amount }} {{ doc.currency }}</span>
+                <span class="warehouse-purchase-paid-values">
+                  <span class="warehouse-purchase-paid-chip" data-warehouse-purchase-highlight>{{ doc.paid_amount }} {{ doc.currency }}</span>
+                  <span class="warehouse-purchase-rest-amount">
+                    Остаток <strong data-warehouse-purchase-highlight>{{ doc.debt_amount }} {{ doc.currency }}</strong>
+                  </span>
+                </span>
               </td>
               <td>
                 <form class="warehouse-purchase-status-form" method="post" action="{{ url_for('warehouse_purchase_status', purchase_id=doc.id) }}">
@@ -361,7 +366,10 @@
               </td>
               <td class="warehouse-purchase-money warehouse-purchase-total warehouse-purchase-paid-total">
                 {% for total in warehouse_purchase_paid_totals %}
-                  <div>{{ total.amount }} {{ total.currency }}</div>
+                  <div>Оплачено {{ total.amount }} {{ total.currency }}</div>
+                {% endfor %}
+                {% for total in warehouse_purchase_debt_totals %}
+                  <div class="warehouse-purchase-debt-total">Остаток {{ total.amount }} {{ total.currency }}</div>
                 {% endfor %}
               </td>
               <td colspan="2"></td>
@@ -729,6 +737,10 @@
           <strong data-purchase-payment-breakdown-total>0 UZS</strong>
         </div>
         <div class="sales-payment-breakdown-lines" data-purchase-payment-breakdown-lines></div>
+        <div class="sales-payment-breakdown-row sales-payment-breakdown-row--rest">
+          <span>Остаток</span>
+          <strong data-purchase-payment-breakdown-rest>0 UZS</strong>
+        </div>
       </div>
 
       <label class="wide warehouse-purchase-entry-note">

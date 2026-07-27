@@ -1440,6 +1440,16 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: #c2410c;
 }
 
+.sales-payment-breakdown-row--rest {
+  margin-top: 0.1rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.sales-payment-breakdown-row--rest strong {
+  color: #c2410c;
+}
+
 .sales-payment-breakdown-lines {
   display: grid;
   gap: 0.3rem;
@@ -14357,6 +14367,43 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 .price-template-extra-table th {
   background: #dff2ff;
   font-weight: 800;
+}
+
+.warehouse-purchase-paid-values {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.warehouse-purchase-paid-values .warehouse-purchase-paid-chip {
+  margin-top: 0;
+}
+
+.warehouse-purchase-rest-amount {
+  display: inline-flex;
+  gap: 0.32rem;
+  align-items: baseline;
+  color: #9a3412;
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+
+.warehouse-purchase-rest-amount strong {
+  color: #c2410c;
+  font-weight: 900;
+}
+
+.warehouse-purchase-paid[data-payment-progress="100"] .warehouse-purchase-rest-amount,
+.warehouse-purchase-paid[data-payment-progress="100"] .warehouse-purchase-rest-amount strong {
+  color: #15803d;
+}
+
+.warehouse-purchase-debt-total {
+  margin-top: 0.18rem;
+  color: #c2410c;
 }
 
 .price-template-extra-table td {
