@@ -1569,6 +1569,192 @@
     });
   }
 
+  function initWarehouseAdjustment(root = document) {
+    root.querySelectorAll("[data-warehouse-adjustment-entry]").forEach((form) => {
+      if (form.dataset.warehouseAdjustmentReady === "1") return;
+      form.dataset.warehouseAdjustmentReady = "1";
+      const options = readPurchaseOptions();
+      const products = Array.isArray(options.product_rows) ? options.product_rows : [];
+      const body = form.querySelector("[data-adjustment-lines]");
+      const warehouseInput = form.querySelector("[data-adjustment-warehouse]");
+      const currencyInput = form.querySelector("[data-adjustment-currency]");
+      const totalOutput = form.querySelector("[data-adjustment-total]");
+      const errorOutput = form.querySelector("[data-adjustment-error]");
+      const submitButton = form.querySelector("[data-adjustment-submit]");
+      const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
+      const directionSign = direction === "in" ? 1 : -1;
+      const signLabel = direction === "in" ? "+" : "−";
+      const rows = () => Array.from(body?.querySelectorAll("[data-adjustment-row]") || []);
+      const productForRow = (row) => {
+        const productId = String(row.querySelector("[data-adjustment-product]")?.value || "");
+        return products.find((product) => String(product?.id || "") === productId) || null;
+      };
+      const stockForProduct = (product) => {
+        const warehouse = normalize(warehouseInput?.value);
+        const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
+        return stocks
+          .filter((stock) => normalize(stock?.warehouse) === warehouse)
+          .reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
+      };
+      const priceForProduct = (product) => {
+        const warehouse = normalize(warehouseInput?.value);
+        const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
+        const matching = stocks.filter((stock) => normalize(stock?.warehouse) === warehouse);
+        const priced = [...matching].reverse().find((stock) => purchaseEntryNumber(stock?.price) > 0)
+          || [...stocks].reverse().find((stock) => purchaseEntryNumber(stock?.price) > 0);
+        return purchaseEntryNumber(priced?.price);
+      };
+      const currency = () => String(currencyInput?.value || "UZS").toUpperCase();
+      const setOutput = (row, selector, value) => {
+        const output = row.querySelector(selector);
+        if (output) output.textContent = value;
+      };
+      const renumber = () => {
+        rows().forEach((row, index) => {
+          setOutput(row, ".warehouse-adjustment-row-number", index + 1);
+        });
+      };
+      const recalc = () => {
+        let total = 0;
+        let hasLine = false;
+        let invalidStock = false;
+        let duplicateProduct = false;
+        const selectedProducts = new Set();
+        rows().forEach((row) => {
+          const product = productForRow(row);
+          const quantityInput = row.querySelector("[data-adjustment-quantity]");
+          const priceInput = row.querySelector("[data-adjustment-price]");
+          const quantity = Math.max(0, purchaseEntryNumber(quantityInput?.value));
+          const price = Math.max(0, purchaseEntryNumber(priceInput?.value));
+          const current = product ? stockForProduct(product) : 0;
+          const after = current + directionSign * quantity;
+          const lineTotal = quantity * price;
+          const productId = String(product?.id || "");
+          if (productId) {
+            if (selectedProducts.has(productId)) duplicateProduct = true;
+            selectedProducts.add(productId);
+          }
+          hasLine = hasLine || Boolean(product && quantity > 0);
+          const rowInvalid = direction === "out" && Boolean(product) && quantity > current;
+          invalidStock = invalidStock || rowInvalid;
+          row.classList.toggle("is-insufficient", rowInvalid);
+          quantityInput?.setAttribute("aria-invalid", rowInvalid ? "true" : "false");
+          setOutput(row, "[data-adjustment-current]", quantityText(current));
+          setOutput(row, "[data-adjustment-after]", quantityText(after));
+          setOutput(row, "[data-adjustment-unit]", product?.unit || "");
+          setOutput(row, "[data-adjustment-sign]", signLabel);
+          setOutput(
+            row,
+            "[data-adjustment-line-total]",
+            `${signLabel} ${purchaseEntryMoney(lineTotal, currency())}`,
+          );
+          if (product && quantity > 0) total += lineTotal;
+        });
+        if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(total, currency())}`;
+        if (errorOutput) {
+          errorOutput.textContent = duplicateProduct
+            ? "Один товар нельзя добавлять дважды."
+            : invalidStock
+              ? "Количество списания превышает доступный остаток."
+              : "";
+        }
+        if (submitButton) submitButton.disabled = !hasLine || invalidStock || duplicateProduct;
+        renumber();
+      };
+      const resetRow = (row) => {
+        row.classList.remove("is-insufficient");
+        row.querySelectorAll("select, input").forEach((control) => {
+          control.value = "";
+          control.removeAttribute("aria-invalid");
+          delete control.dataset.adjustmentAutoPrice;
+        });
+        setOutput(row, "[data-adjustment-current]", "0");
+        setOutput(row, "[data-adjustment-after]", "0");
+        setOutput(row, "[data-adjustment-unit]", "");
+        setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
+      };
+      const wireRow = (row) => {
+        if (row.dataset.warehouseAdjustmentRowReady === "1") return;
+        row.dataset.warehouseAdjustmentRowReady = "1";
+        const productInput = row.querySelector("[data-adjustment-product]");
+        const quantityInput = row.querySelector("[data-adjustment-quantity]");
+        const priceInput = row.querySelector("[data-adjustment-price]");
+        productInput?.addEventListener("change", () => {
+          const suggestedPrice = priceForProduct(productForRow(row));
+          if (priceInput) {
+            priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
+            priceInput.dataset.adjustmentAutoPrice = "1";
+          }
+          recalc();
+          quantityInput?.focus();
+        });
+        quantityInput?.addEventListener("input", () => {
+          quantityInput.value = quantityInput.value.replace(/[^\d\s.,]/g, "");
+          recalc();
+        });
+        priceInput?.addEventListener("input", () => {
+          formatPurchasePriceInput(priceInput, currency());
+          priceInput.dataset.adjustmentAutoPrice = "0";
+          recalc();
+        });
+        [quantityInput, priceInput].forEach((input) => {
+          input?.addEventListener("focus", () => window.setTimeout(() => input.select(), 0));
+          input?.addEventListener("blur", () => {
+            const value = purchaseEntryNumber(input.value);
+            input.value = value
+              ? input === quantityInput
+                ? quantityText(value)
+                : purchaseEntryFormatCurrency(value, currency())
+              : "";
+            recalc();
+          });
+        });
+        row.querySelector("[data-adjustment-remove]")?.addEventListener("click", () => {
+          if (rows().length > 1) row.remove();
+          else resetRow(row);
+          recalc();
+        });
+      };
+      const addRow = () => {
+        const source = rows()[0];
+        if (!source || !body) return;
+        const clone = source.cloneNode(true);
+        delete clone.dataset.warehouseAdjustmentRowReady;
+        resetRow(clone);
+        body.append(clone);
+        wireRow(clone);
+        recalc();
+        clone.querySelector("[data-adjustment-product]")?.focus();
+      };
+      rows().forEach(wireRow);
+      form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
+      warehouseInput?.addEventListener("change", () => {
+        rows().forEach((row) => {
+          const priceInput = row.querySelector("[data-adjustment-price]");
+          if (!priceInput || priceInput.dataset.adjustmentAutoPrice === "0") return;
+          const suggestedPrice = priceForProduct(productForRow(row));
+          priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
+        });
+        recalc();
+      });
+      currencyInput?.addEventListener("change", recalc);
+      form.addEventListener("submit", (event) => {
+        recalc();
+        if (submitButton?.disabled) {
+          event.preventDefault();
+          return;
+        }
+        rows().forEach((row) => {
+          row.querySelectorAll("[data-adjustment-quantity], [data-adjustment-price]").forEach((input) => {
+            const value = purchaseEntryNumber(input.value);
+            input.value = value ? String(value) : "";
+          });
+        });
+      });
+      recalc();
+    });
+  }
+
   function readPurchase(id) {
     const node = document.getElementById(`warehouse-purchase-data-${id}`);
     if (!node) return null;
@@ -1925,6 +2111,7 @@
 
   function init(root = document) {
     initPurchaseEntry(root);
+    initWarehouseAdjustment(root);
     root.querySelectorAll("[data-warehouse-purchases-filter]").forEach((form) => {
       if (form.dataset.warehousePurchasesReady === "1") return;
       form.dataset.warehousePurchasesReady = "1";

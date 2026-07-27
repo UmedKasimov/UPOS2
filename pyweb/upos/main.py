@@ -7995,6 +7995,51 @@ def create_app() -> FastAPI:
         }
         return data, amount
 
+    def _warehouse_adjustment_lines_payload(form: Any) -> tuple[dict[str, Any], list[dict[str, Any]], Decimal, str]:
+        operation_type = str(form.get("operation_type") or "out").strip()
+        if operation_type not in {"in", "out"}:
+            operation_type = "out"
+        products = list(form.getlist("line_product"))
+        quantities = list(form.getlist("line_quantity"))
+        prices = list(form.getlist("line_price"))
+        lines: list[dict[str, Any]] = []
+        total = Decimal("0")
+        for index in range(max(len(products), len(quantities), len(prices))):
+            product = str(products[index] if index < len(products) else "").strip()
+            quantity_raw = quantities[index] if index < len(quantities) else ""
+            price_raw = prices[index] if index < len(prices) else ""
+            if not product and not str(quantity_raw or "").strip() and not str(price_raw or "").strip():
+                continue
+            if not product:
+                raise ValueError("Выберите товар в каждой заполненной строке")
+            quantity = _sales_decimal_strict(quantity_raw, "Количество")
+            price = _sales_decimal_strict(price_raw, "Цена")
+            if quantity <= 0:
+                raise ValueError("Количество должно быть больше нуля")
+            if price < 0:
+                raise ValueError("Цена не может быть отрицательной")
+            line_total = quantity * price
+            total += line_total
+            lines.append(
+                {
+                    "product": product,
+                    "quantity": str(quantity.normalize()),
+                    "price": str(price.normalize() if price else "0"),
+                    "total": str(line_total.normalize() if line_total else "0"),
+                }
+            )
+        if not lines:
+            raise ValueError("Добавьте хотя бы один товар")
+        currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+        data = {
+            "date": str(form.get("date") or "").strip(),
+            "operation_type": operation_type,
+            "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
+            "responsible": str(form.get("responsible") or "").strip(),
+            "note": str(form.get("note") or "").strip(),
+        }
+        return data, lines, total, currency
+
     def _warehouse_operation_data(row: WarehouseOperation) -> dict[str, Any]:
         data = _json_object(row.data)
         quantity = _sales_decimal(row.quantity)
@@ -9227,6 +9272,85 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        if "line_product" in form:
+            requested_operation_type = str(form.get("operation_type") or "out").strip()
+            requested_operation_type = requested_operation_type if requested_operation_type in {"in", "out"} else "out"
+            try:
+                data, lines, _total, currency = _warehouse_adjustment_lines_payload(form)
+            except ValueError as exc:
+                return RedirectResponse(
+                    url=f"/warehouse?op={requested_operation_type}&error=" + quote(str(exc)) + "#adjustments",
+                    status_code=302,
+                )
+            with session_scope() as session:
+                warehouse_row = _ensure_warehouse(session, wid, name=data["warehouse"])
+                delta_sign = 1 if data["operation_type"] == "in" else -1
+                prepared_lines: list[dict[str, Any]] = []
+                for line in lines:
+                    product_row = _resolve_product_row(session, wid, str(line.get("product") or ""))
+                    if product_row is None:
+                        return RedirectResponse(
+                            url=f"/warehouse?op={data['operation_type']}&error=" + quote("Товар не найден") + "#adjustments",
+                            status_code=302,
+                        )
+                    quantity = _sales_decimal(line.get("quantity"))
+                    current_stock = _product_available_in_warehouse(product_row, warehouse_row.name)
+                    prepared_line = dict(line)
+                    prepared_line.update(
+                        {
+                            "product_id": product_row.id,
+                            "product": product_row.name,
+                            "warehouse": warehouse_row.name,
+                            "stock_before": str(current_stock.normalize() if current_stock else "0"),
+                            "stock_after": str((current_stock + Decimal(delta_sign) * quantity).normalize()),
+                        }
+                    )
+                    prepared_lines.append(prepared_line)
+                try:
+                    resolved_lines = _sync_product_lines(
+                        session,
+                        wid,
+                        warehouse_name=warehouse_row.name,
+                        lines=prepared_lines,
+                        delta_sign=delta_sign,
+                        op_date=str(data.get("date") or ""),
+                        require_stock_product=True,
+                    )
+                except ValueError as exc:
+                    return RedirectResponse(
+                        url=f"/warehouse?op={data['operation_type']}&error=" + quote(str(exc)) + "#adjustments",
+                        status_code=302,
+                    )
+                count = session.execute(
+                    select(func.count(WarehouseOperation.id)).where(WarehouseOperation.workspace_owner_id == wid)
+                ).scalar_one()
+                operation_batch_id = str(uuid.uuid4())
+                number_date = datetime.now(timezone.utc).strftime("%Y%m%d")
+                for index, line in enumerate(resolved_lines, start=1):
+                    quantity = _sales_decimal(line.get("quantity"))
+                    price = _sales_decimal(line.get("price"))
+                    line_data = {
+                        **data,
+                        **line,
+                        "warehouse_id": warehouse_row.id,
+                        "operation_batch_id": operation_batch_id,
+                        "signed_quantity": str((Decimal(delta_sign) * quantity).normalize()),
+                    }
+                    session.add(
+                        WarehouseOperation(
+                            id=str(uuid.uuid4()),
+                            workspace_owner_id=wid,
+                            number=f"W-{number_date}-{int(count) + index:03d}",
+                            operation_type=data["operation_type"],
+                            warehouse_id=warehouse_row.id,
+                            product_id=str(line.get("product_id") or "") or None,
+                            quantity=quantity,
+                            amount=quantity * price,
+                            currency=currency,
+                            data=line_data,
+                        )
+                    )
+            return RedirectResponse(url=f"/warehouse?op={data['operation_type']}&msg=saved#adjustments", status_code=302)
         try:
             data, amount = _warehouse_operation_payload(form)
         except ValueError as exc:

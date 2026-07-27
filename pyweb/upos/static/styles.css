@@ -25587,3 +25587,269 @@ html.dark .clients-map-empty {
   color: var(--foreground);
   box-shadow: 0 12px 28px oklch(0 0 0 / 0.3);
 }
+
+/* Warehouse stock receipt and write-off editor */
+.warehouse-adjustment-entry {
+  min-width: 0;
+}
+
+.warehouse-adjustment-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.warehouse-adjustment-direction {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.warehouse-adjustment-direction--out {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.warehouse-adjustment-form {
+  display: grid;
+  gap: 14px;
+}
+
+.warehouse-adjustment-meta {
+  grid-template-columns: minmax(150px, 0.7fr) minmax(220px, 1.3fr) minmax(130px, 0.6fr) minmax(220px, 1fr);
+}
+
+.warehouse-adjustment-section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.warehouse-adjustment-section-head {
+  margin-bottom: 8px;
+}
+
+.warehouse-adjustment-add {
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.warehouse-adjustment-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+}
+
+.warehouse-adjustment-table {
+  width: 100%;
+  min-width: 1080px;
+  table-layout: fixed;
+}
+
+.warehouse-adjustment-table th:nth-child(1),
+.warehouse-adjustment-table td:nth-child(1) {
+  width: 44px;
+  text-align: center;
+}
+
+.warehouse-adjustment-table th:nth-child(2),
+.warehouse-adjustment-table td:nth-child(2) {
+  width: 31%;
+}
+
+.warehouse-adjustment-table th:nth-child(3),
+.warehouse-adjustment-table td:nth-child(3),
+.warehouse-adjustment-table th:nth-child(4),
+.warehouse-adjustment-table td:nth-child(4),
+.warehouse-adjustment-table th:nth-child(5),
+.warehouse-adjustment-table td:nth-child(5) {
+  width: 13%;
+}
+
+.warehouse-adjustment-table th:nth-child(6),
+.warehouse-adjustment-table td:nth-child(6),
+.warehouse-adjustment-table th:nth-child(7),
+.warehouse-adjustment-table td:nth-child(7) {
+  width: 14%;
+}
+
+.warehouse-adjustment-table th:nth-child(8),
+.warehouse-adjustment-table td:nth-child(8) {
+  width: 44px;
+  text-align: center;
+}
+
+.warehouse-adjustment-table select,
+.warehouse-adjustment-table input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.warehouse-adjustment-table select:focus,
+.warehouse-adjustment-table input:focus {
+  outline: 2px solid color-mix(in oklch, var(--primary), transparent 35%);
+  outline-offset: -2px;
+}
+
+.warehouse-adjustment-table td {
+  vertical-align: middle;
+}
+
+.warehouse-adjustment-table td:nth-child(3) {
+  white-space: normal;
+}
+
+.warehouse-adjustment-stock,
+.warehouse-adjustment-table [data-adjustment-after],
+.warehouse-adjustment-line-total {
+  display: block;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.warehouse-adjustment-table [data-adjustment-unit] {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.warehouse-adjustment-change {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+}
+
+.warehouse-adjustment-change > span {
+  text-align: center;
+  color: #b91c1c;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-change > span,
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-line-total,
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-summary strong {
+  color: #15803d;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-line-total,
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-summary strong {
+  color: #b91c1c;
+}
+
+.warehouse-adjustment-table tr.is-insufficient td {
+  background: #fff1f2;
+}
+
+.warehouse-adjustment-table tr.is-insufficient [data-adjustment-after] {
+  color: #b91c1c;
+}
+
+.warehouse-adjustment-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  min-height: 46px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: color-mix(in oklch, var(--primary), white 95%);
+  font-size: 13px;
+}
+
+.warehouse-adjustment-summary strong {
+  min-width: 160px;
+  text-align: right;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warehouse-adjustment-error {
+  min-height: 18px;
+  margin: 6px 0 0;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.warehouse-adjustment-note {
+  display: grid;
+  gap: 6px;
+}
+
+.warehouse-adjustment-note > span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.warehouse-adjustment-note textarea {
+  width: 100%;
+  min-height: 58px;
+  resize: vertical;
+}
+
+.warehouse-adjustment-actions {
+  justify-content: flex-end;
+}
+
+html.dark .warehouse-adjustment-direction {
+  border-color: color-mix(in oklch, #22c55e, transparent 55%);
+  background: color-mix(in oklch, #22c55e, var(--card) 88%);
+  color: #86efac;
+}
+
+html.dark .warehouse-adjustment-direction--out {
+  border-color: color-mix(in oklch, #ef4444, transparent 55%);
+  background: color-mix(in oklch, #ef4444, var(--card) 88%);
+  color: #fca5a5;
+}
+
+html.dark .warehouse-adjustment-table tr.is-insufficient td {
+  background: color-mix(in oklch, #ef4444, var(--card) 90%);
+}
+
+html.dark .warehouse-adjustment-summary {
+  background: color-mix(in oklch, var(--primary), var(--card) 92%);
+}
+
+@media (max-width: 900px) {
+  .warehouse-adjustment-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .warehouse-adjustment-entry-head {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .warehouse-adjustment-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-adjustment-entry-head {
+    flex-direction: column;
+  }
+
+  .warehouse-adjustment-summary {
+    justify-content: space-between;
+  }
+}
