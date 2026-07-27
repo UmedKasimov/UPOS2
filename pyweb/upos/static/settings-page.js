@@ -52,6 +52,26 @@
     return el ? el.value || "" : "";
   }
 
+  function readJsonResponse(response) {
+    return response.text().then(function (text) {
+      var body = {};
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch (err) {
+          body = {};
+        }
+      }
+      if (!response.ok) {
+        var message = body.error || body.message || "";
+        if (!message && text && text !== "Internal Server Error") message = text;
+        if (!message) message = "Ошибка сервера. Повторите действие.";
+        throw new Error(message);
+      }
+      return body;
+    });
+  }
+
   function setGreenWhiteStatus(message, variant, root) {
     var scope = root || document;
     var el = scope.querySelector("[data-greenwhite-status]");
@@ -117,21 +137,22 @@
     return select ? (select.value || "").trim() : "";
   }
 
-  function fillIBOXFilials(root, filials, selectedId) {
+  function fillIBOXBranches(root, branches, selectedId) {
     var scope = root || document;
-    var select = scope.querySelector("[data-ibox-filial]");
+    var select = scope.querySelector("[data-ibox-upos-branch]");
     if (!select) return;
     var selected = String(selectedId || "");
+    if (!selected && branches && branches.length) selected = String(branches[0].id || "");
     select.innerHTML = "";
     var empty = document.createElement("option");
     empty.value = "";
-    empty.textContent = filials && filials.length ? "Выберите филиал" : "Филиалы не найдены";
+    empty.textContent = branches && branches.length ? "Выберите филиал U-POS" : "Филиалы U-POS не найдены";
     select.appendChild(empty);
-    (filials || []).forEach(function (filial) {
+    (branches || []).forEach(function (branch) {
       var option = document.createElement("option");
-      var id = filial.id || filial.filial_id || filial.uuid || filial.code || "";
+      var id = branch.id || "";
       option.value = String(id);
-      option.textContent = filial.name || filial.title || filial.label || String(id);
+      option.textContent = branch.name || String(id);
       if (String(id) === selected) option.selected = true;
       select.appendChild(option);
     });
@@ -162,7 +183,7 @@
       var moduleKey = checkbox.getAttribute("data-ibox-module") || "";
       checkbox.checked = !config.sync_modules || config.sync_modules[moduleKey] !== false;
     });
-    fillIBOXFilials(scope, body.filials || [], config.filial_id || "");
+    fillIBOXBranches(scope, body.branches || [], config.upos_branch_id || "");
     if (body.status) {
       var status = body.status;
       if (status.status === "running") setIBOXStatus("Синхронизация выполняется…", "", scope);
@@ -181,12 +202,7 @@
     var organizationId = iboxOrganizationId(root);
     if (!organizationId) return Promise.resolve();
     return fetch("/api/integrations/ibox/config?organization_id=" + encodeURIComponent(organizationId))
-      .then(function (res) {
-        return res.json().then(function (body) {
-          if (!res.ok) throw new Error(body.error || "Не удалось загрузить настройки");
-          return body;
-        });
-      })
+      .then(readJsonResponse)
       .then(function (body) {
         hydrateIBOXConfig(root, body);
         return body;
@@ -212,8 +228,8 @@
         },
         body: JSON.stringify(collectIntegrationPayload("ibox")),
       }).then(function (res) {
-        return res.json().then(function (body) {
-          if (!res.ok || !body.ok) throw new Error(body.error || "Не удалось сохранить настройки");
+        return readJsonResponse(res).then(function (body) {
+          if (!body.ok) throw new Error(body.error || "Не удалось сохранить настройки");
           return body;
         });
       });
@@ -227,7 +243,7 @@
     function poll() {
       clearTimeout(pollTimer);
       fetch(endpoint("/api/integrations/ibox/status"))
-        .then(function (res) { return res.json(); })
+        .then(readJsonResponse)
         .then(function (body) {
           var status = body.status;
           if (!status) return;
@@ -265,15 +281,13 @@
             });
           })
           .then(function (res) {
-            return res.json().then(function (body) {
-              if (!res.ok || !body.ok) throw new Error(body.error || "Подключение не установлено");
+            return readJsonResponse(res).then(function (body) {
+              if (!body.ok) throw new Error(body.error || "Подключение не установлено");
               return body;
             });
           })
           .then(function (body) {
-            var selected = scope.querySelector("[data-ibox-filial]");
-            fillIBOXFilials(scope, body.filials || [], selected ? selected.value : "");
-            setIBOXStatus("Подключено. Филиалов: " + String(body.filial_count || 0), "ok", scope);
+            setIBOXStatus("Подключение установлено", "ok", scope);
           })
           .catch(function (err) {
             setIBOXStatus(err.message || "Подключение не установлено", "err", scope);
@@ -295,8 +309,8 @@
             });
           })
           .then(function (res) {
-            return res.json().then(function (body) {
-              if (!res.ok || !body.ok) throw new Error(body.error || "Не удалось запустить синхронизацию");
+            return readJsonResponse(res).then(function (body) {
+              if (!body.ok) throw new Error(body.error || "Не удалось запустить синхронизацию");
               return body;
             });
           })
@@ -528,7 +542,7 @@
       integrations.ibox = {
         api_url: fieldVal("ibox_api_url"),
         api_key: fieldVal("ibox_api_key"),
-        filial_id: fieldVal("ibox_filial_id"),
+        upos_branch_id: fieldVal("ibox_upos_branch_id"),
         organization_id: fieldVal("ibox_organization_id"),
         sync_enabled: !!(iboxEnabled && iboxEnabled.checked),
         full_history: !!(iboxFullHistory && iboxFullHistory.checked),
@@ -648,7 +662,9 @@
         if (!activeKey) return;
         saveBtn.disabled = true;
         var saveLabel = saveBtn.textContent;
-        if (activeKey === "greenwhite" || activeKey === "clopos" || activeKey === "ibox") {
+        if (activeKey === "ibox") {
+          saveBtn.textContent = "Сохранение...";
+        } else if (activeKey === "greenwhite" || activeKey === "clopos") {
           saveBtn.textContent = t("settings.integrations.testing");
         }
         fetch("/api/settings/integrations", {
@@ -660,8 +676,8 @@
           body: JSON.stringify(collectIntegrationPayload(activeKey)),
         })
           .then(function (res) {
-            return res.json().then(function (body) {
-              if (!res.ok || !body.ok) throw new Error(body.error || t("settings.js.save_err"));
+            return readJsonResponse(res).then(function (body) {
+              if (!body.ok) throw new Error(body.error || t("settings.js.save_err"));
               return body;
             });
           })

@@ -133,9 +133,10 @@ from upos.greenwhite_store import (
     sync_greenwhite,
     test_greenwhite_connection,
 )
-from upos.smpro_client import DEFAULT_MODULES, SMProClient, SMProError
+from upos.smpro_client import DEFAULT_MODULES, SMProError
 from upos.smpro_store import (
     last_smpro_status,
+    list_upos_branches,
     run_smpro_sync,
     start_smpro_sync,
     test_smpro_connection,
@@ -18854,12 +18855,8 @@ def create_app() -> FastAPI:
                 block["connection_message"] = message
                 block["connection_checked_at"] = checked_at
                 return {"key": key, "ok": False, "message": message}
-            try:
-                SMProClient(block).test_connection()
-                ok = True
-                message = translate(loc, "settings.integrations.connected")
-            except SMProError as exc:
-                message = str(exc).strip() or translate(loc, "settings.integrations.not_connected")
+            ok = True
+            message = "Настройки сохранены"
         elif _integration_configured(key, block):
             ok = True
             message = translate(loc, "settings.integrations.connected")
@@ -18924,12 +18921,18 @@ def create_app() -> FastAPI:
                 for key in DEFAULT_MODULES
             }
             api_key = str(ibox.get("api_key") or "").strip() or str(prev.get("api_key") or "").strip()
-            filial_id = str(ibox.get("filial_id") or ibox.get("terminal_id") or "").strip()
+            filial_id = str(prev.get("filial_id") or prev.get("terminal_id") or "").strip()
+            upos_branch_id = str(ibox.get("upos_branch_id") or "").strip()
+            upos_branches = list_upos_branches(wid)
+            valid_branch_ids = {str(branch.get("id") or "") for branch in upos_branches}
+            if upos_branch_id not in valid_branch_ids:
+                upos_branch_id = str((upos_branches[0] if upos_branches else {}).get("id") or "")
             data["integrations"]["ibox"] = {
                 "api_url": str(ibox.get("api_url") or "").strip(),
                 "api_key": api_key,
                 "terminal_id": filial_id,
                 "filial_id": filial_id,
+                "upos_branch_id": upos_branch_id,
                 "organization_id": wid,
                 "sync_enabled": bool(ibox.get("sync_enabled", True)),
                 "full_history": bool(ibox.get("full_history", True)),
@@ -19375,6 +19378,7 @@ def create_app() -> FastAPI:
             "api_url": str(block.get("api_url") or ""),
             "api_key_configured": bool(str(block.get("api_key") or "").strip()),
             "filial_id": str(block.get("filial_id") or block.get("terminal_id") or ""),
+            "upos_branch_id": str(block.get("upos_branch_id") or ""),
             "organization_id": wid,
             "sync_enabled": bool(block.get("sync_enabled", True)),
             "full_history": bool(block.get("full_history", True)),
@@ -19385,7 +19389,12 @@ def create_app() -> FastAPI:
             "last_sync_at": str(block.get("last_sync_at") or ""),
             "initial_sync_completed": bool(block.get("initial_sync_completed")),
         }
-        return {"ok": True, "config": config, "filials": block.get("filials") or [], "status": last_smpro_status(wid)}
+        return {
+            "ok": True,
+            "config": config,
+            "branches": list_upos_branches(wid),
+            "status": last_smpro_status(wid),
+        }
 
     @app.get("/api/integrations/ibox/status")
     def api_ibox_status(request: Request, organization_id: str = Query(default="")):
@@ -19410,7 +19419,23 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": str(exc)}, status_code=400)
         settings = load_workspace_settings(wid)
         block = settings.setdefault("integrations", {}).setdefault("ibox", {})
-        block["filials"] = result.get("filials") or []
+        filials = result.get("filials") or []
+        if not filials:
+            return JSONResponse(
+                {"error": "IBOX / SMPro не вернул доступный удалённый филиал"},
+                status_code=400,
+            )
+        if filials and not str(block.get("filial_id") or "").strip():
+            first = filials[0] if isinstance(filials[0], dict) else {}
+            remote_filial_id = str(
+                first.get("id")
+                or first.get("filial_id")
+                or first.get("uuid")
+                or first.get("code")
+                or ""
+            ).strip()
+            block["filial_id"] = remote_filial_id
+            block["terminal_id"] = remote_filial_id
         block["connection_ok"] = True
         block["connection_message"] = "Подключено"
         block["connection_checked_at"] = datetime.now(timezone.utc).isoformat()
@@ -19433,8 +19458,10 @@ def create_app() -> FastAPI:
         block = load_workspace_settings(wid).get("integrations", {}).get("ibox", {})
         if not integration_configured("ibox", block):
             return JSONResponse({"error": "Сначала настройте IBOX / SMPro"}, status_code=400)
+        if not str(block.get("upos_branch_id") or "").strip():
+            return JSONResponse({"error": "Сначала выберите филиал U-POS"}, status_code=400)
         if not str(block.get("filial_id") or block.get("terminal_id") or "").strip():
-            return JSONResponse({"error": "Сначала выберите филиал SMPro"}, status_code=400)
+            return JSONResponse({"error": "Сначала проверьте подключение к IBOX / SMPro"}, status_code=400)
         modules = block.get("sync_modules")
         if isinstance(modules, dict) and not any(bool(modules.get(key)) for key in DEFAULT_MODULES):
             return JSONResponse({"error": "Выберите хотя бы один раздел учёта"}, status_code=400)

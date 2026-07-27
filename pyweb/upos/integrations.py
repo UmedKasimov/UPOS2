@@ -83,6 +83,7 @@ INTEGRATION_PROVIDERS: tuple[IntegrationProvider, ...] = (
             "terminal_id": "",
             "filial_id": "",
             "organization_id": "",
+            "upos_branch_id": "",
             "sync_enabled": True,
             "full_history": True,
             "sync_modules": {

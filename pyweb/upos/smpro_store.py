@@ -141,6 +141,27 @@ def test_smpro_connection(workspace_owner_id: str) -> dict[str, Any]:
     return SMProClient(config).test_connection()
 
 
+def list_upos_branches(workspace_owner_id: str) -> list[dict[str, str]]:
+    with session_scope() as session:
+        rows = session.scalars(
+            select(Branch)
+            .where(Branch.workspace_owner_id == workspace_owner_id)
+            .order_by(func.lower(Branch.name), Branch.id)
+        ).all()
+        if not rows:
+            row = Branch(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=workspace_owner_id,
+                name="Основной филиал",
+                external_source="manual",
+                external_id="main",
+            )
+            session.add(row)
+            session.flush()
+            rows = [row]
+        return [{"id": str(row.id), "name": str(row.name or "Филиал")} for row in rows]
+
+
 def start_smpro_sync(workspace_owner_id: str) -> dict[str, Any]:
     current = last_smpro_status(workspace_owner_id)
     if current and current.get("status") == "running":
@@ -227,6 +248,9 @@ def _finish_run(
 
 def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, Any]]]) -> int:
     total = 0
+    settings = load_workspace_settings(workspace_owner_id)
+    integration = settings.get("integrations", {}).get(INTEGRATION, {})
+    target_branch_id = str(integration.get("upos_branch_id") or "").strip() or None
     ordered = (
         "filials",
         "offices",
@@ -266,7 +290,14 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
                         set_={"payload": payload, "payload_hash": digest, "synced_at": func.now()},
                     )
                 )
-                _normalize(session, workspace_owner_id, entity_type, ext_id, payload)
+                _normalize(
+                    session,
+                    workspace_owner_id,
+                    entity_type,
+                    ext_id,
+                    payload,
+                    target_branch_id=target_branch_id,
+                )
                 total += 1
     return total
 
@@ -282,6 +313,8 @@ def _normalize(
     entity_type: str,
     ext_id: str,
     payload: dict[str, Any],
+    *,
+    target_branch_id: str | None,
 ) -> None:
     common = {
         "id": str(uuid.uuid4()),
@@ -290,16 +323,7 @@ def _normalize(
         "external_id": ext_id,
     }
     name = _text(payload, "name", "title", "product_name", "outlet_name", "warehouse_name")
-    if entity_type in {"filials", "offices"}:
-        values = {**common, "name": name or f"SMPro {ext_id}"}
-        _upsert_model(
-            session,
-            Branch,
-            "uq_branches_external",
-            values,
-            {"name": values["name"], "updated_at": func.now()},
-        )
-    elif entity_type == "clients":
+    if entity_type == "clients":
         values = {
             **common,
             "kind": "client",
@@ -331,20 +355,44 @@ def _normalize(
             {key: values[key] for key in ("name", "sku", "barcode", "data")},
         )
     elif entity_type == "warehouses":
-        values = {**common, "name": name or f"Склад SMPro {ext_id}", "branch_id": None, "data": payload}
+        values = {
+            **common,
+            "name": name or f"Склад SMPro {ext_id}",
+            "branch_id": target_branch_id,
+            "data": payload,
+        }
         _upsert_model(
             session,
             Warehouse,
             "uq_warehouses_external",
             values,
-            {"name": values["name"], "data": payload, "updated_at": func.now()},
+            {
+                "name": values["name"],
+                "branch_id": target_branch_id,
+                "data": payload,
+                "updated_at": func.now(),
+            },
         )
     elif entity_type in {"orders", "shipments", "returns"}:
         document_common = {**common, "external_id": f"{entity_type}:{ext_id}"[:180]}
-        _upsert_document(session, SaleDocument, "uq_sale_documents_external", document_common, payload)
+        _upsert_document(
+            session,
+            SaleDocument,
+            "uq_sale_documents_external",
+            document_common,
+            payload,
+            target_branch_id=target_branch_id,
+        )
     elif entity_type in {"purchases", "supplier_returns"}:
         document_common = {**common, "external_id": f"{entity_type}:{ext_id}"[:180]}
-        _upsert_document(session, PurchaseDocument, "uq_purchase_documents_external", document_common, payload)
+        _upsert_document(
+            session,
+            PurchaseDocument,
+            "uq_purchase_documents_external",
+            document_common,
+            payload,
+            target_branch_id=target_branch_id,
+        )
     elif entity_type.startswith("payments_received"):
         payment_common = {**common, "external_id": f"{entity_type}:{ext_id}"[:180]}
         _upsert_payment(session, payment_common, payload, "in")
@@ -353,14 +401,22 @@ def _normalize(
         _upsert_expense(session, expense_common, payload)
 
 
-def _upsert_document(session, model, constraint: str, common: dict[str, Any], payload: dict[str, Any]) -> None:
+def _upsert_document(
+    session,
+    model,
+    constraint: str,
+    common: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    target_branch_id: str | None,
+) -> None:
     values = {
         **common,
         "number": _text(payload, "number", "document_number", "code"),
         "amount": _money(payload),
         "currency": _currency(payload),
         "counterparty_id": None,
-        "branch_id": None,
+        "branch_id": target_branch_id,
         "data": payload,
         "created_at": _created_at(payload),
     }
@@ -369,7 +425,10 @@ def _upsert_document(session, model, constraint: str, common: dict[str, Any], pa
         model,
         constraint,
         values,
-        {key: values[key] for key in ("number", "amount", "currency", "data", "created_at")},
+        {
+            key: values[key]
+            for key in ("number", "amount", "currency", "branch_id", "data", "created_at")
+        },
     )
 
 

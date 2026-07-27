@@ -1478,13 +1478,9 @@
                     <input id="ibox_api_url" type="url" value="{{ settings.integrations.ibox.api_url }}" placeholder="https://company.smpro.uz" autocomplete="off" />
                     <label for="ibox_api_key">API-ключ</label>
                     <input id="ibox_api_key" type="password" value="" placeholder="{% if settings.integrations.ibox.api_key %}Ключ сохранён{% else %}Bearer token{% endif %}" autocomplete="new-password" />
-                    <label for="ibox_filial_id">Филиал SMPro</label>
-                    <select id="ibox_filial_id" data-ibox-filial>
-                      {% if settings.integrations.ibox.filial_id %}
-                        <option value="{{ settings.integrations.ibox.filial_id }}" selected>{{ settings.integrations.ibox.filial_id }}</option>
-                      {% else %}
-                        <option value="">Сначала проверьте подключение</option>
-                      {% endif %}
+                    <label for="ibox_upos_branch_id">Филиал U-POS</label>
+                    <select id="ibox_upos_branch_id" data-ibox-upos-branch>
+                      <option value="">Загрузка филиалов...</option>
                     </select>
                     <label class="integr-check-row" for="ibox_sync_enabled"><input id="ibox_sync_enabled" type="checkbox" {% if settings.integrations.ibox.sync_enabled %}checked{% endif %} />Автоматическая синхронизация</label>
                     <label class="integr-check-row" for="ibox_full_history"><input id="ibox_full_history" type="checkbox" {% if settings.integrations.ibox.full_history %}checked{% endif %} />Загрузить данные за всё время</label>
@@ -1508,7 +1504,7 @@
                       </div>
                     </fieldset>
                     <div class="integr-action-row">
-                      <button type="button" class="btn btn-secondary btn-sm" data-ibox-test>Проверить и получить филиалы</button>
+                      <button type="button" class="btn btn-secondary btn-sm" data-ibox-test>Проверить подключение</button>
                       <button type="button" class="btn btn-secondary btn-sm" data-ibox-sync>Синхронизировать всё</button>
                     </div>
                     <p class="integr-sync-status" data-ibox-status></p>
