@@ -253,16 +253,24 @@
                 {% for document in row.related_documents %}
                   <article
                     class="crm-card-detail-event crm-card-detail-event--sale crm-card-detail-document"
-                    role="button"
-                    tabindex="0"
-                    data-crm-document-open
-                    data-crm-document='{{ document.detail_json|tojson|forceescape }}'
-                    data-crm-document-label="{{ document.related_label|e }}"
-                    data-crm-document-href="{{ document.detail_href|e }}"
                   >
-                    <strong>{{ document.related_label }} {{ document.number }}</strong>
-                    <span>{{ document.date_label or document.date or "-" }} · {{ document.status_label }}</span>
-                    <p>{{ document.amount }} {{ document.currency }}</p>
+                    <button
+                      class="crm-card-detail-document-trigger"
+                      type="button"
+                      aria-expanded="false"
+                      data-crm-document-open
+                      data-crm-document='{{ document.detail_json|tojson|forceescape }}'
+                      data-crm-document-label="{{ document.related_label|e }}"
+                      data-crm-document-href="{{ document.detail_href|e }}"
+                    >
+                      <span class="crm-card-detail-document-main">
+                        <strong>{{ document.related_label }} {{ document.number }}</strong>
+                        <small>{{ document.date_label or document.date or "-" }} · {{ document.status_label }}</small>
+                      </span>
+                      <b>{{ document.amount }} {{ document.currency }}</b>
+                      <span class="crm-card-detail-document-chevron" aria-hidden="true"></span>
+                    </button>
+                    <div class="crm-card-detail-document-expand" data-crm-document-expand hidden></div>
                   </article>
                 {% endfor %}
               </template>
@@ -463,39 +471,6 @@
         </div>
       </form>
     </div>
-  </div>
-</dialog>
-
-<dialog class="settings-profile-modal crm-document-detail-dialog" id="crm-document-detail-dialog" aria-labelledby="crm-document-detail-title">
-  <div class="settings-profile-modal-surface crm-document-detail-surface">
-    <header class="settings-profile-modal-head">
-      <div class="settings-profile-modal-head-text">
-        <h2 id="crm-document-detail-title" class="settings-profile-modal-title" data-crm-document-title>Документ</h2>
-        <p class="settings-profile-modal-sub" data-crm-document-subtitle>Информация о заказе</p>
-      </div>
-      <button type="button" class="settings-profile-modal-close" data-crm-document-close aria-label="Закрыть">×</button>
-    </header>
-    <div class="crm-document-detail-body">
-      <dl class="crm-card-detail-list crm-document-detail-list">
-        <div><dt>Клиент</dt><dd data-crm-document-field="client">-</dd></div>
-        <div><dt>Дата</dt><dd data-crm-document-field="date">-</dd></div>
-        <div><dt>Статус</dt><dd data-crm-document-field="status">-</dd></div>
-        <div><dt>Склад</dt><dd data-crm-document-field="warehouse">-</dd></div>
-        <div><dt>Сумма</dt><dd class="crm-card-detail-money" data-crm-document-field="amount">-</dd></div>
-        <div><dt>Оплачено</dt><dd data-crm-document-field="paid">-</dd></div>
-        <div><dt>Долг</dt><dd data-crm-document-field="debt">-</dd></div>
-        <div><dt>Ответственный</dt><dd data-crm-document-field="manager">-</dd></div>
-        <div class="wide"><dt>Комментарий</dt><dd data-crm-document-field="note">-</dd></div>
-      </dl>
-      <div class="crm-document-lines">
-        <h3>Состав</h3>
-        <div data-crm-document-lines></div>
-      </div>
-    </div>
-    <footer class="settings-profile-modal-foot">
-      <button type="button" class="btn btn-secondary" data-crm-document-close>Закрыть</button>
-      <a class="btn" href="#" data-crm-document-go>Перейти</a>
-    </footer>
   </div>
 </dialog>
 

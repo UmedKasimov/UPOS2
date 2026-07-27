@@ -5979,32 +5979,148 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-card-detail-document {
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .crm-card-detail-document:hover,
-.crm-card-detail-document:focus-visible {
+.crm-card-detail-document.is-open {
   border-color: color-mix(in srgb, #16a34a 54%, var(--workbench-line, var(--border)));
-  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
-  outline: none;
-  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgb(15 23 42 / 7%);
 }
 
-.crm-document-detail-surface {
-  width: min(42rem, calc(100vw - 2rem));
-}
-
-.crm-document-detail-body {
+.crm-card-detail-document-trigger {
   display: grid;
-  gap: 0.85rem;
-  min-height: 0;
-  padding: 0 1rem 1rem;
-  overflow: auto;
+  grid-template-columns: minmax(0, 1fr) auto 1rem;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 3.35rem;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
 }
 
-.crm-document-detail-list {
+.crm-card-detail-document-trigger:hover,
+.crm-card-detail-document-trigger:focus-visible,
+.crm-card-detail-document.is-open .crm-card-detail-document-trigger {
+  background: color-mix(in srgb, #16a34a 5%, var(--card));
+  outline: none;
+}
+
+.crm-card-detail-document-main {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.crm-card-detail-document-main strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-card-detail-document-main small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-card-detail-document-trigger > b {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.crm-card-detail-document-chevron {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.16s ease;
+}
+
+.crm-card-detail-document.is-open .crm-card-detail-document-chevron {
+  transform: rotate(225deg);
+}
+
+.crm-card-detail-document-expand {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.crm-card-detail-document-expand[hidden] {
+  display: none;
+}
+
+.crm-document-expand-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.crm-document-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid var(--workbench-line, var(--border));
+}
+
+.crm-document-metrics > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.6rem;
+}
+
+.crm-document-metrics > div + div {
+  border-left: 1px solid var(--workbench-line, var(--border));
+}
+
+.crm-document-metrics span,
+.crm-document-meta dt,
+.crm-document-line-values dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-document-metrics strong,
+.crm-document-line-values dd {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.crm-document-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
   margin: 0;
+}
+
+.crm-document-meta > div {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 0.45fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.crm-document-meta > .wide {
+  grid-column: 1 / -1;
+}
+
+.crm-document-meta dd,
+.crm-document-line-values dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--foreground);
 }
 
 .crm-document-lines {
@@ -6012,26 +6128,25 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.55rem;
 }
 
-.crm-document-lines h3 {
+.crm-document-lines h3,
+.crm-document-lines h4 {
   margin: 0;
   font-size: var(--text-sm);
 }
 
 .crm-document-line {
   display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr) minmax(5rem, auto) minmax(6rem, auto);
+  grid-template-columns: 1.4rem minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--workbench-line, var(--border));
-  border-radius: 7px;
-  background: var(--card);
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--workbench-line, var(--border));
 }
 
-.crm-document-line span,
-.crm-document-line small {
+.crm-document-line-index {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
+  text-align: center;
 }
 
 .crm-document-line strong {
@@ -6041,9 +6156,56 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   white-space: nowrap;
 }
 
-.crm-document-line b {
-  text-align: right;
-  white-space: nowrap;
+.crm-document-line-values {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.crm-document-line-values > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.crm-document-expand-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 680px) {
+  .crm-card-detail-document-trigger {
+    grid-template-columns: minmax(0, 1fr) 1rem;
+  }
+
+  .crm-card-detail-document-trigger > b {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .crm-card-detail-document-chevron {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .crm-document-metrics,
+  .crm-document-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-document-metrics > div + div {
+    border-top: 1px solid var(--workbench-line, var(--border));
+    border-left: 0;
+  }
+
+  .crm-document-meta > .wide {
+    grid-column: auto;
+  }
+
+  .crm-document-line-values {
+    grid-template-columns: 1fr;
+  }
 }
 
 .crm-client-duplicate-note {
