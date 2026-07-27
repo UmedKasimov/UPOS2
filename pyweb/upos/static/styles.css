@@ -5754,6 +5754,42 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow-x: auto;
 }
 
+.crm-card-detail-chatbox .messenger-channel-tab.active,
+.crm-card-detail-chatbox .messenger-channel-tab:hover,
+.crm-card-detail-chatbox .messenger-channel-tab:focus-visible,
+.crm-card-detail-chatbox .messenger-channel-tab.active .messenger-channel-label,
+.crm-card-detail-chatbox .messenger-channel-tab:hover .messenger-channel-label,
+.crm-card-detail-chatbox .messenger-channel-tab:focus-visible .messenger-channel-label {
+  color: #fff;
+  opacity: 1;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 18%);
+}
+
+.crm-card-detail-chatbox .messenger-channel-logo {
+  opacity: 1;
+  visibility: visible;
+}
+
+.crm-card-detail-chatbox .messenger-channel-tab.active .messenger-channel-logo,
+.crm-card-detail-chatbox .messenger-channel-tab:hover .messenger-channel-logo,
+.crm-card-detail-chatbox .messenger-channel-tab:focus-visible .messenger-channel-logo,
+.crm-card-detail-chatbox .messenger-channel-tab.active b,
+.crm-card-detail-chatbox .messenger-channel-tab:hover b,
+.crm-card-detail-chatbox .messenger-channel-tab:focus-visible b {
+  border: 1px solid rgb(255 255 255 / 72%);
+  background: #fff;
+  color: var(--channel-brand-strong);
+  opacity: 1;
+  text-shadow: none;
+}
+
+.crm-card-detail-chatbox .messenger-channel-logo svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  stroke: currentColor;
+  opacity: 1;
+}
+
 .crm-card-detail-chat-title {
   min-height: 1.2rem;
   color: var(--foreground);
