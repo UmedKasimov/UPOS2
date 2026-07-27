@@ -306,6 +306,7 @@
       <label><span>Официальное название</span><input name="official_name" /></label>
       <label><span>Тип клиента</span><select name="client_type"><option value="company">Компания</option><option value="individual">Физическое лицо</option></select></label>
       <label><span>Телефон</span><input name="phone" /></label>
+      <label><span>Email</span><input name="email" type="email" /></label>
       <label><span>Telegram номер</span><input name="telegram_phone" /></label>
       <label><span>ИНН</span><input name="tax_id" /></label>
       <label><span>ПИНФЛ</span><input name="pinfl" /></label>
@@ -793,6 +794,7 @@
         <label><span>Официальное название</span><input name="official_name" value="{{ selected_client_card.official_name or '' }}" /></label>
         <label><span>Тип клиента</span><select name="client_type"><option value="company" {% if selected_client_card.client_type == 'company' %}selected{% endif %}>Компания</option><option value="individual" {% if selected_client_card.client_type == 'individual' %}selected{% endif %}>Физическое лицо</option></select></label>
         <label><span>Телефон</span><input name="phone" value="{{ selected_client_card.phone or '' }}" /></label>
+        <label><span>Email</span><input name="email" type="email" value="{{ selected_client_card.email or '' }}" /></label>
         <label><span>Telegram номер</span><input name="telegram_phone" value="{{ selected_client_card.telegram_phone or '' }}" /></label>
         <label><span>ИНН</span><input name="tax_id" value="{{ selected_client_card.inn or '' }}" /></label>
         <label><span>ПИНФЛ</span><input name="pinfl" value="{{ selected_client_card.pinfl or '' }}" /></label>

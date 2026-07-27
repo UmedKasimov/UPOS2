@@ -3208,6 +3208,90 @@ def create_app() -> FastAPI:
     def _counterparty_extra(row: Counterparty) -> dict[str, Any]:
         return _json_object(getattr(row, "data", {}))
 
+    def _identity_name(value: Any) -> str:
+        return " ".join(str(value or "").split()).casefold()
+
+    def _identity_phone(value: Any) -> str:
+        digits = re.sub(r"\D+", "", str(value or ""))
+        if len(digits) < 7:
+            return ""
+        return digits[-9:] if len(digits) >= 9 else digits
+
+    def _identity_email(value: Any) -> str:
+        email = re.sub(r"\s+", "", str(value or "")).casefold()
+        return email if len(email) >= 5 and "@" in email else ""
+
+    def _identity_tax_id(value: Any) -> str:
+        tax_id = re.sub(r"[^0-9a-zA-Zа-яА-Я]+", "", str(value or "")).casefold()
+        return tax_id if len(tax_id) >= 5 else ""
+
+    def _counterparty_duplicate(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        counterparty_id: str = "",
+        name: str = "",
+        phone: str = "",
+        email: str = "",
+        tax_id: str = "",
+        pinfl: str = "",
+    ) -> tuple[Counterparty, str] | None:
+        submitted_name = _identity_name(name)
+        submitted_phone = _identity_phone(phone)
+        submitted_email = _identity_email(email)
+        submitted_tax_ids = {
+            item for item in (_identity_tax_id(tax_id), _identity_tax_id(pinfl)) if item
+        }
+        rows = session.execute(
+            select(Counterparty).where(Counterparty.workspace_owner_id == workspace_owner_id)
+        ).scalars()
+        for row in rows:
+            if counterparty_id and row.id == counterparty_id:
+                continue
+            extra = _counterparty_extra(row)
+            existing_tax_ids = {
+                item
+                for item in (
+                    _identity_tax_id(row.tax_id),
+                    _identity_tax_id(extra.get("inn")),
+                    _identity_tax_id(extra.get("pinfl")),
+                )
+                if item
+            }
+            if submitted_tax_ids and submitted_tax_ids.intersection(existing_tax_ids):
+                return row, "tax_id"
+            if submitted_email and submitted_email == _identity_email(extra.get("email")):
+                return row, "email"
+            existing_phones = {
+                item
+                for item in (
+                    _identity_phone(row.phone),
+                    _identity_phone(extra.get("phone")),
+                )
+                if item
+            }
+            if submitted_phone and submitted_phone in existing_phones:
+                return row, "phone"
+            existing_names = {
+                _identity_name(row.name),
+                _identity_name(extra.get("official_name")),
+                _identity_name(extra.get("legal_name")),
+            }
+            existing_names.discard("")
+            if submitted_name and submitted_name in existing_names:
+                return row, "name"
+        return None
+
+    def _counterparty_duplicate_message(match: tuple[Counterparty, str]) -> str:
+        row, field = match
+        field_label = {
+            "phone": "номер телефона",
+            "email": "email",
+            "tax_id": "ИНН или ПИНФЛ",
+            "name": "название",
+        }.get(field, "реквизиты")
+        return f"Запись «{row.name}» уже существует: совпадает {field_label}"
+
     def _resolve_counterparty(
         session: Any,
         workspace_owner_id: str,
@@ -3327,6 +3411,43 @@ def create_app() -> FastAPI:
                 ),
             )
         ).scalars().first()
+
+    def _product_duplicate(
+        session: Any,
+        workspace_owner_id: str,
+        *,
+        product_id: str = "",
+        name: str = "",
+        sku: str = "",
+        barcode: str = "",
+    ) -> tuple[Product, str] | None:
+        submitted_name = _identity_name(name)
+        submitted_sku = re.sub(r"\s+", "", str(sku or "")).casefold()
+        submitted_barcode = re.sub(r"[\s-]+", "", str(barcode or "")).casefold()
+        rows = session.execute(
+            select(Product).where(Product.workspace_owner_id == workspace_owner_id)
+        ).scalars()
+        for row in rows:
+            if product_id and row.id == product_id:
+                continue
+            existing_barcode = re.sub(r"[\s-]+", "", str(row.barcode or "")).casefold()
+            if submitted_barcode and submitted_barcode == existing_barcode:
+                return row, "barcode"
+            existing_sku = re.sub(r"\s+", "", str(row.sku or "")).casefold()
+            if submitted_sku and submitted_sku == existing_sku:
+                return row, "sku"
+            if submitted_name and submitted_name == _identity_name(row.name):
+                return row, "name"
+        return None
+
+    def _product_duplicate_message(match: tuple[Product, str]) -> str:
+        row, field = match
+        field_label = {
+            "barcode": "штрихкод",
+            "sku": "артикул",
+            "name": "название",
+        }.get(field, "реквизиты")
+        return f"Товар «{row.name}» уже существует: совпадает {field_label}"
 
     def _resolve_warehouse(session: Any, workspace_owner_id: str, raw_value: str) -> Warehouse | None:
         value = str(raw_value or "").strip()
@@ -5447,7 +5568,7 @@ def create_app() -> FastAPI:
         imported_count = 0
         with session_scope() as session:
             for row_values in rows[1:]:
-                name = _product_excel_text(cell(row_values, "Название", "Name"))
+                name = " ".join(_product_excel_text(cell(row_values, "Название", "Name")).split())
                 if not name:
                     continue
                 imported_count += 1
@@ -5458,27 +5579,15 @@ def create_app() -> FastAPI:
                 row = session.get(Product, product_id) if product_id else None
                 if row and row.workspace_owner_id != wid:
                     row = None
-                if row is None and sku:
-                    row = session.execute(
-                        select(Product).where(
-                            Product.workspace_owner_id == wid,
-                            Product.sku == sku,
-                        )
-                    ).scalars().first()
-                if row is None and barcode:
-                    row = session.execute(
-                        select(Product).where(
-                            Product.workspace_owner_id == wid,
-                            Product.barcode == barcode,
-                        )
-                    ).scalars().first()
                 if row is None:
-                    row = session.execute(
-                        select(Product).where(
-                            Product.workspace_owner_id == wid,
-                            func.lower(Product.name) == name.lower(),
-                        )
-                    ).scalars().first()
+                    duplicate = _product_duplicate(
+                        session,
+                        wid,
+                        name=name,
+                        sku=sku,
+                        barcode=barcode,
+                    )
+                    row = duplicate[0] if duplicate else None
 
                 prices_json = _product_excel_text(cell(row_values, "Цены JSON"))
                 prices: list[dict[str, str]] = []
@@ -5633,7 +5742,7 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         product_id = str(form.get("product_id") or "").strip()
-        name = str(form.get("name") or "").strip()
+        name = " ".join(str(form.get("name") or "").split())
         if not name:
             return RedirectResponse(url="/products?error=" + quote("Название товара обязательно"), status_code=302)
         sku = str(form.get("sku") or "").strip()
@@ -5650,32 +5759,19 @@ def create_app() -> FastAPI:
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
                 return RedirectResponse(url="/products?error=" + quote("Товар не найден"), status_code=302)
-            duplicate = session.execute(
-                select(Product)
-                .where(
-                    Product.workspace_owner_id == wid,
-                    func.lower(Product.name) == name.lower(),
+            normalized_duplicate = _product_duplicate(
+                session,
+                wid,
+                product_id=product_id,
+                name=name,
+                sku=sku,
+                barcode=barcode,
+            )
+            if normalized_duplicate:
+                return RedirectResponse(
+                    url="/products?error=" + quote(_product_duplicate_message(normalized_duplicate)) + "#product-form",
+                    status_code=302,
                 )
-                .limit(1)
-            ).scalars().first()
-            if duplicate and duplicate.id != product_id:
-                return RedirectResponse(url="/products?error=" + quote("Товар с таким названием уже есть") + "#product-form", status_code=302)
-            if sku:
-                duplicate = session.execute(
-                    select(Product)
-                    .where(Product.workspace_owner_id == wid, func.lower(Product.sku) == sku.lower())
-                    .limit(1)
-                ).scalars().first()
-                if duplicate and duplicate.id != product_id:
-                    return RedirectResponse(url="/products?error=" + quote("Товар с таким артикулом уже есть") + "#product-form", status_code=302)
-            if barcode:
-                duplicate = session.execute(
-                    select(Product)
-                    .where(Product.workspace_owner_id == wid, Product.barcode == barcode)
-                    .limit(1)
-                ).scalars().first()
-                if duplicate and duplicate.id != product_id:
-                    return RedirectResponse(url="/products?error=" + quote("Товар с таким штрихкодом уже есть") + "#product-form", status_code=302)
             if row is None:
                 product_id = product_id or str(uuid.uuid4())
                 row = Product(
@@ -7045,7 +7141,7 @@ def create_app() -> FastAPI:
         kind = _product_excel_kind(form.get("kind"), "product")
         if kind not in {"product", "service"}:
             kind = "product"
-        name = str(form.get("name") or "").strip()
+        name = " ".join(str(form.get("name") or "").split())
         if not name:
             return JSONResponse({"error": "Название обязательно"}, status_code=400)
         sku = str(form.get("sku") or "").strip()
@@ -7056,30 +7152,12 @@ def create_app() -> FastAPI:
             data["stocks"] = []
             data["unit"] = data.get("unit") or "Услуга"
         with session_scope() as session:
-            duplicate = session.execute(
-                select(Product).where(
-                    Product.workspace_owner_id == wid,
-                    func.lower(Product.name) == name.lower(),
+            normalized_duplicate = _product_duplicate(session, wid, name=name, sku=sku, barcode=barcode)
+            if normalized_duplicate:
+                return JSONResponse(
+                    {"error": _product_duplicate_message(normalized_duplicate)},
+                    status_code=409,
                 )
-            ).scalar_one_or_none()
-            if duplicate:
-                return JSONResponse({"error": "Такая позиция уже есть"}, status_code=409)
-            if sku:
-                duplicate = session.execute(
-                    select(Product)
-                    .where(Product.workspace_owner_id == wid, func.lower(Product.sku) == sku.lower())
-                    .limit(1)
-                ).scalars().first()
-                if duplicate:
-                    return JSONResponse({"error": "Позиция с таким артикулом уже есть"}, status_code=409)
-            if barcode:
-                duplicate = session.execute(
-                    select(Product)
-                    .where(Product.workspace_owner_id == wid, Product.barcode == barcode)
-                    .limit(1)
-                ).scalars().first()
-                if duplicate:
-                    return JSONResponse({"error": "Позиция с таким штрихкодом уже есть"}, status_code=409)
             product_id = str(uuid.uuid4())
             row = Product(
                 id=product_id,
@@ -9932,13 +10010,37 @@ def create_app() -> FastAPI:
                 return JSONResponse({"ok": False, "error": "Нужно войти заново"}, status_code=401)
             return redir
         assert wid is not None
-        name = str(form.get("name") or "").strip()
+        name = " ".join(str(form.get("name") or "").split())
         if not name:
             if wants_json:
                 return JSONResponse({"ok": False, "error": "Название клиента обязательно"}, status_code=400)
             return RedirectResponse(url="/clients?error=" + quote("Название клиента обязательно") + "#clients", status_code=302)
         is_supplier = str(form.get("is_supplier") or "").strip() == "1"
         client_id = str(form.get("client_id") or "").strip()
+        phone = str(form.get("phone") or "").strip()
+        tax_id = str(form.get("tax_id") or form.get("inn") or "").strip()
+        pinfl = str(form.get("pinfl") or "").strip()
+        email = str(form.get("email") or "").strip()
+        with session_scope() as session:
+            duplicate = _counterparty_duplicate(
+                session,
+                wid,
+                counterparty_id=client_id,
+                name=name,
+                phone=phone,
+                email=email,
+                tax_id=tax_id,
+                pinfl=pinfl,
+            )
+            if duplicate:
+                message = _counterparty_duplicate_message(duplicate)
+                if wants_json:
+                    return JSONResponse({"ok": False, "error": message}, status_code=409)
+                target = "client-edit" if client_id else "client-create"
+                return RedirectResponse(
+                    url="/clients?error=" + quote(message) + f"#{target}",
+                    status_code=302,
+                )
         uploaded_photo_url = await _save_client_photo_upload(wid, form.get("photo_file"))
         with session_scope() as session:
             client_type = str(form.get("client_type") or "company").strip()
@@ -9950,7 +10052,6 @@ def create_app() -> FastAPI:
             crm_status = str(form.get("crm_status") or "new_lead").strip()
             if crm_status not in CLIENT_CRM_STATUS_LABELS:
                 crm_status = "new_lead"
-            tax_id = str(form.get("tax_id") or form.get("inn") or "").strip()
             industry = str(form.get("industry") or "").strip()
             map_icon = str(form.get("map_icon") or "").strip()
             if not map_icon or map_icon == "default":
@@ -9976,7 +10077,7 @@ def create_app() -> FastAPI:
                 counterparty_id=client_id,
                 name=name,
                 role="both" if is_supplier else "client",
-                phone=str(form.get("phone") or "").strip(),
+                phone=phone,
                 tax_id=tax_id,
                 data={
                     "official_name": str(form.get("official_name") or "").strip(),
@@ -9985,7 +10086,7 @@ def create_app() -> FastAPI:
                     "photo_url": uploaded_photo_url or str(form.get("photo_url") or "").strip(),
                     "client_type": client_type,
                     "inn": tax_id,
-                    "pinfl": str(form.get("pinfl") or "").strip(),
+                    "pinfl": pinfl,
                     "okved": str(form.get("okved") or "").strip(),
                     "territory": str(form.get("territory") or "").strip(),
                     "category": str(form.get("category") or "").strip(),
@@ -10003,7 +10104,7 @@ def create_app() -> FastAPI:
                     "telegram_phone": str(form.get("telegram_phone") or form.get("telegram") or "").strip(),
                     "note": str(form.get("note") or "").strip(),
                     "comment": str(form.get("comment") or form.get("note") or "").strip(),
-                    "email": str(form.get("email") or "").strip(),
+                    "email": email,
                     "address": address,
                     "latitude": latitude,
                     "longitude": longitude,
@@ -10262,23 +10363,37 @@ def create_app() -> FastAPI:
         if redir:
             return JSONResponse({"error": "Нужно войти заново"}, status_code=401)
         assert wid is not None
-        name = str(form.get("name") or "").strip()
+        name = " ".join(str(form.get("name") or "").split())
         if not name:
             return JSONResponse({"error": "Название поставщика обязательно"}, status_code=400)
         phone = str(form.get("phone") or "").strip()
         tax_id = str(form.get("tax_id") or "").strip()
+        email = str(form.get("email") or "").strip()
         is_client = str(form.get("is_client") or "").strip() == "1"
         data = {
             "official_name": str(form.get("official_name") or "").strip(),
             "category": str(form.get("category") or "").strip(),
             "status": str(form.get("status") or "active").strip(),
             "note": str(form.get("note") or "").strip(),
-            "email": str(form.get("email") or "").strip(),
+            "email": email,
             "address": str(form.get("address") or "").strip(),
             "is_client": is_client,
             "is_supplier": True,
         }
         with session_scope() as session:
+            duplicate = _counterparty_duplicate(
+                session,
+                wid,
+                name=name,
+                phone=phone,
+                email=email,
+                tax_id=tax_id,
+            )
+            if duplicate:
+                return JSONResponse(
+                    {"error": _counterparty_duplicate_message(duplicate)},
+                    status_code=409,
+                )
             row = _ensure_counterparty(
                 session,
                 wid,
@@ -10356,24 +10471,40 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        name = str(form.get("name") or "").strip()
+        name = " ".join(str(form.get("name") or "").split())
         if not name:
             return RedirectResponse(url="/suppliers?error=" + quote("Название поставщика обязательно") + "#suppliers", status_code=302)
         is_client = str(form.get("is_client") or "").strip() == "1"
+        phone = str(form.get("phone") or "").strip()
+        tax_id = str(form.get("tax_id") or "").strip()
+        email = str(form.get("email") or "").strip()
         with session_scope() as session:
+            duplicate = _counterparty_duplicate(
+                session,
+                wid,
+                name=name,
+                phone=phone,
+                email=email,
+                tax_id=tax_id,
+            )
+            if duplicate:
+                return RedirectResponse(
+                    url="/suppliers?error=" + quote(_counterparty_duplicate_message(duplicate)) + "#supplier-create",
+                    status_code=302,
+                )
             _ensure_counterparty(
                 session,
                 wid,
                 name=name,
                 role="both" if is_client else "supplier",
-                phone=str(form.get("phone") or "").strip(),
-                tax_id=str(form.get("tax_id") or "").strip(),
+                phone=phone,
+                tax_id=tax_id,
                 data={
                     "official_name": str(form.get("official_name") or "").strip(),
                     "category": str(form.get("category") or "").strip(),
                     "status": str(form.get("status") or "active").strip(),
                     "note": str(form.get("note") or "").strip(),
-                    "email": str(form.get("email") or "").strip(),
+                    "email": email,
                     "address": str(form.get("address") or "").strip(),
                     "is_client": is_client,
                     "is_supplier": True,
