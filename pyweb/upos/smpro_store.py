@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -810,8 +810,22 @@ def list_upos_branches(workspace_owner_id: str) -> list[dict[str, str]]:
 def start_smpro_sync(workspace_owner_id: str) -> dict[str, Any]:
     current = last_smpro_status(workspace_owner_id)
     if current and current.get("status") == "running":
-        current["already_running"] = True
-        return current
+        started_raw = str(current.get("started_at") or "")
+        try:
+            started_at = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+            if started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=UTC)
+        except ValueError:
+            started_at = datetime.now(UTC)
+        if datetime.now(UTC) - started_at <= timedelta(minutes=5):
+            current["already_running"] = True
+            return current
+        _finish_run(
+            str(current.get("id") or ""),
+            "error",
+            int(current.get("imported_count") or 0),
+            error="Предыдущая синхронизация была прервана обновлением сервера. Запущен новый проход.",
+        )
     run_id = str(uuid.uuid4())
     with session_scope() as session:
         session.add(
