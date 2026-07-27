@@ -45,6 +45,7 @@ from upos.db_models import (
     FinanceAccount,
     FinanceCategory,
     Product,
+    ProductPhoto,
     PurchaseDocument,
     SaleDocument,
     TelegramChat,
@@ -5555,25 +5556,52 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=_product_import_redirect_url(kind, error="В Excel не найдено ни одной строки товара"), status_code=302)
         return RedirectResponse(url=_product_import_redirect_url(kind, msg="imported", count=imported_count), status_code=302)
 
-    async def _save_product_photo_upload(workspace_owner_id: str, upload: Any) -> str:
+    async def _prepare_product_photo_upload(upload: Any) -> tuple[bytes, str] | None:
         filename = str(getattr(upload, "filename", "") or "").strip()
         if not filename:
-            return ""
+            return None
         suffix = Path(filename).suffix.lower()
         if suffix not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
-            return ""
+            raise ValueError("Поддерживаются фото JPG, PNG, WEBP и GIF")
         content_type = str(getattr(upload, "content_type", "") or "").lower()
         if content_type and not content_type.startswith("image/"):
-            return ""
+            raise ValueError("Выбранный файл не является изображением")
         payload = await upload.read()
         if not payload:
-            return ""
-        target_dir = BASE_DIR / "static" / "uploads" / "products" / re.sub(r"[^a-zA-Z0-9_-]", "_", workspace_owner_id)
-        target_dir.mkdir(parents=True, exist_ok=True)
-        file_name = f"{uuid.uuid4().hex}{suffix}"
-        target = target_dir / file_name
-        target.write_bytes(payload)
-        return f"/static/uploads/products/{target_dir.name}/{file_name}"
+            raise ValueError("Файл изображения пуст")
+        if len(payload) > 15 * 1024 * 1024:
+            raise ValueError("Размер фото не должен превышать 15 МБ")
+        try:
+            with Image.open(io.BytesIO(payload)) as source:
+                source.seek(0)
+                image = source.copy()
+            image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            if image.mode not in {"RGB", "RGBA"}:
+                image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+            output = io.BytesIO()
+            image.save(output, "WEBP", quality=84, method=6)
+        except Exception as exc:
+            raise ValueError("Не удалось прочитать изображение") from exc
+        return output.getvalue(), "image/webp"
+
+    @app.get("/products/{product_id}/photo", name="product_photo")
+    def product_photo(request: Request, product_id: str):
+        wid, redir = _product_workspace_owner(request)
+        if redir or not wid:
+            return Response(status_code=401)
+        with session_scope() as session:
+            photo = session.get(ProductPhoto, product_id)
+            if photo is None or photo.workspace_owner_id != wid:
+                return Response(status_code=404)
+            content = bytes(photo.content or b"")
+            content_type = str(photo.content_type or "image/webp")
+        if not content:
+            return Response(status_code=404)
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "private, no-cache"},
+        )
 
     @app.post("/products/save", name="products_save")
     async def products_save(request: Request):
@@ -5591,9 +5619,13 @@ def create_app() -> FastAPI:
         sku = str(form.get("sku") or "").strip()
         barcode = str(form.get("barcode") or "").strip()
         data = _product_form_payload(form)
-        uploaded_photo_url = await _save_product_photo_upload(wid, form.get("photo_file"))
-        if uploaded_photo_url:
-            data["photo_url"] = uploaded_photo_url
+        try:
+            uploaded_photo = await _prepare_product_photo_upload(form.get("photo_file"))
+        except ValueError as exc:
+            return RedirectResponse(
+                url="/products?error=" + quote(str(exc)) + "#product-form",
+                status_code=302,
+            )
         with session_scope() as session:
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
@@ -5625,7 +5657,7 @@ def create_app() -> FastAPI:
                 if duplicate and duplicate.id != product_id:
                     return RedirectResponse(url="/products?error=" + quote("Товар с таким штрихкодом уже есть") + "#product-form", status_code=302)
             if row is None:
-                product_id = str(uuid.uuid4())
+                product_id = product_id or str(uuid.uuid4())
                 row = Product(
                     id=product_id,
                     workspace_owner_id=wid,
@@ -5643,7 +5675,31 @@ def create_app() -> FastAPI:
                 row.barcode = barcode
                 row.external_source = row.external_source or "local"
                 row.external_id = row.external_id or row.id
-                row.data = data
+            old_data = _json_object(row.data)
+            old_photo_url = str(old_data.get("photo_url") or "")
+            photo = session.get(ProductPhoto, product_id)
+            if uploaded_photo:
+                content, content_type = uploaded_photo
+                if photo is None:
+                    photo = ProductPhoto(
+                        product_id=product_id,
+                        workspace_owner_id=wid,
+                        content_type=content_type,
+                        content=content,
+                    )
+                    session.add(photo)
+                else:
+                    photo.workspace_owner_id = wid
+                    photo.content_type = content_type
+                    photo.content = content
+                data["photo_url"] = f"/products/{product_id}/photo"
+            elif photo is not None:
+                submitted_photo_url = str(data.get("photo_url") or "")
+                if submitted_photo_url == old_photo_url:
+                    data["photo_url"] = f"/products/{product_id}/photo"
+                else:
+                    session.delete(photo)
+            row.data = data
         return RedirectResponse(url="/products?msg=saved", status_code=302)
 
     @app.post("/products/categories/save", name="products_category_save")
