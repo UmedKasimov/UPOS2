@@ -678,6 +678,20 @@
     }, 180);
   }
 
+  function hideDetailImmediately(root) {
+    var panel = root.querySelector("[data-sales-journal-detail]");
+    var backdrop = root.querySelector(".sales-document-detail-backdrop");
+    if (panel) {
+      panel.classList.remove("is-open");
+      panel.hidden = true;
+    }
+    if (backdrop) {
+      backdrop.classList.remove("is-open");
+      backdrop.hidden = true;
+    }
+    closeDetailMenu(root);
+  }
+
   function statusClass(value) {
     if (value === "paid") return "confirmed";
     if (value === "return") return "rejected";
@@ -935,15 +949,17 @@
     scope.querySelectorAll("[data-sales-debt-pay]").forEach(function (button) {
       if (button.dataset.salesDebtPayReady === "1") return;
       button.dataset.salesDebtPayReady = "1";
-      button.addEventListener("click", function () {
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
         var saleId = button.dataset.saleId || "";
-        openDetail(scope, saleId);
+        var sale = readSale(saleId);
         var panel = scope.querySelector("[data-sales-journal-detail]");
-        if (!panel) return;
-        activateSalesDetailTab(panel, "payment");
-        window.setTimeout(function () {
-          openDetailPaymentDialog(scope, panel);
-        }, 0);
+        if (!panel || !sale) return;
+        panel.dataset.saleId = saleId;
+        renderDetail(panel, sale);
+        hideDetailImmediately(scope);
+        openDetailPaymentDialog(scope, panel);
       });
     });
     scope.querySelectorAll("[data-sales-detail-menu-return]").forEach(function (trigger) {
