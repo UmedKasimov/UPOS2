@@ -6995,26 +6995,41 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  box-shadow: inset 0 -0.26rem 0 color-mix(in srgb, var(--workbench-line, var(--border)) 72%, transparent);
 }
 
 .warehouse-purchase-paid::before {
   position: absolute;
-  z-index: 0;
-  inset: 0 auto 0 0;
+  z-index: 2;
+  bottom: 0;
+  left: 0;
   width: var(--purchase-paid-progress, 0%);
-  border-right: 1px solid color-mix(in srgb, #16a34a 48%, transparent);
-  background: color-mix(in srgb, #22c55e 23%, transparent);
+  height: 0.26rem;
+  border-radius: 0 999px 999px 0;
+  background: #16a34a;
   content: "";
   pointer-events: none;
   transition: width 420ms ease;
 }
 
-.warehouse-purchase-paid[data-payment-progress="0"]::before {
-  border-right: 0;
+.warehouse-purchase-paid::after {
+  position: absolute;
+  z-index: 2;
+  bottom: 0.25rem;
+  left: clamp(0.3rem, var(--purchase-paid-progress, 0%), calc(100% - 0.3rem));
+  width: 0;
+  height: 0;
+  border-top: 0.34rem solid #15803d;
+  border-right: 0.3rem solid transparent;
+  border-left: 0.3rem solid transparent;
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: left 420ms ease;
 }
 
-.warehouse-purchase-paid[data-payment-progress="100"]::before {
-  background: color-mix(in srgb, #22c55e 30%, transparent);
+.warehouse-purchase-paid[data-payment-progress="0"]::after {
+  display: none;
 }
 
 .warehouse-purchase-paid-age {
@@ -10756,26 +10771,41 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  box-shadow: inset 0 -0.26rem 0 color-mix(in srgb, var(--workbench-line, var(--border)) 72%, transparent);
 }
 
 .sales-journal-payment-progress::before {
   position: absolute;
-  z-index: 0;
-  inset: 0 auto 0 0;
+  z-index: 2;
+  bottom: 0;
+  left: 0;
   width: var(--sales-payment-progress, 0%);
-  border-right: 1px solid color-mix(in srgb, #16a34a 48%, transparent);
-  background: color-mix(in srgb, #22c55e 23%, transparent);
+  height: 0.26rem;
+  border-radius: 0 999px 999px 0;
+  background: #16a34a;
   content: "";
   pointer-events: none;
   transition: width 420ms ease;
 }
 
-.sales-journal-payment-progress[data-payment-progress="0"]::before {
-  border-right: 0;
+.sales-journal-payment-progress::after {
+  position: absolute;
+  z-index: 2;
+  bottom: 0.25rem;
+  left: clamp(0.3rem, var(--sales-payment-progress, 0%), calc(100% - 0.3rem));
+  width: 0;
+  height: 0;
+  border-top: 0.34rem solid #15803d;
+  border-right: 0.3rem solid transparent;
+  border-left: 0.3rem solid transparent;
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: left 420ms ease;
 }
 
-.sales-journal-payment-progress[data-payment-progress="100"]::before {
-  background: color-mix(in srgb, #22c55e 30%, transparent);
+.sales-journal-payment-progress[data-payment-progress="0"]::after {
+  display: none;
 }
 
 .sales-journal-payment-progress > span,
