@@ -184,7 +184,7 @@ class SMProStoreTests(unittest.TestCase):
 
         self.assertEqual([row["id"] for row in rows], ["1", "ibox:7:1", "ibox:7:3"])
         self.assertEqual(rows[0]["name"], "ПРОДАЖНАЯ ЦЕНА")
-        self.assertEqual(rows[1]["name"], "Retail")
+        self.assertEqual(rows[1]["name"], "IBOX · Retail")
         self.assertEqual(rows[1]["convert_to_currency"], "USD")
         self.assertEqual(rows[1]["created_by"], "IBOX")
 

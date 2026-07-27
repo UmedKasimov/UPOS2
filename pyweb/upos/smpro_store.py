@@ -148,10 +148,11 @@ def _ibox_price_type_rows(
             sort_order = int(str(payload.get("sort_order") or ""))
         except (TypeError, ValueError):
             sort_order = int(previous.get("sort_order") or base_sort_order + offset)
+        remote_name = _text(payload, "name", "title") or str(remote_id)
         row = {
             **previous,
             "id": local_id,
-            "name": _text(payload, "name", "title") or f"IBOX {remote_id}",
+            "name": f"IBOX · {remote_name}",
             "sort_order": sort_order,
             "is_for_sales": _bool_value(
                 payload.get("is_for_sales", payload.get("active")),
