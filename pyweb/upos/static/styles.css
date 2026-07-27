@@ -14094,7 +14094,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background-image:
     linear-gradient(rgb(22 131 232 / 8%) 1px, transparent 1px),
     linear-gradient(90deg, rgb(22 131 232 / 8%) 1px, transparent 1px);
-  background-size: 12px 12px;
+  background-size: 6px 6px;
 }
 
 .price-template-drag-handle {
