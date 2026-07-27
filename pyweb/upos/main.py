@@ -6113,15 +6113,67 @@ def create_app() -> FastAPI:
             return f"{int(amount):,}".replace(",", " ")
         return f"{amount:,.2f}".replace(",", " ").rstrip("0").rstrip(".")
 
-    def _sales_status_label(status: str) -> str:
+    _SALES_WORKFLOW_VERSION = 2
+    _SALES_WORKFLOW_STATUSES = {
+        "new": "Новый",
+        "shipped": "Отгружен",
+        "installation": "Установка",
+        "completed": "Завершен",
+        "archived": "Архив",
+    }
+
+    def _sales_workflow_status(data: dict[str, Any]) -> str:
+        doc_type = str(data.get("doc_type") or "sale").strip()
+        raw_status = str(data.get("status") or "new").strip().lower()
+        if doc_type == "return":
+            return "return"
+        if int(_sales_decimal(data.get("workflow_version"))) >= _SALES_WORKFLOW_VERSION:
+            return raw_status if raw_status in _SALES_WORKFLOW_STATUSES else "new"
+        if doc_type == "order":
+            return "new"
         return {
-            "new": "Новый",
-            "reserved": "Резерв",
-            "paid": "Оплачен",
-            "partial": "Частично",
-            "debt": "Долг",
-            "return": "Возврат",
-        }.get(status or "", "Новый")
+            "new": "shipped",
+            "reserved": "shipped",
+            "partial": "installation",
+            "debt": "installation",
+            "paid": "archived",
+        }.get(raw_status, raw_status if raw_status in _SALES_WORKFLOW_STATUSES else "new")
+
+    def _sales_status_label(status: str) -> str:
+        if status == "return":
+            return "Возврат"
+        return _SALES_WORKFLOW_STATUSES.get(status or "", "Новый")
+
+    def _sales_status_requires_inventory(status: str, doc_type: str) -> bool:
+        if doc_type == "return":
+            return True
+        return status in {"shipped", "installation", "completed", "archived"}
+
+    def _sales_status_records_debt(status: str, doc_type: str) -> bool:
+        if doc_type == "return":
+            return True
+        return status in {"installation", "completed", "archived"}
+
+    def _sales_status_records_profit(status: str, doc_type: str) -> bool:
+        return doc_type == "return" or status == "archived"
+
+    def _sales_inventory_applied(data: dict[str, Any]) -> bool:
+        if "inventory_applied" in data:
+            value = data.get("inventory_applied")
+            if isinstance(value, bool):
+                return value
+            return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+        doc_type = str(data.get("doc_type") or "sale").strip()
+        if int(_sales_decimal(data.get("workflow_version"))) >= _SALES_WORKFLOW_VERSION:
+            return _sales_status_requires_inventory(_sales_workflow_status(data), doc_type)
+        return doc_type in {"sale", "return"}
+
+    def _sales_inventory_delta_sign(doc_type: str) -> int:
+        if doc_type == "return":
+            return 1
+        if doc_type in {"sale", "order"}:
+            return -1
+        return 0
 
     def _sales_doc_type_label(doc_type: str) -> str:
         return {
@@ -6167,7 +6219,10 @@ def create_app() -> FastAPI:
         data = row.data if isinstance(row.data, dict) else {}
         paid_amount = _sales_decimal(data.get("paid_amount"))
         amount_value = _sales_decimal(row.amount)
-        debt_amount = amount_value - paid_amount
+        doc_type = str(data.get("doc_type") or "sale")
+        status = _sales_workflow_status(data)
+        raw_debt_amount = max(Decimal("0"), amount_value - paid_amount)
+        debt_amount = raw_debt_amount if _sales_status_records_debt(status, doc_type) else Decimal("0")
         payment_progress = 0
         if amount_value > 0:
             paid_for_progress = max(Decimal("0"), min(paid_amount, amount_value))
@@ -6176,8 +6231,6 @@ def create_app() -> FastAPI:
                     Decimal("1"), rounding=ROUND_HALF_UP
                 )
             )
-        doc_type = str(data.get("doc_type") or "sale")
-        status = str(data.get("status") or ("return" if doc_type == "return" else "new"))
         date_from = str(data.get("date") or "")
         date_to = str(data.get("date_to") or "")
         date_label = f"{date_from} - {date_to}" if date_from and date_to and date_to != date_from else date_from
@@ -6208,6 +6261,9 @@ def create_app() -> FastAPI:
             ],
             "status": status,
             "status_label": _sales_status_label(status),
+            "inventory_applied": _sales_inventory_applied(data),
+            "debt_recognized": _sales_status_records_debt(status, doc_type),
+            "profit_recognized": _sales_status_records_profit(status, doc_type),
             "manager": str(data.get("manager") or ""),
             "note": str(data.get("note") or ""),
             "price_type_id": str(data.get("price_type_id") or ""),
@@ -6500,10 +6556,7 @@ def create_app() -> FastAPI:
         paid_amount = _sales_decimal_strict(form.get("paid_amount"), "Оплачено")
         if paid_amount < 0:
             raise ValueError("Оплачено не может быть отрицательным")
-        if doc_type == "return":
-            status = "return"
-        else:
-            status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "new"
+        status = "return" if doc_type == "return" else "new"
         payment_lines: list[dict[str, str]] = []
         raw_payment_lines = str(form.get("payment_lines") or "").strip()
         if raw_payment_lines:
@@ -6540,6 +6593,8 @@ def create_app() -> FastAPI:
             "client": str(form.get("client") or "").strip(),
             "warehouse": first_warehouse or "Основной склад",
             "status": status,
+            "workflow_version": _SALES_WORKFLOW_VERSION,
+            "inventory_applied": doc_type == "return",
             "price_type_id": str(form.get("price_type_id") or "").strip(),
             "price_type": str(form.get("price_type_name") or "").strip(),
             "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
@@ -6993,6 +7048,8 @@ def create_app() -> FastAPI:
                     continue
                 sale_currency = str(sale_row.currency or "UZS").upper()
                 sale_doc_type = str(sale_data.get("doc_type") or "sale")
+                if not _sales_status_records_debt(_sales_workflow_status(sale_data), sale_doc_type):
+                    continue
                 sale_sign = Decimal("-1") if sale_doc_type == "return" else Decimal("1")
                 sale_balance = sale_sign * (_sales_decimal(sale_row.amount) - _sales_decimal(sale_data.get("paid_amount")))
                 sale_counterparty_id = str(sale_data.get("counterparty_id") or "").strip()
@@ -7234,6 +7291,9 @@ def create_app() -> FastAPI:
                 old_data = _json_object(candidate_row.data).copy()
                 old_doc_type = str(old_data.get("doc_type") or "sale")
                 data["doc_type"] = old_doc_type if old_doc_type in {"sale", "order", "return"} else "sale"
+                data["status"] = _sales_workflow_status(old_data)
+                data["workflow_version"] = _SALES_WORKFLOW_VERSION
+                data["inventory_applied"] = _sales_inventory_applied(old_data)
                 if not data.get("crm_record_id"):
                     data["crm_record_id"] = str(old_data.get("crm_record_id") or "")
                 if not data.get("source_sale_id"):
@@ -7278,17 +7338,19 @@ def create_app() -> FastAPI:
                     )
                 if editing_row is not None:
                     old_doc_type = str(old_data.get("doc_type") or "sale")
-                    old_delta_sign = 1 if old_doc_type == "sale" else -1 if old_doc_type == "return" else 0
-                    _sync_product_lines(
-                        session,
-                        wid,
-                        warehouse_name=str(old_data.get("warehouse") or "Основной склад"),
-                        lines=list(old_data.get("lines") or []),
-                        delta_sign=old_delta_sign,
-                        op_date=str(old_data.get("date") or ""),
-                        allow_negative_stock=False,
-                    )
-                delta_sign = -1 if data["doc_type"] == "sale" else 1 if data["doc_type"] == "return" else 0
+                    if _sales_inventory_applied(old_data):
+                        _sync_product_lines(
+                            session,
+                            wid,
+                            warehouse_name=str(old_data.get("warehouse") or "Основной склад"),
+                            lines=list(old_data.get("lines") or []),
+                            delta_sign=-_sales_inventory_delta_sign(old_doc_type),
+                            op_date=str(old_data.get("date") or ""),
+                            allow_negative_stock=False,
+                        )
+                workflow_status = _sales_workflow_status(data)
+                inventory_applied = _sales_status_requires_inventory(workflow_status, data["doc_type"])
+                delta_sign = _sales_inventory_delta_sign(data["doc_type"]) if inventory_applied else 0
                 data["lines"] = _sync_product_lines(
                     session,
                     wid,
@@ -7298,9 +7360,13 @@ def create_app() -> FastAPI:
                     op_date=str(data.get("date") or ""),
                     allow_negative_stock=False,
                 )
+                data["status"] = workflow_status
+                data["workflow_version"] = _SALES_WORKFLOW_VERSION
+                data["inventory_applied"] = inventory_applied
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = client_row.id
             except ValueError as exc:
+                session.rollback()
                 return sales_form_redirect(error=str(exc))
             if editing_row is not None:
                 row = editing_row
@@ -7384,16 +7450,16 @@ def create_app() -> FastAPI:
             if row and row.workspace_owner_id == wid:
                 data = _json_object(row.data)
                 doc_type = str(data.get("doc_type") or "sale")
-                delta_sign = 1 if doc_type == "sale" else -1 if doc_type == "return" else 0
                 try:
-                    _sync_product_lines(
-                        session,
-                        wid,
-                        warehouse_name=str(data.get("warehouse") or "Основной склад"),
-                        lines=list(data.get("lines") or []),
-                        delta_sign=delta_sign,
-                        op_date=str(data.get("date") or ""),
-                    )
+                    if _sales_inventory_applied(data):
+                        _sync_product_lines(
+                            session,
+                            wid,
+                            warehouse_name=str(data.get("warehouse") or "Основной склад"),
+                            lines=list(data.get("lines") or []),
+                            delta_sign=-_sales_inventory_delta_sign(doc_type),
+                            op_date=str(data.get("date") or ""),
+                        )
                 except ValueError as exc:
                     return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-journal", status_code=302)
                 deleted_sale_id = row.id
@@ -7415,18 +7481,48 @@ def create_app() -> FastAPI:
             return redir
         assert wid is not None
         status = str(form.get("status") or "").strip()
-        if status not in {"new", "reserved", "paid", "partial", "debt", "return"}:
+        if status not in {*_SALES_WORKFLOW_STATUSES, "return"}:
             return RedirectResponse(url="/sales?error=" + quote("Неверный статус") + "#sales-journal", status_code=302)
         with session_scope() as session:
             row = session.get(SaleDocument, sale_id)
             if row and row.workspace_owner_id == wid:
-                data = _json_object(row.data)
+                data = _json_object(row.data).copy()
+                doc_type = str(data.get("doc_type") or "sale").strip()
                 if status == "return" and str(data.get("doc_type") or "sale") != "return":
                     return RedirectResponse(
                         url="/sales?error=" + quote("Оформите возврат отдельным документом из продажи") + "#sales-journal",
                         status_code=302,
                     )
+                if doc_type == "return" and status != "return":
+                    return RedirectResponse(
+                        url="/sales?error=" + quote("Статус возврата меняется через документ возврата") + "#sales-journal",
+                        status_code=302,
+                    )
+                inventory_was_applied = _sales_inventory_applied(data)
+                inventory_should_apply = _sales_status_requires_inventory(status, doc_type)
+                if inventory_was_applied != inventory_should_apply:
+                    try:
+                        _sync_product_lines(
+                            session,
+                            wid,
+                            warehouse_name=str(data.get("warehouse") or "Основной склад"),
+                            lines=list(data.get("lines") or []),
+                            delta_sign=(
+                                _sales_inventory_delta_sign(doc_type)
+                                if inventory_should_apply
+                                else -_sales_inventory_delta_sign(doc_type)
+                            ),
+                            op_date=str(data.get("date") or ""),
+                            allow_negative_stock=False,
+                        )
+                    except ValueError as exc:
+                        return RedirectResponse(
+                            url="/sales?error=" + quote(str(exc)) + "#sales-journal",
+                            status_code=302,
+                        )
                 data["status"] = status
+                data["workflow_version"] = _SALES_WORKFLOW_VERSION
+                data["inventory_applied"] = inventory_should_apply
                 data["status_manual"] = True
                 row.data = data
                 flag_modified(row, "data")
@@ -7486,7 +7582,9 @@ def create_app() -> FastAPI:
             data["paid_amount"] = _decimal_plain_text(next_paid_amount)
             data["payment_type"] = payment_type or str(data.get("payment_type") or "Оплата")
             data["payment_lines"] = payment_lines
-            data["status"] = "paid" if next_paid_amount >= amount else "partial"
+            data["status"] = _sales_workflow_status(data)
+            data["workflow_version"] = _SALES_WORKFLOW_VERSION
+            data["inventory_applied"] = _sales_inventory_applied(data)
             row.data = data
             flag_modified(row, "data")
             session.add(row)
@@ -7836,6 +7934,8 @@ def create_app() -> FastAPI:
         for row in rows:
             data = _json_object(row.data)
             doc_type = str(data.get("doc_type") or "sale")
+            if not _sales_status_records_debt(_sales_workflow_status(data), doc_type):
+                continue
             signed = Decimal("-1") if doc_type == "return" else Decimal("1")
             balance = signed * (_sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount")))
             name = str(data.get("client") or "").strip()
@@ -7863,6 +7963,8 @@ def create_app() -> FastAPI:
         for row in rows:
             data = _json_object(row.data)
             doc_type = str(data.get("doc_type") or "sale")
+            if not _sales_status_records_debt(_sales_workflow_status(data), doc_type):
+                continue
             signed = Decimal("-1") if doc_type == "return" else Decimal("1")
             balance = signed * (_sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount")))
             currency = str(row.currency or "UZS").strip().upper() or "UZS"
@@ -8458,6 +8560,8 @@ def create_app() -> FastAPI:
         ):
             data = _json_object(sale_row.data)
             item = _sales_document_data(sale_row)
+            if not _sales_status_records_debt(item["status"], item["doc_type"]):
+                continue
             amount = _sales_decimal(sale_row.amount)
             paid_amount = _sales_decimal(data.get("paid_amount"))
             if item["doc_type"] == "return":
@@ -8627,7 +8731,17 @@ def create_app() -> FastAPI:
         history_events.sort(key=lambda item: item["sort_date"], reverse=True)
 
         total_sales = sum(
-            (_sales_decimal(item.amount) for item in matched_sale_rows if _json_object(item.data).get("doc_type") != "return"),
+            (
+                _sales_decimal(item.amount)
+                for item in matched_sale_rows
+                if (
+                    (item_data := _json_object(item.data)).get("doc_type") != "return"
+                    and _sales_status_records_debt(
+                        _sales_workflow_status(item_data),
+                        str(item_data.get("doc_type") or "sale"),
+                    )
+                )
+            ),
             Decimal("0"),
         )
         total_returns = sum(
@@ -14363,12 +14477,16 @@ def create_app() -> FastAPI:
                     if not _report_in_period(doc_date):
                         continue
                     doc_type = str(data.get("doc_type") or "sale")
+                    workflow_status = _sales_workflow_status(data)
+                    records_debt = _sales_status_records_debt(workflow_status, doc_type)
+                    records_profit = _sales_status_records_profit(workflow_status, doc_type)
+                    inventory_applied = _sales_inventory_applied(data)
                     amount = _sales_decimal(row.amount)
                     currency = str(row.currency or data.get("currency") or "UZS").upper()
                     amount_primary = report_to_primary(amount, currency)
                     client = str(data.get("client") or "Без клиента").strip() or "Без клиента"
                     paid_amount = min(amount, _sales_decimal(data.get("paid_amount")))
-                    debt_amount = max(Decimal("0"), amount - paid_amount)
+                    debt_amount = max(Decimal("0"), amount - paid_amount) if records_debt else Decimal("0")
                     lines = data.get("lines") if isinstance(data.get("lines"), list) else []
                     document_cost_uzs = sum(
                         (_sales_decimal(line.get("quantity")) * report_product_unit_cost(line) for line in lines if isinstance(line, dict)),
@@ -14378,14 +14496,16 @@ def create_app() -> FastAPI:
                     sign = Decimal("-1") if doc_type == "return" else Decimal("1")
                     if doc_type == "sale":
                         sale_count += 1
-                        sale_docs.append(row)
-                        gross_sales_total += amount_primary
-                        paid_total += report_to_primary(paid_amount, currency)
-                        debt_total += report_to_primary(debt_amount, currency)
-                        cost_total += document_cost
-                        profit_total += amount_primary - document_cost
-                        top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
-                        day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
+                        if records_debt:
+                            sale_docs.append(row)
+                            gross_sales_total += amount_primary
+                            paid_total += report_to_primary(paid_amount, currency)
+                            debt_total += report_to_primary(debt_amount, currency)
+                            top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
+                            day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
+                        if records_profit:
+                            cost_total += document_cost
+                            profit_total += amount_primary - document_cost
                     elif doc_type == "return":
                         return_count += 1
                         returns_total += amount_primary
@@ -14396,11 +14516,19 @@ def create_app() -> FastAPI:
                     else:
                         order_count += 1
                         orders_total += amount_primary
+                        if records_debt:
+                            paid_total += report_to_primary(paid_amount, currency)
+                            debt_total += report_to_primary(debt_amount, currency)
+                        if records_profit:
+                            cost_total += document_cost
+                            profit_total += amount_primary - document_cost
+                            top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
+                            day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
                     for line in data.get("lines") if isinstance(data.get("lines"), list) else []:
                         product_name = str(line.get("product") or "Без товара").strip() or "Без товара"
-                        if doc_type in {"sale", "return"}:
+                        if doc_type == "return" or inventory_applied:
                             top_products[product_name] = top_products.get(product_name, Decimal("0")) + sign * _sales_decimal(line.get("quantity"))
-                    if doc_type == "sale" and debt_amount > 0:
+                    if doc_type in {"sale", "order"} and debt_amount > 0:
                         rec = receivables.setdefault(
                             client,
                             {
@@ -14423,10 +14551,10 @@ def create_app() -> FastAPI:
                             "client": client,
                             "warehouse": str(data.get("warehouse") or "Основной склад"),
                             "amount": _report_money(amount, currency),
-                            "paid": _report_money(paid_amount, currency) if doc_type == "sale" else "-",
-                            "debt": _report_money(debt_amount, currency) if doc_type == "sale" else "-",
-                            "cost": _report_money(document_cost, primary_currency) if doc_type in {"sale", "return"} else "-",
-                            "profit": _report_money(sign * (amount_primary - document_cost), primary_currency) if doc_type in {"sale", "return"} else "-",
+                            "paid": _report_money(paid_amount, currency) if doc_type in {"sale", "order"} else "-",
+                            "debt": _report_money(debt_amount, currency) if doc_type in {"sale", "order"} and records_debt else "-",
+                            "cost": _report_money(document_cost, primary_currency) if records_profit else "-",
+                            "profit": _report_money(sign * (amount_primary - document_cost), primary_currency) if records_profit else "-",
                             "status": view.get("status_label") or "-",
                             "source_sale_number": str(data.get("source_sale_number") or ""),
                         }

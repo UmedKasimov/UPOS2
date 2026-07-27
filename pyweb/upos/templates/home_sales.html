@@ -135,10 +135,10 @@
         <select name="status">
           <option value="all" {% if sales_filters.status == 'all' %}selected{% endif %}>Все</option>
           <option value="new" {% if sales_filters.status == 'new' %}selected{% endif %}>Новый</option>
-          <option value="reserved" {% if sales_filters.status == 'reserved' %}selected{% endif %}>Резерв</option>
-          <option value="paid" {% if sales_filters.status == 'paid' %}selected{% endif %}>Оплачен</option>
-          <option value="partial" {% if sales_filters.status == 'partial' %}selected{% endif %}>Частично</option>
-          <option value="debt" {% if sales_filters.status == 'debt' %}selected{% endif %}>Долг</option>
+          <option value="shipped" {% if sales_filters.status == 'shipped' %}selected{% endif %}>Отгружен</option>
+          <option value="installation" {% if sales_filters.status == 'installation' %}selected{% endif %}>Установка</option>
+          <option value="completed" {% if sales_filters.status == 'completed' %}selected{% endif %}>Завершен</option>
+          <option value="archived" {% if sales_filters.status == 'archived' %}selected{% endif %}>Архив</option>
           <option value="return" {% if sales_filters.status == 'return' %}selected{% endif %}>Возврат</option>
         </select>
       </label>
@@ -370,7 +370,7 @@
                     {% endif %}
                   </td>
                   <td>
-                    {% set status_style = 'confirmed' if sale.status == 'paid' else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['reserved', 'partial', 'debt'] else 'draft')) %}
+                    {% set status_style = 'confirmed' if sale.status in ['completed', 'archived'] else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['shipped', 'installation'] else 'draft')) %}
                     <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">
                       {% include "_csrf_field.html" %}
                       <select
@@ -379,12 +379,15 @@
                         data-sales-status-select
                         aria-label="Статус продажи {{ sale.number }}"
                       >
-                        <option value="new" {% if sale.status == 'new' %}selected{% endif %}>Новый</option>
-                        <option value="reserved" {% if sale.status == 'reserved' %}selected{% endif %}>Резерв</option>
-                        <option value="paid" {% if sale.status == 'paid' %}selected{% endif %}>Оплачен</option>
-                        <option value="partial" {% if sale.status == 'partial' %}selected{% endif %}>Частично</option>
-                        <option value="debt" {% if sale.status == 'debt' %}selected{% endif %}>Долг</option>
-                        {% if sale.doc_type == 'return' %}<option value="return" selected>Возврат</option>{% endif %}
+                        {% if sale.doc_type == 'return' %}
+                          <option value="return" selected>Возврат</option>
+                        {% else %}
+                          <option value="new" {% if sale.status == 'new' %}selected{% endif %}>Новый</option>
+                          <option value="shipped" {% if sale.status == 'shipped' %}selected{% endif %}>Отгружен</option>
+                          <option value="installation" {% if sale.status == 'installation' %}selected{% endif %}>Установка</option>
+                          <option value="completed" {% if sale.status == 'completed' %}selected{% endif %}>Завершен</option>
+                          <option value="archived" {% if sale.status == 'archived' %}selected{% endif %}>Архив</option>
+                        {% endif %}
                       </select>
                     </form>
                   </td>
@@ -1232,7 +1235,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=17" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=18" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=57" defer></script>
   {% if sales_embed %}
     <script>

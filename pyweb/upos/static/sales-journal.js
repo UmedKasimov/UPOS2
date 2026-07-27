@@ -693,9 +693,9 @@
   }
 
   function statusClass(value) {
-    if (value === "paid") return "confirmed";
+    if (value === "completed" || value === "archived") return "confirmed";
     if (value === "return") return "rejected";
-    if (value === "reserved" || value === "partial" || value === "debt") return "pending";
+    if (value === "shipped" || value === "installation") return "pending";
     return "draft";
   }
 
