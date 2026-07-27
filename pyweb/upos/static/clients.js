@@ -50,18 +50,51 @@
     if (normalized.includes("кафе") || normalized.includes("coffee") || normalized.includes("cafe")) return "#b45309";
     if (normalized.includes("одеж") || normalized.includes("clothes")) return "#7c3aed";
     if (normalized.includes("аксес") || normalized.includes("access")) return "#0891b2";
-    return "#2563eb";
+    return "";
   }
 
-  function markerSvg(type = "") {
-    const color = markerColor(type);
+  // Категории клиентов заводит сам пользователь (ALIPOS, BILLZ, ОФИС...), поэтому
+  // фиксированного списка иконок быть не может: цвет и инициалы выводим из названия,
+  // чтобы одна категория всегда выглядела одинаково.
+  const CATEGORY_PALETTE = [
+    "#2563eb", "#16a34a", "#dc2626", "#b45309", "#7c3aed", "#0891b2",
+    "#db2777", "#0f766e", "#c2410c", "#4f46e5", "#65a30d", "#9333ea",
+  ];
+
+  function categoryColor(category = "") {
+    const text = String(category || "").trim().toLowerCase();
+    if (!text) return "";
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) {
+      hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    }
+    return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
+  }
+
+  function categoryInitials(category = "") {
+    const text = String(category || "").trim();
+    if (!text) return "";
+    const words = text.split(/[\s\-_/.,]+/).filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return text.slice(0, 2).toUpperCase();
+  }
+
+  function markerSvg(type = "", category = "") {
+    const color = markerColor(type) || categoryColor(category) || "#2563eb";
     const glyph = markerGlyph(type);
+    const initials = glyph ? "" : categoryInitials(category);
+    let mark;
+    if (glyph) {
+      mark = `<text x="16" y="19" text-anchor="middle" font-size="13" font-family="Arial, sans-serif" fill="white">${glyph}</text>`;
+    } else if (initials) {
+      mark = `<text x="16" y="19.5" text-anchor="middle" font-size="${initials.length > 1 ? 10 : 13}" font-weight="700" font-family="Inter, Arial, sans-serif" fill="white">${escapeHtml(initials)}</text>`;
+    } else {
+      mark = `<path d="M12 15.5l-1.5-1.5v5h3v-3h5v3h3v-5l-1.5 1.5L16 12l-4 3.5z" fill="white"/>`;
+    }
     return `<svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="${color}"/>
       <circle cx="16" cy="15" r="7" fill="rgba(255,255,255,0.25)"/>
-      ${glyph
-        ? `<text x="16" y="19" text-anchor="middle" font-size="13" font-family="Arial, sans-serif" fill="white">${glyph}</text>`
-        : `<path d="M12 15.5l-1.5-1.5v5h3v-3h5v3h3v-5l-1.5 1.5L16 12l-4 3.5z" fill="white"/>`}
+      ${mark}
     </svg>`;
   }
 
@@ -74,14 +107,31 @@
       .replaceAll("'", "&#039;");
   }
 
-  function markerIcon(label = "Клиент", type = "") {
+  function markerIcon(label = "Клиент", type = "", category = "") {
     return window.L.divIcon({
-      html: `<div class="client-leaflet-marker">${markerSvg(type)}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
+      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
       className: "client-leaflet-marker-wrap",
       iconSize: [92, 54],
       iconAnchor: [16, 40],
       popupAnchor: [0, -40],
     });
+  }
+
+  // Подписи читаемы только вблизи: на общем плане десятки названий сливаются,
+  // поэтому показываем их с этого зума и выше.
+  const LABEL_MIN_ZOOM = 14;
+
+  function syncMarkerLabels(api) {
+    if (!api?.map || !api.container) return;
+    const visible = api.map.getZoom() >= LABEL_MIN_ZOOM;
+    api.container.classList.toggle("client-map--labels", visible);
+  }
+
+  function bindLabelZoom(api) {
+    if (!api?.map || api._labelZoomBound) return;
+    api._labelZoomBound = true;
+    api.map.on("zoomend", () => syncMarkerLabels(api));
+    syncMarkerLabels(api);
   }
 
   function openMapHref(lat, lon) {
@@ -369,13 +419,15 @@
       const resolved = await overviewPointCoords(point);
       if (!resolved) continue;
       container.classList.remove("clients-overview-map--empty");
-      const marker = window.L.marker([resolved.lat, resolved.lon], { icon: markerIcon(resolved.name, resolved.icon) }).addTo(api.layer);
+      const marker = window.L.marker([resolved.lat, resolved.lon], { icon: markerIcon(resolved.name, resolved.icon, resolved.category) }).addTo(api.layer);
       marker.bindPopup(`
         <strong>${escapeHtml(resolved.name)}</strong>
+        ${resolved.category ? `<span>${escapeHtml(resolved.category)}</span>` : ""}
         ${resolved.address ? `<span>${escapeHtml(resolved.address)}</span>` : ""}
       `);
       bounds.push([resolved.lat, resolved.lon]);
     }
+    bindLabelZoom(api);
 
     if (!bounds.length) {
       container.classList.add("clients-overview-map--empty");
@@ -457,12 +509,14 @@
     const name = api.container.dataset.name || "Клиент";
     const icon = api.container.dataset.icon || "";
     const address = api.container.dataset.address || "";
-    const marker = window.L.marker([point.lat, point.lon], { icon: markerIcon(name, icon) }).addTo(api.layer);
+    const category = api.container.dataset.category || "";
+    const marker = window.L.marker([point.lat, point.lon], { icon: markerIcon(name, icon, category) }).addTo(api.layer);
     marker.bindPopup(`
       <strong>${escapeHtml(name)}</strong>
       ${address ? `<span>${escapeHtml(address)}</span>` : ""}
     `);
     api.map.setView([point.lat, point.lon], PICK_ZOOM);
+    bindLabelZoom(api);
     scheduleInvalidate(api);
   }
 
@@ -474,12 +528,14 @@
     if (hint) hint.hidden = true;
     const name = api.container.dataset.name || "РљР»РёРµРЅС‚";
     const icon = api.container.dataset.icon || "";
-    const marker = window.L.marker([lat, lon], { icon: markerIcon(name, icon) }).addTo(api.layer);
+    const category = api.container.dataset.category || "";
+    const marker = window.L.marker([lat, lon], { icon: markerIcon(name, icon, category) }).addTo(api.layer);
     marker.bindPopup(`
       <strong>${escapeHtml(name)}</strong>
       ${address ? `<span>${escapeHtml(address)}</span>` : ""}
     `);
     api.map.setView([lat, lon], PICK_ZOOM);
+    bindLabelZoom(api);
     scheduleInvalidate(api);
   }
 
@@ -857,6 +913,97 @@
     );
   }
 
+  const locationSuggestCache = new Map();
+
+  async function geocodeSuggestions(query) {
+    const key = String(query || "").trim().toLowerCase();
+    if (key.length < 3) return [];
+    if (locationSuggestCache.has(key)) return locationSuggestCache.get(key);
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("limit", "6");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("countrycodes", "uz,kz,kg,tj,tm");
+    url.searchParams.set("q", query);
+    let items = [];
+    try {
+      const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+      if (response.ok) items = await response.json();
+    } catch {
+      items = [];
+    }
+    const list = (Array.isArray(items) ? items : [])
+      .map((item) => ({
+        label: String(item.display_name || "").trim(),
+        lat: Number.parseFloat(item.lat),
+        lon: Number.parseFloat(item.lon),
+      }))
+      .filter((item) => item.label && Number.isFinite(item.lat) && Number.isFinite(item.lon));
+    locationSuggestCache.set(key, list);
+    return list;
+  }
+
+  function closeLocationSuggest(box) {
+    const list = box?.querySelector("[data-client-location-suggest]");
+    if (!list) return;
+    list.hidden = true;
+    list.innerHTML = "";
+  }
+
+  function renderLocationSuggest(box, items) {
+    const list = box.querySelector("[data-client-location-suggest]");
+    if (!list) return;
+    if (!items.length) {
+      closeLocationSuggest(box);
+      return;
+    }
+    list.innerHTML = items
+      .map(
+        (item) =>
+          `<li><button type="button" data-client-location-pick data-lat="${item.lat}" data-lon="${item.lon}" data-label="${escapeHtml(item.label)}">${escapeHtml(item.label)}</button></li>`
+      )
+      .join("");
+    list.hidden = false;
+  }
+
+  async function suggestClientLocation(box) {
+    if (!box) return;
+    const input = box.querySelector("[data-client-location-search]");
+    const query = String(input?.value || "").trim();
+    if (query.length < 3) {
+      closeLocationSuggest(box);
+      return;
+    }
+    const items = await geocodeSuggestions(query);
+    // Пока шёл запрос, текст мог измениться — не перекрываем более свежий ввод.
+    if (String(input?.value || "").trim() !== query) return;
+    renderLocationSuggest(box, items);
+  }
+
+  async function applyClientLocationPoint(box, lat, lon, label) {
+    const status = box.querySelector("[data-client-location-search-status]");
+    const setStatus = (text) => {
+      if (status) status.textContent = text;
+    };
+    const container = box.closest(".client-card-location-card")?.querySelector("[data-client-card-map]");
+    const api = container ? ensureClientCardMap(container) : null;
+    if (!api) {
+      setStatus("Карта ещё не готова, откройте раздел «Локация»");
+      return;
+    }
+    // Сохранение подставляет адрес из dataset, поэтому запись обновляем до вызова:
+    // иначе у точки остался бы прежний адрес клиента.
+    container.dataset.address = label;
+    api.layer.clearLayers();
+    setClientCardPoint(api, lat, lon, label);
+    try {
+      await saveClientCardLocation(api, lat, lon);
+      setStatus("Локация обновлена");
+    } catch {
+      setStatus("Точка найдена, но сохранить не удалось");
+    }
+  }
+
   async function runClientLocationSearch(box) {
     if (!box) return;
     const input = box.querySelector("[data-client-location-search]");
@@ -869,34 +1016,21 @@
       setStatus("Введите адрес или ориентир");
       return;
     }
-    const container = box.closest(".client-card-location-card")?.querySelector("[data-client-card-map]");
-    const api = container ? ensureClientCardMap(container) : null;
-    if (!api) {
-      setStatus("Карта ещё не готова, откройте раздел «Локация»");
-      return;
-    }
     setStatus("Ищем...");
-    let point = null;
-    try {
-      point = await geocodeAddress(query);
-    } catch {
-      point = null;
-    }
-    if (!point) {
+    const items = await geocodeSuggestions(query);
+    if (!items.length) {
+      closeLocationSuggest(box);
       setStatus("Ничего не найдено — уточните запрос");
       return;
     }
-    // Сохранение подставляет адрес из dataset, поэтому запись обновляем до вызова:
-    // иначе у точки остался бы прежний адрес клиента.
-    container.dataset.address = query;
-    api.layer.clearLayers();
-    setClientCardPoint(api, point.lat, point.lon, query);
-    try {
-      await saveClientCardLocation(api, point.lat, point.lon);
-      setStatus("Локация обновлена");
-    } catch {
-      setStatus("Точка найдена, но сохранить не удалось");
+    // Один вариант ставим сразу, несколько — показываем списком, чтобы выбрал человек.
+    if (items.length === 1) {
+      closeLocationSuggest(box);
+      await applyClientLocationPoint(box, items[0].lat, items[0].lon, items[0].label);
+      return;
     }
+    renderLocationSuggest(box, items);
+    setStatus("Выберите вариант из списка");
   }
 
   document.addEventListener("click", (event) => {
@@ -918,6 +1052,27 @@
       return;
     }
 
+    const suggestPick = event.target.closest("[data-client-location-pick]");
+    if (suggestPick) {
+      event.preventDefault();
+      const box = suggestPick.closest("[data-client-location-search-box]");
+      const label = suggestPick.dataset.label || "";
+      const input = box?.querySelector("[data-client-location-search]");
+      if (input) input.value = label;
+      closeLocationSuggest(box);
+      void applyClientLocationPoint(
+        box,
+        Number.parseFloat(suggestPick.dataset.lat),
+        Number.parseFloat(suggestPick.dataset.lon),
+        label
+      );
+      return;
+    }
+
+    if (!event.target.closest("[data-client-location-search-box]")) {
+      document.querySelectorAll("[data-client-location-search-box]").forEach(closeLocationSuggest);
+    }
+
     const button = event.target.closest("[data-client-geolocate]");
     if (button) {
       const form = button.closest("form");
@@ -934,7 +1089,29 @@
     }
   });
 
+  let locationSuggestTimer = 0;
+
+  document.addEventListener("keydown", (event) => {
+    if (!event.target.matches?.("[data-client-location-search]")) return;
+    const box = event.target.closest("[data-client-location-search-box]");
+    if (event.key === "Enter") {
+      // Поле живёт внутри карточки клиента — без этого Enter отправил бы её форму.
+      event.preventDefault();
+      window.clearTimeout(locationSuggestTimer);
+      void runClientLocationSearch(box);
+    } else if (event.key === "Escape") {
+      closeLocationSuggest(box);
+    }
+  });
+
   document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-client-location-search]")) {
+      const box = event.target.closest("[data-client-location-search-box]");
+      // Подсказки тянем из внешнего сервиса, поэтому ждём паузы в наборе,
+      // а не дёргаем запрос на каждую букву.
+      window.clearTimeout(locationSuggestTimer);
+      locationSuggestTimer = window.setTimeout(() => void suggestClientLocation(box), 350);
+    }
     if (event.target.closest("[data-clients-map-filter]")) {
       document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
     }

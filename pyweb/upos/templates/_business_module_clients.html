@@ -579,6 +579,7 @@
         />
         <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
         <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+        <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Варианты территории" hidden></ul>
       </div>
       <div
         class="client-location-map client-card-location-map{% if not selected_client_card.latitude and not selected_client_card.longitude and not selected_client_card.address %} client-location-map--empty{% endif %}"
@@ -591,6 +592,7 @@
         data-address="{{ selected_client_card.address or '' }}"
         data-name="{{ selected_client_card.name }}"
         data-icon="{{ selected_client_card.map_icon or selected_client_card.industry or '' }}"
+        data-category="{{ selected_client_card.category or '' }}"
       >
         <p class="client-location-map-hint">
           {% if selected_client_card.address %}
