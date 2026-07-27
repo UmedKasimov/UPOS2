@@ -7831,10 +7831,12 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .warehouse-operation-dialog {
   padding: 0;
+  width: 100%;
+  max-width: min(34rem, calc(100vw - 2rem));
 }
 
-.warehouse-operation-dialog .telephony-dialog-surface {
-  width: min(34rem, calc(100vw - 2rem));
+.warehouse-operation-dialog .warehouse-operation-dialog-surface {
+  width: 100%;
 }
 
 .warehouse-operation-dialog .settings-profile-modal-head {

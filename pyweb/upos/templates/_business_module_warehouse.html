@@ -1079,12 +1079,12 @@
 </div>
 
 <dialog class="settings-profile-modal warehouse-operation-dialog" id="warehouse-operation-dialog">
-  <div class="settings-profile-modal-card telephony-dialog-surface">
+  <div class="settings-profile-modal-surface warehouse-operation-dialog-surface">
     <header class="settings-profile-modal-head">
       <div>
         <h2>Складская операция</h2>
       </div>
-      <button type="button" class="settings-profile-close" data-warehouse-close-operation aria-label="Закрыть">×</button>
+      <button type="button" class="settings-profile-modal-close" data-warehouse-close-operation aria-label="Закрыть">×</button>
     </header>
     <div class="warehouse-operation-choices">
       <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=in#adjustments" data-warehouse-operation-link>
