@@ -10136,6 +10136,7 @@ def create_app() -> FastAPI:
             if client_key:
                 messenger_threads_by_client.setdefault(client_key, []).append(thread)
         today_iso = datetime.now(timezone.utc).date().isoformat()
+        crm_usd_rate = _workspace_usd_uzs_rate(wid)
         with session_scope() as session:
             counterparty_rows = list(
                 session.execute(
@@ -10239,12 +10240,6 @@ def create_app() -> FastAPI:
                     or sale_by_key.get(str(item.get("counterparty_id") or ""))
                     or sale_by_key.get(str(item["client"] or "").strip().lower())
                 )
-                item["order_number"] = str(linked_sale.get("number") or "") if linked_sale else ""
-                item["order_amount"] = str(linked_sale.get("amount") or "") if linked_sale else ""
-                item["order_currency"] = str(linked_sale.get("currency") or item["currency"] or "UZS") if linked_sale else item["currency"]
-                linked_doc_type = str(linked_sale.get("doc_type") or "sale") if linked_sale else ""
-                item["related_document_type"] = linked_doc_type
-                item["related_document_label"] = {"order": "Заказ", "return": "Возврат"}.get(linked_doc_type, "Отгрузка") if linked_sale else ""
                 related_documents: list[dict[str, Any]] = []
                 related_seen: set[str] = set()
                 for key in (
@@ -10264,9 +10259,39 @@ def create_app() -> FastAPI:
                                 "detail_href": f"/sales?q={quote(str(document.get('number') or ''))}&doc_type={quote(str(document.get('doc_type') or 'sale'))}#sales-journal",
                             }
                         )
+                related_orders = [
+                    document
+                    for document in related_documents
+                    if str(document.get("doc_type") or "") == "order"
+                ]
+                order_total_value = sum(
+                    [
+                        _sales_decimal(document.get("amount_value"))
+                        * (
+                            crm_usd_rate
+                            if str(document.get("currency") or "UZS").strip().upper() == "USD"
+                            else Decimal("1")
+                        )
+                        for document in related_orders
+                    ],
+                    Decimal("0"),
+                )
+                latest_order = related_orders[0] if related_orders else None
+                item["order_count"] = len(related_documents)
+                item["order_number"] = str(latest_order.get("number") or "") if latest_order else ""
+                item["order_amount"] = _sales_money_label(order_total_value) if related_orders else ""
+                item["order_currency"] = "UZS" if related_orders else item["currency"]
+                item["related_document_type"] = "order" if latest_order else (
+                    str(linked_sale.get("doc_type") or "") if linked_sale else ""
+                )
+                item["related_document_label"] = "Заказ" if latest_order else (
+                    {"return": "Возврат"}.get(str(linked_sale.get("doc_type") or ""), "Отгрузка")
+                    if linked_sale
+                    else ""
+                )
                 item["related_documents"] = related_documents[:8]
-                item["kanban_amount"] = item["order_amount"] if linked_sale else item["amount"]
-                item["kanban_amount_value"] = linked_sale.get("amount_value", Decimal("0")) if linked_sale else item["amount_value"]
+                item["kanban_amount"] = item["order_amount"] if related_orders else item["amount"]
+                item["kanban_amount_value"] = order_total_value if related_orders else item["amount_value"]
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
                 messenger_channels: list[dict[str, str]] = []
                 messenger_threads = messenger_threads_by_client.get(str(item["client"] or "").strip().casefold(), [])

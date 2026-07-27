@@ -98,6 +98,7 @@
           data-crm-archive-card
           data-crm-detail-title="{{ row.title|e }}"
           data-crm-detail-client="{{ row.client|e }}"
+          data-crm-order-count="{{ row.order_count or 0 }}"
         >
           {% if row.date or row.due_date %}
             <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
@@ -111,7 +112,10 @@
           {% endif %}
           <div class="crm-kanban-card-money">
             {% if row.kanban_amount %}
-              <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+              <div class="crm-kanban-card-money-main">
+                <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+                {% if row.order_count %}<span class="crm-kanban-order-count" aria-label="{{ row.order_count }} заказов">{{ row.order_count }}+</span>{% endif %}
+              </div>
             {% else %}
               <span>Сумма не указана</span>
             {% endif %}
@@ -172,6 +176,7 @@
               data-crm-detail-amount="{{ ((row.kanban_amount ~ ' ' ~ (row.order_currency or row.currency)) if row.kanban_amount else 'Сумма не указана')|e }}"
               data-crm-amount-value="{{ row.kanban_amount_value }}"
               data-crm-amount-currency="{{ (row.order_currency or row.currency or 'UZS')|e }}"
+              data-crm-order-count="{{ row.order_count or 0 }}"
               data-crm-detail-responsible="{{ (row.responsible or 'Без ответственного')|e }}"
               data-crm-detail-date="{{ (row.date or '-')|e }}"
               data-crm-detail-due-date="{{ (row.due_date or '-')|e }}"
@@ -212,7 +217,10 @@
               {% endif %}
               <div class="crm-kanban-card-money">
                 {% if row.kanban_amount %}
-                  <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+                  <div class="crm-kanban-card-money-main">
+                    <strong>{{ row.kanban_amount }} {{ row.order_currency or row.currency }}</strong>
+                    {% if row.order_count %}<span class="crm-kanban-order-count" aria-label="{{ row.order_count }} заказов">{{ row.order_count }}+</span>{% endif %}
+                  </div>
                 {% else %}
                   <span>Сумма не указана</span>
                 {% endif %}

@@ -5267,6 +5267,34 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: space-between;
 }
 
+.crm-kanban-card-money-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.crm-kanban-order-count {
+  display: inline-grid;
+  flex: 0 0 1.35rem;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border-radius: 999px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 11%, var(--card));
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.crm-kanban-order-count[hidden] {
+  display: none;
+}
+
 .crm-kanban-card-titleline strong,
 .crm-kanban-client,
 .crm-kanban-chat,

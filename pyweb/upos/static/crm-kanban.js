@@ -778,6 +778,7 @@
       const title = valueOrDash(card.dataset.crmDetailTitle);
       const client = valueOrDash(card.dataset.crmDetailClient);
       const amount = valueOrDash(card.dataset.crmDetailAmount);
+      const orderCount = Number.parseInt(card.dataset.crmOrderCount || "0", 10) || 0;
       const date = valueOrDash(card.dataset.crmDetailDate || card.dataset.crmDetailDueDate);
       const type = valueOrDash(card.dataset.crmDetailType);
       item.dataset.crmDetailTitle = title;
@@ -789,13 +790,24 @@
           <span></span>
         </div>
         <span class="crm-kanban-client"></span>
-        <div class="crm-kanban-card-money"><strong></strong></div>
+        <div class="crm-kanban-card-money">
+          <div class="crm-kanban-card-money-main">
+            <strong></strong>
+            <span class="crm-kanban-order-count" hidden></span>
+          </div>
+        </div>
       `;
       item.querySelector(".crm-kanban-card-date").textContent = date;
       item.querySelector(".crm-kanban-card-top strong").textContent = title;
       item.querySelector(".crm-kanban-card-top span").textContent = type;
       item.querySelector(".crm-kanban-client").textContent = client === "-" ? "" : client;
       item.querySelector(".crm-kanban-card-money strong").textContent = amount;
+      const orderBadge = item.querySelector(".crm-kanban-order-count");
+      if (orderBadge && orderCount > 0) {
+        orderBadge.hidden = false;
+        orderBadge.textContent = `${orderCount}+`;
+        orderBadge.setAttribute("aria-label", `${orderCount} заказов`);
+      }
       archiveList.prepend(item);
       applyArchiveSearch();
     };
