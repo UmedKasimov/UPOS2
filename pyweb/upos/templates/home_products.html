@@ -758,7 +758,28 @@
             <input type="hidden" name="price_type_id" value="{{ selected_price.id }}" />
             <div class="products-table-wrap">
               <table class="products-table price-type-products-table">
-                <thead><tr><th>Фото</th><th>Название</th><th>Артикул</th><th>Бренд</th><th>Группа</th><th>Категория</th><th>Цена за ед.хр</th><th>Валюта</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Фото</th>
+                    <th>Название</th>
+                    <th>Артикул</th>
+                    <th>Бренд</th>
+                    <th>Группа</th>
+                    <th>Категория</th>
+                    <th>
+                      <div class="price-type-price-heading">
+                        <span>Цена за ед.хр</span>
+                        {% if selected_price.pricing_method == "dependent" %}
+                          <label class="price-type-auto-toggle price-type-auto-toggle--all">
+                            <input type="checkbox" data-dependent-price-auto-all />
+                            <span>Авто для всех</span>
+                          </label>
+                        {% endif %}
+                      </div>
+                    </th>
+                    <th>Валюта</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for product in price_type_state.rows %}
                     <tr>
@@ -977,16 +998,34 @@
 	        });
 	      }
 
-	      document.querySelectorAll('[data-dependent-price-auto]').forEach((toggle) => {
+	      const dependentPriceToggles = Array.from(document.querySelectorAll('[data-dependent-price-auto]'));
+	      const allDependentPricesToggle = document.querySelector('[data-dependent-price-auto-all]');
+	      const syncAllDependentPrices = () => {
+	        if (!allDependentPricesToggle || !dependentPriceToggles.length) return;
+	        const checkedCount = dependentPriceToggles.filter((toggle) => toggle.checked).length;
+	        allDependentPricesToggle.checked = checkedCount === dependentPriceToggles.length;
+	        allDependentPricesToggle.indeterminate = checkedCount > 0 && checkedCount < dependentPriceToggles.length;
+	      };
+	      dependentPriceToggles.forEach((toggle) => {
 	        const input = toggle.closest('.price-type-dependent-control')?.querySelector('[data-dependent-price-input]');
 	        const sync = () => {
 	          if (!input) return;
 	          input.readOnly = toggle.checked;
 	          input.classList.toggle('is-automatic', toggle.checked);
+	          syncAllDependentPrices();
 	        };
 	        toggle.addEventListener('change', sync);
 	        sync();
 	      });
+	      if (allDependentPricesToggle) {
+	        allDependentPricesToggle.addEventListener('change', () => {
+	          dependentPriceToggles.forEach((toggle) => {
+	            toggle.checked = allDependentPricesToggle.checked;
+	            toggle.dispatchEvent(new Event('change'));
+	          });
+	        });
+	        syncAllDependentPrices();
+	      }
 
 	      const dialog = document.getElementById('products-category-dialog');
 	      if (!dialog) return;

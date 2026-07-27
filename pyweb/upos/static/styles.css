@@ -25078,6 +25078,12 @@ html.dark .org-settings-panel-surface {
   align-items: center;
   gap: 6px;
 }
+.price-type-price-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .price-type-price-input.is-automatic {
   background: #f4f7fb;
   color: #526579;
@@ -25095,6 +25101,9 @@ html.dark .org-settings-panel-surface {
   width: 15px;
   height: 15px;
   margin: 0;
+}
+.price-type-auto-toggle--all {
+  font-size: 11px;
 }
 .price-type-dialog-grid {
   margin-top: 12px;
