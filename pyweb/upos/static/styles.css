@@ -10865,7 +10865,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   z-index: 1;
 }
 
-.sales-journal-payment-progress .sales-journal-debt-amount,
+.sales-journal-table td.sales-journal-payment-progress > small.sales-journal-debt-amount,
 .sales-journal-total-row .sales-journal-debt-amount {
   color: #dc2626;
   font-weight: 800;
