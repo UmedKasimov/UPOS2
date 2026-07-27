@@ -4,7 +4,7 @@ import unittest
 
 import httpx
 
-from upos.smpro_client import SMProClient, SMProResource
+from upos.smpro_client import SMProClient, SMProError, SMProResource
 
 
 class SMProClientTests(unittest.TestCase):
@@ -23,6 +23,39 @@ class SMProClientTests(unittest.TestCase):
 
         self.assertEqual(result["filial_count"], 1)
         self.assertEqual(result["filials"][0]["id"], 7)
+        self.assertEqual(result["filial_id"], "7")
+
+    def test_connection_uses_ascii_filial_code_when_id_is_not_ascii(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={"data": [{"id": "Главный филиал", "code": "branch-42"}]},
+            )
+
+        client = SMProClient(
+            {"api_url": "smpro.example", "api_key": "secret"},
+            transport=httpx.MockTransport(handler),
+        )
+
+        result = client.test_connection()
+
+        self.assertEqual(result["filial_id"], "branch-42")
+
+    def test_non_ascii_filial_header_returns_friendly_error(self) -> None:
+        client = SMProClient(
+            {
+                "api_url": "smpro.example",
+                "api_key": "secret",
+                "filial_id": "Главный филиал",
+            },
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"data": []})),
+        )
+
+        with self.assertRaisesRegex(SMProError, "Технический ID филиала IBOX"):
+            client.fetch_resource(
+                SMProResource("orders", "api/integration/document/order/list"),
+                full_history=True,
+            )
 
     def test_resource_paginates_and_sends_filial(self) -> None:
         requested_pages: list[int] = []

@@ -19425,17 +19425,19 @@ def create_app() -> FastAPI:
                 {"error": "IBOX / SMPro не вернул доступный удалённый филиал"},
                 status_code=400,
             )
-        if filials and not str(block.get("filial_id") or "").strip():
-            first = filials[0] if isinstance(filials[0], dict) else {}
-            remote_filial_id = str(
-                first.get("id")
-                or first.get("filial_id")
-                or first.get("uuid")
-                or first.get("code")
-                or ""
-            ).strip()
-            block["filial_id"] = remote_filial_id
-            block["terminal_id"] = remote_filial_id
+        remote_filial_id = str(result.get("filial_id") or "").strip()
+        if not remote_filial_id:
+            return JSONResponse(
+                {
+                    "error": (
+                        "IBOX / SMPro не вернул технический ID филиала. "
+                        "Проверьте права API-ключа."
+                    )
+                },
+                status_code=400,
+            )
+        block["filial_id"] = remote_filial_id
+        block["terminal_id"] = remote_filial_id
         block["connection_ok"] = True
         block["connection_message"] = "Подключено"
         block["connection_checked_at"] = datetime.now(timezone.utc).isoformat()

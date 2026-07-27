@@ -110,6 +110,12 @@ def _created_at(item: dict[str, Any]) -> datetime:
 
 
 def _run_dict(run: IntegrationSyncRun) -> dict[str, Any]:
+    error = str(run.error or "")
+    if "codec can't encode" in error or "ordinal not in range" in error:
+        error = (
+            "IBOX вернул некорректный технический ID филиала. "
+            "Проверьте подключение и повторите синхронизацию."
+        )
     return {
         "id": run.id,
         "integration": run.integration,
@@ -117,7 +123,7 @@ def _run_dict(run: IntegrationSyncRun) -> dict[str, Any]:
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
         "imported_count": run.imported_count,
-        "error": run.error,
+        "error": error or None,
         "data": run.data,
     }
 

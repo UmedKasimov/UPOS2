@@ -138,6 +138,42 @@ def _pagination(payload: Any) -> dict[str, Any]:
     return payload
 
 
+def _ascii_identifier(value: Any) -> str:
+    if isinstance(value, bool) or isinstance(value, (dict, list)):
+        return ""
+    text = _clean(value)
+    if not text or len(text) > 180 or "\r" in text or "\n" in text:
+        return ""
+    try:
+        text.encode("ascii")
+    except UnicodeEncodeError:
+        return ""
+    return text
+
+
+def extract_filial_identifier(filials: list[dict[str, Any]]) -> str:
+    for filial in filials:
+        fields = {str(key).lower(): value for key, value in filial.items()}
+        for key in ("id", "filial_id", "uuid", "guid", "code", "value"):
+            identifier = _ascii_identifier(fields.get(key))
+            if identifier:
+                return identifier
+    return ""
+
+
+def _header_value(value: Any, *, label: str) -> str:
+    text = _clean(value)
+    if not text:
+        return ""
+    try:
+        text.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise SMProError(f"{label} содержит недопустимые символы") from exc
+    if "\r" in text or "\n" in text:
+        raise SMProError(f"{label} содержит недопустимые символы")
+    return text
+
+
 class SMProClient:
     def __init__(self, config: dict[str, Any], *, transport: httpx.BaseTransport | None = None):
         self.base_url = _base_url(config.get("api_url"))
@@ -154,14 +190,17 @@ class SMProClient:
 
     def _headers(self, *, require_filial: bool) -> dict[str, str]:
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {_header_value(self.api_key, label='API-ключ IBOX')}",
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
         if require_filial:
             if not self.filial_id:
                 raise SMProError("Выберите филиал SMPro")
-            headers["Filial-Id"] = self.filial_id
+            headers["Filial-Id"] = _header_value(
+                self.filial_id,
+                label="Технический ID филиала IBOX",
+            )
         return headers
 
     def _request(
@@ -203,6 +242,7 @@ class SMProClient:
             "ok": True,
             "filials": filials,
             "filial_count": len(filials),
+            "filial_id": extract_filial_identifier(filials),
         }
 
     def fetch_resource(
