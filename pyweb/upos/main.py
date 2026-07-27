@@ -4708,6 +4708,16 @@ def create_app() -> FastAPI:
             if not entry:
                 return "", str(price_type.get("convert_to_currency") or "UZS")
             return str(entry.get("price") or ""), str(entry.get("currency") or "UZS").upper()
+        override = _product_price_entry(product, price_type)
+        if override and override.get("manual_override"):
+            return (
+                str(override.get("price") or ""),
+                str(
+                    override.get("currency")
+                    or price_type.get("convert_to_currency")
+                    or "UZS"
+                ).upper(),
+            )
         base_id = str(price_type.get("base_price_type_id") or "")
         if base_id == "last_purchase_price":
             base, base_currency = _product_last_purchase(product)
@@ -4734,7 +4744,20 @@ def create_app() -> FastAPI:
         rows: list[dict[str, Any]] = []
         for product in products:
             price, currency = _calculated_product_price(product, price_type, price_types)
-            rows.append({**product, "price_type_price": price, "price_type_currency": currency, "has_price": bool(price)})
+            entry = _product_price_entry(product, price_type)
+            rows.append(
+                {
+                    **product,
+                    "price_type_price": price,
+                    "price_type_currency": currency,
+                    "price_type_override": bool(
+                        price_type.get("pricing_method") == "dependent"
+                        and entry
+                        and entry.get("manual_override")
+                    ),
+                    "has_price": bool(price),
+                }
+            )
         return rows
 
     def _product_search_variants(raw: Any) -> list[str]:
@@ -5975,11 +5998,17 @@ def create_app() -> FastAPI:
         price_types = _workspace_price_types(wid)
         price_type_id = str(form.get("price_type_id") or "").strip()
         price_type = _price_type_by_id(price_types, price_type_id)
-        if price_type.get("pricing_method") != "manual":
+        pricing_method = str(price_type.get("pricing_method") or "manual")
+        if pricing_method not in {"manual", "dependent"}:
             return _price_type_redirect(price_type_id)
         product_ids = list(form.getlist("product_id"))
         values = list(form.getlist("price_value"))
         currencies = list(form.getlist("price_currency"))
+        automatic_product_ids = {
+            str(item or "").strip()
+            for item in form.getlist("price_auto")
+            if str(item or "").strip()
+        }
         with session_scope() as session:
             for idx, product_id in enumerate(product_ids):
                 row = session.get(Product, str(product_id or ""))
@@ -5992,12 +6021,27 @@ def create_app() -> FastAPI:
                 if currency not in {"UZS", "USD"}:
                     currency = "UZS"
                 entry = next((item for item in prices if str(item.get("price_type_id") or "") == price_type_id), None)
-                if entry is None:
+                if entry is None and pricing_method == "manual":
                     entry = next((item for item in prices if str(item.get("name") or "").strip().lower() == str(price_type.get("name") or "").strip().lower()), None)
+                if pricing_method == "dependent" and str(product_id) in automatic_product_ids:
+                    if entry is not None and entry.get("manual_override"):
+                        prices.remove(entry)
+                    data["prices"] = prices
+                    row.data = data
+                    flag_modified(row, "data")
+                    continue
                 if entry is None:
                     entry = {}
                     prices.append(entry)
-                entry.update({"price_type_id": price_type_id, "name": price_type["name"], "price": value, "currency": currency})
+                entry.update(
+                    {
+                        "price_type_id": price_type_id,
+                        "name": price_type["name"],
+                        "price": value,
+                        "currency": currency,
+                        "manual_override": pricing_method == "dependent",
+                    }
+                )
                 data["prices"] = prices
                 row.data = data
                 flag_modified(row, "data")

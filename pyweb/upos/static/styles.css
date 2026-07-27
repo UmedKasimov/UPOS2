@@ -25072,6 +25072,30 @@ html.dark .org-settings-panel-surface {
   border-radius: var(--workbench-radius-sm, 10px);
   padding: 8px 10px;
 }
+.price-type-dependent-control {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.price-type-price-input.is-automatic {
+  background: #f4f7fb;
+  color: #526579;
+}
+.price-type-auto-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: #315575;
+}
+.price-type-auto-toggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
 .price-type-dialog-grid {
   margin-top: 12px;
 }
@@ -25830,6 +25854,16 @@ html.dark .price-type-filter {
 html.dark .price-type-products-table th {
   border-color: var(--workbench-line);
   background: var(--workbench-muted-surface);
+  color: var(--muted-foreground);
+}
+
+html.dark .price-type-price-input.is-automatic {
+  border-color: var(--workbench-line);
+  background: var(--workbench-muted-surface);
+  color: var(--muted-foreground);
+}
+
+html.dark .price-type-auto-toggle {
   color: var(--muted-foreground);
 }
 

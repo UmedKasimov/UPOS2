@@ -772,9 +772,26 @@
                         {% if selected_price.pricing_method == "manual" %}
                           <input class="price-type-price-input" name="price_value" value="{{ product.price_type_price }}" inputmode="decimal" />
                         {% else %}
-                          {% if selected_price.pricing_method == "dependent" %}<input type="checkbox" title="Исключить из расчета" />{% endif %}
-                          <strong>{{ product.price_type_price or "-" }}</strong>
-                          <input type="hidden" name="price_value" value="{{ product.price_type_price }}" />
+                          <div class="price-type-dependent-control">
+                            <input
+                              class="price-type-price-input"
+                              name="price_value"
+                              value="{{ product.price_type_price }}"
+                              inputmode="decimal"
+                              data-dependent-price-input
+                              {{ "readonly" if not product.price_type_override else "" }}
+                            />
+                            <label class="price-type-auto-toggle">
+                              <input
+                                type="checkbox"
+                                name="price_auto"
+                                value="{{ product.id }}"
+                                data-dependent-price-auto
+                                {{ "checked" if not product.price_type_override else "" }}
+                              />
+                              <span>Авто</span>
+                            </label>
+                          </div>
                         {% endif %}
                       </td>
                       <td>
@@ -801,7 +818,7 @@
                 <span>Стр. {{ price_type_state.page }} из {{ price_type_state.total_pages }}</span>
               </div>
               <div class="products-catalog-footer-meta"><span>Всего: {{ price_type_state.total }}</span><span>Показано: {{ price_type_state.from }}-{{ price_type_state.to }}</span></div>
-              {% if selected_price.pricing_method == "manual" %}<button class="btn" type="submit">Сохранить цены</button>{% endif %}
+              <button class="btn" type="submit">Сохранить цены</button>
             </footer>
           </form>
         </section>
@@ -959,6 +976,17 @@
 	          button.addEventListener('click', () => priceDialog.close());
 	        });
 	      }
+
+	      document.querySelectorAll('[data-dependent-price-auto]').forEach((toggle) => {
+	        const input = toggle.closest('.price-type-dependent-control')?.querySelector('[data-dependent-price-input]');
+	        const sync = () => {
+	          if (!input) return;
+	          input.readOnly = toggle.checked;
+	          input.classList.toggle('is-automatic', toggle.checked);
+	        };
+	        toggle.addEventListener('change', sync);
+	        sync();
+	      });
 
 	      const dialog = document.getElementById('products-category-dialog');
 	      if (!dialog) return;
