@@ -10859,30 +10859,16 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   transition: width 420ms ease;
 }
 
-.sales-journal-payment-progress::after {
-  position: absolute;
-  z-index: 2;
-  bottom: 0.25rem;
-  left: clamp(0.3rem, var(--sales-payment-progress, 0%), calc(100% - 0.3rem));
-  width: 0;
-  height: 0;
-  border-top: 0.34rem solid #15803d;
-  border-right: 0.3rem solid transparent;
-  border-left: 0.3rem solid transparent;
-  content: "";
-  pointer-events: none;
-  transform: translateX(-50%);
-  transition: left 420ms ease;
-}
-
-.sales-journal-payment-progress[data-payment-progress="0"]::after {
-  display: none;
-}
-
 .sales-journal-payment-progress > span,
 .sales-journal-payment-progress > small {
   position: relative;
   z-index: 1;
+}
+
+.sales-journal-payment-progress .sales-journal-debt-amount,
+.sales-journal-total-row .sales-journal-debt-amount {
+  color: #dc2626;
+  font-weight: 800;
 }
 
 .sales-journal-total-row td {

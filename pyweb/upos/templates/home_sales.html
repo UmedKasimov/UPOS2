@@ -356,7 +356,9 @@
                     title="Оплачено: {{ sale.payment_progress }}%"
                   >
                     <span>{{ sale.paid_amount }} {{ sale.currency }}</span>
-                    <small>Долг: {{ sale.debt_amount }} {{ sale.currency }}</small>
+                    {% if sale.has_debt %}
+                      <small class="sales-journal-debt-amount">-{{ sale.debt_amount }} {{ sale.currency }}</small>
+                    {% endif %}
                   </td>
                   <td>
                     {% set status_style = 'confirmed' if sale.status == 'paid' else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['reserved', 'partial', 'debt'] else 'draft')) %}
@@ -415,7 +417,9 @@
                   <td>
                     {% for total in sales_journal_totals %}
                       <span>{{ total.paid }} {{ total.currency }}</span>
-                      <small>Долг: {{ total.debt }} {{ total.currency }}</small>
+                      {% if total.has_debt %}
+                        <small class="sales-journal-debt-amount">-{{ total.debt }} {{ total.currency }}</small>
+                      {% endif %}
                     {% endfor %}
                   </td>
                   <td colspan="2"></td>

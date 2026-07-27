@@ -6198,6 +6198,7 @@ def create_app() -> FastAPI:
             "paid_value": str(paid_amount),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "debt_value": str(debt_amount if debt_amount > 0 else 0),
+            "has_debt": debt_amount > 0,
             "payment_progress": payment_progress,
             "payment_type": str(data.get("payment_type") or ""),
             "payment_lines": [
@@ -6943,6 +6944,7 @@ def create_app() -> FastAPI:
                     "amount": _sales_money_label(values["amount"]),
                     "paid": _sales_money_label(values["paid"]),
                     "debt": _sales_money_label(values["debt"]),
+                    "has_debt": values["debt"] > 0,
                 }
                 for currency, values in sorted(sales_journal_totals_by_currency.items())
             ]
