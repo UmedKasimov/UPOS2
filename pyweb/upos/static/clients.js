@@ -857,6 +857,48 @@
     );
   }
 
+  async function runClientLocationSearch(box) {
+    if (!box) return;
+    const input = box.querySelector("[data-client-location-search]");
+    const status = box.querySelector("[data-client-location-search-status]");
+    const setStatus = (text) => {
+      if (status) status.textContent = text;
+    };
+    const query = String(input?.value || "").trim();
+    if (!query) {
+      setStatus("Введите адрес или ориентир");
+      return;
+    }
+    const container = box.closest(".client-card-location-card")?.querySelector("[data-client-card-map]");
+    const api = container ? ensureClientCardMap(container) : null;
+    if (!api) {
+      setStatus("Карта ещё не готова, откройте раздел «Локация»");
+      return;
+    }
+    setStatus("Ищем...");
+    let point = null;
+    try {
+      point = await geocodeAddress(query);
+    } catch {
+      point = null;
+    }
+    if (!point) {
+      setStatus("Ничего не найдено — уточните запрос");
+      return;
+    }
+    // Сохранение подставляет адрес из dataset, поэтому запись обновляем до вызова:
+    // иначе у точки остался бы прежний адрес клиента.
+    container.dataset.address = query;
+    api.layer.clearLayers();
+    setClientCardPoint(api, point.lat, point.lon, query);
+    try {
+      await saveClientCardLocation(api, point.lat, point.lon);
+      setStatus("Локация обновлена");
+    } catch {
+      setStatus("Точка найдена, но сохранить не удалось");
+    }
+  }
+
   document.addEventListener("click", (event) => {
     const sectionLink = event.target.closest("[data-client-section-nav]");
     if (sectionLink) {
@@ -866,6 +908,13 @@
       url.hash = section;
       window.history.replaceState(null, "", url.toString());
       showClientSection(section);
+      return;
+    }
+
+    const searchRun = event.target.closest("[data-client-location-search-run]");
+    if (searchRun) {
+      event.preventDefault();
+      void runClientLocationSearch(searchRun.closest("[data-client-location-search-box]"));
       return;
     }
 

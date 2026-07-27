@@ -3851,6 +3851,33 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 26rem;
 }
 
+.client-location-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.client-location-search input {
+  flex: 1 1 18rem;
+  min-width: 0;
+  min-height: var(--workbench-field-height, 38px);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--control-border);
+  border-radius: var(--workbench-radius-sm, 10px);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  font: inherit;
+}
+
+.client-location-search-status {
+  flex: 0 1 auto;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
 .client-card-location-map {
   height: 24rem;
   border: 0;

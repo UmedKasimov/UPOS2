@@ -569,6 +569,17 @@
           <a class="btn btn-secondary" href="https://www.openstreetmap.org/?mlat={{ selected_client_card.latitude }}&mlon={{ selected_client_card.longitude }}#map=17/{{ selected_client_card.latitude }}/{{ selected_client_card.longitude }}" target="_blank" rel="noreferrer">Открыть карту</a>
         {% endif %}
       </header>
+      <div class="client-location-search" data-client-location-search-box>
+        <input
+          type="search"
+          placeholder="Найдите территорию: улица, район, ориентир"
+          value="{{ selected_client_card.address or '' }}"
+          data-client-location-search
+          aria-label="Поиск территории на карте"
+        />
+        <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+        <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+      </div>
       <div
         class="client-location-map client-card-location-map{% if not selected_client_card.latitude and not selected_client_card.longitude and not selected_client_card.address %} client-location-map--empty{% endif %}"
         data-client-card-map
