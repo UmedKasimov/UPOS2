@@ -609,9 +609,27 @@
                     />
                   </div>
                   <div class="price-template-stage">
+                    <div class="price-template-canvas-toolbar" data-price-template-canvas-toolbar hidden>
+                      <strong data-price-template-selected-name>Элемент</strong>
+                      <div class="price-template-canvas-tools" role="group" aria-label="Положение и размер элемента">
+                        <button type="button" data-price-template-adjust="left" title="Сдвинуть влево" aria-label="Сдвинуть влево">←</button>
+                        <button type="button" data-price-template-adjust="up" title="Сдвинуть вверх" aria-label="Сдвинуть вверх">↑</button>
+                        <button type="button" data-price-template-adjust="down" title="Сдвинуть вниз" aria-label="Сдвинуть вниз">↓</button>
+                        <button type="button" data-price-template-adjust="right" title="Сдвинуть вправо" aria-label="Сдвинуть вправо">→</button>
+                        <span class="price-template-tool-separator" aria-hidden="true"></span>
+                        <button type="button" data-price-template-adjust="smaller" title="Уменьшить" aria-label="Уменьшить">−</button>
+                        <button type="button" data-price-template-adjust="larger" title="Увеличить" aria-label="Увеличить">+</button>
+                        <button type="button" data-price-template-adjust="reset" title="Сбросить положение и размер">Сбросить</button>
+                        <span class="price-template-photo-tools" data-price-template-photo-tools hidden>
+                          <button type="button" data-price-template-photo-upload>Заменить фото</button>
+                          <button type="button" data-price-template-photo-remove>Удалить фото</button>
+                        </span>
+                      </div>
+                      <input type="file" accept="image/png,image/jpeg,image/webp" data-price-template-photo-file hidden />
+                    </div>
                     <article class="price-template-preview" aria-label="Редактируемый шаблон ценника U-POS">
                       <header class="price-template-top">
-                        <button class="price-template-brand" type="button" data-price-component="logo" data-price-template-logo-trigger aria-label="Заменить логотип">
+                        <button class="price-template-brand" type="button" data-price-component="logo" data-price-layout-key="logo" data-price-template-logo-trigger aria-label="Выбрать логотип">
                           <span class="price-template-default-logo" data-price-template-default-logo>
                             <span class="price-template-mark">u</span>
                             <span class="price-template-word"><span>u</span><b>POS</b></span>
@@ -620,47 +638,50 @@
                           <span class="price-template-logo-edit">Заменить</span>
                         </button>
                         <div class="price-template-meta">
-                          <h2 data-price-component="title"><span contenteditable="true" data-price-template-field="title" data-price-cell data-cell-address="Заголовок">BIZNES DASTURLASH TAKLIFI</span></h2>
+                          <h2 data-price-component="title" data-price-layout-key="title"><span contenteditable="true" data-price-template-field="title" data-price-cell data-cell-address="Заголовок">BIZNES DASTURLASH TAKLIFI</span></h2>
                           <dl>
-                            <div data-price-component="date"><dt>Sana:</dt><dd><span contenteditable="true" data-price-template-meta="date" data-price-cell data-cell-address="Дата">27-07-2026</span></dd></div>
-                            <div data-price-component="id"><dt>ID:</dt><dd><span contenteditable="true" data-price-template-meta="id" data-price-cell data-cell-address="ID">CLI-741751</span></dd></div>
-                            <div data-price-component="customer"><dt>Xaridor:</dt><dd><span contenteditable="true" data-price-template-meta="customer" data-price-cell data-cell-address="Имя клиента">dilshod aka gulchexra market</span></dd></div>
-                            <div data-price-component="customer_phone"><dt>Xaridor raqami:</dt><dd><span contenteditable="true" data-price-template-meta="customer_phone" data-price-cell data-cell-address="Номер клиента">&nbsp;</span></dd></div>
-                            <div data-price-component="seller"><dt>Sotuvchi:</dt><dd><span contenteditable="true" data-price-template-meta="seller" data-price-cell data-cell-address="Имя продавца">Расул Бабаев</span></dd></div>
-                            <div data-price-component="seller_phone"><dt>Sotuvchi raqami:</dt><dd><span contenteditable="true" data-price-template-meta="seller_phone" data-price-cell data-cell-address="Номер продавца">+998978910550</span></dd></div>
-                            <div data-price-component="address"><dt>Manzil:</dt><dd><span contenteditable="true" data-price-template-meta="address" data-price-cell data-cell-address="Адрес">Ташкент</span></dd></div>
+                            <div data-price-component="date" data-price-layout-key="date"><dt>Sana:</dt><dd><span contenteditable="true" data-price-template-meta="date" data-price-cell data-cell-address="Дата">27-07-2026</span></dd></div>
+                            <div data-price-component="id" data-price-layout-key="id"><dt>ID:</dt><dd><span contenteditable="true" data-price-template-meta="id" data-price-cell data-cell-address="ID">CLI-741751</span></dd></div>
+                            <div data-price-component="customer" data-price-layout-key="customer"><dt>Xaridor:</dt><dd><span contenteditable="true" data-price-template-meta="customer" data-price-cell data-cell-address="Имя клиента">dilshod aka gulchexra market</span></dd></div>
+                            <div data-price-component="customer_phone" data-price-layout-key="customer_phone"><dt>Xaridor raqami:</dt><dd><span contenteditable="true" data-price-template-meta="customer_phone" data-price-cell data-cell-address="Номер клиента">&nbsp;</span></dd></div>
+                            <div data-price-component="seller" data-price-layout-key="seller"><dt>Sotuvchi:</dt><dd><span contenteditable="true" data-price-template-meta="seller" data-price-cell data-cell-address="Имя продавца">Расул Бабаев</span></dd></div>
+                            <div data-price-component="seller_phone" data-price-layout-key="seller_phone"><dt>Sotuvchi raqami:</dt><dd><span contenteditable="true" data-price-template-meta="seller_phone" data-price-cell data-cell-address="Номер продавца">+998978910550</span></dd></div>
+                            <div data-price-component="address" data-price-layout-key="address"><dt>Manzil:</dt><dd><span contenteditable="true" data-price-template-meta="address" data-price-cell data-cell-address="Адрес">Ташкент</span></dd></div>
                           </dl>
                         </div>
                       </header>
 
-                      <div class="price-template-custom-text" data-price-component="custom_text">
+                      <div class="price-template-custom-text" data-price-component="custom_text" data-price-layout-key="custom_text">
                         <span contenteditable="true" data-price-template-field="custom_text" data-price-cell data-cell-address="Текст">Дополнительный текст предложения</span>
                       </div>
 
-                      <table class="price-template-table" data-price-component="table">
+                      <div class="price-template-table-wrap" data-price-component="table" data-price-layout-key="table">
+                        <button class="price-template-layout-handle" type="button" data-price-template-select-layout="table" title="Выбрать таблицу" aria-label="Выбрать таблицу">↔</button>
+                      <table class="price-template-table">
                         <thead>
                           <tr>
-                            <th><span contenteditable="true" data-price-template-header="0" data-price-cell data-cell-address="A1">№</span></th>
-                            <th data-price-component="name"><span contenteditable="true" data-price-template-header="1" data-price-cell data-cell-address="B1">TOVAR NOMI</span></th>
-                            <th data-price-component="category"><span contenteditable="true" data-price-template-header="2" data-price-cell data-cell-address="C1">KATEGORIYA</span></th>
-                            <th data-price-component="photo"><span contenteditable="true" data-price-template-header="3" data-price-cell data-cell-address="D1">RASMI</span></th>
-                            <th data-price-component="qty"><span contenteditable="true" data-price-template-header="4" data-price-cell data-cell-address="E1">SONI</span></th>
-                            <th data-price-component="price"><span contenteditable="true" data-price-template-header="5" data-price-cell data-cell-address="F1">NARXI</span></th>
-                            <th data-price-component="discount"><span contenteditable="true" data-price-template-header="6" data-price-cell data-cell-address="G1">CHEGIRMA</span></th>
-                            <th><span contenteditable="true" data-price-template-header="7" data-price-cell data-cell-address="H1">JAMI</span></th>
+                            <th><span contenteditable="true" data-price-template-header="0" data-price-layout-key="header_0" data-price-cell data-cell-address="A1">№</span></th>
+                            <th data-price-component="name"><span contenteditable="true" data-price-template-header="1" data-price-layout-key="header_1" data-price-cell data-cell-address="B1">TOVAR NOMI</span></th>
+                            <th data-price-component="category"><span contenteditable="true" data-price-template-header="2" data-price-layout-key="header_2" data-price-cell data-cell-address="C1">KATEGORIYA</span></th>
+                            <th data-price-component="photo"><span contenteditable="true" data-price-template-header="3" data-price-layout-key="header_3" data-price-cell data-cell-address="D1">RASMI</span></th>
+                            <th data-price-component="qty"><span contenteditable="true" data-price-template-header="4" data-price-layout-key="header_4" data-price-cell data-cell-address="E1">SONI</span></th>
+                            <th data-price-component="price"><span contenteditable="true" data-price-template-header="5" data-price-layout-key="header_5" data-price-cell data-cell-address="F1">NARXI</span></th>
+                            <th data-price-component="discount"><span contenteditable="true" data-price-template-header="6" data-price-layout-key="header_6" data-price-cell data-cell-address="G1">CHEGIRMA</span></th>
+                            <th><span contenteditable="true" data-price-template-header="7" data-price-layout-key="header_7" data-price-cell data-cell-address="H1">JAMI</span></th>
                           </tr>
                         </thead>
                         <tbody data-price-template-rows></tbody>
                         <tfoot>
                           <tr>
-                            <td data-price-template-total-label-cell colspan="4"><span contenteditable="true" data-price-template-field="total_label" data-price-cell data-cell-address="Итог">Umumiy:</span></td>
+                            <td data-price-template-total-label-cell colspan="4"><span contenteditable="true" data-price-template-field="total_label" data-price-layout-key="total_label" data-price-cell data-cell-address="Итог">Umumiy:</span></td>
                             <td data-price-component="qty" data-price-template-qty-total>3</td>
                             <td data-price-template-price-summary-cell colspan="2"><span class="price-template-old" data-price-template-price-total>610</span></td>
                             <td data-price-template-grand-total>560</td>
                           </tr>
                         </tfoot>
                       </table>
-                      <footer class="price-template-note" data-price-component="comment"><span contenteditable="true" data-price-template-field="note" data-price-cell data-cell-address="Комментарий">IZOH:</span></footer>
+                      </div>
+                      <footer class="price-template-note" data-price-component="comment" data-price-layout-key="comment"><span contenteditable="true" data-price-template-field="note" data-price-cell data-cell-address="Комментарий">IZOH:</span></footer>
                     </article>
                   </div>
                 </div>
@@ -2007,7 +2028,7 @@
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
-  <script src="{{ url_for('static', path='price-template-editor.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', path='price-template-editor.js') }}?v=3" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=28" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

@@ -17788,8 +17788,30 @@ def create_app() -> FastAPI:
             for index in range(len(default_headers))
         ]
         allowed_images = {"monitor", "scale", "printer", "empty"}
-        rows: list[dict[str, str]] = []
+        rows: list[dict[str, Any]] = []
         raw_rows = source.get("rows") if isinstance(source.get("rows"), list) else []
+
+        def clean_image_data(value: object, limit: int) -> str:
+            image_data = clean_text(value, limit)
+            if image_data and re.fullmatch(
+                r"data:image/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+",
+                image_data,
+            ):
+                return image_data
+            return ""
+
+        def clean_number(
+            value: object,
+            fallback: float,
+            minimum: float,
+            maximum: float,
+        ) -> float:
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError):
+                parsed = fallback
+            return round(max(minimum, min(parsed, maximum)), 3)
+
         for raw_row in raw_rows[:50]:
             row = raw_row if isinstance(raw_row, dict) else {}
             image = clean_text(row.get("image"), 20)
@@ -17798,6 +17820,10 @@ def create_app() -> FastAPI:
                     "name": clean_text(row.get("name"), 300),
                     "category": clean_text(row.get("category"), 160),
                     "image": image if image in allowed_images else "empty",
+                    "photo": clean_image_data(row.get("photo"), 750_000),
+                    "photo_x": clean_number(row.get("photo_x"), 0, -80, 80),
+                    "photo_y": clean_number(row.get("photo_y"), 0, -80, 80),
+                    "photo_scale": clean_number(row.get("photo_scale"), 1, 0.5, 4),
                     "qty": clean_text(row.get("qty"), 40),
                     "price": clean_text(row.get("price"), 50),
                     "discount": clean_text(row.get("discount"), 50),
@@ -17810,6 +17836,10 @@ def create_app() -> FastAPI:
                     "name": "Новый товар",
                     "category": "",
                     "image": "empty",
+                    "photo": "",
+                    "photo_x": 0,
+                    "photo_y": 0,
+                    "photo_scale": 1,
                     "qty": "1 шт",
                     "price": "0",
                     "discount": "0",
@@ -17849,17 +17879,45 @@ def create_app() -> FastAPI:
             key: clean_bool(raw_visible.get(key), fallback)
             for key, fallback in default_visible.items()
         }
-        logo = clean_text(source.get("logo"), 2_000_000)
-        if logo and not re.fullmatch(
-            r"data:image/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+",
-            logo,
-        ):
-            logo = ""
+        logo = clean_image_data(source.get("logo"), 2_000_000)
+        allowed_layout_keys = {
+            "logo",
+            "title",
+            "table",
+            "custom_text",
+            "comment",
+            "total_label",
+            "date",
+            "id",
+            "customer",
+            "customer_phone",
+            "seller",
+            "seller_phone",
+            "address",
+            *{f"header_{index}" for index in range(8)},
+            *{
+                f"row_{row_index}_{field}"
+                for row_index in range(50)
+                for field in ("name", "category", "qty", "price", "discount", "total")
+            },
+        }
+        raw_layout = source.get("layout") if isinstance(source.get("layout"), dict) else {}
+        layout: dict[str, dict[str, float]] = {}
+        for key in allowed_layout_keys:
+            adjustment = raw_layout.get(key)
+            if not isinstance(adjustment, dict):
+                continue
+            layout[key] = {
+                "x": clean_number(adjustment.get("x"), 0, -300, 300),
+                "y": clean_number(adjustment.get("y"), 0, -300, 300),
+                "scale": clean_number(adjustment.get("scale"), 1, 0.5, 2),
+            }
         return {
             "version": 2,
             "title": clean_text(source.get("title"), 120) or "BIZNES DASTURLASH TAKLIFI",
             "logo": logo,
             "visible": visible,
+            "layout": layout,
             "meta": {
                 "date": clean_text(raw_meta.get("date"), 160),
                 "id": clean_text(raw_meta.get("id"), 120),

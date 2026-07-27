@@ -24,6 +24,7 @@
     version: 2,
     title: "BIZNES DASTURLASH TAKLIFI",
     logo: "",
+    layout: {},
     visible: DEFAULT_VISIBILITY,
     meta: {
       date: "27-07-2026",
@@ -52,6 +53,10 @@
         name: "MONOBLOK SMART I5 6A METALLIK WIFI",
         category: "Моноблок",
         image: "monitor",
+        photo: "",
+        photo_x: 0,
+        photo_y: 0,
+        photo_scale: 1,
         qty: "1 шт",
         price: "350",
         discount: "320",
@@ -61,6 +66,10 @@
         name: "Весы без этикетор",
         category: "Весы",
         image: "scale",
+        photo: "",
+        photo_x: 0,
+        photo_y: 0,
+        photo_scale: 1,
         qty: "1 шт",
         price: "220",
         discount: "200",
@@ -70,6 +79,10 @@
         name: "Чек Принтер XPRINTER 80C",
         category: "Принтер",
         image: "printer",
+        photo: "",
+        photo_x: 0,
+        photo_y: 0,
+        photo_scale: 1,
         qty: "1 шт",
         price: "40",
         discount: "40",
@@ -101,6 +114,12 @@
     return String(rounded);
   }
 
+  function clamp(value, minimum, maximum, fallback) {
+    var number = Number.parseFloat(value);
+    if (!Number.isFinite(number)) number = fallback;
+    return Math.max(minimum, Math.min(number, maximum));
+  }
+
   function csrfToken() {
     var meta = document.querySelector('meta[name="csrf-token"]');
     if (meta) return meta.getAttribute("content") || "";
@@ -123,16 +142,40 @@
     return span;
   }
 
-  function createImage(kind) {
+  function createImage(row) {
     var allowed = ["monitor", "scale", "printer", "empty"];
+    var kind = text(row && row.image) || "empty";
     var safeKind = allowed.indexOf(kind) >= 0 ? kind : "empty";
+    var photo = /^data:image\/(?:png|jpeg|webp);base64,/i.test(text(row && row.photo))
+      ? text(row.photo)
+      : "";
+    var photoX = Math.max(-80, Math.min(numericValue(row && row.photo_x), 80));
+    var photoY = Math.max(-80, Math.min(numericValue(row && row.photo_y), 80));
+    var photoScale = Math.max(
+      0.5,
+      Math.min(numericValue(row && row.photo_scale) || 1, 4),
+    );
     var image = document.createElement("button");
     image.type = "button";
-    image.className = "price-template-product-img price-template-product-img--" + safeKind;
+    image.className =
+      "price-template-product-img price-template-product-img--" +
+      (photo ? "custom" : safeKind);
     image.setAttribute("data-price-template-image", safeKind);
-    image.setAttribute("aria-label", "Сменить вид изображения");
-    image.title = "Нажмите, чтобы сменить изображение";
-    if (safeKind === "monitor" || safeKind === "printer") {
+    image.setAttribute("data-price-template-photo", photo);
+    image.setAttribute("data-price-template-photo-x", String(photoX));
+    image.setAttribute("data-price-template-photo-y", String(photoY));
+    image.setAttribute("data-price-template-photo-scale", String(photoScale));
+    image.setAttribute("aria-label", "Выбрать фотографию");
+    image.title = "Выбрать фотографию для редактирования";
+    image.style.setProperty("--photo-x", photoX + "px");
+    image.style.setProperty("--photo-y", photoY + "px");
+    image.style.setProperty("--photo-scale", String(photoScale));
+    if (photo) {
+      var customImage = document.createElement("img");
+      customImage.src = photo;
+      customImage.alt = "";
+      image.appendChild(customImage);
+    } else if (safeKind === "monitor" || safeKind === "printer") {
       var label = document.createElement("span");
       label.textContent = safeKind === "monitor" ? "Monoblok A2" : "XP-Q80AS";
       image.appendChild(label);
@@ -166,7 +209,7 @@
 
     tr.appendChild(createDataCell("name", createEditableCell("name", row.name)));
     tr.appendChild(createDataCell("category", createEditableCell("category", row.category)));
-    tr.appendChild(createDataCell("photo", createImage(text(row.image) || "empty")));
+    tr.appendChild(createDataCell("photo", createImage(row)));
     tr.appendChild(createDataCell("qty", createEditableCell("qty", row.qty)));
     tr.appendChild(
       createDataCell("price", createEditableCell("price", row.price, { oldPrice: true })),
@@ -213,12 +256,32 @@
       Array.isArray(source.rows) && source.rows.length
         ? source.rows.slice(0, 50)
         : defaults.rows;
+    var rawLayout =
+      source.layout && typeof source.layout === "object" ? source.layout : {};
+    var layout = {};
+    Object.keys(rawLayout).forEach(function (key) {
+      if (
+        !/^(?:logo|title|table|custom_text|comment|total_label|date|id|customer|customer_phone|seller|seller_phone|address|header_[0-7]|row_(?:[0-9]|[1-4][0-9])_(?:name|category|qty|price|discount|total))$/.test(
+          key,
+        )
+      ) {
+        return;
+      }
+      var adjustment =
+        rawLayout[key] && typeof rawLayout[key] === "object" ? rawLayout[key] : {};
+      layout[key] = {
+        x: clamp(adjustment.x, -300, 300, 0),
+        y: clamp(adjustment.y, -300, 300, 0),
+        scale: clamp(adjustment.scale, 0.5, 2, 1),
+      };
+    });
     return {
       version: 2,
       title: text(source.title || defaults.title),
       logo: /^data:image\/(?:png|jpeg|webp);base64,/i.test(text(source.logo))
         ? text(source.logo)
         : "",
+      layout: layout,
       visible: visible,
       meta: {
         date: date,
@@ -247,6 +310,12 @@
           name: text(item.name),
           category: text(item.category),
           image: text(item.image || "empty"),
+          photo: /^data:image\/(?:png|jpeg|webp);base64,/i.test(text(item.photo))
+            ? text(item.photo)
+            : "",
+          photo_x: clamp(item.photo_x, -80, 80, 0),
+          photo_y: clamp(item.photo_y, -80, 80, 0),
+          photo_scale: clamp(item.photo_scale, 0.5, 4, 1),
           qty: text(item.qty),
           price: text(item.price),
           discount: text(item.discount),
@@ -268,10 +337,16 @@
     var logoFile = root.querySelector("[data-price-template-logo-file]");
     var logoImage = root.querySelector("[data-price-template-logo-image]");
     var defaultLogo = root.querySelector("[data-price-template-default-logo]");
+    var canvasToolbar = root.querySelector("[data-price-template-canvas-toolbar]");
+    var selectedName = root.querySelector("[data-price-template-selected-name]");
+    var photoTools = root.querySelector("[data-price-template-photo-tools]");
+    var photoFile = root.querySelector("[data-price-template-photo-file]");
     if (!preview || !rowsRoot || !formula || !address) return;
 
     var selectedCell = null;
+    var selectedTarget = null;
     var currentLogo = "";
+    var layout = {};
     var visibility = Object.assign({}, DEFAULT_VISIBILITY);
     var dirty = false;
 
@@ -299,6 +374,164 @@
       if (defaultLogo) defaultLogo.hidden = Boolean(currentLogo);
     }
 
+    function layoutLabel(key, node) {
+      var labels = {
+        logo: "Логотип",
+        title: "Заголовок",
+        table: "Таблица",
+        custom_text: "Текст",
+        comment: "Комментарий",
+        total_label: "Итог",
+        date: "Дата",
+        id: "ID",
+        customer: "Имя клиента",
+        customer_phone: "Номер клиента",
+        seller: "Имя продавца",
+        seller_phone: "Номер продавца",
+        address: "Адрес",
+      };
+      if (labels[key]) return labels[key];
+      if (key.indexOf("header_") === 0) return "Заголовок колонки";
+      if (key.indexOf("row_") === 0) {
+        var cell = node && node.getAttribute("data-cell-address");
+        return cell ? "Текст " + cell : "Текст товара";
+      }
+      return "Элемент";
+    }
+
+    function applyLayoutAdjustment(key) {
+      var adjustment = layout[key] || { x: 0, y: 0, scale: 1 };
+      preview
+        .querySelectorAll('[data-price-layout-key="' + key + '"]')
+        .forEach(function (node) {
+          node.style.setProperty("--layout-x", adjustment.x + "px");
+          node.style.setProperty("--layout-y", adjustment.y + "px");
+          node.style.setProperty("--layout-scale", String(adjustment.scale));
+        });
+    }
+
+    function applyAllLayout() {
+      preview.querySelectorAll("[data-price-layout-key]").forEach(function (node) {
+        node.style.setProperty("--layout-x", "0px");
+        node.style.setProperty("--layout-y", "0px");
+        node.style.setProperty("--layout-scale", "1");
+      });
+      Object.keys(layout).forEach(applyLayoutAdjustment);
+    }
+
+    function clearTargetSelection() {
+      preview
+        .querySelectorAll(".is-layout-selected, .is-photo-selected")
+        .forEach(function (node) {
+          node.classList.remove("is-layout-selected", "is-photo-selected");
+        });
+      selectedTarget = null;
+      if (canvasToolbar) canvasToolbar.hidden = true;
+      if (photoTools) photoTools.hidden = true;
+    }
+
+    function selectLayoutTarget(node, key) {
+      if (!node || !key) {
+        clearTargetSelection();
+        return;
+      }
+      clearTargetSelection();
+      selectedTarget = { type: "layout", key: key, node: node };
+      node.classList.add("is-layout-selected");
+      if (selectedName) selectedName.textContent = layoutLabel(key, node);
+      if (canvasToolbar) canvasToolbar.hidden = false;
+    }
+
+    function selectPhotoTarget(node) {
+      if (!node) {
+        clearTargetSelection();
+        return;
+      }
+      clearTargetSelection();
+      selectedTarget = { type: "photo", node: node };
+      node.classList.add("is-photo-selected");
+      if (selectedName) selectedName.textContent = "Фото товара";
+      if (canvasToolbar) canvasToolbar.hidden = false;
+      if (photoTools) photoTools.hidden = false;
+    }
+
+    function updatePhotoTransform(node, values) {
+      if (!node) return;
+      var x = clamp(values.x, -80, 80, 0);
+      var y = clamp(values.y, -80, 80, 0);
+      var scale = clamp(values.scale, 0.5, 4, 1);
+      node.setAttribute("data-price-template-photo-x", String(x));
+      node.setAttribute("data-price-template-photo-y", String(y));
+      node.setAttribute("data-price-template-photo-scale", String(scale));
+      node.style.setProperty("--photo-x", x + "px");
+      node.style.setProperty("--photo-y", y + "px");
+      node.style.setProperty("--photo-scale", String(scale));
+    }
+
+    function photoValues(node) {
+      return {
+        x: clamp(node && node.getAttribute("data-price-template-photo-x"), -80, 80, 0),
+        y: clamp(node && node.getAttribute("data-price-template-photo-y"), -80, 80, 0),
+        scale: clamp(
+          node && node.getAttribute("data-price-template-photo-scale"),
+          0.5,
+          4,
+          1,
+        ),
+      };
+    }
+
+    function replaceSelectedPhoto(photo) {
+      if (!selectedTarget || selectedTarget.type !== "photo") return;
+      var oldNode = selectedTarget.node;
+      var replacement = createImage({
+        image: oldNode.getAttribute("data-price-template-image") || "empty",
+        photo: photo || "",
+        photo_x: 0,
+        photo_y: 0,
+        photo_scale: 1,
+      });
+      oldNode.replaceWith(replacement);
+      selectPhotoTarget(replacement);
+      markDirty();
+    }
+
+    function adjustSelected(action) {
+      if (!selectedTarget) return;
+      if (selectedTarget.type === "layout") {
+        var key = selectedTarget.key;
+        var current = layout[key] || { x: 0, y: 0, scale: 1 };
+        var next = {
+          x: clamp(current.x, -300, 300, 0),
+          y: clamp(current.y, -300, 300, 0),
+          scale: clamp(current.scale, 0.5, 2, 1),
+        };
+        if (action === "left") next.x -= 6;
+        if (action === "right") next.x += 6;
+        if (action === "up") next.y -= 6;
+        if (action === "down") next.y += 6;
+        if (action === "smaller") next.scale -= 0.05;
+        if (action === "larger") next.scale += 0.05;
+        if (action === "reset") next = { x: 0, y: 0, scale: 1 };
+        next.x = clamp(next.x, -300, 300, 0);
+        next.y = clamp(next.y, -300, 300, 0);
+        next.scale = clamp(next.scale, 0.5, 2, 1);
+        layout[key] = next;
+        applyLayoutAdjustment(key);
+      } else {
+        var photo = photoValues(selectedTarget.node);
+        if (action === "left") photo.x -= 4;
+        if (action === "right") photo.x += 4;
+        if (action === "up") photo.y -= 4;
+        if (action === "down") photo.y += 4;
+        if (action === "smaller") photo.scale -= 0.1;
+        if (action === "larger") photo.scale += 0.1;
+        if (action === "reset") photo = { x: 0, y: 0, scale: 1 };
+        updatePhotoTransform(selectedTarget.node, photo);
+      }
+      markDirty();
+    }
+
     function updateRowAddresses() {
       var rows = rowsRoot.querySelectorAll("[data-price-template-row]");
       var columns = {
@@ -317,11 +550,34 @@
           var cell = row.querySelector(
             '[data-price-template-row-field="' + field + '"]',
           );
-          if (cell) cell.setAttribute("data-cell-address", columns[field] + rowNumber);
+          if (cell) {
+            cell.setAttribute("data-cell-address", columns[field] + rowNumber);
+            cell.setAttribute(
+              "data-price-layout-key",
+              "row_" + index + "_" + field,
+            );
+          }
         });
         var remove = row.querySelector("[data-price-template-remove-row]");
         if (remove) remove.disabled = rows.length <= 1;
       });
+    }
+
+    function removeRowLayout(rowIndex) {
+      var nextLayout = {};
+      Object.keys(layout).forEach(function (key) {
+        var match = /^row_(\d+)_(.+)$/.exec(key);
+        if (!match) {
+          nextLayout[key] = layout[key];
+          return;
+        }
+        var index = Number(match[1]);
+        if (index === rowIndex) return;
+        var nextKey =
+          index > rowIndex ? "row_" + (index - 1) + "_" + match[2] : key;
+        nextLayout[nextKey] = layout[key];
+      });
+      layout = nextLayout;
     }
 
     function updateFooterLayout() {
@@ -363,6 +619,13 @@
           });
       }
       if (selectedCell && selectedCell.closest("[hidden]")) selectCell(null);
+      if (
+        selectedTarget &&
+        selectedTarget.node &&
+        selectedTarget.node.closest("[hidden]")
+      ) {
+        clearTargetSelection();
+      }
       updateFooterLayout();
     }
 
@@ -476,11 +739,14 @@
         rowsRoot.appendChild(createRow(row));
       });
       setLogo(data.logo);
+      layout = Object.assign({}, data.layout);
       visibility = Object.assign({}, data.visible);
       updateRowAddresses();
       recalculateTotals();
       applyAllVisibility();
+      applyAllLayout();
       selectCell(null);
+      clearTargetSelection();
     }
 
     function collectTemplate() {
@@ -504,6 +770,33 @@
           image: image
             ? image.getAttribute("data-price-template-image") || "empty"
             : "empty",
+          photo: image
+            ? image.getAttribute("data-price-template-photo") || ""
+            : "",
+          photo_x: image
+            ? clamp(
+                image.getAttribute("data-price-template-photo-x"),
+                -80,
+                80,
+                0,
+              )
+            : 0,
+          photo_y: image
+            ? clamp(
+                image.getAttribute("data-price-template-photo-y"),
+                -80,
+                80,
+                0,
+              )
+            : 0,
+          photo_scale: image
+            ? clamp(
+                image.getAttribute("data-price-template-photo-scale"),
+                0.5,
+                4,
+                1,
+              )
+            : 1,
           qty:
             row.querySelector('[data-price-template-row-field="qty"]').textContent ||
             "",
@@ -524,6 +817,7 @@
           preview.querySelector('[data-price-template-field="title"]').textContent ||
           "",
         logo: currentLogo,
+        layout: Object.assign({}, layout),
         visible: Object.assign({}, visibility),
         meta: {
           date:
@@ -584,7 +878,7 @@
       }
     }
 
-    function readImageFile(file) {
+    function readImageFile(file, options) {
       return new Promise(function (resolve, reject) {
         if (!file || !/^image\/(?:png|jpeg|webp)$/i.test(file.type)) {
           reject(new Error("type"));
@@ -600,8 +894,9 @@
           var image = new Image();
           image.onerror = reject;
           image.onload = function () {
-            var maxWidth = 640;
-            var maxHeight = 280;
+            var settings = options || {};
+            var maxWidth = settings.maxWidth || 640;
+            var maxHeight = settings.maxHeight || 280;
             var scale = Math.min(
               1,
               maxWidth / image.naturalWidth,
@@ -613,7 +908,12 @@
             var context = canvas.getContext("2d");
             context.clearRect(0, 0, canvas.width, canvas.height);
             context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL("image/png"));
+            resolve(
+              canvas.toDataURL(
+                settings.outputType || "image/png",
+                settings.quality == null ? 0.9 : settings.quality,
+              ),
+            );
           };
           image.src = reader.result;
         };
@@ -637,9 +937,19 @@
       if (remove) {
         var row = remove.closest("[data-price-template-row]");
         if (row && rowsRoot.children.length > 1) {
+          var rowIndex = Array.prototype.indexOf.call(rowsRoot.children, row);
           if (row.contains(selectedCell)) selectCell(null);
+          if (
+            selectedTarget &&
+            selectedTarget.node &&
+            row.contains(selectedTarget.node)
+          ) {
+            clearTargetSelection();
+          }
+          removeRowLayout(rowIndex);
           row.remove();
           updateRowAddresses();
+          applyAllLayout();
           recalculateTotals();
           markDirty();
         }
@@ -648,19 +958,23 @@
 
       var image = event.target.closest("[data-price-template-image]");
       if (image) {
-        var kinds = ["monitor", "scale", "printer", "empty"];
-        var current = image.getAttribute("data-price-template-image") || "empty";
-        var next = kinds[(kinds.indexOf(current) + 1) % kinds.length];
-        image.replaceWith(createImage(next));
-        markDirty();
+        selectPhotoTarget(image);
         return;
       }
 
-      if (
-        event.target.closest("[data-price-template-logo-trigger]") ||
-        event.target.closest("[data-price-template-logo-upload]")
-      ) {
+      if (event.target.closest("[data-price-template-logo-upload]")) {
         if (logoFile) logoFile.click();
+        return;
+      }
+
+      if (event.target.closest(".price-template-logo-edit")) {
+        if (logoFile) logoFile.click();
+        return;
+      }
+
+      var logoTrigger = event.target.closest("[data-price-template-logo-trigger]");
+      if (logoTrigger) {
+        selectLayoutTarget(logoTrigger, "logo");
         return;
       }
 
@@ -670,8 +984,43 @@
         return;
       }
 
+      var tableHandle = event.target.closest("[data-price-template-select-layout]");
+      if (tableHandle) {
+        var tableKey = tableHandle.getAttribute("data-price-template-select-layout");
+        selectLayoutTarget(
+          preview.querySelector('[data-price-layout-key="' + tableKey + '"]'),
+          tableKey,
+        );
+        return;
+      }
+
+      var adjustment = event.target.closest("[data-price-template-adjust]");
+      if (adjustment) {
+        adjustSelected(adjustment.getAttribute("data-price-template-adjust"));
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-photo-upload]")) {
+        if (photoFile) photoFile.click();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-photo-remove]")) {
+        replaceSelectedPhoto("");
+        return;
+      }
+
       var cell = event.target.closest("[data-price-cell]");
-      if (cell && root.contains(cell)) selectCell(cell);
+      if (cell && root.contains(cell)) {
+        selectCell(cell);
+        var layoutNode = cell.closest("[data-price-layout-key]");
+        if (layoutNode) {
+          selectLayoutTarget(
+            layoutNode,
+            layoutNode.getAttribute("data-price-layout-key"),
+          );
+        }
+      }
     });
 
     root.addEventListener("input", function (event) {
@@ -723,7 +1072,11 @@
         if (!file) return;
         setStatus("Подготавливаем логотип…", "pending");
         try {
-          var logo = await readImageFile(file);
+          var logo = await readImageFile(file, {
+            maxWidth: 640,
+            maxHeight: 280,
+            outputType: "image/png",
+          });
           setLogo(logo);
           visibility.logo = true;
           applyVisibility("logo", true);
@@ -741,6 +1094,32 @@
       });
     }
 
+    if (photoFile) {
+      photoFile.addEventListener("change", async function () {
+        var file = photoFile.files && photoFile.files[0];
+        if (!file || !selectedTarget || selectedTarget.type !== "photo") return;
+        setStatus("Подготавливаем фото…", "pending");
+        try {
+          var photo = await readImageFile(file, {
+            maxWidth: 700,
+            maxHeight: 700,
+            outputType: "image/webp",
+            quality: 0.82,
+          });
+          replaceSelectedPhoto(photo);
+        } catch (error) {
+          setStatus(
+            error && error.message === "size"
+              ? "Файл фото должен быть меньше 5 МБ"
+              : "Выберите PNG, JPG или WEBP",
+            "error",
+          );
+        } finally {
+          photoFile.value = "";
+        }
+      });
+    }
+
     if (addButton) {
       addButton.addEventListener("click", function () {
         if (rowsRoot.children.length >= 50) {
@@ -752,6 +1131,10 @@
             name: "Новый товар",
             category: "",
             image: "empty",
+            photo: "",
+            photo_x: 0,
+            photo_y: 0,
+            photo_scale: 1,
             qty: "1 шт",
             price: "0",
             discount: "0",
@@ -763,6 +1146,7 @@
         updateRowAddresses();
         recalculateTotals();
         applyAllVisibility();
+        applyAllLayout();
         markDirty();
         var newCell = rowsRoot.lastElementChild.querySelector(
           '[data-price-template-row-field="name"]',
