@@ -6964,6 +6964,8 @@ def create_app() -> FastAPI:
         client: str = "",
         date_from: str = "",
         date_to: str = "",
+        debt_page: int = 1,
+        debt_page_size: int = 100,
         crm_record_id: str = "",
         embed: str = "",
     ):
@@ -7077,6 +7079,67 @@ def create_app() -> FastAPI:
                     continue
                 sales.append(item)
             sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)
+            if debt_page_size not in {100, 500, 1000}:
+                debt_page_size = 100
+            debt_clients_total = int(sales_debt_workspace["clients_count"])
+            debt_total_pages = max(1, math.ceil(debt_clients_total / debt_page_size))
+            debt_current_page = min(max(1, debt_page), debt_total_pages)
+            debt_page_start = (debt_current_page - 1) * debt_page_size
+            debt_page_end = min(debt_clients_total, debt_page_start + debt_page_size)
+            sales_debt_workspace["clients"] = sales_debt_workspace["clients"][
+                debt_page_start:debt_page_end
+            ]
+            sales_debt_workspace.update(
+                {
+                    "page": debt_current_page,
+                    "page_size": debt_page_size,
+                    "total_pages": debt_total_pages,
+                    "page_from": debt_page_start + 1 if debt_clients_total else 0,
+                    "page_to": debt_page_end,
+                }
+            )
+
+            def debt_page_url(page_number: int, page_size: int = debt_page_size) -> str:
+                pairs = [
+                    (key, value)
+                    for key, value in request.query_params.multi_items()
+                    if key not in {"status", "debt_page", "debt_page_size"}
+                ]
+                pairs.extend(
+                    [
+                        ("status", "debt"),
+                        ("debt_page", str(page_number)),
+                        ("debt_page_size", str(page_size)),
+                    ]
+                )
+                return f"{request.url.path}?{urlencode(pairs, doseq=True)}#debt"
+
+            debt_pagination_pages = list(
+                range(
+                    max(1, debt_current_page - 2),
+                    min(debt_total_pages, debt_current_page + 2) + 1,
+                )
+            )
+            if 1 not in debt_pagination_pages:
+                debt_pagination_pages.insert(0, 1)
+            if debt_total_pages not in debt_pagination_pages:
+                debt_pagination_pages.append(debt_total_pages)
+            sales_debt_workspace.update(
+                {
+                    "pagination_pages": debt_pagination_pages,
+                    "page_urls": {
+                        page_number: debt_page_url(page_number)
+                        for page_number in debt_pagination_pages
+                    },
+                    "prev_page_url": debt_page_url(max(1, debt_current_page - 1)),
+                    "next_page_url": debt_page_url(
+                        min(debt_total_pages, debt_current_page + 1)
+                    ),
+                    "page_size_urls": {
+                        size: debt_page_url(1, size) for size in (100, 500, 1000)
+                    },
+                }
+            )
             sales_journal_totals_by_currency: dict[str, dict[str, Decimal]] = {}
             for item in sales:
                 currency = str(item.get("currency") or "UZS").upper()

@@ -296,8 +296,50 @@
                 </tr>
               {% endfor %}
             </tbody>
+            <tfoot>
+              <tr class="sales-debt-total-row">
+                <td>
+                  <strong>Итого по всем страницам</strong>
+                  <small>{{ sales_debt_workspace.clients_count }} клиентов</small>
+                </td>
+                <td>
+                  {% for total in sales_debt_workspace.totals %}
+                    <strong class="sales-debt-money">{{ total.amount }} {{ total.currency }}</strong>
+                  {% else %}
+                    <strong class="sales-debt-money">0</strong>
+                  {% endfor %}
+                </td>
+                <td><strong>{{ sales_debt_workspace.documents_count }}</strong></td>
+                <td colspan="4"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
+        <footer class="products-catalog-footer sales-debt-footer">
+          <nav class="products-pagination" aria-label="Страницы долгов клиентов">
+            <a class="products-page-link {% if sales_debt_workspace.page <= 1 %}disabled{% endif %}" href="{{ sales_debt_workspace.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+            {% for page_no in sales_debt_workspace.pagination_pages %}
+              <a class="products-page-link {% if page_no == sales_debt_workspace.page %}active{% endif %}" href="{{ sales_debt_workspace.page_urls[page_no] }}" {% if page_no == sales_debt_workspace.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+            {% endfor %}
+            <a class="products-page-link {% if sales_debt_workspace.page >= sales_debt_workspace.total_pages %}disabled{% endif %}" href="{{ sales_debt_workspace.next_page_url }}" aria-label="Следующая страница">›</a>
+            <span class="products-page-count">Стр. {{ sales_debt_workspace.page }} из {{ sales_debt_workspace.total_pages }}</span>
+          </nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Итоги списка долгов">
+              <span>Клиентов: {{ sales_debt_workspace.clients_count }}</span>
+              <span>Документов: {{ sales_debt_workspace.documents_count }}</span>
+              <span>Показано: {{ sales_debt_workspace.page_from }}-{{ sales_debt_workspace.page_to }}</span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select aria-label="Количество клиентов на странице" onchange="window.location.href=this.value">
+                {% for size in [100, 500, 1000] %}
+                  <option value="{{ sales_debt_workspace.page_size_urls[size] }}" {% if sales_debt_workspace.page_size == size %}selected{% endif %}>{{ size }} шт</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </footer>
       </article>
 
       <article class="products-list-panel{% if sales_filters.status == 'debt' %} sales-journal-support{% endif %}" id="sales-journal" data-workspace-view="journal order return debt" hidden>
