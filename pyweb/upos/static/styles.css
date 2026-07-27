@@ -14443,7 +14443,7 @@ html.dark .price-template-toggle-face::after {
   background: color-mix(in oklch, var(--foreground), var(--card) 32%);
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1400px) {
   .price-template-builder-layout {
     grid-template-columns: 1fr;
   }
