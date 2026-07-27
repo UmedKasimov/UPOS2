@@ -9236,6 +9236,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-entry-table {
   table-layout: fixed;
   width: 100%;
+  min-width: 60rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(1),
@@ -9246,32 +9247,32 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .warehouse-purchase-entry-table th:nth-child(2),
 .warehouse-purchase-entry-table td:nth-child(2) {
-  width: auto;
+  width: 14rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(3),
 .warehouse-purchase-entry-table td:nth-child(3) {
-  width: 9rem;
+  width: 6rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(4),
 .warehouse-purchase-entry-table td:nth-child(4) {
-  width: 10rem;
+  width: 8rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(5),
 .warehouse-purchase-entry-table td:nth-child(5) {
-  width: 11rem;
+  width: 10rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(6),
 .warehouse-purchase-entry-table td:nth-child(6) {
-  width: 10rem;
+  width: 8rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(7),
 .warehouse-purchase-entry-table td:nth-child(7) {
-  width: 10rem;
+  width: 8rem;
 }
 
 .warehouse-purchase-entry-table th:nth-child(8),
