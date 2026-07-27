@@ -1072,7 +1072,7 @@
           <span>Склад*</span>
           <select name="warehouse" required data-adjustment-warehouse>
             {% for warehouse in warehouse_options.warehouses %}
-              <option value="{{ warehouse.name }}" {% if warehouse.name == 'Основной склад' %}selected{% endif %}>{{ warehouse.name }}</option>
+              <option value="{{ warehouse }}" {% if warehouse == 'Основной склад' %}selected{% endif %}>{{ warehouse }}</option>
             {% endfor %}
           </select>
         </label>
