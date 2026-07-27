@@ -1082,23 +1082,19 @@
   <div class="settings-profile-modal-card telephony-dialog-surface">
     <header class="settings-profile-modal-head">
       <div>
-        <p>Складская операция</p>
-        <h2>Выберите тип операции</h2>
+        <h2>Складская операция</h2>
       </div>
       <button type="button" class="settings-profile-close" data-warehouse-close-operation aria-label="Закрыть">×</button>
     </header>
     <div class="warehouse-operation-choices">
       <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=in#adjustments" data-warehouse-operation-link>
         <strong>Приход</strong>
-        <span>Поступление товара от поставщика на склад.</span>
       </a>
       <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=out#adjustments" data-warehouse-operation-link>
         <strong>Списание</strong>
-        <span>Брак, потери, недостачи и ручное уменьшение остатка.</span>
       </a>
       <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=transfer#transfers" data-warehouse-operation-link>
         <strong>Перемещение</strong>
-        <span>Перевод товара между складами с ответственным и датой.</span>
       </a>
     </div>
   </div>
