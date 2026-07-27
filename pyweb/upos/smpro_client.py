@@ -282,7 +282,8 @@ class SMProClient:
         since: str = "",
         filial_id: str = "",
     ) -> list[dict[str, Any]]:
-        per_page = 200
+        # SMPro document endpoints reject values above 100 with HTTP 422.
+        per_page = 100
         page = 1
         result: list[dict[str, Any]] = []
         while page <= 10000:

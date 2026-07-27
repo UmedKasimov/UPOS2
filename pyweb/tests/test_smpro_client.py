@@ -63,6 +63,7 @@ class SMProClientTests(unittest.TestCase):
 
         def handler(request: httpx.Request) -> httpx.Response:
             self.assertEqual(request.headers["Filial-Id"], "42")
+            self.assertEqual(request.url.params["per_page"], "100")
             page = int(request.url.params["page"])
             requested_pages.append(page)
             return httpx.Response(
