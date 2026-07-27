@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid'] %}
-{% set sales_default_tab = 'journal' if flash_ok in sales_saved_messages else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else '')))) %}
+{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
 {% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
 {% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
@@ -22,12 +22,12 @@
 
 {% block main %}
   <section
-    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root sales-workspace products-workspace workspace-module-root workspace-module-root--sales"
+    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root sales-workspace products-workspace workspace-module-root workspace-module-root--sales{% if sales_embed %} sales-workspace--embed{% endif %}"
     data-workspace-tabs
     data-workspace-key="sales"
     data-workspace-default-tab="{{ sales_default_tab }}"
-    data-workspace-force-tab="{{ 'journal' if flash_ok in sales_saved_messages else '' }}"
-    data-workspace-close-tabs-on-load="{{ 'new' if flash_ok in ['saved', 'order_saved', 'return_saved', 'updated'] else '' }}"
+    data-workspace-force-tab="{{ '' if sales_embed else ('journal' if flash_ok in sales_saved_messages else '') }}"
+    data-workspace-close-tabs-on-load="{{ '' if sales_embed else ('new' if flash_ok in ['saved', 'order_saved', 'return_saved', 'updated'] else '') }}"
     data-workspace-home-href="{{ url_for('sales_get') }}"
   >
     {% if flash_ok == "saved" %}
@@ -620,7 +620,7 @@
         </dialog>
       </article>
 
-      <aside class="product-form-panel" id="sales-form" data-workspace-view="new" hidden>
+      <aside class="product-form-panel" id="sales-form" data-workspace-view="new"{% if not sales_embed %} hidden{% endif %}>
         <header class="products-panel-head">
           <div>
             <h2 data-sales-form-title>{{ sales_form_title }}</h2>
@@ -638,6 +638,7 @@
         >
           {% include "_csrf_field.html" %}
 
+          {% if sales_embed %}<input type="hidden" name="embed" value="1" />{% endif %}
           <input type="hidden" name="sale_id" value="" />
           <input type="hidden" name="doc_type" value="{{ sales_form_doc_type }}" />
           <input type="hidden" name="crm_record_id" value="{{ sales_prefill.crm_record_id|e }}" />
@@ -863,7 +864,11 @@
           <div class="sales-form-footer">
             <button type="button" class="btn sales-payment-add-btn" data-sales-payment-open>+ Добавить оплату</button>
             <div class="product-form-actions">
-              <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
+              {% if sales_embed %}
+                <button class="btn btn-secondary" type="button" data-sales-embed-cancel>Отмена</button>
+              {% else %}
+                <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
+              {% endif %}
               <button class="btn" type="submit" data-sales-form-submit>{{ sales_form_save_label }}</button>
             </div>
           </div>
@@ -1208,4 +1213,22 @@
   {{ super() }}
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=15" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=56" defer></script>
+  {% if sales_embed %}
+    <script>
+      (() => {
+        const notifyParent = (type, detail = {}) => {
+          if (window.parent !== window) {
+            window.parent.postMessage({ type, ...detail }, window.location.origin);
+          }
+        };
+        document.querySelector("[data-sales-embed-cancel]")?.addEventListener("click", () => {
+          notifyParent("upos:sales-order-cancel");
+        });
+        const params = new URLSearchParams(window.location.search);
+        if (["saved", "order_saved", "return_saved", "updated"].includes(params.get("msg") || "")) {
+          notifyParent("upos:sales-order-saved", { saleId: params.get("saved_id") || "" });
+        }
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

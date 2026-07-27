@@ -310,6 +310,8 @@
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
     const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
+    const orderDialog = document.getElementById("crm-order-dialog");
+    const orderFrame = orderDialog?.querySelector("[data-crm-order-dialog-frame]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
     const documents = dialog.querySelector("[data-crm-card-detail-documents]");
@@ -550,11 +552,11 @@
       }
       if (orderButton) {
         if (data.crmDetailOrderHref) {
-          orderButton.href = data.crmDetailOrderHref;
+          orderButton.dataset.crmOrderHref = data.crmDetailOrderHref;
           orderButton.hidden = false;
         } else {
           orderButton.hidden = true;
-          orderButton.removeAttribute("href");
+          delete orderButton.dataset.crmOrderHref;
         }
       }
       setText(chat, data.crmDetailChat || "Не привязан");
@@ -602,6 +604,30 @@
       }
     };
 
+    const closeOrderDialog = () => {
+      if (!orderDialog) return;
+      if (orderDialog.open && typeof orderDialog.close === "function") {
+        orderDialog.close();
+      } else {
+        orderDialog.removeAttribute("open");
+      }
+      if (orderFrame) orderFrame.src = "about:blank";
+    };
+
+    const openOrderDialog = () => {
+      const href = orderButton?.dataset.crmOrderHref || "";
+      if (!href || !orderDialog || !orderFrame) return;
+      const url = new URL(href, window.location.origin);
+      url.searchParams.set("embed", "1");
+      url.hash = "sales-form";
+      orderFrame.src = url.toString();
+      if (typeof orderDialog.showModal === "function") {
+        orderDialog.showModal();
+      } else {
+        orderDialog.setAttribute("open", "");
+      }
+    };
+
     document.querySelectorAll(".crm-kanban-card").forEach((card) => {
       card.querySelectorAll("a.crm-kanban-client").forEach((link) => {
         link.addEventListener("click", (event) => {
@@ -620,6 +646,27 @@
       const raw = editButton.dataset.crmEditPayload || "{}";
       closeDetails();
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
+    });
+    orderButton?.addEventListener("click", openOrderDialog);
+    orderDialog?.querySelectorAll("[data-crm-order-dialog-close]").forEach((button) => {
+      button.addEventListener("click", closeOrderDialog);
+    });
+    orderDialog?.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeOrderDialog();
+    });
+    orderDialog?.addEventListener("click", (event) => {
+      if (event.target === orderDialog) closeOrderDialog();
+    });
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.location.origin || event.source !== orderFrame?.contentWindow) return;
+      if (event.data?.type === "upos:sales-order-cancel") {
+        closeOrderDialog();
+      }
+      if (event.data?.type === "upos:sales-order-saved") {
+        closeOrderDialog();
+        window.location.reload();
+      }
     });
     detailTabs.forEach((button) => {
       button.addEventListener("click", () => showDetailPane(button.dataset.crmDetailTab || "history"));

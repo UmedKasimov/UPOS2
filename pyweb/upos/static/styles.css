@@ -5736,6 +5736,111 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-size: var(--text-xs);
 }
 
+.crm-order-dialog {
+  width: calc(100vw - 2rem);
+  max-width: 96rem;
+  height: calc(100dvh - 2rem);
+  max-height: 64rem;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+}
+
+.crm-order-dialog::backdrop {
+  background: rgb(15 23 42 / 58%);
+  backdrop-filter: blur(4px);
+}
+
+.crm-order-dialog-surface {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 8px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.crm-order-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.5rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  background: var(--card);
+}
+
+.crm-order-dialog-head h2,
+.crm-order-dialog-head p {
+  margin: 0;
+}
+
+.crm-order-dialog-head h2 {
+  font-size: 1rem;
+}
+
+.crm-order-dialog-head p {
+  margin-top: 0.12rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-order-dialog-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--background);
+}
+
+body[data-embed="sales-order"] {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+body[data-embed="sales-order"] .sidebar,
+body[data-embed="sales-order"] .mobile-topbar,
+body[data-embed="sales-order"] .page-header,
+body[data-embed="sales-order"] .upos-floating-phone {
+  display: none !important;
+}
+
+body[data-embed="sales-order"] .layout,
+body[data-embed="sales-order"] .main-column {
+  width: 100%;
+  min-height: 100%;
+}
+
+body[data-embed="sales-order"] .page-body {
+  padding: 0.75rem;
+  background: var(--background);
+}
+
+body[data-embed="sales-order"] .sales-workspace--embed > .general-module-tabs,
+body[data-embed="sales-order"] .sales-workspace--embed > .sales-launcher {
+  display: none !important;
+}
+
+body[data-embed="sales-order"] .sales-workspace--embed > .workspace-module-stack {
+  display: block !important;
+}
+
+body[data-embed="sales-order"] .sales-workspace--embed #sales-form {
+  display: block !important;
+  margin: 0;
+}
+
+body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-panel-head {
+  display: none;
+}
+
 .crm-card-detail-chatbox {
   display: grid;
   gap: 0.3rem;
@@ -6332,6 +6437,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   .crm-task-form-main,
   .crm-task-form-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crm-order-dialog {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .crm-order-dialog-surface {
+    border-radius: 0;
   }
 }
 

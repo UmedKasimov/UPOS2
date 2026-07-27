@@ -6682,6 +6682,7 @@ def create_app() -> FastAPI:
         date_from: str = "",
         date_to: str = "",
         crm_record_id: str = "",
+        embed: str = "",
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -6700,6 +6701,7 @@ def create_app() -> FastAPI:
             "date_from": date_from_clean,
             "date_to": date_to_clean,
         }
+        sales_embed = str(embed or "").strip() == "1"
         sales: list[dict[str, Any]] = []
         product_names: list[str] = []
         product_options: list[dict[str, Any]] = []
@@ -6915,6 +6917,8 @@ def create_app() -> FastAPI:
             flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
             sales_saved_id=request.query_params.get("saved_id") or "",
             sales_prefill=sales_prefill,
+            sales_embed=sales_embed,
+            body_embed="sales-order" if sales_embed else "",
         )
 
     @app.get("/api/sales/clients/{client_id}/card", name="sales_client_card_api")
@@ -7025,8 +7029,25 @@ def create_app() -> FastAPI:
     @app.post("/sales/save", name="sales_save")
     async def sales_save(request: Request):
         form = await request.form()
+        sales_embed = str(form.get("embed") or "").strip() == "1"
+        form_doc_type = str(form.get("doc_type") or "sale").strip() or "sale"
+        form_crm_record_id = str(form.get("crm_record_id") or "").strip()
+        redirect_context = f"doc_type={quote(form_doc_type)}"
+        if form_crm_record_id:
+            redirect_context += f"&crm_record_id={quote(form_crm_record_id)}"
+        if sales_embed:
+            redirect_context += "&embed=1"
+
+        def sales_form_redirect(*, error: str = "", err: str = "", anchor: str = "sales-form"):
+            query = redirect_context
+            if error:
+                query += f"&error={quote(error)}"
+            if err:
+                query += f"&err={quote(err)}"
+            return RedirectResponse(url=f"/sales?{query}#{anchor}", status_code=302)
+
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
-            return RedirectResponse(url="/sales?err=csrf", status_code=302)
+            return sales_form_redirect(err="csrf")
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -7039,11 +7060,11 @@ def create_app() -> FastAPI:
                 list(data.get("payment_lines") or []),
             )
         except ValueError as exc:
-            return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-form", status_code=302)
+            return sales_form_redirect(error=str(exc))
         session_user = request.session.get("user") or {}
         data["manager"] = str(session_user.get("name") or session_user.get("username") or "").strip()
         if not data["client"]:
-            return RedirectResponse(url="/sales?error=" + quote("Клиент обязателен") + "#sales-form", status_code=302)
+            return sales_form_redirect(error="Клиент обязателен")
         saved_sale_id = ""
         saved_sale_number = ""
         with session_scope() as session:
@@ -7052,10 +7073,7 @@ def create_app() -> FastAPI:
             if editing_sale_id:
                 candidate_row = session.get(SaleDocument, editing_sale_id)
                 if not candidate_row or candidate_row.workspace_owner_id != wid:
-                    return RedirectResponse(
-                        url="/sales?error=" + quote("Документ продажи не найден") + "#sales-journal",
-                        status_code=302,
-                    )
+                    return sales_form_redirect(error="Документ продажи не найден", anchor="sales-journal")
                 editing_row = candidate_row
                 old_data = _json_object(candidate_row.data).copy()
                 old_doc_type = str(old_data.get("doc_type") or "sale")
@@ -7073,7 +7091,7 @@ def create_app() -> FastAPI:
                     candidate_client = str(candidate_data.get("client") or "").strip()
                     if candidate_client and candidate_client.casefold() != str(data.get("client") or "").strip().casefold():
                         return RedirectResponse(
-                            url=f"/sales?doc_type={quote(str(data.get('doc_type') or 'order'))}&crm_record_id={quote(candidate.id)}&error={quote('Клиент заказа не совпадает с карточкой CRM')}#sales-form",
+                            url=f"/sales?doc_type={quote(str(data.get('doc_type') or 'order'))}&crm_record_id={quote(candidate.id)}{'&embed=1' if sales_embed else ''}&error={quote('Клиент заказа не совпадает с карточкой CRM')}#sales-form",
                             status_code=302,
                         )
                     linked_crm_row = candidate
@@ -7127,7 +7145,7 @@ def create_app() -> FastAPI:
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = client_row.id
             except ValueError as exc:
-                return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-form", status_code=302)
+                return sales_form_redirect(error=str(exc))
             if editing_row is not None:
                 row = editing_row
                 row.amount = amount
@@ -7180,7 +7198,7 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[sales] failed to sync sale %s with kassa", saved_sale_id)
             return RedirectResponse(
-                url="/sales?error=" + quote("Продажа сохранена, но операция кассы не записалась") + "#sales-form",
+                url=f"/sales?{redirect_context}&error={quote('Продажа сохранена, но операция кассы не записалась')}#sales-form",
                 status_code=302,
             )
         saved_message = (
@@ -7192,7 +7210,8 @@ def create_app() -> FastAPI:
             if data.get("doc_type") == "return"
             else "saved"
         )
-        return RedirectResponse(url=f"/sales?msg={saved_message}&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
+        embed_query = "&embed=1" if sales_embed else ""
+        return RedirectResponse(url=f"/sales?msg={saved_message}&saved_id={quote(saved_sale_id)}{embed_query}#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/delete", name="sales_delete")
     async def sales_delete(request: Request, sale_id: str):

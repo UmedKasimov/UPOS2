@@ -591,7 +591,7 @@
       <section class="crm-card-detail-panel crm-card-detail-panel--timeline">
         <div class="crm-card-detail-panel-head">
           <h3>Работа с клиентом</h3>
-          <a class="btn crm-card-detail-order-btn" href="#" data-crm-card-detail-order hidden>+ Добавить заказ</a>
+          <button class="btn crm-card-detail-order-btn" type="button" data-crm-card-detail-order hidden>+ Добавить заказ</button>
         </div>
         <nav class="crm-card-detail-tabs" aria-label="Разделы карточки">
           <button type="button" class="is-active" data-crm-detail-tab="history">История</button>
@@ -643,5 +643,23 @@
         </div>
       </section>
     </div>
+  </div>
+</dialog>
+
+<dialog class="crm-order-dialog" id="crm-order-dialog" aria-labelledby="crm-order-dialog-title">
+  <div class="crm-order-dialog-surface">
+    <header class="crm-order-dialog-head">
+      <div>
+        <h2 id="crm-order-dialog-title">Новый заказ</h2>
+        <p>Полная форма заказа</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-order-dialog-close aria-label="Закрыть">×</button>
+    </header>
+    <iframe
+      class="crm-order-dialog-frame"
+      data-crm-order-dialog-frame
+      src="about:blank"
+      title="Новый заказ"
+    ></iframe>
   </div>
 </dialog>

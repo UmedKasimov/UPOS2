@@ -14,13 +14,14 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=313" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=314" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
     {% block extra_head %}{% endblock %}
   </head>
   <body
     data-theme="{{ body_theme | default('light') }}"
     data-shell="{{ variant | default('user') }}"
+    {% if body_embed | default('') %}data-embed="{{ body_embed | default('') | e }}"{% endif %}
     {% if user %}data-user-id="{{ user.user_id | default(user.id) | e }}" data-user-name="{{ (user.name or user.username or '') | e }}"{% endif %}
     {% if user and not user.get('is_employee') and user.get('role') == 'user' %}data-device-heartbeat="1"{% endif %}
   >
