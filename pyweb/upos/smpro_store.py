@@ -708,7 +708,7 @@ def _sync_ibox_accounts(session, workspace_owner_id: str) -> None:
         account.name = f"IBOX · {data['name']} · филиал {filial_id}"
         account.kind = "cash_uz"
         account.icon = "cash"
-        account.note = f"IBOX cashbox:{filial_id}:{cashbox_id}"
+        account.note = ""
         account.owner_employee_id = None
         account.is_active = True
         session.flush()
@@ -740,7 +740,7 @@ def _sync_ibox_accounts(session, workspace_owner_id: str) -> None:
     imported_accounts = session.execute(
         select(FinanceAccount).where(
             FinanceAccount.workspace_owner_id == workspace_owner_id,
-            FinanceAccount.note.like("IBOX cashbox:%"),
+            FinanceAccount.name.like("IBOX · %"),
         )
     ).scalars().all()
     for account in imported_accounts:
