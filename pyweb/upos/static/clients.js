@@ -22,6 +22,16 @@
     return Boolean(element && element.offsetWidth > 0 && element.offsetHeight > 0);
   }
 
+  function closeClientDocumentMenus(except = null) {
+    document.querySelectorAll("[data-client-document-menu]").forEach((menu) => {
+      if (menu === except) return;
+      const toggle = menu.querySelector("[data-client-document-menu-toggle]");
+      const list = menu.querySelector("[data-client-document-menu-list]");
+      if (list) list.hidden = true;
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+    });
+  }
+
   function scheduleInvalidate(api) {
     if (!api?.map) return;
     const refresh = () => {
@@ -1035,6 +1045,23 @@
   }
 
   document.addEventListener("click", (event) => {
+    const documentMenuToggle = event.target.closest("[data-client-document-menu-toggle]");
+    if (documentMenuToggle) {
+      event.preventDefault();
+      const menu = documentMenuToggle.closest("[data-client-document-menu]");
+      const list = menu?.querySelector("[data-client-document-menu-list]");
+      if (!menu || !list) return;
+      const willOpen = list.hidden;
+      closeClientDocumentMenus(menu);
+      list.hidden = !willOpen;
+      documentMenuToggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      return;
+    }
+
+    if (!event.target.closest("[data-client-document-menu]")) {
+      closeClientDocumentMenus();
+    }
+
     const sectionLink = event.target.closest("[data-client-section-nav]");
     if (sectionLink) {
       event.preventDefault();
@@ -1093,6 +1120,9 @@
   let locationSuggestTimer = 0;
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeClientDocumentMenus();
+    }
     if (!event.target.matches?.("[data-client-location-search]")) return;
     const box = event.target.closest("[data-client-location-search-box]");
     if (event.key === "Enter") {

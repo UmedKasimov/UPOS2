@@ -6884,7 +6884,7 @@ def create_app() -> FastAPI:
         price_type_options: list[dict[str, Any]] = []
         payment_accounts: list[dict[str, str]] = []
         next_numbers: dict[str, str] = {}
-        sales_prefill = {"crm_record_id": "", "client": ""}
+        sales_prefill = {"crm_record_id": "", "client": client.strip()}
         usd_rate = _workspace_usd_uzs_rate(wid)
         today_date = datetime.now(timezone.utc).date()
         with session_scope() as session:

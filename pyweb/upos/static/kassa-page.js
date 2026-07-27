@@ -4432,6 +4432,38 @@
     invalidateFilteredCache();
   }
 
+  async function openInitialEditorFromUrl() {
+    const params = new URLSearchParams(window.location.search || "");
+    const action = String(params.get("new") || "").trim().toLowerCase();
+    if (!["payment", "refund"].includes(action)) return;
+
+    const client = String(params.get("client") || "").trim();
+    const type = action === "payment" ? "income" : "expense";
+    await openEditor();
+
+    const typeField = document.getElementById("kassa-field-type");
+    const clientField = document.getElementById("kassa-field-client");
+    const noteField = document.getElementById("kassa-field-note");
+    const title = document.getElementById("kassa-editor-title");
+    if (typeField) typeField.value = type;
+    handleTypeChange();
+    if (clientField) clientField.value = client;
+    if (noteField && client) {
+      noteField.value = action === "payment"
+        ? `Оплата клиента ${client}`
+        : `Возврат средств клиенту ${client}`;
+    }
+    if (title) {
+      const actionTitle = action === "payment" ? "Оплата" : "Возврат средств";
+      title.textContent = client ? `${actionTitle}: ${client}` : actionTitle;
+    }
+
+    params.delete("new");
+    params.delete("client");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+  }
+
   function bindEvents() {
     window.addEventListener('upos:treasury-updated', () => {
       void fetchTreasuryAndCategories();
@@ -5126,6 +5158,7 @@
     toggleMoneyPanels(false);
     await loadFxRates();
     await loadData();
+    await openInitialEditorFromUrl();
   }
 
   init();

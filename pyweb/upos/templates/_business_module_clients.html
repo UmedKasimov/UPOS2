@@ -430,7 +430,21 @@
           title="Редактировать клиента"
           aria-label="Редактировать клиента"
         >✎</a>
-        <a class="btn" href="{{ url_for('sales_get') }}?client={{ selected_client_card.name }}#journal">+ Новый документ</a>
+        <div class="client-document-menu" data-client-document-menu>
+          <button
+            class="btn client-document-menu-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            data-client-document-menu-toggle
+          >+ Новый документ</button>
+          <div class="client-document-menu-list" role="menu" data-client-document-menu-list hidden>
+            <a role="menuitem" href="{{ url_for('home_kassa') }}?new=payment&amp;client={{ selected_client_card.name|urlencode }}">Оплата</a>
+            <a role="menuitem" href="{{ url_for('home_kassa') }}?new=refund&amp;client={{ selected_client_card.name|urlencode }}">Возврат средств</a>
+            <a role="menuitem" href="{{ url_for('sales_get') }}?doc_type=order&amp;client={{ selected_client_card.name|urlencode }}#sales-form">Заказ</a>
+            <a role="menuitem" href="{{ url_for('sales_get') }}?doc_type=return&amp;client={{ selected_client_card.name|urlencode }}#sales-form">Возврат товара</a>
+          </div>
+        </div>
       </div>
     </header>
 
