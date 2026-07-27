@@ -1159,6 +1159,7 @@
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.querySelector("[data-client-map]")) return;
+    if (form.dataset.clientLocationNoSubmit === "1") return;
     if (form.dataset.clientLocationPrepared === "1") {
       delete form.dataset.clientLocationPrepared;
       return;

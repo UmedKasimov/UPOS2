@@ -307,9 +307,23 @@
               </template>
               <template data-crm-card-tasks>
                 {% for event in row.activity_log if event.kind == "task" %}
-                  <article class="crm-card-detail-event crm-card-detail-event--task">
-                    <strong>{{ event.detail }}</strong>
-                    <span>{{ event.due_date or (event.at or "-")[:10] }} · {{ event.assignee or event.actor or "Без ответственного" }}</span>
+                  {% set task_priority = {"low": "Низкий", "normal": "Обычный", "high": "Высокий", "urgent": "Срочно"}.get(event.priority or "normal", "Обычный") %}
+                  <article class="crm-card-detail-event crm-card-detail-event--task{% if event.completed %} crm-card-detail-event--done{% endif %}">
+                    <div class="crm-task-detail-row">
+                      <strong>{{ event.detail }}</strong>
+                      <em class="crm-task-status{% if event.completed %} crm-task-status--done{% endif %}">{{ "Выполнено" if event.completed else "В работе" }}</em>
+                    </div>
+                    <span class="crm-task-meta">{{ event.due_date or (event.at or "-")[:10] }}{% if event.due_time %} {{ event.due_time }}{% endif %} · {{ event.assignee or event.actor or "Без ответственного" }} · {{ task_priority }}</span>
+                    {% if event.participants or event.reminder_at %}
+                      <p>{% if event.participants %}Участники: {{ event.participants }}{% endif %}{% if event.participants and event.reminder_at %} · {% endif %}{% if event.reminder_at %}Напомнить: {{ event.reminder_at|replace("T", " ") }}{% endif %}</p>
+                    {% endif %}
+                    {% if event.checklist %}
+                      <ul class="crm-task-checklist">
+                        {% for item in event.checklist %}
+                          <li>{{ item }}</li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
                   </article>
                 {% endfor %}
                 {% for task in crm_records if task.item_type == "task" and task.status == "done" and ((task.related_deal_id and task.related_deal_id == row.id) or (row.client and task.client == row.client)) %}
@@ -621,9 +635,19 @@
         <div class="crm-card-detail-work-pane" data-crm-detail-pane="tasks" hidden>
           <div class="crm-card-detail-feed" data-crm-card-detail-task-feed></div>
           <form class="crm-card-detail-activity-form crm-card-detail-task-form" data-crm-activity-form="task">
-            <input name="text" maxlength="500" placeholder="Название задачи" required />
-            <input name="due_date" type="date" required />
-            <input name="assignee" list="crm-responsible-list" placeholder="Ответственный" required />
+            <div class="crm-task-form-main">
+              <input name="text" maxlength="500" placeholder="Название задачи" required />
+              <label class="crm-task-done-toggle"><input name="completed" type="checkbox" value="1" /> Выполнено</label>
+            </div>
+            <div class="crm-task-form-grid">
+              <label><span>Дата</span><input name="due_date" type="date" /></label>
+              <label><span>Время</span><input name="due_time" type="time" /></label>
+              <label><span>Ответственный</span><input name="assignee" list="crm-responsible-list" placeholder="Сотрудник" /></label>
+              <label><span>Приоритет</span><select name="priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
+              <label><span>Участники</span><input name="participants" list="crm-responsible-list" placeholder="Через запятую" /></label>
+              <label><span>Напоминание</span><input name="reminder_at" type="datetime-local" /></label>
+            </div>
+            <textarea name="checklist" rows="3" maxlength="800" placeholder="Чеклист: каждый пункт с новой строки"></textarea>
             <button class="btn" type="submit">Добавить задачу</button>
           </form>
         </div>

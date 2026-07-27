@@ -620,6 +620,7 @@
           <span>Поставщик*</span>
           <div class="sales-lock-field">
             <input name="supplier" value="{{ warehouse_purchase_edit.supplier if warehouse_purchase_edit else '' }}" placeholder="Выберите или введите поставщика" autocomplete="off" required data-warehouse-supplier-input {{ 'readonly aria-readonly=true' if warehouse_purchase_edit else '' }} />
+            <button type="button" class="sales-combo-add" data-warehouse-supplier-create-open aria-label="Добавить нового поставщика" title="Добавить поставщика">+</button>
             <button type="button" class="sales-combo-edit" data-warehouse-supplier-edit aria-label="Сменить поставщика" title="Сменить поставщика" {{ 'hidden' if not warehouse_purchase_edit else '' }}>✎</button>
           </div>
           <div class="sales-combo-panel" data-warehouse-supplier-panel hidden></div>
@@ -919,8 +920,14 @@
                 <span class="settings-profile-field-label">Статус</span>
                 <select class="settings-profile-input" name="status">
                   <option value="active" selected>Активный</option>
-                  <option value="paused">Пауза</option>
-                  <option value="blocked">Заблокирован</option>
+                  <option value="inactive">Неактивный</option>
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Также клиент</span>
+                <select class="settings-profile-input" name="is_client">
+                  <option value="0">Нет</option>
+                  <option value="1">Да</option>
                 </select>
               </label>
               <label class="settings-profile-field settings-profile-field--full">

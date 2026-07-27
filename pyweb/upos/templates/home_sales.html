@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Продажи{% endblock %}
+{% block extra_head %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="{{ url_for('static', path='clients.js') }}?v=13" defer></script>
+{% endblock %}
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'paid'] %}
 {% set sales_default_tab = 'journal' if flash_ok in sales_saved_messages else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else '')))) %}
@@ -624,6 +629,7 @@
           action="{{ url_for('sales_save') }}"
           class="product-form sales-form"
           data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
+          data-sales-client-save-url="{{ url_for('clients_save') }}"
           data-sales-client-card-url-template="{{ url_for('sales_client_card_api', client_id='__client_id__') }}"
           data-sales-prefill-client="{{ sales_prefill.client|e }}"
         >
@@ -647,6 +653,7 @@
               </span>
               <div class="sales-lock-field">
                 <input name="client" required autocomplete="off" value="{{ sales_prefill.client|e }}" placeholder="Выберите или введите клиента" data-sales-combo-input />
+                <button type="button" class="sales-combo-add" data-sales-client-create-open aria-label="Добавить нового клиента" title="Добавить клиента">+</button>
                 <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить клиента" title="Сменить клиента" hidden>✎</button>
               </div>
               <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
@@ -922,6 +929,150 @@
           </form>
         </dialog>
 
+        <dialog class="settings-profile-modal sales-client-create-dialog" data-sales-client-create-dialog>
+          <form class="settings-profile-modal-surface sales-client-create-surface" data-sales-client-create-form data-client-location-no-submit="1">
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="response" value="json" />
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Создание клиента</h2>
+                <p class="settings-profile-modal-sub">Полная карточка сразу попадет в выбор клиента для продажи.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-client-create-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-scroll">
+              <div class="settings-profile-modal-body">
+                <div class="settings-profile-form-grid sales-client-create-grid">
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Название клиента*</span>
+                    <input class="settings-profile-input" name="name" required data-sales-client-create-name />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Официальное название</span>
+                    <input class="settings-profile-input" name="official_name" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Тип клиента</span>
+                    <select class="settings-profile-input" name="client_type">
+                      <option value="company">Компания</option>
+                      <option value="individual">Физическое лицо</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Телефон</span>
+                    <input class="settings-profile-input" name="phone" inputmode="tel" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Telegram номер</span>
+                    <input class="settings-profile-input" name="telegram_phone" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">ИНН</span>
+                    <input class="settings-profile-input" name="tax_id" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">ПИНФЛ</span>
+                    <input class="settings-profile-input" name="pinfl" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Категория</span>
+                    <input class="settings-profile-input" name="category" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Отрасль</span>
+                    <input class="settings-profile-input" name="industry" placeholder="Продуктовый, ресторан..." />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Иконка на карте</span>
+                    <select class="settings-profile-input" name="map_icon" data-client-map-icon>
+                      <option value="default">Обычная</option>
+                      <option value="Продуктовый">Продуктовый</option>
+                      <option value="Ресторан">Ресторан</option>
+                      <option value="Кафе">Кафе</option>
+                      <option value="Одежда">Одежда</option>
+                      <option value="Аксессуар">Аксессуар</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">CRM статус</span>
+                    <select class="settings-profile-input" name="crm_status">
+                      <option value="new_lead">Новый лид</option>
+                      <option value="qualification">Квалификация</option>
+                      <option value="negotiation">Переговоры</option>
+                      <option value="invoice">Счёт</option>
+                      <option value="our_client">Наш клиент</option>
+                      <option value="lost">Потеряно</option>
+                      <option value="in_work">В работе</option>
+                      <option value="paused">Пауза</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Программа клиента</span>
+                    <input class="settings-profile-input" name="program_custom" placeholder="Например: лояльность" />
+                  </label>
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Адрес</span>
+                    <input class="settings-profile-input" name="address" data-client-address />
+                  </label>
+                  <div class="client-location-panel settings-profile-field--full">
+                    <input type="hidden" name="latitude" data-client-latitude />
+                    <input type="hidden" name="longitude" data-client-longitude />
+                    <div class="client-location-actions">
+                      <button class="btn btn-secondary" type="button" data-client-geolocate>Найти по геолокации</button>
+                      <a class="btn btn-secondary" href="#" target="_blank" rel="noreferrer" data-client-map-link hidden>Открыть карту</a>
+                    </div>
+                    <div class="client-location-status" data-client-location-status>Локация не выбрана</div>
+                    <div class="client-location-map client-location-map--empty" title="Карта клиента" data-client-map role="button" tabindex="0" aria-label="Выбрать точку клиента на карте">
+                      <div class="client-location-map-grid"></div>
+                      <div class="client-location-map-road client-location-map-road--main"></div>
+                      <div class="client-location-map-road client-location-map-road--side"></div>
+                      <div class="client-location-map-road client-location-map-road--cross"></div>
+                      <div class="client-location-zone client-location-zone--a"></div>
+                      <div class="client-location-zone client-location-zone--b"></div>
+                      <div class="client-location-marker" data-client-map-marker hidden>
+                        <span></span>
+                        <strong>Клиент</strong>
+                      </div>
+                      <div class="client-location-map-hint">Нажмите на карту, чтобы выбрать точку клиента</div>
+                    </div>
+                  </div>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Прайс-лист</span>
+                    <input class="settings-profile-input" name="price_type" placeholder="ПРОДАЖНАЯ ЦЕНА" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Кредитный лимит</span>
+                    <input class="settings-profile-input" name="credit_limit" inputmode="decimal" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Статус</span>
+                    <select class="settings-profile-input" name="status">
+                      <option value="active">Активный</option>
+                      <option value="inactive">Неактивный</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Черный список</span>
+                    <select class="settings-profile-input" name="is_blacklisted">
+                      <option value="0">Нет</option>
+                      <option value="1">Да</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Комментарий</span>
+                    <textarea class="settings-profile-input sales-client-create-note" name="comment"></textarea>
+                  </label>
+                </div>
+                <p class="sales-product-dialog-status" data-sales-client-create-status aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-client-create-cancel>Отмена</button>
+              <button type="submit" class="btn" data-sales-client-create-submit>Сохранить клиента</button>
+            </div>
+          </form>
+        </dialog>
+
         <dialog class="settings-profile-modal sales-product-dialog" data-sales-product-dialog>
           <form class="settings-profile-modal-surface sales-product-dialog-surface" data-sales-product-form>
             {% include "_csrf_field.html" %}
@@ -1052,5 +1203,5 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=14" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=54" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=55" defer></script>
 {% endblock %}

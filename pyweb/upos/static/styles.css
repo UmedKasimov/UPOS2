@@ -56,28 +56,28 @@
 }
 
 html.dark {
-  --background: oklch(0.195 0.045 264);
-  --foreground: oklch(0.96 0.012 264);
-  --card: oklch(0.235 0.042 264);
-  --card-foreground: oklch(0.96 0.012 264);
-  --muted: oklch(0.28 0.032 264);
-  --muted-foreground: oklch(0.74 0.025 264);
-  --accent: oklch(0.32 0.045 258);
-  --accent-foreground: oklch(0.94 0.02 258);
-  --primary: oklch(0.72 0.14 252);
-  --primary-foreground: oklch(0.17 0.04 264);
+  --background: oklch(0.17 0.006 265);
+  --foreground: oklch(0.94 0.006 265);
+  --card: oklch(0.215 0.007 265);
+  --card-foreground: oklch(0.94 0.006 265);
+  --muted: oklch(0.275 0.006 265);
+  --muted-foreground: oklch(0.72 0.008 265);
+  --accent: oklch(0.285 0.012 265);
+  --accent-foreground: oklch(0.95 0.006 265);
+  --primary: oklch(0.68 0.135 255);
+  --primary-foreground: oklch(0.985 0.004 255);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.62 0.16 252);
-  --sidebar: oklch(0.21 0.046 264);
-  --sidebar-foreground: oklch(0.94 0.015 264);
-  --sidebar-primary: oklch(0.72 0.14 252);
-  --sidebar-primary-foreground: oklch(0.17 0.04 264);
-  --sidebar-accent: oklch(0.29 0.038 264);
-  --sidebar-accent-foreground: oklch(0.94 0.015 264);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.62 0.16 252);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.135 255);
+  --sidebar: oklch(0.145 0.005 265);
+  --sidebar-foreground: oklch(0.92 0.006 265);
+  --sidebar-primary: oklch(0.68 0.135 255);
+  --sidebar-primary-foreground: oklch(0.985 0.004 255);
+  --sidebar-accent: oklch(0.245 0.009 265);
+  --sidebar-accent-foreground: oklch(0.94 0.006 265);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.68 0.135 255);
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.22);
   --shadow-md:
     0 6px 16px -4px oklch(0 0 0 / 0.38),
@@ -85,12 +85,12 @@ html.dark {
   --shadow-lg:
     0 16px 32px -8px oklch(0 0 0 / 0.42),
     0 4px 10px -4px oklch(0 0 0 / 0.3);
-  --card-ring: oklch(1 0 0 / 14%);
+  --card-ring: oklch(1 0 0 / 10%);
 
-  --control-bg: oklch(0.26 0.036 264);
-  --control-fg: oklch(0.96 0.012 264);
-  --control-border: oklch(1 0 0 / 18%);
-  --control-placeholder: oklch(0.68 0.022 264);
+  --control-bg: oklch(0.255 0.007 265);
+  --control-fg: oklch(0.94 0.006 265);
+  --control-border: oklch(1 0 0 / 13%);
+  --control-placeholder: oklch(0.66 0.008 265);
 }
 
 html.emerald:not(.dark) {
@@ -5821,10 +5821,45 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-card-detail-task-form {
-  grid-template-columns: minmax(0, 1.4fr) minmax(8rem, 0.7fr) minmax(9rem, 0.9fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+
+.crm-task-form-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.crm-task-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.crm-task-form-grid label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-task-done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.35rem;
+  padding: 0 0.65rem;
+  border: 1px solid var(--input);
+  border-radius: var(--workbench-radius-sm, 10px);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
 }
 
 .crm-card-detail-activity-form input,
+.crm-card-detail-activity-form select,
 .crm-card-detail-activity-form textarea {
   min-width: 0;
   border: 1px solid var(--input);
@@ -5837,6 +5872,46 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-card-detail-activity-form textarea {
   resize: vertical;
+}
+
+.crm-task-detail-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.crm-task-status {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 12%, var(--card));
+  color: #92400e;
+  font-size: var(--text-xs);
+  font-style: normal;
+  font-weight: 800;
+  padding: 0.12rem 0.45rem;
+}
+
+.crm-task-status--done {
+  background: color-mix(in srgb, #16a34a 12%, var(--card));
+  color: #15803d;
+}
+
+.crm-task-meta {
+  font-weight: 700;
+}
+
+.crm-task-checklist {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-task-checklist li::marker {
+  color: var(--primary);
 }
 
 .crm-card-detail-event--chat {
@@ -6015,6 +6090,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   }
 
   .crm-card-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crm-task-form-main,
+  .crm-task-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -8181,7 +8261,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding-right: 2.45rem;
 }
 
-.sales-combo-edit {
+.sales-lock-field:has(.sales-combo-add) input {
+  padding-right: 4.5rem;
+}
+
+.sales-combo-edit,
+.sales-combo-add {
   position: absolute;
   inset-inline-end: 0.32rem;
   top: 50%;
@@ -8200,16 +8285,52 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   transform: translateY(-50%);
 }
 
+.sales-combo-add {
+  inset-inline-end: 2.22rem;
+  background: var(--brand-box, #2d6cdf);
+  color: white;
+}
+
+.sales-lock-field:has(.sales-combo-edit[hidden]) .sales-combo-add {
+  inset-inline-end: 0.32rem;
+}
+
 .sales-combo-edit:hover,
-.sales-combo-edit:focus {
+.sales-combo-edit:focus,
+.sales-combo-add:hover,
+.sales-combo-add:focus {
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 24%, var(--card));
   outline: none;
+}
+
+.sales-combo-add:hover,
+.sales-combo-add:focus {
+  background: color-mix(in srgb, var(--brand-box, #2d6cdf) 86%, white);
 }
 
 .sales-combobox.is-locked input {
   background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 8%, var(--card));
   color: var(--foreground);
   cursor: default;
+}
+
+.settings-profile-modal.sales-client-create-dialog {
+  width: min(58rem, 96vw);
+  max-width: min(58rem, 96vw);
+}
+
+.sales-client-create-surface {
+  max-height: min(88vh, 54rem);
+}
+
+.sales-client-create-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-client-create-note,
+.warehouse-supplier-dialog-note {
+  min-height: 5.5rem;
+  resize: vertical;
 }
 
 .sales-product-picker {
@@ -16905,7 +17026,7 @@ html.dark .organization-edit-form {
   box-shadow: var(--shadow-sm);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.2;
   transition:
     border-color 0.12s ease,
@@ -16967,7 +17088,7 @@ html.dark .organization-edit-form {
   box-shadow: none;
   font-size: var(--text-sm);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--muted-foreground);
   transition:
     background 0.14s ease,
@@ -16993,10 +17114,21 @@ html.dark .organization-edit-form {
 }
 
 html.dark .theme-picker-ios .theme-chip input:checked + .theme-chip-face {
-  background: color-mix(in oklch, var(--card), var(--background) 18%);
+  background: color-mix(in oklch, var(--foreground), transparent 91%);
+  color: var(--foreground);
+  outline: 1px solid oklch(1 0 0 / 0.08);
   box-shadow:
-    0 1px 2px oklch(0 0 0 / 0.35),
-    inset 0 1px 0 oklch(1 1 1 / 0.05);
+    0 1px 2px oklch(0 0 0 / 0.42),
+    inset 0 1px 0 oklch(1 0 0 / 0.07);
+}
+
+html.dark .theme-picker-ios {
+  background: oklch(1 0 0 / 0.055);
+  border: 1px solid oklch(1 0 0 / 0.055);
+}
+
+html.dark .theme-picker-ios .theme-chip-face {
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 8%);
 }
 
 .theme-picker-ios .theme-chip-icon {
@@ -21165,6 +21297,236 @@ textarea::placeholder {
 .roles-permission-table tbody tr:hover td,
 .pnl-table tbody tr:hover td {
   background: color-mix(in oklch, var(--muted), transparent 78%);
+}
+
+html.dark {
+  --workspace-blue: var(--primary);
+  --workspace-navy: oklch(0.94 0.006 265);
+  --workspace-panel: oklch(0.215 0.007 265);
+  --workspace-line: oklch(1 0 0 / 9%);
+  --workbench-line: oklch(1 0 0 / 9%);
+  --workbench-surface: oklch(0.215 0.007 265);
+  --workbench-muted-surface: oklch(0.255 0.007 265);
+  --workspace-shadow:
+    0 18px 42px oklch(0 0 0 / 0.34),
+    0 1px 0 oklch(1 0 0 / 0.055) inset;
+  --workbench-shadow:
+    0 18px 42px oklch(0 0 0 / 0.34),
+    0 1px 0 oklch(1 0 0 / 0.055) inset;
+}
+
+html.dark body,
+html.dark .page-body {
+  background: var(--background);
+}
+
+html.dark .page-header {
+  background: color-mix(in oklch, var(--background), var(--card) 18%);
+  border-bottom-color: var(--workbench-line);
+}
+
+html.dark .sidebar,
+html.dark .sidebar-head,
+html.dark .sidebar-footer {
+  background: var(--sidebar);
+  border-color: var(--sidebar-border);
+}
+
+html.dark .nav-link,
+html.dark .nav-sublink,
+html.dark .sidebar-org-switcher,
+html.dark .sidebar-rail-toggle {
+  color: color-mix(in oklch, var(--sidebar-foreground), transparent 8%);
+  background: transparent;
+}
+
+html.dark .nav-link:hover,
+html.dark .nav-sublink:hover,
+html.dark .sidebar-org-switcher:hover {
+  background: oklch(1 0 0 / 0.045);
+  color: var(--sidebar-foreground);
+}
+
+html.dark .nav-link.active,
+html.dark .nav-sublink.active,
+html.dark .sidebar-org-switcher.active {
+  background: oklch(1 0 0 / 0.075);
+  color: var(--sidebar-foreground);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+html.dark .general-module-tabs {
+  background: color-mix(in oklch, var(--card), var(--background) 22%);
+  border-color: var(--workbench-line);
+  box-shadow:
+    0 1px 0 oklch(1 0 0 / 0.05) inset,
+    0 12px 28px oklch(0 0 0 / 0.28);
+}
+
+html.dark .general-module-tab {
+  color: var(--muted-foreground);
+  background: oklch(1 0 0 / 0.035);
+  border-color: var(--workbench-line);
+  box-shadow: none;
+}
+
+html.dark .general-module-tab:hover {
+  color: var(--foreground);
+  background: oklch(1 0 0 / 0.06);
+}
+
+html.dark .general-module-tab.active {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--primary), var(--card) 82%);
+  border-color: color-mix(in oklch, var(--primary), transparent 46%);
+  box-shadow:
+    0 1px 0 oklch(1 0 0 / 0.1) inset,
+    0 10px 24px color-mix(in oklch, var(--primary), transparent 84%);
+}
+
+html.dark .card,
+html.dark .settings-employees-table-card,
+html.dark .general-management-settings-shell,
+html.dark .products-list-panel,
+html.dark .director-org-hero,
+html.dark .director-org-actions,
+html.dark .director-org-directory,
+html.dark .org-ops-panel,
+html.dark .org-ops-table-wrap,
+html.dark .gk-table-board,
+html.dark .gk-filters-shell,
+html.dark .gk-kpi-strip,
+html.dark .gk-schet-hero,
+html.dark .reports-panel,
+html.dark .reports-flow,
+html.dark .reports-balance-card,
+html.dark .reports-data-table,
+html.dark .schet-overview-shell,
+html.dark .kassa-filters-shell,
+html.dark .kassa-data-panel,
+html.dark .kassa-overview-grid,
+html.dark .settings-ios-card,
+html.dark .settings-account-showcase,
+html.dark .settings-pref-control {
+  background: var(--workbench-surface);
+  border-color: var(--workbench-line);
+  box-shadow: var(--workbench-shadow);
+}
+
+html.dark .org-ops-panel::before,
+html.dark .products-list-panel::before,
+html.dark .settings-ios-card::before {
+  opacity: 0;
+}
+
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="url"],
+html.dark input[type="number"],
+html.dark input[type="date"],
+html.dark input[type="search"],
+html.dark select,
+html.dark textarea,
+html.dark .settings-profile-input,
+html.dark .settings-ios-select,
+html.dark .settings-compact-select,
+html.dark .upos-ccy-select-btn {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--control-fg);
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.045) inset;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus,
+html.dark .settings-profile-input:focus,
+html.dark .settings-ios-select:focus {
+  border-color: color-mix(in oklch, var(--primary), white 8%);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--primary), transparent 80%),
+    0 1px 0 oklch(1 0 0 / 0.05) inset;
+}
+
+html.dark .btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: color-mix(in oklch, var(--primary), white 10%);
+  box-shadow:
+    0 1px 0 oklch(1 0 0 / 0.14) inset,
+    0 10px 24px color-mix(in oklch, var(--primary), transparent 84%);
+}
+
+html.dark .btn-secondary,
+html.dark .btn-ghost,
+html.dark .kassa-btn,
+html.dark .schet-btn,
+html.dark .gk-page-nav-btn,
+html.dark .kassa-page-nav-btn,
+html.dark .reports-period-tab {
+  background: oklch(1 0 0 / 0.055);
+  border-color: var(--workbench-line);
+  color: var(--foreground);
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.05) inset;
+}
+
+html.dark .btn-secondary:hover,
+html.dark .btn-ghost:hover,
+html.dark .reports-period-tab:hover {
+  background: oklch(1 0 0 / 0.085);
+}
+
+html.dark .settings-employees-table,
+html.dark .org-ops-table,
+html.dark .general-kassa-table,
+html.dark .reports-data-table,
+html.dark .kassa-table,
+html.dark .org-balance-table,
+html.dark .roles-permission-table,
+html.dark .pnl-table,
+html.dark .products-table {
+  background: var(--card);
+  color: var(--foreground);
+}
+
+html.dark .settings-employees-table th,
+html.dark .org-ops-table th,
+html.dark .general-kassa-table th,
+html.dark .reports-data-table th,
+html.dark .kassa-table th,
+html.dark .org-balance-table th,
+html.dark .roles-permission-table th,
+html.dark .pnl-table th,
+html.dark .products-table th {
+  background: var(--workbench-muted-surface);
+  color: var(--muted-foreground);
+  border-color: var(--workbench-line);
+}
+
+html.dark .settings-employees-table td,
+html.dark .org-ops-table td,
+html.dark .general-kassa-table td,
+html.dark .reports-data-table td,
+html.dark .kassa-table td,
+html.dark .org-balance-table td,
+html.dark .roles-permission-table td,
+html.dark .pnl-table td,
+html.dark .products-table td {
+  background: var(--card);
+  border-color: var(--workbench-line);
+}
+
+html.dark .settings-employees-table tbody tr:hover td,
+html.dark .org-ops-table tbody tr:hover td,
+html.dark .general-kassa-table tbody tr:hover td,
+html.dark .reports-data-table tbody tr:hover td,
+html.dark .kassa-table tbody tr:hover td,
+html.dark .org-balance-table tbody tr:hover td,
+html.dark .roles-permission-table tbody tr:hover td,
+html.dark .pnl-table tbody tr:hover td,
+html.dark .products-table tbody tr:hover td {
+  background: oklch(1 0 0 / 0.045);
 }
 
 .schet-ccy-line-amt,

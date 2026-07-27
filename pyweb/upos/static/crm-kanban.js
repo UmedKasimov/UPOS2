@@ -474,8 +474,27 @@
       const actor = String(event?.actor || "UPOS");
       const detail = String(event?.detail || "");
       if (kind === "task") {
-        const meta = `${event?.due_date || at.slice(0, 10)} · ${event?.assignee || actor || "Без ответственного"}`;
-        return `<article class="crm-card-detail-event crm-card-detail-event--task"><strong>${escapeHtml(detail)}</strong><span>${escapeHtml(meta)}</span></article>`;
+        const priorityLabels = { low: "Низкий", normal: "Обычный", high: "Высокий", urgent: "Срочно" };
+        const due = [event?.due_date || at.slice(0, 10), event?.due_time].filter(Boolean).join(" ");
+        const assignee = event?.assignee || actor || "Без ответственного";
+        const participants = String(event?.participants || "").trim();
+        const reminder = String(event?.reminder_at || "").trim().replace("T", " ");
+        const priority = priorityLabels[event?.priority] || priorityLabels.normal;
+        const completed = Boolean(event?.completed);
+        const checklist = Array.isArray(event?.checklist) ? event.checklist.filter(Boolean) : [];
+        const checklistHtml = checklist.length
+          ? `<ul class="crm-task-checklist">${checklist.map((item) => `<li>${escapeHtml(String(item))}</li>`).join("")}</ul>`
+          : "";
+        const extra = [
+          participants ? `Участники: ${participants}` : "",
+          reminder ? `Напомнить: ${reminder}` : "",
+        ].filter(Boolean);
+        return `<article class="crm-card-detail-event crm-card-detail-event--task${completed ? " crm-card-detail-event--done" : ""}">
+          <div class="crm-task-detail-row"><strong>${escapeHtml(detail)}</strong><em class="crm-task-status${completed ? " crm-task-status--done" : ""}">${completed ? "Выполнено" : "В работе"}</em></div>
+          <span class="crm-task-meta">${escapeHtml(due)} · ${escapeHtml(assignee)} · ${escapeHtml(priority)}</span>
+          ${extra.length ? `<p>${escapeHtml(extra.join(" · "))}</p>` : ""}
+          ${checklistHtml}
+        </article>`;
       }
       return `<article class="crm-card-detail-event crm-card-detail-event--${kind}"><strong>${escapeHtml(at)}</strong><span>${escapeHtml(actor)}</span><p>${escapeHtml(detail)}</p></article>`;
     };
@@ -616,7 +635,13 @@
           kind,
           text: String(textInput?.value || "").trim(),
           due_date: String(form.querySelector('[name="due_date"]')?.value || ""),
+          due_time: String(form.querySelector('[name="due_time"]')?.value || ""),
           assignee: String(form.querySelector('[name="assignee"]')?.value || "").trim(),
+          participants: String(form.querySelector('[name="participants"]')?.value || "").trim(),
+          reminder_at: String(form.querySelector('[name="reminder_at"]')?.value || ""),
+          priority: String(form.querySelector('[name="priority"]')?.value || "normal"),
+          checklist: String(form.querySelector('[name="checklist"]')?.value || ""),
+          completed: form.querySelector('[name="completed"]')?.checked ? "1" : "",
         };
         if (!root || !recordId || !payload.text || form.classList.contains("is-saving")) return;
         form.classList.add("is-saving");

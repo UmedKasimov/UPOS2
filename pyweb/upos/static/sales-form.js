@@ -1,5 +1,6 @@
 (function () {
   var quickProductTargetCombo = null;
+  var quickClientTargetCombo = null;
   var SALES_DRAFT_KEY = "upos.sales.new-sale.draft.v1";
   var SALES_DRAFT_WINDOW_PREFIX = "__UPOS_SALES_DRAFT__:";
   var SALES_DRAFT_COOKIE_PREFIX = "upos_sales_draft_";
@@ -919,6 +920,11 @@
     }
   }
 
+  function writeOptions(options) {
+    var node = document.getElementById("sales-form-options");
+    if (node) node.textContent = JSON.stringify(options || {});
+  }
+
   function setDraftField(root, selector, value) {
     var input = root.querySelector(selector);
     if (input && value !== undefined && value !== null) input.value = value;
@@ -1372,6 +1378,132 @@
     });
   }
 
+  function setClientCreateStatus(form, text, kind) {
+    var status = form?.querySelector("[data-sales-client-create-status]");
+    if (!status) return;
+    status.textContent = text || "";
+    status.dataset.status = kind || "";
+  }
+
+  function upsertClientOption(client) {
+    if (!client || !client.name) return;
+    var options = readOptions();
+    var rows = Array.isArray(options.client_rows) ? options.client_rows : [];
+    var index = rows.findIndex(function (item) {
+      return normalize(item.id) === normalize(client.id) || normalize(item.name) === normalize(client.name);
+    });
+    var next = Object.assign({
+      id: "",
+      name: "",
+      phone: "",
+      tax_id: "",
+      price_type: "",
+      balance_kind: "zero",
+      balance_note: "Баланс: 0",
+      balance: "0",
+      balance_lines: [],
+    }, client);
+    if (index >= 0) rows[index] = Object.assign({}, rows[index], next);
+    else rows.push(next);
+    rows.sort(function (a, b) {
+      return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+    });
+    options.client_rows = rows;
+    options.clients = Array.from(new Set([...(options.clients || []), next.name].filter(Boolean))).sort(function (a, b) {
+      return String(a || "").localeCompare(String(b || ""), "ru");
+    });
+    writeOptions(options);
+  }
+
+  function closeClientCreateDialog() {
+    var dialog = document.querySelector("[data-sales-client-create-dialog]");
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.hidden = true;
+    dialog.removeAttribute("open");
+    quickClientTargetCombo = null;
+  }
+
+  function openClientCreateDialog(root, combo, query) {
+    var dialog = document.querySelector("[data-sales-client-create-dialog]");
+    var form = dialog?.querySelector("[data-sales-client-create-form]");
+    if (!dialog || !form) return;
+    quickClientTargetCombo = combo || root.querySelector('[data-sales-combobox="client"]');
+    closePanel(quickClientTargetCombo);
+    form.reset();
+    var nameInput = form.querySelector("[data-sales-client-create-name]");
+    if (nameInput) nameInput.value = String(query || "").trim();
+    setClientCreateStatus(form, "", "");
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.hidden = false;
+      dialog.setAttribute("open", "");
+    }
+    if (!dialog.open) dialog.setAttribute("open", "");
+    setTimeout(function () {
+      if (nameInput) {
+        nameInput.focus();
+        nameInput.select();
+      }
+    }, 0);
+  }
+
+  function wireClientCreateDialog(root) {
+    var dialog = document.querySelector("[data-sales-client-create-dialog]");
+    var form = dialog?.querySelector("[data-sales-client-create-form]");
+    if (!dialog || !form || dialog.dataset.salesClientCreateReady === "1") return;
+    dialog.dataset.salesClientCreateReady = "1";
+    dialog.querySelectorAll("[data-sales-client-create-close], [data-sales-client-create-cancel]").forEach(function (button) {
+      button.addEventListener("click", closeClientCreateDialog);
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) closeClientCreateDialog();
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      var submit = form.querySelector("[data-sales-client-create-submit]");
+      var endpoint = root.getAttribute("data-sales-client-save-url") || "/clients/save";
+      setClientCreateStatus(form, "Сохраняю...", "");
+      if (submit) submit.disabled = true;
+      fetch(endpoint, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json" },
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (body) {
+            if (!response.ok || !body.client) throw new Error(body.error || "Не удалось сохранить клиента");
+            return body.client;
+          });
+        })
+        .then(function (client) {
+          upsertClientOption(client);
+          var combo = quickClientTargetCombo && document.contains(quickClientTargetCombo)
+            ? quickClientTargetCombo
+            : root.querySelector('[data-sales-combobox="client"]');
+          commitCombo(combo, client.name || "");
+          updateClientBalance(root, client);
+          setClientCreateStatus(form, "Сохранено", "ok");
+          closeClientCreateDialog();
+        })
+        .catch(function (error) {
+          setClientCreateStatus(form, error.message || "Не удалось сохранить клиента", "err");
+        })
+        .finally(function () {
+          if (submit) submit.disabled = false;
+        });
+    });
+  }
+
   function renderProduct(root, combo, options, query) {
     var panel = combo.querySelector("[data-sales-combo-panel]");
     var warehouse = selectedLineWarehouse(root, combo);
@@ -1482,6 +1614,18 @@
         input.focus();
         input.select();
         render();
+      });
+    }
+    var createButton = combo.querySelector("[data-sales-client-create-open]");
+    if (createButton && type === "client") {
+      createButton.addEventListener("mousedown", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      createButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openClientCreateDialog(root, combo, input.value);
       });
     }
     input.addEventListener("input", render);
@@ -2265,6 +2409,7 @@
       scheduleSalesDraft(root);
     });
     wireQuickProductDialog(root, options);
+    wireClientCreateDialog(root);
     wireTotalDialog(root);
     wirePaymentDialog(root);
     var currency = root.querySelector("[data-sales-currency]");

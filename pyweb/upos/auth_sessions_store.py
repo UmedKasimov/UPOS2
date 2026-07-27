@@ -203,7 +203,11 @@ def list_user_devices(user_id: str, *, current_session_id: str | None) -> list[d
     with session_scope() as session:
         rows = session.scalars(
             select(UserAuthSession)
-            .where(UserAuthSession.user_id == uid)
+            .where(
+                UserAuthSession.user_id == uid,
+                UserAuthSession.revoked_at.is_(None),
+                UserAuthSession.blocked_at.is_(None),
+            )
             .order_by(UserAuthSession.last_seen_at.desc()),
         ).all()
         return [_session_row_to_dict(r, current_id=current_session_id) for r in rows]

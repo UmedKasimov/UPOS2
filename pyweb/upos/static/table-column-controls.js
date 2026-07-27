@@ -4,6 +4,18 @@
   const CONTROL_CELL = 'upos-table-column-control-cell';
   const HIDDEN_CLASS = 'upos-table-column-hidden';
   const MENU_OPEN_CLASS = 'is-column-menu-open';
+  const TEXT_DROP_TABLE_SELECTOR = [
+    'table[data-upos-column-controls]',
+    'table.products-table',
+    'table.org-ops-table',
+    'table.kassa-table',
+    'table.general-kassa-table',
+    'table.reports-data-table',
+    'table.warehouse-purchases-table',
+    'table.org-balance-table',
+    'table.roles-permission-table',
+    'table.pnl-table',
+  ].join(', ');
 
   function cleanLabel(value, fallback) {
     const label = String(value || '')
@@ -15,6 +27,60 @@
 
   function directCells(row) {
     return Array.from(row?.children || []).filter((cell) => !cell.classList.contains(CONTROL_CELL));
+  }
+
+  function hasTextSelection() {
+    const selection = window.getSelection?.();
+    return Boolean(selection && !selection.isCollapsed && String(selection).trim());
+  }
+
+  function hasControlSelection(target) {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return false;
+    const start = Number(target.selectionStart ?? 0);
+    const end = Number(target.selectionEnd ?? 0);
+    return end > start && target.value.slice(start, end).trim().length > 0;
+  }
+
+  function isRealColumnHeaderDrag(target) {
+    if (!(target instanceof Element)) return false;
+    const header = target.closest('th[draggable="true"], th.clients-table-movable-column');
+    return Boolean(header && !target.closest('input, textarea, select, button, a, [contenteditable="true"]'));
+  }
+
+  function isTableTextDropTarget(target) {
+    if (!(target instanceof Element)) return false;
+    const table = target.closest(TEXT_DROP_TABLE_SELECTOR);
+    if (!table) return false;
+    return Boolean(target.closest('td, input, textarea, select, output, [contenteditable="true"]'));
+  }
+
+  function dataTransferHasText(event) {
+    const types = Array.from(event.dataTransfer?.types || []);
+    return types.includes('text/plain') || types.includes('text/html') || types.includes('Text');
+  }
+
+  function installTextDragGuard() {
+    if (document.documentElement.dataset.uposTableTextDragGuard === '1') return;
+    document.documentElement.dataset.uposTableTextDragGuard = '1';
+
+    document.addEventListener('dragstart', (event) => {
+      if (isRealColumnHeaderDrag(event.target)) return;
+      if ((hasTextSelection() || hasControlSelection(event.target)) && isTableTextDropTarget(event.target)) {
+        event.preventDefault();
+      }
+    }, true);
+
+    document.addEventListener('dragover', (event) => {
+      if (!isTableTextDropTarget(event.target) || !dataTransferHasText(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+    }, true);
+
+    document.addEventListener('drop', (event) => {
+      if (!isTableTextDropTarget(event.target) || !dataTransferHasText(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
   }
 
   function headerRow(table) {
@@ -292,10 +358,12 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+      installTextDragGuard();
       initAll();
       observer.observe(document.body, { childList: true, subtree: true });
     }, { once: true });
   } else {
+    installTextDragGuard();
     initAll();
     observer.observe(document.body, { childList: true, subtree: true });
   }

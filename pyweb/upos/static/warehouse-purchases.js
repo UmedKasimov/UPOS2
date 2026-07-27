@@ -644,6 +644,7 @@
     const picker = form.querySelector("[data-warehouse-supplier-picker]");
     const input = picker?.querySelector("[data-warehouse-supplier-input]");
     const edit = picker?.querySelector("[data-warehouse-supplier-edit]");
+    const createButton = picker?.querySelector("[data-warehouse-supplier-create-open]");
     if (!picker || !input || picker.dataset.warehouseSupplierReady === "1") return;
     picker.dataset.warehouseSupplierReady = "1";
     input.addEventListener("focus", () => {
@@ -666,6 +667,15 @@
       input.focus();
       input.select();
       renderSupplierPicker(picker, input.value);
+    });
+    createButton?.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    createButton?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openSupplierDialog(form, picker, input.value);
     });
   }
 

@@ -9542,14 +9542,21 @@ def create_app() -> FastAPI:
     @app.post("/clients/save", name="clients_save")
     async def clients_save(request: Request):
         form = await request.form()
+        wants_json = "application/json" in str(request.headers.get("accept") or "").lower() or str(form.get("response") or "").strip() == "json"
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            if wants_json:
+                return JSONResponse({"ok": False, "error": "Форма устарела. Обновите страницу и повторите."}, status_code=403)
             return RedirectResponse(url="/clients?err=csrf", status_code=302)
         wid, redir = _product_workspace_owner(request)
         if redir:
+            if wants_json:
+                return JSONResponse({"ok": False, "error": "Нужно войти заново"}, status_code=401)
             return redir
         assert wid is not None
         name = str(form.get("name") or "").strip()
         if not name:
+            if wants_json:
+                return JSONResponse({"ok": False, "error": "Название клиента обязательно"}, status_code=400)
             return RedirectResponse(url="/clients?error=" + quote("Название клиента обязательно") + "#clients", status_code=302)
         is_supplier = str(form.get("is_supplier") or "").strip() == "1"
         client_id = str(form.get("client_id") or "").strip()
@@ -9640,6 +9647,20 @@ def create_app() -> FastAPI:
                 _crm_workspace_stages(wid),
             )
             client_id = saved_row.id
+            if wants_json:
+                extra = _counterparty_extra(saved_row)
+                client = {
+                    "id": saved_row.id,
+                    "name": saved_row.name,
+                    "phone": saved_row.phone or "",
+                    "tax_id": saved_row.tax_id or "",
+                    "price_type": str(extra.get("price_type") or ""),
+                    "balance_kind": "zero",
+                    "balance_note": "Баланс: 0",
+                    "balance": "0",
+                    "balance_lines": [],
+                }
+                return JSONResponse({"ok": True, "client": client})
         if client_id and str(form.get("return_to_card") or "").strip() == "1":
             return RedirectResponse(url=f"/clients?client={quote(client_id)}&msg=saved#client-card", status_code=302)
         return RedirectResponse(url="/clients?msg=saved#clients", status_code=302)
@@ -9867,6 +9888,7 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": "Название поставщика обязательно"}, status_code=400)
         phone = str(form.get("phone") or "").strip()
         tax_id = str(form.get("tax_id") or "").strip()
+        is_client = str(form.get("is_client") or "").strip() == "1"
         data = {
             "official_name": str(form.get("official_name") or "").strip(),
             "category": str(form.get("category") or "").strip(),
@@ -9874,7 +9896,7 @@ def create_app() -> FastAPI:
             "note": str(form.get("note") or "").strip(),
             "email": str(form.get("email") or "").strip(),
             "address": str(form.get("address") or "").strip(),
-            "is_client": False,
+            "is_client": is_client,
             "is_supplier": True,
         }
         with session_scope() as session:
@@ -9882,7 +9904,7 @@ def create_app() -> FastAPI:
                 session,
                 wid,
                 name=name,
-                role="supplier",
+                role="both" if is_client else "supplier",
                 phone=phone,
                 tax_id=tax_id,
                 data=data,
@@ -13322,7 +13344,19 @@ def create_app() -> FastAPI:
         if not text:
             return JSONResponse({"ok": False, "error": "empty"}, status_code=400)
         due_date = str(form.get("due_date") or "").strip()[:10]
+        due_time = str(form.get("due_time") or "").strip()[:5]
         assignee = re.sub(r"\s+", " ", str(form.get("assignee") or "")).strip()[:120]
+        participants = re.sub(r"\s+", " ", str(form.get("participants") or "")).strip()[:240]
+        reminder_at = str(form.get("reminder_at") or "").strip()[:16]
+        priority = str(form.get("priority") or "normal").strip().lower()
+        if priority not in {"low", "normal", "high", "urgent"}:
+            priority = "normal"
+        checklist = [
+            re.sub(r"\s+", " ", item).strip()[:160]
+            for item in str(form.get("checklist") or "").splitlines()
+            if re.sub(r"\s+", " ", item).strip()
+        ][:12]
+        completed = str(form.get("completed") or "").strip().lower() in {"1", "true", "on", "yes"}
         actor = _crm_actor_name(request)
         action = {"chat": "Сообщение", "task": "Задача", "comment": "Комментарий"}[kind]
         event = {
@@ -13332,7 +13366,13 @@ def create_app() -> FastAPI:
             "detail": text,
             "kind": kind,
             "due_date": due_date,
+            "due_time": due_time,
             "assignee": assignee,
+            "participants": participants,
+            "reminder_at": reminder_at,
+            "priority": priority,
+            "checklist": checklist,
+            "completed": completed,
         }
         with session_scope() as session:
             row = session.get(CrmRecord, record_id)
