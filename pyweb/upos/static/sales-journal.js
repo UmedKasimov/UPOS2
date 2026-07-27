@@ -809,7 +809,7 @@
     var table = scope.querySelector("#sales-journal-table");
     if (!table || table.dataset.salesJournalSortReady === "1") return;
     table.dataset.salesJournalSortReady = "1";
-    var numericColumns = new Set([6, 7]);
+    var numericColumns = new Set([6, 7, 8]);
     var dateColumns = new Set([2]);
 
     table.querySelectorAll("thead .sales-journal-sort-btn").forEach(function (button) {
