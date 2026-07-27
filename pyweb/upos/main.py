@@ -7923,6 +7923,13 @@ def create_app() -> FastAPI:
                 bucket[currency] = bucket.get(currency, Decimal("0")) + balance
         return balance_by_id, balance_by_name
 
+    def _client_balance_display(amount: Any) -> str:
+        amount = _sales_decimal(amount)
+        if not amount:
+            return "-"
+        prefix = "-" if amount > 0 else ""
+        return f"{prefix}{_sales_money_label(abs(amount))}"
+
     def _counterparty_view_data(
         row: Counterparty,
         *,
@@ -7956,12 +7963,20 @@ def create_app() -> FastAPI:
                     "currency": currency,
                     "amount": _sales_money_label(amount),
                     "amount_abs": _sales_money_label(abs(amount)),
+                    "display": _client_balance_display(amount),
                     "kind": kind,
-                    "note": "Нам должны" if kind == "debt" else "Мы должны" if kind == "advance" else "Нет долга",
                 }
             )
         if not balance_lines:
-            balance_lines.append({"currency": "UZS", "amount": "0", "amount_abs": "0", "kind": "zero", "note": "Нет долга"})
+            balance_lines.append(
+                {
+                    "currency": "UZS",
+                    "amount": "0",
+                    "amount_abs": "0",
+                    "display": "-",
+                    "kind": "zero",
+                }
+            )
         raw_programs = extra.get("programs")
         if isinstance(raw_programs, list):
             programs = [str(item).strip() for item in raw_programs if str(item).strip()]
@@ -8028,9 +8043,9 @@ def create_app() -> FastAPI:
             "balance_value": balance,
             "balance": _sales_money_label(balance),
             "balance_abs": _sales_money_label(abs(balance)),
+            "balance_display": _client_balance_display(balance),
             "balance_lines": balance_lines,
             "balance_kind": balance_kind,
-            "balance_note": "Нам должны" if balance_kind == "debt" else "Мы должны" if balance_kind == "advance" else "Нет долга",
             "last_date": last_date,
             "created_at": row.created_at.date().isoformat() if getattr(row, "created_at", None) else "",
             "updated_at": row.updated_at.date().isoformat() if getattr(row, "updated_at", None) else "",
@@ -9825,10 +9840,14 @@ def create_app() -> FastAPI:
             (abs(item["balance_value"]) for item in all_clients_records if item["balance_value"] < 0),
             Decimal("0"),
         )
+        clients_net_total = clients_debt_total - clients_advance_total
         clients_balance_summary = {
             "debt": _sales_money_label(clients_debt_total),
+            "debt_display": _client_balance_display(clients_debt_total),
             "advance": _sales_money_label(clients_advance_total),
-            "net": _sales_money_label(clients_debt_total - clients_advance_total),
+            "advance_display": _client_balance_display(-clients_advance_total),
+            "net": _sales_money_label(clients_net_total),
+            "net_display": _client_balance_display(clients_net_total),
             "debt_count": sum(1 for item in all_clients_records if item["balance_value"] > 0),
             "advance_count": sum(1 for item in all_clients_records if item["balance_value"] < 0),
         }

@@ -740,7 +740,8 @@
   function clientNumericValue(cell, key) {
     const raw = (cell?.textContent || "").replace(/\u00a0/g, " ").replace(/[^0-9,.-]/g, "").replace(",", ".");
     const value = Number.parseFloat(raw) || 0;
-    if (key === "balance" && cell?.querySelector(".client-balance-pill--advance")) return -Math.abs(value);
+    if (key === "balance" && cell?.querySelector(".client-balance-pill--debt")) return -Math.abs(value);
+    if (key === "balance" && cell?.querySelector(".client-balance-pill--advance")) return Math.abs(value);
     return value;
   }
 

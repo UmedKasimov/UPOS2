@@ -5267,6 +5267,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: space-between;
 }
 
+.client-balance-empty {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
 .crm-kanban-card-money-main {
   display: flex;
   align-items: center;

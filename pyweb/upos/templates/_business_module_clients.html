@@ -132,8 +132,11 @@
               </td>
               <td>{{ client.official_name or "-" }}</td>
               <td>
-                <span class="client-balance-pill client-balance-pill--{{ client.balance_kind }}">{{ client.balance_abs }} UZS</span>
-                <small>{{ client.balance_note }}</small>
+                {% if client.balance_kind == "zero" %}
+                  <span class="client-balance-empty">-</span>
+                {% else %}
+                  <span class="client-balance-pill client-balance-pill--{{ client.balance_kind }}">{{ client.balance_display }} UZS</span>
+                {% endif %}
               </td>
               <td>{{ client.last_date or "-" }}</td>
               <td>{{ client.telegram_phone or "-" }}</td>
@@ -160,16 +163,21 @@
             <td colspan="4">Итого клиенты</td>
             <td>
               <div class="client-balance-total-lines">
-                <span class="client-balance-pill client-balance-pill--debt">{{ clients_balance_summary.debt }} UZS</span>
-                <small>Нам должны{% if clients_balance_summary.debt_count %}: {{ clients_balance_summary.debt_count }}{% endif %}</small>
-                <span class="client-balance-pill client-balance-pill--advance">{{ clients_balance_summary.advance }} UZS</span>
-                <small>Мы должны{% if clients_balance_summary.advance_count %}: {{ clients_balance_summary.advance_count }}{% endif %}</small>
+                {% if clients_balance_summary.debt_count %}
+                  <span class="client-balance-pill client-balance-pill--debt">{{ clients_balance_summary.debt_display }} UZS</span>
+                {% endif %}
+                {% if clients_balance_summary.advance_count %}
+                  <span class="client-balance-pill client-balance-pill--advance">{{ clients_balance_summary.advance_display }} UZS</span>
+                {% endif %}
+                {% if not clients_balance_summary.debt_count and not clients_balance_summary.advance_count %}
+                  <span class="client-balance-empty">-</span>
+                {% endif %}
               </div>
             </td>
             <td colspan="10">
               <div class="client-balance-net">
                 <span>Итоговый баланс</span>
-                <strong>{{ clients_balance_summary.net }} UZS</strong>
+                <strong>{{ clients_balance_summary.net_display }}{% if clients_balance_summary.net_display != "-" %} UZS{% endif %}</strong>
               </div>
             </td>
           </tr>
@@ -454,14 +462,9 @@
         <span>Баланс</span>
         <div class="client-balance-lines">
           {% for line in selected_client_card.balance_lines %}
-            <strong class="client-balance-line client-balance-line--{{ line.kind }}">{{ line.amount_abs }} {{ line.currency }}</strong>
+            <strong class="client-balance-line client-balance-line--{{ line.kind }}">{{ line.display }}{% if line.display != "-" %} {{ line.currency }}{% endif %}</strong>
           {% endfor %}
         </div>
-        <small>
-          {% for line in selected_client_card.balance_lines %}
-            {% if not loop.first %} · {% endif %}{{ line.note }} {{ line.currency }}
-          {% endfor %}
-        </small>
       </div>
       <div>
         <span>Продажи</span>
@@ -486,7 +489,7 @@
           </div>
           <div class="client-balance-lines client-balance-lines--compact">
             {% for line in selected_client_card.balance_lines %}
-              <strong class="client-balance-line client-balance-line--{{ line.kind }}">{{ line.amount_abs }} {{ line.currency }}</strong>
+              <strong class="client-balance-line client-balance-line--{{ line.kind }}">{{ line.display }}{% if line.display != "-" %} {{ line.currency }}{% endif %}</strong>
             {% endfor %}
           </div>
         </header>
@@ -903,7 +906,7 @@
           {% for row in client_balances %}
             <tr>
               <td><strong>{{ row.name }}</strong><small>{{ row.category or row.territory or "" }}</small></td>
-              <td><span class="client-balance-pill client-balance-pill--debt">{{ row.balance_abs }} UZS</span><small>Нам должны</small></td>
+              <td><span class="client-balance-pill client-balance-pill--debt">{{ row.balance_display }} UZS</span></td>
               <td>{{ row.phone or "-" }}</td>
               <td>{{ row.consignment_days or "-" }}</td>
               <td>{{ row.last_date or "-" }}</td>
