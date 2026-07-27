@@ -24192,3 +24192,219 @@ body.is-sidebar-collapsed .upos-floating-phone,
     grid-template-columns: 1fr;
   }
 }
+
+/* Dark theme surface hardening. Keep document previews and map tiles unchanged. */
+html.dark .general-report-launcher,
+html.dark .workbench-launcher,
+html.dark .business-module-filters,
+html.dark .messenger-channel-tabs,
+html.dark .messenger-telegram-subscribers,
+html.dark .social-telegram-card,
+html.dark .settings-ios-group,
+html.dark .settings-business-panel,
+html.dark .settings-profile-modal-surface,
+html.dark .crm-card-detail-surface,
+html.dark .crm-card-detail-panel,
+html.dark .product-form-section,
+html.dark .product-form-section--primary,
+html.dark .price-type-card,
+html.dark .price-type-products-panel,
+html.dark .telephony-incoming-popup {
+  border-color: var(--workbench-line, var(--border));
+  background: var(--workbench-surface, var(--card));
+  box-shadow:
+    0 16px 36px oklch(0 0 0 / 0.28),
+    0 1px 0 oklch(1 0 0 / 0.045) inset;
+}
+
+html.dark .general-report-launcher {
+  background: color-mix(in oklch, var(--workbench-surface), var(--background) 18%);
+}
+
+html.dark .settings-page-wrap .settings-tab.settings-tab--rail {
+  border-color: var(--workbench-line);
+  background: oklch(1 0 0 / 0.045);
+  color: var(--muted-foreground);
+  box-shadow: none;
+}
+
+html.dark .settings-page-wrap .settings-tab.settings-tab--rail.active {
+  border-color: color-mix(in oklch, var(--primary), transparent 34%);
+  background: color-mix(in oklch, var(--primary), var(--card) 76%);
+  color: var(--foreground);
+}
+
+html.dark .price-type-card-main,
+html.dark .price-type-card-main strong {
+  color: var(--foreground);
+}
+
+html.dark .price-type-card-main span,
+html.dark .price-type-card-main small,
+html.dark .price-type-card-meta {
+  color: var(--muted-foreground);
+}
+
+html.dark .price-type-card-meta span,
+html.dark .price-type-flags label {
+  border-color: color-mix(in oklch, var(--primary), transparent 62%);
+  background: color-mix(in oklch, var(--primary), var(--card) 86%);
+  color: color-mix(in oklch, var(--primary), white 22%);
+}
+
+html.dark .price-type-card-meta .is-muted {
+  border-color: var(--workbench-line);
+  background: oklch(1 0 0 / 0.045);
+  color: var(--muted-foreground);
+}
+
+html.dark .price-type-filter {
+  border-color: var(--workbench-line);
+  background: var(--workbench-muted-surface);
+}
+
+html.dark .price-type-products-table th {
+  border-color: var(--workbench-line);
+  background: var(--workbench-muted-surface);
+  color: var(--muted-foreground);
+}
+
+html.dark .upos-floating-phone-panel {
+  border-color: var(--workbench-line);
+  background: var(--workbench-surface);
+  color: var(--foreground);
+  box-shadow: 0 24px 70px oklch(0 0 0 / 0.5);
+}
+
+html.dark .upos-floating-phone-head span,
+html.dark .upos-floating-phone-form label {
+  color: var(--muted-foreground);
+}
+
+html.dark .upos-floating-phone-close,
+html.dark .upos-floating-phone-form input,
+html.dark .upos-floating-phone-form select,
+html.dark .upos-floating-phone-links a {
+  border-color: var(--workbench-line);
+  background: oklch(1 0 0 / 0.045);
+  color: var(--foreground);
+}
+
+html.dark .upos-floating-phone-close:hover,
+html.dark .upos-floating-phone-links a:hover {
+  background: oklch(1 0 0 / 0.08);
+}
+
+html.dark .upos-floating-phone-status {
+  border-color: color-mix(in oklch, #10b981, transparent 62%);
+  background: color-mix(in oklch, #10b981, var(--card) 88%);
+  color: #6ee7b7;
+}
+
+html.dark .upos-floating-phone-status[data-state="pending"] {
+  border-color: color-mix(in oklch, var(--primary), transparent 58%);
+  background: color-mix(in oklch, var(--primary), var(--card) 88%);
+  color: #93c5fd;
+}
+
+html.dark .upos-floating-phone-status[data-state="error"] {
+  border-color: color-mix(in oklch, #f43f5e, transparent 58%);
+  background: color-mix(in oklch, #f43f5e, var(--card) 88%);
+  color: #fda4af;
+}
+
+html.dark .telephony-kpi-card,
+html.dark .telephony-dashboard-columns section,
+html.dark .telephony-recordings-section,
+html.dark .billing-telephony-mini > div {
+  border-color: var(--workbench-line);
+  background: var(--workbench-surface);
+  color: var(--foreground);
+  box-shadow: 0 12px 28px oklch(0 0 0 / 0.24);
+}
+
+html.dark .telephony-kpi-card span,
+html.dark .telephony-kpi-card small,
+html.dark .telephony-mini-row span,
+html.dark .telephony-mini-row em,
+html.dark .billing-telephony-mini span,
+html.dark .telephony-recording-pending,
+html.dark .telephony-recording-empty {
+  color: var(--muted-foreground);
+}
+
+html.dark .telephony-kpi-card strong {
+  color: color-mix(in oklch, var(--primary), white 20%);
+}
+
+html.dark .telephony-mini-row,
+html.dark .billing-telephony-mini p {
+  border-color: var(--workbench-line);
+}
+
+html.dark .telephony-calls-table .telephony-call-phone,
+html.dark .telephony-calls-table .telephony-call-client strong,
+html.dark .telephony-account-cell small {
+  color: var(--foreground);
+}
+
+html.dark .telephony-account-cell strong {
+  color: color-mix(in oklch, var(--primary), white 20%);
+}
+
+html.dark .telephony-date-filter .upos-date,
+html.dark .telephony-date-filter .upos-date-trigger,
+html.dark .telephony-status-filters,
+html.dark .telephony-status-filter {
+  border-color: var(--workbench-line);
+  background: var(--workbench-muted-surface);
+  color: var(--foreground);
+}
+
+html.dark .telephony-date-filter .upos-date-summary {
+  color: var(--muted-foreground);
+}
+
+html.dark .telephony-status-filter strong,
+html.dark .telephony-state,
+html.dark .telephony-calls-table .telephony-call-status-cell--unknown {
+  background: oklch(1 0 0 / 0.07);
+  color: var(--muted-foreground);
+}
+
+html.dark .telephony-status-filter--answered,
+html.dark .telephony-state--online,
+html.dark .telephony-state--connected,
+html.dark .telephony-state--active,
+html.dark .telephony-direction--incoming > span,
+html.dark .telephony-calls-table .telephony-call-status-cell--answered {
+  background: color-mix(in oklch, #22c55e, var(--card) 88%);
+  color: #86efac;
+}
+
+html.dark .telephony-status-filter--missed,
+html.dark .telephony-status-filter--blocked,
+html.dark .telephony-calls-table .telephony-call-status-cell--missed,
+html.dark .telephony-calls-table .telephony-call-status-cell--blocked {
+  background: color-mix(in oklch, #ef4444, var(--card) 88%);
+  color: #fca5a5;
+}
+
+html.dark .telephony-status-filter--planned,
+html.dark .telephony-direction--outgoing > span,
+html.dark .telephony-calls-table .telephony-call-status-cell--planned,
+html.dark .telephony-calls-table th:nth-child(7) {
+  background: color-mix(in oklch, var(--primary), var(--card) 86%);
+  color: #93c5fd;
+}
+
+html.dark .client-location-map .leaflet-control-zoom a,
+html.dark .client-location-map .leaflet-control-attribution,
+html.dark .client-location-map-hint,
+html.dark .client-leaflet-marker-label,
+html.dark .clients-map-empty {
+  border-color: var(--workbench-line);
+  background: color-mix(in oklch, var(--workbench-surface), transparent 5%);
+  color: var(--foreground);
+  box-shadow: 0 12px 28px oklch(0 0 0 / 0.3);
+}
