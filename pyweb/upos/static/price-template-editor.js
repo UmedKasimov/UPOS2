@@ -1,4 +1,6 @@
 (function () {
+  var GRID_SIZE = 6;
+
   var DEFAULT_VISIBILITY = {
     logo: true,
     title: true,
@@ -25,6 +27,7 @@
     title: "BIZNES DASTURLASH TAKLIFI",
     logo: "",
     layout: {},
+    extra_tables: [],
     visible: DEFAULT_VISIBILITY,
     meta: {
       date: "27-07-2026",
@@ -190,6 +193,84 @@
     return td;
   }
 
+  function spreadsheetColumn(index) {
+    var name = "";
+    var value = index + 1;
+    while (value > 0) {
+      name = String.fromCharCode(65 + ((value - 1) % 26)) + name;
+      value = Math.floor((value - 1) / 26);
+    }
+    return name;
+  }
+
+  function createExtraTable(data, tableIndex) {
+    var source = data && typeof data === "object" ? data : {};
+    var id = text(source.id).replace(/[^a-z0-9_-]/gi, "").slice(0, 32);
+    if (!id) id = "table_" + String(Date.now()) + "_" + String(tableIndex);
+    var cells = Array.isArray(source.cells) ? source.cells : [];
+    if (!cells.length) {
+      cells = [
+        ["Заголовок 1", "Заголовок 2", "Заголовок 3"],
+        ["", "", ""],
+        ["", "", ""],
+      ];
+    }
+    var columnCount = Math.max(
+      1,
+      Math.min(
+        10,
+        cells.reduce(function (maximum, row) {
+          return Math.max(maximum, Array.isArray(row) ? row.length : 0);
+        }, 0),
+      ),
+    );
+    var key = "extra_table_" + id;
+    var wrapper = document.createElement("div");
+    wrapper.className = "price-template-extra-table-wrap";
+    wrapper.setAttribute("data-price-template-extra-table", "");
+    wrapper.setAttribute("data-price-template-extra-table-id", id);
+    wrapper.setAttribute("data-price-layout-key", key);
+
+    var handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "price-template-layout-handle price-template-extra-table-handle";
+    handle.setAttribute("data-price-template-select-layout", key);
+    handle.setAttribute("aria-label", "Выбрать дополнительную таблицу");
+    handle.title = "Выбрать таблицу";
+    handle.textContent = "↔";
+    wrapper.appendChild(handle);
+
+    var table = document.createElement("table");
+    table.className = "price-template-extra-table";
+    var body = document.createElement("tbody");
+    cells.slice(0, 20).forEach(function (rawRow, rowIndex) {
+      var row = document.createElement("tr");
+      var values = Array.isArray(rawRow) ? rawRow : [];
+      for (var columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+        var cell = document.createElement(rowIndex === 0 ? "th" : "td");
+        var value = document.createElement("span");
+        value.contentEditable = "true";
+        value.setAttribute("data-price-template-extra-cell", "");
+        value.setAttribute("data-price-cell", "");
+        value.setAttribute(
+          "data-cell-address",
+          "T" +
+            String(tableIndex + 2) +
+            ":" +
+            spreadsheetColumn(columnIndex) +
+            String(rowIndex + 1),
+        );
+        value.textContent = text(values[columnIndex]);
+        cell.appendChild(value);
+        row.appendChild(cell);
+      }
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    wrapper.appendChild(table);
+    return wrapper;
+  }
+
   function createRow(row) {
     var tr = document.createElement("tr");
     tr.setAttribute("data-price-template-row", "");
@@ -256,12 +337,36 @@
       Array.isArray(source.rows) && source.rows.length
         ? source.rows.slice(0, 50)
         : defaults.rows;
+    var extraTables = (
+      Array.isArray(source.extra_tables) ? source.extra_tables : []
+    )
+      .slice(0, 8)
+      .map(function (table, tableIndex) {
+        var item = table && typeof table === "object" ? table : {};
+        var id = text(item.id).replace(/[^a-z0-9_-]/gi, "").slice(0, 32);
+        if (!id) id = "table_" + String(tableIndex + 1);
+        var cells = (Array.isArray(item.cells) ? item.cells : [])
+          .slice(0, 20)
+          .map(function (row) {
+            return (Array.isArray(row) ? row : []).slice(0, 10).map(text);
+          });
+        return {
+          id: id,
+          cells: cells.length
+            ? cells
+            : [
+                ["Заголовок 1", "Заголовок 2", "Заголовок 3"],
+                ["", "", ""],
+                ["", "", ""],
+              ],
+        };
+      });
     var rawLayout =
       source.layout && typeof source.layout === "object" ? source.layout : {};
     var layout = {};
     Object.keys(rawLayout).forEach(function (key) {
       if (
-        !/^(?:logo|title|table|custom_text|comment|total_label|date|id|customer|customer_phone|seller|seller_phone|address|header_[0-7]|row_(?:[0-9]|[1-4][0-9])_(?:name|category|qty|price|discount|total))$/.test(
+        !/^(?:logo|title|table|custom_text|comment|total_label|date|id|customer|customer_phone|seller|seller_phone|address|header_[0-7]|row_(?:[0-9]|[1-4][0-9])_(?:name|category|qty|price|discount|total)|extra_table_[a-z0-9_-]{1,32})$/.test(
           key,
         )
       ) {
@@ -282,6 +387,7 @@
         ? text(source.logo)
         : "",
       layout: layout,
+      extra_tables: extraTables,
       visible: visible,
       meta: {
         date: date,
@@ -328,6 +434,7 @@
   function initEditor(root) {
     var preview = root.querySelector(".price-template-preview");
     var rowsRoot = root.querySelector("[data-price-template-rows]");
+    var extraTablesRoot = root.querySelector("[data-price-template-extra-tables]");
     var formula = root.querySelector("[data-price-template-formula]");
     var address = root.querySelector("[data-price-template-address]");
     var status = document.querySelector("[data-price-template-status]");
@@ -337,16 +444,22 @@
     var logoFile = root.querySelector("[data-price-template-logo-file]");
     var logoImage = root.querySelector("[data-price-template-logo-image]");
     var defaultLogo = root.querySelector("[data-price-template-default-logo]");
-    var canvasToolbar = root.querySelector("[data-price-template-canvas-toolbar]");
     var selectedName = root.querySelector("[data-price-template-selected-name]");
     var photoTools = root.querySelector("[data-price-template-photo-tools]");
+    var extraTableTools = root.querySelector(
+      "[data-price-template-extra-table-tools]",
+    );
     var photoFile = root.querySelector("[data-price-template-photo-file]");
-    if (!preview || !rowsRoot || !formula || !address) return;
+    var gridToggle = root.querySelector("[data-price-template-grid-toggle]");
+    var dragHandle = root.querySelector("[data-price-template-drag-handle]");
+    if (!preview || !rowsRoot || !extraTablesRoot || !formula || !address) return;
 
     var selectedCell = null;
     var selectedTarget = null;
+    var dragState = null;
     var currentLogo = "";
     var layout = {};
+    var gridEnabled = true;
     var visibility = Object.assign({}, DEFAULT_VISIBILITY);
     var dirty = false;
 
@@ -392,6 +505,7 @@
       };
       if (labels[key]) return labels[key];
       if (key.indexOf("header_") === 0) return "Заголовок колонки";
+      if (key.indexOf("extra_table_") === 0) return "Дополнительная таблица";
       if (key.indexOf("row_") === 0) {
         var cell = node && node.getAttribute("data-cell-address");
         return cell ? "Текст " + cell : "Текст товара";
@@ -419,6 +533,36 @@
       Object.keys(layout).forEach(applyLayoutAdjustment);
     }
 
+    function snapToGrid(value, minimum, maximum) {
+      var step = gridEnabled ? GRID_SIZE : 1;
+      return clamp(Math.round(value / step) * step, minimum, maximum, 0);
+    }
+
+    function updateToolbarState() {
+      root.querySelectorAll("[data-price-template-adjust]").forEach(function (button) {
+        button.disabled = !selectedTarget;
+      });
+      if (selectedName && !selectedTarget) {
+        selectedName.textContent = "Выберите элемент";
+      }
+    }
+
+    function positionDragHandle() {
+      if (!dragHandle || !selectedTarget || !selectedTarget.node.isConnected) {
+        if (dragHandle) dragHandle.hidden = true;
+        return;
+      }
+      var previewRect = preview.getBoundingClientRect();
+      var nodeRect = selectedTarget.node.getBoundingClientRect();
+      var left = nodeRect.left - previewRect.left - 12;
+      var top = nodeRect.top - previewRect.top - 12;
+      dragHandle.style.left =
+        clamp(left, 2, Math.max(2, preview.clientWidth - 34), 2) + "px";
+      dragHandle.style.top =
+        clamp(top, 2, Math.max(2, preview.scrollHeight - 34), 2) + "px";
+      dragHandle.hidden = false;
+    }
+
     function clearTargetSelection() {
       preview
         .querySelectorAll(".is-layout-selected, .is-photo-selected")
@@ -426,8 +570,10 @@
           node.classList.remove("is-layout-selected", "is-photo-selected");
         });
       selectedTarget = null;
-      if (canvasToolbar) canvasToolbar.hidden = true;
       if (photoTools) photoTools.hidden = true;
+      if (extraTableTools) extraTableTools.hidden = true;
+      if (dragHandle) dragHandle.hidden = true;
+      updateToolbarState();
     }
 
     function selectLayoutTarget(node, key) {
@@ -439,7 +585,11 @@
       selectedTarget = { type: "layout", key: key, node: node };
       node.classList.add("is-layout-selected");
       if (selectedName) selectedName.textContent = layoutLabel(key, node);
-      if (canvasToolbar) canvasToolbar.hidden = false;
+      if (extraTableTools) {
+        extraTableTools.hidden = key.indexOf("extra_table_") !== 0;
+      }
+      updateToolbarState();
+      window.requestAnimationFrame(positionDragHandle);
     }
 
     function selectPhotoTarget(node) {
@@ -451,8 +601,9 @@
       selectedTarget = { type: "photo", node: node };
       node.classList.add("is-photo-selected");
       if (selectedName) selectedName.textContent = "Фото товара";
-      if (canvasToolbar) canvasToolbar.hidden = false;
       if (photoTools) photoTools.hidden = false;
+      updateToolbarState();
+      window.requestAnimationFrame(positionDragHandle);
     }
 
     function updatePhotoTransform(node, values) {
@@ -498,6 +649,7 @@
 
     function adjustSelected(action) {
       if (!selectedTarget) return;
+      var moveStep = gridEnabled ? GRID_SIZE : 1;
       if (selectedTarget.type === "layout") {
         var key = selectedTarget.key;
         var current = layout[key] || { x: 0, y: 0, scale: 1 };
@@ -506,30 +658,114 @@
           y: clamp(current.y, -300, 300, 0),
           scale: clamp(current.scale, 0.5, 2, 1),
         };
-        if (action === "left") next.x -= 6;
-        if (action === "right") next.x += 6;
-        if (action === "up") next.y -= 6;
-        if (action === "down") next.y += 6;
+        if (action === "left") next.x -= moveStep;
+        if (action === "right") next.x += moveStep;
+        if (action === "up") next.y -= moveStep;
+        if (action === "down") next.y += moveStep;
         if (action === "smaller") next.scale -= 0.05;
         if (action === "larger") next.scale += 0.05;
         if (action === "reset") next = { x: 0, y: 0, scale: 1 };
-        next.x = clamp(next.x, -300, 300, 0);
-        next.y = clamp(next.y, -300, 300, 0);
+        next.x = snapToGrid(next.x, -300, 300);
+        next.y = snapToGrid(next.y, -300, 300);
         next.scale = clamp(next.scale, 0.5, 2, 1);
         layout[key] = next;
         applyLayoutAdjustment(key);
       } else {
         var photo = photoValues(selectedTarget.node);
-        if (action === "left") photo.x -= 4;
-        if (action === "right") photo.x += 4;
-        if (action === "up") photo.y -= 4;
-        if (action === "down") photo.y += 4;
+        if (action === "left") photo.x -= moveStep;
+        if (action === "right") photo.x += moveStep;
+        if (action === "up") photo.y -= moveStep;
+        if (action === "down") photo.y += moveStep;
         if (action === "smaller") photo.scale -= 0.1;
         if (action === "larger") photo.scale += 0.1;
         if (action === "reset") photo = { x: 0, y: 0, scale: 1 };
+        photo.x = snapToGrid(photo.x, -80, 80);
+        photo.y = snapToGrid(photo.y, -80, 80);
         updatePhotoTransform(selectedTarget.node, photo);
       }
+      window.requestAnimationFrame(positionDragHandle);
       markDirty();
+    }
+
+    function selectedPosition(target) {
+      if (target.type === "layout") {
+        var current = layout[target.key] || { x: 0, y: 0, scale: 1 };
+        return {
+          x: clamp(current.x, -300, 300, 0),
+          y: clamp(current.y, -300, 300, 0),
+        };
+      }
+      var photo = photoValues(target.node);
+      return { x: photo.x, y: photo.y };
+    }
+
+    function applyDraggedPosition(target, x, y) {
+      if (!target || !target.node.isConnected) return;
+      if (target.type === "layout") {
+        var current = layout[target.key] || { x: 0, y: 0, scale: 1 };
+        layout[target.key] = {
+          x: snapToGrid(x, -300, 300),
+          y: snapToGrid(y, -300, 300),
+          scale: clamp(current.scale, 0.5, 2, 1),
+        };
+        applyLayoutAdjustment(target.key);
+      } else {
+        var photo = photoValues(target.node);
+        photo.x = snapToGrid(x, -80, 80);
+        photo.y = snapToGrid(y, -80, 80);
+        updatePhotoTransform(target.node, photo);
+      }
+      positionDragHandle();
+    }
+
+    function finishDrag(event) {
+      if (!dragState || (event && event.pointerId !== dragState.pointerId)) return;
+      var changed = dragState.changed;
+      dragState = null;
+      preview.classList.remove("is-grid-dragging");
+      if (dragHandle) dragHandle.classList.remove("is-dragging");
+      if (changed) markDirty();
+    }
+
+    if (dragHandle) {
+      dragHandle.addEventListener("pointerdown", function (event) {
+        if (!selectedTarget || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        var position = selectedPosition(selectedTarget);
+        dragState = {
+          pointerId: event.pointerId,
+          target: selectedTarget,
+          startX: event.clientX,
+          startY: event.clientY,
+          x: position.x,
+          y: position.y,
+          changed: false,
+        };
+        dragHandle.setPointerCapture(event.pointerId);
+        dragHandle.classList.add("is-dragging");
+        preview.classList.add("is-grid-dragging");
+      });
+      dragHandle.addEventListener("pointermove", function (event) {
+        if (!dragState || event.pointerId !== dragState.pointerId) return;
+        event.preventDefault();
+        var previewRect = preview.getBoundingClientRect();
+        var coordinateScale = previewRect.width
+          ? preview.offsetWidth / previewRect.width
+          : 1;
+        var nextX =
+          dragState.x + (event.clientX - dragState.startX) * coordinateScale;
+        var nextY =
+          dragState.y + (event.clientY - dragState.startY) * coordinateScale;
+        applyDraggedPosition(dragState.target, nextX, nextY);
+        dragState.changed = true;
+      });
+      dragHandle.addEventListener("pointerup", finishDrag);
+      dragHandle.addEventListener("pointercancel", finishDrag);
+      dragHandle.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      });
     }
 
     function updateRowAddresses() {
@@ -580,6 +816,160 @@
       layout = nextLayout;
     }
 
+    function updateExtraTableAddresses() {
+      extraTablesRoot
+        .querySelectorAll("[data-price-template-extra-table]")
+        .forEach(function (wrapper, tableIndex) {
+          var handle = wrapper.querySelector("[data-price-template-select-layout]");
+          if (handle) {
+            handle.setAttribute(
+              "aria-label",
+              "Выбрать дополнительную таблицу " + String(tableIndex + 1),
+            );
+          }
+          wrapper.querySelectorAll("tr").forEach(function (row, rowIndex) {
+            row
+              .querySelectorAll("[data-price-template-extra-cell]")
+              .forEach(function (cell, columnIndex) {
+                cell.setAttribute(
+                  "data-cell-address",
+                  "T" +
+                    String(tableIndex + 2) +
+                    ":" +
+                    spreadsheetColumn(columnIndex) +
+                    String(rowIndex + 1),
+                );
+              });
+          });
+        });
+    }
+
+    function appendExtraCell(row, header) {
+      var cell = document.createElement(header ? "th" : "td");
+      var value = document.createElement("span");
+      value.contentEditable = "true";
+      value.setAttribute("data-price-template-extra-cell", "");
+      value.setAttribute("data-price-cell", "");
+      value.textContent = "";
+      cell.appendChild(value);
+      row.appendChild(cell);
+    }
+
+    function addExtraTable() {
+      if (extraTablesRoot.children.length >= 8) {
+        setStatus("Можно добавить не больше 8 таблиц", "error");
+        return;
+      }
+      var id =
+        "table_" +
+        Date.now().toString(36) +
+        "_" +
+        String(extraTablesRoot.children.length + 1);
+      var wrapper = createExtraTable(
+        {
+          id: id,
+          cells: [
+            ["Заголовок 1", "Заголовок 2", "Заголовок 3"],
+            ["", "", ""],
+            ["", "", ""],
+          ],
+        },
+        extraTablesRoot.children.length,
+      );
+      extraTablesRoot.appendChild(wrapper);
+      updateExtraTableAddresses();
+      selectLayoutTarget(wrapper, "extra_table_" + id);
+      markDirty();
+      wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function selectedExtraTable() {
+      if (!selectedTarget || selectedTarget.type !== "layout") return null;
+      return selectedTarget.node.closest("[data-price-template-extra-table]");
+    }
+
+    function addExtraTableRow() {
+      var wrapper = selectedExtraTable();
+      if (!wrapper) return;
+      var body = wrapper.querySelector("tbody");
+      var rows = body ? body.querySelectorAll("tr") : [];
+      if (!body || rows.length >= 20) {
+        setStatus("В таблице может быть не больше 20 строк", "error");
+        return;
+      }
+      var columnCount = rows.length ? rows[0].children.length : 3;
+      var row = document.createElement("tr");
+      for (var index = 0; index < columnCount; index += 1) {
+        appendExtraCell(row, false);
+      }
+      body.appendChild(row);
+      updateExtraTableAddresses();
+      positionDragHandle();
+      markDirty();
+    }
+
+    function removeExtraTableRow() {
+      var wrapper = selectedExtraTable();
+      if (!wrapper) return;
+      var rows = wrapper.querySelectorAll("tr");
+      if (rows.length <= 1) {
+        setStatus("В таблице должна остаться хотя бы одна строка", "error");
+        return;
+      }
+      var lastRow = rows[rows.length - 1];
+      if (lastRow.contains(selectedCell)) selectCell(null);
+      lastRow.remove();
+      updateExtraTableAddresses();
+      positionDragHandle();
+      markDirty();
+    }
+
+    function addExtraTableColumn() {
+      var wrapper = selectedExtraTable();
+      if (!wrapper) return;
+      var rows = wrapper.querySelectorAll("tr");
+      if (!rows.length || rows[0].children.length >= 10) {
+        setStatus("В таблице может быть не больше 10 столбцов", "error");
+        return;
+      }
+      rows.forEach(function (row, rowIndex) {
+        appendExtraCell(row, rowIndex === 0);
+      });
+      updateExtraTableAddresses();
+      positionDragHandle();
+      markDirty();
+    }
+
+    function removeExtraTableColumn() {
+      var wrapper = selectedExtraTable();
+      if (!wrapper) return;
+      var rows = wrapper.querySelectorAll("tr");
+      if (!rows.length || rows[0].children.length <= 1) {
+        setStatus("В таблице должен остаться хотя бы один столбец", "error");
+        return;
+      }
+      rows.forEach(function (row) {
+        var lastCell = row.lastElementChild;
+        if (!lastCell) return;
+        if (lastCell.contains(selectedCell)) selectCell(null);
+        lastCell.remove();
+      });
+      updateExtraTableAddresses();
+      positionDragHandle();
+      markDirty();
+    }
+
+    function removeExtraTable() {
+      var wrapper = selectedExtraTable();
+      if (!wrapper) return;
+      var key = wrapper.getAttribute("data-price-layout-key") || "";
+      if (key) delete layout[key];
+      clearTargetSelection();
+      wrapper.remove();
+      updateExtraTableAddresses();
+      markDirty();
+    }
+
     function updateFooterLayout() {
       var labelCell = preview.querySelector("[data-price-template-total-label-cell]");
       var priceCell = preview.querySelector("[data-price-template-price-summary-cell]");
@@ -627,6 +1017,7 @@
         clearTargetSelection();
       }
       updateFooterLayout();
+      window.requestAnimationFrame(positionDragHandle);
     }
 
     function applyAllVisibility() {
@@ -738,10 +1129,15 @@
       data.rows.forEach(function (row) {
         rowsRoot.appendChild(createRow(row));
       });
+      extraTablesRoot.replaceChildren();
+      data.extra_tables.forEach(function (table, tableIndex) {
+        extraTablesRoot.appendChild(createExtraTable(table, tableIndex));
+      });
       setLogo(data.logo);
       layout = Object.assign({}, data.layout);
       visibility = Object.assign({}, data.visible);
       updateRowAddresses();
+      updateExtraTableAddresses();
       recalculateTotals();
       applyAllVisibility();
       applyAllLayout();
@@ -811,6 +1207,25 @@
             "",
         });
       });
+      var extraTables = [];
+      extraTablesRoot
+        .querySelectorAll("[data-price-template-extra-table]")
+        .forEach(function (wrapper) {
+          var cells = [];
+          wrapper.querySelectorAll("tr").forEach(function (row) {
+            var values = [];
+            row
+              .querySelectorAll("[data-price-template-extra-cell]")
+              .forEach(function (cell) {
+                values.push(cell.textContent || "");
+              });
+            cells.push(values);
+          });
+          extraTables.push({
+            id: wrapper.getAttribute("data-price-template-extra-table-id") || "",
+            cells: cells,
+          });
+        });
       return {
         version: 2,
         title:
@@ -818,6 +1233,7 @@
           "",
         logo: currentLogo,
         layout: Object.assign({}, layout),
+        extra_tables: extraTables,
         visible: Object.assign({}, visibility),
         meta: {
           date:
@@ -930,9 +1346,54 @@
         initial = {};
       }
     }
+    preview.classList.add("is-grid-editing");
+    if (gridToggle) {
+      gridToggle.classList.add("is-active");
+      gridToggle.setAttribute("aria-pressed", "true");
+    }
     applyTemplate(Object.keys(initial).length ? initial : DEFAULT_TEMPLATE);
 
     root.addEventListener("click", function (event) {
+      var gridButton = event.target.closest("[data-price-template-grid-toggle]");
+      if (gridButton) {
+        gridEnabled = !gridEnabled;
+        preview.classList.toggle("is-grid-editing", gridEnabled);
+        gridButton.classList.toggle("is-active", gridEnabled);
+        gridButton.setAttribute("aria-pressed", gridEnabled ? "true" : "false");
+        gridButton.title = gridEnabled ? "Выключить сетку" : "Включить сетку";
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-add-table]")) {
+        addExtraTable();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-extra-row]")) {
+        addExtraTableRow();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-extra-remove-row]")) {
+        removeExtraTableRow();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-extra-column]")) {
+        addExtraTableColumn();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-extra-remove-column]")) {
+        removeExtraTableColumn();
+        return;
+      }
+
+      if (event.target.closest("[data-price-template-extra-remove]")) {
+        removeExtraTable();
+        return;
+      }
+
       var remove = event.target.closest("[data-price-template-remove-row]");
       if (remove) {
         var row = remove.closest("[data-price-template-row]");
@@ -1034,6 +1495,7 @@
       } else if (row && field === "total") {
         recalculateTotals();
       }
+      window.requestAnimationFrame(positionDragHandle);
       markDirty();
     });
 
@@ -1063,6 +1525,7 @@
       } else if (row && field === "total") {
         recalculateTotals();
       }
+      window.requestAnimationFrame(positionDragHandle);
       markDirty();
     });
 
@@ -1166,6 +1629,10 @@
     }
 
     if (saveButton) saveButton.addEventListener("click", saveTemplate);
+
+    window.addEventListener("resize", function () {
+      window.requestAnimationFrame(positionDragHandle);
+    });
 
     window.addEventListener("beforeunload", function (event) {
       if (!dirty) return;

@@ -13993,7 +13993,8 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-canvas-toolbar[hidden],
-.price-template-photo-tools[hidden] {
+.price-template-photo-tools[hidden],
+.price-template-extra-table-tools[hidden] {
   display: none !important;
 }
 
@@ -14006,11 +14007,33 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-canvas-tools,
-.price-template-photo-tools {
+.price-template-photo-tools,
+.price-template-extra-table-tools {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 0.28rem;
+}
+
+.price-template-canvas-tools {
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.price-template-canvas-tools button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.price-template-canvas-tools .price-template-grid-toggle {
+  min-width: 78px;
+}
+
+.price-template-canvas-tools .price-template-grid-toggle.is-active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
 }
 
 .price-template-canvas-tools button {
@@ -14044,13 +14067,15 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: var(--border);
 }
 
-.price-template-photo-tools {
+.price-template-photo-tools,
+.price-template-extra-table-tools {
   margin-left: 0.2rem;
   padding-left: 0.45rem;
   border-left: 1px solid var(--border);
 }
 
 .price-template-preview {
+  position: relative;
   width: min(100%, 800px);
   min-width: 760px;
   margin: 0 auto;
@@ -14062,6 +14087,47 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   font-size: 14px;
   letter-spacing: 0;
   box-shadow: 0 20px 45px rgb(15 23 42 / 14%);
+}
+
+.price-template-preview.is-grid-editing {
+  background-color: #fff;
+  background-image:
+    linear-gradient(rgb(22 131 232 / 8%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(22 131 232 / 8%) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.price-template-drag-handle {
+  position: absolute;
+  z-index: 18;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #0d72cf;
+  border-radius: 5px;
+  padding: 0;
+  background: #1683e8;
+  color: #fff;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 24%);
+  font-size: 17px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.price-template-drag-handle[hidden] {
+  display: none !important;
+}
+
+.price-template-drag-handle.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 32%);
+}
+
+.price-template-preview.is-grid-dragging {
+  cursor: grabbing;
 }
 
 .price-template-preview [data-price-layout-key] {
@@ -14257,6 +14323,56 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-table-wrap {
   position: relative;
+}
+
+.price-template-extra-tables {
+  display: grid;
+  gap: 1.35rem;
+  margin-top: 1.35rem;
+}
+
+.price-template-extra-table-wrap {
+  position: relative;
+}
+
+.price-template-extra-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 2px solid #111;
+  background: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+.price-template-extra-table th,
+.price-template-extra-table td {
+  height: 34px;
+  border: 1px solid #4b5563;
+  padding: 0.25rem 0.4rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.price-template-extra-table th {
+  background: #dff2ff;
+  font-weight: 800;
+}
+
+.price-template-extra-table td {
+  background: rgb(255 255 255 / 92%);
+}
+
+.price-template-extra-table [contenteditable] {
+  display: block;
+  min-height: 22px;
+  outline: 0;
+  overflow-wrap: anywhere;
+}
+
+.price-template-extra-table [data-price-cell].is-selected {
+  box-shadow: inset 0 0 0 2px #1683e8;
+  background: rgb(22 131 232 / 8%);
 }
 
 .price-template-layout-handle {
@@ -14666,8 +14782,14 @@ html.dark .price-template-toggle-face::after {
   }
 
   body:has(.price-template-preview) .price-template-canvas-toolbar,
-  body:has(.price-template-preview) .price-template-layout-handle {
+  body:has(.price-template-preview) .price-template-layout-handle,
+  body:has(.price-template-preview) .price-template-drag-handle {
     display: none !important;
+  }
+
+  body:has(.price-template-preview) .price-template-preview.is-grid-editing {
+    background-color: #fff !important;
+    background-image: none !important;
   }
 
   body:has(.price-template-preview) .price-template-brand {

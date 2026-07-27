@@ -609,9 +609,12 @@
                     />
                   </div>
                   <div class="price-template-stage">
-                    <div class="price-template-canvas-toolbar" data-price-template-canvas-toolbar hidden>
-                      <strong data-price-template-selected-name>Элемент</strong>
+                    <div class="price-template-canvas-toolbar" data-price-template-canvas-toolbar>
+                      <strong data-price-template-selected-name>Выберите элемент</strong>
                       <div class="price-template-canvas-tools" role="group" aria-label="Положение и размер элемента">
+                        <button class="price-template-grid-toggle is-active" type="button" data-price-template-grid-toggle aria-pressed="true" title="Включить или выключить сетку">▦ Сетка 6</button>
+                        <button type="button" data-price-template-add-table title="Добавить новую таблицу">+ Таблица</button>
+                        <span class="price-template-tool-separator" aria-hidden="true"></span>
                         <button type="button" data-price-template-adjust="left" title="Сдвинуть влево" aria-label="Сдвинуть влево">←</button>
                         <button type="button" data-price-template-adjust="up" title="Сдвинуть вверх" aria-label="Сдвинуть вверх">↑</button>
                         <button type="button" data-price-template-adjust="down" title="Сдвинуть вниз" aria-label="Сдвинуть вниз">↓</button>
@@ -624,10 +627,18 @@
                           <button type="button" data-price-template-photo-upload>Заменить фото</button>
                           <button type="button" data-price-template-photo-remove>Удалить фото</button>
                         </span>
+                        <span class="price-template-extra-table-tools" data-price-template-extra-table-tools hidden>
+                          <button type="button" data-price-template-extra-row>+ Строка</button>
+                          <button type="button" data-price-template-extra-remove-row title="Удалить последнюю строку">− Строка</button>
+                          <button type="button" data-price-template-extra-column>+ Столбец</button>
+                          <button type="button" data-price-template-extra-remove-column title="Удалить последний столбец">− Столбец</button>
+                          <button type="button" data-price-template-extra-remove>Удалить</button>
+                        </span>
                       </div>
                       <input type="file" accept="image/png,image/jpeg,image/webp" data-price-template-photo-file hidden />
                     </div>
                     <article class="price-template-preview" aria-label="Редактируемый шаблон ценника U-POS">
+                      <button class="price-template-drag-handle" type="button" data-price-template-drag-handle aria-label="Перетащить выбранный элемент по сетке" title="Перетащить по сетке" hidden>⠿</button>
                       <header class="price-template-top">
                         <button class="price-template-brand" type="button" data-price-component="logo" data-price-layout-key="logo" data-price-template-logo-trigger aria-label="Выбрать логотип">
                           <span class="price-template-default-logo" data-price-template-default-logo>
@@ -681,6 +692,7 @@
                         </tfoot>
                       </table>
                       </div>
+                      <div class="price-template-extra-tables" data-price-template-extra-tables></div>
                       <footer class="price-template-note" data-price-component="comment" data-price-layout-key="comment"><span contenteditable="true" data-price-template-field="note" data-price-cell data-cell-address="Комментарий">IZOH:</span></footer>
                     </article>
                   </div>
@@ -2028,7 +2040,7 @@
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
-  <script src="{{ url_for('static', path='price-template-editor.js') }}?v=3" defer></script>
+  <script src="{{ url_for('static', path='price-template-editor.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=28" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

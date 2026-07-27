@@ -17846,6 +17846,59 @@ def create_app() -> FastAPI:
                     "total": "0",
                 }
             )
+        raw_extra_tables = (
+            source.get("extra_tables")
+            if isinstance(source.get("extra_tables"), list)
+            else []
+        )
+        extra_tables: list[dict[str, Any]] = []
+        used_table_ids: set[str] = set()
+        for table_index, raw_table in enumerate(raw_extra_tables[:8]):
+            table = raw_table if isinstance(raw_table, dict) else {}
+            table_id = re.sub(
+                r"[^a-zA-Z0-9_-]",
+                "",
+                clean_text(table.get("id"), 32),
+            ).lower()
+            if not table_id or table_id in used_table_ids:
+                table_id = f"table_{table_index + 1}"
+            while table_id in used_table_ids:
+                table_id = f"{table_id}_{table_index + 1}"
+            used_table_ids.add(table_id)
+            raw_cells = table.get("cells") if isinstance(table.get("cells"), list) else []
+            column_count = max(
+                1,
+                min(
+                    10,
+                    max(
+                        (
+                            len(raw_row)
+                            for raw_row in raw_cells[:20]
+                            if isinstance(raw_row, list)
+                        ),
+                        default=3,
+                    ),
+                ),
+            )
+            cells = [
+                [
+                    clean_text(
+                        raw_row[column_index]
+                        if isinstance(raw_row, list) and column_index < len(raw_row)
+                        else "",
+                        300,
+                    )
+                    for column_index in range(column_count)
+                ]
+                for raw_row in raw_cells[:20]
+            ]
+            if not cells:
+                cells = [
+                    ["Заголовок 1", "Заголовок 2", "Заголовок 3"],
+                    ["", "", ""],
+                    ["", "", ""],
+                ]
+            extra_tables.append({"id": table_id, "cells": cells})
         raw_visible = source.get("visible") if isinstance(source.get("visible"), dict) else {}
         default_visible = {
             "logo": True,
@@ -17900,6 +17953,7 @@ def create_app() -> FastAPI:
                 for row_index in range(50)
                 for field in ("name", "category", "qty", "price", "discount", "total")
             },
+            *{f"extra_table_{table['id']}" for table in extra_tables},
         }
         raw_layout = source.get("layout") if isinstance(source.get("layout"), dict) else {}
         layout: dict[str, dict[str, float]] = {}
@@ -17918,6 +17972,7 @@ def create_app() -> FastAPI:
             "logo": logo,
             "visible": visible,
             "layout": layout,
+            "extra_tables": extra_tables,
             "meta": {
                 "date": clean_text(raw_meta.get("date"), 160),
                 "id": clean_text(raw_meta.get("id"), 120),
