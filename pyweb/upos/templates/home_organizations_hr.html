@@ -13,7 +13,6 @@
 
 {% block main %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
-    {% include "_finance_module_tabs.html" %}
     {% if flash_ok or flash_err or request.query_params.get("err") == "csrf" %}
       <div class="organizations-flash-group">
         {% if flash_ok == "employee_created" %}
@@ -56,6 +55,9 @@
     {% set archived_employees = employees | rejectattr("status", "equalto", "active") | sort(attribute="full_name") | list %}
 
     <nav class="general-module-tabs org-hr-tabs" aria-label="Разделы HR" data-hr-open-tabs>
+      {# Возврат к лаунчеру финансов. Без data-hr-* — скрипт страницы управляет
+         только своими вкладками и эту ссылку не трогает. #}
+      <a class="general-module-tab" href="{{ url_for('home_finance') }}">Финансы</a>
       <button type="button" class="general-module-tab active" data-hr-home-tab data-hr-view="home" aria-current="page">HR</button>
     </nav>
 
