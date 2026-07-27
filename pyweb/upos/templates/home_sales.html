@@ -130,18 +130,32 @@
         <input name="date_from" type="date" value="{{ sales_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" aria-label="Дата продажи от и до" />
         <input name="date_to" type="hidden" value="{{ sales_filters.date_to }}" />
       </label>
-      <label>
+      <div class="sales-status-filter" data-sales-status-filter>
         <span>Статус</span>
-        <select name="status">
-          <option value="all" {% if sales_filters.status == 'all' %}selected{% endif %}>Все</option>
-          <option value="new" {% if sales_filters.status == 'new' %}selected{% endif %}>Новый</option>
-          <option value="shipped" {% if sales_filters.status == 'shipped' %}selected{% endif %}>Отгружен</option>
-          <option value="installation" {% if sales_filters.status == 'installation' %}selected{% endif %}>Установка</option>
-          <option value="completed" {% if sales_filters.status == 'completed' %}selected{% endif %}>Завершен</option>
-          <option value="archived" {% if sales_filters.status == 'archived' %}selected{% endif %}>Архив</option>
-          <option value="return" {% if sales_filters.status == 'return' %}selected{% endif %}>Возврат</option>
-        </select>
-      </label>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по статусам">
+            <span data-sales-status-summary>{{ sales_filters.status_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-status-all {% if not sales_filters.statuses %}checked{% endif %} />
+              <span>Все статусы</span>
+            </label>
+            {% for option in sales_options.status_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="status"
+                  value="{{ option.value }}"
+                  data-sales-status-option
+                  {% if option.value in sales_filters.statuses %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('sales_get') }}#sales-journal">Очистить</a>
     </form>
@@ -1235,7 +1249,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=18" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=19" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=57" defer></script>
   {% if sales_embed %}
     <script>

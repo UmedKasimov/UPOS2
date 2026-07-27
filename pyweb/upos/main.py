@@ -6921,10 +6921,49 @@ def create_app() -> FastAPI:
         date_to_clean = date_to.strip()
         if date_from_clean and date_to_clean and date_from_clean > date_to_clean:
             date_from_clean, date_to_clean = date_to_clean, date_from_clean
+        status_filter_options = [
+            {"value": "new", "label": "Новый"},
+            {"value": "shipped", "label": "Отгружен"},
+            {"value": "installation", "label": "Установка"},
+            {"value": "completed", "label": "Завершен"},
+            {"value": "archived", "label": "Архив"},
+            {"value": "return", "label": "Возврат"},
+        ]
+        status_query_values = [
+            str(item or "").strip().lower()
+            for item in request.query_params.getlist("status")
+            if str(item or "").strip()
+        ]
+        if not status_query_values:
+            status_query_values = [str(status or "all").strip().lower()]
+        allowed_statuses = {item["value"] for item in status_filter_options}
+        selected_statuses = list(
+            dict.fromkeys(item for item in status_query_values if item in allowed_statuses)
+        )
+        debt_filter_active = "debt" in status_query_values
+        status_filter = (
+            "debt"
+            if debt_filter_active
+            else selected_statuses[0]
+            if len(selected_statuses) == 1
+            else "all"
+        )
+        if not selected_statuses:
+            status_summary = "Все"
+        elif len(selected_statuses) == 1:
+            status_summary = next(
+                item["label"]
+                for item in status_filter_options
+                if item["value"] == selected_statuses[0]
+            )
+        else:
+            status_summary = f"Выбрано: {len(selected_statuses)}"
         filters = {
             "q": q.strip(),
             "doc_type": doc_type.strip() or "all",
-            "status": status.strip() or "all",
+            "status": status_filter,
+            "statuses": selected_statuses,
+            "status_summary": status_summary,
             "client": client.strip(),
             "date_from": date_from_clean,
             "date_to": date_to_clean,
@@ -6969,7 +7008,7 @@ def create_app() -> FastAPI:
                 if filters["status"] == "debt":
                     if item["doc_type"] != "sale" or _sales_decimal(item.get("debt_value")) <= 0:
                         continue
-                elif filters["status"] != "all" and item["status"] != filters["status"]:
+                elif filters["statuses"] and item["status"] not in filters["statuses"]:
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
                     continue
@@ -7139,6 +7178,7 @@ def create_app() -> FastAPI:
                 "product_rows": product_options,
                 "price_types": price_type_options,
                 "payment_accounts": payment_accounts,
+                "status_filters": status_filter_options,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},

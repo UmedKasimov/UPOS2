@@ -10386,6 +10386,111 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   left: 1.67rem;
 }
 
+.sales-status-filter {
+  position: relative;
+  min-width: 0;
+}
+
+.sales-status-filter > span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sales-status-filter-details {
+  position: relative;
+}
+
+.sales-status-filter-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  height: 2.55rem;
+  padding: 0 2.25rem 0 0.8rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-xs, 6px);
+  background: var(--input-bg, var(--card));
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.sales-status-filter-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sales-status-filter-details > summary::after {
+  position: absolute;
+  right: 0.8rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  transform: translateY(-0.15rem) rotate(45deg);
+  transition: transform 150ms ease;
+}
+
+.sales-status-filter-details[open] > summary {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.sales-status-filter-details[open] > summary::after {
+  transform: translateY(0.15rem) rotate(225deg);
+}
+
+.sales-status-filter-details > summary span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sales-status-filter-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  display: grid;
+  min-width: 11.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  box-shadow: 0 12px 30px rgb(15 23 42 / 18%);
+}
+
+.sales-status-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.45rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sales-status-filter-option:hover {
+  background: var(--hover-bg, color-mix(in srgb, var(--primary) 8%, transparent));
+}
+
+.sales-status-filter-option--all {
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sales-status-filter-option input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
 .sales-journal-search-match {
   padding: 0.05em 0.12em;
   border-radius: 3px;

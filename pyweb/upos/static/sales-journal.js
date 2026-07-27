@@ -727,16 +727,52 @@
     var form = scope.querySelector("#sales-journal-filter");
     if (!form || form.dataset.salesJournalFilterReady === "1") return;
     form.dataset.salesJournalFilterReady = "1";
+    var statusFilter = form.querySelector("[data-sales-status-filter]");
+    if (statusFilter) {
+      var allStatuses = statusFilter.querySelector("[data-sales-status-all]");
+      var statusOptions = Array.from(statusFilter.querySelectorAll("[data-sales-status-option]"));
+      var statusSummary = statusFilter.querySelector("[data-sales-status-summary]");
+      var updateStatusSummary = function () {
+        var checked = statusOptions.filter(function (field) {
+          return field.checked;
+        });
+        if (statusSummary) {
+          statusSummary.textContent =
+            checked.length === 0
+              ? "Все"
+              : checked.length === 1
+                ? String(checked[0].closest("label").querySelector("span").textContent || "").trim()
+                : "Выбрано: " + checked.length;
+        }
+        if (allStatuses) allStatuses.checked = checked.length === 0;
+      };
+      if (allStatuses) {
+        allStatuses.addEventListener("change", function () {
+          if (allStatuses.checked) {
+            statusOptions.forEach(function (field) {
+              field.checked = false;
+            });
+          }
+          updateStatusSummary();
+        });
+      }
+      statusOptions.forEach(function (field) {
+        field.addEventListener("change", updateStatusSummary);
+      });
+      updateStatusSummary();
+    }
     var navigate = function () {
       var params = new URLSearchParams();
-      ["q", "doc_type", "client", "status"].forEach(function (name) {
+      ["q", "doc_type", "client", "date_from", "date_to"].forEach(function (name) {
         var field = form.querySelector("[name=\"" + name + "\"]");
         var value = field ? String(field.value || "").trim() : "";
         if (!value) return;
         params.set(name, value);
       });
+      form.querySelectorAll("[data-sales-status-option]:checked").forEach(function (field) {
+        params.append("status", String(field.value || "").trim());
+      });
       if (!params.has("doc_type")) params.set("doc_type", "all");
-      if (!params.has("status")) params.set("status", "all");
       var query = params.toString();
       var targetHash = params.get("status") === "debt" ? "#debt" : "#sales-journal";
       window.location.href = "/sales" + (query ? "?" + query : "") + targetHash;
