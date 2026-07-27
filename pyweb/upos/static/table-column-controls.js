@@ -4,6 +4,9 @@
   const CONTROL_CELL = 'upos-table-column-control-cell';
   const HIDDEN_CLASS = 'upos-table-column-hidden';
   const MENU_OPEN_CLASS = 'is-column-menu-open';
+  const CELL_KEY_ATTR = 'data-upos-column-cell-key';
+  const ORDER_STORAGE_SUFFIX = ':order';
+  let draggedColumn = null;
   const TEXT_DROP_TABLE_SELECTOR = [
     'table[data-upos-column-controls]',
     'table.products-table',
@@ -88,7 +91,65 @@
     return rows[rows.length - 1] || null;
   }
 
+  function tableRows(table) {
+    return [
+      ...Array.from(table.tHead?.rows || []),
+      ...Array.from(table.tBodies || []).flatMap((body) => Array.from(body.rows || [])),
+      ...Array.from(table.tFoot?.rows || []),
+    ];
+  }
+
+  function ensureColumnKeys(table) {
+    const row = headerRow(table);
+    const headerCells = directCells(row);
+    if (!headerCells.length) return [];
+
+    const defaults = Array.isArray(table._uposDefaultColumnOrder)
+      ? [...table._uposDefaultColumnOrder]
+      : [];
+    const used = new Set();
+    const headerKeys = headerCells.map((cell, index) => {
+      const preferred = cell.dataset.columnKey
+        || cell.getAttribute(CELL_KEY_ATTR)
+        || defaults[index]
+        || String(index);
+      let key = String(preferred);
+      let suffix = 2;
+      while (used.has(key)) {
+        key = `${preferred}-${suffix}`;
+        suffix += 1;
+      }
+      used.add(key);
+      cell.dataset.columnKey = key;
+      cell.setAttribute(CELL_KEY_ATTR, key);
+      return key;
+    });
+
+    if (!defaults.length) {
+      table._uposDefaultColumnOrder = [...headerKeys];
+    } else {
+      headerKeys.forEach((key) => {
+        if (!defaults.includes(key)) defaults.push(key);
+      });
+      table._uposDefaultColumnOrder = defaults;
+    }
+
+    const defaultOrder = table._uposDefaultColumnOrder;
+    tableRows(table).forEach((tableRow) => {
+      if (tableRow === row) return;
+      const cells = directCells(tableRow);
+      if (cells.length !== defaultOrder.length) return;
+      cells.forEach((cell, index) => {
+        if (!cell.hasAttribute(CELL_KEY_ATTR)) {
+          cell.setAttribute(CELL_KEY_ATTR, defaultOrder[index]);
+        }
+      });
+    });
+    return headerKeys;
+  }
+
   function columns(table) {
+    ensureColumnKeys(table);
     return directCells(headerRow(table)).map((cell, index) => ({
       index,
       key: cell.dataset.columnKey || String(index),
@@ -104,6 +165,10 @@
     const panel = table.closest('[id]');
     const key = table.id || panel?.id || table.className || 'table';
     return `upos.tableColumns:${location.pathname}:${key}:${tableIndex(table)}`;
+  }
+
+  function orderStorageKey(table) {
+    return `${storageKey(table)}${ORDER_STORAGE_SUFFIX}`;
   }
 
   function readHidden(table) {
@@ -132,6 +197,53 @@
     }
   }
 
+  function readOrder(table) {
+    ensureColumnKeys(table);
+    const available = new Set(columns(table).map((column) => column.key));
+    const fallback = (table._uposDefaultColumnOrder || []).filter((key) => available.has(key));
+    try {
+      const raw = JSON.parse(localStorage.getItem(orderStorageKey(table)) || '[]');
+      if (!Array.isArray(raw)) return fallback;
+      const order = raw.map(String).filter((key, index, items) => (
+        available.has(key) && items.indexOf(key) === index
+      ));
+      fallback.forEach((key) => {
+        if (!order.includes(key)) order.push(key);
+      });
+      return order;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function saveOrder(table, order) {
+    try {
+      localStorage.setItem(orderStorageKey(table), JSON.stringify(order));
+    } catch {
+      /* localStorage may be unavailable. */
+    }
+  }
+
+  function applyOrder(table) {
+    ensureColumnKeys(table);
+    const order = readOrder(table);
+    if (!order.length) return;
+    tableRows(table).forEach((row) => {
+      const cells = directCells(row);
+      if (cells.length !== order.length) return;
+      const keyedCells = new Map(
+        cells.map((cell) => [cell.getAttribute(CELL_KEY_ATTR), cell]),
+      );
+      if (keyedCells.size !== order.length || order.some((key) => !keyedCells.has(key))) return;
+      const currentOrder = cells.map((cell) => cell.getAttribute(CELL_KEY_ATTR));
+      if (currentOrder.every((key, index) => key === order[index])) return;
+      const controlCell = row.querySelector(`:scope > .${CONTROL_CELL}`);
+      order.forEach((key) => {
+        row.insertBefore(keyedCells.get(key), controlCell || null);
+      });
+    });
+  }
+
   function visibleCount(table, hidden) {
     return Math.max(1, columns(table).filter((column) => !hidden.has(column.key)).length);
   }
@@ -158,17 +270,14 @@
   }
 
   function applyVisibility(table) {
+    ensureColumnKeys(table);
     const hidden = readHidden(table);
     const list = columns(table);
-    const rows = [
-      ...Array.from(table.tHead?.rows || []),
-      ...Array.from(table.tBodies || []).flatMap((body) => Array.from(body.rows || [])),
-      ...Array.from(table.tFoot?.rows || []),
-    ];
-    rows.forEach((row) => {
+    tableRows(table).forEach((row) => {
       if (syncPlaceholder(row, table, hidden)) return;
       directCells(row).forEach((cell, index) => {
-        cell.classList.toggle(HIDDEN_CLASS, hidden.has(list[index]?.key || String(index)));
+        const key = cell.getAttribute(CELL_KEY_ATTR) || list[index]?.key || String(index);
+        cell.classList.toggle(HIDDEN_CLASS, hidden.has(key));
       });
     });
   }
@@ -213,8 +322,20 @@
     menu.append(title);
 
     list.forEach((column) => {
+      const choice = document.createElement('div');
+      choice.className = 'upos-table-column-choice';
+      choice.dataset.uposColumnOrderKey = column.key;
+
+      const handle = document.createElement('button');
+      handle.type = 'button';
+      handle.className = 'upos-table-column-drag-handle';
+      handle.dataset.uposColumnDragHandle = '1';
+      handle.draggable = true;
+      handle.title = `Переместить столбец «${column.label}»`;
+      handle.setAttribute('aria-label', `Переместить столбец «${column.label}»`);
+
       const label = document.createElement('label');
-      label.className = 'upos-table-column-choice';
+      label.className = 'upos-table-column-choice-label';
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.checked = !hidden.has(column.key);
@@ -222,14 +343,25 @@
       const text = document.createElement('span');
       text.textContent = column.label;
       label.append(input, text);
-      menu.append(label);
+      choice.append(handle, label);
+      menu.append(choice);
     });
 
-    const footer = document.createElement('button');
-    footer.type = 'button';
-    footer.className = 'upos-table-column-reset';
-    footer.textContent = 'Показать все';
-    footer.dataset.uposColumnReset = '1';
+    const footer = document.createElement('div');
+    footer.className = 'upos-table-column-menu-footer';
+
+    const orderReset = document.createElement('button');
+    orderReset.type = 'button';
+    orderReset.className = 'upos-table-column-reset';
+    orderReset.textContent = 'Сбросить порядок';
+    orderReset.dataset.uposColumnOrderReset = '1';
+
+    const showAll = document.createElement('button');
+    showAll.type = 'button';
+    showAll.className = 'upos-table-column-reset';
+    showAll.textContent = 'Показать все';
+    showAll.dataset.uposColumnReset = '1';
+    footer.append(orderReset, showAll);
     menu.append(footer);
   }
 
@@ -277,6 +409,8 @@
     table.classList.add('upos-table-with-column-controls');
     row.append(createControl(table));
     ensureBodyControlCells(table);
+    ensureColumnKeys(table);
+    applyOrder(table);
     applyVisibility(table);
   }
 
@@ -312,6 +446,18 @@
       return;
     }
 
+    const orderReset = event.target.closest('[data-upos-column-order-reset]');
+    if (orderReset) {
+      const menu = orderReset.closest('[data-upos-column-menu]');
+      const table = menu?._uposColumnTable || orderReset.closest('table');
+      if (!table) return;
+      localStorage.removeItem(orderStorageKey(table));
+      applyOrder(table);
+      applyVisibility(table);
+      renderMenu(table, menu?._uposColumnRoot || orderReset.closest('.upos-table-column-control'));
+      return;
+    }
+
     if (!event.target.closest('.upos-table-column-control') && !event.target.closest('[data-upos-column-menu]')) closeMenus();
   });
 
@@ -326,6 +472,100 @@
     else hidden.add(key);
     saveHidden(table, hidden);
     applyVisibility(table);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const handle = event.target.closest('[data-upos-column-drag-handle]');
+    if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    const choice = handle.closest('[data-upos-column-order-key]');
+    const menu = choice?.closest('[data-upos-column-menu]');
+    const table = menu?._uposColumnTable;
+    if (!choice || !menu || !table) return;
+    const key = choice.dataset.uposColumnOrderKey;
+    const order = readOrder(table);
+    const currentIndex = order.indexOf(key);
+    const nextIndex = currentIndex + (event.key === 'ArrowUp' ? -1 : 1);
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= order.length) return;
+    event.preventDefault();
+    order.splice(currentIndex, 1);
+    order.splice(nextIndex, 0, key);
+    saveOrder(table, order);
+    applyOrder(table);
+    applyVisibility(table);
+    renderMenu(table, menu._uposColumnRoot);
+    menu.querySelector(`[data-upos-column-order-key="${CSS.escape(key)}"] [data-upos-column-drag-handle]`)?.focus();
+  });
+
+  function clearDropIndicators(menu) {
+    menu?.querySelectorAll('.is-drop-before, .is-drop-after').forEach((choice) => {
+      choice.classList.remove('is-drop-before', 'is-drop-after');
+    });
+  }
+
+  document.addEventListener('dragstart', (event) => {
+    const handle = event.target.closest('[data-upos-column-drag-handle]');
+    const choice = handle?.closest('[data-upos-column-order-key]');
+    const menu = choice?.closest('[data-upos-column-menu]');
+    const table = menu?._uposColumnTable;
+    if (!choice || !menu || !table) return;
+    draggedColumn = {
+      key: choice.dataset.uposColumnOrderKey,
+      menu,
+      table,
+    };
+    choice.classList.add('is-dragging');
+    event.dataTransfer?.setData('application/x-upos-column', draggedColumn.key);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  });
+
+  document.addEventListener('dragover', (event) => {
+    if (!draggedColumn) return;
+    const choice = event.target.closest('[data-upos-column-order-key]');
+    if (!choice || choice.closest('[data-upos-column-menu]') !== draggedColumn.menu) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    clearDropIndicators(draggedColumn.menu);
+    const rect = choice.getBoundingClientRect();
+    const after = event.clientY > rect.top + rect.height / 2;
+    choice.classList.add(after ? 'is-drop-after' : 'is-drop-before');
+
+    const menuRect = draggedColumn.menu.getBoundingClientRect();
+    if (event.clientY < menuRect.top + 32) draggedColumn.menu.scrollTop -= 12;
+    if (event.clientY > menuRect.bottom - 32) draggedColumn.menu.scrollTop += 12;
+  });
+
+  document.addEventListener('drop', (event) => {
+    if (!draggedColumn) return;
+    const choice = event.target.closest('[data-upos-column-order-key]');
+    if (!choice || choice.closest('[data-upos-column-menu]') !== draggedColumn.menu) return;
+    event.preventDefault();
+    const targetKey = choice.dataset.uposColumnOrderKey;
+    if (targetKey === draggedColumn.key) {
+      clearDropIndicators(draggedColumn.menu);
+      return;
+    }
+    const rect = choice.getBoundingClientRect();
+    const insertAfter = event.clientY > rect.top + rect.height / 2;
+    const order = readOrder(draggedColumn.table).filter((key) => key !== draggedColumn.key);
+    let targetIndex = order.indexOf(targetKey);
+    if (targetIndex < 0) return;
+    if (insertAfter) targetIndex += 1;
+    order.splice(targetIndex, 0, draggedColumn.key);
+    saveOrder(draggedColumn.table, order);
+    applyOrder(draggedColumn.table);
+    applyVisibility(draggedColumn.table);
+    const root = draggedColumn.menu._uposColumnRoot;
+    clearDropIndicators(draggedColumn.menu);
+    renderMenu(draggedColumn.table, root);
+  });
+
+  document.addEventListener('dragend', () => {
+    if (!draggedColumn) return;
+    draggedColumn.menu.querySelectorAll('.is-dragging').forEach((choice) => {
+      choice.classList.remove('is-dragging');
+    });
+    clearDropIndicators(draggedColumn.menu);
+    draggedColumn = null;
   });
 
   function repositionOpenMenus() {
@@ -349,6 +589,8 @@
     });
     tablesToRefresh.forEach((table) => {
       ensureBodyControlCells(table);
+      ensureColumnKeys(table);
+      applyOrder(table);
       applyVisibility(table);
     });
   });
