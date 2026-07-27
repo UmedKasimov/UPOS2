@@ -10816,6 +10816,16 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-journal-id-cell {
   cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sales-journal-id-cell:hover,
+.sales-journal-id-cell:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--primary) 12%, var(--card)) !important;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 58%, transparent);
 }
 
 .sales-journal-id-cell:hover strong,
