@@ -82,6 +82,7 @@ INTEGRATION_PROVIDERS: tuple[IntegrationProvider, ...] = (
             "api_key": "",
             "terminal_id": "",
             "filial_id": "",
+            "filial_ids": [],
             "organization_id": "",
             "upos_branch_id": "",
             "sync_enabled": True,

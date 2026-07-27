@@ -61,6 +61,28 @@ def _text(item: dict[str, Any], *keys: str) -> str:
     return str(value or "").strip()
 
 
+def _scalar(item: dict[str, Any], *keys: str) -> str:
+    value = _walk(item, *keys)
+    if isinstance(value, (dict, list)):
+        return ""
+    return str(value or "").strip()
+
+
+def _decimal_value(value: Any) -> Decimal:
+    try:
+        return Decimal(str(value or "0"))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal("0")
+
+
+def _decimal_text(value: Any) -> str:
+    number = _decimal_value(value)
+    text = format(number, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
 def _external_id(item: dict[str, Any], entity_type: str) -> str:
     value = _walk(
         item,
@@ -107,6 +129,140 @@ def _created_at(item: dict[str, Any]) -> datetime:
                 except ValueError:
                     continue
     return datetime.now(UTC)
+
+
+def _shipment_details(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    for key in ("shipment_details", "details", "lines", "items", "products"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _shipment_lines(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    lines: list[dict[str, Any]] = []
+    for detail in _shipment_details(payload):
+        product = detail.get("product") if isinstance(detail.get("product"), dict) else {}
+        warehouse = detail.get("warehouse") if isinstance(detail.get("warehouse"), dict) else {}
+        unit = product.get("storage_unit") if isinstance(product.get("storage_unit"), dict) else {}
+        quantity = _decimal_value(
+            detail.get("quantity")
+            or detail.get("qty")
+            or detail.get("count")
+        )
+        price = _decimal_value(
+            detail.get("price")
+            or detail.get("sale_price")
+            or detail.get("amount")
+        )
+        total_raw = detail.get("total")
+        total = _decimal_value(total_raw) if total_raw not in (None, "") else quantity * price
+        product_id = (
+            _scalar(product, "id", "product_id")
+            or _scalar(detail, "product_id")
+        )
+        warehouse_id = (
+            _scalar(warehouse, "id", "warehouse_id")
+            or _scalar(detail, "warehouse_id")
+        )
+        product_name = (
+            _text(product, "name", "title")
+            or _text(detail, "product_name", "name")
+            or (f"IBOX #{product_id}" if product_id else "Товар IBOX")
+        )
+        warehouse_name = (
+            _text(warehouse, "name", "title")
+            or _text(detail, "warehouse_name")
+            or "Основной склад"
+        )
+        lines.append(
+            {
+                "product": product_name,
+                "product_id": product_id,
+                "warehouse": warehouse_name,
+                "warehouse_id": warehouse_id,
+                "quantity": _decimal_text(quantity),
+                "price": _decimal_text(price),
+                "total": _decimal_text(total),
+                "unit": _text(unit, "short_name", "name") or _text(detail, "unit_name", "unit"),
+                "source": INTEGRATION,
+            }
+        )
+    return lines
+
+
+def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
+    created_at = _created_at(payload)
+    lines = _shipment_lines(payload)
+    first_line = lines[0] if lines else {}
+    return {
+        "doc_type": "sale",
+        "date": created_at.date().isoformat(),
+        "date_to": created_at.date().isoformat(),
+        "client": (
+            _text(payload, "outlet_name", "client_name", "counterparty_name")
+            or "Клиент IBOX"
+        ),
+        "warehouse": (
+            str(first_line.get("warehouse") or "").strip()
+            or _text(payload, "warehouse_name")
+            or "Основной склад"
+        ),
+        "status": "shipped",
+        "workflow_version": 2,
+        # IBOX remains the stock source of truth for imported shipments.
+        "inventory_applied": False,
+        "paid_amount": "0",
+        "payment_type": "",
+        "payment_lines": [],
+        "manager": "IBOX",
+        "note": "Импортировано из IBOX",
+        "price_type_id": "",
+        "price_type": "",
+        "crm_record_id": "",
+        "source_sale_id": "",
+        "lines": lines,
+        "source": INTEGRATION,
+        "ibox_document_id": _scalar(payload, "id", "document_id"),
+        "ibox_filial_id": (
+            _scalar(payload, "_ibox_filial_id")
+            or _scalar(payload, "filial_id")
+        ),
+        "ibox_status": payload.get("status"),
+        "ibox_payload": payload,
+    }
+
+
+def _shipment_counterparty_id(
+    session,
+    workspace_owner_id: str,
+    payload: dict[str, Any],
+) -> str | None:
+    outlet_id = _scalar(payload, "outlet_id", "client_id", "counterparty_id")
+    if outlet_id:
+        counterparty_id = session.execute(
+            select(Counterparty.id)
+            .where(
+                Counterparty.workspace_owner_id == workspace_owner_id,
+                Counterparty.external_source == INTEGRATION,
+                Counterparty.external_id == outlet_id,
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if counterparty_id:
+            return str(counterparty_id)
+    client_name = _text(payload, "outlet_name", "client_name", "counterparty_name")
+    if not client_name:
+        return None
+    counterparty_id = session.execute(
+        select(Counterparty.id)
+        .where(
+            Counterparty.workspace_owner_id == workspace_owner_id,
+            func.lower(Counterparty.name) == client_name.lower(),
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+    return str(counterparty_id) if counterparty_id else None
 
 
 def _run_dict(run: IntegrationSyncRun) -> dict[str, Any]:
@@ -388,6 +544,7 @@ def _normalize(
             document_common,
             payload,
             target_branch_id=target_branch_id,
+            entity_type=entity_type,
         )
     elif entity_type in {"purchases", "supplier_returns"}:
         document_common = {**common, "external_id": f"{entity_type}:{ext_id}"[:180]}
@@ -415,15 +572,23 @@ def _upsert_document(
     payload: dict[str, Any],
     *,
     target_branch_id: str | None,
+    entity_type: str = "",
 ) -> None:
+    is_shipment = model is SaleDocument and entity_type == "shipments"
+    document_data = _shipment_document_data(payload) if is_shipment else payload
+    counterparty_id = (
+        _shipment_counterparty_id(session, str(common["workspace_owner_id"]), payload)
+        if is_shipment
+        else None
+    )
     values = {
         **common,
         "number": _text(payload, "number", "document_number", "code"),
         "amount": _money(payload),
         "currency": _currency(payload),
-        "counterparty_id": None,
+        "counterparty_id": counterparty_id,
         "branch_id": target_branch_id,
-        "data": payload,
+        "data": document_data,
         "created_at": _created_at(payload),
     }
     _upsert_model(
@@ -433,7 +598,15 @@ def _upsert_document(
         values,
         {
             key: values[key]
-            for key in ("number", "amount", "currency", "branch_id", "data", "created_at")
+            for key in (
+                "number",
+                "amount",
+                "currency",
+                "counterparty_id",
+                "branch_id",
+                "data",
+                "created_at",
+            )
         },
     )
 

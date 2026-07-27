@@ -18922,6 +18922,12 @@ def create_app() -> FastAPI:
             }
             api_key = str(ibox.get("api_key") or "").strip() or str(prev.get("api_key") or "").strip()
             filial_id = str(prev.get("filial_id") or prev.get("terminal_id") or "").strip()
+            raw_filial_ids = prev.get("filial_ids")
+            filial_ids = (
+                [str(item or "").strip() for item in raw_filial_ids if str(item or "").strip()]
+                if isinstance(raw_filial_ids, list)
+                else ([filial_id] if filial_id else [])
+            )
             upos_branch_id = str(ibox.get("upos_branch_id") or "").strip()
             upos_branches = list_upos_branches(wid)
             valid_branch_ids = {str(branch.get("id") or "") for branch in upos_branches}
@@ -18932,6 +18938,7 @@ def create_app() -> FastAPI:
                 "api_key": api_key,
                 "terminal_id": filial_id,
                 "filial_id": filial_id,
+                "filial_ids": filial_ids,
                 "upos_branch_id": upos_branch_id,
                 "organization_id": wid,
                 "sync_enabled": bool(ibox.get("sync_enabled", True)),
@@ -19426,7 +19433,12 @@ def create_app() -> FastAPI:
                 status_code=400,
             )
         remote_filial_id = str(result.get("filial_id") or "").strip()
-        if not remote_filial_id:
+        remote_filial_ids = [
+            str(item or "").strip()
+            for item in (result.get("filial_ids") if isinstance(result.get("filial_ids"), list) else [])
+            if str(item or "").strip()
+        ]
+        if not remote_filial_id or not remote_filial_ids:
             return JSONResponse(
                 {
                     "error": (
@@ -19438,6 +19450,7 @@ def create_app() -> FastAPI:
             )
         block["filial_id"] = remote_filial_id
         block["terminal_id"] = remote_filial_id
+        block["filial_ids"] = remote_filial_ids
         block["connection_ok"] = True
         block["connection_message"] = "Подключено"
         block["connection_checked_at"] = datetime.now(timezone.utc).isoformat()
@@ -19462,7 +19475,13 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": "Сначала настройте IBOX / SMPro"}, status_code=400)
         if not str(block.get("upos_branch_id") or "").strip():
             return JSONResponse({"error": "Сначала выберите филиал U-POS"}, status_code=400)
-        if not str(block.get("filial_id") or block.get("terminal_id") or "").strip():
+        if not (
+            str(block.get("filial_id") or block.get("terminal_id") or "").strip()
+            or (
+                isinstance(block.get("filial_ids"), list)
+                and any(str(item or "").strip() for item in block.get("filial_ids") or [])
+            )
+        ):
             return JSONResponse({"error": "Сначала проверьте подключение к IBOX / SMPro"}, status_code=400)
         modules = block.get("sync_modules")
         if isinstance(modules, dict) and not any(bool(modules.get(key)) for key in DEFAULT_MODULES):

@@ -151,14 +151,22 @@ def _ascii_identifier(value: Any) -> str:
     return text
 
 
-def extract_filial_identifier(filials: list[dict[str, Any]]) -> str:
+def extract_filial_identifiers(filials: list[dict[str, Any]]) -> list[str]:
+    identifiers: list[str] = []
     for filial in filials:
         fields = {str(key).lower(): value for key, value in filial.items()}
         for key in ("id", "filial_id", "uuid", "guid", "code", "value"):
             identifier = _ascii_identifier(fields.get(key))
             if identifier:
-                return identifier
-    return ""
+                if identifier not in identifiers:
+                    identifiers.append(identifier)
+                break
+    return identifiers
+
+
+def extract_filial_identifier(filials: list[dict[str, Any]]) -> str:
+    identifiers = extract_filial_identifiers(filials)
+    return identifiers[0] if identifiers else ""
 
 
 def _header_value(value: Any, *, label: str) -> str:
@@ -179,6 +187,16 @@ class SMProClient:
         self.base_url = _base_url(config.get("api_url"))
         self.api_key = _clean(config.get("api_key"))
         self.filial_id = _clean(config.get("filial_id") or config.get("terminal_id"))
+        raw_filial_ids = config.get("filial_ids")
+        configured_filial_ids = raw_filial_ids if isinstance(raw_filial_ids, list) else []
+        self.filial_ids = [
+            identifier
+            for identifier in dict.fromkeys(
+                _ascii_identifier(item)
+                for item in configured_filial_ids + ([self.filial_id] if self.filial_id else [])
+            )
+            if identifier
+        ]
         try:
             self.timeout = max(5.0, min(float(config.get("timeout") or 30), 120.0))
         except (TypeError, ValueError):
@@ -188,17 +206,18 @@ class SMProClient:
         self._transport = transport
         self.warnings: list[dict[str, str]] = []
 
-    def _headers(self, *, require_filial: bool) -> dict[str, str]:
+    def _headers(self, *, require_filial: bool, filial_id: str = "") -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {_header_value(self.api_key, label='API-ключ IBOX')}",
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
         if require_filial:
-            if not self.filial_id:
+            selected_filial_id = _clean(filial_id or self.filial_id)
+            if not selected_filial_id:
                 raise SMProError("Выберите филиал SMPro")
             headers["Filial-Id"] = _header_value(
-                self.filial_id,
+                selected_filial_id,
                 label="Технический ID филиала IBOX",
             )
         return headers
@@ -209,11 +228,19 @@ class SMProClient:
         *,
         params: dict[str, Any] | None = None,
         require_filial: bool = True,
+        filial_id: str = "",
     ) -> Any:
         url = urljoin(self.base_url, path.lstrip("/"))
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True, transport=self._transport) as client:
-                response = client.get(url, params=params, headers=self._headers(require_filial=require_filial))
+                response = client.get(
+                    url,
+                    params=params,
+                    headers=self._headers(
+                        require_filial=require_filial,
+                        filial_id=filial_id,
+                    ),
+                )
         except httpx.HTTPError as exc:
             raise SMProError(f"SMPro недоступен: {exc}") from exc
         if response.status_code >= 400:
@@ -238,11 +265,13 @@ class SMProClient:
             require_filial=False,
         )
         filials = _extract_items(payload)
+        filial_ids = extract_filial_identifiers(filials)
         return {
             "ok": True,
             "filials": filials,
             "filial_count": len(filials),
-            "filial_id": extract_filial_identifier(filials),
+            "filial_id": filial_ids[0] if filial_ids else "",
+            "filial_ids": filial_ids,
         }
 
     def fetch_resource(
@@ -251,6 +280,7 @@ class SMProClient:
         *,
         full_history: bool,
         since: str = "",
+        filial_id: str = "",
     ) -> list[dict[str, Any]]:
         per_page = 200
         page = 1
@@ -265,6 +295,7 @@ class SMProClient:
                 resource.path,
                 params=params,
                 require_filial=resource.requires_filial,
+                filial_id=filial_id,
             )
             items = _extract_items(payload)
             result.extend(items)
@@ -295,12 +326,30 @@ class SMProClient:
         entities: dict[str, list[dict[str, Any]]] = {}
         for module in modules:
             for resource in RESOURCES.get(module, ()):
-                try:
-                    entities[resource.key] = self.fetch_resource(
-                        resource,
-                        full_history=full_history,
-                        since=since,
-                    )
-                except SMProError as exc:
-                    self.warnings.append({"resource": resource.key, "error": str(exc)})
+                filial_ids = self.filial_ids if resource.requires_filial else [""]
+                if resource.requires_filial and not filial_ids:
+                    filial_ids = [self.filial_id]
+                merged: list[dict[str, Any]] = []
+                for filial_id in filial_ids:
+                    try:
+                        rows = self.fetch_resource(
+                            resource,
+                            full_history=full_history,
+                            since=since,
+                            filial_id=filial_id,
+                        )
+                        for row in rows:
+                            normalized = dict(row)
+                            if filial_id:
+                                normalized.setdefault("_ibox_filial_id", filial_id)
+                            merged.append(normalized)
+                    except SMProError as exc:
+                        self.warnings.append(
+                            {
+                                "resource": resource.key,
+                                "filial_id": filial_id,
+                                "error": str(exc),
+                            }
+                        )
+                entities[resource.key] = merged
         return entities

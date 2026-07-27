@@ -24,6 +24,7 @@ class SMProClientTests(unittest.TestCase):
         self.assertEqual(result["filial_count"], 1)
         self.assertEqual(result["filials"][0]["id"], 7)
         self.assertEqual(result["filial_id"], "7")
+        self.assertEqual(result["filial_ids"], ["7"])
 
     def test_connection_uses_ascii_filial_code_when_id_is_not_ascii(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
@@ -103,6 +104,35 @@ class SMProClientTests(unittest.TestCase):
             SMProResource("orders", "api/integration/document/order/list"),
             full_history=False,
             since="2026-07-01T12:00:00+00:00",
+        )
+
+    def test_modules_merge_rows_from_all_configured_filials(self) -> None:
+        requested_filials: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            filial_id = request.headers["Filial-Id"]
+            requested_filials.append(filial_id)
+            return httpx.Response(
+                200,
+                json={"data": [{"id": int(filial_id) * 10}]},
+            )
+
+        client = SMProClient(
+            {
+                "api_url": "smpro.example",
+                "api_key": "secret",
+                "filial_id": "1",
+                "filial_ids": ["1", "2", "3"],
+            },
+            transport=httpx.MockTransport(handler),
+        )
+
+        result = client.fetch_modules(["sales"], full_history=True)
+
+        self.assertEqual(requested_filials, ["1", "2", "3"] * 3)
+        self.assertEqual(
+            [row["_ibox_filial_id"] for row in result["shipments"]],
+            ["1", "2", "3"],
         )
 
 
