@@ -11,7 +11,11 @@
 {% block main %}
   {% set emp_perms = user.get('employee_permissions') or {} %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
-    <section class="general-report-launcher" aria-label="Разделы финансов">
+    <nav class="general-module-tabs workbench-open-tabs" aria-label="Открытые вкладки финансов">
+      <button type="button" class="general-module-tab active" aria-current="page">Финансы</button>
+    </nav>
+
+    <section class="general-report-launcher workbench-launcher" aria-label="Разделы финансов">
       {% if not user.get('is_employee') or emp_perms.get('schet') %}
         <a class="general-report-card" href="{{ url_for('home_schet') }}">
           <span class="general-report-card-icon" aria-hidden="true">
