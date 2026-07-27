@@ -13749,12 +13749,97 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   align-items: center;
 }
 
+.price-template-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.price-template-save-status {
+  min-height: 1.2rem;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.price-template-save-status.is-success {
+  color: #16824b;
+}
+
+.price-template-save-status.is-error {
+  color: #c43333;
+}
+
+.price-template-workbook {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 15%);
+  border-radius: var(--radius-md);
+  background: var(--background);
+}
+
+.price-template-formula-bar {
+  display: grid;
+  grid-template-columns: 76px 42px minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 38px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted), var(--background) 66%);
+}
+
+.price-template-cell-address,
+.price-template-fx {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border-right: 1px solid var(--border);
+  color: var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.price-template-cell-address {
+  padding: 0 0.45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-template-fx {
+  color: var(--muted-foreground);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.price-template-formula-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0.75rem;
+  outline: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.price-template-formula-input:focus {
+  box-shadow: inset 0 0 0 2px #1683e8;
+}
+
+.price-template-formula-input:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
 .price-template-stage {
   width: 100%;
   overflow: auto;
   padding: 1rem;
-  border: 1px solid color-mix(in oklch, var(--border), transparent 15%);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: 0;
   background: color-mix(in oklch, var(--muted), var(--background) 58%);
 }
 
@@ -13862,6 +13947,12 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   font-weight: 600;
 }
 
+.price-template-meta dd [contenteditable],
+.price-template-meta h2 [contenteditable] {
+  display: inline-block;
+  min-width: 2.5rem;
+}
+
 .price-template-table {
   width: 100%;
   border-collapse: collapse;
@@ -13885,8 +13976,36 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-table tbody td {
+  position: relative;
   height: 78px;
   background: #e9e9e9;
+}
+
+.price-template-table [contenteditable],
+.price-template-meta [contenteditable],
+.price-template-note [contenteditable] {
+  cursor: text;
+  outline: 0;
+}
+
+.price-template-table [contenteditable] {
+  display: grid;
+  min-height: 28px;
+  place-items: center;
+  padding: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.price-template-table [data-price-template-row-field="name"] {
+  min-height: 68px;
+}
+
+.price-template-table [data-price-cell].is-selected,
+.price-template-meta [data-price-cell].is-selected,
+.price-template-note [data-price-cell].is-selected {
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 3px #1683e8;
+  background: rgb(22 131 232 / 8%);
 }
 
 .price-template-table th:nth-child(1),
@@ -13938,15 +14057,53 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   text-decoration-thickness: 2px;
 }
 
+.price-template-row-number {
+  position: relative;
+  font-weight: 700;
+}
+
+.price-template-row-number [data-price-template-remove-row] {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border: 1px solid #dc5757;
+  border-radius: 3px;
+  padding: 0;
+  background: #fff;
+  color: #bb2929;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.price-template-table tbody tr:hover .price-template-row-number [data-price-template-remove-row],
+.price-template-row-number [data-price-template-remove-row]:focus-visible {
+  opacity: 1;
+}
+
+.price-template-row-number [data-price-template-remove-row]:disabled {
+  display: none;
+}
+
 .price-template-product-img {
   position: relative;
+  display: block;
   width: 86px;
   height: 74px;
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid #d7d7d7;
+  border-radius: 0;
+  padding: 0;
   background: #f4f4f4;
   font-family: Arial, Helvetica, sans-serif;
+  cursor: pointer;
 }
 
 .price-template-product-img--monitor {
@@ -14032,6 +14189,22 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   background: repeating-linear-gradient(#1f77d4 0 3px, transparent 3px 7px);
 }
 
+.price-template-product-img--empty {
+  background:
+    linear-gradient(135deg, transparent 46%, #a9b2bd 47% 53%, transparent 54%),
+    #f5f7f9;
+}
+
+.price-template-product-img--empty::before {
+  content: "+";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #647180;
+  font: 700 22px/1 Arial, Helvetica, sans-serif;
+}
+
 .price-template-note {
   margin-top: 1.35rem;
   padding: 0.2rem 0;
@@ -14041,9 +14214,25 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   font-weight: 900;
 }
 
+@media (max-width: 920px) {
+  .price-template-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .price-template-actions {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 760px) {
   .price-template-stage {
     padding: 0.65rem;
+  }
+
+  .price-template-actions .btn {
+    min-height: 34px;
+    padding-inline: 0.7rem;
   }
 }
 
@@ -14067,6 +14256,15 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
     padding: 18mm 14mm 10mm;
     border: 0;
     box-shadow: none;
+  }
+
+  body:has(.price-template-preview) .price-template-row-number [data-price-template-remove-row] {
+    display: none !important;
+  }
+
+  body:has(.price-template-preview) [data-price-cell].is-selected {
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }
 

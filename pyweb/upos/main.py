@@ -17770,6 +17770,87 @@ def create_app() -> FastAPI:
             apply_locale_cookie(resp, str(data.get("locale") or "ru"))
         return resp
 
+    def _clean_price_template_payload(raw: object) -> dict[str, Any]:
+        source = raw if isinstance(raw, dict) else {}
+
+        def clean_text(value: object, limit: int) -> str:
+            return ("" if value is None else str(value)).replace("\x00", "").strip()[:limit]
+
+        raw_meta = source.get("meta") if isinstance(source.get("meta"), dict) else {}
+        default_headers = ["№", "TOVAR NOMI", "RASMI", "SONI", "NARXI", "CHEGIRMA", "JAMI"]
+        raw_headers = source.get("headers") if isinstance(source.get("headers"), list) else []
+        headers = [
+            clean_text(raw_headers[index], 40)
+            if index < len(raw_headers) and clean_text(raw_headers[index], 40)
+            else default_headers[index]
+            for index in range(len(default_headers))
+        ]
+        allowed_images = {"monitor", "scale", "printer", "empty"}
+        rows: list[dict[str, str]] = []
+        raw_rows = source.get("rows") if isinstance(source.get("rows"), list) else []
+        for raw_row in raw_rows[:50]:
+            row = raw_row if isinstance(raw_row, dict) else {}
+            image = clean_text(row.get("image"), 20)
+            rows.append(
+                {
+                    "name": clean_text(row.get("name"), 300),
+                    "image": image if image in allowed_images else "empty",
+                    "qty": clean_text(row.get("qty"), 40),
+                    "price": clean_text(row.get("price"), 50),
+                    "discount": clean_text(row.get("discount"), 50),
+                    "total": clean_text(row.get("total"), 50),
+                }
+            )
+        if not rows:
+            rows.append(
+                {
+                    "name": "Новый товар",
+                    "image": "empty",
+                    "qty": "1 шт",
+                    "price": "0",
+                    "discount": "0",
+                    "total": "0",
+                }
+            )
+        return {
+            "title": clean_text(source.get("title"), 120) or "BIZNES DASTURLASH TAKLIFI",
+            "meta": {
+                "date": clean_text(raw_meta.get("date"), 160),
+                "customer": clean_text(raw_meta.get("customer"), 200),
+                "customer_phone": clean_text(raw_meta.get("customer_phone"), 80),
+                "seller": clean_text(raw_meta.get("seller"), 160),
+                "seller_phone": clean_text(raw_meta.get("seller_phone"), 80),
+            },
+            "headers": headers,
+            "total_label": clean_text(source.get("total_label"), 80) or "Umumiy:",
+            "note": clean_text(source.get("note"), 500) or "IZOH:",
+            "rows": rows,
+        }
+
+    @app.post("/api/settings/price-template")
+    async def api_settings_price_template(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        user = request.session.get("user") or {}
+        if user.get("is_employee") and not _has_permission(user, "settings"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        wid, err = _workspace_settings_owner_id(request, allow_general=True)
+        if err:
+            return err
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        template = _clean_price_template_payload(body.get("price_template"))
+        data = load_workspace_settings(wid)
+        data["price_template"] = template
+        _save_workspace_settings_from_user(request, data)
+        return {"ok": True, "price_template": template}
+
     def _integration_configured(key: str, block: dict[str, object]) -> bool:
         return integration_configured(key, block)
 

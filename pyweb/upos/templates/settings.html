@@ -583,25 +583,45 @@
               <div class="settings-dict-head price-template-head">
                 <div>
                   <p class="settings-ios-footnote">Шаблон ценника</p>
-                  <p class="settings-business-note">Готовый макет коммерческого предложения для печати.</p>
+                  <p class="settings-business-note">Редактируйте макет как таблицу и сохраните его для печати.</p>
                 </div>
-                <button class="btn" type="button" data-price-template-print>Печать шаблона</button>
+                <div class="price-template-actions">
+                  <span class="price-template-save-status" data-price-template-status role="status"></span>
+                  <button class="btn btn-secondary" type="button" data-price-template-add-row>Добавить строку</button>
+                  <button class="btn btn-secondary" type="button" data-price-template-reset>Вернуть шаблон</button>
+                  <button class="btn" type="button" data-price-template-save>Сохранить</button>
+                  <button class="btn" type="button" data-price-template-print>Печать</button>
+                </div>
               </div>
-              <div class="price-template-stage">
-                <article class="price-template-preview" aria-label="Шаблон ценника U-POS">
+              <div class="price-template-workbook" data-price-template-editor>
+                <script type="application/json" data-price-template-initial>{{ settings.get("price_template", {}) | tojson }}</script>
+                <div class="price-template-formula-bar" aria-label="Строка редактирования ячейки">
+                  <output class="price-template-cell-address" data-price-template-address>—</output>
+                  <span class="price-template-fx" aria-hidden="true">fx</span>
+                  <input
+                    class="price-template-formula-input"
+                    type="text"
+                    data-price-template-formula
+                    placeholder="Выберите ячейку таблицы"
+                    aria-label="Значение выбранной ячейки"
+                    disabled
+                  />
+                </div>
+                <div class="price-template-stage">
+                <article class="price-template-preview" aria-label="Редактируемый шаблон ценника U-POS">
                   <header class="price-template-top">
                     <div class="price-template-brand" aria-label="U-POS">
                       <div class="price-template-mark">u</div>
                       <div class="price-template-word"><span>u</span><b>POS</b></div>
                     </div>
                     <div class="price-template-meta">
-                      <h2>BIZNES DASTURLASH TAKLIFI</h2>
+                      <h2><span contenteditable="true" data-price-template-field="title" data-price-cell data-cell-address="Заголовок">BIZNES DASTURLASH TAKLIFI</span></h2>
                       <dl>
-                        <div><dt>Sana:</dt><dd>27-07-2026 № CLI-741751</dd></div>
-                        <div><dt>Xaridor:</dt><dd>dilshod aka gulchexra market</dd></div>
-                        <div><dt>Xaridor raqami:</dt><dd>&nbsp;</dd></div>
-                        <div><dt>Sotuvchi:</dt><dd>Расул Бабаев</dd></div>
-                        <div><dt>Sotuvchi raqami:</dt><dd>+998978910550</dd></div>
+                        <div><dt>Sana:</dt><dd><span contenteditable="true" data-price-template-meta="date" data-price-cell data-cell-address="Дата">27-07-2026 № CLI-741751</span></dd></div>
+                        <div><dt>Xaridor:</dt><dd><span contenteditable="true" data-price-template-meta="customer" data-price-cell data-cell-address="Покупатель">dilshod aka gulchexra market</span></dd></div>
+                        <div><dt>Xaridor raqami:</dt><dd><span contenteditable="true" data-price-template-meta="customer_phone" data-price-cell data-cell-address="Телефон покупателя">&nbsp;</span></dd></div>
+                        <div><dt>Sotuvchi:</dt><dd><span contenteditable="true" data-price-template-meta="seller" data-price-cell data-cell-address="Продавец">Расул Бабаев</span></dd></div>
+                        <div><dt>Sotuvchi raqami:</dt><dd><span contenteditable="true" data-price-template-meta="seller_phone" data-price-cell data-cell-address="Телефон продавца">+998978910550</span></dd></div>
                       </dl>
                     </div>
                   </header>
@@ -609,55 +629,56 @@
                   <table class="price-template-table">
                     <thead>
                       <tr>
-                        <th>№</th>
-                        <th>TOVAR NOMI</th>
-                        <th>RASMI</th>
-                        <th>SONI</th>
-                        <th>NARXI</th>
-                        <th>CHEGIRMA</th>
-                        <th>JAMI</th>
+                        <th><span contenteditable="true" data-price-template-header="0" data-price-cell data-cell-address="A1">№</span></th>
+                        <th><span contenteditable="true" data-price-template-header="1" data-price-cell data-cell-address="B1">TOVAR NOMI</span></th>
+                        <th><span contenteditable="true" data-price-template-header="2" data-price-cell data-cell-address="C1">RASMI</span></th>
+                        <th><span contenteditable="true" data-price-template-header="3" data-price-cell data-cell-address="D1">SONI</span></th>
+                        <th><span contenteditable="true" data-price-template-header="4" data-price-cell data-cell-address="E1">NARXI</span></th>
+                        <th><span contenteditable="true" data-price-template-header="5" data-price-cell data-cell-address="F1">CHEGIRMA</span></th>
+                        <th><span contenteditable="true" data-price-template-header="6" data-price-cell data-cell-address="G1">JAMI</span></th>
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr>
-                        <td>1</td>
-                        <td>MONOBLOK SMART I5 6A<br>METALLIK WIFI</td>
-                        <td><div class="price-template-product-img price-template-product-img--monitor"><span>Monoblok A2</span></div></td>
-                        <td>1 шт</td>
-                        <td><span class="price-template-old">350</span></td>
-                        <td>320</td>
-                        <td>320</td>
+                    <tbody data-price-template-rows>
+                      <tr data-price-template-row>
+                        <td class="price-template-row-number"><span data-price-template-number>1</span><button type="button" data-price-template-remove-row aria-label="Удалить строку">×</button></td>
+                        <td><span contenteditable="true" data-price-template-row-field="name" data-price-cell>MONOBLOK SMART I5 6A METALLIK WIFI</span></td>
+                        <td><div class="price-template-product-img price-template-product-img--monitor" data-price-template-image="monitor"><span>Monoblok A2</span></div></td>
+                        <td><span contenteditable="true" data-price-template-row-field="qty" data-price-cell>1 шт</span></td>
+                        <td><span class="price-template-old" contenteditable="true" data-price-template-row-field="price" data-price-cell>350</span></td>
+                        <td><span contenteditable="true" data-price-template-row-field="discount" data-price-cell>320</span></td>
+                        <td><span contenteditable="true" data-price-template-row-field="total" data-price-cell>320</span></td>
                       </tr>
-                      <tr>
-                        <td>2</td>
-                        <td>Весы без этикетор</td>
-                        <td><div class="price-template-product-img price-template-product-img--scale"></div></td>
-                        <td>1 шт</td>
-                        <td><span class="price-template-old">220</span></td>
-                        <td>200</td>
-                        <td>200</td>
+                      <tr data-price-template-row>
+                        <td class="price-template-row-number"><span data-price-template-number>2</span><button type="button" data-price-template-remove-row aria-label="Удалить строку">×</button></td>
+                        <td><span contenteditable="true" data-price-template-row-field="name" data-price-cell>Весы без этикетор</span></td>
+                        <td><div class="price-template-product-img price-template-product-img--scale" data-price-template-image="scale"></div></td>
+                        <td><span contenteditable="true" data-price-template-row-field="qty" data-price-cell>1 шт</span></td>
+                        <td><span class="price-template-old" contenteditable="true" data-price-template-row-field="price" data-price-cell>220</span></td>
+                        <td><span contenteditable="true" data-price-template-row-field="discount" data-price-cell>200</span></td>
+                        <td><span contenteditable="true" data-price-template-row-field="total" data-price-cell>200</span></td>
                       </tr>
-                      <tr>
-                        <td>3</td>
-                        <td>Чек Принтер XPRINTER 80C</td>
-                        <td><div class="price-template-product-img price-template-product-img--printer"><span>XP-Q80AS</span></div></td>
-                        <td>1 шт</td>
-                        <td><span class="price-template-old">40</span></td>
-                        <td>40</td>
-                        <td>40</td>
+                      <tr data-price-template-row>
+                        <td class="price-template-row-number"><span data-price-template-number>3</span><button type="button" data-price-template-remove-row aria-label="Удалить строку">×</button></td>
+                        <td><span contenteditable="true" data-price-template-row-field="name" data-price-cell>Чек Принтер XPRINTER 80C</span></td>
+                        <td><div class="price-template-product-img price-template-product-img--printer" data-price-template-image="printer"><span>XP-Q80AS</span></div></td>
+                        <td><span contenteditable="true" data-price-template-row-field="qty" data-price-cell>1 шт</span></td>
+                        <td><span class="price-template-old" contenteditable="true" data-price-template-row-field="price" data-price-cell>40</span></td>
+                        <td><span contenteditable="true" data-price-template-row-field="discount" data-price-cell>40</span></td>
+                        <td><span contenteditable="true" data-price-template-row-field="total" data-price-cell>40</span></td>
                       </tr>
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colspan="3">Umumiy:</td>
-                        <td>3</td>
-                        <td colspan="2"><span class="price-template-old">610</span></td>
-                        <td>560</td>
+                        <td colspan="3"><span contenteditable="true" data-price-template-field="total_label" data-price-cell data-cell-address="Итог">Umumiy:</span></td>
+                        <td data-price-template-qty-total>3</td>
+                        <td colspan="2"><span class="price-template-old" data-price-template-price-total>610</span></td>
+                        <td data-price-template-grand-total>560</td>
                       </tr>
                     </tfoot>
                   </table>
-                  <footer class="price-template-note">IZOH:</footer>
+                  <footer class="price-template-note"><span contenteditable="true" data-price-template-field="note" data-price-cell data-cell-address="Примечание">IZOH:</span></footer>
                 </article>
+                </div>
               </div>
             </section>
           </div>
@@ -1951,6 +1972,7 @@
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
+  <script src="{{ url_for('static', path='price-template-editor.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=28" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}
