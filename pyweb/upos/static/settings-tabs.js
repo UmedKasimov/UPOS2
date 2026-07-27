@@ -87,6 +87,11 @@
 
   function boot() {
     document.querySelectorAll("[data-settings-tabs]").forEach(init);
+    document.querySelectorAll("[data-price-template-print]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        window.print();
+      });
+    });
   }
 
   if (document.readyState === "loading") {

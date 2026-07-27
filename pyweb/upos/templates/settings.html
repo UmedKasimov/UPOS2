@@ -46,6 +46,8 @@
     {% set active_settings_label = 'Соцсети' %}
   {% elif active_settings_tab == 'crm' %}
     {% set active_settings_label = 'CRM' %}
+  {% elif active_settings_tab == 'price-template' %}
+    {% set active_settings_label = 'Шаблон ценника' %}
   {% elif active_settings_tab == 'dictionary' %}
     {% set active_settings_label = _('settings.tab.dictionary') %}
   {% elif active_settings_tab == 'roles' %}
@@ -109,6 +111,13 @@
         </span>
         <span>CRM</span>
         <small>Шкала карточек и этапы</small>
+      </a>
+      <a class="general-report-card general-settings-card {{ 'active' if active_settings_tab == 'price-template' else '' }}" href="{{ settings_base_url }}?tab=price-template" {% if active_settings_tab == 'price-template' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M20 10V7a2 2 0 0 0-2-2h-3"/><path d="M4 10V7a2 2 0 0 1 2-2h3"/><path d="M4 14v3a2 2 0 0 0 2 2h3"/><path d="M20 14v3a2 2 0 0 1-2 2h-3"/><path d="M8 9h8"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+        </span>
+        <span>Шаблон ценника</span>
+        <small>Коммерческое предложение</small>
       </a>
       {% endif %}
       {% if telegram_can_manage | default(false) %}
@@ -213,6 +222,18 @@
             >
               <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
               <span class="settings-tab-title">CRM</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="settings-tab settings-tab--rail"
+              id="tab-price-template"
+              data-settings-tab="price-template"
+              aria-selected="false"
+              aria-controls="panel-price-template"
+            >
+              <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="M20 10V7a2 2 0 0 0-2-2h-3"/><path d="M4 10V7a2 2 0 0 1 2-2h3"/><path d="M4 14v3a2 2 0 0 0 2 2h3"/><path d="M20 14v3a2 2 0 0 1-2 2h-3"/><path d="M8 9h8"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+              <span class="settings-tab-title">Шаблон ценника</span>
             </button>
             {% endif %}
             {% if settings_can_manage_dictionary | default(false) %}
@@ -550,6 +571,97 @@
           </div>
 
           {% if settings_can_manage_settings | default(false) %}
+          <div
+            class="settings-panel"
+            id="panel-price-template"
+            data-settings-panel="price-template"
+            role="tabpanel"
+            aria-labelledby="tab-price-template"
+            hidden
+          >
+            <section class="settings-ios-group settings-business-panel settings-business-panel--wide price-template-settings">
+              <div class="settings-dict-head price-template-head">
+                <div>
+                  <p class="settings-ios-footnote">Шаблон ценника</p>
+                  <p class="settings-business-note">Готовый макет коммерческого предложения для печати.</p>
+                </div>
+                <button class="btn" type="button" data-price-template-print>Печать шаблона</button>
+              </div>
+              <div class="price-template-stage">
+                <article class="price-template-preview" aria-label="Шаблон ценника U-POS">
+                  <header class="price-template-top">
+                    <div class="price-template-brand" aria-label="U-POS">
+                      <div class="price-template-mark">u</div>
+                      <div class="price-template-word"><span>u</span><b>POS</b></div>
+                    </div>
+                    <div class="price-template-meta">
+                      <h2>BIZNES DASTURLASH TAKLIFI</h2>
+                      <dl>
+                        <div><dt>Sana:</dt><dd>27-07-2026 № CLI-741751</dd></div>
+                        <div><dt>Xaridor:</dt><dd>dilshod aka gulchexra market</dd></div>
+                        <div><dt>Xaridor raqami:</dt><dd>&nbsp;</dd></div>
+                        <div><dt>Sotuvchi:</dt><dd>Расул Бабаев</dd></div>
+                        <div><dt>Sotuvchi raqami:</dt><dd>+998978910550</dd></div>
+                      </dl>
+                    </div>
+                  </header>
+
+                  <table class="price-template-table">
+                    <thead>
+                      <tr>
+                        <th>№</th>
+                        <th>TOVAR NOMI</th>
+                        <th>RASMI</th>
+                        <th>SONI</th>
+                        <th>NARXI</th>
+                        <th>CHEGIRMA</th>
+                        <th>JAMI</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>1</td>
+                        <td>MONOBLOK SMART I5 6A<br>METALLIK WIFI</td>
+                        <td><div class="price-template-product-img price-template-product-img--monitor"><span>Monoblok A2</span></div></td>
+                        <td>1 шт</td>
+                        <td><span class="price-template-old">350</span></td>
+                        <td>320</td>
+                        <td>320</td>
+                      </tr>
+                      <tr>
+                        <td>2</td>
+                        <td>Весы без этикетор</td>
+                        <td><div class="price-template-product-img price-template-product-img--scale"></div></td>
+                        <td>1 шт</td>
+                        <td><span class="price-template-old">220</span></td>
+                        <td>200</td>
+                        <td>200</td>
+                      </tr>
+                      <tr>
+                        <td>3</td>
+                        <td>Чек Принтер XPRINTER 80C</td>
+                        <td><div class="price-template-product-img price-template-product-img--printer"><span>XP-Q80AS</span></div></td>
+                        <td>1 шт</td>
+                        <td><span class="price-template-old">40</span></td>
+                        <td>40</td>
+                        <td>40</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="3">Umumiy:</td>
+                        <td>3</td>
+                        <td colspan="2"><span class="price-template-old">610</span></td>
+                        <td>560</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  <footer class="price-template-note">IZOH:</footer>
+                </article>
+              </div>
+            </section>
+          </div>
+
           <div
             class="settings-panel"
             id="panel-crm"
@@ -1838,7 +1950,7 @@
     window.employeeDevicesTitleTemplate = {{ _('employees.devices.title_named', name='{name}') | tojson }};
     window.employeeDeleteConfirmTemplate = {{ _('employees.confirm_delete_access', username='{username}') | tojson }};
   </script>
-  <script src="{{ url_for('static', path='settings-tabs.js') }}?v=7" defer></script>
+  <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=28" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}
