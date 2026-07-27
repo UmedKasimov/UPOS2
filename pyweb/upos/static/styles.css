@@ -8353,6 +8353,24 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   grid-column: 1 / -1;
 }
 
+.sales-form-identity-grid {
+  grid-template-columns: minmax(22rem, 2fr) minmax(10rem, 0.72fr) minmax(8rem, 0.55fr) 7rem;
+  align-items: end;
+}
+
+.sales-form-client-field,
+.sales-form-date-field,
+.sales-form-currency-field,
+.sales-form-id-field {
+  min-width: 0;
+}
+
+.sales-form-id-field input {
+  width: 100%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .product-form-section {
   display: flex;
   flex-direction: column;

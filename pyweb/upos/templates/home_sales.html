@@ -644,14 +644,8 @@
           <input type="hidden" name="crm_record_id" value="{{ sales_prefill.crm_record_id|e }}" />
           <input type="hidden" name="source_sale_id" value="" />
 
-          <div class="product-form-grid">
-            <label><span>ID</span><input name="number" value="{{ sales_options.next_numbers[sales_form_doc_type] }}" readonly data-sales-auto-number aria-readonly="true" /></label>
-            <label>
-              <span>Дата</span>
-              <input name="date" type="date" value="{{ today }}" data-upos-date-range data-upos-date-to="date_to" />
-              <input name="date_to" type="hidden" value="{{ today }}" />
-            </label>
-            <label class="sales-combobox" data-sales-combobox="client">
+          <div class="product-form-grid sales-form-identity-grid">
+            <label class="sales-combobox sales-form-client-field" data-sales-combobox="client">
               <span class="sales-client-label-line">
                 <span>Клиент*</span>
                 <span class="sales-client-balance" data-sales-client-balance hidden></span>
@@ -663,13 +657,19 @@
               </div>
               <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
             </label>
-            <label><span>Валюта</span>
+            <label class="sales-form-date-field">
+              <span>Дата</span>
+              <input name="date" type="date" value="{{ today }}" data-upos-date-range data-upos-date-to="date_to" />
+              <input name="date_to" type="hidden" value="{{ today }}" />
+            </label>
+            <label class="sales-form-currency-field"><span>Валюта</span>
               <select name="currency" data-sales-currency>
                 {% for currency in sales_options.currencies %}
                   <option value="{{ currency }}" {% if currency == "UZS" %}selected{% endif %}>{{ currency }}</option>
                 {% endfor %}
               </select>
             </label>
+            <label class="sales-form-id-field"><span>ID</span><input name="number" value="{{ sales_options.next_numbers[sales_form_doc_type] }}" readonly data-sales-auto-number aria-readonly="true" /></label>
             <input type="hidden" name="manager" value="{{ user.name if user else '' }}" />
             <input type="hidden" name="paid_amount" value="0" data-sales-paid-amount />
             <input type="hidden" name="payment_type" value="" data-sales-payment-type />
