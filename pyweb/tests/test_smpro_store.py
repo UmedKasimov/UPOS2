@@ -9,10 +9,12 @@ db_stub = types.ModuleType("upos.db")
 db_stub.session_scope = lambda: None
 models_stub = types.ModuleType("upos.db_models")
 for model_name in (
+    "AccountBalance",
     "Branch",
     "Counterparty",
     "ExpenseDocument",
     "ExternalRecord",
+    "FinanceAccount",
     "IntegrationSyncRun",
     "PaymentDocument",
     "Product",
@@ -29,6 +31,7 @@ sys.modules["upos.db_models"] = models_stub
 sys.modules["upos.storage"] = storage_stub
 
 from upos.smpro_store import (
+    _ibox_cashbox_movements,
     _ibox_payment_credit,
     _ibox_product_data,
     _shipment_document_data,
@@ -171,6 +174,84 @@ class SMProStoreTests(unittest.TestCase):
         self.assertEqual(credit["currency"], "UZS")
         self.assertEqual(credit["party_key"], ("1", "id:440"))
         self.assertEqual(credit["account"], "Cash")
+
+    def test_cashbox_movements_keep_currencies_and_signed_change(self) -> None:
+        movements = _ibox_cashbox_movements(
+            "payments_received",
+            {
+                "filial_id": 1,
+                "payment_details": [
+                    {
+                        "cashbox_id": 5,
+                        "amount": 700,
+                        "cashbox": {"name": "Cash"},
+                        "currency": {"code": "USD"},
+                    },
+                    {
+                        "cashbox_id": 5,
+                        "amount": -240000,
+                        "cashbox": {"name": "Cash"},
+                        "currency": {"code": "UZS"},
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(
+            [
+                (
+                    row["cashbox_id"],
+                    row["currency"],
+                    str(row["amount"]),
+                )
+                for row in movements
+            ],
+            [("5", "USD", "700"), ("5", "UZS", "-240000")],
+        )
+
+    def test_made_payment_debits_cashbox(self) -> None:
+        movements = _ibox_cashbox_movements(
+            "payments_made",
+            {
+                "filial_id": 1,
+                "payment_details": [
+                    {
+                        "cashbox_id": 5,
+                        "amount": 100,
+                        "cashbox": {"name": "Cash"},
+                        "currency": {"code": "USD"},
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(str(movements[0]["amount"]), "-100")
+
+    def test_transfer_moves_balance_between_ibox_cashboxes(self) -> None:
+        movements = _ibox_cashbox_movements(
+            "payment_transfers",
+            {
+                "filial_id": 1,
+                "currency_code": "UZS",
+                "total": 200000,
+                "from_cashbox_id": 4,
+                "from_cashbox_name": "Card",
+                "to_cashbox_id": 5,
+                "to_cashbox_name": "Cash",
+            },
+        )
+
+        self.assertEqual(
+            [
+                (
+                    row["cashbox_id"],
+                    row["currency"],
+                    str(row["amount"]),
+                )
+                for row in movements
+            ],
+            [("4", "UZS", "-200000"), ("5", "UZS", "200000")],
+        )
 
 
 if __name__ == "__main__":

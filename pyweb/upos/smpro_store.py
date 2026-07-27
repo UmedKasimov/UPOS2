@@ -12,10 +12,12 @@ from sqlalchemy.dialects.postgresql import insert
 
 from upos.db import session_scope
 from upos.db_models import (
+    AccountBalance,
     Branch,
     Counterparty,
     ExpenseDocument,
     ExternalRecord,
+    FinanceAccount,
     IntegrationSyncRun,
     PaymentDocument,
     Product,
@@ -571,6 +573,181 @@ def _reconcile_ibox_payments(session, workspace_owner_id: str) -> None:
         shipment.data = data
 
 
+def _ibox_cashbox_movements(
+    entity_type: str,
+    payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    filial_id = _scalar(payload, "_ibox_filial_id", "filial_id") or "default"
+    movements: list[dict[str, Any]] = []
+
+    if entity_type == "payment_transfers":
+        currency = str(payload.get("currency_code") or "").strip().upper()
+        amount = abs(_decimal_value(payload.get("total") or payload.get("amount")))
+        if currency and amount > 0:
+            for prefix, sign in (("from", Decimal("-1")), ("to", Decimal("1"))):
+                cashbox_id = _scalar(payload, f"{prefix}_cashbox_id")
+                cashbox_name = _text(payload, f"{prefix}_cashbox_name")
+                if cashbox_id or cashbox_name:
+                    movements.append(
+                        {
+                            "filial_id": filial_id,
+                            "cashbox_id": cashbox_id or f"name:{cashbox_name.casefold()}",
+                            "cashbox_name": cashbox_name or f"IBOX {cashbox_id}",
+                            "currency": currency,
+                            "amount": amount * sign,
+                        }
+                    )
+        return movements
+
+    if entity_type.startswith("payments_received"):
+        sign = Decimal("1")
+    elif entity_type.startswith("payments_made") or entity_type == "salary":
+        sign = Decimal("-1")
+    else:
+        return movements
+
+    details = payload.get("payment_details")
+    for item in details if isinstance(details, list) else []:
+        if not isinstance(item, dict):
+            continue
+        cashbox = item.get("cashbox")
+        cashbox = cashbox if isinstance(cashbox, dict) else {}
+        currency_data = item.get("currency")
+        currency_data = currency_data if isinstance(currency_data, dict) else {}
+        cashbox_id = _scalar(item, "cashbox_id") or _scalar(cashbox, "id")
+        cashbox_name = _text(cashbox, "name", "title") or _text(
+            item,
+            "cashbox_name",
+        )
+        currency = str(
+            currency_data.get("code")
+            or item.get("currency_code")
+            or ""
+        ).strip().upper()
+        amount = _decimal_value(item.get("amount"))
+        if (cashbox_id or cashbox_name) and currency and amount:
+            movements.append(
+                {
+                    "filial_id": filial_id,
+                    "cashbox_id": cashbox_id or f"name:{cashbox_name.casefold()}",
+                    "cashbox_name": cashbox_name or f"IBOX {cashbox_id}",
+                    "currency": currency,
+                    "amount": amount * sign,
+                }
+            )
+    return movements
+
+
+def _ibox_account_id(
+    workspace_owner_id: str,
+    filial_id: str,
+    cashbox_id: str,
+) -> str:
+    return str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"upos:{workspace_owner_id}:ibox:cashbox:{filial_id}:{cashbox_id}",
+        )
+    )
+
+
+def _sync_ibox_accounts(session, workspace_owner_id: str) -> None:
+    tracked_types = (
+        "payments_received",
+        "payments_received_from_organizations",
+        "payments_made",
+        "payments_made_to_organizations",
+        "payment_transfers",
+        "salary",
+    )
+    records = session.execute(
+        select(ExternalRecord).where(
+            ExternalRecord.workspace_owner_id == workspace_owner_id,
+            ExternalRecord.integration == INTEGRATION,
+            ExternalRecord.entity_type.in_(tracked_types),
+        )
+    ).scalars().all()
+
+    accounts: dict[tuple[str, str], dict[str, Any]] = {}
+    for record in records:
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        for movement in _ibox_cashbox_movements(record.entity_type, payload):
+            filial_id = str(movement["filial_id"])
+            cashbox_id = str(movement["cashbox_id"])
+            key = (filial_id, cashbox_id)
+            account = accounts.setdefault(
+                key,
+                {
+                    "name": str(movement["cashbox_name"]),
+                    "balances": {},
+                },
+            )
+            currency = str(movement["currency"])
+            balances = account["balances"]
+            balances[currency] = (
+                _decimal_value(balances.get(currency))
+                + _decimal_value(movement["amount"])
+            )
+
+    active_account_ids: set[str] = set()
+    for (filial_id, cashbox_id), data in accounts.items():
+        account_id = _ibox_account_id(
+            workspace_owner_id,
+            filial_id,
+            cashbox_id,
+        )
+        active_account_ids.add(account_id)
+        account = session.get(FinanceAccount, account_id)
+        if account is None:
+            account = FinanceAccount(
+                id=account_id,
+                workspace_owner_id=workspace_owner_id,
+                name=f"IBOX · {data['name']} · филиал {filial_id}",
+            )
+            session.add(account)
+        account.name = f"IBOX · {data['name']} · филиал {filial_id}"
+        account.kind = "cash_uz"
+        account.icon = "cash"
+        account.note = f"IBOX cashbox:{filial_id}:{cashbox_id}"
+        account.owner_employee_id = None
+        account.is_active = True
+        session.flush()
+
+        existing_balances = {
+            row.currency: row
+            for row in session.execute(
+                select(AccountBalance).where(
+                    AccountBalance.account_id == account_id,
+                )
+            ).scalars().all()
+        }
+        seen_currencies: set[str] = set()
+        for currency, amount in data["balances"].items():
+            seen_currencies.add(currency)
+            balance = existing_balances.get(currency)
+            if balance is None:
+                balance = AccountBalance(
+                    id=str(uuid.uuid4()),
+                    account_id=account_id,
+                    currency=currency,
+                )
+                session.add(balance)
+            balance.amount = _decimal_value(amount).quantize(Decimal("0.01"))
+        for currency, balance in existing_balances.items():
+            if currency not in seen_currencies:
+                session.delete(balance)
+
+    imported_accounts = session.execute(
+        select(FinanceAccount).where(
+            FinanceAccount.workspace_owner_id == workspace_owner_id,
+            FinanceAccount.note.like("IBOX cashbox:%"),
+        )
+    ).scalars().all()
+    for account in imported_accounts:
+        if account.id not in active_account_ids:
+            account.is_active = False
+
+
 def _run_dict(run: IntegrationSyncRun) -> dict[str, Any]:
     error = str(run.error or "")
     if "codec can't encode" in error or "ordinal not in range" in error:
@@ -769,6 +946,18 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
                 total += 1
         if "shipments" in entities or "payments_received" in entities:
             _reconcile_ibox_payments(session, workspace_owner_id)
+        if any(
+            key in entities
+            for key in (
+                "payments_received",
+                "payments_received_from_organizations",
+                "payments_made",
+                "payments_made_to_organizations",
+                "payment_transfers",
+                "salary",
+            )
+        ):
+            _sync_ibox_accounts(session, workspace_owner_id)
     return total
 
 
