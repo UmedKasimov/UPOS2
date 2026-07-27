@@ -136,6 +136,65 @@ class SMProClientTests(unittest.TestCase):
             ["1", "2", "3"],
         )
 
+    def test_stock_selection_loads_each_price_type(self) -> None:
+        requested_price_types: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/core/directory"):
+                if request.url.params.get("data") == "product_price_type":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "data": [
+                                {"id": 1, "name": "Retail"},
+                                {"id": 3, "name": "Discount"},
+                            ]
+                        },
+                    )
+                return httpx.Response(200, json={"data": []})
+            if request.url.path.endswith("/document/stock/selection"):
+                self.assertEqual(request.url.params["search_by[]"], "name")
+                price_type_id = request.url.params["price_type_id"]
+                requested_price_types.append(price_type_id)
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": [
+                            {
+                                "id": 19,
+                                "name": "Scanner",
+                                "price": 100 if price_type_id == "1" else 90,
+                                "currency_code": "USD",
+                            }
+                        ]
+                    },
+                )
+            return httpx.Response(404)
+
+        client = SMProClient(
+            {
+                "api_url": "smpro.example",
+                "api_key": "secret",
+                "filial_id": "7",
+            },
+            transport=httpx.MockTransport(handler),
+        )
+
+        result = client.fetch_modules(["products", "stock"], full_history=True)
+
+        self.assertEqual(requested_price_types, ["1", "3"])
+        self.assertEqual(
+            [
+                (
+                    row["_ibox_filial_id"],
+                    row["_ibox_price_type_id"],
+                    row["_ibox_price_type_name"],
+                )
+                for row in result["stock_selection"]
+            ],
+            [("7", "1", "Retail"), ("7", "3", "Discount")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

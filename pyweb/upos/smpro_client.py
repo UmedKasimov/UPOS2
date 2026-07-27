@@ -40,7 +40,6 @@ RESOURCES: dict[str, tuple[SMProResource, ...]] = {
         SMProResource("product_folders", "api/integration/core/directory", "product_folder_tree"),
     ),
     "stock": (
-        SMProResource("stock_products", "api/integration/document/stock/product"),
         SMProResource("stock_selection", "api/integration/document/stock/selection"),
     ),
     "sales": (
@@ -281,6 +280,7 @@ class SMProClient:
         full_history: bool,
         since: str = "",
         filial_id: str = "",
+        extra_params: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         # SMPro document endpoints reject values above 100 with HTTP 422.
         per_page = 100
@@ -290,6 +290,10 @@ class SMProClient:
             params: dict[str, Any] = {"per_page": per_page, "page": page}
             if resource.directory:
                 params["data"] = resource.directory
+            if resource.key == "stock_selection":
+                params["search_by[]"] = "name"
+            if extra_params:
+                params.update(extra_params)
             if not full_history and since:
                 params["period[from]"] = since[:10]
             payload = self._request(
@@ -332,25 +336,47 @@ class SMProClient:
                     filial_ids = [self.filial_id]
                 merged: list[dict[str, Any]] = []
                 for filial_id in filial_ids:
-                    try:
-                        rows = self.fetch_resource(
-                            resource,
-                            full_history=full_history,
-                            since=since,
-                            filial_id=filial_id,
-                        )
-                        for row in rows:
-                            normalized = dict(row)
-                            if filial_id:
-                                normalized.setdefault("_ibox_filial_id", filial_id)
-                            merged.append(normalized)
-                    except SMProError as exc:
-                        self.warnings.append(
-                            {
-                                "resource": resource.key,
-                                "filial_id": filial_id,
-                                "error": str(exc),
-                            }
-                        )
+                    variants: list[tuple[str, str]] = [("", "")]
+                    if resource.key == "stock_selection":
+                        remote_price_types = [
+                            item
+                            for item in entities.get("price_types", [])
+                            if not filial_id
+                            or str(item.get("_ibox_filial_id") or "") == filial_id
+                        ]
+                        variants = [
+                            (str(item.get("id") or ""), str(item.get("name") or ""))
+                            for item in remote_price_types
+                            if str(item.get("id") or "").strip()
+                        ] or [("", "")]
+                    for price_type_id, price_type_name in variants:
+                        try:
+                            rows = self.fetch_resource(
+                                resource,
+                                full_history=full_history,
+                                since=since,
+                                filial_id=filial_id,
+                                extra_params=(
+                                    {"price_type_id": price_type_id}
+                                    if price_type_id
+                                    else None
+                                ),
+                            )
+                            for row in rows:
+                                normalized = dict(row)
+                                if filial_id:
+                                    normalized.setdefault("_ibox_filial_id", filial_id)
+                                if price_type_id:
+                                    normalized["_ibox_price_type_id"] = price_type_id
+                                    normalized["_ibox_price_type_name"] = price_type_name
+                                merged.append(normalized)
+                        except SMProError as exc:
+                            self.warnings.append(
+                                {
+                                    "resource": resource.key,
+                                    "filial_id": filial_id,
+                                    "error": str(exc),
+                                }
+                            )
                 entities[resource.key] = merged
         return entities

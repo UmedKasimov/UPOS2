@@ -265,6 +265,312 @@ def _shipment_counterparty_id(
     return str(counterparty_id) if counterparty_id else None
 
 
+def _ibox_product_data(
+    payload: dict[str, Any],
+    previous: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    existing = dict(previous or {})
+    storage_unit = payload.get("storage_unit")
+    storage_unit = storage_unit if isinstance(storage_unit, dict) else {}
+    last_purchase = payload.get("last_purchase_price")
+    last_purchase = last_purchase if isinstance(last_purchase, dict) else {}
+    purchase_currency = last_purchase.get("currency")
+    purchase_currency = purchase_currency if isinstance(purchase_currency, dict) else {}
+    filial_id = _scalar(payload, "_ibox_filial_id", "filial_id")
+    price_type_id = _scalar(payload, "_ibox_price_type_id")
+    price_type_name = _scalar(payload, "_ibox_price_type_name")
+
+    prices = [
+        dict(item)
+        for item in existing.get("prices", [])
+        if isinstance(item, dict)
+    ]
+    sale_price = payload.get("price")
+    sale_currency = str(payload.get("currency_code") or "").strip().upper()
+    if price_type_id and sale_price not in (None, "") and sale_currency:
+        local_price_type_id = price_type_id
+        prices = [
+            item
+            for item in prices
+            if not (
+                str(item.get("price_type_id") or "") == local_price_type_id
+                and str(item.get("ibox_filial_id") or "") == filial_id
+            )
+        ]
+        prices.append(
+            {
+                "price_type_id": local_price_type_id,
+                "name": price_type_name or f"IBOX {price_type_id}",
+                "price": _decimal_text(sale_price),
+                "currency": sale_currency,
+                "ibox_filial_id": filial_id,
+                "source": INTEGRATION,
+            }
+        )
+
+    stocks = [
+        dict(item)
+        for item in existing.get("stocks", [])
+        if isinstance(item, dict)
+    ]
+    available = payload.get("available")
+    if available is None:
+        available = payload.get("stock")
+    if available is not None:
+        stock_key = filial_id or "default"
+        stocks = [
+            item
+            for item in stocks
+            if str(item.get("ibox_filial_id") or "default") != stock_key
+        ]
+        stocks.append(
+            {
+                "warehouse": (
+                    f"IBOX филиал {filial_id}"
+                    if filial_id
+                    else "IBOX"
+                ),
+                "quantity": _decimal_text(available),
+                "price": _decimal_text(last_purchase.get("price")),
+                "currency": str(purchase_currency.get("code") or "UZS").upper(),
+                "date": datetime.now(UTC).date().isoformat(),
+                "ibox_filial_id": filial_id,
+                "source": INTEGRATION,
+            }
+        )
+
+    data = {
+        **existing,
+        "kind": "service" if str(payload.get("type") or "") == "2" else "product",
+        "category": str(payload.get("product_category_name") or existing.get("category") or ""),
+        "unit": (
+            str(storage_unit.get("name") or storage_unit.get("short_name") or "")
+            or str(existing.get("unit") or "Штука")
+        ),
+        "status": "active",
+        "batch_tracking": bool(payload.get("batch_tracking")),
+        "prices": prices,
+        "stocks": stocks,
+        "source": INTEGRATION,
+        "ibox_product_id": _scalar(payload, "id", "product_id"),
+        "ibox_filial_id": filial_id,
+        "ibox_payload": payload,
+    }
+    if last_purchase.get("price") not in (None, ""):
+        data["purchase_price"] = _decimal_text(last_purchase.get("price"))
+        data["purchase_currency"] = str(purchase_currency.get("code") or "UZS").upper()
+    return data
+
+
+def _ibox_product_barcode(payload: dict[str, Any]) -> str:
+    barcode = _scalar(payload, "barcode", "bar_code")
+    if barcode:
+        return barcode
+    rows = payload.get("barcodes")
+    if isinstance(rows, list):
+        for row in rows:
+            if isinstance(row, dict) and _scalar(row, "barcode", "code"):
+                return _scalar(row, "barcode", "code")
+    return ""
+
+
+def _upsert_ibox_product(
+    session,
+    common: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    existing = session.execute(
+        select(Product)
+        .where(
+            Product.workspace_owner_id == common["workspace_owner_id"],
+            Product.external_source == INTEGRATION,
+            Product.external_id == common["external_id"],
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+    previous_data = existing.data if existing and isinstance(existing.data, dict) else {}
+    name = (
+        str(payload.get("name") or payload.get("product_name") or "").strip()
+        or (str(existing.name or "").strip() if existing else "")
+        or f"Товар IBOX {common['external_id']}"
+    )
+    sku = (
+        str(payload.get("sku") or payload.get("article") or "").strip()
+        or (str(existing.sku or "").strip() if existing else "")
+    )
+    barcode = _ibox_product_barcode(payload) or (
+        str(existing.barcode or "").strip() if existing else ""
+    )
+    values = {
+        **common,
+        "name": name,
+        "sku": sku,
+        "barcode": barcode,
+        "data": _ibox_product_data(payload, previous_data),
+    }
+    _upsert_model(
+        session,
+        Product,
+        "uq_products_external",
+        values,
+        {key: values[key] for key in ("name", "sku", "barcode", "data")},
+    )
+
+
+def _resolve_shipment_products(
+    session,
+    workspace_owner_id: str,
+    document_data: dict[str, Any],
+) -> dict[str, Any]:
+    lines = [
+        dict(item)
+        for item in document_data.get("lines", [])
+        if isinstance(item, dict)
+    ]
+    remote_ids = {
+        str(item.get("product_id") or "").strip()
+        for item in lines
+        if str(item.get("product_id") or "").strip()
+    }
+    if not remote_ids:
+        document_data["lines"] = lines
+        return document_data
+
+    products = session.execute(
+        select(Product).where(
+            Product.workspace_owner_id == workspace_owner_id,
+            Product.external_source == INTEGRATION,
+            Product.external_id.in_(remote_ids),
+        )
+    ).scalars().all()
+    products_by_external_id = {
+        str(product.external_id or ""): product
+        for product in products
+    }
+    for line in lines:
+        remote_id = str(line.get("product_id") or "").strip()
+        product = products_by_external_id.get(remote_id)
+        if not product:
+            continue
+        line["ibox_product_id"] = remote_id
+        line["product_id"] = str(product.id)
+        line["product"] = str(product.name or line.get("product") or "").strip()
+        product_data = product.data if isinstance(product.data, dict) else {}
+        if not str(line.get("unit") or "").strip():
+            line["unit"] = str(product_data.get("unit") or "").strip()
+    document_data["lines"] = lines
+    return document_data
+
+
+def _ibox_party_key(payload: dict[str, Any]) -> tuple[str, str]:
+    filial_id = _scalar(payload, "_ibox_filial_id", "filial_id")
+    outlet_id = _scalar(payload, "outlet_id", "client_id", "counterparty_id")
+    if outlet_id:
+        return filial_id, f"id:{outlet_id}"
+    name = _text(payload, "outlet_name", "client_name", "counterparty_name").casefold()
+    return filial_id, f"name:{name}"
+
+
+def _ibox_payment_credit(payload: dict[str, Any]) -> dict[str, Any] | None:
+    amount = _decimal_value(payload.get("total") or payload.get("amount"))
+    currency = str(payload.get("currency_code") or "").strip().upper()
+    if amount <= 0 or not currency:
+        return None
+    details = payload.get("payment_details")
+    detail_rows = details if isinstance(details, list) else []
+    accounts = [
+        str((item.get("cashbox") or {}).get("name") or "").strip()
+        for item in detail_rows
+        if isinstance(item, dict) and isinstance(item.get("cashbox"), dict)
+    ]
+    return {
+        "party_key": _ibox_party_key(payload),
+        "currency": currency,
+        "amount": amount,
+        "remaining": amount,
+        "number": _scalar(payload, "number", "document_number"),
+        "date": _created_at(payload).date().isoformat(),
+        "type": str(payload.get("payment_type_name") or "Оплата IBOX").strip(),
+        "account": ", ".join(dict.fromkeys(item for item in accounts if item)) or "IBOX",
+        "external_id": _scalar(payload, "id", "document_id"),
+    }
+
+
+def _reconcile_ibox_payments(session, workspace_owner_id: str) -> None:
+    payment_rows = session.execute(
+        select(PaymentDocument)
+        .where(
+            PaymentDocument.workspace_owner_id == workspace_owner_id,
+            PaymentDocument.external_source == INTEGRATION,
+            PaymentDocument.direction == "in",
+        )
+        .order_by(PaymentDocument.created_at.asc(), PaymentDocument.id.asc())
+    ).scalars().all()
+    credits: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    fallback_credits: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for payment in payment_rows:
+        payload = payment.data if isinstance(payment.data, dict) else {}
+        credit = _ibox_payment_credit(payload)
+        if not credit:
+            continue
+        party_key = credit["party_key"]
+        key = (party_key[0], party_key[1], credit["currency"])
+        credits.setdefault(key, []).append(credit)
+        fallback_credits.setdefault((party_key[1], credit["currency"]), []).append(credit)
+
+    shipment_rows = session.execute(
+        select(SaleDocument)
+        .where(
+            SaleDocument.workspace_owner_id == workspace_owner_id,
+            SaleDocument.external_source == INTEGRATION,
+            SaleDocument.external_id.like("shipments:%"),
+        )
+        .order_by(SaleDocument.created_at.asc(), SaleDocument.id.asc())
+    ).scalars().all()
+    for shipment in shipment_rows:
+        data = dict(shipment.data) if isinstance(shipment.data, dict) else {}
+        payload = data.get("ibox_payload")
+        payload = payload if isinstance(payload, dict) else {}
+        party_key = _ibox_party_key(payload)
+        currency = str(shipment.currency or "UZS").upper()
+        candidates = credits.get((party_key[0], party_key[1], currency))
+        if candidates is None:
+            candidates = fallback_credits.get((party_key[1], currency), [])
+        outstanding = max(Decimal("0"), _decimal_value(shipment.amount))
+        paid = Decimal("0")
+        payment_lines: list[dict[str, Any]] = []
+        for credit in candidates:
+            remaining = _decimal_value(credit.get("remaining"))
+            if remaining <= 0 or paid >= outstanding:
+                continue
+            allocated = min(remaining, outstanding - paid)
+            credit["remaining"] = remaining - allocated
+            paid += allocated
+            payment_lines.append(
+                {
+                    "amount": _decimal_text(allocated),
+                    "currency": currency,
+                    "type": str(credit.get("type") or "Оплата IBOX"),
+                    "account": str(credit.get("account") or "IBOX"),
+                    "account_id": "",
+                    "date": str(credit.get("date") or ""),
+                    "number": str(credit.get("number") or ""),
+                    "source": INTEGRATION,
+                    "external_id": str(credit.get("external_id") or ""),
+                }
+            )
+        data["paid_amount"] = _decimal_text(paid)
+        data["payment_lines"] = payment_lines
+        data["payment_type"] = ", ".join(
+            dict.fromkeys(
+                str(item.get("type") or "")
+                for item in payment_lines
+                if str(item.get("type") or "")
+            )
+        )
+        shipment.data = data
+
+
 def _run_dict(run: IntegrationSyncRun) -> dict[str, Any]:
     error = str(run.error or "")
     if "codec can't encode" in error or "ordinal not in range" in error:
@@ -419,7 +725,7 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
         "clients",
         "warehouses",
         "products",
-        "stock_products",
+        "stock_selection",
         "orders",
         "shipments",
         "returns",
@@ -461,6 +767,8 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
                     target_branch_id=target_branch_id,
                 )
                 total += 1
+        if "shipments" in entities or "payments_received" in entities:
+            _reconcile_ibox_payments(session, workspace_owner_id)
     return total
 
 
@@ -502,20 +810,9 @@ def _normalize(
             {key: values[key] for key in ("name", "tax_id", "phone", "data")},
         )
     elif entity_type == "products":
-        values = {
-            **common,
-            "name": name or f"Товар SMPro {ext_id}",
-            "sku": _text(payload, "sku", "article", "vendor_code", "code"),
-            "barcode": _text(payload, "barcode", "bar_code"),
-            "data": payload,
-        }
-        _upsert_model(
-            session,
-            Product,
-            "uq_products_external",
-            values,
-            {key: values[key] for key in ("name", "sku", "barcode", "data")},
-        )
+        _upsert_ibox_product(session, common, payload)
+    elif entity_type == "stock_selection":
+        _upsert_ibox_product(session, common, payload)
     elif entity_type == "warehouses":
         values = {
             **common,
@@ -576,6 +873,12 @@ def _upsert_document(
 ) -> None:
     is_shipment = model is SaleDocument and entity_type == "shipments"
     document_data = _shipment_document_data(payload) if is_shipment else payload
+    if is_shipment:
+        document_data = _resolve_shipment_products(
+            session,
+            str(common["workspace_owner_id"]),
+            document_data,
+        )
     counterparty_id = (
         _shipment_counterparty_id(session, str(common["workspace_owner_id"]), payload)
         if is_shipment
@@ -612,12 +915,21 @@ def _upsert_document(
 
 
 def _upsert_payment(session, common: dict[str, Any], payload: dict[str, Any], direction: str) -> None:
+    counterparty_id = (
+        _shipment_counterparty_id(
+            session,
+            str(common["workspace_owner_id"]),
+            payload,
+        )
+        if direction == "in"
+        else None
+    )
     values = {
         **common,
         "number": _text(payload, "number", "document_number", "code"),
         "amount": _money(payload),
         "currency": _currency(payload),
-        "counterparty_id": None,
+        "counterparty_id": counterparty_id,
         "transaction_id": None,
         "direction": direction,
         "data": payload,
@@ -628,7 +940,18 @@ def _upsert_payment(session, common: dict[str, Any], payload: dict[str, Any], di
         PaymentDocument,
         "uq_payment_documents_external",
         values,
-        {key: values[key] for key in ("number", "amount", "currency", "direction", "data", "created_at")},
+        {
+            key: values[key]
+            for key in (
+                "number",
+                "amount",
+                "currency",
+                "counterparty_id",
+                "direction",
+                "data",
+                "created_at",
+            )
+        },
     )
 
 
