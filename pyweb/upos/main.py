@@ -133,6 +133,13 @@ from upos.greenwhite_store import (
     sync_greenwhite,
     test_greenwhite_connection,
 )
+from upos.smpro_client import DEFAULT_MODULES, SMProClient, SMProError
+from upos.smpro_store import (
+    last_smpro_status,
+    run_smpro_sync,
+    start_smpro_sync,
+    test_smpro_connection,
+)
 from upos.integrations import (
     CLOPOS_DEFAULT_API_BASE_URL,
     INTEGRATION_PROVIDERS,
@@ -18284,11 +18291,18 @@ def create_app() -> FastAPI:
                 "api_base_url": yespos_api_base_url.strip(),
                 "api_key": yespos_api_key.strip(),
             }
-            data["integrations"]["ibox"] = {
-                "api_url": ibox_api_url.strip(),
-                "api_key": ibox_api_key.strip(),
-                "terminal_id": ibox_terminal_id.strip(),
-            }
+            if ibox_api_url.strip() or ibox_api_key.strip() or ibox_terminal_id.strip():
+                prev_ibox = data["integrations"].get("ibox") or {}
+                filial_id = ibox_terminal_id.strip() or str(
+                    prev_ibox.get("filial_id") or prev_ibox.get("terminal_id") or ""
+                )
+                data["integrations"]["ibox"] = {
+                    **prev_ibox,
+                    "api_url": ibox_api_url.strip() or str(prev_ibox.get("api_url") or ""),
+                    "api_key": ibox_api_key.strip() or str(prev_ibox.get("api_key") or ""),
+                    "terminal_id": filial_id,
+                    "filial_id": filial_id,
+                }
             prev_clopos = data["integrations"].get("clopos") or {}
             data["integrations"]["clopos"] = {
                 "api_base_url": clopos_api_base_url.strip() or CLOPOS_DEFAULT_API_BASE_URL,
@@ -18468,6 +18482,20 @@ def create_app() -> FastAPI:
         if not valid_workspace_owner_id(wid):
             return None, JSONResponse({"error": "workspace"}, status_code=400)
         return wid, None
+
+    def _integration_target_workspace(
+        request: Request,
+        requested_organization_id: str = "",
+    ) -> tuple[str | None, JSONResponse | None]:
+        current_wid, err = _role_permissions_owner_id(request)
+        if err:
+            return None, err
+        user = request.session.get("user") or {}
+        owner_id = str(user.get("account_owner_id") or user.get("user_id") or "").strip()
+        target_id = str(requested_organization_id or current_wid or "").strip()
+        if not valid_workspace_owner_id(owner_id) or not get_organization(owner_id, target_id):
+            return None, JSONResponse({"error": "organization"}, status_code=400)
+        return target_id, None
 
     def _save_workspace_settings_from_user(request: Request, data: dict[str, Any]) -> None:
         u = request.session.get("user") or {}
@@ -18817,6 +18845,18 @@ def create_app() -> FastAPI:
                 block["token"] = ""
                 block["expires_at"] = ""
                 message = str(exc).strip() or translate(loc, "settings.integrations.not_connected")
+        elif key == "ibox":
+            if not _integration_configured(key, block):
+                block["connection_ok"] = False
+                block["connection_message"] = message
+                block["connection_checked_at"] = checked_at
+                return {"key": key, "ok": False, "message": message}
+            try:
+                SMProClient(block).test_connection()
+                ok = True
+                message = translate(loc, "settings.integrations.connected")
+            except SMProError as exc:
+                message = str(exc).strip() or translate(loc, "settings.integrations.not_connected")
         elif _integration_configured(key, block):
             ok = True
             message = translate(loc, "settings.integrations.connected")
@@ -18842,8 +18882,18 @@ def create_app() -> FastAPI:
             body = {}
         if not isinstance(body, dict):
             body = {}
-        data = load_workspace_settings(wid)
         integrations = body.get("integrations") if isinstance(body.get("integrations"), dict) else {}
+        ibox_input = integrations.get("ibox") if isinstance(integrations.get("ibox"), dict) else None
+        if ibox_input is not None:
+            target_wid, target_err = _integration_target_workspace(
+                request,
+                str(ibox_input.get("organization_id") or ""),
+            )
+            if target_err:
+                return target_err
+            assert target_wid is not None
+            wid = target_wid
+        data = load_workspace_settings(wid)
         prev_greenwhite = data.get("integrations", {}).get("greenwhite") or {}
         updated_keys: list[str] = []
         if isinstance(integrations.get("onec"), dict):
@@ -18864,10 +18914,29 @@ def create_app() -> FastAPI:
             updated_keys.append("yespos")
         if isinstance(integrations.get("ibox"), dict):
             ibox = integrations["ibox"]
+            prev = data.get("integrations", {}).get("ibox") or {}
+            raw_modules = ibox.get("sync_modules")
+            sync_modules = {
+                key: bool(raw_modules.get(key, True)) if isinstance(raw_modules, dict) else True
+                for key in DEFAULT_MODULES
+            }
+            api_key = str(ibox.get("api_key") or "").strip() or str(prev.get("api_key") or "").strip()
+            filial_id = str(ibox.get("filial_id") or ibox.get("terminal_id") or "").strip()
             data["integrations"]["ibox"] = {
                 "api_url": str(ibox.get("api_url") or "").strip(),
-                "api_key": str(ibox.get("api_key") or "").strip(),
-                "terminal_id": str(ibox.get("terminal_id") or "").strip(),
+                "api_key": api_key,
+                "terminal_id": filial_id,
+                "filial_id": filial_id,
+                "organization_id": wid,
+                "sync_enabled": bool(ibox.get("sync_enabled", True)),
+                "full_history": bool(ibox.get("full_history", True)),
+                "sync_modules": sync_modules,
+                "last_sync_at": str(prev.get("last_sync_at") or ""),
+                "initial_sync_completed": bool(prev.get("initial_sync_completed")),
+                "filials": prev.get("filials") or [],
+                "connection_ok": bool(prev.get("connection_ok")),
+                "connection_message": str(prev.get("connection_message") or ""),
+                "connection_checked_at": str(prev.get("connection_checked_at") or ""),
             }
             updated_keys.append("ibox")
         if isinstance(integrations.get("clopos"), dict):
@@ -18916,7 +18985,10 @@ def create_app() -> FastAPI:
             block = data.get("integrations", {}).get(key) or {}
             if isinstance(block, dict):
                 connection = _apply_integration_connection(wid, key, block, loc)
-        _save_workspace_settings_from_user(request, data)
+        if ibox_input is not None:
+            save_workspace_settings(wid, data)
+        else:
+            _save_workspace_settings_from_user(request, data)
         out: dict[str, object] = {"ok": True}
         if connection:
             out["connection"] = connection
@@ -19285,6 +19357,88 @@ def create_app() -> FastAPI:
             "categories": _filter_categories_for_user(u, list_categories(wid)),
             "restricted": _employee_category_access(u) is not None,
         }
+
+    @app.get("/api/integrations/ibox/config")
+    def api_ibox_config(request: Request, organization_id: str = Query(default="")):
+        wid, err = _integration_target_workspace(request, organization_id)
+        if err:
+            return err
+        assert wid is not None
+        block = load_workspace_settings(wid).get("integrations", {}).get("ibox", {})
+        saved_modules = block.get("sync_modules")
+        if not isinstance(saved_modules, dict):
+            saved_modules = {}
+        config = {
+            "api_url": str(block.get("api_url") or ""),
+            "api_key_configured": bool(str(block.get("api_key") or "").strip()),
+            "filial_id": str(block.get("filial_id") or block.get("terminal_id") or ""),
+            "organization_id": wid,
+            "sync_enabled": bool(block.get("sync_enabled", True)),
+            "full_history": bool(block.get("full_history", True)),
+            "sync_modules": {
+                key: bool(saved_modules.get(key, True))
+                for key in DEFAULT_MODULES
+            },
+            "last_sync_at": str(block.get("last_sync_at") or ""),
+            "initial_sync_completed": bool(block.get("initial_sync_completed")),
+        }
+        return {"ok": True, "config": config, "filials": block.get("filials") or [], "status": last_smpro_status(wid)}
+
+    @app.get("/api/integrations/ibox/status")
+    def api_ibox_status(request: Request, organization_id: str = Query(default="")):
+        wid, err = _integration_target_workspace(request, organization_id)
+        if err:
+            return err
+        assert wid is not None
+        return {"ok": True, "status": last_smpro_status(wid)}
+
+    @app.post("/api/integrations/ibox/test")
+    def api_ibox_test(request: Request, organization_id: str = Query(default="")):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _integration_target_workspace(request, organization_id)
+        if err:
+            return err
+        assert wid is not None
+        try:
+            result = test_smpro_connection(wid)
+        except SMProError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        settings = load_workspace_settings(wid)
+        block = settings.setdefault("integrations", {}).setdefault("ibox", {})
+        block["filials"] = result.get("filials") or []
+        block["connection_ok"] = True
+        block["connection_message"] = "Подключено"
+        block["connection_checked_at"] = datetime.now(timezone.utc).isoformat()
+        save_workspace_settings(wid, settings)
+        return result
+
+    @app.post("/api/integrations/ibox/sync")
+    def api_ibox_sync(
+        request: Request,
+        background_tasks: BackgroundTasks,
+        organization_id: str = Query(default=""),
+    ):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _integration_target_workspace(request, organization_id)
+        if err:
+            return err
+        assert wid is not None
+        block = load_workspace_settings(wid).get("integrations", {}).get("ibox", {})
+        if not integration_configured("ibox", block):
+            return JSONResponse({"error": "Сначала настройте IBOX / SMPro"}, status_code=400)
+        if not str(block.get("filial_id") or block.get("terminal_id") or "").strip():
+            return JSONResponse({"error": "Сначала выберите филиал SMPro"}, status_code=400)
+        modules = block.get("sync_modules")
+        if isinstance(modules, dict) and not any(bool(modules.get(key)) for key in DEFAULT_MODULES):
+            return JSONResponse({"error": "Выберите хотя бы один раздел учёта"}, status_code=400)
+        status = start_smpro_sync(wid)
+        if status.get("status") == "running" and not status.get("already_running"):
+            background_tasks.add_task(run_smpro_sync, wid, str(status.get("id") or ""))
+        return {"ok": True, "status": status}
 
     @app.get("/api/integrations/greenwhite/status")
     def api_greenwhite_status(request: Request):

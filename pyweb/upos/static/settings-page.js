@@ -102,6 +102,217 @@
     }
   }
 
+  function setIBOXStatus(message, variant, root) {
+    var scope = root || document;
+    var el = scope.querySelector("[data-ibox-status]");
+    if (!el) return;
+    el.textContent = message || "";
+    if (variant) el.setAttribute("data-variant", variant);
+    else el.removeAttribute("data-variant");
+  }
+
+  function iboxOrganizationId(root) {
+    var scope = root || document;
+    var select = scope.querySelector("[data-ibox-organization]");
+    return select ? (select.value || "").trim() : "";
+  }
+
+  function fillIBOXFilials(root, filials, selectedId) {
+    var scope = root || document;
+    var select = scope.querySelector("[data-ibox-filial]");
+    if (!select) return;
+    var selected = String(selectedId || "");
+    select.innerHTML = "";
+    var empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = filials && filials.length ? "Выберите филиал" : "Филиалы не найдены";
+    select.appendChild(empty);
+    (filials || []).forEach(function (filial) {
+      var option = document.createElement("option");
+      var id = filial.id || filial.filial_id || filial.uuid || filial.code || "";
+      option.value = String(id);
+      option.textContent = filial.name || filial.title || filial.label || String(id);
+      if (String(id) === selected) option.selected = true;
+      select.appendChild(option);
+    });
+    if (selected && !Array.prototype.some.call(select.options, function (option) { return option.value === selected; })) {
+      var current = document.createElement("option");
+      current.value = selected;
+      current.textContent = selected;
+      current.selected = true;
+      select.appendChild(current);
+    }
+  }
+
+  function hydrateIBOXConfig(root, body) {
+    var scope = root || document;
+    var config = body && body.config ? body.config : {};
+    var url = scope.querySelector("#ibox_api_url");
+    var key = scope.querySelector("#ibox_api_key");
+    var enabled = scope.querySelector("#ibox_sync_enabled");
+    var history = scope.querySelector("#ibox_full_history");
+    if (url) url.value = config.api_url || "";
+    if (key) {
+      key.value = "";
+      key.placeholder = config.api_key_configured ? "Ключ сохранён" : "Bearer token";
+    }
+    if (enabled) enabled.checked = config.sync_enabled !== false;
+    if (history) history.checked = config.full_history !== false;
+    scope.querySelectorAll("[data-ibox-module]").forEach(function (checkbox) {
+      var moduleKey = checkbox.getAttribute("data-ibox-module") || "";
+      checkbox.checked = !config.sync_modules || config.sync_modules[moduleKey] !== false;
+    });
+    fillIBOXFilials(scope, body.filials || [], config.filial_id || "");
+    if (body.status) {
+      var status = body.status;
+      if (status.status === "running") setIBOXStatus("Синхронизация выполняется…", "", scope);
+      else if (status.status === "error") setIBOXStatus(status.error || "Ошибка синхронизации", "err", scope);
+      else if (status.status === "partial") {
+        var warnings = status.data && status.data.warnings ? status.data.warnings.length : 0;
+        setIBOXStatus("Импортировано: " + String(status.imported_count || 0) + ". Недоступных разделов: " + String(warnings), "", scope);
+      }
+      else setIBOXStatus("Импортировано записей: " + String(status.imported_count || 0), "ok", scope);
+    } else {
+      setIBOXStatus("", "", scope);
+    }
+  }
+
+  function loadIBOXConfig(root) {
+    var organizationId = iboxOrganizationId(root);
+    if (!organizationId) return Promise.resolve();
+    return fetch("/api/integrations/ibox/config?organization_id=" + encodeURIComponent(organizationId))
+      .then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || "Не удалось загрузить настройки");
+          return body;
+        });
+      })
+      .then(function (body) {
+        hydrateIBOXConfig(root, body);
+        return body;
+      })
+      .catch(function (err) {
+        setIBOXStatus(err.message || "Не удалось загрузить настройки", "err", root);
+      });
+  }
+
+  function initIBOXActions(root) {
+    var scope = root || document;
+    var organization = scope.querySelector("[data-ibox-organization]");
+    var btnTest = scope.querySelector("[data-ibox-test]");
+    var btnSync = scope.querySelector("[data-ibox-sync]");
+    var pollTimer = 0;
+
+    function saveConfig() {
+      return fetch("/api/settings/integrations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken(),
+        },
+        body: JSON.stringify(collectIntegrationPayload("ibox")),
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok || !body.ok) throw new Error(body.error || "Не удалось сохранить настройки");
+          return body;
+        });
+      });
+    }
+
+    function endpoint(path) {
+      var organizationId = iboxOrganizationId(scope);
+      return path + "?organization_id=" + encodeURIComponent(organizationId);
+    }
+
+    function poll() {
+      clearTimeout(pollTimer);
+      fetch(endpoint("/api/integrations/ibox/status"))
+        .then(function (res) { return res.json(); })
+        .then(function (body) {
+          var status = body.status;
+          if (!status) return;
+          if (status.status === "running") {
+            setIBOXStatus("Синхронизация выполняется…", "", scope);
+            pollTimer = setTimeout(poll, 1800);
+          } else if (status.status === "error") {
+            setIBOXStatus(status.error || "Ошибка синхронизации", "err", scope);
+          } else if (status.status === "partial") {
+            var warnings = status.data && status.data.warnings ? status.data.warnings.length : 0;
+            setIBOXStatus("Импортировано: " + String(status.imported_count || 0) + ". Недоступных разделов: " + String(warnings), "", scope);
+          } else {
+            setIBOXStatus("Готово. Импортировано записей: " + String(status.imported_count || 0), "ok", scope);
+          }
+        })
+        .catch(function () {
+          pollTimer = setTimeout(poll, 2500);
+        });
+    }
+
+    if (organization) {
+      organization.addEventListener("change", function () {
+        loadIBOXConfig(scope);
+      });
+    }
+    if (btnTest) {
+      btnTest.addEventListener("click", function () {
+        btnTest.disabled = true;
+        setIBOXStatus("Проверяю подключение…", "", scope);
+        saveConfig()
+          .then(function () {
+            return fetch(endpoint("/api/integrations/ibox/test"), {
+              method: "POST",
+              headers: { "X-CSRF-Token": csrfToken() },
+            });
+          })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              if (!res.ok || !body.ok) throw new Error(body.error || "Подключение не установлено");
+              return body;
+            });
+          })
+          .then(function (body) {
+            var selected = scope.querySelector("[data-ibox-filial]");
+            fillIBOXFilials(scope, body.filials || [], selected ? selected.value : "");
+            setIBOXStatus("Подключено. Филиалов: " + String(body.filial_count || 0), "ok", scope);
+          })
+          .catch(function (err) {
+            setIBOXStatus(err.message || "Подключение не установлено", "err", scope);
+          })
+          .finally(function () {
+            btnTest.disabled = false;
+          });
+      });
+    }
+    if (btnSync) {
+      btnSync.addEventListener("click", function () {
+        btnSync.disabled = true;
+        setIBOXStatus("Запускаю полную синхронизацию…", "", scope);
+        saveConfig()
+          .then(function () {
+            return fetch(endpoint("/api/integrations/ibox/sync"), {
+              method: "POST",
+              headers: { "X-CSRF-Token": csrfToken() },
+            });
+          })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              if (!res.ok || !body.ok) throw new Error(body.error || "Не удалось запустить синхронизацию");
+              return body;
+            });
+          })
+          .then(function () {
+            poll();
+          })
+          .catch(function (err) {
+            setIBOXStatus(err.message || "Не удалось запустить синхронизацию", "err", scope);
+          })
+          .finally(function () {
+            btnSync.disabled = false;
+          });
+      });
+    }
+  }
+
   function initLanguageDropdowns() {
     document.querySelectorAll("[data-lang-dropdown]").forEach(function (root) {
       var trigger = root.querySelector("[data-lang-trigger]");
@@ -308,10 +519,20 @@
         api_key: fieldVal("yespos_api_key"),
       };
     } else if (key === "ibox") {
+      var iboxModules = {};
+      document.querySelectorAll("[data-ibox-module]").forEach(function (checkbox) {
+        iboxModules[checkbox.getAttribute("data-ibox-module") || ""] = !!checkbox.checked;
+      });
+      var iboxEnabled = document.getElementById("ibox_sync_enabled");
+      var iboxFullHistory = document.getElementById("ibox_full_history");
       integrations.ibox = {
         api_url: fieldVal("ibox_api_url"),
         api_key: fieldVal("ibox_api_key"),
-        terminal_id: fieldVal("ibox_terminal_id"),
+        filial_id: fieldVal("ibox_filial_id"),
+        organization_id: fieldVal("ibox_organization_id"),
+        sync_enabled: !!(iboxEnabled && iboxEnabled.checked),
+        full_history: !!(iboxFullHistory && iboxFullHistory.checked),
+        sync_modules: iboxModules,
       };
     } else if (key === "clopos") {
       integrations.clopos = {
@@ -397,6 +618,7 @@
       }
       if (typeof dialog.showModal === "function") dialog.showModal();
       else dialog.setAttribute("open", "open");
+      if (key === "ibox") loadIBOXConfig(dialog);
       var firstInput = dialog.querySelector('[data-integr-form="' + key + '"] input:not([type="checkbox"])');
       if (firstInput) firstInput.focus();
     }
@@ -419,13 +641,14 @@
     });
 
     initGreenWhiteActions(dialog);
+    initIBOXActions(dialog);
 
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         if (!activeKey) return;
         saveBtn.disabled = true;
         var saveLabel = saveBtn.textContent;
-        if (activeKey === "greenwhite" || activeKey === "clopos") {
+        if (activeKey === "greenwhite" || activeKey === "clopos" || activeKey === "ibox") {
           saveBtn.textContent = t("settings.integrations.testing");
         }
         fetch("/api/settings/integrations", {

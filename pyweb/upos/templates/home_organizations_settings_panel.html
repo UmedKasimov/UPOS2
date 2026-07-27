@@ -310,9 +310,50 @@
                     <label for="yespos_api_key">{{ _('settings.api_key') }}</label><input id="yespos_api_key" type="password" value="{{ settings.integrations.yespos.api_key }}" autocomplete="new-password" />
                   </div>
                   <div class="integr-card-body" data-integr-form="ibox" hidden>
-                    <label for="ibox_api_url">{{ _('settings.api_url') }}</label><input id="ibox_api_url" type="url" value="{{ settings.integrations.ibox.api_url }}" />
-                    <label for="ibox_api_key">{{ _('settings.api_key') }}</label><input id="ibox_api_key" type="password" value="{{ settings.integrations.ibox.api_key }}" autocomplete="new-password" />
-                    <label for="ibox_terminal_id">{{ _('settings.terminal_id') }}</label><input id="ibox_terminal_id" type="text" value="{{ settings.integrations.ibox.terminal_id }}" />
+                    <label for="ibox_organization_id">Организация U-POS</label>
+                    <select id="ibox_organization_id" data-ibox-organization>
+                      {% for org in telegram_organizations | default([]) %}
+                        <option value="{{ org.id }}" {% if org.id == (settings.integrations.ibox.organization_id or telegram_selected_organization_id) %}selected{% endif %}>{{ org.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <label for="ibox_api_url">Адрес API IBOX / SMPro</label>
+                    <input id="ibox_api_url" type="url" value="{{ settings.integrations.ibox.api_url }}" placeholder="https://company.smpro.uz" autocomplete="off" />
+                    <label for="ibox_api_key">API-ключ</label>
+                    <input id="ibox_api_key" type="password" value="" placeholder="{% if settings.integrations.ibox.api_key %}Ключ сохранён{% else %}Bearer token{% endif %}" autocomplete="new-password" />
+                    <label for="ibox_filial_id">Филиал SMPro</label>
+                    <select id="ibox_filial_id" data-ibox-filial>
+                      {% if settings.integrations.ibox.filial_id %}
+                        <option value="{{ settings.integrations.ibox.filial_id }}" selected>{{ settings.integrations.ibox.filial_id }}</option>
+                      {% else %}
+                        <option value="">Сначала проверьте подключение</option>
+                      {% endif %}
+                    </select>
+                    <label class="integr-check-row" for="ibox_sync_enabled"><input id="ibox_sync_enabled" type="checkbox" {% if settings.integrations.ibox.sync_enabled %}checked{% endif %} />Автоматическая синхронизация</label>
+                    <label class="integr-check-row" for="ibox_full_history"><input id="ibox_full_history" type="checkbox" {% if settings.integrations.ibox.full_history %}checked{% endif %} />Загрузить данные за всё время</label>
+                    <fieldset class="integr-module-fieldset">
+                      <legend>Разделы учёта</legend>
+                      <div class="integr-module-grid">
+                        {% set ibox_modules = settings.integrations.ibox.sync_modules or {} %}
+                        {% for key, label in [
+                          ('directories', 'Справочники и клиенты'),
+                          ('products', 'Товары и цены'),
+                          ('stock', 'Остатки и склады'),
+                          ('sales', 'Заказы, продажи и возвраты'),
+                          ('purchases', 'Закупки и возвраты поставщикам'),
+                          ('payments', 'Оплаты и переводы'),
+                          ('salary', 'Зарплата'),
+                          ('currency', 'Курсы валют'),
+                          ('organization_shipments', 'Перемещения организаций')
+                        ] %}
+                          <label class="integr-check-row"><input type="checkbox" data-ibox-module="{{ key }}" {% if ibox_modules.get(key, true) %}checked{% endif %} />{{ label }}</label>
+                        {% endfor %}
+                      </div>
+                    </fieldset>
+                    <div class="integr-action-row">
+                      <button type="button" class="btn btn-secondary btn-sm" data-ibox-test>Проверить и получить филиалы</button>
+                      <button type="button" class="btn btn-secondary btn-sm" data-ibox-sync>Синхронизировать всё</button>
+                    </div>
+                    <p class="integr-sync-status" data-ibox-status></p>
                   </div>
                   <div class="integr-card-body" data-integr-form="clopos" hidden>
                     <label for="clopos_api_base_url">{{ _('settings.api_base_url') }}</label><input id="clopos_api_base_url" type="url" value="{{ settings.integrations.clopos.api_base_url }}" />
