@@ -1019,10 +1019,12 @@
 	      });
 	      if (allDependentPricesToggle) {
 	        allDependentPricesToggle.addEventListener('change', () => {
+	          const nextChecked = allDependentPricesToggle.checked;
 	          dependentPriceToggles.forEach((toggle) => {
-	            toggle.checked = allDependentPricesToggle.checked;
+	            toggle.checked = nextChecked;
 	            toggle.dispatchEvent(new Event('change'));
 	          });
+	          syncAllDependentPrices();
 	        });
 	        syncAllDependentPrices();
 	      }
