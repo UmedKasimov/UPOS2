@@ -85,6 +85,135 @@ def _decimal_text(value: Any) -> str:
     return text or "0"
 
 
+def _bool_value(value: Any, default: bool = True) -> bool:
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() not in {"0", "false", "no", "off", "inactive"}
+
+
+def _ibox_price_type_id(filial_id: Any, remote_id: Any) -> str:
+    filial = str(filial_id or "default").strip() or "default"
+    remote = str(remote_id or "").strip()
+    return f"ibox:{filial}:{remote}" if remote else ""
+
+
+def _ibox_price_type_rows(
+    remote_price_types: list[dict[str, Any]],
+    stock_rows: list[dict[str, Any]],
+    existing: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    result = [
+        dict(item)
+        for item in (existing or [])
+        if isinstance(item, dict)
+    ]
+    by_id = {str(item.get("id") or ""): item for item in result}
+    stock_currencies: dict[tuple[str, str], str] = {}
+    for stock in stock_rows:
+        filial_id = _scalar(stock, "_ibox_filial_id", "filial_id") or "default"
+        remote_id = _scalar(stock, "_ibox_price_type_id")
+        currency = str(stock.get("currency_code") or "").strip().upper()
+        if remote_id and currency:
+            stock_currencies.setdefault((filial_id, remote_id), currency)
+
+    base_sort_order = max(
+        (
+            int(str(item.get("sort_order") or "0"))
+            for item in result
+            if str(item.get("sort_order") or "0").lstrip("-").isdigit()
+        ),
+        default=0,
+    )
+    for offset, payload in enumerate(remote_price_types, start=1):
+        remote_id = _scalar(payload, "id", "price_type_id")
+        filial_id = _scalar(payload, "_ibox_filial_id", "filial_id") or "default"
+        local_id = _ibox_price_type_id(filial_id, remote_id)
+        if not local_id:
+            continue
+        currency_data = payload.get("currency")
+        currency_data = currency_data if isinstance(currency_data, dict) else {}
+        currency = str(
+            payload.get("currency_code")
+            or payload.get("convert_to_currency")
+            or currency_data.get("code")
+            or stock_currencies.get((filial_id, remote_id))
+            or "UZS"
+        ).strip().upper()
+        if currency not in {"UZS", "USD"}:
+            currency = "UZS"
+        previous = by_id.get(local_id, {})
+        try:
+            sort_order = int(str(payload.get("sort_order") or ""))
+        except (TypeError, ValueError):
+            sort_order = int(previous.get("sort_order") or base_sort_order + offset)
+        row = {
+            **previous,
+            "id": local_id,
+            "name": _text(payload, "name", "title") or f"IBOX {remote_id}",
+            "sort_order": sort_order,
+            "is_for_sales": _bool_value(
+                payload.get("is_for_sales", payload.get("active")),
+                True,
+            ),
+            "is_for_purchases": False,
+            "is_active": _bool_value(
+                payload.get("is_active", payload.get("active")),
+                True,
+            ),
+            "pricing_method": "manual",
+            "created_by": "IBOX",
+            "updated_at": str(
+                payload.get("updated_at")
+                or payload.get("date")
+                or datetime.now(UTC).date().isoformat()
+            )[:10],
+            "base_price_type_id": "",
+            "markup_type": "markup",
+            "markup_value": "",
+            "convert_to_currency": currency,
+            "rounding": "1.0",
+        }
+        by_id[local_id] = row
+
+    imported_ids = list(
+        dict.fromkeys(
+            _ibox_price_type_id(
+                _scalar(payload, "_ibox_filial_id", "filial_id") or "default",
+                _scalar(payload, "id", "price_type_id"),
+            )
+            for payload in remote_price_types
+        )
+    )
+    imported_ids = [item_id for item_id in imported_ids if item_id]
+    return [
+        *(item for item in result if str(item.get("id") or "") not in imported_ids),
+        *(by_id[item_id] for item_id in imported_ids),
+    ]
+
+
+def _sync_ibox_price_types(
+    workspace_owner_id: str,
+    remote_price_types: list[dict[str, Any]],
+    stock_rows: list[dict[str, Any]],
+) -> None:
+    if not remote_price_types:
+        return
+    settings = load_workspace_settings(workspace_owner_id)
+    existing = (
+        settings.get("product_price_types")
+        if isinstance(settings.get("product_price_types"), list)
+        else []
+    )
+    settings["product_price_types"] = _ibox_price_type_rows(
+        remote_price_types,
+        stock_rows,
+        existing,
+    )
+    save_workspace_settings(workspace_owner_id, settings)
+
+
 def _external_id(item: dict[str, Any], entity_type: str) -> str:
     value = _walk(
         item,
@@ -290,13 +419,18 @@ def _ibox_product_data(
     sale_price = payload.get("price")
     sale_currency = str(payload.get("currency_code") or "").strip().upper()
     if price_type_id and sale_price not in (None, "") and sale_currency:
-        local_price_type_id = price_type_id
+        local_price_type_id = _ibox_price_type_id(filial_id, price_type_id)
         prices = [
             item
             for item in prices
             if not (
-                str(item.get("price_type_id") or "") == local_price_type_id
+                str(item.get("source") or "") == INTEGRATION
                 and str(item.get("ibox_filial_id") or "") == filial_id
+                and (
+                    str(item.get("ibox_price_type_id") or "") == price_type_id
+                    or str(item.get("price_type_id") or "")
+                    in {price_type_id, local_price_type_id}
+                )
             )
         ]
         prices.append(
@@ -306,6 +440,7 @@ def _ibox_product_data(
                 "price": _decimal_text(sale_price),
                 "currency": sale_currency,
                 "ibox_filial_id": filial_id,
+                "ibox_price_type_id": price_type_id,
                 "source": INTEGRATION,
             }
         )
@@ -972,6 +1107,11 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
             )
         ):
             _sync_ibox_accounts(session, workspace_owner_id)
+    _sync_ibox_price_types(
+        workspace_owner_id,
+        entities.get("price_types") or [],
+        entities.get("stock_selection") or [],
+    )
     return total
 
 

@@ -34,6 +34,7 @@ from upos.smpro_store import (
     _ibox_cashbox_movements,
     _ibox_payment_credit,
     _ibox_product_data,
+    _ibox_price_type_rows,
     _shipment_document_data,
 )
 
@@ -139,9 +140,81 @@ class SMProStoreTests(unittest.TestCase):
         self.assertEqual(product["category"], "Scanners")
         self.assertEqual(product["unit"], "Piece")
         self.assertEqual(product["prices"][0]["price"], "240")
-        self.assertEqual(product["prices"][0]["price_type_id"], "1")
+        self.assertEqual(product["prices"][0]["price_type_id"], "ibox:7:1")
+        self.assertEqual(product["prices"][0]["ibox_price_type_id"], "1")
         self.assertEqual(product["stocks"][0]["quantity"], "12")
         self.assertEqual(product["purchase_price"], "180")
+
+    def test_ibox_price_types_do_not_replace_local_price_lists(self) -> None:
+        rows = _ibox_price_type_rows(
+            [
+                {
+                    "id": 1,
+                    "name": "Retail",
+                    "_ibox_filial_id": "7",
+                    "active": 1,
+                },
+                {
+                    "id": 3,
+                    "name": "Discount",
+                    "_ibox_filial_id": "7",
+                    "active": 1,
+                },
+            ],
+            [
+                {
+                    "_ibox_filial_id": "7",
+                    "_ibox_price_type_id": "1",
+                    "currency_code": "USD",
+                },
+                {
+                    "_ibox_filial_id": "7",
+                    "_ibox_price_type_id": "3",
+                    "currency_code": "UZS",
+                },
+            ],
+            [
+                {
+                    "id": "1",
+                    "name": "ПРОДАЖНАЯ ЦЕНА",
+                    "sort_order": 1,
+                }
+            ],
+        )
+
+        self.assertEqual([row["id"] for row in rows], ["1", "ibox:7:1", "ibox:7:3"])
+        self.assertEqual(rows[0]["name"], "ПРОДАЖНАЯ ЦЕНА")
+        self.assertEqual(rows[1]["name"], "Retail")
+        self.assertEqual(rows[1]["convert_to_currency"], "USD")
+        self.assertEqual(rows[1]["created_by"], "IBOX")
+
+    def test_product_replaces_legacy_ibox_price_id(self) -> None:
+        product = _ibox_product_data(
+            {
+                "id": 19,
+                "price": 125,
+                "currency_code": "USD",
+                "_ibox_filial_id": "7",
+                "_ibox_price_type_id": "1",
+                "_ibox_price_type_name": "Retail",
+            },
+            {
+                "prices": [
+                    {
+                        "price_type_id": "1",
+                        "name": "Retail",
+                        "price": "100",
+                        "currency": "USD",
+                        "ibox_filial_id": "7",
+                        "source": "ibox",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(len(product["prices"]), 1)
+        self.assertEqual(product["prices"][0]["price_type_id"], "ibox:7:1")
+        self.assertEqual(product["prices"][0]["price"], "125")
 
     def test_received_payment_uses_document_total_and_cashbox(self) -> None:
         credit = _ibox_payment_credit(
