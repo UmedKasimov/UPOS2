@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Финансы · UPOS FINANCE{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ user.get('active_organization_name') or _('workspace.default_name') }}</span>
+    <h1 class="page-title settings-ios-page-title">Финансы</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  {% set emp_perms = user.get('employee_permissions') or {} %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    <section class="general-report-launcher" aria-label="Разделы финансов">
+      {% if not user.get('is_employee') or emp_perms.get('schet') %}
+        <a class="general-report-card" href="{{ url_for('home_schet') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+          </span>
+          <span>{{ _('nav.account') }}</span>
+          <small>Остатки и места хранения</small>
+        </a>
+      {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('kassa') %}
+        <a class="general-report-card" href="{{ url_for('home_kassa') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
+          </span>
+          <span>{{ _('nav.kassa') }}</span>
+          <small>Приходы, расходы, переводы</small>
+        </a>
+      {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('adjustments') %}
+        <a class="general-report-card" href="{{ url_for('home_adjustments') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v18" /><path d="M5 8h14" /><path d="M7 16h10" /><path d="m8 5-3 3 3 3" /><path d="m16 13 3 3-3 3" /></svg>
+          </span>
+          <span>Корректировки</span>
+          <small>Приход и списание</small>
+        </a>
+      {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('shipments') or ((emp_perms.get('shipments') is none) and (emp_perms.get('kassa') or emp_perms.get('reports'))) %}
+        <a class="general-report-card" href="{{ url_for('home_shipments') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M10 17h4V5H3v12h3" /><path d="M14 17h1a2 2 0 1 0 4 0h1v-5l-3-4h-3" /><circle cx="8" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></svg>
+          </span>
+          <span>Отгрузки</span>
+          <small>Журнал отгрузок</small>
+        </a>
+      {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('hr') or ((emp_perms.get('hr') is none) and emp_perms.get('employees')) %}
+        <a class="general-report-card" href="{{ url_for('home_hr') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          </span>
+          <span>HR</span>
+          <small>Сотрудники и зарплата</small>
+        </a>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

@@ -2933,6 +2933,15 @@ def create_app() -> FastAPI:
         background_tasks.add_task(notify_transaction_deleted, oid, notify_tx)
         return {"ok": True}
 
+    @app.get("/finance", response_class=HTMLResponse, name="home_finance")
+    def home_finance(request: Request):
+        return tpl(
+            request,
+            "home_finance.html",
+            variant="user",
+            active="home_finance",
+        )
+
     @app.get("/schet", response_class=HTMLResponse)
     def home_schet(request: Request):
         u = request.session.get("user") or {}
