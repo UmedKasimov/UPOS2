@@ -201,7 +201,7 @@
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
           <select name="page_size" form="clients-filter-form" onchange="this.form.requestSubmit()">
-            {% for size in [50, 100, 250] %}
+            {% for size in [100, 500, 1000] %}
               <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
             {% endfor %}
           </select>
@@ -941,9 +941,19 @@
         <a class="products-page-link {% if client_balances_page >= client_balances_total_pages %}disabled{% endif %}" href="{{ client_balances_next_page_url }}" aria-label="Следующая страница">›</a>
         <span class="products-page-count">Стр. {{ client_balances_page }} из {{ client_balances_total_pages }}</span>
       </nav>
-      <div class="products-panel-stats" aria-label="Информация по списку должников">
-        <span>Всего: {{ client_balances_total }}</span>
-        <span>Показано: {{ client_balances_page_from }}-{{ client_balances_page_to }}</span>
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по списку должников">
+          <span>Всего: {{ client_balances_total }}</span>
+          <span>Показано: {{ client_balances_page_from }}-{{ client_balances_page_to }}</span>
+        </div>
+        <label class="products-page-size products-page-size--footer">
+          <span>Показать</span>
+          <select name="page_size" form="clients-filter-form" onchange="this.form.requestSubmit()">
+            {% for size in [100, 500, 1000] %}
+              <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
+            {% endfor %}
+          </select>
+        </label>
       </div>
     </footer>
   </article>

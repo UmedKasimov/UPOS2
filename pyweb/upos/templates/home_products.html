@@ -580,7 +580,7 @@
             <label class="products-page-size products-page-size--footer">
               <span>Показать</span>
               <select name="page_size" form="products-catalog-filter">
-                {% for size in [100, 500, 1000, 10000] %}
+                {% for size in [100, 500, 1000] %}
                   <option value="{{ size }}" {% if product_page_size == size %}selected{% endif %}>{{ size }} шт</option>
                 {% endfor %}
               </select>

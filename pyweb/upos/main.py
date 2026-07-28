@@ -4380,12 +4380,15 @@ def create_app() -> FastAPI:
             "kind_values": selected_kind,
         }
 
-    def _product_page_size(raw: Any = 100) -> int:
+    def _table_page_size(raw: Any = 100) -> int:
         try:
             value = int(str(raw or "100").strip())
         except Exception:
             value = 100
-        return value if value in {100, 500, 1000, 10000} else 100
+        return value if value in {100, 500, 1000} else 100
+
+    def _product_page_size(raw: Any = 100) -> int:
+        return _table_page_size(raw)
 
     def _positive_int(raw: Any, default: int = 1) -> int:
         try:
@@ -4393,6 +4396,19 @@ def create_app() -> FastAPI:
         except Exception:
             value = default
         return max(1, value)
+
+    def _table_pagination_pages(current_page: int, total_pages: int) -> list[int]:
+        pages = list(
+            range(
+                max(1, current_page - 2),
+                min(total_pages, current_page + 2) + 1,
+            )
+        )
+        if 1 not in pages:
+            pages.insert(0, 1)
+        if total_pages not in pages:
+            pages.append(total_pages)
+        return pages
 
     PRODUCT_PRICE_TYPE_DEFAULTS = [
         {
@@ -5342,10 +5358,10 @@ def create_app() -> FastAPI:
             pairs.append(("page", str(target_page)))
             return f"{request.url.path}?{urlencode(pairs, doseq=True)}#catalog"
 
-        product_pagination_pages = [
-            page_no
-            for page_no in range(max(1, product_page - 2), min(product_total_pages, product_page + 2) + 1)
-        ]
+        product_pagination_pages = _table_pagination_pages(
+            product_page,
+            product_total_pages,
+        )
         price_types = list(options.get("price_lists") or _workspace_price_types(wid))
         selected_price_type = _price_type_by_id(price_types, price_type) if price_types else {}
         price_rows = _price_type_product_rows(price_products, selected_price_type, price_types) if selected_price_type else []
@@ -6964,6 +6980,8 @@ def create_app() -> FastAPI:
         client: str = "",
         date_from: str = "",
         date_to: str = "",
+        journal_page: int = 1,
+        journal_page_size: int = 100,
         debt_page: int = 1,
         debt_page_size: int = 100,
         crm_record_id: str = "",
@@ -7027,6 +7045,8 @@ def create_app() -> FastAPI:
         }
         sales_embed = str(embed or "").strip() == "1"
         sales: list[dict[str, Any]] = []
+        filtered_sale_clients: list[str] = []
+        filtered_sale_warehouses: list[str] = []
         product_names: list[str] = []
         product_options: list[dict[str, Any]] = []
         clients: list[str] = []
@@ -7079,8 +7099,7 @@ def create_app() -> FastAPI:
                     continue
                 sales.append(item)
             sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)
-            if debt_page_size not in {100, 500, 1000}:
-                debt_page_size = 100
+            debt_page_size = _table_page_size(debt_page_size)
             debt_clients_total = int(sales_debt_workspace["clients_count"])
             debt_total_pages = max(1, math.ceil(debt_clients_total / debt_page_size))
             debt_current_page = min(max(1, debt_page), debt_total_pages)
@@ -7114,16 +7133,10 @@ def create_app() -> FastAPI:
                 )
                 return f"{request.url.path}?{urlencode(pairs, doseq=True)}#debt"
 
-            debt_pagination_pages = list(
-                range(
-                    max(1, debt_current_page - 2),
-                    min(debt_total_pages, debt_current_page + 2) + 1,
-                )
+            debt_pagination_pages = _table_pagination_pages(
+                debt_current_page,
+                debt_total_pages,
             )
-            if 1 not in debt_pagination_pages:
-                debt_pagination_pages.insert(0, 1)
-            if debt_total_pages not in debt_pagination_pages:
-                debt_pagination_pages.append(debt_total_pages)
             sales_debt_workspace.update(
                 {
                     "pagination_pages": debt_pagination_pages,
@@ -7160,6 +7173,66 @@ def create_app() -> FastAPI:
                 }
                 for currency, values in sorted(sales_journal_totals_by_currency.items())
             ]
+            journal_page_size = _table_page_size(journal_page_size)
+            journal_total = len(sales)
+            journal_total_pages = max(1, math.ceil(journal_total / journal_page_size))
+            journal_current_page = min(max(1, journal_page), journal_total_pages)
+            journal_page_start = (journal_current_page - 1) * journal_page_size
+            journal_page_end = min(journal_total, journal_page_start + journal_page_size)
+
+            def journal_page_url(
+                page_number: int,
+                page_size: int = journal_page_size,
+            ) -> str:
+                pairs = [
+                    (key, value)
+                    for key, value in request.query_params.multi_items()
+                    if key not in {"journal_page", "journal_page_size"}
+                ]
+                pairs.extend(
+                    [
+                        ("journal_page", str(page_number)),
+                        ("journal_page_size", str(page_size)),
+                    ]
+                )
+                return f"{request.url.path}?{urlencode(pairs, doseq=True)}#sales-journal"
+
+            journal_pagination_pages = _table_pagination_pages(
+                journal_current_page,
+                journal_total_pages,
+            )
+            sales_journal_pagination = {
+                "total": journal_total,
+                "page": journal_current_page,
+                "page_size": journal_page_size,
+                "total_pages": journal_total_pages,
+                "page_from": journal_page_start + 1 if journal_total else 0,
+                "page_to": journal_page_end,
+                "row_offset": journal_page_start,
+                "pagination_pages": journal_pagination_pages,
+                "page_urls": {
+                    page_number: journal_page_url(page_number)
+                    for page_number in journal_pagination_pages
+                },
+                "prev_page_url": journal_page_url(max(1, journal_current_page - 1)),
+                "next_page_url": journal_page_url(
+                    min(journal_total_pages, journal_current_page + 1)
+                ),
+                "page_size_urls": {
+                    size: journal_page_url(1, size) for size in (100, 500, 1000)
+                },
+            }
+            filtered_sale_clients = [
+                str(item.get("client") or "").strip()
+                for item in sales
+                if str(item.get("client") or "").strip()
+            ]
+            filtered_sale_warehouses = [
+                str(item.get("warehouse") or "").strip()
+                for item in sales
+                if str(item.get("warehouse") or "").strip()
+            ]
+            sales = sales[journal_page_start:journal_page_end]
             price_types = _workspace_price_types(wid)
             active_sales_price_types = [
                 item
@@ -7257,8 +7330,20 @@ def create_app() -> FastAPI:
                 "order": _next_sales_document_number(session, wid, "order"),
                 "return": _next_sales_document_number(session, wid, "return"),
             }
-        clients = sorted({item for item in [*clients, *[sale["client"] for sale in sales if sale["client"]]] if item})
-        warehouses = sorted({item for item in [*warehouses, *[sale["warehouse"] for sale in sales if sale["warehouse"]]] if item}) or ["Основной склад"]
+        clients = sorted(
+            {
+                item
+                for item in [*clients, *filtered_sale_clients]
+                if item
+            }
+        )
+        warehouses = sorted(
+            {
+                item
+                for item in [*warehouses, *filtered_sale_warehouses]
+                if item
+            }
+        ) or ["Основной склад"]
         if not warehouse_options:
             warehouse_options = [{"id": "", "name": item, "manager": "", "status": "active", "note": ""} for item in warehouses]
         treasury = load_treasury(wid)
@@ -7285,6 +7370,7 @@ def create_app() -> FastAPI:
             active="sales",
             sales=sales,
             sales_journal_totals=sales_journal_totals,
+            sales_journal_pagination=sales_journal_pagination,
             sales_debt_workspace=sales_debt_workspace,
             sales_filters=filters,
             sales_options={
@@ -9383,6 +9469,8 @@ def create_app() -> FastAPI:
         critical: str = "",
         op: str = "",
         edit_purchase: str = "",
+        purchase_page: int = 1,
+        purchase_page_size: int = 100,
     ):
         wid, redir = _product_workspace_owner(request)
         if redir:
@@ -9525,6 +9613,82 @@ def create_app() -> FastAPI:
                     warehouse_purchase_debt_totals.get(currency, Decimal("0"))
                     + _sales_decimal(item.get("debt_amount"))
                 )
+        purchase_page_size = _table_page_size(purchase_page_size)
+        warehouse_purchases_total = len(warehouse_purchases)
+        warehouse_purchases_total_pages = max(
+            1,
+            math.ceil(warehouse_purchases_total / purchase_page_size),
+        )
+        warehouse_purchases_page = min(
+            max(1, purchase_page),
+            warehouse_purchases_total_pages,
+        )
+        warehouse_purchases_start = (
+            warehouse_purchases_page - 1
+        ) * purchase_page_size
+        warehouse_purchases_end = min(
+            warehouse_purchases_total,
+            warehouse_purchases_start + purchase_page_size,
+        )
+
+        def warehouse_purchase_page_url(
+            page_number: int,
+            page_size: int = purchase_page_size,
+        ) -> str:
+            pairs = [
+                (key, value)
+                for key, value in request.query_params.multi_items()
+                if key
+                not in {
+                    "purchase_page",
+                    "purchase_page_size",
+                    "purchase_id",
+                    "edit_purchase",
+                }
+            ]
+            pairs.extend(
+                [
+                    ("purchase_page", str(page_number)),
+                    ("purchase_page_size", str(page_size)),
+                ]
+            )
+            return f"{request.url.path}?{urlencode(pairs, doseq=True)}#purchases"
+
+        warehouse_purchases_pagination_pages = _table_pagination_pages(
+            warehouse_purchases_page,
+            warehouse_purchases_total_pages,
+        )
+        warehouse_purchases_pagination = {
+            "total": warehouse_purchases_total,
+            "page": warehouse_purchases_page,
+            "page_size": purchase_page_size,
+            "total_pages": warehouse_purchases_total_pages,
+            "page_from": (
+                warehouse_purchases_start + 1 if warehouse_purchases_total else 0
+            ),
+            "page_to": warehouse_purchases_end,
+            "pagination_pages": warehouse_purchases_pagination_pages,
+            "page_urls": {
+                page_number: warehouse_purchase_page_url(page_number)
+                for page_number in warehouse_purchases_pagination_pages
+            },
+            "prev_page_url": warehouse_purchase_page_url(
+                max(1, warehouse_purchases_page - 1)
+            ),
+            "next_page_url": warehouse_purchase_page_url(
+                min(
+                    warehouse_purchases_total_pages,
+                    warehouse_purchases_page + 1,
+                )
+            ),
+            "page_size_urls": {
+                size: warehouse_purchase_page_url(1, size)
+                for size in (100, 500, 1000)
+            },
+        }
+        warehouse_purchases = warehouse_purchases[
+            warehouse_purchases_start:warehouse_purchases_end
+        ]
         price_types = _workspace_price_types(wid)
         purchase_price_types = [
             item
@@ -9586,6 +9750,7 @@ def create_app() -> FastAPI:
             warehouse_stock_total=_sales_money_label(warehouse_stock_total),
             warehouse_operations=warehouse_operations,
             warehouse_purchases=warehouse_purchases,
+            warehouse_purchases_pagination=warehouse_purchases_pagination,
             warehouse_purchase_edit=warehouse_purchase_edit,
             warehouse_purchase_totals=[
                 {"currency": currency, "amount": _sales_money_label(amount)}
@@ -10133,12 +10298,7 @@ def create_app() -> FastAPI:
             "clients": sorted({item["name"] for item in all_clients_records if item["name"]}),
         }
 
-        try:
-            clients_page_size = int(str(page_size or "100").strip())
-        except Exception:
-            clients_page_size = 100
-        if clients_page_size not in {50, 100, 250}:
-            clients_page_size = 100
+        clients_page_size = _table_page_size(page_size)
 
         clients_total_pages = max(1, math.ceil(clients_total / clients_page_size))
         clients_page = min(_positive_int(page, 1), clients_total_pages)
@@ -10169,17 +10329,14 @@ def create_app() -> FastAPI:
             pairs.append((page_key, str(target_page)))
             return f"{request.url.path}?{urlencode(pairs, doseq=True)}#{anchor}"
 
-        clients_pagination_pages = [
-            page_no
-            for page_no in range(max(1, clients_page - 2), min(clients_total_pages, clients_page + 2) + 1)
-        ]
-        client_balances_pagination_pages = [
-            page_no
-            for page_no in range(
-                max(1, client_balances_page - 2),
-                min(client_balances_total_pages, client_balances_page + 2) + 1,
-            )
-        ]
+        clients_pagination_pages = _table_pagination_pages(
+            clients_page,
+            clients_total_pages,
+        )
+        client_balances_pagination_pages = _table_pagination_pages(
+            client_balances_page,
+            client_balances_total_pages,
+        )
         return tpl(
             request,
             "home_business_module.html",

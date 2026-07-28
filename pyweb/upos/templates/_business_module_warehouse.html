@@ -230,6 +230,7 @@
         <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню">⋮</button>
       </div>
       <form class="warehouse-purchases-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
+        <input type="hidden" name="purchase_page_size" value="{{ warehouse_purchases_pagination.page_size }}" />
         <label class="warehouse-purchases-search">
           <span>Поиск</span>
           <input name="q" type="search" value="{{ warehouse_filters.q }}" placeholder="Поиск" />
@@ -380,23 +381,24 @@
     </div>
     <footer class="warehouse-purchases-footer">
       <nav class="products-pagination" aria-label="Страницы закупок">
-        <a class="products-page-link disabled" href="{{ url_for('warehouse_get') }}#purchases" aria-label="Предыдущая страница">‹</a>
-        <a class="products-page-link active" href="{{ url_for('warehouse_get') }}#purchases" aria-current="page">1</a>
-        <a class="products-page-link disabled" href="{{ url_for('warehouse_get') }}#purchases" aria-label="Следующая страница">›</a>
-        <span class="products-page-count">Стр. 1 из 1</span>
+        <a class="products-page-link {% if warehouse_purchases_pagination.page <= 1 %}disabled{% endif %}" href="{{ warehouse_purchases_pagination.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+        {% for page_no in warehouse_purchases_pagination.pagination_pages %}
+          <a class="products-page-link {% if page_no == warehouse_purchases_pagination.page %}active{% endif %}" href="{{ warehouse_purchases_pagination.page_urls[page_no] }}" {% if page_no == warehouse_purchases_pagination.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+        {% endfor %}
+        <a class="products-page-link {% if warehouse_purchases_pagination.page >= warehouse_purchases_pagination.total_pages %}disabled{% endif %}" href="{{ warehouse_purchases_pagination.next_page_url }}" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. {{ warehouse_purchases_pagination.page }} из {{ warehouse_purchases_pagination.total_pages }}</span>
       </nav>
       <div class="products-catalog-footer-meta">
         <div class="products-panel-stats" aria-label="Информация по закупкам">
-          <span>Всего: {{ warehouse_purchases|length }}</span>
-          <span>Показано: 1-{{ warehouse_purchases|length }}</span>
+          <span>Всего: {{ warehouse_purchases_pagination.total }}</span>
+          <span>Показано: {{ warehouse_purchases_pagination.page_from }}-{{ warehouse_purchases_pagination.page_to }}</span>
         </div>
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
-          <select aria-label="Размер страницы закупок">
-            <option selected>100 шт</option>
-            <option>500 шт</option>
-            <option>1000 шт</option>
-            <option>10000 шт</option>
+          <select aria-label="Размер страницы закупок" onchange="window.location.href=this.value">
+            {% for size in [100, 500, 1000] %}
+              <option value="{{ warehouse_purchases_pagination.page_size_urls[size] }}" {% if warehouse_purchases_pagination.page_size == size %}selected{% endif %}>{{ size }} шт</option>
+            {% endfor %}
           </select>
         </label>
       </div>

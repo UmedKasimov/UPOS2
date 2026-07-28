@@ -108,6 +108,8 @@
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
     <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-workspace-view="journal order return debt" hidden>
+      <input type="hidden" name="journal_page_size" value="{{ sales_journal_pagination.page_size }}" />
+      <input type="hidden" name="debt_page_size" value="{{ sales_debt_workspace.page_size }}" />
       <label class="products-catalog-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
@@ -321,7 +323,7 @@
         <header class="products-panel-head">
           <div>
             <h2>Журнал продаж</h2>
-            <span>Всего: {{ sales|length }}</span>
+            <span>Всего: {{ sales_journal_pagination.total }}</span>
           </div>
           <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
         </header>
@@ -377,7 +379,7 @@
             <tbody>
               {% for sale in sales %}
                 <tr class="sales-table-row--{{ sale.doc_type }}{% if sales_saved_id and sales_saved_id == sale.id %} sales-table-row--saved{% endif %}" data-sales-journal-row>
-                  <td class="sales-journal-row-index">{{ loop.index }}</td>
+                  <td class="sales-journal-row-index">{{ sales_journal_pagination.row_offset + loop.index }}</td>
                   <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0"><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
                   <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
                   <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
@@ -475,6 +477,30 @@
             {% endif %}
           </table>
         </div>
+        <footer class="products-catalog-footer sales-journal-footer">
+          <nav class="products-pagination" aria-label="Страницы журнала продаж">
+            <a class="products-page-link {% if sales_journal_pagination.page <= 1 %}disabled{% endif %}" href="{{ sales_journal_pagination.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+            {% for page_no in sales_journal_pagination.pagination_pages %}
+              <a class="products-page-link {% if page_no == sales_journal_pagination.page %}active{% endif %}" href="{{ sales_journal_pagination.page_urls[page_no] }}" {% if page_no == sales_journal_pagination.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+            {% endfor %}
+            <a class="products-page-link {% if sales_journal_pagination.page >= sales_journal_pagination.total_pages %}disabled{% endif %}" href="{{ sales_journal_pagination.next_page_url }}" aria-label="Следующая страница">›</a>
+            <span class="products-page-count">Стр. {{ sales_journal_pagination.page }} из {{ sales_journal_pagination.total_pages }}</span>
+          </nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Информация по журналу продаж">
+              <span>Всего: {{ sales_journal_pagination.total }}</span>
+              <span>Показано: {{ sales_journal_pagination.page_from }}-{{ sales_journal_pagination.page_to }}</span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select aria-label="Количество продаж на странице" onchange="window.location.href=this.value">
+                {% for size in [100, 500, 1000] %}
+                  <option value="{{ sales_journal_pagination.page_size_urls[size] }}" {% if sales_journal_pagination.page_size == size %}selected{% endif %}>{{ size }} шт</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </footer>
         {% for sale in sales %}
           <script type="application/json" id="sales-journal-data-{{ sale.id }}">{{ sale.detail_json|tojson }}</script>
         {% endfor %}
