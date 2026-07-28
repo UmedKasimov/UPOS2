@@ -263,17 +263,31 @@ def _created_at(item: dict[str, Any]) -> datetime:
     return datetime.now(UTC)
 
 
-def _shipment_details(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    for key in ("shipment_details", "details", "lines", "items", "products"):
+def _sales_document_details(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    for key in (
+        "shipment_details",
+        "order_details",
+        "return_details",
+        "details",
+        "lines",
+        "items",
+        "products",
+    ):
         value = payload.get(key)
         if isinstance(value, list):
             return [item for item in value if isinstance(item, dict)]
+    for key in ("data", "document", "shipment", "order", "return"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            details = _sales_document_details(value)
+            if details:
+                return details
     return []
 
 
 def _shipment_lines(payload: dict[str, Any]) -> list[dict[str, Any]]:
     lines: list[dict[str, Any]] = []
-    for detail in _shipment_details(payload):
+    for detail in _sales_document_details(payload):
         product = detail.get("product") if isinstance(detail.get("product"), dict) else {}
         warehouse = detail.get("warehouse") if isinstance(detail.get("warehouse"), dict) else {}
         unit = product.get("storage_unit") if isinstance(product.get("storage_unit"), dict) else {}
@@ -323,10 +337,25 @@ def _shipment_lines(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return lines
 
 
-def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
+def _ibox_sales_document_data(
+    payload: dict[str, Any],
+    entity_type: str,
+) -> dict[str, Any]:
     created_at = _created_at(payload)
     lines = _shipment_lines(payload)
     first_line = lines[0] if lines else {}
+    doc_type = {
+        "orders": "order",
+        "shipments": "sale",
+        "returns": "return",
+    }.get(entity_type, "sale")
+    status = (
+        _ibox_shipment_status(_money(payload), Decimal("0"))
+        if entity_type == "shipments"
+        else "completed"
+        if entity_type == "returns"
+        else "new"
+    )
     due_date = _scalar(
         payload,
         "due_date",
@@ -335,7 +364,7 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
         "deadline",
     )[:10]
     return {
-        "doc_type": "sale",
+        "doc_type": doc_type,
         "date": created_at.date().isoformat(),
         "date_to": due_date or created_at.date().isoformat(),
         "client": (
@@ -347,7 +376,7 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
             or _text(payload, "warehouse_name")
             or "Основной склад"
         ),
-        "status": _ibox_shipment_status(_money(payload), Decimal("0")),
+        "status": status,
         "workflow_version": 2,
         # IBOX remains the stock source of truth for imported shipments.
         "inventory_applied": False,
@@ -370,6 +399,10 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
         "ibox_status": payload.get("status"),
         "ibox_payload": payload,
     }
+
+
+def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
+    return _ibox_sales_document_data(payload, "shipments")
 
 
 def _ibox_shipment_status(amount: Any, paid: Any) -> str:
@@ -1236,9 +1269,17 @@ def _upsert_document(
     target_branch_id: str | None,
     entity_type: str = "",
 ) -> None:
-    is_shipment = model is SaleDocument and entity_type == "shipments"
-    document_data = _shipment_document_data(payload) if is_shipment else payload
-    if is_shipment:
+    is_ibox_sales_document = model is SaleDocument and entity_type in {
+        "orders",
+        "shipments",
+        "returns",
+    }
+    document_data = (
+        _ibox_sales_document_data(payload, entity_type)
+        if is_ibox_sales_document
+        else payload
+    )
+    if is_ibox_sales_document:
         document_data = _resolve_shipment_products(
             session,
             str(common["workspace_owner_id"]),
@@ -1246,7 +1287,7 @@ def _upsert_document(
         )
     counterparty_id = (
         _shipment_counterparty_id(session, str(common["workspace_owner_id"]), payload)
-        if is_shipment
+        if is_ibox_sales_document
         else None
     )
     values = {

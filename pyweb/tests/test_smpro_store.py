@@ -35,12 +35,87 @@ from upos.smpro_store import (
     _ibox_payment_credit,
     _ibox_product_data,
     _ibox_price_type_rows,
+    _ibox_sales_document_data,
     _ibox_shipment_status,
     _shipment_document_data,
 )
 
 
 class SMProStoreTests(unittest.TestCase):
+    def test_ibox_order_keeps_product_names_and_lines(self) -> None:
+        document = _ibox_sales_document_data(
+            {
+                "id": 4286,
+                "currency_code": "UZS",
+                "outlet_id": 938,
+                "outlet_name": "Lux Shop",
+                "number": "CLI-741552",
+                "date": "2026-04-03T09:37:06.000000Z",
+                "status": 43,
+                "total": 550000,
+                "order_details": [
+                    {
+                        "id": 2141,
+                        "product_id": 354,
+                        "warehouse_id": 1,
+                        "quantity": 1,
+                        "price": 550000,
+                        "total": 550000,
+                        "product": {
+                            "id": 354,
+                            "name": "Сканер mp2050b",
+                            "storage_unit": {"short_name": "шт"},
+                        },
+                        "warehouse": {"id": 1, "name": "Офис Склад"},
+                    }
+                ],
+            },
+            "orders",
+        )
+
+        self.assertEqual(document["doc_type"], "order")
+        self.assertEqual(document["status"], "new")
+        self.assertEqual(document["client"], "Lux Shop")
+        self.assertEqual(document["warehouse"], "Офис Склад")
+        self.assertEqual(
+            document["lines"][0],
+            {
+                "product": "Сканер mp2050b",
+                "product_id": "354",
+                "warehouse": "Офис Склад",
+                "warehouse_id": "1",
+                "quantity": "1",
+                "price": "550000",
+                "total": "550000",
+                "unit": "шт",
+                "source": "ibox",
+            },
+        )
+
+    def test_ibox_return_reads_nested_document_details(self) -> None:
+        document = _ibox_sales_document_data(
+            {
+                "date": "2026-07-28",
+                "data": {
+                    "return_details": [
+                        {
+                            "product_id": 77,
+                            "product_name": "Возвращённый товар",
+                            "quantity": 2,
+                            "price": 10,
+                            "total": 20,
+                        }
+                    ]
+                },
+            },
+            "returns",
+        )
+
+        self.assertEqual(document["doc_type"], "return")
+        self.assertEqual(document["status"], "completed")
+        self.assertEqual(document["lines"][0]["product"], "Возвращённый товар")
+        self.assertEqual(document["lines"][0]["quantity"], "2")
+
     def test_shipment_becomes_sales_journal_document(self) -> None:
         payload = {
             "id": 8583,

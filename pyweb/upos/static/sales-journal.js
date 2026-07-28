@@ -50,7 +50,7 @@
     if (!lines.length) {
       return (
         "<tr>" +
-        "<td>" + escapeHtml(sale.number || "Продажа") + "</td>" +
+        "<td>Позиции не указаны</td>" +
         "<td class=\"num\">1</td>" +
         "<td class=\"num\">" + escapeHtml(moneyWithCurrency(sale.amount, currency)) + "</td>" +
         "</tr>"
@@ -519,7 +519,7 @@
     if (!lines.length) {
       var emptyRow = document.createElement("tr");
       appendCell(emptyRow, "1");
-      appendCell(emptyRow, sale.number || "Продажа");
+      appendCell(emptyRow, "Позиции не указаны");
       appendCell(emptyRow, sale.warehouse || "-");
       appendCell(emptyRow, "-");
       appendCell(emptyRow, "-");
