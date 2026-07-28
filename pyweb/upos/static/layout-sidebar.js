@@ -56,6 +56,127 @@
     window.addEventListener("resize", syncRailForViewport);
   }
 
+  function sidebarCsrfToken() {
+    var input = document.querySelector('input[name="csrf_token"]');
+    return input ? String(input.value || "") : "";
+  }
+
+  function readJsonResponse(response) {
+    return response.text().then(function (text) {
+      var body = {};
+      try {
+        body = text ? JSON.parse(text) : {};
+      } catch (e) {
+        body = {};
+      }
+      if (!response.ok) {
+        throw new Error(body.error || body.message || "Не удалось выполнить синхронизацию");
+      }
+      return body;
+    });
+  }
+
+  function bootSidebarIboxSync() {
+    var button = document.querySelector("[data-sidebar-ibox-sync]");
+    if (!button) return;
+    var statusNode = button.querySelector("[data-sidebar-ibox-sync-status]");
+    var liveNode = document.querySelector("[data-sidebar-ibox-sync-live]");
+    var pollTimer = 0;
+    var resetTimer = 0;
+
+    function setState(state, message, detail) {
+      button.dataset.state = state;
+      button.disabled = state === "running";
+      if (statusNode) statusNode.textContent = message;
+      button.title = detail || message;
+      button.setAttribute("aria-label", detail || message);
+      if (liveNode) liveNode.textContent = detail || message;
+    }
+
+    function resetCompletedState() {
+      clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(function () {
+        setState("idle", "Синхронизировать вручную", "Ручная синхронизация с IBOX");
+      }, 5000);
+    }
+
+    function applyStatus(status, announce) {
+      if (!status) {
+        setState("idle", "Синхронизировать вручную", "Ручная синхронизация с IBOX");
+        return false;
+      }
+      if (status.status === "running") {
+        setState("running", "Синхронизация…", "IBOX: синхронизация выполняется");
+        return true;
+      }
+      if (status.status === "error") {
+        setState("error", "Ошибка синхронизации", status.error || "IBOX: ошибка синхронизации");
+        return false;
+      }
+      if (status.status === "partial") {
+        var warnings = status.data && Array.isArray(status.data.warnings)
+          ? status.data.warnings.length
+          : 0;
+        var partialDetail =
+          "IBOX: импортировано " +
+          String(status.imported_count || 0) +
+          ", недоступных разделов " +
+          String(warnings);
+        setState("partial", "Синхронизировано частично", partialDetail);
+        if (announce) resetCompletedState();
+        return false;
+      }
+      var detail = "IBOX: импортировано записей " + String(status.imported_count || 0);
+      setState(announce ? "success" : "idle", announce ? "Данные обновлены" : "Синхронизировать вручную", detail);
+      if (announce) resetCompletedState();
+      return false;
+    }
+
+    function pollStatus(announce) {
+      clearTimeout(pollTimer);
+      fetch("/api/integrations/ibox/status", {
+        headers: { Accept: "application/json" },
+      })
+        .then(readJsonResponse)
+        .then(function (body) {
+          if (applyStatus(body.status, announce)) {
+            pollTimer = window.setTimeout(function () {
+              pollStatus(true);
+            }, 1800);
+          }
+        })
+        .catch(function (error) {
+          setState("error", "Ошибка синхронизации", error.message || "IBOX недоступен");
+        });
+    }
+
+    button.addEventListener("click", function () {
+      if (button.disabled) return;
+      clearTimeout(resetTimer);
+      setState("running", "Запускаю…", "IBOX: запускаю полную синхронизацию");
+      fetch("/api/integrations/ibox/sync", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "X-CSRF-Token": sidebarCsrfToken(),
+        },
+      })
+        .then(readJsonResponse)
+        .then(function (body) {
+          if (applyStatus(body.status, true)) {
+            pollTimer = window.setTimeout(function () {
+              pollStatus(true);
+            }, 1200);
+          }
+        })
+        .catch(function (error) {
+          setState("error", "Ошибка синхронизации", error.message || "Не удалось запустить синхронизацию IBOX");
+        });
+    });
+
+    pollStatus(false);
+  }
+
   function setOpen(on) {
     var body = document.body;
     var toggle = document.querySelector("[data-sidebar-toggle]");
@@ -72,6 +193,7 @@
 
   function boot() {
     bootSidebarRail();
+    bootSidebarIboxSync();
 
     var toggle = document.querySelector("[data-sidebar-toggle]");
     var backdrop = document.querySelector("[data-sidebar-backdrop]");
