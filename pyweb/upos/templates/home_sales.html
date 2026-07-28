@@ -226,17 +226,21 @@
           </div>
         </section>
         <div class="sales-debt-table-wrap">
-          <table class="products-table products-catalog-table sales-debt-table">
+          <table
+            class="products-table products-catalog-table sales-debt-table"
+            id="sales-debt-table"
+            data-upos-column-controls
+          >
             <thead>
               <tr>
-                <th>Клиент</th>
-                <th>Долг</th>
-                <th>Документы</th>
-                <th>Ближайший срок</th>
-                <th>Просрочка</th>
-                <th>Ответственный</th>
-                <th>Статус</th>
-                <th>Оплата</th>
+                <th data-column-key="client" data-column-label="Клиент">Клиент</th>
+                <th data-column-key="debt" data-column-label="Долг">Долг</th>
+                <th data-column-key="documents" data-column-label="Документы">Документы</th>
+                <th data-column-key="due" data-column-label="Ближайший срок">Ближайший срок</th>
+                <th data-column-key="overdue" data-column-label="Просрочка">Просрочка</th>
+                <th data-column-key="manager" data-column-label="Ответственный">Ответственный</th>
+                <th data-column-key="status" data-column-label="Статус">Статус</th>
+                <th data-column-key="payment" data-column-label="Оплата">Оплата</th>
               </tr>
             </thead>
             <tbody>
