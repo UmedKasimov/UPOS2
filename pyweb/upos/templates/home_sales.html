@@ -243,36 +243,10 @@
               {% for debt_client in sales_debt_workspace.clients %}
                 <tr class="sales-debt-client-row sales-debt-client-row--{{ debt_client.status }}">
                   <td>
-                    <details class="sales-debt-client" {% if loop.first %}open{% endif %}>
-                      <summary>
-                        <strong>{{ debt_client.client }}</strong>
-                        <span>{{ debt_client.documents_count }} неоплаченных продаж</span>
-                      </summary>
-                      <div class="sales-debt-documents">
-                        {% for sale in debt_client.documents %}
-                          <div class="sales-debt-document sales-debt-document--{{ sale.state }}" data-sales-debt-document>
-                            <button type="button" class="sales-debt-document-main" data-sales-journal-open data-sale-id="{{ sale.id }}">
-                              <strong>{{ sale.number }}</strong>
-                              <span>{{ sale.date_label or sale.date or "-" }}</span>
-                              <small>{{ sale.warehouse or "-" }}</small>
-                            </button>
-                            <div class="sales-debt-document-money">
-                              <strong>{{ sale.debt_label }} {{ sale.currency }}</strong>
-                              <small>из {{ sale.amount }} {{ sale.currency }}</small>
-                            </div>
-                            <div class="sales-debt-document-due">
-                              <span class="sales-debt-pill sales-debt-pill--{{ sale.state }}">{{ sale.state_label }}</span>
-                              <small>{{ sale.due_label }}</small>
-                            </div>
-                            <div class="sales-debt-document-aging">
-                              <span>{{ sale.aging_label }}</span>
-                              <small>{{ sale.manager or "Без ответственного" }}</small>
-                            </div>
-                            <button type="button" class="btn btn-secondary btn-sm sales-debt-pay-btn" data-sales-debt-pay data-sale-id="{{ sale.id }}">Оплатить</button>
-                          </div>
-                        {% endfor %}
-                      </div>
-                    </details>
+                    <div class="sales-debt-client-label">
+                      <strong>{{ debt_client.client }}</strong>
+                      <span>{{ debt_client.documents_count }} неоплаченных продаж</span>
+                    </div>
                   </td>
                   <td>
                     {% for total in debt_client.totals_list %}
@@ -307,23 +281,6 @@
                 </tr>
               {% endfor %}
             </tbody>
-            <tfoot>
-              <tr class="sales-debt-total-row">
-                <td>
-                  <strong>Итого по всем страницам</strong>
-                  <small>{{ sales_debt_workspace.clients_count }} клиентов</small>
-                </td>
-                <td>
-                  {% for total in sales_debt_workspace.totals %}
-                    <strong class="sales-debt-money">{{ total.amount }} {{ total.currency }}</strong>
-                  {% else %}
-                    <strong class="sales-debt-money">0</strong>
-                  {% endfor %}
-                </td>
-                <td><strong>{{ sales_debt_workspace.documents_count }}</strong></td>
-                <td colspan="5"></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
         <footer class="products-catalog-footer sales-debt-footer">
@@ -339,6 +296,9 @@
             <div class="products-panel-stats" aria-label="Итоги списка долгов">
               <span>Клиентов: {{ sales_debt_workspace.clients_count }}</span>
               <span>Документов: {{ sales_debt_workspace.documents_count }}</span>
+              {% for total in sales_debt_workspace.totals %}
+                <span>Общий долг: {{ total.amount }} {{ total.currency }}</span>
+              {% endfor %}
               <span>Показано: {{ sales_debt_workspace.page_from }}-{{ sales_debt_workspace.page_to }}</span>
             </div>
             <label class="products-page-size products-page-size--footer">
