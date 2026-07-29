@@ -11043,10 +11043,12 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-table td.sales-journal-client-cell {
+  overflow: hidden;
   font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sales-journal-id-cell {

@@ -440,7 +440,7 @@
                   <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0"><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
                   <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
                   <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
-                  <td class="sales-journal-client-cell">{{ sale.client or "-" }}</td>
+                  <td class="sales-journal-client-cell" title="{{ sale.client or '-' }}">{{ sale.client or "-" }}</td>
                   <td>{{ sale.warehouse or "-" }}</td>
                   <td data-sort-value="{{ sale.amount_value }}">{{ sale.amount }} {{ sale.currency }}</td>
                   <td
