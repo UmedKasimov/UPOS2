@@ -7,7 +7,8 @@
 {% endblock %}
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid'] %}
-{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))))) %}
+{% set sales_journal_requested = request.query_params.get('view') == 'journal' %}
+{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
 {% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
 {% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
@@ -51,7 +52,7 @@
       <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Продажи</button>
     </nav>
 
-    <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher>
+    <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher{% if sales_default_tab %} hidden{% endif %}>
       <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
@@ -106,11 +107,12 @@
       </a>
     </section>
 
-    <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
+    <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
     {% macro render_sales_journal_filter() %}
-    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-workspace-view="journal order return debt" hidden>
+    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-workspace-view="journal order return debt"{% if sales_default_tab not in ['journal', 'order', 'return', 'debt'] %} hidden{% endif %}>
       <input type="hidden" name="journal_page_size" value="{{ sales_journal_pagination.page_size }}" />
       <input type="hidden" name="debt_page_size" value="{{ sales_debt_workspace.page_size }}" />
+      {% if sales_filters.status != 'debt' %}<input type="hidden" name="view" value="journal" />{% endif %}
       <label class="products-catalog-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
@@ -203,7 +205,7 @@
         </details>
       </div>
       <button class="btn btn-secondary" type="submit">Применить</button>
-      <a class="btn btn-secondary" href="{{ url_for('sales_get') }}#sales-journal">Очистить</a>
+      <a class="btn btn-secondary" href="{{ url_for('sales_get') }}?view=journal#sales-journal">Очистить</a>
     </form>
     {% endmacro %}
     {% if sales_filters.status == 'debt' %}
@@ -221,7 +223,7 @@
     </datalist>
 
     <div class="sales-layout products-layout">
-      <article class="products-list-panel sales-debt-workspace" id="debt" data-workspace-view="debt" hidden>
+      <article class="products-list-panel sales-debt-workspace" id="debt" data-workspace-view="debt"{% if sales_default_tab != 'debt' %} hidden{% endif %}>
         <header class="products-panel-head sales-debt-head">
           <div>
             <h2>Дебиторская задолженность</h2>
@@ -367,7 +369,7 @@
         </footer>
       </article>
 
-      <article class="products-list-panel{% if sales_filters.status == 'debt' %} sales-journal-support{% endif %}" id="sales-journal" data-workspace-view="journal order return debt" hidden>
+      <article class="products-list-panel{% if sales_filters.status == 'debt' %} sales-journal-support{% endif %}" id="sales-journal" data-workspace-view="journal order return debt"{% if sales_default_tab not in ['journal', 'order', 'return', 'debt'] %} hidden{% endif %}>
         <header class="products-panel-head sales-journal-head">
           <div class="products-panel-title">
             <h2>Журнал продаж</h2>
@@ -767,7 +769,7 @@
         </dialog>
       </article>
 
-      <aside class="product-form-panel" id="sales-form" data-workspace-view="new"{% if not sales_embed %} hidden{% endif %}>
+      <aside class="product-form-panel" id="sales-form" data-workspace-view="new"{% if not sales_embed and sales_default_tab != 'new' %} hidden{% endif %}>
         <header class="products-panel-head">
           <div>
             <h2 data-sales-form-title>{{ sales_form_title }}</h2>

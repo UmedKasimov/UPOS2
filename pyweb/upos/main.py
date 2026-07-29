@@ -7168,8 +7168,9 @@ def create_app() -> FastAPI:
                 pairs = [
                     (key, value)
                     for key, value in request.query_params.multi_items()
-                    if key not in {"doc_type", "journal_page"}
+                    if key not in {"doc_type", "journal_page", "view"}
                 ]
+                pairs.append(("view", "journal"))
                 if tab_doc_type:
                     pairs.append(("doc_type", tab_doc_type))
                 query = urlencode(pairs, doseq=True)
