@@ -114,15 +114,32 @@
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
       </label>
-      <label>
+      <div class="sales-status-filter sales-doc-type-filter" data-sales-doc-type-filter>
         <span>Тип документа</span>
-        <select name="doc_type">
-          <option value="all" {% if sales_filters.doc_type == 'all' %}selected{% endif %}>Все</option>
-          <option value="sale" {% if sales_filters.doc_type == 'sale' %}selected{% endif %}>Продажа</option>
-          <option value="order" {% if sales_filters.doc_type == 'order' %}selected{% endif %}>Заказ</option>
-          <option value="return" {% if sales_filters.doc_type == 'return' %}selected{% endif %}>Возврат</option>
-        </select>
-      </label>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по типам документов">
+            <span data-sales-doc-type-summary>{{ sales_filters.doc_type_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-doc-type-all {% if not sales_filters.doc_types %}checked{% endif %} />
+              <span>Все виды</span>
+            </label>
+            {% for option in sales_options.doc_type_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="doc_type"
+                  value="{{ option.value }}"
+                  data-sales-doc-type-option
+                  {% if option.value in sales_filters.doc_types %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
       <label>
         <span>Клиент</span>
         <input name="client" list="sales-client-list" value="{{ sales_filters.client }}" />
@@ -1292,7 +1309,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=19" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=20" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=57" defer></script>
   {% if sales_embed %}
     <script>

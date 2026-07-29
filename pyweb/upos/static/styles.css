@@ -10462,6 +10462,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border: 1px solid var(--border);
   border-radius: var(--workbench-radius-sm, 8px);
   background: var(--card);
+  color: var(--foreground);
   box-shadow: 0 12px 30px rgb(15 23 42 / 18%);
 }
 
@@ -10491,12 +10492,18 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-filter .sales-status-filter-option > span {
-  display: inline;
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
   min-width: 0;
+  overflow: visible;
+  clip: auto;
   color: var(--foreground);
   font: inherit;
   opacity: 1;
   visibility: visible;
+  white-space: normal;
 }
 
 .sales-journal-filter .sales-status-filter-option input {

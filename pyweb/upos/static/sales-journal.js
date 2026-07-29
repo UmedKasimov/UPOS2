@@ -727,47 +727,62 @@
     var form = scope.querySelector("#sales-journal-filter");
     if (!form || form.dataset.salesJournalFilterReady === "1") return;
     form.dataset.salesJournalFilterReady = "1";
-    var statusFilter = form.querySelector("[data-sales-status-filter]");
-    if (statusFilter) {
-      var allStatuses = statusFilter.querySelector("[data-sales-status-all]");
-      var statusOptions = Array.from(statusFilter.querySelectorAll("[data-sales-status-option]"));
-      var statusSummary = statusFilter.querySelector("[data-sales-status-summary]");
-      var updateStatusSummary = function () {
-        var checked = statusOptions.filter(function (field) {
+    var bindCheckboxFilter = function (root, allSelector, optionSelector, summarySelector) {
+      if (!root) return;
+      var allOption = root.querySelector(allSelector);
+      var options = Array.from(root.querySelectorAll(optionSelector));
+      var summary = root.querySelector(summarySelector);
+      var updateSummary = function () {
+        var checked = options.filter(function (field) {
           return field.checked;
         });
-        if (statusSummary) {
-          statusSummary.textContent =
+        if (summary) {
+          summary.textContent =
             checked.length === 0
               ? "Все"
               : checked.length === 1
                 ? String(checked[0].closest("label").querySelector("span").textContent || "").trim()
                 : "Выбрано: " + checked.length;
         }
-        if (allStatuses) allStatuses.checked = checked.length === 0;
+        if (allOption) allOption.checked = checked.length === 0;
       };
-      if (allStatuses) {
-        allStatuses.addEventListener("change", function () {
-          if (allStatuses.checked) {
-            statusOptions.forEach(function (field) {
+      if (allOption) {
+        allOption.addEventListener("change", function () {
+          if (allOption.checked) {
+            options.forEach(function (field) {
               field.checked = false;
             });
           }
-          updateStatusSummary();
+          updateSummary();
         });
       }
-      statusOptions.forEach(function (field) {
-        field.addEventListener("change", updateStatusSummary);
+      options.forEach(function (field) {
+        field.addEventListener("change", updateSummary);
       });
-      updateStatusSummary();
-    }
+      updateSummary();
+    };
+    bindCheckboxFilter(
+      form.querySelector("[data-sales-doc-type-filter]"),
+      "[data-sales-doc-type-all]",
+      "[data-sales-doc-type-option]",
+      "[data-sales-doc-type-summary]"
+    );
+    bindCheckboxFilter(
+      form.querySelector("[data-sales-status-filter]"),
+      "[data-sales-status-all]",
+      "[data-sales-status-option]",
+      "[data-sales-status-summary]"
+    );
     var navigate = function () {
       var params = new URLSearchParams();
-      ["q", "doc_type", "client", "date_from", "date_to"].forEach(function (name) {
+      ["q", "client", "date_from", "date_to"].forEach(function (name) {
         var field = form.querySelector("[name=\"" + name + "\"]");
         var value = field ? String(field.value || "").trim() : "";
         if (!value) return;
         params.set(name, value);
+      });
+      form.querySelectorAll("[data-sales-doc-type-option]:checked").forEach(function (field) {
+        params.append("doc_type", String(field.value || "").trim());
       });
       form.querySelectorAll("[data-sales-status-option]:checked").forEach(function (field) {
         params.append("status", String(field.value || "").trim());

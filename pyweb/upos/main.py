@@ -6996,6 +6996,33 @@ def create_app() -> FastAPI:
         date_to_clean = date_to.strip()
         if date_from_clean and date_to_clean and date_from_clean > date_to_clean:
             date_from_clean, date_to_clean = date_to_clean, date_from_clean
+        doc_type_filter_options = [
+            {"value": "sale", "label": "Продажа"},
+            {"value": "order", "label": "Заказ"},
+            {"value": "return", "label": "Возврат"},
+        ]
+        doc_type_query_values = [
+            str(item or "").strip().lower()
+            for item in request.query_params.getlist("doc_type")
+            if str(item or "").strip()
+        ]
+        if not doc_type_query_values:
+            doc_type_query_values = [str(doc_type or "all").strip().lower()]
+        allowed_doc_types = {item["value"] for item in doc_type_filter_options}
+        selected_doc_types = list(
+            dict.fromkeys(item for item in doc_type_query_values if item in allowed_doc_types)
+        )
+        doc_type_filter = selected_doc_types[0] if len(selected_doc_types) == 1 else "all"
+        if not selected_doc_types:
+            doc_type_summary = "Все"
+        elif len(selected_doc_types) == 1:
+            doc_type_summary = next(
+                item["label"]
+                for item in doc_type_filter_options
+                if item["value"] == selected_doc_types[0]
+            )
+        else:
+            doc_type_summary = f"Выбрано: {len(selected_doc_types)}"
         status_filter_options = [
             {"value": "new", "label": "Новый"},
             {"value": "shipped", "label": "Отгружен"},
@@ -7035,7 +7062,9 @@ def create_app() -> FastAPI:
             status_summary = f"Выбрано: {len(selected_statuses)}"
         filters = {
             "q": q.strip(),
-            "doc_type": doc_type.strip() or "all",
+            "doc_type": doc_type_filter,
+            "doc_types": selected_doc_types,
+            "doc_type_summary": doc_type_summary,
             "status": status_filter,
             "statuses": selected_statuses,
             "status_summary": status_summary,
@@ -7080,7 +7109,7 @@ def create_app() -> FastAPI:
             )
             for row in rows:
                 item = _sales_document_data(row)
-                if filters["doc_type"] != "all" and item["doc_type"] != filters["doc_type"]:
+                if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
                     continue
                 if filters["status"] == "debt":
                     if item["doc_type"] != "sale" or _sales_decimal(item.get("debt_value")) <= 0:
@@ -7382,6 +7411,7 @@ def create_app() -> FastAPI:
                 "product_rows": product_options,
                 "price_types": price_type_options,
                 "payment_accounts": payment_accounts,
+                "doc_type_filters": doc_type_filter_options,
                 "status_filters": status_filter_options,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
