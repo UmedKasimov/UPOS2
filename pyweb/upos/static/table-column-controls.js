@@ -6,7 +6,12 @@
   const MENU_OPEN_CLASS = 'is-column-menu-open';
   const CELL_KEY_ATTR = 'data-upos-column-cell-key';
   const ORDER_STORAGE_SUFFIX = ':order';
+  const WIDTH_STORAGE_SUFFIX = ':widths';
+  const MIN_COLUMN_WIDTH = 48;
+  const MAX_COLUMN_WIDTH = 720;
   let draggedColumn = null;
+  let draggedHeaderColumn = null;
+  let resizedColumn = null;
   const TEXT_DROP_TABLE_SELECTOR = [
     'table[data-upos-column-controls]',
     'table.products-table',
@@ -46,6 +51,7 @@
 
   function isRealColumnHeaderDrag(target) {
     if (!(target instanceof Element)) return false;
+    if (target.closest('[data-upos-header-drag-handle]')) return true;
     const header = target.closest('th[draggable="true"], th.clients-table-movable-column');
     return Boolean(header && !target.closest('input, textarea, select, button, a, [contenteditable="true"]'));
   }
@@ -169,6 +175,112 @@
 
   function orderStorageKey(table) {
     return `${storageKey(table)}${ORDER_STORAGE_SUFFIX}`;
+  }
+
+  function widthStorageKey(table) {
+    return `${storageKey(table)}${WIDTH_STORAGE_SUFFIX}`;
+  }
+
+  function readWidths(table) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(widthStorageKey(table)) || '{}');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+      return Object.fromEntries(
+        Object.entries(raw)
+          .map(([key, value]) => [String(key), Number(value)])
+          .filter(([, value]) => Number.isFinite(value) && value >= MIN_COLUMN_WIDTH),
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  function saveWidths(table, widths) {
+    try {
+      localStorage.setItem(widthStorageKey(table), JSON.stringify(widths));
+    } catch {
+      /* localStorage may be unavailable. */
+    }
+  }
+
+  function captureBaseWidths(table) {
+    if (table._uposBaseColumnWidths && Object.keys(table._uposBaseColumnWidths).length) return;
+    const widths = {};
+    directCells(headerRow(table)).forEach((cell) => {
+      const key = cell.getAttribute(CELL_KEY_ATTR);
+      const width = cell.getBoundingClientRect().width;
+      if (key && Number.isFinite(width) && width > 0) {
+        widths[key] = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, width));
+      }
+    });
+    if (Object.keys(widths).length) table._uposBaseColumnWidths = widths;
+  }
+
+  function applyWidths(table, overrides = {}) {
+    ensureColumnKeys(table);
+    captureBaseWidths(table);
+    const hidden = readHidden(table);
+    const saved = readWidths(table);
+    const widths = {
+      ...(table._uposBaseColumnWidths || {}),
+      ...saved,
+      ...overrides,
+    };
+    let totalWidth = 0;
+
+    columns(table).forEach((column) => {
+      const value = Number(widths[column.key]);
+      if (!Number.isFinite(value)) return;
+      const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+      tableRows(table).forEach((row) => {
+        const cell = directCells(row).find((item) => item.getAttribute(CELL_KEY_ATTR) === column.key);
+        if (!cell) return;
+        cell.style.width = `${width}px`;
+        cell.style.minWidth = `${width}px`;
+        cell.style.maxWidth = `${width}px`;
+      });
+      if (!hidden.has(column.key)) totalWidth += width;
+    });
+
+    const controlWidth = headerRow(table)?.querySelector(`:scope > .${CONTROL_CELL}`)?.getBoundingClientRect().width || 48;
+    table.style.setProperty('--upos-table-column-total-width', `${Math.ceil(totalWidth + controlWidth)}px`);
+  }
+
+  function enhanceHeaderInteractions(table) {
+    const row = headerRow(table);
+    if (!row) return;
+    directCells(row).forEach((cell) => {
+      const key = cell.getAttribute(CELL_KEY_ATTR);
+      if (!key) return;
+      cell.classList.add('upos-table-interactive-header');
+      if (getComputedStyle(cell).position === 'static') cell.style.position = 'relative';
+
+      if (
+        !cell.classList.contains('clients-table-movable-column')
+        && !cell.querySelector(':scope > [data-upos-header-drag-handle]')
+      ) {
+        const moveHandle = document.createElement('button');
+        moveHandle.type = 'button';
+        moveHandle.className = 'upos-table-header-drag-handle';
+        moveHandle.dataset.uposHeaderDragHandle = '1';
+        moveHandle.draggable = true;
+        moveHandle.title = 'Переместить столбец';
+        moveHandle.setAttribute('aria-label', 'Переместить столбец');
+        cell.append(moveHandle);
+      }
+
+      if (!cell.querySelector(':scope > [data-upos-column-resize-handle]')) {
+        const resizeHandle = document.createElement('span');
+        resizeHandle.className = 'upos-table-column-resize-handle';
+        resizeHandle.dataset.uposColumnResizeHandle = '1';
+        resizeHandle.setAttribute('role', 'separator');
+        resizeHandle.setAttribute('aria-orientation', 'vertical');
+        resizeHandle.setAttribute('tabindex', '0');
+        resizeHandle.title = 'Изменить ширину столбца';
+        resizeHandle.setAttribute('aria-label', 'Изменить ширину столбца');
+        cell.append(resizeHandle);
+      }
+    });
   }
 
   function readHidden(table) {
@@ -356,12 +468,18 @@
     orderReset.textContent = 'Сбросить порядок';
     orderReset.dataset.uposColumnOrderReset = '1';
 
+    const widthReset = document.createElement('button');
+    widthReset.type = 'button';
+    widthReset.className = 'upos-table-column-reset';
+    widthReset.textContent = 'Сбросить размеры';
+    widthReset.dataset.uposColumnWidthReset = '1';
+
     const showAll = document.createElement('button');
     showAll.type = 'button';
     showAll.className = 'upos-table-column-reset';
     showAll.textContent = 'Показать все';
     showAll.dataset.uposColumnReset = '1';
-    footer.append(orderReset, showAll);
+    footer.append(orderReset, widthReset, showAll);
     menu.append(footer);
   }
 
@@ -406,12 +524,16 @@
     const row = headerRow(table);
     if (!row || columns(table).length < 2) return;
     table.setAttribute(READY_ATTR, '1');
-    table.classList.add('upos-table-with-column-controls');
+    table.classList.add('upos-table-with-column-controls', 'upos-table-resizable-columns');
+    ensureColumnKeys(table);
+    captureBaseWidths(table);
     row.append(createControl(table));
     ensureBodyControlCells(table);
     ensureColumnKeys(table);
     applyOrder(table);
     applyVisibility(table);
+    enhanceHeaderInteractions(table);
+    applyWidths(table);
   }
 
   function initAll(root = document) {
@@ -443,6 +565,17 @@
       localStorage.removeItem(storageKey(table));
       renderMenu(table, reset.closest('[data-upos-column-menu]')?._uposColumnRoot || reset.closest('.upos-table-column-control'));
       applyVisibility(table);
+      applyWidths(table);
+      return;
+    }
+
+    const widthReset = event.target.closest('[data-upos-column-width-reset]');
+    if (widthReset) {
+      const menu = widthReset.closest('[data-upos-column-menu]');
+      const table = menu?._uposColumnTable || widthReset.closest('table');
+      if (!table) return;
+      localStorage.removeItem(widthStorageKey(table));
+      applyWidths(table);
       return;
     }
 
@@ -454,6 +587,7 @@
       localStorage.removeItem(orderStorageKey(table));
       applyOrder(table);
       applyVisibility(table);
+      applyWidths(table);
       renderMenu(table, menu?._uposColumnRoot || orderReset.closest('.upos-table-column-control'));
       return;
     }
@@ -472,9 +606,115 @@
     else hidden.add(key);
     saveHidden(table, hidden);
     applyVisibility(table);
+    applyWidths(table);
+  });
+
+  function resizeColumn(table, key, width, persist = false) {
+    const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.round(width)));
+    applyWidths(table, { [key]: nextWidth });
+    if (persist) {
+      const widths = readWidths(table);
+      widths[key] = nextWidth;
+      saveWidths(table, widths);
+    }
+    return nextWidth;
+  }
+
+  function finishColumnResize() {
+    if (!resizedColumn) return;
+    resizeColumn(resizedColumn.table, resizedColumn.key, resizedColumn.width, true);
+    resizedColumn.handle.releasePointerCapture?.(resizedColumn.pointerId);
+    resizedColumn.handle.removeAttribute('data-resizing');
+    document.body.classList.remove('upos-table-column-resizing');
+    resizedColumn = null;
+  }
+
+  document.addEventListener('pointerdown', (event) => {
+    const handle = event.target.closest('[data-upos-column-resize-handle]');
+    const header = handle?.closest(`th[${CELL_KEY_ATTR}]`);
+    const table = header?.closest(TABLE_SELECTOR);
+    if (!handle || !header || !table || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    resizedColumn = {
+      table,
+      key: header.getAttribute(CELL_KEY_ATTR),
+      handle,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: header.getBoundingClientRect().width,
+      width: header.getBoundingClientRect().width,
+    };
+    handle.dataset.resizing = '1';
+    handle.setPointerCapture?.(event.pointerId);
+    document.body.classList.add('upos-table-column-resizing');
+  });
+
+  document.addEventListener('pointermove', (event) => {
+    if (!resizedColumn || event.pointerId !== resizedColumn.pointerId) return;
+    event.preventDefault();
+    resizedColumn.width = resizeColumn(
+      resizedColumn.table,
+      resizedColumn.key,
+      resizedColumn.startWidth + event.clientX - resizedColumn.startX,
+    );
+  });
+
+  document.addEventListener('pointerup', (event) => {
+    if (!resizedColumn || event.pointerId !== resizedColumn.pointerId) return;
+    finishColumnResize();
+  });
+
+  document.addEventListener('pointercancel', finishColumnResize);
+
+  document.addEventListener('dblclick', (event) => {
+    const handle = event.target.closest('[data-upos-column-resize-handle]');
+    const header = handle?.closest(`th[${CELL_KEY_ATTR}]`);
+    const table = header?.closest(TABLE_SELECTOR);
+    if (!handle || !header || !table) return;
+    event.preventDefault();
+    const widths = readWidths(table);
+    delete widths[header.getAttribute(CELL_KEY_ATTR)];
+    saveWidths(table, widths);
+    applyWidths(table);
   });
 
   document.addEventListener('keydown', (event) => {
+    const moveHandle = event.target.closest('[data-upos-header-drag-handle]');
+    if (moveHandle && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      const header = moveHandle.closest(`th[${CELL_KEY_ATTR}]`);
+      const table = header?.closest(TABLE_SELECTOR);
+      if (!header || !table) return;
+      const cells = directCells(headerRow(table));
+      const currentIndex = cells.indexOf(header);
+      const target = cells[currentIndex + (event.key === 'ArrowLeft' ? -1 : 1)];
+      if (!target) return;
+      event.preventDefault();
+      moveHeaderColumn(
+        table,
+        header.getAttribute(CELL_KEY_ATTR),
+        target.getAttribute(CELL_KEY_ATTR),
+        event.key === 'ArrowRight',
+      );
+      moveHandle.focus();
+      return;
+    }
+
+    const resizeHandle = event.target.closest('[data-upos-column-resize-handle]');
+    if (resizeHandle && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      const header = resizeHandle.closest(`th[${CELL_KEY_ATTR}]`);
+      const table = header?.closest(TABLE_SELECTOR);
+      if (!header || !table) return;
+      event.preventDefault();
+      resizeColumn(
+        table,
+        header.getAttribute(CELL_KEY_ATTR),
+        header.getBoundingClientRect().width + (event.key === 'ArrowLeft' ? -8 : 8),
+        true,
+      );
+      return;
+    }
+
     const handle = event.target.closest('[data-upos-column-drag-handle]');
     if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
     const choice = handle.closest('[data-upos-column-order-key]');
@@ -492,6 +732,7 @@
     saveOrder(table, order);
     applyOrder(table);
     applyVisibility(table);
+    applyWidths(table);
     renderMenu(table, menu._uposColumnRoot);
     menu.querySelector(`[data-upos-column-order-key="${CSS.escape(key)}"] [data-upos-column-drag-handle]`)?.focus();
   });
@@ -502,7 +743,42 @@
     });
   }
 
+  function clearHeaderDropIndicators(table) {
+    headerRow(table)?.querySelectorAll('.is-upos-drop-before, .is-upos-drop-after').forEach((cell) => {
+      cell.classList.remove('is-upos-drop-before', 'is-upos-drop-after');
+    });
+  }
+
+  function moveHeaderColumn(table, sourceKey, targetKey, insertAfter) {
+    if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+    const order = readOrder(table).filter((key) => key !== sourceKey);
+    let targetIndex = order.indexOf(targetKey);
+    if (targetIndex < 0) return;
+    if (insertAfter) targetIndex += 1;
+    order.splice(targetIndex, 0, sourceKey);
+    saveOrder(table, order);
+    applyOrder(table);
+    applyVisibility(table);
+    enhanceHeaderInteractions(table);
+    applyWidths(table);
+  }
+
   document.addEventListener('dragstart', (event) => {
+    const headerHandle = event.target.closest('[data-upos-header-drag-handle]');
+    const headerCell = headerHandle?.closest(`th[${CELL_KEY_ATTR}]`);
+    const headerTable = headerCell?.closest(TABLE_SELECTOR);
+    if (headerHandle && headerCell && headerTable) {
+      draggedHeaderColumn = {
+        key: headerCell.getAttribute(CELL_KEY_ATTR),
+        table: headerTable,
+      };
+      headerCell.classList.add('is-upos-header-dragging');
+      event.dataTransfer?.setData('application/x-upos-header-column', draggedHeaderColumn.key);
+      event.dataTransfer?.setData('text/plain', draggedHeaderColumn.key);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+      return;
+    }
+
     const handle = event.target.closest('[data-upos-column-drag-handle]');
     const choice = handle?.closest('[data-upos-column-order-key]');
     const menu = choice?.closest('[data-upos-column-menu]');
@@ -519,6 +795,17 @@
   });
 
   document.addEventListener('dragover', (event) => {
+    if (draggedHeaderColumn) {
+      const cell = event.target.closest(`th[${CELL_KEY_ATTR}]`);
+      if (!cell || cell.closest(TABLE_SELECTOR) !== draggedHeaderColumn.table) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      clearHeaderDropIndicators(draggedHeaderColumn.table);
+      const rect = cell.getBoundingClientRect();
+      cell.classList.add(event.clientX > rect.left + rect.width / 2 ? 'is-upos-drop-after' : 'is-upos-drop-before');
+      return;
+    }
+
     if (!draggedColumn) return;
     const choice = event.target.closest('[data-upos-column-order-key]');
     if (!choice || choice.closest('[data-upos-column-menu]') !== draggedColumn.menu) return;
@@ -535,6 +822,25 @@
   });
 
   document.addEventListener('drop', (event) => {
+    if (draggedHeaderColumn) {
+      const cell = event.target.closest(`th[${CELL_KEY_ATTR}]`);
+      if (!cell || cell.closest(TABLE_SELECTOR) !== draggedHeaderColumn.table) return;
+      event.preventDefault();
+      const rect = cell.getBoundingClientRect();
+      moveHeaderColumn(
+        draggedHeaderColumn.table,
+        draggedHeaderColumn.key,
+        cell.getAttribute(CELL_KEY_ATTR),
+        event.clientX > rect.left + rect.width / 2,
+      );
+      headerRow(draggedHeaderColumn.table)?.querySelectorAll('.is-upos-header-dragging').forEach((item) => {
+        item.classList.remove('is-upos-header-dragging');
+      });
+      clearHeaderDropIndicators(draggedHeaderColumn.table);
+      draggedHeaderColumn = null;
+      return;
+    }
+
     if (!draggedColumn) return;
     const choice = event.target.closest('[data-upos-column-order-key]');
     if (!choice || choice.closest('[data-upos-column-menu]') !== draggedColumn.menu) return;
@@ -554,12 +860,20 @@
     saveOrder(draggedColumn.table, order);
     applyOrder(draggedColumn.table);
     applyVisibility(draggedColumn.table);
+    applyWidths(draggedColumn.table);
     const root = draggedColumn.menu._uposColumnRoot;
     clearDropIndicators(draggedColumn.menu);
     renderMenu(draggedColumn.table, root);
   });
 
   document.addEventListener('dragend', () => {
+    if (draggedHeaderColumn) {
+      headerRow(draggedHeaderColumn.table)?.querySelectorAll('.is-upos-header-dragging').forEach((cell) => {
+        cell.classList.remove('is-upos-header-dragging');
+      });
+      clearHeaderDropIndicators(draggedHeaderColumn.table);
+      draggedHeaderColumn = null;
+    }
     if (!draggedColumn) return;
     draggedColumn.menu.querySelectorAll('.is-dragging').forEach((choice) => {
       choice.classList.remove('is-dragging');
@@ -592,6 +906,8 @@
       ensureColumnKeys(table);
       applyOrder(table);
       applyVisibility(table);
+      enhanceHeaderInteractions(table);
+      applyWidths(table);
     });
   });
 
