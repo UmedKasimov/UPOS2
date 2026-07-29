@@ -11012,6 +11012,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   white-space: nowrap;
 }
 
+.sales-journal-payment-progress[data-payment-progress="0"] > span {
+  color: var(--foreground, #111827);
+}
+
 .sales-journal-debt-cell > span {
   display: block;
   white-space: nowrap;
