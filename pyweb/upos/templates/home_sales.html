@@ -107,6 +107,7 @@
     </section>
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt" hidden>
+    {% macro render_sales_journal_filter() %}
     <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-workspace-view="journal order return debt" hidden>
       <input type="hidden" name="journal_page_size" value="{{ sales_journal_pagination.page_size }}" />
       <input type="hidden" name="debt_page_size" value="{{ sales_debt_workspace.page_size }}" />
@@ -204,6 +205,10 @@
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('sales_get') }}#sales-journal">Очистить</a>
     </form>
+    {% endmacro %}
+    {% if sales_filters.status == 'debt' %}
+      {{ render_sales_journal_filter() }}
+    {% endif %}
 
     <datalist id="sales-client-list">
       {% for item in sales_options.clients %}<option value="{{ item }}">{% endfor %}
@@ -363,12 +368,15 @@
       </article>
 
       <article class="products-list-panel{% if sales_filters.status == 'debt' %} sales-journal-support{% endif %}" id="sales-journal" data-workspace-view="journal order return debt" hidden>
-        <header class="products-panel-head">
-          <div>
+        <header class="products-panel-head sales-journal-head">
+          <div class="products-panel-title">
             <h2>Журнал продаж</h2>
             <span>Всего: {{ sales_journal_pagination.total }}</span>
           </div>
           <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
+          {% if sales_filters.status != 'debt' %}
+            {{ render_sales_journal_filter() }}
+          {% endif %}
         </header>
         <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Типы документов журнала">
           {% for tab in sales_options.document_tabs %}

@@ -10385,23 +10385,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-filter {
-  grid-area: auto;
-  grid-template-columns:
-    minmax(12rem, 1.35fr)
-    minmax(7.5rem, 0.7fr)
-    minmax(9.5rem, 0.95fr)
-    minmax(9.5rem, 0.8fr)
-    minmax(9rem, 0.8fr)
-    minmax(7.5rem, 0.7fr)
-    minmax(6.5rem, auto)
-    minmax(6.5rem, auto);
-  margin-bottom: 0.85rem;
-  padding: 0.65rem;
-  border: 1px solid var(--workbench-line, var(--border));
-  border-radius: var(--workbench-radius-sm, 10px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card), white 10%), var(--card));
-  box-shadow: var(--workspace-module-panel-shadow);
+  grid-area: filters;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  margin: 0;
+  padding: 0.2rem 0 0.1rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sales-journal-head > .sales-journal-create-btn {
+  grid-area: top;
 }
 
 .sales-journal-filter .products-catalog-search {
