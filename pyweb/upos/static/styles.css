@@ -11042,7 +11042,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   font-weight: 800;
 }
 
-.sales-journal-client-cell {
+.sales-journal-table td.sales-journal-client-cell {
   font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.25;
