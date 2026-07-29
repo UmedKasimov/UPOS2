@@ -149,6 +149,32 @@
         <input name="date_from" type="date" value="{{ sales_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" aria-label="Дата продажи от и до" />
         <input name="date_to" type="hidden" value="{{ sales_filters.date_to }}" />
       </label>
+      <div class="sales-status-filter sales-payment-status-filter" data-sales-payment-status-filter>
+        <span>Оплата</span>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по состоянию оплаты">
+            <span data-sales-payment-status-summary>{{ sales_filters.payment_status_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-payment-status-all {% if not sales_filters.payment_statuses %}checked{% endif %} />
+              <span>Все оплаты</span>
+            </label>
+            {% for option in sales_options.payment_status_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="payment_status"
+                  value="{{ option.value }}"
+                  data-sales-payment-status-option
+                  {% if option.value in sales_filters.payment_statuses %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
       <div class="sales-status-filter" data-sales-status-filter>
         <span>Статус</span>
         <details class="sales-status-filter-details">
@@ -1309,7 +1335,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=20" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=21" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=57" defer></script>
   {% if sales_embed %}
     <script>

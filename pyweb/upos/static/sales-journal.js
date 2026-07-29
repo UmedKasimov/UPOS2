@@ -768,6 +768,12 @@
       "[data-sales-doc-type-summary]"
     );
     bindCheckboxFilter(
+      form.querySelector("[data-sales-payment-status-filter]"),
+      "[data-sales-payment-status-all]",
+      "[data-sales-payment-status-option]",
+      "[data-sales-payment-status-summary]"
+    );
+    bindCheckboxFilter(
       form.querySelector("[data-sales-status-filter]"),
       "[data-sales-status-all]",
       "[data-sales-status-option]",
@@ -786,6 +792,9 @@
       });
       form.querySelectorAll("[data-sales-status-option]:checked").forEach(function (field) {
         params.append("status", String(field.value || "").trim());
+      });
+      form.querySelectorAll("[data-sales-payment-status-option]:checked").forEach(function (field) {
+        params.append("payment_status", String(field.value || "").trim());
       });
       if (!params.has("doc_type")) params.set("doc_type", "all");
       var query = params.toString();

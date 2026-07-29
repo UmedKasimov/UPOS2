@@ -6302,6 +6302,13 @@ def create_app() -> FastAPI:
                     Decimal("1"), rounding=ROUND_HALF_UP
                 )
             )
+        payment_status = (
+            "paid"
+            if amount_value <= 0 or paid_amount >= amount_value
+            else "partial"
+            if paid_amount > 0
+            else "unpaid"
+        )
         date_from = str(data.get("date") or "")
         date_to = str(data.get("date_to") or "")
         date_label = f"{date_from} - {date_to}" if date_from and date_to and date_to != date_from else date_from
@@ -6320,6 +6327,7 @@ def create_app() -> FastAPI:
             "currency": row.currency,
             "paid_amount": _sales_money_label(paid_amount),
             "paid_value": str(paid_amount),
+            "payment_status": payment_status,
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "debt_value": str(debt_amount if debt_amount > 0 else 0),
             "has_debt": debt_amount > 0,
@@ -6977,6 +6985,7 @@ def create_app() -> FastAPI:
         q: str = "",
         doc_type: str = "all",
         status: str = "all",
+        payment_status: str = "all",
         client: str = "",
         date_from: str = "",
         date_to: str = "",
@@ -7060,6 +7069,40 @@ def create_app() -> FastAPI:
             )
         else:
             status_summary = f"Выбрано: {len(selected_statuses)}"
+        payment_status_filter_options = [
+            {"value": "unpaid", "label": "Не оплачено"},
+            {"value": "partial", "label": "Частично оплачено"},
+            {"value": "paid", "label": "Оплачено полностью"},
+        ]
+        payment_status_query_values = [
+            str(item or "").strip().lower()
+            for item in request.query_params.getlist("payment_status")
+            if str(item or "").strip()
+        ]
+        if not payment_status_query_values:
+            payment_status_query_values = [
+                str(payment_status or "all").strip().lower()
+            ]
+        allowed_payment_statuses = {
+            item["value"] for item in payment_status_filter_options
+        }
+        selected_payment_statuses = list(
+            dict.fromkeys(
+                item
+                for item in payment_status_query_values
+                if item in allowed_payment_statuses
+            )
+        )
+        if not selected_payment_statuses:
+            payment_status_summary = "Все"
+        elif len(selected_payment_statuses) == 1:
+            payment_status_summary = next(
+                item["label"]
+                for item in payment_status_filter_options
+                if item["value"] == selected_payment_statuses[0]
+            )
+        else:
+            payment_status_summary = f"Выбрано: {len(selected_payment_statuses)}"
         filters = {
             "q": q.strip(),
             "doc_type": doc_type_filter,
@@ -7068,6 +7111,8 @@ def create_app() -> FastAPI:
             "status": status_filter,
             "statuses": selected_statuses,
             "status_summary": status_summary,
+            "payment_statuses": selected_payment_statuses,
+            "payment_status_summary": payment_status_summary,
             "client": client.strip(),
             "date_from": date_from_clean,
             "date_to": date_to_clean,
@@ -7115,6 +7160,11 @@ def create_app() -> FastAPI:
                     if item["doc_type"] != "sale" or _sales_decimal(item.get("debt_value")) <= 0:
                         continue
                 elif filters["statuses"] and item["status"] not in filters["statuses"]:
+                    continue
+                if (
+                    filters["payment_statuses"]
+                    and item["payment_status"] not in filters["payment_statuses"]
+                ):
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
                     continue
@@ -7413,6 +7463,7 @@ def create_app() -> FastAPI:
                 "payment_accounts": payment_accounts,
                 "doc_type_filters": doc_type_filter_options,
                 "status_filters": status_filter_options,
+                "payment_status_filters": payment_status_filter_options,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
