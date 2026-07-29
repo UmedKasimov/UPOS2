@@ -10545,6 +10545,32 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   white-space: nowrap;
 }
 
+@media (max-width: 1500px) {
+  .sales-journal-filter {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .sales-journal-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-journal-filter .products-catalog-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .sales-journal-filter {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-journal-filter .products-catalog-search {
+    grid-column: auto;
+  }
+}
+
 .sales-layout > #sales-journal:not([hidden]) {
   grid-column: 1 / -1;
   width: 100%;
