@@ -8,7 +8,7 @@
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid'] %}
 {% set sales_journal_requested = request.query_params.get('view') == 'journal' %}
-{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))))) %}
+{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else 'journal'))))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
 {% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
 {% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
