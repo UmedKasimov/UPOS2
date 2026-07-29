@@ -11104,10 +11104,31 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   z-index: 1;
 }
 
-.sales-journal-debt-cell > .sales-journal-debt-amount,
+.sales-journal-debt-cell .sales-journal-debt-amount,
 .sales-journal-total-row .sales-journal-debt-amount {
   color: #dc2626;
   font-weight: 800;
+}
+
+.sales-journal-debt-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.08rem;
+  min-width: max-content;
+  padding: 0.24rem 0.42rem;
+  border: 1px solid color-mix(in srgb, #dc2626 68%, var(--border));
+  border-radius: var(--workbench-radius-xs, 5px);
+  background: color-mix(in srgb, #dc2626 7%, var(--card));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #dc2626 8%, transparent) inset;
+  white-space: nowrap;
+}
+
+.sales-journal-debt-badge > small {
+  color: color-mix(in srgb, #dc2626 78%, var(--muted-foreground));
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .sales-journal-debt-cell > .sales-journal-no-debt {

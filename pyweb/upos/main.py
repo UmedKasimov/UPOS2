@@ -7219,6 +7219,15 @@ def create_app() -> FastAPI:
             ]
             for row in rows:
                 item = _sales_document_data(row)
+                debt_timing = _sales_debt_timing(
+                    str(item.get("date_to") or item.get("date") or ""),
+                    today_date,
+                )
+                item["debt_age_days"] = (
+                    None
+                    if debt_timing["state"] == "none"
+                    else int(debt_timing["days_overdue"] or 0)
+                )
                 if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
                     continue
                 if filters["status"] == "debt":

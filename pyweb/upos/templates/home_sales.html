@@ -452,9 +452,14 @@
                   >
                     <span>{{ sale.paid_amount }} {{ sale.currency }}</span>
                   </td>
-                  <td class="sales-journal-debt-cell" data-sort-value="{{ sale.debt_value }}">
+                  <td class="sales-journal-debt-cell{% if sale.has_debt %} has-debt{% endif %}" data-sort-value="{{ sale.debt_value }}">
                     {% if sale.has_debt %}
-                      <span class="sales-journal-debt-amount">-{{ sale.debt_amount }} {{ sale.currency }}</span>
+                      <span class="sales-journal-debt-badge">
+                        <span class="sales-journal-debt-amount">-{{ sale.debt_amount }} {{ sale.currency }}</span>
+                        {% if sale.debt_age_days is not none %}
+                          <small>{{ sale.debt_age_days }} дн.</small>
+                        {% endif %}
+                      </span>
                     {% else %}
                       <span class="sales-journal-no-debt">-</span>
                     {% endif %}
