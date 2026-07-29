@@ -10355,6 +10355,35 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   white-space: nowrap;
 }
 
+.sales-document-tabs {
+  margin: 0 0.75rem;
+  min-height: 2.95rem;
+}
+
+.sales-document-tab[data-channel-brand="all"] {
+  --channel-brand: #4f7ecb;
+  --channel-brand-strong: #245ca8;
+  --channel-brand-soft: #eaf2ff;
+}
+
+.sales-document-tab[data-channel-brand="sale"] {
+  --channel-brand: #22a45d;
+  --channel-brand-strong: #087a35;
+  --channel-brand-soft: #e8f8ef;
+}
+
+.sales-document-tab[data-channel-brand="order"] {
+  --channel-brand: #d59a22;
+  --channel-brand-strong: #8a5a00;
+  --channel-brand-soft: #fff6dc;
+}
+
+.sales-document-tab[data-channel-brand="return"] {
+  --channel-brand: #d95c65;
+  --channel-brand-strong: #9f2430;
+  --channel-brand-soft: #fff0f1;
+}
+
 .sales-journal-filter {
   grid-area: auto;
   grid-template-columns:

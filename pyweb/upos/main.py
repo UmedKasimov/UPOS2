@@ -7152,6 +7152,71 @@ def create_app() -> FastAPI:
                     .order_by(SaleDocument.updated_at.desc())
                 ).scalars()
             )
+            journal_doc_type_counts = {
+                "all": len(rows),
+                "sale": 0,
+                "order": 0,
+                "return": 0,
+            }
+            for row in rows:
+                row_data = _json_object(row.data)
+                row_doc_type = str(row_data.get("doc_type") or "sale").strip()
+                if row_doc_type in journal_doc_type_counts:
+                    journal_doc_type_counts[row_doc_type] += 1
+
+            def document_tab_url(tab_doc_type: str = "") -> str:
+                pairs = [
+                    (key, value)
+                    for key, value in request.query_params.multi_items()
+                    if key not in {"doc_type", "journal_page"}
+                ]
+                if tab_doc_type:
+                    pairs.append(("doc_type", tab_doc_type))
+                query = urlencode(pairs, doseq=True)
+                return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
+
+            document_tabs = [
+                {
+                    "value": "",
+                    "label": "Все",
+                    "logo": "ВС",
+                    "brand": "all",
+                    "count": journal_doc_type_counts["all"],
+                    "href": document_tab_url(),
+                    "active": not selected_doc_types,
+                    "current": not selected_doc_types,
+                },
+                {
+                    "value": "sale",
+                    "label": "Продажи",
+                    "logo": "ПР",
+                    "brand": "sale",
+                    "count": journal_doc_type_counts["sale"],
+                    "href": document_tab_url("sale"),
+                    "active": "sale" in selected_doc_types,
+                    "current": selected_doc_types == ["sale"],
+                },
+                {
+                    "value": "order",
+                    "label": "Заказы",
+                    "logo": "ЗК",
+                    "brand": "order",
+                    "count": journal_doc_type_counts["order"],
+                    "href": document_tab_url("order"),
+                    "active": "order" in selected_doc_types,
+                    "current": selected_doc_types == ["order"],
+                },
+                {
+                    "value": "return",
+                    "label": "Возвраты",
+                    "logo": "ВЗ",
+                    "brand": "return",
+                    "count": journal_doc_type_counts["return"],
+                    "href": document_tab_url("return"),
+                    "active": "return" in selected_doc_types,
+                    "current": selected_doc_types == ["return"],
+                },
+            ]
             for row in rows:
                 item = _sales_document_data(row)
                 if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
@@ -7462,6 +7527,7 @@ def create_app() -> FastAPI:
                 "price_types": price_type_options,
                 "payment_accounts": payment_accounts,
                 "doc_type_filters": doc_type_filter_options,
+                "document_tabs": document_tabs,
                 "status_filters": status_filter_options,
                 "payment_status_filters": payment_status_filter_options,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
