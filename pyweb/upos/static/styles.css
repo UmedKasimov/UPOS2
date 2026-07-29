@@ -10491,7 +10491,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border-bottom: 1px solid var(--border);
 }
 
-.sales-journal-filter .sales-status-filter-option > span {
+.sales-journal-filter .sales-status-filter-menu .sales-status-filter-option > span {
   position: static;
   display: block;
   width: auto;
