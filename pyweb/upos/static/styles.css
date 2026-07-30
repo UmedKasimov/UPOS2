@@ -11397,15 +11397,37 @@ html.dark .sales-journal-task-completed {
   color: var(--brand-box, #2d6cdf);
 }
 
-.sales-journal-table td:nth-child(7),
-.sales-journal-payment-progress > span {
+.sales-journal-table td:nth-child(7) {
   color: var(--brand-box, #2d6cdf);
   font-weight: 800;
   white-space: nowrap;
 }
 
+.sales-journal-payment-progress > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 1.65rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid color-mix(in srgb, #16a34a 46%, var(--border));
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, #16a34a 9%, var(--card));
+  color: #15803d;
+  font-size: calc(1em + 1px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .sales-journal-payment-progress[data-payment-progress="0"] > span {
-  color: var(--foreground, #111827);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--muted-foreground) 9%, var(--card));
+  color: var(--muted-foreground);
+}
+
+html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > span {
+  color: #4ade80;
 }
 
 .sales-journal-debt-cell > span {
