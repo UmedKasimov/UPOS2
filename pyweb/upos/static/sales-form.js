@@ -318,6 +318,10 @@
       if (item && item.id) clientInput.dataset.salesClientId = String(item.id);
       else if (!item) delete clientInput.dataset.salesClientId;
     }
+    var segmentSelect = root.querySelector("[data-sales-segment-select]");
+    if (segmentSelect) {
+      segmentSelect.value = item ? String(item.business_segment_id || "") : "";
+    }
     node.dataset.balanceKind = kind;
     node.hidden = !text;
     node.textContent = text ? String(item.balance_note || "Баланс") + ": " + text : "";
@@ -900,6 +904,7 @@
       date: root.querySelector('input[name="date"]')?.value || "",
       dateTo: root.querySelector('input[name="date_to"]')?.value || "",
       client: root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]')?.value || "",
+      businessSegmentId: root.querySelector("[data-sales-segment-select]")?.value || "",
       currency: root.querySelector('select[name="currency"]')?.value || "",
       priceTypeId: root.querySelector('select[name="price_type_id"]')?.value || "",
       paidAmount: root.querySelector("[data-sales-paid-amount]")?.value || "",
@@ -1036,6 +1041,7 @@
       return normalize(item.name) === normalize(draft.client);
     });
     updateClientBalance(root, matchedClient || (draft.client ? draft.client : null));
+    setDraftField(root, "[data-sales-segment-select]", draft.businessSegmentId);
     var editing = !!String(draft.documentId || "").trim();
     var typeLabel = draft.docType === "order" ? "заказа" : draft.docType === "return" ? "возврата" : "продажи";
     var title = root.closest("#sales-form")?.querySelector("[data-sales-form-title]");
@@ -1428,6 +1434,9 @@
       phone: "",
       tax_id: "",
       price_type: "",
+      business_segment_id: "",
+      business_segment: "",
+      business_segment_icon: "",
       balance_kind: "zero",
       balance_note: "Баланс: 0",
       balance: "0",
@@ -1463,6 +1472,9 @@
     form.reset();
     var nameInput = form.querySelector("[data-sales-client-create-name]");
     if (nameInput) nameInput.value = String(query || "").trim();
+    var clientSegment = form.querySelector("[data-sales-client-segment-select]");
+    var selectedSegment = root.querySelector("[data-sales-segment-select]");
+    if (clientSegment && selectedSegment) clientSegment.value = selectedSegment.value;
     setClientCreateStatus(form, "", "");
     if (typeof dialog.showModal === "function") {
       try {
@@ -1527,6 +1539,116 @@
         })
         .catch(function (error) {
           setClientCreateStatus(form, error.message || "Не удалось сохранить клиента", "err");
+        })
+        .finally(function () {
+          if (submit) submit.disabled = false;
+        });
+    });
+  }
+
+  function setSegmentStatus(form, text, kind) {
+    var status = form?.querySelector("[data-sales-segment-status]");
+    if (!status) return;
+    status.textContent = text || "";
+    status.dataset.status = kind || "";
+  }
+
+  function closeSegmentDialog() {
+    var dialog = document.querySelector("[data-sales-segment-dialog]");
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.hidden = true;
+    dialog.removeAttribute("open");
+  }
+
+  function syncSegmentOptions(segment) {
+    if (!segment || !segment.id || !segment.name) return;
+    document.querySelectorAll("[data-sales-segment-select], [data-sales-client-segment-select]").forEach(function (select) {
+      var option = Array.from(select.options).find(function (item) {
+        return String(item.value) === String(segment.id);
+      });
+      if (!option) {
+        option = document.createElement("option");
+        option.value = String(segment.id);
+        select.appendChild(option);
+      }
+      option.textContent = [segment.icon || "", segment.name].filter(Boolean).join(" ");
+    });
+    var options = readOptions();
+    var segments = Array.isArray(options.business_segments) ? options.business_segments : [];
+    var index = segments.findIndex(function (item) {
+      return String(item.id) === String(segment.id) || normalize(item.name) === normalize(segment.name);
+    });
+    if (index >= 0) segments[index] = Object.assign({}, segments[index], segment);
+    else segments.push(segment);
+    options.business_segments = segments;
+    writeOptions(options);
+  }
+
+  function openSegmentDialog() {
+    var dialog = document.querySelector("[data-sales-segment-dialog]");
+    var form = dialog?.querySelector("[data-sales-segment-form]");
+    if (!dialog || !form) return;
+    form.reset();
+    setSegmentStatus(form, "", "");
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.hidden = false;
+      dialog.setAttribute("open", "");
+    }
+    if (!dialog.open) dialog.setAttribute("open", "");
+    setTimeout(function () {
+      form.querySelector("[data-sales-segment-name]")?.focus();
+    }, 0);
+  }
+
+  function wireSegmentDialog(root) {
+    var dialog = document.querySelector("[data-sales-segment-dialog]");
+    var form = dialog?.querySelector("[data-sales-segment-form]");
+    if (!dialog || !form || dialog.dataset.salesSegmentReady === "1") return;
+    dialog.dataset.salesSegmentReady = "1";
+    root.querySelector("[data-sales-segment-create-open]")?.addEventListener("click", openSegmentDialog);
+    dialog.querySelectorAll("[data-sales-segment-close], [data-sales-segment-cancel]").forEach(function (button) {
+      button.addEventListener("click", closeSegmentDialog);
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) closeSegmentDialog();
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      var submit = form.querySelector("[data-sales-segment-submit]");
+      setSegmentStatus(form, "Сохраняю...", "");
+      if (submit) submit.disabled = true;
+      fetch(root.getAttribute("data-sales-segment-save-url") || "/api/sales/business-segments", {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json" },
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (body) {
+            if (!response.ok || !body.segment) throw new Error(body.error || "Не удалось сохранить сегмент");
+            return body.segment;
+          });
+        })
+        .then(function (segment) {
+          syncSegmentOptions(segment);
+          var select = root.querySelector("[data-sales-segment-select]");
+          if (select) select.value = String(segment.id);
+          setSegmentStatus(form, "Сегмент добавлен", "ok");
+          closeSegmentDialog();
+          scheduleSalesDraft(root);
+        })
+        .catch(function (error) {
+          setSegmentStatus(form, error.message || "Не удалось сохранить сегмент", "err");
         })
         .finally(function () {
           if (submit) submit.disabled = false;
@@ -2440,6 +2562,7 @@
     });
     wireQuickProductDialog(root, options);
     wireClientCreateDialog(root);
+    wireSegmentDialog(root);
     wireTotalDialog(root);
     wirePaymentDialog(root);
     var currency = root.querySelector("[data-sales-currency]");

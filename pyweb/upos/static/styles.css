@@ -8574,15 +8574,49 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-form-identity-grid {
-  grid-template-columns: minmax(22rem, 2fr) minmax(10rem, 0.72fr) minmax(8rem, 0.55fr) 7rem;
+  grid-template-columns: minmax(20rem, 2fr) minmax(9rem, 0.68fr) minmax(12rem, 0.9fr) minmax(7rem, 0.52fr) 6.5rem;
   align-items: end;
 }
 
 .sales-form-client-field,
 .sales-form-date-field,
+.sales-form-segment-field,
 .sales-form-currency-field,
 .sales-form-id-field {
   min-width: 0;
+}
+
+.sales-segment-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.35rem;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.sales-segment-control select {
+  min-width: 0;
+}
+
+.sales-segment-add {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  color: var(--primary);
+  font-size: 1.15rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sales-segment-add:hover,
+.sales-segment-add:focus-visible {
+  background: color-mix(in srgb, var(--primary) 17%, var(--card));
+  outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  outline-offset: 1px;
 }
 
 .sales-form-id-field input {
@@ -8951,6 +8985,55 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .settings-profile-modal.sales-client-create-dialog {
   width: min(58rem, 96vw);
   max-width: min(58rem, 96vw);
+}
+
+.settings-profile-modal.sales-segment-dialog {
+  width: min(32rem, 94vw);
+  max-width: min(32rem, 94vw);
+}
+
+.sales-segment-icon-picker {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(2.4rem, 1fr));
+  gap: 0.4rem;
+  margin: 0.85rem 0;
+  padding: 0;
+  border: 0;
+}
+
+.sales-segment-icon-picker legend {
+  grid-column: 1 / -1;
+  margin-bottom: 0.15rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.sales-segment-icon-picker label {
+  position: relative;
+}
+
+.sales-segment-icon-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sales-segment-icon-picker span {
+  display: grid;
+  place-items: center;
+  min-height: 2.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.sales-segment-icon-picker input:checked + span {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .sales-client-create-surface {
@@ -11197,6 +11280,50 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sales-journal-client-name {
+  vertical-align: middle;
+}
+
+.sales-business-segment-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 11rem;
+  margin-left: 0.45rem;
+  padding: 0.16rem 0.42rem;
+  overflow: hidden;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb, var(--primary) 36%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+  color: var(--foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1100px) {
+  .sales-form-identity-grid {
+    grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(9rem, 1fr));
+  }
+
+  .sales-form-id-field,
+  .sales-form-currency-field {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .sales-form-identity-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-segment-icon-picker {
+    grid-template-columns: repeat(5, minmax(2.4rem, 1fr));
+  }
 }
 
 .sales-journal-id-cell {

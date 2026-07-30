@@ -44,7 +44,11 @@
   }
 
   function markerGlyph(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
+    const raw = String(type || "").trim();
+    const normalized = raw.toLowerCase();
+    const customIcon = ["🍽️", "🍽", "☕", "🍔", "🏪", "🛒", "🛍️", "🛍", "📦", "🧰", "🚗", "👕", "🧴", "🥣", "🏷️", "🏷"]
+      .find((icon) => raw.includes(icon));
+    if (customIcon) return customIcon;
     if (normalized.includes("продукт") || normalized.includes("grocery")) return "🛒";
     if (normalized.includes("ресторан") || normalized.includes("restaurant")) return "🍽";
     if (normalized.includes("кафе") || normalized.includes("coffee") || normalized.includes("cafe")) return "☕";
@@ -54,7 +58,13 @@
   }
 
   function markerColor(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
+    const raw = String(type || "").trim();
+    const normalized = raw.toLowerCase();
+    if (/[🍽☕🍔]/u.test(raw)) return "#dc2626";
+    if (/[🏪🛒🛍]/u.test(raw)) return "#16a34a";
+    if (/[📦🧰]/u.test(raw)) return "#2563eb";
+    if (/[🚗]/u.test(raw)) return "#0891b2";
+    if (/[👕🧴🥣]/u.test(raw)) return "#7c3aed";
     if (normalized.includes("продукт") || normalized.includes("grocery")) return "#16a34a";
     if (normalized.includes("ресторан") || normalized.includes("restaurant")) return "#dc2626";
     if (normalized.includes("кафе") || normalized.includes("coffee") || normalized.includes("cafe")) return "#b45309";

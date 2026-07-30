@@ -3943,6 +3943,63 @@ def create_app() -> FastAPI:
         "paused": "lost",
     }
 
+    DEFAULT_BUSINESS_SEGMENTS = [
+        {"id": "restaurant", "name": "Ресторан", "icon": "🍽️"},
+        {"id": "cafe", "name": "Кафе", "icon": "☕"},
+        {"id": "fastfood", "name": "Фастфуд", "icon": "🍔"},
+        {"id": "shop", "name": "Магазин", "icon": "🏪"},
+        {"id": "supermarket", "name": "Супермаркет", "icon": "🛒"},
+        {"id": "hypermarket", "name": "Гипермаркет", "icon": "🛍️"},
+        {"id": "warehouse", "name": "Склад", "icon": "📦"},
+        {"id": "household", "name": "Хозтоварный магазин", "icon": "🧰"},
+        {"id": "auto-accessories", "name": "Авто Аксессуар", "icon": "🚗"},
+        {"id": "clothes", "name": "Одежда", "icon": "👕"},
+        {"id": "perfume", "name": "Парфюм", "icon": "🧴"},
+        {"id": "tableware", "name": "Посуда", "icon": "🥣"},
+    ]
+
+    def _clean_business_segments(raw: Any) -> list[dict[str, str]]:
+        source = raw if isinstance(raw, list) and raw else DEFAULT_BUSINESS_SEGMENTS
+        result: list[dict[str, str]] = []
+        used_ids: set[str] = set()
+        used_names: set[str] = set()
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            name = " ".join(str(item.get("name") or "").split())[:80]
+            if not name or name.casefold() in used_names:
+                continue
+            base_id = _entity_slug(str(item.get("id") or name))[:80]
+            segment_id = base_id
+            suffix = 2
+            while segment_id in used_ids:
+                segment_id = f"{base_id}-{suffix}"[:80]
+                suffix += 1
+            icon = str(item.get("icon") or "🏷️").strip()[:8] or "🏷️"
+            result.append({"id": segment_id, "name": name, "icon": icon})
+            used_ids.add(segment_id)
+            used_names.add(name.casefold())
+        return result or [dict(item) for item in DEFAULT_BUSINESS_SEGMENTS]
+
+    def _workspace_business_segments(workspace_owner_id: str) -> list[dict[str, str]]:
+        settings = load_workspace_settings(workspace_owner_id)
+        return _clean_business_segments(settings.get("client_business_segments"))
+
+    def _business_segment_for_value(
+        value: Any,
+        segments: list[dict[str, str]],
+    ) -> dict[str, str] | None:
+        raw = str(value or "").strip().casefold()
+        if not raw:
+            return None
+        for segment in segments:
+            if raw in {
+                str(segment.get("id") or "").casefold(),
+                str(segment.get("name") or "").casefold(),
+            }:
+                return segment
+        return None
+
     def _client_crm_status_from_stage(stage: dict[str, str] | None) -> str:
         raw_id = str((stage or {}).get("id") or "").strip().lower()
         raw_title = str((stage or {}).get("title") or "").strip().lower()
@@ -6321,6 +6378,9 @@ def create_app() -> FastAPI:
             "doc_type": doc_type,
             "doc_type_label": _sales_doc_type_label(doc_type),
             "client": str(data.get("client") or ""),
+            "business_segment_id": str(data.get("business_segment_id") or ""),
+            "business_segment": str(data.get("business_segment") or ""),
+            "business_segment_icon": str(data.get("business_segment_icon") or ""),
             "warehouse": str(data.get("warehouse") or ""),
             "amount": _sales_money_label(row.amount),
             "amount_value": str(amount_value),
@@ -6822,6 +6882,7 @@ def create_app() -> FastAPI:
             "date": str(form.get("date") or "").strip(),
             "date_to": str(form.get("date_to") or form.get("date") or "").strip(),
             "client": str(form.get("client") or "").strip(),
+            "business_segment_id": str(form.get("business_segment_id") or "").strip(),
             "warehouse": first_warehouse or "Основной склад",
             "status": status,
             "workflow_version": _SALES_WORKFLOW_VERSION,
@@ -7283,6 +7344,7 @@ def create_app() -> FastAPI:
         payment_accounts: list[dict[str, str]] = []
         next_numbers: dict[str, str] = {}
         sales_prefill = {"crm_record_id": "", "client": client.strip()}
+        business_segments = _workspace_business_segments(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
         today_date = datetime.now(timezone.utc).date()
         with session_scope() as session:
@@ -7631,10 +7693,46 @@ def create_app() -> FastAPI:
                         "phone": row.phone,
                         "tax_id": row.tax_id,
                         "price_type": str(extra.get("price_type") or ""),
+                        "business_segment_id": str(extra.get("business_segment_id") or ""),
+                        "business_segment": str(extra.get("business_segment") or ""),
+                        "business_segment_icon": str(
+                            extra.get("business_segment_icon")
+                            or extra.get("map_icon")
+                            or ""
+                        ),
                         "balance_kind": balance_kind,
                         "balance_note": "Баланс: нам должны" if balance_kind == "debt" else "Баланс: мы должны" if balance_kind == "advance" else "Баланс: 0",
                         "balance": _sales_money_label(abs(balance_total)),
                         "balance_lines": balance_lines,
+                    }
+                )
+            client_segments_by_id = {
+                str(item["id"]): item
+                for item in client_options
+                if str(item.get("business_segment") or "").strip()
+            }
+            client_segments_by_name = {
+                str(item["name"]).strip().casefold(): item
+                for item in client_options
+                if str(item.get("business_segment") or "").strip()
+            }
+            for item in sales:
+                if str(item.get("business_segment") or "").strip():
+                    continue
+                segment_client = (
+                    client_segments_by_id.get(str(item.get("counterparty_id") or ""))
+                    or client_segments_by_name.get(str(item.get("client") or "").strip().casefold())
+                )
+                if not segment_client:
+                    continue
+                item["business_segment_id"] = str(segment_client.get("business_segment_id") or "")
+                item["business_segment"] = str(segment_client.get("business_segment") or "")
+                item["business_segment_icon"] = str(segment_client.get("business_segment_icon") or "")
+                item["detail_json"].update(
+                    {
+                        "business_segment_id": item["business_segment_id"],
+                        "business_segment": item["business_segment"],
+                        "business_segment_icon": item["business_segment_icon"],
                     }
                 )
             warehouse_rows = list(
@@ -7707,6 +7805,7 @@ def create_app() -> FastAPI:
                 "document_tabs": document_tabs,
                 "status_filters": status_filter_options,
                 "payment_status_filters": payment_status_filter_options,
+                "business_segments": business_segments,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
@@ -7807,6 +7906,46 @@ def create_app() -> FastAPI:
             product_view = _sales_product_option(row, active_sales_price_types, price_types, _workspace_usd_uzs_rate(wid))
         return JSONResponse({"ok": True, "product": product_view})
 
+    @app.post("/api/sales/business-segments", name="sales_business_segment_save")
+    async def sales_business_segment_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse(
+                {"ok": False, "error": "Форма устарела. Обновите страницу и повторите."},
+                status_code=403,
+            )
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "Нужно войти заново"}, status_code=401)
+        assert wid is not None
+        name = " ".join(str(form.get("name") or "").split())[:80]
+        if not name:
+            return JSONResponse(
+                {"ok": False, "error": "Укажите название сегмента"},
+                status_code=400,
+            )
+        icon = str(form.get("icon_custom") or form.get("icon") or "🏷️").strip()[:8] or "🏷️"
+        settings = load_workspace_settings(wid)
+        segments = _clean_business_segments(settings.get("client_business_segments"))
+        existing = next(
+            (segment for segment in segments if segment["name"].casefold() == name.casefold()),
+            None,
+        )
+        if existing is not None:
+            return JSONResponse({"ok": True, "segment": existing, "existing": True})
+        used_ids = {segment["id"] for segment in segments}
+        base_id = _entity_slug(name)[:80]
+        segment_id = base_id
+        suffix = 2
+        while segment_id in used_ids:
+            segment_id = f"{base_id}-{suffix}"[:80]
+            suffix += 1
+        segment = {"id": segment_id, "name": name, "icon": icon}
+        segments.append(segment)
+        settings["client_business_segments"] = segments
+        save_workspace_settings(wid, settings)
+        return JSONResponse({"ok": True, "segment": segment})
+
     @app.post("/sales/save", name="sales_save")
     async def sales_save(request: Request):
         form = await request.form()
@@ -7846,6 +7985,7 @@ def create_app() -> FastAPI:
         data["manager"] = str(session_user.get("name") or session_user.get("username") or "").strip()
         if not data["client"]:
             return sales_form_redirect(error="Клиент обязателен")
+        business_segments = _workspace_business_segments(wid)
         saved_sale_id = ""
         saved_sale_number = ""
         with session_scope() as session:
@@ -7888,6 +8028,32 @@ def create_app() -> FastAPI:
                     name=data["client"],
                     role="client",
                 )
+                client_extra = _counterparty_extra(client_row).copy()
+                selected_segment = _business_segment_for_value(
+                    data.get("business_segment_id"),
+                    business_segments,
+                )
+                if selected_segment is None and not data.get("business_segment_id"):
+                    selected_segment = _business_segment_for_value(
+                        client_extra.get("business_segment_id")
+                        or old_data.get("business_segment_id"),
+                        business_segments,
+                    )
+                if selected_segment is not None:
+                    data["business_segment_id"] = selected_segment["id"]
+                    data["business_segment"] = selected_segment["name"]
+                    data["business_segment_icon"] = selected_segment["icon"]
+                    client_extra["business_segment_id"] = selected_segment["id"]
+                    client_extra["business_segment"] = selected_segment["name"]
+                    client_extra["business_segment_icon"] = selected_segment["icon"]
+                    client_extra["industry"] = selected_segment["name"]
+                    client_extra["map_icon"] = selected_segment["icon"]
+                    client_row.data = client_extra
+                    flag_modified(client_row, "data")
+                else:
+                    data["business_segment_id"] = ""
+                    data["business_segment"] = ""
+                    data["business_segment_icon"] = ""
                 warehouse_row = _ensure_warehouse(
                     session,
                     wid,
@@ -8876,6 +9042,11 @@ def create_app() -> FastAPI:
             "category": str(extra.get("category") or ""),
             "industry": str(extra.get("industry") or ""),
             "map_icon": map_icon,
+            "business_segment_id": str(extra.get("business_segment_id") or ""),
+            "business_segment": str(extra.get("business_segment") or ""),
+            "business_segment_icon": str(
+                extra.get("business_segment_icon") or map_icon or ""
+            ),
             "program": ", ".join(programs),
             "programs": programs,
             "route": str(extra.get("route") or ""),
@@ -10983,6 +11154,11 @@ def create_app() -> FastAPI:
         tax_id = str(form.get("tax_id") or form.get("inn") or "").strip()
         pinfl = str(form.get("pinfl") or "").strip()
         email = str(form.get("email") or "").strip()
+        business_segments = _workspace_business_segments(wid)
+        selected_segment = _business_segment_for_value(
+            form.get("business_segment_id"),
+            business_segments,
+        )
         with session_scope() as session:
             duplicate = _counterparty_duplicate(
                 session,
@@ -11016,6 +11192,9 @@ def create_app() -> FastAPI:
                 crm_status = "new_lead"
             industry = str(form.get("industry") or "").strip()
             map_icon = str(form.get("map_icon") or "").strip()
+            if selected_segment is not None:
+                industry = selected_segment["name"]
+                map_icon = selected_segment["icon"]
             if not map_icon or map_icon == "default":
                 map_icon = industry or "default"
             selected_programs: list[str] = []
@@ -11054,6 +11233,9 @@ def create_app() -> FastAPI:
                     "category": str(form.get("category") or "").strip(),
                     "industry": industry,
                     "map_icon": map_icon,
+                    "business_segment_id": selected_segment["id"] if selected_segment else "",
+                    "business_segment": selected_segment["name"] if selected_segment else "",
+                    "business_segment_icon": selected_segment["icon"] if selected_segment else "",
                     "program": ", ".join(selected_programs),
                     "programs": selected_programs,
                     "route": str(form.get("route") or "").strip(),
@@ -11097,6 +11279,13 @@ def create_app() -> FastAPI:
                     "phone": saved_row.phone or "",
                     "tax_id": saved_row.tax_id or "",
                     "price_type": str(extra.get("price_type") or ""),
+                    "business_segment_id": str(extra.get("business_segment_id") or ""),
+                    "business_segment": str(extra.get("business_segment") or ""),
+                    "business_segment_icon": str(
+                        extra.get("business_segment_icon")
+                        or extra.get("map_icon")
+                        or ""
+                    ),
                     "balance_kind": "zero",
                     "balance_note": "Баланс: 0",
                     "balance": "0",

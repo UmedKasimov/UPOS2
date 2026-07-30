@@ -409,6 +409,7 @@
     var draft = {
       sourceSaleId: sale.id || "",
       client: sale.client || "",
+      businessSegmentId: sale.business_segment_id || "",
       currency: sale.currency || "UZS",
       priceTypeId: sale.price_type_id || sale.priceTypeId || "",
       paidAmount: "",

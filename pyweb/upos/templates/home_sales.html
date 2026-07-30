@@ -3,7 +3,7 @@
 {% block extra_head %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="{{ url_for('static', path='clients.js') }}?v=14" defer></script>
+  <script src="{{ url_for('static', path='clients.js') }}?v=16" defer></script>
 {% endblock %}
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid', 'converted', 'already_converted'] %}
@@ -454,7 +454,15 @@
                   <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0"><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
                   <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
                   <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
-                  <td class="sales-journal-client-cell" title="{{ sale.client or '-' }}">{{ sale.client or "-" }}</td>
+                  <td class="sales-journal-client-cell" title="{{ sale.client or '-' }}">
+                    <span class="sales-journal-client-name">{{ sale.client or "-" }}</span>
+                    {% if sale.business_segment %}
+                      <span class="sales-business-segment-tag">
+                        {% if sale.business_segment_icon %}<span aria-hidden="true">{{ sale.business_segment_icon }}</span>{% endif %}
+                        {{ sale.business_segment }}
+                      </span>
+                    {% endif %}
+                  </td>
                   <td>{{ sale.warehouse or "-" }}</td>
                   <td data-sort-value="{{ sale.amount_value }}">{{ sale.amount }} {{ sale.currency }}</td>
                   <td
@@ -808,6 +816,7 @@
           class="product-form sales-form"
           data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
           data-sales-client-save-url="{{ url_for('clients_save') }}"
+          data-sales-segment-save-url="{{ url_for('sales_business_segment_save') }}"
           data-sales-client-card-url-template="{{ url_for('sales_client_card_api', client_id='__client_id__') }}"
           data-sales-prefill-client="{{ sales_prefill.client|e }}"
         >
@@ -836,6 +845,18 @@
               <span>Дата</span>
               <input name="date" type="date" value="{{ today }}" data-upos-date-range data-upos-date-to="date_to" />
               <input name="date_to" type="hidden" value="{{ today }}" />
+            </label>
+            <label class="sales-form-segment-field">
+              <span>Сегмент</span>
+              <span class="sales-segment-control">
+                <select name="business_segment_id" data-sales-segment-select>
+                  <option value="">Не выбран</option>
+                  {% for segment in sales_options.business_segments %}
+                    <option value="{{ segment.id }}">{{ segment.icon }} {{ segment.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="button" class="sales-segment-add" data-sales-segment-create-open aria-label="Добавить сегмент" title="Добавить сегмент">+</button>
+              </span>
             </label>
             <label class="sales-form-currency-field"><span>Валюта</span>
               <select name="currency" data-sales-currency>
@@ -1171,6 +1192,15 @@
                     <input class="settings-profile-input" name="industry" placeholder="Продуктовый, ресторан..." />
                   </label>
                   <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Сегмент бизнеса</span>
+                    <select class="settings-profile-input" name="business_segment_id" data-sales-client-segment-select>
+                      <option value="">Не выбран</option>
+                      {% for segment in sales_options.business_segments %}
+                        <option value="{{ segment.id }}">{{ segment.icon }} {{ segment.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
                     <span class="settings-profile-field-label">Иконка на карте</span>
                     <select class="settings-profile-input" name="map_icon" data-client-map-icon>
                       <option value="default">Обычная</option>
@@ -1257,6 +1287,43 @@
             <div class="settings-profile-modal-foot">
               <button type="button" class="btn btn-secondary" data-sales-client-create-cancel>Отмена</button>
               <button type="submit" class="btn" data-sales-client-create-submit>Сохранить клиента</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-segment-dialog" data-sales-segment-dialog>
+          <form class="settings-profile-modal-surface" data-sales-segment-form>
+            {% include "_csrf_field.html" %}
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Новый сегмент</h2>
+                <p class="settings-profile-modal-sub">Сегмент сохранится в справочнике и будет доступен во всех продажах.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-segment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Название*</span>
+                <input class="settings-profile-input" name="name" required maxlength="80" data-sales-segment-name />
+              </label>
+              <fieldset class="sales-segment-icon-picker">
+                <legend>Иконка на карте</legend>
+                {% for icon in ["🍽️", "☕", "🍔", "🏪", "🛒", "🛍️", "📦", "🧰", "🚗", "👕", "🧴", "🥣", "🏷️"] %}
+                  <label>
+                    <input type="radio" name="icon" value="{{ icon }}" {% if loop.first %}checked{% endif %} />
+                    <span aria-hidden="true">{{ icon }}</span>
+                  </label>
+                {% endfor %}
+              </fieldset>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Своя иконка</span>
+                <input class="settings-profile-input" name="icon_custom" maxlength="8" placeholder="Например: 🏢" />
+              </label>
+              <p class="sales-product-dialog-status" data-sales-segment-status aria-live="polite"></p>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-segment-cancel>Отмена</button>
+              <button type="submit" class="btn" data-sales-segment-submit>Добавить сегмент</button>
             </div>
           </form>
         </dialog>
@@ -1390,8 +1457,8 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=23" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=57" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=24" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=58" defer></script>
   {% if sales_embed %}
     <script>
       (() => {
