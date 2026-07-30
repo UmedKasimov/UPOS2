@@ -943,3 +943,203 @@ class TelegramDeliveryLog(Base):
     ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InstallationTaskTemplate(Base):
+    """Шаблон чек-листа, который продавец выбирает при назначении установки."""
+
+    __tablename__ = "installation_task_templates"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "name", name="uq_installation_templates_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Список пунктов: [{"title": ..., "description": ..., "is_required": bool}]
+    tasks: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class InstallationOrder(Base):
+    """Выезд к клиенту: заказ из основной системы, назначенный установщику."""
+
+    __tablename__ = "installation_orders"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "external_source",
+            "external_id",
+            name="uq_installation_orders_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    # Заказ-источник. SET NULL, чтобы удаление продажи не стирало историю выездов.
+    sale_document_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("sale_documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    branch_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("branches.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    installer_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="new", server_default=text("'new'"))
+    priority: Mapped[str] = mapped_column(String(16), nullable=False, default="normal", server_default=text("'normal'"))
+    # Плановое время выезда; отдельный флаг фиксирует, согласовал ли его установщик.
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduled_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    address: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    latitude: Mapped[str] = mapped_column(String(32), nullable=False, default="", server_default=text("''"))
+    longitude: Mapped[str] = mapped_column(String(32), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    paid_amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    # Снимок позиций заказа, комментарии, вложения, контакты продавца и клиента.
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class InstallationTask(Base):
+    """Пункт чек-листа конкретной установки."""
+
+    __tablename__ = "installation_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    installation_order_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("installation_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default=text("''"))
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    is_done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    done_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    photo_path: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class InstallationEvent(Base):
+    """Журнал действий по установке: статусы, даты, оплаты, задачи, комментарии."""
+
+    __tablename__ = "installation_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    installation_order_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("installation_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    actor_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    actor_name: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Для аудита финансов и переносов даты храним «было/стало».
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InstallationPushSubscription(Base):
+    """Web Push подписка устройства установщика."""
+
+    __tablename__ = "installation_push_subscriptions"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "endpoint_hash", name="uq_installation_push_endpoint"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Хэш нужен для уникальности: сам endpoint слишком длинный для индекса.
+    endpoint_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    p256dh: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    auth: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    user_agent: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
