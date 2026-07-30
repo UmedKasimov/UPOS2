@@ -7216,6 +7216,186 @@ def create_app() -> FastAPI:
                 user=None,
             )
 
+    @app.get("/dashboard", response_class=HTMLResponse, name="dashboard_get")
+    def dashboard_get(
+        request: Request,
+        date_from: str = "",
+        date_to: str = "",
+    ):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+
+        workspace_settings = load_workspace_settings(wid)
+        timezone_name = normalize_workspace_timezone(str(workspace_settings.get("timezone") or ""))
+        try:
+            today_local = datetime.now(ZoneInfo(timezone_name)).date()
+        except Exception:
+            today_local = datetime.now(timezone.utc).date()
+
+        def dashboard_date(raw: str, fallback: date) -> date:
+            try:
+                return date.fromisoformat(str(raw or "").strip())
+            except (TypeError, ValueError):
+                return fallback
+
+        period_from = dashboard_date(date_from, today_local)
+        period_to = dashboard_date(date_to, today_local)
+        if period_from > period_to:
+            period_from, period_to = period_to, period_from
+
+        treasury = load_treasury(wid)
+        primary_currency = str(treasury.get("display_currency") or "USD").strip().upper() or "USD"
+        if primary_currency not in {"USD", "UZS"}:
+            primary_currency = "USD"
+        usd_rate = _workspace_usd_uzs_rate(wid)
+
+        def to_primary(value: Any, currency: str) -> Decimal:
+            return _convert_product_currency(
+                _sales_decimal(value),
+                str(currency or primary_currency).strip().upper() or primary_currency,
+                primary_currency,
+                usd_rate,
+            )
+
+        def money(value: Any) -> str:
+            return f"{_sales_money_label(value)} {primary_currency}"
+
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(SaleDocument)
+                    .where(SaleDocument.workspace_owner_id == wid)
+                    .order_by(SaleDocument.created_at.desc())
+                ).scalars()
+            )
+
+        totals = {
+            "sale_count": 0,
+            "order_count": 0,
+            "sale_amount": Decimal("0"),
+            "order_amount": Decimal("0"),
+            "paid_amount": Decimal("0"),
+        }
+        daily: dict[str, dict[str, Any]] = {}
+        sellers: dict[str, dict[str, Any]] = {}
+
+        for row in rows:
+            data = _json_object(row.data)
+            raw_document_date = str(data.get("date") or "").strip()[:10]
+            if raw_document_date:
+                try:
+                    document_date = date.fromisoformat(raw_document_date)
+                except ValueError:
+                    continue
+            else:
+                created_at = row.created_at
+                try:
+                    document_date = created_at.astimezone(ZoneInfo(timezone_name)).date()
+                except Exception:
+                    document_date = created_at.date()
+            if document_date < period_from or document_date > period_to:
+                continue
+
+            doc_type = str(data.get("doc_type") or "sale").strip().lower()
+            if doc_type not in {"sale", "order"}:
+                continue
+            currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
+            amount_primary = to_primary(row.amount, currency)
+            paid_primary = to_primary(
+                min(_sales_decimal(row.amount), _sales_decimal(data.get("paid_amount"))),
+                currency,
+            )
+            date_key = document_date.isoformat()
+            day = daily.setdefault(
+                date_key,
+                {
+                    "date": date_key,
+                    "sale_count": 0,
+                    "order_count": 0,
+                    "sale_amount": Decimal("0"),
+                    "order_amount": Decimal("0"),
+                    "paid_amount": Decimal("0"),
+                },
+            )
+            day["paid_amount"] += paid_primary
+            totals["paid_amount"] += paid_primary
+
+            if doc_type == "order":
+                totals["order_count"] += 1
+                totals["order_amount"] += amount_primary
+                day["order_count"] += 1
+                day["order_amount"] += amount_primary
+                continue
+
+            totals["sale_count"] += 1
+            totals["sale_amount"] += amount_primary
+            day["sale_count"] += 1
+            day["sale_amount"] += amount_primary
+            manager = str(data.get("manager") or "").strip()
+            if not manager:
+                manager = str(row.external_source or "").strip().upper() or "Без ответственного"
+            seller = sellers.setdefault(
+                manager,
+                {
+                    "name": manager,
+                    "sale_count": 0,
+                    "amount": Decimal("0"),
+                },
+            )
+            seller["sale_count"] += 1
+            seller["amount"] += amount_primary
+
+        daily_rows = []
+        for item in sorted(daily.values(), key=lambda value: value["date"], reverse=True):
+            daily_rows.append(
+                {
+                    **item,
+                    "sale_amount_label": money(item["sale_amount"]),
+                    "order_amount_label": money(item["order_amount"]),
+                    "paid_amount_label": money(item["paid_amount"]),
+                }
+            )
+        seller_rows = []
+        for position, item in enumerate(
+            sorted(sellers.values(), key=lambda value: value["amount"], reverse=True)[:10],
+            start=1,
+        ):
+            seller_rows.append(
+                {
+                    **item,
+                    "position": position,
+                    "amount_label": money(item["amount"]),
+                }
+            )
+
+        dashboard = {
+            "date_from": period_from.isoformat(),
+            "date_to": period_to.isoformat(),
+            "is_today": period_from == today_local and period_to == today_local,
+            "primary_currency": primary_currency,
+            "sale_count": totals["sale_count"],
+            "order_count": totals["order_count"],
+            "sale_amount": money(totals["sale_amount"]),
+            "order_amount": money(totals["order_amount"]),
+            "paid_amount": money(totals["paid_amount"]),
+            "average_sale": money(
+                totals["sale_amount"] / Decimal(totals["sale_count"])
+                if totals["sale_count"]
+                else Decimal("0")
+            ),
+            "daily_rows": daily_rows,
+            "seller_rows": seller_rows,
+        }
+        return tpl(
+            request,
+            "dashboard.html",
+            variant="user",
+            active="dashboard",
+            dashboard=dashboard,
+        )
+
     @app.get("/sales", response_class=HTMLResponse, name="sales_get")
     def sales_get(
         request: Request,

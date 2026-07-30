@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Дашборд{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">Оперативные показатели</span>
+    <h1 class="page-title settings-ios-page-title">Дашборд</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <section class="organizations-page-wrap organizations-page-wrap--general dashboard-workspace" aria-labelledby="dashboard-title">
+    <header class="dashboard-head">
+      <div>
+        <h2 id="dashboard-title">Дашборд</h2>
+        <p>{{ "Показатели за сегодня" if dashboard.is_today else "Показатели за выбранный период" }}</p>
+      </div>
+      <form class="dashboard-period-form" method="get" action="{{ url_for('dashboard_get') }}">
+        <label>
+          <span>Дата от</span>
+          <input type="date" name="date_from" value="{{ dashboard.date_from }}" />
+        </label>
+        <label>
+          <span>Дата до</span>
+          <input type="date" name="date_to" value="{{ dashboard.date_to }}" />
+        </label>
+        <button type="submit" class="btn btn-primary">Показать</button>
+      </form>
+    </header>
+
+    <div class="dashboard-kpi-grid" aria-label="Основные показатели">
+      <article class="dashboard-kpi dashboard-kpi--sales">
+        <span class="dashboard-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/></svg>
+        </span>
+        <div>
+          <span>Продажи</span>
+          <strong>{{ dashboard.sale_count }}</strong>
+          <small>{{ dashboard.sale_amount }}</small>
+        </div>
+      </article>
+      <article class="dashboard-kpi dashboard-kpi--orders">
+        <span class="dashboard-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 2h12v20H6z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
+        </span>
+        <div>
+          <span>Заказы</span>
+          <strong>{{ dashboard.order_count }}</strong>
+          <small>{{ dashboard.order_amount }}</small>
+        </div>
+      </article>
+      <article class="dashboard-kpi dashboard-kpi--payments">
+        <span class="dashboard-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </span>
+        <div>
+          <span>Приход денег</span>
+          <strong>{{ dashboard.paid_amount }}</strong>
+          <small>Оплачено по документам</small>
+        </div>
+      </article>
+      <article class="dashboard-kpi dashboard-kpi--average">
+        <span class="dashboard-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/></svg>
+        </span>
+        <div>
+          <span>Средняя продажа</span>
+          <strong>{{ dashboard.average_sale }}</strong>
+          <small>На один документ продажи</small>
+        </div>
+      </article>
+    </div>
+
+    <div class="dashboard-content-grid">
+      <section class="dashboard-section" aria-labelledby="dashboard-days-title">
+        <header>
+          <div>
+            <h3 id="dashboard-days-title">Динамика по дням</h3>
+            <p>Продажи, заказы и поступившие оплаты</p>
+          </div>
+        </header>
+        <div class="dashboard-table-wrap">
+          <table class="dashboard-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Продажи</th>
+                <th>Заказы</th>
+                <th>Приход денег</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in dashboard.daily_rows %}
+                <tr>
+                  <td><strong>{{ row.date }}</strong></td>
+                  <td><span>{{ row.sale_count }}</span><small>{{ row.sale_amount_label }}</small></td>
+                  <td><span>{{ row.order_count }}</span><small>{{ row.order_amount_label }}</small></td>
+                  <td class="dashboard-money-positive">{{ row.paid_amount_label }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" class="dashboard-empty">За этот период документов нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="dashboard-sellers-title">
+        <header>
+          <div>
+            <h3 id="dashboard-sellers-title">Топ продавцов</h3>
+            <p>Рейтинг по сумме продаж</p>
+          </div>
+        </header>
+        <div class="dashboard-seller-list">
+          {% for seller in dashboard.seller_rows %}
+            <article class="dashboard-seller-row">
+              <span class="dashboard-seller-rank">{{ seller.position }}</span>
+              <div>
+                <strong>{{ seller.name }}</strong>
+                <small>{{ seller.sale_count }} {{ "продажа" if seller.sale_count == 1 else "продаж" }}</small>
+              </div>
+              <b>{{ seller.amount_label }}</b>
+            </article>
+          {% else %}
+            <p class="dashboard-empty">Продаж за выбранный период нет.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </section>
+{% endblock %}

@@ -27012,3 +27012,342 @@ html.dark .warehouse-adjustment-summary {
     justify-content: space-between;
   }
 }
+/* Dashboard */
+.dashboard-workspace {
+  display: grid;
+  gap: 14px;
+  padding: 12px;
+}
+
+.dashboard-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  padding: 2px 0 12px;
+}
+
+.dashboard-head h2,
+.dashboard-section h3 {
+  margin: 0;
+  color: var(--foreground);
+  letter-spacing: 0;
+}
+
+.dashboard-head h2 {
+  font-size: 20px;
+}
+
+.dashboard-head p,
+.dashboard-section header p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dashboard-period-form {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.dashboard-period-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-period-form label > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dashboard-period-form input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 7px 10px;
+}
+
+.dashboard-period-form .btn {
+  min-height: 36px;
+}
+
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.dashboard-kpi {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  min-height: 104px;
+  padding: 14px;
+  border-right: 1px solid var(--border);
+}
+
+.dashboard-kpi:last-child {
+  border-right: 0;
+}
+
+.dashboard-kpi-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--primary) 11%, var(--card));
+  color: var(--primary);
+}
+
+.dashboard-kpi--sales .dashboard-kpi-icon,
+.dashboard-kpi--payments .dashboard-kpi-icon {
+  background: color-mix(in srgb, #16a05d 12%, var(--card));
+  color: #10864c;
+}
+
+.dashboard-kpi--orders .dashboard-kpi-icon {
+  background: color-mix(in srgb, #d69b19 15%, var(--card));
+  color: #a36d00;
+}
+
+.dashboard-kpi-icon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dashboard-kpi > div {
+  display: grid;
+  min-width: 0;
+}
+
+.dashboard-kpi span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dashboard-kpi strong {
+  margin-top: 3px;
+  color: var(--foreground);
+  font-size: 23px;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.dashboard-kpi small {
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 14px;
+}
+
+.dashboard-section {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.dashboard-section > header {
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-section h3 {
+  font-size: 14px;
+}
+
+.dashboard-table-wrap {
+  overflow: auto;
+}
+
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.dashboard-table th {
+  height: 36px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--muted);
+  font-size: 10px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dashboard-table td {
+  height: 49px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  font-size: 12px;
+}
+
+.dashboard-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.dashboard-table td span,
+.dashboard-table td small {
+  display: block;
+}
+
+.dashboard-table td small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.dashboard-money-positive {
+  color: #10864c !important;
+  font-weight: 800;
+}
+
+.dashboard-seller-list {
+  display: grid;
+}
+
+.dashboard-seller-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 53px;
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-seller-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-seller-rank {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dashboard-seller-row:nth-child(-n + 3) .dashboard-seller-rank {
+  background: color-mix(in srgb, #d69b19 15%, var(--card));
+  color: #916100;
+}
+
+.dashboard-seller-row > div {
+  display: grid;
+  min-width: 0;
+}
+
+.dashboard-seller-row strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-seller-row small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.dashboard-seller-row b {
+  color: var(--foreground);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dashboard-empty {
+  padding: 24px !important;
+  color: var(--muted) !important;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-kpi:nth-child(2) {
+    border-right: 0;
+  }
+
+  .dashboard-kpi:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dashboard-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-period-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dashboard-period-form .btn {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-kpi,
+  .dashboard-kpi:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dashboard-kpi:last-child {
+    border-bottom: 0;
+  }
+
+  .dashboard-table {
+    min-width: 620px;
+  }
+}
