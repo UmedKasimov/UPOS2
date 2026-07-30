@@ -544,6 +544,73 @@
     });
   }
 
+  function renderCompletedTasks(panel, sale) {
+    var root = panel.querySelector("[data-sales-detail-tasks]");
+    var count = panel.querySelector("[data-sales-detail-task-count]");
+    var tasks = Array.isArray(sale.completed_tasks) ? sale.completed_tasks : [];
+    if (count) count.textContent = String(sale.completed_tasks_count == null ? tasks.length : sale.completed_tasks_count);
+    if (!root) return;
+    root.replaceChildren();
+    if (!tasks.length) {
+      var empty = document.createElement("div");
+      empty.className = "sales-document-tasks-empty";
+      empty.textContent = "Выполненных задач нет.";
+      root.append(empty);
+      return;
+    }
+
+    tasks.forEach(function (task) {
+      var article = document.createElement("article");
+      article.className = "sales-document-task";
+
+      var row = document.createElement("label");
+      row.className = "sales-document-task-main";
+      var checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = true;
+      checkbox.disabled = true;
+      checkbox.setAttribute("aria-label", "Задача выполнена");
+      var content = document.createElement("span");
+      var title = document.createElement("strong");
+      title.textContent = String(task.title || "Задача");
+      content.append(title);
+
+      var metaParts = [];
+      if (task.completed_at) metaParts.push("Выполнено " + String(task.completed_at));
+      else if (task.due_date) metaParts.push(String(task.due_date));
+      if (task.assignee) metaParts.push(String(task.assignee));
+      if (metaParts.length) {
+        var meta = document.createElement("small");
+        meta.textContent = metaParts.join(" · ");
+        content.append(meta);
+      }
+      row.append(checkbox, content);
+      article.append(row);
+
+      var checklist = Array.isArray(task.checklist) ? task.checklist : [];
+      if (checklist.length) {
+        var list = document.createElement("ul");
+        list.className = "sales-document-task-checklist";
+        checklist.forEach(function (entry) {
+          var listItem = document.createElement("li");
+          var itemLabel = document.createElement("label");
+          var itemCheckbox = document.createElement("input");
+          itemCheckbox.type = "checkbox";
+          itemCheckbox.checked = true;
+          itemCheckbox.disabled = true;
+          itemCheckbox.setAttribute("aria-label", "Пункт выполнен");
+          var itemText = document.createElement("span");
+          itemText.textContent = String(entry);
+          itemLabel.append(itemCheckbox, itemText);
+          listItem.append(itemLabel);
+          list.append(listItem);
+        });
+        article.append(list);
+      }
+      root.append(article);
+    });
+  }
+
   function updatePaymentButton(panel, sale) {
     var form = panel.querySelector("[data-sales-payment-form]");
     var button = panel.querySelector("[data-sales-payment-pay]");
@@ -633,6 +700,11 @@
     setText(panel, "[data-sales-detail-client]", sale.client || "Клиент не указан");
     setText(panel, "[data-sales-detail-warehouse]", sale.warehouse || "Склад не указан");
     setText(panel, "[data-sales-detail-status]", sale.status_label || "Новый");
+    var crmStatus = panel.querySelector("[data-sales-detail-crm-status]");
+    if (crmStatus) {
+      crmStatus.textContent = "CRM · " + (sale.crm_status_label || "Не назначен");
+      crmStatus.dataset.crmStatus = sale.crm_status || "unassigned";
+    }
     setText(panel, "[data-sales-detail-paid]", moneyWithCurrency(sale.paid_amount, currency));
     setText(panel, "[data-sales-detail-debt]", moneyWithCurrency(sale.debt_amount, currency));
     setText(panel, "[data-sales-detail-total]", moneyWithCurrency(sale.amount, currency));
@@ -646,6 +718,7 @@
     updatePaymentButton(panel, sale);
     updateReturnButton(panel, sale);
     renderLines(panel, sale);
+    renderCompletedTasks(panel, sale);
   }
 
   function openDetail(root, saleId) {

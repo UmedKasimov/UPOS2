@@ -7277,6 +7277,44 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   font-weight: 800;
 }
 
+.sales-document-detail-heading {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.sales-document-detail-heading-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.sales-document-detail-heading-meta p {
+  margin: 0;
+}
+
+.sales-document-detail-crm-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.16rem 0.48rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sales-document-detail-crm-status[data-crm-status="lost"],
+.sales-document-detail-crm-status[data-crm-status="unassigned"] {
+  border-color: color-mix(in srgb, var(--muted-foreground) 28%, var(--border));
+  background: color-mix(in srgb, var(--muted-foreground) 8%, var(--card));
+  color: var(--muted-foreground);
+}
+
 .warehouse-purchase-detail-actions {
   display: inline-flex;
   align-items: center;
@@ -7419,8 +7457,102 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   color: var(--foreground);
 }
 
+.sales-detail-tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  margin-left: 0.25rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted-foreground) 12%, var(--card));
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.warehouse-purchase-detail-tabs button.active .sales-detail-tab-count {
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  color: var(--primary);
+}
+
 .warehouse-purchase-detail-pane[hidden] {
   display: none;
+}
+
+.sales-document-tasks-pane {
+  min-height: 0;
+  overflow: auto;
+}
+
+.sales-document-completed-tasks {
+  display: grid;
+  margin: 0.85rem 1rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.sales-document-task {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem 0.2rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.sales-document-task-main,
+.sales-document-task-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  color: var(--foreground);
+}
+
+.sales-document-task-main > input,
+.sales-document-task-checklist input {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.12rem 0 0;
+  accent-color: #16a34a;
+  opacity: 1;
+}
+
+.sales-document-task-main > span {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.sales-document-task-main strong {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.sales-document-task-main small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.sales-document-task-checklist {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0 0 0 1.55rem;
+  padding: 0;
+  list-style: none;
+}
+
+.sales-document-task-checklist label {
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.sales-document-tasks-empty {
+  padding: 1.15rem 0.2rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 700;
 }
 
 .warehouse-purchase-detail-table-wrap {

@@ -6347,6 +6347,7 @@ def create_app() -> FastAPI:
             "note": str(data.get("note") or ""),
             "price_type_id": str(data.get("price_type_id") or ""),
             "price_type": str(data.get("price_type") or ""),
+            "counterparty_id": str(row.counterparty_id or data.get("counterparty_id") or ""),
             "crm_record_id": str(data.get("crm_record_id") or ""),
             "source_sale_id": str(data.get("source_sale_id") or ""),
             "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
@@ -6358,6 +6359,155 @@ def create_app() -> FastAPI:
             if key != "updated_at"
         }
         return item
+
+    def _sales_crm_index(rows: list[CrmRecord], stages: list[dict[str, str]]) -> dict[str, Any]:
+        records_by_id: dict[str, CrmRecord] = {}
+        deals_by_counterparty: dict[str, CrmRecord] = {}
+        deals_by_client: dict[str, CrmRecord] = {}
+        tasks_by_deal: dict[str, list[CrmRecord]] = {}
+        tasks_by_counterparty: dict[str, list[CrmRecord]] = {}
+        tasks_by_client: dict[str, list[CrmRecord]] = {}
+
+        for row in rows:
+            data = _json_object(row.data)
+            records_by_id[row.id] = row
+            counterparty_id = str(row.counterparty_id or data.get("counterparty_id") or "").strip()
+            client_key = str(data.get("client") or "").strip().casefold()
+            if row.item_type == "deal":
+                if counterparty_id:
+                    deals_by_counterparty.setdefault(counterparty_id, row)
+                if client_key:
+                    deals_by_client.setdefault(client_key, row)
+                continue
+            if row.item_type != "task" or row.status != "done":
+                continue
+            related_deal_id = str(data.get("related_deal_id") or "").strip()
+            if related_deal_id:
+                tasks_by_deal.setdefault(related_deal_id, []).append(row)
+            if counterparty_id:
+                tasks_by_counterparty.setdefault(counterparty_id, []).append(row)
+            if client_key:
+                tasks_by_client.setdefault(client_key, []).append(row)
+
+        return {
+            "records_by_id": records_by_id,
+            "deals_by_counterparty": deals_by_counterparty,
+            "deals_by_client": deals_by_client,
+            "tasks_by_deal": tasks_by_deal,
+            "tasks_by_counterparty": tasks_by_counterparty,
+            "tasks_by_client": tasks_by_client,
+            "stages": stages,
+        }
+
+    def _sales_crm_context(item: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
+        records_by_id = index["records_by_id"]
+        counterparty_id = str(item.get("counterparty_id") or "").strip()
+        client_key = str(item.get("client") or "").strip().casefold()
+        direct_record = records_by_id.get(str(item.get("crm_record_id") or "").strip())
+        linked_deal = direct_record if direct_record and direct_record.item_type == "deal" else None
+        if direct_record and direct_record.item_type == "task":
+            direct_data = _json_object(direct_record.data)
+            linked_deal = records_by_id.get(str(direct_data.get("related_deal_id") or "").strip())
+            if linked_deal and linked_deal.item_type != "deal":
+                linked_deal = None
+        if linked_deal is None and counterparty_id:
+            linked_deal = index["deals_by_counterparty"].get(counterparty_id)
+        if linked_deal is None and client_key:
+            linked_deal = index["deals_by_client"].get(client_key)
+
+        status_record = linked_deal or direct_record
+        crm_status = ""
+        crm_status_label = "Не назначен"
+        if status_record:
+            status_data = _json_object(status_record.data)
+            if status_record.item_type == "deal":
+                stage = _crm_stage_for_value(
+                    status_data.get("stage_id") or status_data.get("stage"),
+                    index["stages"],
+                )
+                crm_status = stage["id"]
+                crm_status_label = stage["title"]
+            else:
+                crm_status = str(status_record.status or "new")
+                crm_status_label = _crm_status_label(crm_status)
+
+        completed_tasks: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def add_task(
+            key: str,
+            title: Any,
+            *,
+            completed_at: Any = "",
+            due_date: Any = "",
+            assignee: Any = "",
+            checklist: Any = None,
+        ) -> None:
+            title_value = re.sub(r"\s+", " ", str(title or "")).strip()
+            if not title_value or key in seen:
+                return
+            seen.add(key)
+            checklist_values = [
+                re.sub(r"\s+", " ", str(entry or "")).strip()
+                for entry in (checklist if isinstance(checklist, list) else [])
+                if re.sub(r"\s+", " ", str(entry or "")).strip()
+            ][:12]
+            completed_tasks.append(
+                {
+                    "title": title_value[:500],
+                    "completed_at": str(completed_at or "")[:16].replace("T", " "),
+                    "due_date": str(due_date or "")[:16].replace("T", " "),
+                    "assignee": re.sub(r"\s+", " ", str(assignee or "")).strip()[:120],
+                    "checklist": checklist_values,
+                }
+            )
+
+        activity_records = [record for record in (linked_deal, direct_record) if record]
+        for record in dict.fromkeys(activity_records):
+            data = _json_object(record.data)
+            raw_events = data.get("activity_log") if isinstance(data.get("activity_log"), list) else []
+            for position, event in enumerate(raw_events):
+                if not isinstance(event, dict) or event.get("kind") != "task" or not event.get("completed"):
+                    continue
+                add_task(
+                    f"event:{record.id}:{position}",
+                    event.get("detail") or event.get("action"),
+                    completed_at=event.get("at"),
+                    due_date=event.get("due_date"),
+                    assignee=event.get("assignee") or event.get("actor"),
+                    checklist=event.get("checklist"),
+                )
+
+        task_rows: list[CrmRecord] = []
+        if direct_record and direct_record.item_type == "task" and direct_record.status == "done":
+            task_rows.append(direct_record)
+        if linked_deal:
+            task_rows.extend(index["tasks_by_deal"].get(linked_deal.id, []))
+        if counterparty_id:
+            task_rows.extend(index["tasks_by_counterparty"].get(counterparty_id, []))
+        elif client_key:
+            task_rows.extend(index["tasks_by_client"].get(client_key, []))
+        for task in task_rows:
+            data = _json_object(task.data)
+            add_task(
+                f"record:{task.id}",
+                task.title,
+                completed_at=task.updated_at.isoformat() if task.updated_at else "",
+                due_date=task.due_date or data.get("due_date") or data.get("date"),
+                assignee=data.get("responsible"),
+            )
+
+        completed_tasks.sort(
+            key=lambda task: str(task.get("completed_at") or task.get("due_date") or ""),
+            reverse=True,
+        )
+        visible_tasks = completed_tasks[:50]
+        return {
+            "crm_status": crm_status,
+            "crm_status_label": crm_status_label,
+            "completed_tasks": visible_tasks,
+            "completed_tasks_count": len(visible_tasks),
+        }
 
     def _sales_debt_timing(due_date: str, today: date) -> dict[str, Any]:
         clean_due_date = str(due_date or "").strip()
@@ -7387,6 +7537,21 @@ def create_app() -> FastAPI:
                 if str(item.get("warehouse") or "").strip()
             ]
             sales = sales[journal_page_start:journal_page_end]
+            crm_rows_for_sales = list(
+                session.execute(
+                    select(CrmRecord)
+                    .where(CrmRecord.workspace_owner_id == wid)
+                    .order_by(CrmRecord.updated_at.desc())
+                ).scalars()
+            )
+            sales_crm_index = _sales_crm_index(
+                crm_rows_for_sales,
+                _crm_workspace_stages(wid),
+            )
+            for item in sales:
+                crm_context = _sales_crm_context(item, sales_crm_index)
+                item.update(crm_context)
+                item["detail_json"].update(crm_context)
             price_types = _workspace_price_types(wid)
             active_sales_price_types = [
                 item
