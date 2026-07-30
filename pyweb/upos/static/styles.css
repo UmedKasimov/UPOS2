@@ -10848,6 +10848,9 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-journal-filter-field {
   display: grid !important;
+  /* Часть полей — <label>, часть — <div>. Глобальный label{margin-bottom} при
+     align-items:end поднимал бы их на 0.4rem выше соседей, поэтому обнуляем. */
+  margin: 0;
   grid-template-rows: 0.95rem 2.55rem;
   gap: 0.2rem;
   min-width: 0;
