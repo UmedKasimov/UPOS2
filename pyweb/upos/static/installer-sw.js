@@ -1,8 +1,8 @@
-const CACHE_NAME = "upos-installer-v1";
+const CACHE_NAME = "upos-installer-v2";
 const APP_SHELL = [
   "/installer",
-  "/static/installer.css?v=1",
-  "/static/installer.js?v=1",
+  "/static/installer.css?v=2",
+  "/static/installer.js?v=2",
   "/static/installer-manifest.webmanifest",
   "/static/favicon.svg"
 ];

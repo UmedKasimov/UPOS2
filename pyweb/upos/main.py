@@ -7295,6 +7295,41 @@ def create_app() -> FastAPI:
             current = current.astimezone(timezone.utc)
         return current.strftime("%Y-%m-%dT%H:%M")
 
+    def _installer_order_line_payload(
+        raw_line: dict[str, Any],
+        *,
+        index: int,
+        currency: str,
+    ) -> dict[str, Any]:
+        line = dict(raw_line)
+        product = line.get("product")
+        product_data = product if isinstance(product, dict) else {}
+        product_name = next(
+            (
+                str(value).strip()
+                for value in (
+                    line.get("product_name"),
+                    product if not isinstance(product, dict) else "",
+                    product_data.get("name"),
+                    product_data.get("title"),
+                    line.get("name"),
+                    line.get("title"),
+                    line.get("service_name"),
+                    line.get("item_name"),
+                )
+                if str(value or "").strip()
+            ),
+            f"Позиция {index + 1}",
+        )
+        line["product_name"] = product_name
+        line["quantity"] = line.get("quantity", line.get("qty", line.get("count", "1")))
+        line["total"] = line.get(
+            "total",
+            line.get("amount", line.get("sum", line.get("price", 0))),
+        )
+        line["currency"] = str(line.get("currency") or currency or "UZS")
+        return line
+
     def _installer_order_payload(
         session: Any,
         order: InstallationOrder,
@@ -7312,6 +7347,7 @@ def create_app() -> FastAPI:
         lines = data.get("sale_lines")
         if not isinstance(lines, list):
             lines = []
+        currency = str(order.currency or "UZS")
         return {
             "id": order.id,
             "number": str(order.number or ""),
@@ -7334,12 +7370,20 @@ def create_app() -> FastAPI:
             "longitude": str(order.longitude or ""),
             "amount": str(order.amount or 0),
             "paid_amount": str(order.paid_amount or 0),
-            "currency": str(order.currency or "UZS"),
+            "currency": currency,
             "installer_name": str(data.get("installer_name") or "").strip(),
             "notes": str(data.get("notes") or "").strip(),
             "result_comment": str(data.get("result_comment") or "").strip(),
             "conflict_warning": str(data.get("conflict_warning") or "").strip(),
-            "lines": [line for line in lines if isinstance(line, dict)],
+            "lines": [
+                _installer_order_line_payload(
+                    line,
+                    index=index,
+                    currency=currency,
+                )
+                for index, line in enumerate(lines)
+                if isinstance(line, dict)
+            ],
             "tasks": [
                 {
                     "id": task.id,

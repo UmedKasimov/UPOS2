@@ -297,7 +297,16 @@
   }
 
   function lineMarkup(line, index, order) {
-    const name = line.product_name || line.name || line.title || line.service_name || `Позиция ${index + 1}`;
+    const product = typeof line.product === "object" ? line.product : null;
+    const name = line.product_name
+      || (typeof line.product === "string" ? line.product : "")
+      || product?.name
+      || product?.title
+      || line.name
+      || line.title
+      || line.service_name
+      || line.item_name
+      || `Позиция ${index + 1}`;
     const quantity = line.quantity ?? line.qty ?? line.count ?? "1";
     const amount = line.amount ?? line.total ?? line.sum ?? line.price ?? 0;
     return `
