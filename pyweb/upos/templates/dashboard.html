@@ -37,7 +37,7 @@
         </span>
         <div>
           <span>Продажи</span>
-          <strong>{{ dashboard.sale_count }}</strong>
+          <strong>{{ dashboard.sale_amount }}</strong>
           <div class="dashboard-kpi-currencies dashboard-kpi-currencies--sales" aria-label="Продажи по валютам">
             {% for item in dashboard.sale_currency_rows %}
               <span>
@@ -46,7 +46,7 @@
               </span>
             {% endfor %}
           </div>
-          <small>{{ dashboard.sale_amount }}</small>
+          <small>Документов: {{ dashboard.sale_count }}</small>
         </div>
       </article>
       <article class="dashboard-kpi dashboard-kpi--orders">
@@ -55,7 +55,7 @@
         </span>
         <div>
           <span>Заказы</span>
-          <strong>{{ dashboard.order_count }}</strong>
+          <strong>{{ dashboard.order_amount }}</strong>
           <div class="dashboard-kpi-currencies dashboard-kpi-currencies--orders" aria-label="Заказы по валютам">
             {% for item in dashboard.order_currency_rows %}
               <span>
@@ -64,7 +64,7 @@
               </span>
             {% endfor %}
           </div>
-          <small>{{ dashboard.order_amount }}</small>
+          <small>Документов: {{ dashboard.order_count }}</small>
         </div>
       </article>
       <article class="dashboard-kpi dashboard-kpi--payments">
