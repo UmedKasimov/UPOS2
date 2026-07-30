@@ -6,7 +6,7 @@
   <script src="{{ url_for('static', path='clients.js') }}?v=14" defer></script>
 {% endblock %}
 
-{% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid'] %}
+{% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid', 'converted', 'already_converted'] %}
 {% set sales_journal_requested = request.query_params.get('view') == 'journal' %}
 {% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else 'journal'))))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
@@ -41,6 +41,10 @@
       <div class="flash ok settings-ios-flash">Документ продажи обновлён.</div>
     {% elif flash_ok == "paid" %}
       <div class="flash ok settings-ios-flash">Оплата внесена. Продажа обновлена.</div>
+    {% elif flash_ok == "converted" %}
+      <div class="flash ok settings-ios-flash">Продажа создана из заказа.</div>
+    {% elif flash_ok == "already_converted" %}
+      <div class="flash ok settings-ios-flash">Этот заказ уже преобразован в продажу.</div>
     {% elif flash_ok == "deleted" %}
       <div class="flash ok settings-ios-flash">Документ продажи удалён.</div>
     {% endif %}
@@ -587,6 +591,18 @@
               <h2 data-sales-detail-title>Продажа</h2>
             </div>
             <div class="warehouse-purchase-detail-actions">
+              <form
+                method="post"
+                action=""
+                data-sales-detail-convert-form
+                data-action-template="{{ url_for('sales_convert_to_sale', sale_id='__sale_id__') }}"
+                hidden
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button class="btn btn-primary btn-sm" type="submit" data-sales-detail-convert>
+                  Сделать продажу
+                </button>
+              </form>
               <button class="btn btn-secondary btn-sm sales-detail-return-btn" type="button" data-sales-detail-return hidden>
                 Сделать возврат
               </button>
@@ -1374,7 +1390,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=22" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=23" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=57" defer></script>
   {% if sales_embed %}
     <script>

@@ -6350,6 +6350,8 @@ def create_app() -> FastAPI:
             "counterparty_id": str(row.counterparty_id or data.get("counterparty_id") or ""),
             "crm_record_id": str(data.get("crm_record_id") or ""),
             "source_sale_id": str(data.get("source_sale_id") or ""),
+            "source_order_id": str(data.get("source_order_id") or ""),
+            "converted_sale_id": str(data.get("converted_sale_id") or ""),
             "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
             "updated_at": row.updated_at,
         }
@@ -8000,6 +8002,194 @@ def create_app() -> FastAPI:
         )
         embed_query = "&embed=1" if sales_embed else ""
         return RedirectResponse(url=f"/sales?msg={saved_message}&saved_id={quote(saved_sale_id)}{embed_query}#sales-journal", status_code=302)
+
+    @app.post("/sales/{sale_id}/convert-to-sale", name="sales_convert_to_sale")
+    async def sales_convert_to_sale(request: Request, sale_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(
+                url="/sales?doc_type=order&err=csrf#sales-journal",
+                status_code=302,
+            )
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+
+        def converted_redirect(document_id: str, message: str = "converted"):
+            return RedirectResponse(
+                url=f"/sales?view=journal&doc_type=sale&msg={message}&saved_id={quote(document_id)}#sales-journal",
+                status_code=302,
+            )
+
+        session_user = request.session.get("user") or {}
+        converted_sale_id = ""
+        converted_sale_number = ""
+        converted_data: dict[str, Any] = {}
+        converted_amount = Decimal("0")
+        converted_currency = "UZS"
+        transferred_payment = False
+
+        try:
+            with session_scope() as session:
+                order_row = session.get(SaleDocument, sale_id)
+                if not order_row or order_row.workspace_owner_id != wid:
+                    return RedirectResponse(
+                        url="/sales?doc_type=order&error="
+                        + quote("Заказ не найден")
+                        + "#sales-journal",
+                        status_code=302,
+                    )
+                order_data = _json_object(order_row.data).copy()
+                if str(order_data.get("doc_type") or "sale").strip() != "order":
+                    return RedirectResponse(
+                        url="/sales?error="
+                        + quote("Продажу можно создать только из заказа")
+                        + "#sales-journal",
+                        status_code=302,
+                    )
+
+                linked_sale_id = str(order_data.get("converted_sale_id") or "").strip()
+                if linked_sale_id:
+                    linked_sale = session.get(SaleDocument, linked_sale_id)
+                    if linked_sale and linked_sale.workspace_owner_id == wid:
+                        return converted_redirect(linked_sale.id, "already_converted")
+
+                existing_sale = session.execute(
+                    select(SaleDocument)
+                    .where(
+                        SaleDocument.workspace_owner_id == wid,
+                        SaleDocument.external_source == "order_conversion",
+                        SaleDocument.external_id == order_row.id,
+                    )
+                    .limit(1)
+                ).scalar_one_or_none()
+                if existing_sale:
+                    order_data["converted_sale_id"] = existing_sale.id
+                    order_data["converted_sale_number"] = existing_sale.number
+                    order_row.data = order_data
+                    flag_modified(order_row, "data")
+                    return converted_redirect(existing_sale.id, "already_converted")
+
+                converted_sale_id = str(uuid.uuid4())
+                converted_sale_number = _next_sales_document_number(session, wid, "sale")
+                converted_data = {
+                    **order_data,
+                    "doc_type": "sale",
+                    "date": datetime.now(timezone.utc).date().isoformat(),
+                    "date_to": datetime.now(timezone.utc).date().isoformat(),
+                    "status": "new",
+                    "workflow_version": _SALES_WORKFLOW_VERSION,
+                    "inventory_applied": False,
+                    "source_order_id": order_row.id,
+                    "source_order_number": order_row.number,
+                    "converted_from_order": True,
+                    "lines": [
+                        dict(line)
+                        for line in order_data.get("lines") or []
+                        if isinstance(line, dict)
+                    ],
+                    "payment_lines": [
+                        dict(payment)
+                        for payment in order_data.get("payment_lines") or []
+                        if isinstance(payment, dict)
+                    ],
+                }
+                converted_amount = _sales_decimal(order_row.amount)
+                converted_currency = str(order_row.currency or "UZS").strip().upper() or "UZS"
+                transferred_payment = (
+                    _sales_decimal(converted_data.get("paid_amount")) > 0
+                    or bool(converted_data.get("payment_lines"))
+                )
+
+                converted_row = SaleDocument(
+                    id=converted_sale_id,
+                    workspace_owner_id=wid,
+                    number=converted_sale_number,
+                    amount=converted_amount,
+                    currency=converted_currency,
+                    counterparty_id=order_row.counterparty_id,
+                    branch_id=order_row.branch_id,
+                    external_source="order_conversion",
+                    external_id=order_row.id,
+                    data=converted_data,
+                )
+                session.add(converted_row)
+
+                order_data["converted_sale_id"] = converted_sale_id
+                order_data["converted_sale_number"] = converted_sale_number
+                order_data["converted_at"] = datetime.now(timezone.utc).isoformat()
+                if transferred_payment:
+                    order_data["transferred_paid_amount"] = str(order_data.get("paid_amount") or "0")
+                    order_data["transferred_payment_lines"] = [
+                        dict(payment)
+                        for payment in order_data.get("payment_lines") or []
+                        if isinstance(payment, dict)
+                    ]
+                    order_data["paid_amount"] = "0"
+                    order_data["payment_type"] = ""
+                    order_data["payment_lines"] = []
+                order_row.data = order_data
+                flag_modified(order_row, "data")
+
+                crm_record_id = str(converted_data.get("crm_record_id") or "").strip()
+                if crm_record_id:
+                    crm_row = session.get(CrmRecord, crm_record_id)
+                    if crm_row and crm_row.workspace_owner_id == wid:
+                        crm_data = _json_object(crm_row.data).copy()
+                        crm_data["related_sale_id"] = converted_sale_id
+                        crm_data["related_sale_number"] = converted_sale_number
+                        crm_data["related_sale_type"] = "sale"
+                        _crm_append_activity(
+                            crm_data,
+                            "Продажа создана из заказа",
+                            _crm_actor_name(request),
+                            f"{order_row.number} → {converted_sale_number}",
+                        )
+                        crm_row.data = crm_data
+                        flag_modified(crm_row, "data")
+
+                session.flush()
+        except SQLAlchemyError:
+            logger.exception("[sales] failed to convert order %s to sale", sale_id)
+            with session_scope() as session:
+                existing_sale = session.execute(
+                    select(SaleDocument)
+                    .where(
+                        SaleDocument.workspace_owner_id == wid,
+                        SaleDocument.external_source == "order_conversion",
+                        SaleDocument.external_id == sale_id,
+                    )
+                    .limit(1)
+                ).scalar_one_or_none()
+                if existing_sale:
+                    return converted_redirect(existing_sale.id, "already_converted")
+            return RedirectResponse(
+                url="/sales?doc_type=order&error="
+                + quote("Не удалось создать продажу из заказа")
+                + "#sales-journal",
+                status_code=302,
+            )
+
+        if transferred_payment:
+            try:
+                _sync_sales_cash_transactions(
+                    wid,
+                    sale_id=converted_sale_id,
+                    sale_number=converted_sale_number,
+                    data=converted_data,
+                    amount=converted_amount,
+                    currency=converted_currency,
+                    user=session_user,
+                )
+                _delete_sales_cash_transactions(wid, sale_id)
+            except Exception:
+                logger.exception(
+                    "[sales] order %s converted, but payment reassignment failed",
+                    sale_id,
+                )
+
+        return converted_redirect(converted_sale_id)
 
     @app.post("/sales/{sale_id}/delete", name="sales_delete")
     async def sales_delete(request: Request, sale_id: str):

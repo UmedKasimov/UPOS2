@@ -471,6 +471,21 @@
     });
   }
 
+  function updateConvertButton(panel, sale) {
+    var form = panel.querySelector("[data-sales-detail-convert-form]");
+    var button = panel.querySelector("[data-sales-detail-convert]");
+    if (!form || !button) return;
+    var canConvert = textValue(sale.doc_type).toLowerCase() === "order";
+    form.hidden = !canConvert;
+    button.disabled = !canConvert;
+    if (!canConvert) {
+      form.removeAttribute("action");
+      return;
+    }
+    var template = form.dataset.actionTemplate || "";
+    form.action = template.replace("__sale_id__", encodeURIComponent(String(sale.id || "")));
+  }
+
   function setDetailMenu(panel, open) {
     if (!panel) return;
     var menu = panel.querySelector("[data-sales-detail-menu]");
@@ -717,6 +732,7 @@
     renderSalesPaymentSummary(panel, sale);
     updatePaymentButton(panel, sale);
     updateReturnButton(panel, sale);
+    updateConvertButton(panel, sale);
     renderLines(panel, sale);
     renderCompletedTasks(panel, sale);
   }
