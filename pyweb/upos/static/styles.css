@@ -11695,6 +11695,20 @@ html.dark .sales-journal-task-completed {
     box-shadow 160ms ease;
 }
 
+.sales-journal-id-cell > strong,
+.sales-journal-id-cell > small {
+  display: block;
+}
+
+.sales-journal-id-age {
+  margin-top: 0.12rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
 .sales-journal-id-cell:hover,
 .sales-journal-id-cell:focus-visible {
   outline: none;

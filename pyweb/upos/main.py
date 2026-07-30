@@ -6707,6 +6707,29 @@ def create_app() -> FastAPI:
             "sort_date": clean_due_date,
         }
 
+    def _sales_document_age_label(document_date: Any, today: date) -> str:
+        clean_document_date = str(document_date or "").strip()
+        try:
+            parsed_date = (
+                datetime.strptime(clean_document_date[:10], "%Y-%m-%d").date()
+                if clean_document_date
+                else None
+            )
+        except ValueError:
+            parsed_date = None
+        if not parsed_date:
+            return ""
+        days = max(0, (today - parsed_date).days)
+        remainder_100 = days % 100
+        remainder_10 = days % 10
+        if remainder_10 == 1 and remainder_100 != 11:
+            unit = "день"
+        elif remainder_10 in {2, 3, 4} and remainder_100 not in {12, 13, 14}:
+            unit = "дня"
+        else:
+            unit = "дней"
+        return f"{days} {unit}"
+
     def _sales_debt_workspace(rows: list[SaleDocument], filters: dict[str, str], q_clean: str, today: date) -> dict[str, Any]:
         clients_map: dict[str, dict[str, Any]] = {}
         totals_by_currency: dict[str, Decimal] = {}
@@ -8222,6 +8245,10 @@ def create_app() -> FastAPI:
 
             for row in rows:
                 item = _sales_document_data(row)
+                item["document_age_label"] = _sales_document_age_label(
+                    item.get("date"),
+                    today_date,
+                )
                 debt_timing = _sales_debt_timing(
                     str(item.get("date_to") or item.get("date") or ""),
                     today_date,

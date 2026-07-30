@@ -455,7 +455,13 @@
               {% for sale in sales %}
                 <tr class="sales-table-row--{{ sale.doc_type }}{% if sales_saved_id and sales_saved_id == sale.id %} sales-table-row--saved{% endif %}" data-sales-journal-row>
                   <td class="sales-journal-row-index">{{ sales_journal_pagination.row_offset + loop.index }}</td>
-                  <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0"><strong>{{ sale.number }}</strong><small>{{ sale.manager or "Без ответственного" }}</small></td>
+                  <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0">
+                    <strong>{{ sale.number }}</strong>
+                    <small>{{ sale.manager or "Без ответственного" }}</small>
+                    {% if sale.document_age_label %}
+                      <small class="sales-journal-id-age">{{ sale.document_age_label }}</small>
+                    {% endif %}
+                  </td>
                   <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
                   <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
                   <td class="sales-journal-client-cell" title="{{ sale.client or '-' }}">
