@@ -27309,7 +27309,7 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-period-form {
   display: grid;
-  grid-template-columns: minmax(250px, 360px) auto;
+  grid-template-columns: minmax(250px, 360px);
   align-items: end;
   gap: 8px;
 }
@@ -27333,10 +27333,6 @@ html.dark .warehouse-adjustment-summary {
   background: var(--card);
   color: var(--foreground);
   padding: 7px 10px;
-}
-
-.dashboard-period-form .btn {
-  min-height: 36px;
 }
 
 .dashboard-kpi-grid {
@@ -27418,6 +27414,39 @@ html.dark .warehouse-adjustment-summary {
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-kpi-currencies {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.dashboard-kpi-currencies > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, #16a05d 24%, var(--border));
+  border-radius: 5px;
+  background: color-mix(in srgb, #16a05d 6%, var(--card));
+}
+
+.dashboard-kpi-currencies em {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.dashboard-kpi-currencies b {
+  overflow: hidden;
+  color: #10864c;
+  font-size: 11px;
+  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -27587,11 +27616,7 @@ html.dark .warehouse-adjustment-summary {
   }
 
   .dashboard-period-form {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .dashboard-period-form .btn {
-    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
   }
 
   .dashboard-kpi-grid {

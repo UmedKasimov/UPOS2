@@ -15,7 +15,7 @@
         <h2 id="dashboard-title">Дашборд</h2>
         <p>{{ "Показатели за сегодня" if dashboard.is_today else "Показатели за выбранный период" }}</p>
       </div>
-      <form class="dashboard-period-form" method="get" action="{{ url_for('dashboard_get') }}">
+      <form class="dashboard-period-form" method="get" action="{{ url_for('dashboard_get') }}" data-dashboard-auto-period>
         <label class="dashboard-period-field">
           <span>Период</span>
           <input
@@ -27,7 +27,6 @@
           />
           <input type="hidden" name="date_to" value="{{ dashboard.date_to }}" />
         </label>
-        <button type="submit" class="btn btn-primary">Показать</button>
       </form>
     </header>
 
@@ -59,6 +58,14 @@
         <div>
           <span>Приход денег</span>
           <strong>{{ dashboard.paid_amount }}</strong>
+          <div class="dashboard-kpi-currencies" aria-label="Приход денег по валютам">
+            {% for item in dashboard.paid_currency_rows %}
+              <span>
+                <em>{{ item.currency }}</em>
+                <b>{{ item.amount }} {{ item.currency }}</b>
+              </span>
+            {% endfor %}
+          </div>
           <small>Оплачено по документам</small>
         </div>
       </article>
@@ -132,4 +139,8 @@
       </section>
     </div>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='dashboard.js') }}?v=1" defer></script>
 {% endblock %}

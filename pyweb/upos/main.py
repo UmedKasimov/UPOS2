@@ -7283,6 +7283,10 @@ def create_app() -> FastAPI:
             "sale_amount": Decimal("0"),
             "order_amount": Decimal("0"),
             "paid_amount": Decimal("0"),
+            "paid_by_currency": {
+                "USD": Decimal("0"),
+                "UZS": Decimal("0"),
+            },
         }
         daily: dict[str, dict[str, Any]] = {}
         sellers: dict[str, dict[str, Any]] = {}
@@ -7309,10 +7313,13 @@ def create_app() -> FastAPI:
                 continue
             currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
             amount_primary = to_primary(row.amount, currency)
-            paid_primary = to_primary(
+            paid_original = max(
+                Decimal("0"),
                 min(_sales_decimal(row.amount), _sales_decimal(data.get("paid_amount"))),
-                currency,
             )
+            paid_primary = to_primary(paid_original, currency)
+            totals["paid_by_currency"].setdefault(currency, Decimal("0"))
+            totals["paid_by_currency"][currency] += paid_original
             date_key = document_date.isoformat()
             day = daily.setdefault(
                 date_key,
@@ -7386,6 +7393,20 @@ def create_app() -> FastAPI:
             "sale_amount": money(totals["sale_amount"]),
             "order_amount": money(totals["order_amount"]),
             "paid_amount": money(totals["paid_amount"]),
+            "paid_currency_rows": [
+                {
+                    "currency": currency,
+                    "amount": _sales_money_label(totals["paid_by_currency"].get(currency, 0)),
+                }
+                for currency in (
+                    ["USD", "UZS"]
+                    + sorted(
+                        item
+                        for item in totals["paid_by_currency"]
+                        if item not in {"USD", "UZS"}
+                    )
+                )
+            ],
             "average_sale": money(
                 totals["sale_amount"] / Decimal(totals["sale_count"])
                 if totals["sale_count"]
