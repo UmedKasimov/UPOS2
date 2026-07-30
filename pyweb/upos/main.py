@@ -7283,6 +7283,18 @@ def create_app() -> FastAPI:
             "sale_amount": Decimal("0"),
             "order_amount": Decimal("0"),
             "paid_amount": Decimal("0"),
+            "sale_by_currency": {
+                "USD": Decimal("0"),
+                "UZS": Decimal("0"),
+            },
+            "order_by_currency": {
+                "USD": Decimal("0"),
+                "UZS": Decimal("0"),
+            },
+            "sale_count_by_currency": {
+                "USD": 0,
+                "UZS": 0,
+            },
             "paid_by_currency": {
                 "USD": Decimal("0"),
                 "UZS": Decimal("0"),
@@ -7338,12 +7350,18 @@ def create_app() -> FastAPI:
             if doc_type == "order":
                 totals["order_count"] += 1
                 totals["order_amount"] += amount_primary
+                totals["order_by_currency"].setdefault(currency, Decimal("0"))
+                totals["order_by_currency"][currency] += _sales_decimal(row.amount)
                 day["order_count"] += 1
                 day["order_amount"] += amount_primary
                 continue
 
             totals["sale_count"] += 1
             totals["sale_amount"] += amount_primary
+            totals["sale_by_currency"].setdefault(currency, Decimal("0"))
+            totals["sale_by_currency"][currency] += _sales_decimal(row.amount)
+            totals["sale_count_by_currency"].setdefault(currency, 0)
+            totals["sale_count_by_currency"][currency] += 1
             day["sale_count"] += 1
             day["sale_amount"] += amount_primary
             manager = str(data.get("manager") or "").strip()
@@ -7383,6 +7401,29 @@ def create_app() -> FastAPI:
                 }
             )
 
+        def currency_rows(
+            amounts: dict[str, Decimal],
+            counts: dict[str, int] | None = None,
+        ) -> list[dict[str, str]]:
+            currencies = [
+                "USD",
+                "UZS",
+                *sorted(currency for currency in amounts if currency not in {"USD", "UZS"}),
+            ]
+            result = []
+            for currency in currencies:
+                amount = amounts.get(currency, Decimal("0"))
+                if counts is not None:
+                    count = counts.get(currency, 0)
+                    amount = amount / Decimal(count) if count else Decimal("0")
+                result.append(
+                    {
+                        "currency": currency,
+                        "amount": _sales_money_label(amount),
+                    }
+                )
+            return result
+
         dashboard = {
             "date_from": period_from.isoformat(),
             "date_to": period_to.isoformat(),
@@ -7393,20 +7434,13 @@ def create_app() -> FastAPI:
             "sale_amount": money(totals["sale_amount"]),
             "order_amount": money(totals["order_amount"]),
             "paid_amount": money(totals["paid_amount"]),
-            "paid_currency_rows": [
-                {
-                    "currency": currency,
-                    "amount": _sales_money_label(totals["paid_by_currency"].get(currency, 0)),
-                }
-                for currency in (
-                    ["USD", "UZS"]
-                    + sorted(
-                        item
-                        for item in totals["paid_by_currency"]
-                        if item not in {"USD", "UZS"}
-                    )
-                )
-            ],
+            "sale_currency_rows": currency_rows(totals["sale_by_currency"]),
+            "order_currency_rows": currency_rows(totals["order_by_currency"]),
+            "paid_currency_rows": currency_rows(totals["paid_by_currency"]),
+            "average_sale_currency_rows": currency_rows(
+                totals["sale_by_currency"],
+                totals["sale_count_by_currency"],
+            ),
             "average_sale": money(
                 totals["sale_amount"] / Decimal(totals["sale_count"])
                 if totals["sale_count"]

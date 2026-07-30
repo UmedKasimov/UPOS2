@@ -27435,6 +27435,16 @@ html.dark .warehouse-adjustment-summary {
   background: color-mix(in srgb, #16a05d 6%, var(--card));
 }
 
+.dashboard-kpi-currencies--orders > span {
+  border-color: color-mix(in srgb, #d69b19 28%, var(--border));
+  background: color-mix(in srgb, #d69b19 7%, var(--card));
+}
+
+.dashboard-kpi-currencies--average > span {
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+
 .dashboard-kpi-currencies em {
   color: var(--muted-foreground);
   font-size: 9px;
@@ -27449,6 +27459,14 @@ html.dark .warehouse-adjustment-summary {
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dashboard-kpi-currencies--orders b {
+  color: #9a6800;
+}
+
+.dashboard-kpi-currencies--average b {
+  color: var(--primary);
 }
 
 .dashboard-content-grid {
