@@ -10846,6 +10846,23 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   --channel-brand-soft: #fff0f1;
 }
 
+.crm-document-type-tabs.sales-document-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  background: var(--card);
+}
+
+.crm-document-type-tabs .sales-document-tab {
+  cursor: pointer;
+}
+
+.crm-document-filter-empty {
+  margin: 0.25rem 0.1rem;
+}
+
 .sales-journal-filter {
   grid-area: filters;
   grid-template-columns: repeat(6, minmax(0, 1fr));

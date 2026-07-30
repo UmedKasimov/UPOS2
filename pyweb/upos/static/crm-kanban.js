@@ -428,6 +428,72 @@
       if (content) content.hidden = true;
     };
 
+    const documentFilterOptions = [
+      { type: "order", brand: "order", logo: "ЗК", label: "Заказы", empty: "Заказов по клиенту пока нет." },
+      { type: "sale", brand: "sale", logo: "ОТ", label: "Отгрузки", empty: "Отгрузок по клиенту пока нет." },
+      { type: "return", brand: "return", logo: "ВЗ", label: "Возвраты", empty: "Возвратов по клиенту пока нет." },
+    ];
+
+    const normalizeDocumentType = (value) => {
+      const type = String(value || "").trim().toLowerCase();
+      return type === "order" || type === "return" ? type : "sale";
+    };
+
+    const applyDocumentFilter = (type) => {
+      if (!documents) return;
+      const activeType = normalizeDocumentType(type);
+      let visibleCount = 0;
+      documents.querySelectorAll(".crm-card-detail-document").forEach((article) => {
+        const visible = normalizeDocumentType(article.dataset.crmDocumentType) === activeType;
+        article.hidden = !visible;
+        if (visible) {
+          visibleCount += 1;
+        } else {
+          closeDocumentDetail(article);
+        }
+      });
+      documents.querySelectorAll("[data-crm-document-filter]").forEach((button) => {
+        const active = button.dataset.crmDocumentFilter === activeType;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      const empty = documents.querySelector("[data-crm-document-filter-empty]");
+      if (empty) {
+        empty.textContent = documentFilterOptions.find((option) => option.type === activeType)?.empty || "";
+        empty.hidden = visibleCount > 0;
+      }
+    };
+
+    const setupDocumentFilters = () => {
+      if (!documents) return;
+      Array.from(documents.children).forEach((child) => {
+        if (child.classList.contains("crm-card-detail-empty")) child.remove();
+      });
+      const counts = { order: 0, sale: 0, return: 0 };
+      documents.querySelectorAll(".crm-card-detail-document").forEach((article) => {
+        counts[normalizeDocumentType(article.dataset.crmDocumentType)] += 1;
+      });
+      const tabs = document.createElement("nav");
+      tabs.className = "messenger-channel-tabs sales-document-tabs crm-document-type-tabs";
+      tabs.setAttribute("aria-label", "Типы документов клиента");
+      tabs.innerHTML =
+        '<span class="sales-document-tabs-title">Разделы документов</span>' +
+        documentFilterOptions.map((option) => (
+          `<button type="button" class="messenger-channel-tab sales-document-tab" ` +
+          `data-channel-brand="${option.brand}" data-crm-document-filter="${option.type}" aria-pressed="false">` +
+          `<span class="messenger-channel-logo" aria-hidden="true">${option.logo}</span>` +
+          `<span class="messenger-channel-label">${option.label}</span>` +
+          `<b>${counts[option.type]}</b>` +
+          "</button>"
+        )).join("");
+      const empty = document.createElement("p");
+      empty.className = "crm-card-detail-empty crm-document-filter-empty";
+      empty.dataset.crmDocumentFilterEmpty = "";
+      documents.prepend(tabs);
+      documents.append(empty);
+      applyDocumentFilter("order");
+    };
+
     const toggleDocumentDetail = (trigger) => {
       if (!trigger) return;
       const article = trigger.closest(".crm-card-detail-document");
@@ -583,6 +649,7 @@
       }
       fillFeed(chatFeed, card, "template[data-crm-card-chat]", "Сообщений пока нет.");
       fillFeed(documents, card, "template[data-crm-card-documents]", "Заказов и отгрузок по клиенту пока нет.");
+      setupDocumentFilters();
       fillFeed(messengerList, card, "template[data-crm-card-messengers]", "Связанных мессенджеров пока нет.");
       showMessengerThread("");
       fillFeed(taskFeed, card, "template[data-crm-card-tasks]", "Задач пока нет.");
@@ -683,6 +750,11 @@
       showMessengerThread(tab.dataset.crmThreadTab || "");
     });
     documents?.addEventListener("click", (event) => {
+      const filter = event.target.closest("[data-crm-document-filter]");
+      if (filter) {
+        applyDocumentFilter(filter.dataset.crmDocumentFilter);
+        return;
+      }
       const trigger = event.target.closest("[data-crm-document-open]");
       if (trigger) toggleDocumentDetail(trigger);
     });

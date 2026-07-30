@@ -220,6 +220,7 @@
                 {% for document in row.related_documents %}
                   <article
                     class="crm-card-detail-event crm-card-detail-event--sale crm-card-detail-document"
+                    data-crm-document-type="{{ document.doc_type|default('sale', true)|e }}"
                   >
                     <button
                       class="crm-card-detail-document-trigger"
