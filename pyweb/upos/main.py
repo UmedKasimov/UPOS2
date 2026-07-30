@@ -7549,6 +7549,7 @@ def create_app() -> FastAPI:
         next_numbers: dict[str, str] = {}
         sales_prefill = {"crm_record_id": "", "client": client.strip()}
         business_segments = _workspace_business_segments(wid)
+        crm_stages = _crm_workspace_stages(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
         today_date = datetime.now(timezone.utc).date()
         with session_scope() as session:
@@ -7814,7 +7815,7 @@ def create_app() -> FastAPI:
             )
             sales_crm_index = _sales_crm_index(
                 crm_rows_for_sales,
-                _crm_workspace_stages(wid),
+                crm_stages,
             )
             for item in sales:
                 crm_context = _sales_crm_context(item, sales_crm_index)
@@ -8010,6 +8011,7 @@ def create_app() -> FastAPI:
                 "status_filters": status_filter_options,
                 "payment_status_filters": payment_status_filter_options,
                 "business_segments": business_segments,
+                "crm_stages": crm_stages,
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
@@ -8654,6 +8656,143 @@ def create_app() -> FastAPI:
                 flag_modified(row, "data")
                 session.add(row)
         return RedirectResponse(url="/sales?msg=status#sales-journal", status_code=302)
+
+    @app.post("/sales/{sale_id}/crm-stage", name="sales_crm_stage_update")
+    async def sales_crm_stage_update(request: Request, sale_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "Сессия формы устарела"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir or not wid:
+            return JSONResponse({"ok": False, "error": "Требуется авторизация"}, status_code=401)
+        stage_id = str(form.get("stage_id") or "").strip()
+        stages = _crm_workspace_stages(wid)
+        stage = next((item for item in stages if item["id"] == stage_id), None)
+        if stage is None:
+            return JSONResponse({"ok": False, "error": "Этап CRM не найден"}, status_code=400)
+
+        with session_scope() as session:
+            sale_row = session.get(SaleDocument, sale_id)
+            if not sale_row or sale_row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "Документ продажи не найден"}, status_code=404)
+
+            sale_data = _json_object(sale_row.data).copy()
+            client_name = str(sale_data.get("client") or "").strip()
+            counterparty_id = str(sale_row.counterparty_id or sale_data.get("counterparty_id") or "").strip()
+            crm_rows = list(
+                session.execute(
+                    select(CrmRecord)
+                    .where(CrmRecord.workspace_owner_id == wid)
+                    .order_by(CrmRecord.updated_at.desc())
+                ).scalars()
+            )
+            crm_index = _sales_crm_index(crm_rows, stages)
+            records_by_id = crm_index["records_by_id"]
+            direct_record = records_by_id.get(str(sale_data.get("crm_record_id") or "").strip())
+            deal_row = direct_record if direct_record and direct_record.item_type == "deal" else None
+            if direct_record and direct_record.item_type == "task":
+                direct_data = _json_object(direct_record.data)
+                related_deal = records_by_id.get(str(direct_data.get("related_deal_id") or "").strip())
+                if related_deal and related_deal.item_type == "deal":
+                    deal_row = related_deal
+            if deal_row is None and counterparty_id:
+                deal_row = crm_index["deals_by_counterparty"].get(counterparty_id)
+            if deal_row is None and client_name:
+                deal_row = crm_index["deals_by_client"].get(client_name.casefold())
+
+            if not counterparty_id and client_name:
+                counterparty = _resolve_counterparty(session, wid, name=client_name, role="client")
+                counterparty_id = counterparty.id if counterparty else ""
+
+            actor = _crm_actor_name(request)
+            if deal_row is None:
+                deal_data: dict[str, Any] = {
+                    "item_type": "deal",
+                    "client": client_name,
+                    "responsible": str(sale_data.get("manager") or actor).strip(),
+                    "date": str(sale_data.get("date") or ""),
+                    "due_date": "",
+                    "lead_source": "Продажи",
+                    "contact_type": "",
+                    "chat_ref": "",
+                    "service_type": "",
+                    "priority": "normal",
+                    "next_step": "",
+                    "probability": "",
+                    "note": f"Создано из документа {sale_row.number}",
+                    "lost_reason": "",
+                    "tags": [_sales_doc_type_label(str(sale_data.get("doc_type") or "sale"))],
+                    "sales_document_ids": [sale_row.id],
+                }
+                _crm_apply_stage(deal_data, stages, stage["id"])
+                _crm_append_activity(
+                    deal_data,
+                    "Сделка создана из продажи",
+                    actor,
+                    f"{_sales_doc_type_label(str(sale_data.get('doc_type') or 'sale'))} {sale_row.number}",
+                )
+                deal_row = CrmRecord(
+                    id=str(uuid.uuid4()),
+                    workspace_owner_id=wid,
+                    item_type="deal",
+                    title=f"{_sales_doc_type_label(str(sale_data.get('doc_type') or 'sale'))} {sale_row.number}",
+                    counterparty_id=counterparty_id or None,
+                    status="in_progress",
+                    due_date="",
+                    amount=sale_row.amount,
+                    currency=sale_row.currency,
+                    data=deal_data,
+                )
+                session.add(deal_row)
+            else:
+                deal_data = _json_object(deal_row.data).copy()
+                previous_stage = str(deal_data.get("stage") or "")
+                linked_documents = [
+                    str(item)
+                    for item in (
+                        deal_data.get("sales_document_ids")
+                        if isinstance(deal_data.get("sales_document_ids"), list)
+                        else []
+                    )
+                    if str(item).strip()
+                ]
+                if sale_row.id not in linked_documents:
+                    linked_documents.append(sale_row.id)
+                deal_data["sales_document_ids"] = linked_documents[-100:]
+                if client_name and not str(deal_data.get("client") or "").strip():
+                    deal_data["client"] = client_name
+                _crm_apply_stage(deal_data, stages, stage["id"])
+                _crm_append_activity(
+                    deal_data,
+                    "Этап изменён из продажи",
+                    actor,
+                    f"{previous_stage or 'Не назначен'} → {stage['title']}",
+                )
+                deal_row.data = deal_data
+                flag_modified(deal_row, "data")
+
+            crm_client_status = _client_crm_status_from_stage(stage)
+            deal_row.status = (
+                "won"
+                if crm_client_status == "our_client"
+                else "lost"
+                if crm_client_status == "lost"
+                else "in_progress"
+            )
+            _sync_counterparty_crm_status_from_stage(session, wid, deal_row, stages)
+            sale_data["crm_record_id"] = deal_row.id
+            sale_row.data = sale_data
+            flag_modified(sale_row, "data")
+            session.add(sale_row)
+
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "crm_record_id": deal_row.id,
+                    "crm_status": stage["id"],
+                    "crm_status_label": stage["title"],
+                }
+            )
 
     @app.post("/sales/{sale_id}/pay", name="sales_pay")
     async def sales_pay(request: Request, sale_id: str):

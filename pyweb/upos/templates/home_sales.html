@@ -612,7 +612,20 @@
             <div class="sales-document-detail-heading">
               <div class="sales-document-detail-heading-meta">
                 <p data-sales-detail-date></p>
-                <span class="sales-document-detail-crm-status" data-sales-detail-crm-status></span>
+                <label class="sales-document-detail-crm-control">
+                  <span class="sales-document-detail-crm-prefix">CRM</span>
+                  <select
+                    class="sales-document-detail-crm-status"
+                    data-sales-detail-crm-status
+                    data-action-template="{{ url_for('sales_crm_stage_update', sale_id='__sale_id__') }}"
+                    aria-label="Этап CRM"
+                  >
+                    <option value="" disabled>Не назначен</option>
+                    {% for stage in sales_options.crm_stages %}
+                      <option value="{{ stage.id }}">{{ stage.title }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
               </div>
               <h2 data-sales-detail-title>Продажа</h2>
             </div>
@@ -1475,7 +1488,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=25" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=26" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=58" defer></script>
   {% if sales_embed %}
     <script>

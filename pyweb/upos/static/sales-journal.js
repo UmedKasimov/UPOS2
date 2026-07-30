@@ -18,6 +18,18 @@
     node.textContent = value == null || value === "" ? "-" : String(value);
   }
 
+  function updateSale(id, values) {
+    var node = document.getElementById("sales-journal-data-" + id);
+    if (!node) return null;
+    var sale = readSale(id);
+    if (!sale) return null;
+    Object.keys(values || {}).forEach(function (key) {
+      sale[key] = values[key];
+    });
+    node.textContent = JSON.stringify(sale);
+    return sale;
+  }
+
   function escapeHtml(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -718,8 +730,12 @@
     setText(panel, "[data-sales-detail-status]", sale.status_label || "Новый");
     var crmStatus = panel.querySelector("[data-sales-detail-crm-status]");
     if (crmStatus) {
-      crmStatus.textContent = "CRM · " + (sale.crm_status_label || "Не назначен");
+      var selectedStage = sale.crm_status || "";
+      crmStatus.value = Array.from(crmStatus.options).some(function (option) {
+        return option.value === selectedStage;
+      }) ? selectedStage : "";
       crmStatus.dataset.crmStatus = sale.crm_status || "unassigned";
+      crmStatus.title = "Этап CRM: " + (sale.crm_status_label || "Не назначен");
     }
     setText(panel, "[data-sales-detail-paid]", moneyWithCurrency(sale.paid_amount, currency));
     setText(panel, "[data-sales-detail-debt]", moneyWithCurrency(sale.debt_amount, currency));
@@ -1059,6 +1075,52 @@
       tab.addEventListener("click", function () {
         var panel = tab.closest("[data-sales-journal-detail]");
         activateSalesDetailTab(panel, tab.dataset.salesDetailTab || "items");
+      });
+    });
+    scope.querySelectorAll("[data-sales-detail-crm-status]").forEach(function (select) {
+      if (select.dataset.salesCrmStageReady === "1") return;
+      select.dataset.salesCrmStageReady = "1";
+      select.addEventListener("change", async function () {
+        var panel = select.closest("[data-sales-journal-detail]");
+        var saleId = panel ? panel.dataset.saleId || "" : "";
+        var sale = readSale(saleId);
+        var stageId = String(select.value || "").trim();
+        if (!panel || !sale || !saleId || !stageId) return;
+        var previousStage = sale.crm_status || "";
+        var actionTemplate = select.dataset.actionTemplate || "";
+        var action = actionTemplate.replace("__sale_id__", encodeURIComponent(saleId));
+        var csrf = panel.querySelector("[name=\"csrf_token\"]");
+        var formData = new FormData();
+        formData.set("csrf_token", csrf ? csrf.value : "");
+        formData.set("stage_id", stageId);
+        select.disabled = true;
+        select.setAttribute("aria-busy", "true");
+        try {
+          var response = await fetch(action, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          });
+          var payload = {};
+          try {
+            payload = await response.json();
+          } catch (_err) {}
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "Не удалось сохранить этап CRM");
+          }
+          var updatedSale = updateSale(saleId, {
+            crm_record_id: payload.crm_record_id || sale.crm_record_id || "",
+            crm_status: payload.crm_status || stageId,
+            crm_status_label: payload.crm_status_label || select.options[select.selectedIndex].text,
+          });
+          if (updatedSale) renderDetail(panel, updatedSale);
+        } catch (error) {
+          select.value = previousStage;
+          window.alert(error && error.message ? error.message : "Не удалось сохранить этап CRM");
+        } finally {
+          select.disabled = false;
+          select.removeAttribute("aria-busy");
+        }
       });
     });
     var detailDialog = detailPaymentDialog(scope);
