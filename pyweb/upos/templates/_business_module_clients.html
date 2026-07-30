@@ -125,12 +125,13 @@
                   data-workspace-tab-title="{{ client.name }}"
                   data-workspace-tab-hash="client-card"
                   data-workspace-tab-href="{{ client_tab_href }}"
+                  title="{{ client.name }}{% if client.route or client.territory %} · {{ client.route or client.territory }}{% endif %}"
                 >
                   <strong>{{ client.name }}</strong>
                   <small>{{ client.route or client.territory or "Без маршрута" }}</small>
                 </a>
               </td>
-              <td>{{ client.official_name or "-" }}</td>
+              <td title="{{ client.official_name or '-' }}">{{ client.official_name or "-" }}</td>
               <td>
                 {% if client.balance_kind == "zero" %}
                   <span class="client-balance-empty">-</span>
@@ -138,15 +139,15 @@
                   <span class="client-balance-pill client-balance-pill--{{ client.balance_kind }}">{{ client.balance_display }} UZS</span>
                 {% endif %}
               </td>
-              <td>{{ client.last_date or "-" }}</td>
-              <td>{{ client.telegram_phone or "-" }}</td>
-              <td>{{ client.created_at or "-" }}</td>
-              <td>{{ client.phone or "-" }}</td>
-              <td>{{ client.category or "-" }}</td>
-              <td>{{ client.inn or "-" }}</td>
-              <td>{{ client.pinfl or "-" }}</td>
-              <td>{{ client.address or "-" }}</td>
-              <td>{{ client.code or "-" }}</td>
+              <td title="{{ client.last_date or '-' }}">{{ client.last_date or "-" }}</td>
+              <td title="{{ client.telegram_phone or '-' }}">{{ client.telegram_phone or "-" }}</td>
+              <td title="{{ client.created_at or '-' }}">{{ client.created_at or "-" }}</td>
+              <td title="{{ client.phone or '-' }}">{{ client.phone or "-" }}</td>
+              <td title="{{ client.category or '-' }}">{{ client.category or "-" }}</td>
+              <td title="{{ client.inn or '-' }}">{{ client.inn or "-" }}</td>
+              <td title="{{ client.pinfl or '-' }}">{{ client.pinfl or "-" }}</td>
+              <td title="{{ client.address or '-' }}">{{ client.address or "-" }}</td>
+              <td title="{{ client.code or '-' }}">{{ client.code or "-" }}</td>
               <td class="products-row-actions">
                 <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}">
                   {% include "_csrf_field.html" %}

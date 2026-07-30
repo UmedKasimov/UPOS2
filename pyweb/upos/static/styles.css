@@ -4190,6 +4190,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 92rem;
 }
 
+#clients-directory-table {
+  width: 100%;
+  min-width: 125rem;
+  table-layout: fixed;
+}
+
 #products-catalog-table tfoot td {
   position: sticky;
   bottom: 0;
@@ -4224,13 +4230,58 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 600;
 }
 
-.clients-table.products-catalog-table th:nth-child(3),
-.clients-table.products-catalog-table td:nth-child(3) {
-  min-width: 8rem;
+#clients-directory-table [data-client-column="name"] {
+  width: 12rem;
 }
 
-.clients-table.products-catalog-table [data-client-column="name"] {
-  min-width: 14rem;
+#clients-directory-table [data-client-column="select"] {
+  width: 2.75rem;
+}
+
+#clients-directory-table [data-client-column="id"] {
+  width: 4.5rem;
+}
+
+#clients-directory-table [data-client-column="official_name"] {
+  width: 12rem;
+}
+
+#clients-directory-table [data-client-column="balance"] {
+  width: 9rem;
+}
+
+#clients-directory-table [data-client-column="last_date"],
+#clients-directory-table [data-client-column="created_at"] {
+  width: 8rem;
+}
+
+#clients-directory-table [data-client-column="telegram"],
+#clients-directory-table [data-client-column="phone"] {
+  width: 9rem;
+}
+
+#clients-directory-table [data-client-column="category"] {
+  width: 8rem;
+}
+
+#clients-directory-table [data-client-column="inn"] {
+  width: 7rem;
+}
+
+#clients-directory-table [data-client-column="pinfl"] {
+  width: 8rem;
+}
+
+#clients-directory-table [data-client-column="address"] {
+  width: 14rem;
+}
+
+#clients-directory-table [data-client-column="code"] {
+  width: 5rem;
+}
+
+#clients-directory-table [data-client-column="actions"] {
+  width: 4rem;
 }
 
 .clients-table-sort-btn {
@@ -4258,14 +4309,36 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
-.clients-table.products-catalog-table td {
-  height: 3.9rem;
-  min-height: 3.9rem;
+#clients-directory-table td {
+  height: 3.25rem;
+  min-height: 3.25rem;
+  padding: 0.35rem 0.55rem;
+  line-height: 1.2;
 }
 
-.clients-table.products-catalog-table th:nth-child(3),
-.clients-table.products-catalog-table td:nth-child(3) {
-  min-width: 14rem;
+#clients-directory-table tbody tr {
+  height: 3.25rem;
+}
+
+#clients-directory-table tbody td:not(.products-row-actions):not(.upos-table-column-control-cell) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#clients-directory-table .client-open-link,
+#clients-directory-table .client-open-link strong,
+#clients-directory-table .client-open-link small {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#clients-directory-table .client-open-link {
+  display: grid;
+  gap: 0.1rem;
 }
 
 .clients-table.products-catalog-table tfoot td {
