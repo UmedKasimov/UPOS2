@@ -11178,7 +11178,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-journal-table {
   width: 100%;
-  min-width: 80rem;
+  min-width: 86rem;
 }
 
 .sales-journal-table .sales-journal-sort-btn {
@@ -11219,8 +11219,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-journal-table td:nth-child(3),
 .sales-journal-table th:nth-child(4),
 .sales-journal-table td:nth-child(4),
-.sales-journal-table th:nth-child(10),
-.sales-journal-table td:nth-child(10) {
+.sales-journal-table th:nth-child(11),
+.sales-journal-table td:nth-child(11) {
   width: 8rem;
   min-width: 8rem;
 }
@@ -11243,8 +11243,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   text-align: right;
 }
 
-.sales-journal-table th:nth-child(11),
-.sales-journal-table td:nth-child(11) {
+.sales-journal-table th:nth-child(12),
+.sales-journal-table td:nth-child(12) {
   width: 6.2rem;
   min-width: 6.2rem;
   text-align: center;
@@ -11280,6 +11280,58 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sales-journal-table th:nth-child(10),
+.sales-journal-table td:nth-child(10) {
+  width: 10rem;
+  min-width: 10rem;
+  text-align: center;
+}
+
+.sales-journal-task-progress {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.28rem;
+  white-space: nowrap;
+}
+
+.sales-journal-task-progress small {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.sales-journal-task-progress strong {
+  min-width: 1.5rem;
+  padding: 0.16rem 0.38rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.sales-journal-task-total {
+  background: color-mix(in srgb, #eab308 12%, var(--card));
+  color: #a16207;
+}
+
+.sales-journal-task-completed {
+  background: color-mix(in srgb, #16a34a 10%, var(--card));
+  color: #15803d;
+}
+
+html.dark .sales-journal-task-total {
+  color: #fde047;
+}
+
+html.dark .sales-journal-task-completed {
+  color: #4ade80;
+}
+
+.sales-journal-no-tasks {
+  color: var(--muted-foreground);
 }
 
 .sales-journal-client-name {

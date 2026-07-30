@@ -959,7 +959,7 @@
     var table = scope.querySelector("#sales-journal-table");
     if (!table || table.dataset.salesJournalSortReady === "1") return;
     table.dataset.salesJournalSortReady = "1";
-    var numericColumns = new Set([6, 7, 8]);
+    var numericColumns = new Set([6, 7, 8, 9]);
     var dateColumns = new Set([2]);
 
     table.querySelectorAll("thead .sales-journal-sort-btn").forEach(function (button) {
@@ -968,7 +968,7 @@
         var body = table.tBodies[0];
         if (!header || !body) return;
         var columnIndex = header.cellIndex;
-        var kind = numericColumns.has(columnIndex) ? "number" : dateColumns.has(columnIndex) ? "date" : "text";
+        var kind = header.dataset.sortKind || (numericColumns.has(columnIndex) ? "number" : dateColumns.has(columnIndex) ? "date" : "text");
         var direction = header.getAttribute("aria-sort") === "descending" ? "ascending" : "descending";
         var rows = Array.from(body.querySelectorAll("tr[data-sales-journal-row]"));
 

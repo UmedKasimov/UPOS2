@@ -6441,7 +6441,7 @@ def create_app() -> FastAPI:
                 if client_key:
                     deals_by_client.setdefault(client_key, row)
                 continue
-            if row.item_type != "task" or row.status != "done":
+            if row.item_type != "task":
                 continue
             related_deal_id = str(data.get("related_deal_id") or "").strip()
             if related_deal_id:
@@ -6495,6 +6495,8 @@ def create_app() -> FastAPI:
 
         completed_tasks: list[dict[str, Any]] = []
         seen: set[str] = set()
+        task_keys: set[str] = set()
+        completed_task_keys: set[str] = set()
 
         def add_task(
             key: str,
@@ -6529,11 +6531,23 @@ def create_app() -> FastAPI:
             data = _json_object(record.data)
             raw_events = data.get("activity_log") if isinstance(data.get("activity_log"), list) else []
             for position, event in enumerate(raw_events):
-                if not isinstance(event, dict) or event.get("kind") != "task" or not event.get("completed"):
+                if not isinstance(event, dict) or event.get("kind") != "task":
                     continue
+                task_key = f"event:{record.id}:{position}"
+                task_title = re.sub(
+                    r"\s+",
+                    " ",
+                    str(event.get("detail") or event.get("action") or ""),
+                ).strip()
+                if not task_title:
+                    continue
+                task_keys.add(task_key)
+                if not event.get("completed"):
+                    continue
+                completed_task_keys.add(task_key)
                 add_task(
-                    f"event:{record.id}:{position}",
-                    event.get("detail") or event.get("action"),
+                    task_key,
+                    task_title,
                     completed_at=event.get("at"),
                     due_date=event.get("due_date"),
                     assignee=event.get("assignee") or event.get("actor"),
@@ -6541,7 +6555,7 @@ def create_app() -> FastAPI:
                 )
 
         task_rows: list[CrmRecord] = []
-        if direct_record and direct_record.item_type == "task" and direct_record.status == "done":
+        if direct_record and direct_record.item_type == "task":
             task_rows.append(direct_record)
         if linked_deal:
             task_rows.extend(index["tasks_by_deal"].get(linked_deal.id, []))
@@ -6549,10 +6563,18 @@ def create_app() -> FastAPI:
             task_rows.extend(index["tasks_by_counterparty"].get(counterparty_id, []))
         elif client_key:
             task_rows.extend(index["tasks_by_client"].get(client_key, []))
-        for task in task_rows:
+        unique_task_rows = {task.id: task for task in task_rows}
+        for task in unique_task_rows.values():
             data = _json_object(task.data)
+            task_key = f"record:{task.id}"
+            if not re.sub(r"\s+", " ", str(task.title or "")).strip():
+                continue
+            task_keys.add(task_key)
+            if task.status != "done":
+                continue
+            completed_task_keys.add(task_key)
             add_task(
-                f"record:{task.id}",
+                task_key,
                 task.title,
                 completed_at=task.updated_at.isoformat() if task.updated_at else "",
                 due_date=task.due_date or data.get("due_date") or data.get("date"),
@@ -6568,7 +6590,9 @@ def create_app() -> FastAPI:
             "crm_status": crm_status,
             "crm_status_label": crm_status_label,
             "completed_tasks": visible_tasks,
-            "completed_tasks_count": len(visible_tasks),
+            "completed_tasks_count": len(completed_tasks),
+            "task_total_count": len(task_keys),
+            "task_completed_count": len(completed_task_keys),
         }
 
     def _sales_debt_timing(due_date: str, today: date) -> dict[str, Any]:

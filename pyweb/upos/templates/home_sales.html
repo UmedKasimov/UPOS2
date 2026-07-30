@@ -439,6 +439,11 @@
                     <span>Долг</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
+                <th data-column-label="Задачи" data-sort-kind="number" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Задачи</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="Статус" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
                     <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -486,6 +491,19 @@
                       <span class="sales-journal-no-debt">-</span>
                     {% endif %}
                   </td>
+                  <td class="sales-journal-tasks-cell" data-sort-value="{{ sale.task_total_count }}">
+                    {% if sale.task_total_count %}
+                      <span class="sales-journal-task-progress" title="Выполнено {{ sale.task_completed_count }} из {{ sale.task_total_count }}">
+                        <small>из</small>
+                        <strong class="sales-journal-task-total">{{ sale.task_total_count }}</strong>
+                        <span aria-hidden="true">/</span>
+                        <strong class="sales-journal-task-completed">{{ sale.task_completed_count }}</strong>
+                        <small>выполнено</small>
+                      </span>
+                    {% else %}
+                      <span class="sales-journal-no-tasks">-</span>
+                    {% endif %}
+                  </td>
                   <td>
                     {% set status_style = 'confirmed' if sale.status in ['completed', 'archived'] else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['shipped', 'installation'] else 'draft')) %}
                     <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">
@@ -530,7 +548,7 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="11">Пока нет продаж. Создайте первую продажу справа.</td>
+                  <td colspan="12">Пока нет продаж. Создайте первую продажу справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -555,7 +573,7 @@
                       {% endif %}
                     {% endfor %}
                   </td>
-                  <td colspan="2"></td>
+                  <td colspan="3"></td>
                 </tr>
               </tfoot>
             {% endif %}
@@ -1457,7 +1475,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=24" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=25" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=58" defer></script>
   {% if sales_embed %}
     <script>
