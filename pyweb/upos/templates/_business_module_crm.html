@@ -10,7 +10,148 @@
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
 </datalist>
 
-<section class="crm-service-dashboard" data-workspace-view="tasks deals" hidden>
+<section class="crm-task-workspace" data-workspace-view="tasks" data-crm-task-workspace hidden>
+  <header class="crm-task-workspace-head">
+    <div>
+      <h2>Задачи сотрудников</h2>
+      <p>Сроки, ответственные и выполнение в одном рабочем экране.</p>
+    </div>
+    <button class="btn" type="button" data-crm-open-dialog data-crm-kind="task">+ Задача</button>
+  </header>
+
+  <div class="crm-task-metrics" aria-label="Сводка по задачам">
+    <div><span>Всего</span><strong>{{ crm_task_summary.total_count }}</strong></div>
+    <div><span>В работе</span><strong>{{ crm_task_summary.open_count }}</strong></div>
+    <div class="{% if crm_task_summary.overdue_count %}is-alert{% endif %}"><span>Просрочено</span><strong>{{ crm_task_summary.overdue_count }}</strong></div>
+    <div><span>Сегодня</span><strong>{{ crm_task_summary.today_count }}</strong></div>
+    <div class="is-complete"><span>Выполнено</span><strong>{{ crm_task_summary.completed_count }}</strong></div>
+  </div>
+
+  <div class="crm-task-toolbar">
+    <div class="crm-task-view-switch" role="tablist" aria-label="Вид задач">
+      <button type="button" class="is-active" data-crm-task-view="list" aria-selected="true">Список</button>
+      <button type="button" data-crm-task-view="calendar" aria-selected="false">Календарь</button>
+    </div>
+    <label class="crm-task-filter-search">
+      <span>Поиск</span>
+      <input type="search" data-crm-task-filter="search" placeholder="Задача или клиент" />
+    </label>
+    <label>
+      <span>Сотрудник</span>
+      <select data-crm-task-filter="responsible">
+        <option value="">Все сотрудники</option>
+        {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item|e }}">{{ item }}</option>{% endif %}{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Состояние</span>
+      <select data-crm-task-filter="status">
+        <option value="">Все задачи</option>
+        <option value="open">В работе</option>
+        <option value="overdue">Просрочено</option>
+        <option value="today">На сегодня</option>
+        <option value="done">Выполнено</option>
+      </select>
+    </label>
+    <label>
+      <span>Приоритет</span>
+      <select data-crm-task-filter="priority">
+        <option value="">Все</option>
+        {% for value, label in crm_priorities.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Дата</span>
+      <input type="date" data-crm-task-filter="date" />
+    </label>
+  </div>
+
+  <div class="crm-task-list-pane" data-crm-task-pane="list">
+    <div class="crm-task-table-wrap">
+      <table class="crm-task-table">
+        <thead>
+          <tr>
+            <th aria-label="Выполнение"></th>
+            <th>Задача</th>
+            <th>Клиент</th>
+            <th>Ответственный</th>
+            <th>Приоритет</th>
+            <th>Срок</th>
+            <th>Состояние</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in crm_task_records %}
+            {% set action_state = row.get("action_state") or {"id": "", "label": ""} %}
+            {% set is_done = row.status == "done" %}
+            <tr
+              class="{% if is_done %}is-complete{% elif action_state.id == 'overdue' %}is-overdue{% endif %}"
+              data-crm-task-row
+              data-task-title="{{ row.title|e }}"
+              data-task-client="{{ row.client|e }}"
+              data-task-responsible="{{ row.responsible|e }}"
+              data-task-priority="{{ row.priority|e }}"
+              data-task-status="{{ row.status|e }}"
+              data-task-due-date="{{ row.due_date|e }}"
+              data-task-action-state="{{ action_state.id|e }}"
+              data-task-complete="{{ 'true' if is_done else 'false' }}"
+            >
+              <td class="crm-task-complete-cell">
+                {% if is_done %}
+                  <span class="crm-task-complete-mark" title="Задача выполнена" aria-label="Задача выполнена">✓</span>
+                {% else %}
+                  <form method="post" action="/crm/{{ row.id }}/complete">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <button type="submit" title="Отметить выполненной" aria-label="Отметить задачу выполненной">✓</button>
+                  </form>
+                {% endif %}
+              </td>
+              <td>
+                <button
+                  class="crm-task-title-button"
+                  type="button"
+                  data-crm-edit='{{ row.edit_payload|tojson|forceescape }}'
+                >{{ row.title }}</button>
+                {% if row.next_step %}<small>{{ row.next_step }}</small>{% endif %}
+              </td>
+              <td>{{ row.client or "—" }}</td>
+              <td>{{ row.responsible or "Не назначен" }}</td>
+              <td><span class="crm-task-priority crm-task-priority--{{ row.priority }}">{{ row.priority_label }}</span></td>
+              <td>{{ row.due_date or "Без срока" }}</td>
+              <td>
+                <span class="crm-task-state crm-task-state--{{ action_state.id or row.status }}">
+                  {% if is_done %}Выполнено{% elif action_state.label %}{{ action_state.label }}{% else %}{{ row.status_label }}{% endif %}
+                </span>
+              </td>
+            </tr>
+          {% else %}
+            <tr data-crm-task-server-empty><td colspan="7">Задач пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="crm-task-empty" data-crm-task-empty hidden>По выбранным фильтрам задач нет.</p>
+  </div>
+
+  <div class="crm-task-calendar-pane" data-crm-task-pane="calendar" hidden>
+    <header class="crm-task-calendar-head">
+      <div>
+        <button type="button" data-crm-calendar-step="-1" title="Предыдущий месяц" aria-label="Предыдущий месяц">‹</button>
+        <button type="button" data-crm-calendar-today>Сегодня</button>
+        <button type="button" data-crm-calendar-step="1" title="Следующий месяц" aria-label="Следующий месяц">›</button>
+      </div>
+      <strong data-crm-calendar-title></strong>
+    </header>
+    <div class="crm-task-calendar-scroll">
+      <div class="crm-task-calendar-weekdays" aria-hidden="true">
+        <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+      </div>
+      <div class="crm-task-calendar-grid" data-crm-task-calendar></div>
+    </div>
+  </div>
+</section>
+
+<section class="crm-service-dashboard" data-workspace-view="deals" hidden>
   <div class="crm-service-metrics" aria-label="Сводка CRM">
     <div class="crm-service-metric">
       <span>Активные</span>
@@ -45,7 +186,7 @@
   </div>
 </section>
 
-<section class="crm-pipeline-shell" data-workspace-view="tasks deals" hidden>
+<section class="crm-pipeline-shell" data-workspace-view="deals" hidden>
   <header class="crm-pipeline-head crm-pipeline-head--filters">
     <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
       <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" placeholder="Задача, клиент, ответственный" /></label>

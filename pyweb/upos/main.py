@@ -12779,9 +12779,17 @@ def create_app() -> FastAPI:
             filters["priority"] = "all"
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
+        crm_task_records: list[dict[str, Any]] = []
         crm_history_records: list[dict[str, Any]] = []
         crm_archive_records: list[dict[str, Any]] = []
         crm_next_actions: list[dict[str, Any]] = []
+        crm_task_summary = {
+            "total_count": 0,
+            "open_count": 0,
+            "overdue_count": 0,
+            "today_count": 0,
+            "completed_count": 0,
+        }
         crm_summary = {
             "active_count": 0,
             "open_deals": 0,
@@ -13005,6 +13013,18 @@ def create_app() -> FastAPI:
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
                 item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
                 item["edit_payload"] = _crm_record_edit_payload(item)
+                if item["item_type"] == "task" and item["status"] != "archived":
+                    crm_task_records.append(item)
+                    crm_task_summary["total_count"] += 1
+                    if item["status"] == "done":
+                        crm_task_summary["completed_count"] += 1
+                    else:
+                        crm_task_summary["open_count"] += 1
+                        if item["action_state"]["id"] == "overdue":
+                            crm_task_summary["overdue_count"] += 1
+                        elif item["action_state"]["id"] == "today":
+                            crm_task_summary["today_count"] += 1
+                    continue
                 hay = " ".join(
                     [
                         item["title"],
@@ -13064,7 +13084,11 @@ def create_app() -> FastAPI:
                 column["records"].append(item)
                 column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
             crm_options = {
-                "clients": sorted({row.name for row in counterparty_rows if row.name} | {item["client"] for item in crm_records if item["client"]}),
+                "clients": sorted(
+                    {row.name for row in counterparty_rows if row.name}
+                    | {item["client"] for item in crm_records if item["client"]}
+                    | {item["client"] for item in crm_task_records if item["client"]}
+                ),
                 "contacts": [
                     {
                         "name": row.name,
@@ -13073,7 +13097,11 @@ def create_app() -> FastAPI:
                     for row in counterparty_rows
                     if str(row.phone or _counterparty_extra(row).get("phone") or "").strip()
                 ],
-                "responsibles": sorted({item["responsible"] for item in crm_records if item["responsible"]} | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())),
+                "responsibles": sorted(
+                    {item["responsible"] for item in crm_records if item["responsible"]}
+                    | {item["responsible"] for item in crm_task_records if item["responsible"]}
+                    | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())
+                ),
                 "deals": deal_options,
             }
         crm_kanban_columns = []
@@ -13094,6 +13122,15 @@ def create_app() -> FastAPI:
                 str(item.get("title") or ""),
             ),
         )[:6]
+        crm_task_records = sorted(
+            crm_task_records,
+            key=lambda item: (
+                item.get("status") == "done",
+                action_rank.get(str(item.get("action_state", {}).get("id") or ""), 5),
+                str(item.get("due_date") or "9999-12-31"),
+                str(item.get("title") or ""),
+            ),
+        )
         return tpl(
             request,
             "home_business_module.html",
@@ -13103,6 +13140,8 @@ def create_app() -> FastAPI:
             crm_filters=filters,
             crm_options=crm_options,
             crm_records=crm_records,
+            crm_task_records=crm_task_records,
+            crm_task_summary=crm_task_summary,
             crm_history_records=crm_history_records,
             crm_archive_records=crm_archive_records,
             crm_summary=crm_summary,

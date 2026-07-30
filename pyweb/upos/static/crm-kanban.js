@@ -1442,10 +1442,191 @@
     openFromMessenger();
   }
 
+  function initTaskWorkspace() {
+    const workspace = document.querySelector("[data-crm-task-workspace]");
+    if (!workspace) return;
+
+    const rows = Array.from(workspace.querySelectorAll("[data-crm-task-row]"));
+    const filters = Object.fromEntries(
+      Array.from(workspace.querySelectorAll("[data-crm-task-filter]")).map((control) => [
+        control.dataset.crmTaskFilter,
+        control,
+      ]),
+    );
+    const panes = Object.fromEntries(
+      Array.from(workspace.querySelectorAll("[data-crm-task-pane]")).map((pane) => [
+        pane.dataset.crmTaskPane,
+        pane,
+      ]),
+    );
+    const viewButtons = Array.from(workspace.querySelectorAll("[data-crm-task-view]"));
+    const empty = workspace.querySelector("[data-crm-task-empty]");
+    const serverEmpty = workspace.querySelector("[data-crm-task-server-empty]");
+    const calendar = workspace.querySelector("[data-crm-task-calendar]");
+    const calendarTitle = workspace.querySelector("[data-crm-calendar-title]");
+    let currentView = "list";
+    let calendarMonth = new Date();
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+
+    const normalize = (value) => String(value || "").trim().toLocaleLowerCase("ru");
+    const isoDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+    const filteredRows = () => {
+      const search = normalize(filters.search?.value);
+      const responsible = filters.responsible?.value || "";
+      const status = filters.status?.value || "";
+      const priority = filters.priority?.value || "";
+      const date = filters.date?.value || "";
+
+      return rows.filter((row) => {
+        const isComplete = row.dataset.taskComplete === "true";
+        const matchesSearch =
+          !search ||
+          normalize(row.dataset.taskTitle).includes(search) ||
+          normalize(row.dataset.taskClient).includes(search);
+        const matchesResponsible = !responsible || row.dataset.taskResponsible === responsible;
+        const matchesPriority = !priority || row.dataset.taskPriority === priority;
+        const matchesDate = !date || row.dataset.taskDueDate === date;
+        let matchesStatus = true;
+        if (status === "open") matchesStatus = !isComplete;
+        if (status === "done") matchesStatus = isComplete;
+        if (status === "overdue" || status === "today") {
+          matchesStatus = !isComplete && row.dataset.taskActionState === status;
+        }
+        return matchesSearch && matchesResponsible && matchesPriority && matchesDate && matchesStatus;
+      });
+    };
+
+    const openTask = (row) => {
+      row.querySelector("[data-crm-edit]")?.click();
+    };
+
+    const renderCalendar = (visibleRows) => {
+      if (!calendar) return;
+      calendar.replaceChildren();
+      const year = calendarMonth.getFullYear();
+      const month = calendarMonth.getMonth();
+      if (calendarTitle) {
+        calendarTitle.textContent = new Intl.DateTimeFormat("ru-RU", {
+          month: "long",
+          year: "numeric",
+        }).format(calendarMonth);
+      }
+      const firstDay = new Date(year, month, 1);
+      const mondayOffset = (firstDay.getDay() + 6) % 7;
+      const gridStart = new Date(year, month, 1 - mondayOffset);
+      const today = isoDate(new Date());
+      const rowsByDate = new Map();
+      visibleRows.forEach((row) => {
+        const dueDate = row.dataset.taskDueDate;
+        if (!dueDate) return;
+        if (!rowsByDate.has(dueDate)) rowsByDate.set(dueDate, []);
+        rowsByDate.get(dueDate).push(row);
+      });
+
+      for (let index = 0; index < 42; index += 1) {
+        const date = new Date(gridStart);
+        date.setDate(gridStart.getDate() + index);
+        const dateKey = isoDate(date);
+        const day = document.createElement("div");
+        day.className = "crm-task-calendar-day";
+        if (date.getMonth() !== month) day.classList.add("is-outside");
+        if (dateKey === today) day.classList.add("is-today");
+        if (date.getDay() === 0 || date.getDay() === 6) day.classList.add("is-weekend");
+        day.dataset.date = dateKey;
+
+        const number = document.createElement("span");
+        number.className = "crm-task-calendar-date";
+        number.textContent = String(date.getDate());
+        day.append(number);
+
+        const dayTasks = rowsByDate.get(dateKey) || [];
+        dayTasks.slice(0, 4).forEach((row) => {
+          const task = document.createElement("button");
+          task.type = "button";
+          task.className = "crm-task-calendar-event";
+          if (row.dataset.taskComplete === "true") task.classList.add("is-complete");
+          if (row.dataset.taskActionState === "overdue") task.classList.add("is-overdue");
+          task.textContent = row.dataset.taskTitle || "Задача";
+          task.title = [row.dataset.taskTitle, row.dataset.taskResponsible]
+            .filter(Boolean)
+            .join(" · ");
+          task.addEventListener("click", () => openTask(row));
+          day.append(task);
+        });
+        if (dayTasks.length > 4) {
+          const more = document.createElement("small");
+          more.className = "crm-task-calendar-more";
+          more.textContent = `Ещё ${dayTasks.length - 4}`;
+          day.append(more);
+        }
+        calendar.append(day);
+      }
+    };
+
+    const applyFilters = () => {
+      const visibleRows = filteredRows();
+      rows.forEach((row) => {
+        row.hidden = !visibleRows.includes(row);
+      });
+      if (serverEmpty) serverEmpty.hidden = rows.length > 0;
+      if (empty) empty.hidden = rows.length === 0 || visibleRows.length > 0 || currentView !== "list";
+      renderCalendar(visibleRows);
+    };
+
+    const setView = (view) => {
+      currentView = view === "calendar" ? "calendar" : "list";
+      Object.entries(panes).forEach(([name, pane]) => {
+        pane.hidden = name !== currentView;
+      });
+      viewButtons.forEach((button) => {
+        const isActive = button.dataset.crmTaskView === currentView;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-selected", String(isActive));
+      });
+      applyFilters();
+    };
+
+    Object.values(filters).forEach((control) => {
+      control.addEventListener(control.matches("input[type='search']") ? "input" : "change", () => {
+        if (control === filters.date && control.value) {
+          const selected = new Date(`${control.value}T00:00:00`);
+          calendarMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+        }
+        applyFilters();
+      });
+    });
+    viewButtons.forEach((button) => {
+      button.addEventListener("click", () => setView(button.dataset.crmTaskView));
+    });
+    workspace.querySelectorAll("[data-crm-calendar-step]").forEach((button) => {
+      button.addEventListener("click", () => {
+        calendarMonth = new Date(
+          calendarMonth.getFullYear(),
+          calendarMonth.getMonth() + Number(button.dataset.crmCalendarStep || 0),
+          1,
+        );
+        applyFilters();
+      });
+    });
+    workspace.querySelector("[data-crm-calendar-today]")?.addEventListener("click", () => {
+      const today = new Date();
+      calendarMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      applyFilters();
+    });
+
+    setView("list");
+  }
+
   function init() {
     document.querySelectorAll("[data-crm-kanban]").forEach(initKanban);
     initDialog();
     initCardDetails();
+    initTaskWorkspace();
   }
 
   if (document.readyState === "loading") {
