@@ -3646,6 +3646,69 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 100%;
 }
 
+.client-program-dropdown {
+  position: relative;
+  min-width: 0;
+}
+
+.client-program-dropdown > summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.45rem 2rem 0.45rem 0.7rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  list-style: none;
+  position: relative;
+}
+
+.client-program-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-program-dropdown > summary::after {
+  content: "";
+  position: absolute;
+  right: 0.75rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.client-program-dropdown[open] > summary {
+  border-color: var(--primary);
+}
+
+.client-program-dropdown[open] > summary::after {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.client-program-dropdown .client-program-options {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 510;
+  display: grid;
+  align-content: start;
+  max-height: 15rem;
+  overflow-y: auto;
+  padding: 0.45rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.client-program-dropdown .client-program-options label {
+  width: 100%;
+  border-radius: var(--workbench-radius-sm, 8px);
+}
+
 .client-program-options {
   display: flex;
   flex-wrap: wrap;
@@ -5332,6 +5395,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-kanban-card-meta,
 .crm-kanban-card-money {
   justify-content: space-between;
+}
+
+.client-location-panel > .client-location-search {
+  padding: 0;
+  border-bottom: 0;
 }
 
 .client-balance-empty {
@@ -27078,7 +27146,7 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-period-form {
   display: grid;
-  grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) auto;
+  grid-template-columns: minmax(250px, 360px) auto;
   align-items: end;
   gap: 8px;
 }

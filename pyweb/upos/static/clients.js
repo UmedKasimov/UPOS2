@@ -183,6 +183,10 @@
   }
 
   function formMarkerType(form) {
+    const segment = form.querySelector("[data-client-segment-select]");
+    if (segment?.value) {
+      return segment.selectedOptions?.[0]?.textContent || segment.value;
+    }
     const selected = form.querySelector("[data-client-map-icon]")?.value || "";
     if (selected && selected !== "default") return selected;
     return form.querySelector('input[name="industry"]')?.value || selected;
@@ -1003,13 +1007,22 @@
 
   async function applyClientLocationPoint(box, lat, lon, label) {
     const status = box.querySelector("[data-client-location-search-status]");
-    const setStatus = (text) => {
+    const setSearchStatus = (text) => {
       if (status) status.textContent = text;
     };
+    const form = box.closest("form");
+    if (form?.querySelector("[data-client-map]")) {
+      const addressInput = form.querySelector("[data-client-address]");
+      if (addressInput) addressInput.value = label;
+      updateMap(form, lat, lon);
+      setSearchStatus("Точка выбрана");
+      setStatus(form, `Локация выбрана: ${lat}, ${lon}`);
+      return;
+    }
     const container = box.closest(".client-card-location-card")?.querySelector("[data-client-card-map]");
     const api = container ? ensureClientCardMap(container) : null;
     if (!api) {
-      setStatus("Карта ещё не готова, откройте раздел «Локация»");
+      setSearchStatus("Карта ещё не готова, откройте раздел «Локация»");
       return;
     }
     // Сохранение подставляет адрес из dataset, поэтому запись обновляем до вызова:
@@ -1019,9 +1032,9 @@
     setClientCardPoint(api, lat, lon, label);
     try {
       await saveClientCardLocation(api, lat, lon);
-      setStatus("Локация обновлена");
+      setSearchStatus("Локация обновлена");
     } catch {
-      setStatus("Точка найдена, но сохранить не удалось");
+      setSearchStatus("Точка найдена, но сохранить не удалось");
     }
   }
 
@@ -1052,6 +1065,23 @@
     }
     renderLocationSuggest(box, items);
     setStatus("Выберите вариант из списка");
+  }
+
+  function syncProgramDropdown(dropdown) {
+    if (!dropdown) return;
+    const checked = [...dropdown.querySelectorAll('input[name="programs"]:checked')]
+      .map((input) => input.value)
+      .filter(Boolean);
+    const summary = dropdown.querySelector("[data-client-program-summary]");
+    if (!summary) return;
+    summary.textContent = checked.length
+      ? (checked.length <= 2 ? checked.join(", ") : `Выбрано: ${checked.length}`)
+      : "Не выбраны";
+    summary.title = checked.join(", ");
+  }
+
+  function initializeProgramDropdowns(root = document) {
+    root.querySelectorAll("[data-client-program-dropdown]").forEach(syncProgramDropdown);
   }
 
   document.addEventListener("click", (event) => {
@@ -1166,10 +1196,14 @@
   });
 
   document.addEventListener("change", (event) => {
+    const programDropdown = event.target.closest?.("[data-client-program-dropdown]");
+    if (programDropdown && event.target.matches('input[name="programs"]')) {
+      syncProgramDropdown(programDropdown);
+    }
     if (event.target.matches("[data-client-map-select]") || event.target.closest("[data-clients-map-filter]")) {
       document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
     }
-    if (event.target.matches("[data-client-map-icon], input[name='industry'], input[name='name']")) {
+    if (event.target.matches("[data-client-map-icon], [data-client-segment-select], input[name='industry'], input[name='name']")) {
       const form = event.target.closest("form");
       const api = form?.querySelector("[data-client-map]")?._clientMapApi;
       if (form && api?.marker) {
@@ -1222,6 +1256,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     initializeClientDirectoryTables();
+    initializeProgramDropdowns();
     showClientSection();
     initializeMaps();
     setTimeout(refreshMaps, 250);

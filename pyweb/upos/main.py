@@ -11109,6 +11109,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        business_segments = _workspace_business_segments(wid)
         filters = {
             "q": q.strip(),
             "territory": territory.strip(),
@@ -11371,6 +11372,7 @@ def create_app() -> FastAPI:
             module=_business_module_context("clients"),
             client_filters=filters,
             client_options=client_options,
+            client_business_segments=business_segments,
             clients_records=clients_records,
             clients_map_records=clients_map_records,
             clients_total=clients_total,

@@ -16,13 +16,16 @@
         <p>{{ "Показатели за сегодня" if dashboard.is_today else "Показатели за выбранный период" }}</p>
       </div>
       <form class="dashboard-period-form" method="get" action="{{ url_for('dashboard_get') }}">
-        <label>
-          <span>Дата от</span>
-          <input type="date" name="date_from" value="{{ dashboard.date_from }}" />
-        </label>
-        <label>
-          <span>Дата до</span>
-          <input type="date" name="date_to" value="{{ dashboard.date_to }}" />
+        <label class="dashboard-period-field">
+          <span>Период</span>
+          <input
+            type="date"
+            name="date_from"
+            value="{{ dashboard.date_from }}"
+            data-upos-date-range
+            data-upos-date-to="date_to"
+          />
+          <input type="hidden" name="date_to" value="{{ dashboard.date_to }}" />
         </label>
         <button type="submit" class="btn btn-primary">Показать</button>
       </form>
