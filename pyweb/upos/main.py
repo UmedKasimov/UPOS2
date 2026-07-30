@@ -7441,17 +7441,23 @@ def create_app() -> FastAPI:
     @app.get("/api/installer/orders", name="installer_orders_api")
     def installer_orders_api(request: Request):
         wid, installer_user_id, can_manage = _installer_request_scope(request)
+        requested_installer_id = str(
+            request.query_params.get("installer_user_id") or ""
+        ).strip()
+        selected_installer_id = installer_user_id
+        if can_manage and requested_installer_id:
+            selected_installer_id = requested_installer_id
         if not wid:
             return _installer_api_error("Нужно войти заново", 401)
         timezone_name = normalize_workspace_timezone(
             str(load_workspace_settings(wid).get("timezone") or "")
         )
         with session_scope() as session:
-            if installer_user_id:
+            if selected_installer_id:
                 rows = installer_orders(
                     session,
                     workspace_owner_id=wid,
-                    installer_user_id=installer_user_id,
+                    installer_user_id=selected_installer_id,
                 )
             else:
                 rows = list(

@@ -2514,6 +2514,229 @@
     });
   }
 
+  function installationDateKey(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function installationLocalDate(value) {
+    var parts = String(value || "").slice(0, 10).split("-").map(Number);
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+
+  function shortInstallationAddress(value) {
+    var text = String(value || "").trim();
+    if (!text) return "Адрес не указан";
+    return text.length > 42 ? text.slice(0, 39).trimEnd() + "..." : text;
+  }
+
+  function wireInstallationCalendar(root) {
+    var dialog = document.querySelector("[data-sales-installation-calendar-dialog]");
+    var dateInput = root.querySelector("[data-sales-installation-date]");
+    var installerSelect = root.querySelector("[data-sales-installation-installer]");
+    if (!dialog || !dateInput || !installerSelect || dialog.dataset.salesCalendarReady === "1") return;
+    dialog.dataset.salesCalendarReady = "1";
+
+    var grid = dialog.querySelector("[data-sales-installation-calendar-grid]");
+    var monthLabel = dialog.querySelector("[data-sales-installation-calendar-month]");
+    var installerLabel = dialog.querySelector("[data-sales-installation-calendar-installer]");
+    var status = dialog.querySelector("[data-sales-installation-calendar-status]");
+    var selectedLabel = dialog.querySelector("[data-sales-installation-calendar-selected]");
+    var timeInput = dialog.querySelector("[data-sales-installation-calendar-time]");
+    var applyButton = dialog.querySelector("[data-sales-installation-calendar-apply]");
+    var state = {
+      orders: [],
+      viewDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      selectedDate: null,
+      requestId: 0
+    };
+    var monthFormatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
+    var selectedFormatter = new Intl.DateTimeFormat("ru-RU", {
+      weekday: "short",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+
+    function ordersByDate() {
+      return state.orders.reduce(function (result, order) {
+        var key = String(order.scheduled_at || "").slice(0, 10);
+        if (!key) return result;
+        if (!result[key]) result[key] = [];
+        result[key].push(order);
+        return result;
+      }, {});
+    }
+
+    function render() {
+      if (!grid) return;
+      var monthStart = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth(), 1);
+      var firstCell = new Date(monthStart);
+      var mondayOffset = (monthStart.getDay() + 6) % 7;
+      firstCell.setDate(firstCell.getDate() - mondayOffset);
+      var grouped = ordersByDate();
+      var todayKey = installationDateKey(new Date());
+      var selectedKey = installationDateKey(state.selectedDate);
+      monthLabel.textContent = monthFormatter.format(monthStart);
+      grid.innerHTML = "";
+
+      for (var index = 0; index < 42; index += 1) {
+        var date = new Date(firstCell);
+        date.setDate(firstCell.getDate() + index);
+        var key = installationDateKey(date);
+        var dayOrders = grouped[key] || [];
+        var day = document.createElement("button");
+        day.type = "button";
+        day.className = "sales-installation-calendar-day";
+        day.dataset.date = key;
+        if (date.getMonth() !== monthStart.getMonth()) day.classList.add("is-outside");
+        if (date.getDay() === 0 || date.getDay() === 6) day.classList.add("is-weekend");
+        if (key === todayKey) day.classList.add("is-today");
+        if (key === selectedKey) day.classList.add("is-selected");
+
+        var number = document.createElement("span");
+        number.className = "sales-installation-calendar-day-number";
+        number.textContent = String(date.getDate());
+        day.appendChild(number);
+
+        var events = document.createElement("span");
+        events.className = "sales-installation-calendar-events";
+        dayOrders.slice(0, 3).forEach(function (order) {
+          var event = document.createElement("span");
+          event.className = "sales-installation-calendar-order";
+          if (["completed", "archived"].includes(String(order.status || ""))) {
+            event.classList.add("is-completed");
+          }
+          var client = order.client || {};
+          var time = String(order.scheduled_at || "").slice(11, 16);
+          var money = formatMoney(order.amount, order.currency || "UZS") + " " + String(order.currency || "UZS");
+          event.title = [
+            client.name || "Клиент",
+            money,
+            client.address || "Адрес не указан"
+          ].join(" · ");
+          event.innerHTML =
+            '<strong>' + escapeHtml((time ? time + " " : "") + (client.name || "Клиент")) + "</strong>" +
+            '<small>' + escapeHtml(money) + " · " + escapeHtml(shortInstallationAddress(client.address)) + "</small>";
+          events.appendChild(event);
+        });
+        if (dayOrders.length > 3) {
+          var more = document.createElement("span");
+          more.className = "sales-installation-calendar-more";
+          more.textContent = "+" + String(dayOrders.length - 3) + " заказа";
+          events.appendChild(more);
+        }
+        day.appendChild(events);
+        day.addEventListener("click", function () {
+          state.selectedDate = installationLocalDate(this.dataset.date);
+          state.viewDate = new Date(state.selectedDate.getFullYear(), state.selectedDate.getMonth(), 1);
+          selectedLabel.textContent = selectedFormatter.format(state.selectedDate);
+          applyButton.disabled = false;
+          render();
+        });
+        grid.appendChild(day);
+      }
+    }
+
+    function loadSchedule() {
+      var installerId = String(installerSelect.value || "").trim();
+      var option = installerSelect.selectedOptions && installerSelect.selectedOptions[0];
+      var installerName = option ? String(option.textContent || "").trim() : "";
+      installerLabel.textContent = installerId
+        ? "График: " + installerName
+        : "Сначала выберите установщика";
+      state.orders = [];
+      render();
+      if (!installerId) {
+        status.textContent = "Выберите установщика, чтобы увидеть его занятые даты.";
+        return;
+      }
+      var requestId = ++state.requestId;
+      status.textContent = "Загружаем заказы установщика...";
+      fetch("/api/installer/orders?installer_user_id=" + encodeURIComponent(installerId), {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin"
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error("Не удалось загрузить календарь");
+          return response.json();
+        })
+        .then(function (payload) {
+          if (requestId !== state.requestId) return;
+          state.orders = Array.isArray(payload.orders) ? payload.orders : [];
+          status.textContent = state.orders.length
+            ? "Назначено заказов: " + String(state.orders.length)
+            : "У этого установщика пока нет назначенных заказов.";
+          render();
+        })
+        .catch(function (error) {
+          if (requestId !== state.requestId) return;
+          status.textContent = error && error.message
+            ? error.message
+            : "Не удалось загрузить календарь.";
+        });
+    }
+
+    function openCalendar() {
+      var current = installationLocalDate(dateInput.value) || new Date();
+      state.selectedDate = installationLocalDate(dateInput.value);
+      state.viewDate = new Date(current.getFullYear(), current.getMonth(), 1);
+      if (dateInput.value && String(dateInput.value).includes("T")) {
+        timeInput.value = String(dateInput.value).split("T")[1].slice(0, 5) || "09:00";
+      }
+      selectedLabel.textContent = state.selectedDate
+        ? selectedFormatter.format(state.selectedDate)
+        : "Дата не выбрана";
+      applyButton.disabled = !state.selectedDate;
+      loadSchedule();
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    }
+
+    function closeCalendar() {
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+
+    root.querySelectorAll("[data-sales-installation-calendar-open], [data-sales-installation-date]").forEach(function (control) {
+      control.addEventListener("click", openCalendar);
+    });
+    installerSelect.addEventListener("change", function () {
+      if (dialog.open) loadSchedule();
+    });
+    dialog.querySelector("[data-sales-installation-calendar-prev]")?.addEventListener("click", function () {
+      state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() - 1, 1);
+      render();
+    });
+    dialog.querySelector("[data-sales-installation-calendar-next]")?.addEventListener("click", function () {
+      state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + 1, 1);
+      render();
+    });
+    dialog.querySelector("[data-sales-installation-calendar-today]")?.addEventListener("click", function () {
+      var today = new Date();
+      state.viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      render();
+    });
+    dialog.querySelectorAll("[data-sales-installation-calendar-close], [data-sales-installation-calendar-cancel]").forEach(function (button) {
+      button.addEventListener("click", closeCalendar);
+    });
+    applyButton.addEventListener("click", function () {
+      if (!state.selectedDate) return;
+      dateInput.value = installationDateKey(state.selectedDate) + "T" + (timeInput.value || "09:00");
+      dateInput.dispatchEvent(new Event("input", { bubbles: true }));
+      dateInput.dispatchEvent(new Event("change", { bubbles: true }));
+      closeCalendar();
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) closeCalendar();
+    });
+  }
+
   function init() {
     var root = document.querySelector(".sales-form");
     if (!root) return;
@@ -2578,6 +2801,7 @@
       restoreSalesDraft(root, options);
     }
     syncInstallationSection(root);
+    wireInstallationCalendar(root);
     hydratePaymentRows(root, parsePaymentLines(root));
     updatePaymentBreakdown(root);
     root.addEventListener("input", function () {

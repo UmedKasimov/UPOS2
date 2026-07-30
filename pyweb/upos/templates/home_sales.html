@@ -912,16 +912,31 @@
             <div class="sales-installation-grid">
               <label>
                 <span>Установщик</span>
-                <select name="installer_user_id">
+                <select name="installer_user_id" data-sales-installation-installer>
                   <option value="">Не назначен</option>
                   {% for installer in sales_options.installers %}
                     <option value="{{ installer.id }}">{{ installer.name }}{% if installer.position %} · {{ installer.position }}{% endif %}</option>
                   {% endfor %}
                 </select>
               </label>
-              <label>
+              <label class="sales-installation-date-field">
                 <span>Дата и время установки</span>
-                <input type="datetime-local" name="installation_scheduled_at" />
+                <span class="sales-installation-date-control">
+                  <input
+                    type="datetime-local"
+                    name="installation_scheduled_at"
+                    data-sales-installation-date
+                    readonly
+                    aria-haspopup="dialog"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-secondary sales-installation-calendar-trigger"
+                    data-sales-installation-calendar-open
+                    aria-label="Открыть календарь установщика"
+                    title="Открыть календарь установщика"
+                  >Календарь</button>
+                </span>
               </label>
               <label>
                 <span>Шаблон задач</span>
@@ -1147,6 +1162,57 @@
             </div>
           </div>
         </form>
+
+        <dialog class="settings-profile-modal sales-installation-calendar-dialog" data-sales-installation-calendar-dialog>
+          <section class="settings-profile-modal-surface sales-installation-calendar-surface" aria-labelledby="sales-installation-calendar-title">
+            <header class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title" id="sales-installation-calendar-title">Календарь установщика</h2>
+                <p class="settings-profile-modal-sub" data-sales-installation-calendar-installer>Сначала выберите установщика</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-installation-calendar-close aria-label="Закрыть">×</button>
+            </header>
+            <div class="sales-installation-calendar-toolbar">
+              <div class="sales-installation-calendar-navigation" aria-label="Навигация по календарю">
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-prev aria-label="Предыдущий месяц">←</button>
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-today>Сегодня</button>
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-next aria-label="Следующий месяц">→</button>
+              </div>
+              <strong data-sales-installation-calendar-month></strong>
+              <span class="sales-installation-calendar-legend">
+                <i aria-hidden="true"></i>
+                Назначенные заказы
+              </span>
+            </div>
+            <div class="sales-installation-calendar-status" data-sales-installation-calendar-status aria-live="polite"></div>
+            <div class="sales-installation-calendar-scroll">
+              <div class="sales-installation-calendar-weekdays" aria-hidden="true">
+                <span>Пн</span>
+                <span>Вт</span>
+                <span>Ср</span>
+                <span>Чт</span>
+                <span>Пт</span>
+                <span>Сб</span>
+                <span>Вс</span>
+              </div>
+              <div class="sales-installation-calendar-grid" data-sales-installation-calendar-grid></div>
+            </div>
+            <footer class="sales-installation-calendar-footer">
+              <div class="sales-installation-calendar-selection">
+                <span>Выбранная установка</span>
+                <strong data-sales-installation-calendar-selected>Дата не выбрана</strong>
+              </div>
+              <label>
+                <span>Время</span>
+                <input type="time" value="09:00" data-sales-installation-calendar-time />
+              </label>
+              <div class="sales-installation-calendar-actions">
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-cancel>Отмена</button>
+                <button type="button" class="btn" data-sales-installation-calendar-apply disabled>Выбрать дату</button>
+              </div>
+            </footer>
+          </section>
+        </dialog>
 
         <dialog class="settings-profile-modal sales-payment-dialog" data-sales-payment-dialog>
           <form class="settings-profile-modal-surface sales-payment-dialog-surface" data-sales-payment-form>
@@ -1536,7 +1602,7 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=27" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=58" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=59" defer></script>
   {% if sales_embed %}
     <script>
       (() => {
