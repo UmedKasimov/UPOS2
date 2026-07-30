@@ -1,0 +1,564 @@
+(() => {
+  "use strict";
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+  const canManage = document.body.dataset.canManage === "1";
+  const listNode = document.getElementById("installer-order-list");
+  const detailDialog = document.getElementById("installer-detail");
+  const detailBody = document.getElementById("installer-detail-body");
+  const helpDialog = document.getElementById("installer-help");
+  const toastNode = document.getElementById("installer-toast");
+
+  const TAB_STATUSES = {
+    new: ["new", "pending"],
+    calendar: ["accepted", "date_negotiation", "scheduled", "postponed"],
+    work: ["en_route", "started", "in_progress", "awaiting_payment"],
+    done: ["completed", "cancelled"],
+  };
+
+  const STATUS_ACTIONS = {
+    new: [{ status: "accepted", label: "Принять заказ", primary: true }],
+    pending: [{ status: "accepted", label: "Принять заказ", primary: true }],
+    accepted: [{ status: "date_negotiation", label: "Согласовать дату" }],
+    date_negotiation: [],
+    scheduled: [{ status: "en_route", label: "Выехал", primary: true }],
+    en_route: [{ status: "started", label: "Начать установку", primary: true }],
+    started: [{ status: "in_progress", label: "Продолжить работу", primary: true }],
+    in_progress: [{ status: "awaiting_payment", label: "Ожидает оплаты" }],
+    awaiting_payment: [],
+    postponed: [{ status: "accepted", label: "Вернуть в работу" }],
+    completed: [],
+    cancelled: [],
+  };
+
+  const state = {
+    orders: [],
+    activeTab: "new",
+    activeId: "",
+    deferredInstallPrompt: null,
+    busy: false,
+  };
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function numberValue(value) {
+    const parsed = Number.parseFloat(String(value ?? "0").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function formatMoney(value, currency) {
+    const amount = numberValue(value);
+    const fraction = Math.abs(amount % 1) > 0.0001 ? 2 : 0;
+    return `${new Intl.NumberFormat("ru-RU", {
+      minimumFractionDigits: fraction,
+      maximumFractionDigits: 2,
+    }).format(amount)} ${escapeHtml(currency || "UZS")}`;
+  }
+
+  function parseLocalDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatDateTime(value) {
+    const date = parseLocalDate(value);
+    if (!date) return "Дата не назначена";
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  function isToday(value) {
+    const date = parseLocalDate(value);
+    if (!date) return false;
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  }
+
+  function phoneHref(phone) {
+    const clean = String(phone || "").replace(/[^\d+]/g, "");
+    return clean ? `tel:${clean}` : "";
+  }
+
+  function mapHref(order) {
+    const lat = String(order.latitude || "").trim();
+    const lng = String(order.longitude || "").trim();
+    if (lat && lng) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+    }
+    const address = String(order.client?.address || "").trim();
+    return address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+      : "";
+  }
+
+  function groupForStatus(status) {
+    return Object.keys(TAB_STATUSES).find((key) => TAB_STATUSES[key].includes(status)) || "new";
+  }
+
+  function setBusy(value) {
+    state.busy = value;
+    document.body.classList.toggle("is-busy", value);
+  }
+
+  function showToast(message, isError = false) {
+    toastNode.textContent = message;
+    toastNode.classList.toggle("is-error", isError);
+    toastNode.classList.add("is-visible");
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => {
+      toastNode.classList.remove("is-visible");
+    }, 3200);
+  }
+
+  async function apiRequest(url, options = {}) {
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+        ...(options.headers || {}),
+      },
+    });
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch (_error) {
+      payload = {};
+    }
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Не удалось выполнить действие");
+    }
+    return payload;
+  }
+
+  function replaceOrder(order) {
+    const index = state.orders.findIndex((item) => item.id === order.id);
+    if (index >= 0) state.orders[index] = order;
+    else state.orders.unshift(order);
+    render();
+    if (state.activeId === order.id && detailDialog.open) renderDetail(order);
+  }
+
+  function renderCounters() {
+    const counts = {
+      new: state.orders.filter((order) => groupForStatus(order.status) === "new").length,
+      calendar: state.orders.filter((order) => groupForStatus(order.status) === "calendar").length,
+      work: state.orders.filter((order) => groupForStatus(order.status) === "work").length,
+      done: state.orders.filter((order) => order.status === "completed").length,
+      today: state.orders.filter((order) => isToday(order.scheduled_at)).length,
+    };
+    document.getElementById("installer-count-new").textContent = counts.new;
+    document.getElementById("installer-count-today").textContent = counts.today;
+    document.getElementById("installer-count-work").textContent = counts.work;
+    document.getElementById("installer-count-done").textContent = counts.done;
+    document.getElementById("installer-tab-new").textContent = counts.new;
+    document.getElementById("installer-tab-calendar").textContent = counts.calendar;
+    document.getElementById("installer-tab-work").textContent = counts.work;
+    document.getElementById("installer-tab-done").textContent =
+      state.orders.filter((order) => groupForStatus(order.status) === "done").length;
+  }
+
+  function progressMarkup(order) {
+    const percent = Math.max(0, Math.min(100, Number(order.progress?.percent || 0)));
+    const label = order.progress?.label || "Задач нет";
+    return `
+      <div class="installer-progress">
+        <div class="installer-progress-label">
+          <span>${escapeHtml(label)}</span>
+          <strong>${percent}%</strong>
+        </div>
+        <div class="installer-progress-track"><i style="width:${percent}%"></i></div>
+      </div>
+    `;
+  }
+
+  function quickActionMarkup(order) {
+    if (order.status === "new" || order.status === "pending") {
+      return `<button class="installer-primary-button" type="button" data-action="accept" data-id="${escapeHtml(order.id)}">Принять</button>`;
+    }
+    if (["accepted", "date_negotiation", "postponed"].includes(order.status)) {
+      return `<button class="installer-secondary-button" type="button" data-action="open" data-id="${escapeHtml(order.id)}">Назначить дату</button>`;
+    }
+    if (order.status === "scheduled") {
+      return `<button class="installer-primary-button" type="button" data-action="status" data-status="en_route" data-id="${escapeHtml(order.id)}">Выехал</button>`;
+    }
+    return `<button class="installer-secondary-button" type="button" data-action="open" data-id="${escapeHtml(order.id)}">Открыть</button>`;
+  }
+
+  function orderCardMarkup(order) {
+    const client = order.client || {};
+    const paid = numberValue(order.paid_amount);
+    const total = numberValue(order.amount);
+    const balance = Math.max(0, total - paid);
+    const scheduleClass = order.scheduled_at ? "" : " installer-warning";
+    return `
+      <article class="installer-order-card" data-priority="${escapeHtml(order.priority)}">
+        <div class="installer-order-top">
+          <span class="installer-order-number">№ ${escapeHtml(order.number || order.id.slice(0, 8))}</span>
+          <span class="installer-status">${escapeHtml(order.status_label)}</span>
+        </div>
+        <h2>${escapeHtml(client.name || "Клиент")}</h2>
+        <div class="installer-order-meta">
+          <span class="${scheduleClass}">${escapeHtml(formatDateTime(order.scheduled_at))}</span>
+          <strong>${formatMoney(order.amount, order.currency)}</strong>
+          <span>${escapeHtml(client.address || "Адрес не указан")}</span>
+          <strong>${balance > 0 ? `Остаток ${formatMoney(balance, order.currency)}` : "Оплачено"}</strong>
+        </div>
+        ${order.conflict_warning ? `<p class="installer-warning">${escapeHtml(order.conflict_warning)}</p>` : ""}
+        ${progressMarkup(order)}
+        <div class="installer-order-actions">
+          ${quickActionMarkup(order)}
+          <button class="installer-secondary-button" type="button" data-action="open" data-id="${escapeHtml(order.id)}">Детали</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderList() {
+    const orders = state.orders
+      .filter((order) => groupForStatus(order.status) === state.activeTab)
+      .sort((left, right) => {
+        const leftTime = parseLocalDate(left.scheduled_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const rightTime = parseLocalDate(right.scheduled_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return leftTime - rightTime;
+      });
+
+    if (!orders.length) {
+      const messages = {
+        new: "Новых заказов пока нет",
+        calendar: "В календаре пока нет установок",
+        work: "Нет активных установок",
+        done: "Завершённых установок пока нет",
+      };
+      listNode.innerHTML = `<div class="installer-empty">${messages[state.activeTab]}</div>`;
+      return;
+    }
+    listNode.innerHTML = orders.map(orderCardMarkup).join("");
+  }
+
+  function render() {
+    renderCounters();
+    renderList();
+    document.querySelectorAll(".installer-tab").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.tab === state.activeTab);
+    });
+  }
+
+  function detailActionMarkup(order) {
+    const actions = STATUS_ACTIONS[order.status] || [];
+    const allowed = new Set(order.allowed_transitions || []);
+    const actionButtons = actions
+      .filter((action) => allowed.has(action.status))
+      .map(
+        (action) => `
+          <button
+            class="${action.primary ? "installer-primary-button" : "installer-secondary-button"}"
+            type="button"
+            data-action="detail-status"
+            data-status="${escapeHtml(action.status)}"
+          >${escapeHtml(action.label)}</button>
+        `,
+      )
+      .join("");
+    const completeButton = allowed.has("completed")
+      ? `<button class="installer-primary-button" type="button" data-action="complete">Завершить заказ</button>`
+      : "";
+    return actionButtons + completeButton;
+  }
+
+  function taskMarkup(order, task) {
+    const disabled = ["completed", "cancelled"].includes(order.status) ? " disabled" : "";
+    return `
+      <label class="installer-task${task.done ? " is-done" : ""}">
+        <input type="checkbox" data-action="task" data-task-id="${escapeHtml(task.id)}"${task.done ? " checked" : ""}${disabled}>
+        <span>
+          <strong>${escapeHtml(task.title)}${task.required ? " *" : ""}</strong>
+          ${task.description ? `<small>${escapeHtml(task.description)}</small>` : ""}
+        </span>
+      </label>
+    `;
+  }
+
+  function lineMarkup(line, index, order) {
+    const name = line.product_name || line.name || line.title || line.service_name || `Позиция ${index + 1}`;
+    const quantity = line.quantity ?? line.qty ?? line.count ?? "1";
+    const amount = line.amount ?? line.total ?? line.sum ?? line.price ?? 0;
+    return `
+      <tr>
+        <td>${escapeHtml(name)}</td>
+        <td>${escapeHtml(quantity)}</td>
+        <td>${formatMoney(amount, line.currency || order.currency)}</td>
+      </tr>
+    `;
+  }
+
+  function renderDetail(order) {
+    const client = order.client || {};
+    const phone = phoneHref(client.phone);
+    const map = mapHref(order);
+    document.getElementById("installer-detail-number").textContent =
+      `Заказ № ${order.number || order.id.slice(0, 8)}`;
+    document.getElementById("installer-detail-client").textContent = client.name || "Клиент";
+    detailBody.innerHTML = `
+      <section class="installer-detail-section">
+        <div class="installer-detail-grid">
+          <div><span>Статус</span><strong class="installer-detail-value">${escapeHtml(order.status_label)}</strong></div>
+          <div><span>Сумма</span><strong class="installer-detail-value">${formatMoney(order.amount, order.currency)}</strong></div>
+          <div><span>Телефон</span><strong class="installer-detail-value">${escapeHtml(client.phone || "Не указан")}</strong></div>
+          <div><span>Адрес</span><strong class="installer-detail-value">${escapeHtml(client.address || "Не указан")}</strong></div>
+        </div>
+        <div class="installer-client-actions">
+          ${phone ? `<a class="installer-primary-button" href="${escapeHtml(phone)}">Позвонить</a>` : ""}
+          ${map ? `<a class="installer-secondary-button" href="${escapeHtml(map)}" target="_blank" rel="noopener">Открыть карту</a>` : ""}
+        </div>
+      </section>
+
+      <section class="installer-detail-section">
+        <h3>Дата установки</h3>
+        <div class="installer-schedule-row">
+          <input id="installer-schedule" type="datetime-local" value="${escapeHtml(order.scheduled_at || "")}" ${["completed", "cancelled"].includes(order.status) ? "disabled" : ""}>
+          ${["completed", "cancelled"].includes(order.status) ? "" : '<button class="installer-secondary-button" type="button" data-action="schedule">Сохранить</button>'}
+        </div>
+        ${order.scheduled_confirmed ? '<p class="installer-detail-value">Дата подтверждена</p>' : ""}
+      </section>
+
+      <section class="installer-detail-section">
+        <h3>Выполнение</h3>
+        ${progressMarkup(order)}
+        <div class="installer-checklist">
+          ${(order.tasks || []).length
+            ? order.tasks.map((task) => taskMarkup(order, task)).join("")
+            : '<div class="installer-empty">Чек-лист не добавлен</div>'}
+        </div>
+      </section>
+
+      <section class="installer-detail-section">
+        <h3>Состав заказа</h3>
+        ${(order.lines || []).length
+          ? `<table class="installer-lines">
+              <thead><tr><th>Товар или услуга</th><th>К-во</th><th>Сумма</th></tr></thead>
+              <tbody>${order.lines.map((line, index) => lineMarkup(line, index, order)).join("")}</tbody>
+            </table>`
+          : '<div class="installer-empty">Позиции заказа не указаны</div>'}
+      </section>
+
+      ${order.notes ? `<section class="installer-detail-section"><h3>Комментарий продавца</h3><p>${escapeHtml(order.notes)}</p></section>` : ""}
+
+      <section class="installer-detail-section">
+        <h3>Итог установки</h3>
+        <textarea class="installer-comment" id="installer-result-comment" placeholder="Что установлено, что проверено, результат">${escapeHtml(order.result_comment || "")}</textarea>
+        ${(order.completion_blockers || []).length
+          ? `<p class="installer-warning">${escapeHtml(order.completion_blockers.join(" "))}</p>`
+          : ""}
+      </section>
+
+      <div class="installer-detail-actions">
+        ${detailActionMarkup(order)}
+      </div>
+    `;
+  }
+
+  function openDetail(id) {
+    const order = state.orders.find((item) => item.id === id);
+    if (!order) return;
+    state.activeId = id;
+    renderDetail(order);
+    if (!detailDialog.open) detailDialog.showModal();
+  }
+
+  async function updateStatus(id, status, resultComment = "") {
+    if (state.busy) return;
+    setBusy(true);
+    try {
+      const payload = await apiRequest(`/api/installer/orders/${encodeURIComponent(id)}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status, result_comment: resultComment }),
+      });
+      replaceOrder(payload.order);
+      showToast(payload.order.status_label);
+      if (status === "accepted") {
+        state.activeTab = "calendar";
+        render();
+        openDetail(id);
+      }
+      if (status === "completed") {
+        detailDialog.close();
+        state.activeTab = "done";
+        render();
+      }
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSchedule() {
+    const order = state.orders.find((item) => item.id === state.activeId);
+    const input = document.getElementById("installer-schedule");
+    if (!order || !input?.value || state.busy) {
+      if (!input?.value) showToast("Выберите дату и время", true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = await apiRequest(
+        `/api/installer/orders/${encodeURIComponent(order.id)}/schedule`,
+        {
+          method: "POST",
+          body: JSON.stringify({ scheduled_at: input.value, confirmed: true }),
+        },
+      );
+      replaceOrder(payload.order);
+      showToast("Дата установки подтверждена");
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleTask(input) {
+    const order = state.orders.find((item) => item.id === state.activeId);
+    if (!order || state.busy) return;
+    input.disabled = true;
+    try {
+      const payload = await apiRequest(
+        `/api/installer/orders/${encodeURIComponent(order.id)}/tasks/${encodeURIComponent(input.dataset.taskId)}`,
+        {
+          method: "POST",
+          body: JSON.stringify({ done: input.checked }),
+        },
+      );
+      replaceOrder(payload.order);
+    } catch (error) {
+      input.checked = !input.checked;
+      showToast(error.message, true);
+    } finally {
+      input.disabled = false;
+    }
+  }
+
+  async function loadOrders({ quiet = false } = {}) {
+    if (!quiet) listNode.innerHTML = '<div class="installer-loading">Загрузка заказов...</div>';
+    try {
+      const payload = await apiRequest("/api/installer/orders");
+      state.orders = Array.isArray(payload.orders) ? payload.orders : [];
+      render();
+    } catch (error) {
+      listNode.innerHTML = `<div class="installer-empty">${escapeHtml(error.message)}</div>`;
+      showToast(error.message, true);
+    }
+  }
+
+  listNode.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const id = button.dataset.id;
+    if (button.dataset.action === "open") openDetail(id);
+    if (button.dataset.action === "accept") updateStatus(id, "accepted");
+    if (button.dataset.action === "status") updateStatus(id, button.dataset.status);
+  });
+
+  detailBody.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const order = state.orders.find((item) => item.id === state.activeId);
+    if (!order) return;
+    if (button.dataset.action === "schedule") saveSchedule();
+    if (button.dataset.action === "detail-status") {
+      updateStatus(order.id, button.dataset.status, document.getElementById("installer-result-comment")?.value || "");
+    }
+    if (button.dataset.action === "complete") {
+      const comment = document.getElementById("installer-result-comment")?.value.trim() || "";
+      if (!comment) {
+        showToast("Добавьте итоговый комментарий", true);
+        document.getElementById("installer-result-comment")?.focus();
+        return;
+      }
+      updateStatus(order.id, "completed", comment);
+    }
+  });
+
+  detailBody.addEventListener("change", (event) => {
+    if (event.target.matches('input[data-action="task"]')) toggleTask(event.target);
+  });
+
+  document.querySelectorAll(".installer-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeTab = button.dataset.tab;
+      render();
+    });
+  });
+
+  document.getElementById("installer-detail-close").addEventListener("click", () => {
+    detailDialog.close();
+  });
+  detailDialog.addEventListener("click", (event) => {
+    if (event.target === detailDialog) detailDialog.close();
+  });
+  document.getElementById("installer-refresh").addEventListener("click", () => loadOrders());
+
+  document.querySelectorAll("[data-close-help]").forEach((button) => {
+    button.addEventListener("click", () => helpDialog.close());
+  });
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    state.deferredInstallPrompt = event;
+    document.getElementById("installer-install").hidden = false;
+  });
+
+  document.getElementById("installer-install").addEventListener("click", async () => {
+    if (!state.deferredInstallPrompt) {
+      helpDialog.showModal();
+      return;
+    }
+    state.deferredInstallPrompt.prompt();
+    await state.deferredInstallPrompt.userChoice;
+    state.deferredInstallPrompt = null;
+  });
+
+  function updateConnection() {
+    const node = document.getElementById("installer-connection");
+    node.textContent = navigator.onLine ? "Онлайн" : "Нет сети";
+    node.classList.toggle("is-offline", !navigator.onLine);
+  }
+
+  window.addEventListener("online", () => {
+    updateConnection();
+    loadOrders({ quiet: true });
+  });
+  window.addEventListener("offline", updateConnection);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) loadOrders({ quiet: true });
+  });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/installer-sw.js").catch(() => {});
+    });
+  }
+
+  if (canManage) document.getElementById("installer-manager-note").hidden = false;
+  updateConnection();
+  loadOrders();
+  window.setInterval(() => loadOrders({ quiet: true }), 60000);
+})();

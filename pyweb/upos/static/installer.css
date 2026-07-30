@@ -1,0 +1,716 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f3f6fb;
+  color: #152033;
+  letter-spacing: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f3f6fb;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+.installer-app {
+  width: min(100%, 820px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  background: #f8fafc;
+  border-inline: 1px solid #dbe3ef;
+}
+
+.installer-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 72px;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+  color: #fff;
+  background: #0f172a;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.16);
+}
+
+.installer-brand {
+  margin: 0 0 2px;
+  color: #63b3ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.installer-header h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.installer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.installer-connection {
+  padding: 4px 7px;
+  border: 1px solid rgba(134, 239, 172, 0.45);
+  border-radius: 999px;
+  color: #bbf7d0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-connection.is-offline {
+  border-color: rgba(253, 186, 116, 0.5);
+  color: #fed7aa;
+}
+
+.installer-icon-button {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #334155;
+  background: #fff;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.installer-header .installer-icon-button {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  background: #1e293b;
+}
+
+.installer-icon-button:hover,
+.installer-icon-button:focus-visible {
+  border-color: #3b82f6;
+  outline: 2px solid rgba(59, 130, 246, 0.18);
+}
+
+.installer-install-button,
+.installer-primary-button,
+.installer-secondary-button,
+.installer-danger-button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 750;
+}
+
+.installer-install-button,
+.installer-primary-button {
+  color: #fff;
+  background: #1673dc;
+}
+
+.installer-install-button:hover,
+.installer-primary-button:hover {
+  background: #0f62bd;
+}
+
+.installer-secondary-button {
+  border-color: #b9c7da;
+  color: #24415f;
+  background: #fff;
+}
+
+.installer-danger-button {
+  border-color: #fecaca;
+  color: #b42318;
+  background: #fff7f7;
+}
+
+main {
+  padding: 14px;
+}
+
+.installer-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid #d8e1ee;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.installer-summary > div {
+  min-width: 0;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.installer-summary > div + div {
+  border-left: 1px solid #e2e8f0;
+}
+
+.installer-summary strong,
+.installer-summary span {
+  display: block;
+}
+
+.installer-summary strong {
+  color: #0f4c81;
+  font-size: 19px;
+}
+
+.installer-summary span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-manager-note {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-left: 3px solid #3b82f6;
+  color: #334155;
+  background: #eaf3ff;
+  font-size: 12px;
+}
+
+.installer-order-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.installer-loading,
+.installer-empty {
+  padding: 56px 16px;
+  color: #64748b;
+  text-align: center;
+}
+
+.installer-order-card {
+  position: relative;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #d5dfec;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.installer-order-card[data-priority="urgent"],
+.installer-order-card[data-priority="high"] {
+  border-left-color: #dc2626;
+}
+
+.installer-order-card:hover {
+  border-color: #82b5ee;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.installer-order-top,
+.installer-order-bottom,
+.installer-order-actions,
+.installer-detail-actions,
+.installer-client-actions,
+.installer-schedule-row,
+.installer-progress-label {
+  display: flex;
+  align-items: center;
+}
+
+.installer-order-top,
+.installer-order-bottom,
+.installer-progress-label {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.installer-order-number {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-status {
+  padding: 4px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #075aa8;
+  background: #eff6ff;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.installer-order-card h2 {
+  margin: 10px 0 5px;
+  overflow: hidden;
+  color: #111827;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-order-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+  color: #526175;
+  font-size: 12px;
+}
+
+.installer-order-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-order-meta strong {
+  color: #172033;
+}
+
+.installer-progress {
+  margin: 12px 0 10px;
+}
+
+.installer-progress-label {
+  margin-bottom: 5px;
+  color: #5d6c80;
+  font-size: 11px;
+}
+
+.installer-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4eaf2;
+}
+
+.installer-progress-track i {
+  display: block;
+  height: 100%;
+  background: #16a34a;
+}
+
+.installer-order-bottom {
+  padding-top: 10px;
+  border-top: 1px solid #edf1f6;
+  color: #607086;
+  font-size: 12px;
+}
+
+.installer-order-actions,
+.installer-detail-actions,
+.installer-client-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.installer-order-actions {
+  margin-top: 11px;
+}
+
+.installer-order-actions button {
+  flex: 1 1 120px;
+}
+
+.installer-tabs {
+  position: fixed;
+  z-index: 30;
+  bottom: 0;
+  left: 50%;
+  display: grid;
+  width: min(100%, 820px);
+  min-height: 66px;
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.installer-tab {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 4px;
+  place-items: center;
+  border: 0;
+  color: #64748b;
+  background: transparent;
+  font-size: 11px;
+}
+
+.installer-tab b {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #475569;
+  background: #e7edf5;
+  font-size: 10px;
+}
+
+.installer-tab.is-active {
+  color: #0b65c2;
+  font-weight: 800;
+}
+
+.installer-tab.is-active b {
+  color: #fff;
+  background: #1673dc;
+}
+
+.installer-detail,
+.installer-help {
+  width: min(100%, 820px);
+  max-width: none;
+  height: min(94vh, 900px);
+  max-height: none;
+  margin: auto auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: #fff;
+}
+
+.installer-detail::backdrop,
+.installer-help::backdrop {
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.installer-detail-shell {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.installer-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #dce4ef;
+}
+
+.installer-detail-head p {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-detail-head h2 {
+  max-width: min(70vw, 600px);
+  margin: 0;
+  overflow: hidden;
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-detail-body {
+  min-height: 0;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.installer-detail-section {
+  padding: 14px 0;
+  border-bottom: 1px solid #e6ebf2;
+}
+
+.installer-detail-section:first-child {
+  padding-top: 0;
+}
+
+.installer-detail-section h3 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.installer-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.installer-detail-value {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e0e7f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.installer-detail-value span,
+.installer-detail-value strong {
+  display: block;
+}
+
+.installer-detail-value span {
+  margin-bottom: 3px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.installer-detail-value strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-client-actions {
+  margin-top: 10px;
+}
+
+.installer-client-actions a {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 8px 12px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b9c7da;
+  border-radius: 8px;
+  color: #154d80;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.installer-schedule-row {
+  gap: 8px;
+}
+
+.installer-schedule-row input {
+  min-width: 0;
+  height: 40px;
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #b9c7da;
+  border-radius: 7px;
+  color: #172033;
+  background: #fff;
+}
+
+.installer-checklist {
+  display: grid;
+  gap: 7px;
+}
+
+.installer-task {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 44px;
+  padding: 9px;
+  align-items: start;
+  border: 1px solid #dce4ef;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.installer-task input {
+  width: 19px;
+  height: 19px;
+  margin: 1px 0 0;
+  accent-color: #168449;
+}
+
+.installer-task strong,
+.installer-task small {
+  display: block;
+}
+
+.installer-task strong {
+  font-size: 13px;
+}
+
+.installer-task small {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.installer-task.is-done strong {
+  color: #64748b;
+  text-decoration: line-through;
+}
+
+.installer-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.installer-lines th,
+.installer-lines td {
+  padding: 8px 6px;
+  border: 1px solid #dce4ef;
+  text-align: left;
+}
+
+.installer-lines th {
+  color: #526175;
+  background: #f1f5f9;
+  font-size: 10px;
+}
+
+.installer-comment {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid #b9c7da;
+  border-radius: 7px;
+  color: #172033;
+  background: #fff;
+}
+
+.installer-detail-actions {
+  position: sticky;
+  bottom: -18px;
+  margin: 14px -16px -18px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #dce4ef;
+  background: #fff;
+}
+
+.installer-detail-actions button {
+  flex: 1 1 145px;
+}
+
+.installer-warning {
+  padding: 9px 10px;
+  border-left: 3px solid #d97706;
+  color: #7c3f00;
+  background: #fff7e6;
+  font-size: 12px;
+}
+
+.installer-help {
+  width: min(calc(100% - 24px), 430px);
+  height: auto;
+  margin: auto;
+  border-radius: 8px;
+}
+
+.installer-help > div {
+  padding: 16px;
+}
+
+.installer-help header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.installer-help h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.installer-help p {
+  color: #526175;
+  line-height: 1.5;
+}
+
+.installer-help .installer-primary-button {
+  width: 100%;
+}
+
+.installer-toast {
+  position: fixed;
+  z-index: 100;
+  right: 16px;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  left: 16px;
+  max-width: 520px;
+  margin: auto;
+  padding: 11px 13px;
+  transform: translateY(24px);
+  border-radius: 8px;
+  color: #fff;
+  background: #172033;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.installer-toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.installer-toast.is-error {
+  background: #991b1b;
+}
+
+@media (max-width: 600px) {
+  .installer-header {
+    padding-inline: 12px;
+  }
+
+  .installer-install-button {
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+
+  main {
+    padding: 10px;
+  }
+
+  .installer-summary > div {
+    padding-inline: 4px;
+  }
+
+  .installer-summary span {
+    font-size: 10px;
+  }
+
+  .installer-order-meta,
+  .installer-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .installer-order-meta strong {
+    text-align: left;
+  }
+}
+
+@media (display-mode: standalone) {
+  .installer-install-button {
+    display: none;
+  }
+}

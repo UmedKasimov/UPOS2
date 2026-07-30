@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="U-POS Установщик">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>U-POS Установщик</title>
+  <link rel="manifest" href="/static/installer-manifest.webmanifest">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/installer.css?v=1">
+  <script defer src="/static/installer.js?v=1"></script>
+</head>
+<body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
+  <div class="installer-app">
+    <header class="installer-header">
+      <div>
+        <p class="installer-brand">U-POS</p>
+        <h1>Установщик</h1>
+      </div>
+      <div class="installer-header-actions">
+        <span class="installer-connection" id="installer-connection">Онлайн</span>
+        <button class="installer-icon-button" id="installer-refresh" type="button" title="Обновить" aria-label="Обновить">↻</button>
+        <button class="installer-install-button" id="installer-install" type="button">Установить</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="installer-summary" aria-label="Сводка">
+        <div><strong id="installer-count-new">0</strong><span>Новые</span></div>
+        <div><strong id="installer-count-today">0</strong><span>Сегодня</span></div>
+        <div><strong id="installer-count-work">0</strong><span>В работе</span></div>
+        <div><strong id="installer-count-done">0</strong><span>Выполнено</span></div>
+      </section>
+
+      <div class="installer-manager-note" id="installer-manager-note" hidden>
+        Режим руководителя: показаны установки всей организации.
+      </div>
+
+      <section class="installer-order-list" id="installer-order-list" aria-live="polite">
+        <div class="installer-loading">Загрузка заказов...</div>
+      </section>
+    </main>
+
+    <nav class="installer-tabs" aria-label="Разделы установщика">
+      <button class="installer-tab is-active" type="button" data-tab="new">
+        <span>Новые</span><b id="installer-tab-new">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="calendar">
+        <span>Календарь</span><b id="installer-tab-calendar">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="work">
+        <span>В работе</span><b id="installer-tab-work">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="done">
+        <span>Готово</span><b id="installer-tab-done">0</b>
+      </button>
+    </nav>
+  </div>
+
+  <dialog class="installer-detail" id="installer-detail">
+    <div class="installer-detail-shell">
+      <header class="installer-detail-head">
+        <div>
+          <p id="installer-detail-number">Заказ</p>
+          <h2 id="installer-detail-client">Клиент</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-detail-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="installer-detail-body" id="installer-detail-body"></div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-help" id="installer-help">
+    <div>
+      <header>
+        <h2>Установка приложения</h2>
+        <button class="installer-icon-button" data-close-help type="button" aria-label="Закрыть">×</button>
+      </header>
+      <p>Откройте меню браузера и выберите «На экран Домой» или «Установить приложение».</p>
+      <button class="installer-primary-button" data-close-help type="button">Понятно</button>
+    </div>
+  </dialog>
+
+  <div class="installer-toast" id="installer-toast" role="status" aria-live="polite"></div>
+</body>
+</html>

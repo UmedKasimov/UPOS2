@@ -1,0 +1,21 @@
+{
+  "id": "/installer",
+  "name": "U-POS Установщик",
+  "short_name": "Установщик",
+  "description": "Заказы, календарь и чек-листы установщика U-POS",
+  "lang": "ru",
+  "start_url": "/installer",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f6fb",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

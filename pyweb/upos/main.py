@@ -44,6 +44,8 @@ from upos.db_models import (
     EmployeeAccountAccess,
     FinanceAccount,
     FinanceCategory,
+    InstallationOrder,
+    InstallationTask,
     Product,
     ProductPhoto,
     PurchaseDocument,
@@ -149,10 +151,22 @@ from upos.integrations import (
     integration_configured,
 )
 from upos.installations_store import (
+    ALLOWED_TRANSITIONS,
     INSTALLATION_PRIORITY_LABELS,
     INSTALLATION_PRIORITIES,
+    InstallationError,
+    client_contact,
+    completion_blockers,
+    installer_orders,
     list_installation_templates,
     list_installers,
+    load_order,
+    log_event,
+    order_tasks,
+    reschedule,
+    set_status,
+    status_label,
+    task_progress,
     upsert_installation_for_order,
 )
 from upos.organizations_store import (
@@ -7259,6 +7273,345 @@ def create_app() -> FastAPI:
                 currency=str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS",
                 user=None,
             )
+
+    def _installer_request_scope(request: Request) -> tuple[str | None, str, bool]:
+        user = request.session.get("user") or {}
+        wid = str(user.get("workspace_owner_id") or user.get("user_id") or "").strip()
+        if not valid_workspace_owner_id(wid):
+            return None, "", False
+        role_key = _employee_role_key(user)
+        installer_user_id = _session_user_id(user) if role_key == "installer" else ""
+        return wid, installer_user_id, not bool(installer_user_id)
+
+    def _installer_local_datetime(value: datetime | None, timezone_name: str) -> str:
+        if value is None:
+            return ""
+        current = value
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=timezone.utc)
+        try:
+            current = current.astimezone(ZoneInfo(timezone_name))
+        except Exception:
+            current = current.astimezone(timezone.utc)
+        return current.strftime("%Y-%m-%dT%H:%M")
+
+    def _installer_order_payload(
+        session: Any,
+        order: InstallationOrder,
+        *,
+        timezone_name: str,
+        can_manage: bool,
+    ) -> dict[str, Any]:
+        data = order.data if isinstance(order.data, dict) else {}
+        contact = client_contact(session, order.counterparty_id)
+        tasks = order_tasks(session, order.id)
+        progress = task_progress(tasks)
+        client_name = str(data.get("client_name") or contact.get("name") or "Клиент").strip()
+        client_phone = str(data.get("client_phone") or contact.get("phone") or "").strip()
+        address = str(order.address or data.get("client_address") or contact.get("address") or "").strip()
+        lines = data.get("sale_lines")
+        if not isinstance(lines, list):
+            lines = []
+        return {
+            "id": order.id,
+            "number": str(order.number or ""),
+            "sale_document_id": str(order.sale_document_id or ""),
+            "status": str(order.status or "new"),
+            "status_label": status_label(str(order.status or "new")),
+            "priority": str(order.priority or "normal"),
+            "priority_label": INSTALLATION_PRIORITY_LABELS.get(
+                str(order.priority or "normal"),
+                str(order.priority or "normal"),
+            ),
+            "scheduled_at": _installer_local_datetime(order.scheduled_at, timezone_name),
+            "scheduled_confirmed": bool(order.scheduled_confirmed),
+            "client": {
+                "name": client_name,
+                "phone": client_phone,
+                "address": address,
+            },
+            "latitude": str(order.latitude or ""),
+            "longitude": str(order.longitude or ""),
+            "amount": str(order.amount or 0),
+            "paid_amount": str(order.paid_amount or 0),
+            "currency": str(order.currency or "UZS"),
+            "installer_name": str(data.get("installer_name") or "").strip(),
+            "notes": str(data.get("notes") or "").strip(),
+            "result_comment": str(data.get("result_comment") or "").strip(),
+            "conflict_warning": str(data.get("conflict_warning") or "").strip(),
+            "lines": [line for line in lines if isinstance(line, dict)],
+            "tasks": [
+                {
+                    "id": task.id,
+                    "title": str(task.title or ""),
+                    "description": str(task.description or ""),
+                    "required": bool(task.is_required),
+                    "done": bool(task.is_done),
+                    "comment": str(task.comment or ""),
+                }
+                for task in tasks
+            ],
+            "progress": progress,
+            "completion_blockers": completion_blockers(order, tasks),
+            "allowed_transitions": sorted(ALLOWED_TRANSITIONS.get(str(order.status or ""), ())),
+            "can_manage": can_manage,
+        }
+
+    def _installer_api_error(message: str, status_code: int = 400) -> JSONResponse:
+        return JSONResponse({"ok": False, "error": message}, status_code=status_code)
+
+    def _installer_csrf_valid(request: Request) -> bool:
+        token = (
+            request.headers.get("X-CSRF-Token")
+            or request.headers.get("x-csrf-token")
+            or ""
+        )
+        return csrf_matches_session(request, token)
+
+    @app.get("/installer", response_class=HTMLResponse, name="installer_app")
+    def installer_app(request: Request):
+        wid, _installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return RedirectResponse(url="/auth?next=/installer", status_code=302)
+        return tpl(
+            request,
+            "installer.html",
+            installer_can_manage=can_manage,
+        )
+
+    @app.get("/installer-sw.js", name="installer_service_worker")
+    def installer_service_worker():
+        path = BASE_DIR / "static" / "installer-sw.js"
+        if not path.exists():
+            return Response("", media_type="application/javascript", status_code=404)
+        return Response(
+            path.read_text(encoding="utf-8"),
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-cache",
+                "Service-Worker-Allowed": "/",
+            },
+        )
+
+    @app.get("/api/installer/orders", name="installer_orders_api")
+    def installer_orders_api(request: Request):
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        timezone_name = normalize_workspace_timezone(
+            str(load_workspace_settings(wid).get("timezone") or "")
+        )
+        with session_scope() as session:
+            if installer_user_id:
+                rows = installer_orders(
+                    session,
+                    workspace_owner_id=wid,
+                    installer_user_id=installer_user_id,
+                )
+            else:
+                rows = list(
+                    session.execute(
+                        select(InstallationOrder)
+                        .where(InstallationOrder.workspace_owner_id == wid)
+                        .order_by(
+                            InstallationOrder.scheduled_at.asc().nulls_last(),
+                            InstallationOrder.created_at.desc(),
+                        )
+                    ).scalars()
+                )
+            payload = [
+                _installer_order_payload(
+                    session,
+                    row,
+                    timezone_name=timezone_name,
+                    can_manage=can_manage,
+                )
+                for row in rows
+            ]
+        return JSONResponse({"ok": True, "orders": payload})
+
+    @app.post("/api/installer/orders/{order_id}/status", name="installer_order_status_api")
+    async def installer_order_status_api(request: Request, order_id: str):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            return _installer_api_error("Некорректные данные")
+        target = str((body or {}).get("status") or "").strip()
+        result_comment = str((body or {}).get("result_comment") or "").strip()
+        user = request.session.get("user") or {}
+        actor_id = _session_user_id(user)
+        actor_name = str(user.get("name") or user.get("username") or "").strip()
+        timezone_name = normalize_workspace_timezone(
+            str(load_workspace_settings(wid).get("timezone") or "")
+        )
+        with session_scope() as session:
+            order = load_order(
+                session,
+                workspace_owner_id=wid,
+                order_id=order_id,
+                installer_user_id=installer_user_id if not can_manage else "",
+            )
+            if order is None:
+                return _installer_api_error("Заказ установки не найден", 404)
+            if result_comment:
+                data = order.data if isinstance(order.data, dict) else {}
+                order.data = {**data, "result_comment": result_comment}
+                flag_modified(order, "data")
+            if target == "completed":
+                blockers = completion_blockers(order, order_tasks(session, order.id))
+                if blockers:
+                    return _installer_api_error(blockers[0], 409)
+            try:
+                set_status(
+                    session,
+                    order=order,
+                    target=target,
+                    actor_user_id=actor_id,
+                    actor_name=actor_name,
+                )
+            except InstallationError as exc:
+                return _installer_api_error(str(exc), 409)
+            payload = _installer_order_payload(
+                session,
+                order,
+                timezone_name=timezone_name,
+                can_manage=can_manage,
+            )
+        return JSONResponse({"ok": True, "order": payload})
+
+    @app.post("/api/installer/orders/{order_id}/schedule", name="installer_order_schedule_api")
+    async def installer_order_schedule_api(request: Request, order_id: str):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            return _installer_api_error("Некорректные данные")
+        scheduled_text = str((body or {}).get("scheduled_at") or "").strip()
+        confirmed = bool((body or {}).get("confirmed", True))
+        if not scheduled_text:
+            return _installer_api_error("Выберите дату и время установки")
+        timezone_name = normalize_workspace_timezone(
+            str(load_workspace_settings(wid).get("timezone") or "")
+        )
+        try:
+            scheduled_at = datetime.fromisoformat(scheduled_text)
+            if scheduled_at.tzinfo is None:
+                scheduled_at = scheduled_at.replace(tzinfo=ZoneInfo(timezone_name))
+            scheduled_at = scheduled_at.astimezone(timezone.utc)
+        except (TypeError, ValueError, OSError):
+            return _installer_api_error("Укажите корректную дату и время")
+        user = request.session.get("user") or {}
+        actor_id = _session_user_id(user)
+        actor_name = str(user.get("name") or user.get("username") or "").strip()
+        with session_scope() as session:
+            order = load_order(
+                session,
+                workspace_owner_id=wid,
+                order_id=order_id,
+                installer_user_id=installer_user_id if not can_manage else "",
+            )
+            if order is None:
+                return _installer_api_error("Заказ установки не найден", 404)
+            reschedule(
+                session,
+                order=order,
+                scheduled_at=scheduled_at,
+                actor_user_id=actor_id,
+                actor_name=actor_name,
+                confirmed=confirmed,
+            )
+            if confirmed and str(order.status or "") in {
+                "accepted",
+                "date_negotiation",
+                "postponed",
+            }:
+                try:
+                    set_status(
+                        session,
+                        order=order,
+                        target="scheduled",
+                        actor_user_id=actor_id,
+                        actor_name=actor_name,
+                    )
+                except InstallationError:
+                    pass
+            payload = _installer_order_payload(
+                session,
+                order,
+                timezone_name=timezone_name,
+                can_manage=can_manage,
+            )
+        return JSONResponse({"ok": True, "order": payload})
+
+    @app.post(
+        "/api/installer/orders/{order_id}/tasks/{task_id}",
+        name="installer_order_task_api",
+    )
+    async def installer_order_task_api(request: Request, order_id: str, task_id: str):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            return _installer_api_error("Некорректные данные")
+        user = request.session.get("user") or {}
+        actor_id = _session_user_id(user)
+        actor_name = str(user.get("name") or user.get("username") or "").strip()
+        timezone_name = normalize_workspace_timezone(
+            str(load_workspace_settings(wid).get("timezone") or "")
+        )
+        with session_scope() as session:
+            order = load_order(
+                session,
+                workspace_owner_id=wid,
+                order_id=order_id,
+                installer_user_id=installer_user_id if not can_manage else "",
+            )
+            if order is None:
+                return _installer_api_error("Заказ установки не найден", 404)
+            if str(order.status or "") in {"completed", "cancelled"}:
+                return _installer_api_error("Завершённый заказ нельзя изменить", 409)
+            task = session.get(InstallationTask, task_id)
+            if (
+                task is None
+                or task.workspace_owner_id != wid
+                or task.installation_order_id != order.id
+            ):
+                return _installer_api_error("Задача не найдена", 404)
+            done = bool((body or {}).get("done"))
+            task.is_done = done
+            task.done_at = datetime.now(timezone.utc) if done else None
+            task.done_by_user_id = actor_id if done else None
+            task.comment = str((body or {}).get("comment") or task.comment or "").strip()
+            log_event(
+                session,
+                workspace_owner_id=wid,
+                order_id=order.id,
+                kind="task",
+                actor_user_id=actor_id,
+                actor_name=actor_name,
+                detail=f"{'Выполнено' if done else 'Возвращено'}: {task.title}",
+                payload={"task_id": task.id, "done": done},
+            )
+            payload = _installer_order_payload(
+                session,
+                order,
+                timezone_name=timezone_name,
+                can_manage=can_manage,
+            )
+        return JSONResponse({"ok": True, "order": payload})
 
     @app.get("/dashboard", response_class=HTMLResponse, name="dashboard_get")
     def dashboard_get(
