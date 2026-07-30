@@ -7240,6 +7240,18 @@ def create_app() -> FastAPI:
         except Exception:
             today_local = datetime.now(timezone.utc).date()
 
+        if "date_from" not in request.query_params and "date_to" not in request.query_params:
+            today_value = today_local.isoformat()
+            return RedirectResponse(
+                url=str(
+                    request.url.include_query_params(
+                        date_from=today_value,
+                        date_to=today_value,
+                    )
+                ),
+                status_code=303,
+            )
+
         def dashboard_date(raw: str, fallback: date) -> date:
             try:
                 return date.fromisoformat(str(raw or "").strip())
@@ -7451,6 +7463,20 @@ def create_app() -> FastAPI:
             )
             segment["sale_count"] += 1
             segment["amount"] += amount_primary
+
+        if period_from <= today_local <= period_to:
+            today_key = today_local.isoformat()
+            daily.setdefault(
+                today_key,
+                {
+                    "date": today_key,
+                    "sale_count": 0,
+                    "order_count": 0,
+                    "sale_amount": Decimal("0"),
+                    "order_amount": Decimal("0"),
+                    "paid_amount": Decimal("0"),
+                },
+            )
 
         daily_rows = []
         for item in sorted(daily.values(), key=lambda value: value["date"], reverse=True):
