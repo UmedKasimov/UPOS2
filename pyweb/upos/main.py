@@ -7754,17 +7754,15 @@ def create_app() -> FastAPI:
                     .order_by(SaleDocument.updated_at.desc())
                 ).scalars()
             )
+            # Заполняется ниже, в цикле по документам: счётчики должны отражать
+            # текущий период и остальные фильтры, иначе вкладки показывали бы
+            # общее количество по базе независимо от выбранной даты.
             journal_doc_type_counts = {
-                "all": len(rows),
+                "all": 0,
                 "sale": 0,
                 "order": 0,
                 "return": 0,
             }
-            for row in rows:
-                row_data = _json_object(row.data)
-                row_doc_type = str(row_data.get("doc_type") or "sale").strip()
-                if row_doc_type in journal_doc_type_counts:
-                    journal_doc_type_counts[row_doc_type] += 1
 
             def document_tab_url(tab_doc_type: str = "") -> str:
                 pairs = [
@@ -7778,6 +7776,47 @@ def create_app() -> FastAPI:
                 query = urlencode(pairs, doseq=True)
                 return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
 
+            for row in rows:
+                item = _sales_document_data(row)
+                debt_timing = _sales_debt_timing(
+                    str(item.get("date_to") or item.get("date") or ""),
+                    today_date,
+                )
+                item["debt_age_days"] = (
+                    None
+                    if debt_timing["state"] == "none"
+                    else int(debt_timing["days_overdue"] or 0)
+                )
+                if filters["status"] == "debt":
+                    if item["doc_type"] != "sale" or _sales_decimal(item.get("debt_value")) <= 0:
+                        continue
+                elif filters["statuses"] and item["status"] not in filters["statuses"]:
+                    continue
+                if (
+                    filters["payment_statuses"]
+                    and item["payment_status"] not in filters["payment_statuses"]
+                ):
+                    continue
+                if filters["client"] and item["client"] != filters["client"]:
+                    continue
+                item_date = str(item.get("date") or "").strip()
+                if filters["date_from"] and (not item_date or item_date < filters["date_from"]):
+                    continue
+                if filters["date_to"] and (not item_date or item_date > filters["date_to"]):
+                    continue
+                hay = " ".join([item["number"], item["client"], item["warehouse"], item["status_label"], item["doc_type_label"]]).lower()
+                if q_clean and q_clean not in hay:
+                    continue
+                # Считаем до отбора по типу документа: вкладка «Заказы» должна
+                # показывать своё число даже когда открыта вкладка «Продажи».
+                journal_doc_type_counts["all"] += 1
+                if item["doc_type"] in journal_doc_type_counts:
+                    journal_doc_type_counts[item["doc_type"]] += 1
+                if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
+                    continue
+                sales.append(item)
+
+            # Строим после цикла: счётчики наполняются там же.
             document_tabs = [
                 {
                     "value": "",
@@ -7820,40 +7859,6 @@ def create_app() -> FastAPI:
                     "current": selected_doc_types == ["return"],
                 },
             ]
-            for row in rows:
-                item = _sales_document_data(row)
-                debt_timing = _sales_debt_timing(
-                    str(item.get("date_to") or item.get("date") or ""),
-                    today_date,
-                )
-                item["debt_age_days"] = (
-                    None
-                    if debt_timing["state"] == "none"
-                    else int(debt_timing["days_overdue"] or 0)
-                )
-                if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
-                    continue
-                if filters["status"] == "debt":
-                    if item["doc_type"] != "sale" or _sales_decimal(item.get("debt_value")) <= 0:
-                        continue
-                elif filters["statuses"] and item["status"] not in filters["statuses"]:
-                    continue
-                if (
-                    filters["payment_statuses"]
-                    and item["payment_status"] not in filters["payment_statuses"]
-                ):
-                    continue
-                if filters["client"] and item["client"] != filters["client"]:
-                    continue
-                item_date = str(item.get("date") or "").strip()
-                if filters["date_from"] and (not item_date or item_date < filters["date_from"]):
-                    continue
-                if filters["date_to"] and (not item_date or item_date > filters["date_to"]):
-                    continue
-                hay = " ".join([item["number"], item["client"], item["warehouse"], item["status_label"], item["doc_type_label"]]).lower()
-                if q_clean and q_clean not in hay:
-                    continue
-                sales.append(item)
             sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)
             debt_page_size = _table_page_size(debt_page_size)
             debt_clients_total = int(sales_debt_workspace["clients_count"])
