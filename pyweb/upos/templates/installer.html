@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=3">
-  <script defer src="/static/installer.js?v=3"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=4">
+  <script defer src="/static/installer.js?v=4"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -24,6 +24,20 @@
       </div>
       <div class="installer-header-actions">
         <span class="installer-connection" id="installer-connection">Онлайн</span>
+        <div class="installer-menu-wrap">
+          <button
+            class="installer-icon-button"
+            id="installer-menu-toggle"
+            type="button"
+            title="Меню"
+            aria-label="Меню"
+            aria-expanded="false"
+            aria-controls="installer-menu"
+          >☰</button>
+          <div class="installer-menu" id="installer-menu" hidden>
+            <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
+          </div>
+        </div>
         <button class="installer-icon-button" id="installer-refresh" type="button" title="Обновить" aria-label="Обновить">↻</button>
         <button class="installer-install-button" id="installer-install" type="button">Установить</button>
       </div>
@@ -75,6 +89,33 @@
         <button class="installer-icon-button" id="installer-detail-close" type="button" aria-label="Закрыть">×</button>
       </header>
       <div class="installer-detail-body" id="installer-detail-body"></div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-calendar" id="installer-calendar">
+    <div class="installer-calendar-shell">
+      <header class="installer-calendar-head">
+        <div>
+          <p>График установок</p>
+          <h2 id="installer-calendar-title">Календарь заказов</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-calendar-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="installer-calendar-body">
+        <div class="installer-calendar-toolbar">
+          <button class="installer-icon-button" id="installer-calendar-prev" type="button" aria-label="Предыдущий месяц">‹</button>
+          <strong id="installer-calendar-month"></strong>
+          <button class="installer-icon-button" id="installer-calendar-next" type="button" aria-label="Следующий месяц">›</button>
+        </div>
+        <div class="installer-calendar-weekdays" aria-hidden="true">
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+        </div>
+        <div class="installer-calendar-grid" id="installer-calendar-grid"></div>
+        <section class="installer-calendar-selection">
+          <h3 id="installer-calendar-selected-title">Заказы на выбранный день</h3>
+          <div class="installer-calendar-orders" id="installer-calendar-orders"></div>
+        </section>
+      </div>
     </div>
   </dialog>
 

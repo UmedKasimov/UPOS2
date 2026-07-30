@@ -74,6 +74,41 @@ button {
   gap: 8px;
 }
 
+.installer-menu-wrap {
+  position: relative;
+}
+
+.installer-menu {
+  position: absolute;
+  z-index: 45;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 210px;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.2);
+}
+
+.installer-menu button {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: #172033;
+  background: transparent;
+  font-weight: 750;
+  text-align: left;
+}
+
+.installer-menu button:hover,
+.installer-menu button:focus-visible {
+  outline: 0;
+  background: #eaf3ff;
+}
+
 .installer-connection {
   padding: 4px 7px;
   border: 1px solid rgba(134, 239, 172, 0.45);
@@ -394,6 +429,7 @@ main {
 }
 
 .installer-detail,
+.installer-calendar,
 .installer-help {
   width: min(100%, 820px);
   max-width: none;
@@ -407,6 +443,7 @@ main {
 }
 
 .installer-detail::backdrop,
+.installer-calendar::backdrop,
 .installer-help::backdrop {
   background: rgba(15, 23, 42, 0.56);
 }
@@ -415,6 +452,189 @@ main {
   display: flex;
   height: 100%;
   flex-direction: column;
+}
+
+.installer-calendar {
+  width: min(calc(100% - 16px), 820px);
+  height: min(96vh, 920px);
+  margin: auto;
+  border-radius: 8px;
+}
+
+.installer-calendar-shell {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.installer-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #dce4ef;
+}
+
+.installer-calendar-head p {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-calendar-head h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.installer-calendar-body {
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.installer-calendar-toolbar {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.installer-calendar-toolbar strong {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.installer-calendar-weekdays,
+.installer-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.installer-calendar-weekdays {
+  border: 1px solid #d8e1ee;
+  border-bottom: 0;
+  color: #64748b;
+  background: #f1f5f9;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.installer-calendar-weekdays span {
+  padding: 7px 2px;
+}
+
+.installer-calendar-day {
+  min-width: 0;
+  min-height: 90px;
+  padding: 5px;
+  border-right: 1px solid #d8e1ee;
+  border-bottom: 1px solid #d8e1ee;
+  background: #fff;
+}
+
+.installer-calendar-day:nth-child(7n + 1) {
+  border-left: 1px solid #d8e1ee;
+}
+
+.installer-calendar-day.is-outside {
+  background: #f8fafc;
+}
+
+.installer-calendar-day.is-selected {
+  background: #eaf3ff;
+  box-shadow: inset 0 0 0 2px #1673dc;
+}
+
+.installer-calendar-day.is-today .installer-calendar-date {
+  color: #fff;
+  background: #1673dc;
+}
+
+.installer-calendar-date {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #334155;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.installer-calendar-event {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid #b9d5f2;
+  border-radius: 5px;
+  color: #154d80;
+  background: #edf6ff;
+  font-size: 9px;
+  font-weight: 750;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-calendar-more {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.installer-calendar-selection {
+  margin-top: 14px;
+}
+
+.installer-calendar-selection h3 {
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+
+.installer-calendar-orders {
+  border-top: 1px solid #dce4ef;
+}
+
+.installer-calendar-order {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 11px 4px;
+  border: 0;
+  border-bottom: 1px solid #dce4ef;
+  color: #172033;
+  background: transparent;
+  text-align: left;
+}
+
+.installer-calendar-order:hover,
+.installer-calendar-order:focus-visible {
+  outline: 0;
+  background: #f1f7ff;
+}
+
+.installer-calendar-order strong,
+.installer-calendar-order span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-calendar-order small {
+  grid-column: 1 / -1;
+  color: #64748b;
 }
 
 .installer-detail-head {
@@ -713,6 +933,28 @@ main {
 
   .installer-order-meta strong {
     text-align: left;
+  }
+
+  .installer-calendar-body {
+    padding: 8px;
+  }
+
+  .installer-calendar-day {
+    min-height: 76px;
+    padding: 3px;
+  }
+
+  .installer-calendar-event {
+    padding: 3px;
+    font-size: 8px;
+  }
+
+  .installer-calendar-order {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .installer-calendar-order small {
+    grid-column: auto;
   }
 }
 

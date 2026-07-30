@@ -6,6 +6,11 @@
   const listNode = document.getElementById("installer-order-list");
   const detailDialog = document.getElementById("installer-detail");
   const detailBody = document.getElementById("installer-detail-body");
+  const calendarDialog = document.getElementById("installer-calendar");
+  const calendarGrid = document.getElementById("installer-calendar-grid");
+  const calendarOrders = document.getElementById("installer-calendar-orders");
+  const menuToggle = document.getElementById("installer-menu-toggle");
+  const menuNode = document.getElementById("installer-menu");
   const helpDialog = document.getElementById("installer-help");
   const toastNode = document.getElementById("installer-toast");
 
@@ -36,6 +41,8 @@
     orders: [],
     activeTab: "new",
     activeId: "",
+    calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    calendarDate: "",
     deferredInstallPrompt: null,
     busy: false,
   };
@@ -89,6 +96,42 @@
       date.getMonth() === today.getMonth() &&
       date.getDate() === today.getDate()
     );
+  }
+
+  function dateKey(value) {
+    const date = value instanceof Date ? value : parseLocalDate(value);
+    if (!date) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function dateFromKey(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+    if (!match) return null;
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  function calendarDateLabel(value) {
+    const date = dateFromKey(value);
+    if (!date) return "Заказы на выбранный день";
+    return new Intl.DateTimeFormat("ru-RU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(date);
+  }
+
+  function ordersForDate(value) {
+    return state.orders
+      .filter((order) => dateKey(order.scheduled_at) === value)
+      .sort((left, right) => {
+        const leftTime = parseLocalDate(left.scheduled_at)?.getTime() || 0;
+        const rightTime = parseLocalDate(right.scheduled_at)?.getTime() || 0;
+        return leftTime - rightTime;
+      });
   }
 
   function phoneHref(phone) {
@@ -263,6 +306,112 @@
     document.querySelectorAll(".installer-tab").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.tab === state.activeTab);
     });
+    if (calendarDialog.open) renderOrderCalendar();
+  }
+
+  function calendarEventMarkup(order) {
+    const clientName = order.client?.name || order.number || "Клиент";
+    return `
+      <button
+        class="installer-calendar-event"
+        type="button"
+        data-calendar-order-id="${escapeHtml(order.id)}"
+        title="${escapeHtml(clientName)}"
+      >${escapeHtml(clientName)}</button>
+    `;
+  }
+
+  function calendarOrderMarkup(order) {
+    const clientName = order.client?.name || "Клиент";
+    const orderNumber = order.number || order.id.slice(0, 8);
+    return `
+      <button
+        class="installer-calendar-order"
+        type="button"
+        data-calendar-order-id="${escapeHtml(order.id)}"
+      >
+        <strong>${escapeHtml(clientName)}</strong>
+        <span>${formatMoney(order.amount, order.currency)}</span>
+        <small>${escapeHtml(formatDateTime(order.scheduled_at))} · Заказ № ${escapeHtml(orderNumber)} · ${escapeHtml(order.status_label || "")}</small>
+      </button>
+    `;
+  }
+
+  function renderOrderCalendar() {
+    if (!state.calendarDate) state.calendarDate = dateKey(new Date());
+
+    const month = state.calendarMonth;
+    document.getElementById("installer-calendar-month").textContent =
+      new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(month);
+
+    const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    const mondayOffset = (firstOfMonth.getDay() + 6) % 7;
+    const gridStart = new Date(month.getFullYear(), month.getMonth(), 1 - mondayOffset);
+    const todayKey = dateKey(new Date());
+    const cells = [];
+
+    for (let index = 0; index < 42; index += 1) {
+      const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index);
+      const key = dateKey(day);
+      const orders = ordersForDate(key);
+      const classes = ["installer-calendar-day"];
+      if (day.getMonth() !== month.getMonth()) classes.push("is-outside");
+      if (key === state.calendarDate) classes.push("is-selected");
+      if (key === todayKey) classes.push("is-today");
+      cells.push(`
+        <div class="${classes.join(" ")}" data-calendar-date="${key}">
+          <button class="installer-calendar-date" type="button" data-calendar-date="${key}">
+            ${day.getDate()}
+          </button>
+          ${orders.slice(0, 2).map(calendarEventMarkup).join("")}
+          ${orders.length > 2 ? `<span class="installer-calendar-more">+ ещё ${orders.length - 2}</span>` : ""}
+        </div>
+      `);
+    }
+    calendarGrid.innerHTML = cells.join("");
+
+    const selectedOrders = ordersForDate(state.calendarDate);
+    document.getElementById("installer-calendar-selected-title").textContent =
+      calendarDateLabel(state.calendarDate);
+    calendarOrders.innerHTML = selectedOrders.length
+      ? selectedOrders.map(calendarOrderMarkup).join("")
+      : '<div class="installer-empty">На выбранный день установок нет</div>';
+  }
+
+  function closeInstallerMenu() {
+    menuNode.hidden = true;
+    menuToggle.setAttribute("aria-expanded", "false");
+  }
+
+  function openOrderCalendar() {
+    closeInstallerMenu();
+    const selectedDate = dateFromKey(state.calendarDate) || new Date();
+    state.calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    renderOrderCalendar();
+    if (!calendarDialog.open) calendarDialog.showModal();
+  }
+
+  function shiftCalendarMonth(offset) {
+    const selectedDate = dateFromKey(state.calendarDate) || state.calendarMonth;
+    const targetMonth = new Date(
+      state.calendarMonth.getFullYear(),
+      state.calendarMonth.getMonth() + offset,
+      1,
+    );
+    const lastDay = new Date(
+      targetMonth.getFullYear(),
+      targetMonth.getMonth() + 1,
+      0,
+    ).getDate();
+    state.calendarMonth = targetMonth;
+    state.calendarDate = dateKey(
+      new Date(
+        targetMonth.getFullYear(),
+        targetMonth.getMonth(),
+        Math.min(selectedDate.getDate(), lastDay),
+      ),
+    );
+    renderOrderCalendar();
   }
 
   function detailActionMarkup(order) {
@@ -480,6 +629,55 @@
       showToast(error.message, true);
     }
   }
+
+  menuToggle.addEventListener("click", () => {
+    const willOpen = menuNode.hidden;
+    menuNode.hidden = !willOpen;
+    menuToggle.setAttribute("aria-expanded", String(willOpen));
+  });
+
+  menuNode.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-menu-action]");
+    if (!button) return;
+    if (button.dataset.menuAction === "orders-calendar") openOrderCalendar();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!menuNode.hidden && !event.target.closest(".installer-menu-wrap")) closeInstallerMenu();
+  });
+
+  document.getElementById("installer-calendar-prev").addEventListener("click", () => {
+    shiftCalendarMonth(-1);
+  });
+
+  document.getElementById("installer-calendar-next").addEventListener("click", () => {
+    shiftCalendarMonth(1);
+  });
+
+  document.getElementById("installer-calendar-close").addEventListener("click", () => {
+    calendarDialog.close();
+  });
+
+  calendarDialog.addEventListener("click", (event) => {
+    if (event.target === calendarDialog) {
+      calendarDialog.close();
+      return;
+    }
+    const orderButton = event.target.closest("[data-calendar-order-id]");
+    if (orderButton) {
+      calendarDialog.close();
+      openDetail(orderButton.dataset.calendarOrderId);
+      return;
+    }
+    const dateButton = event.target.closest("[data-calendar-date]");
+    if (!dateButton) return;
+    state.calendarDate = dateButton.dataset.calendarDate;
+    const selectedDate = dateFromKey(state.calendarDate);
+    if (selectedDate && selectedDate.getMonth() !== state.calendarMonth.getMonth()) {
+      state.calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    }
+    renderOrderCalendar();
+  });
 
   listNode.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
