@@ -10471,6 +10471,22 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   background: color-mix(in srgb, #facc15 27%, var(--card));
 }
 
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
+  background: color-mix(in srgb, #22c55e 7%, var(--card));
+}
+
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale:hover td {
+  background: color-mix(in srgb, #22c55e 12%, var(--card));
+}
+
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--return td {
+  background: color-mix(in srgb, #b91c1c 11%, var(--card));
+}
+
+.sales-journal-table.products-catalog-table tbody tr.sales-table-row--return:hover td {
+  background: color-mix(in srgb, #b91c1c 17%, var(--card));
+}
+
 .sales-journal-doc-type-cell {
   font-size: 0.92rem !important;
   font-weight: 900;
@@ -23933,6 +23949,22 @@ html.dark .roles-permission-table tbody tr:hover td,
 html.dark .pnl-table tbody tr:hover td,
 html.dark .products-table tbody tr:hover td {
   background: oklch(1 0 0 / 0.045);
+}
+
+html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
+  background: color-mix(in srgb, #22c55e 10%, var(--card));
+}
+
+html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale:hover td {
+  background: color-mix(in srgb, #22c55e 16%, var(--card));
+}
+
+html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--return td {
+  background: color-mix(in srgb, #ef4444 15%, var(--card));
+}
+
+html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--return:hover td {
+  background: color-mix(in srgb, #ef4444 21%, var(--card));
 }
 
 .schet-ccy-line-amt,
