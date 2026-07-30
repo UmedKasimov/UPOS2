@@ -86,7 +86,10 @@
     const known = presets.find(([key]) => key === preset);
     if (known && from && to) return known[1];
     if (from && to && from !== to) return `${display(from)} - ${display(to)}`;
+    // Открытый диапазон: выбрана только нижняя граница.
+    if (from && !to) return `с ${display(from)}`;
     if (from) return display(from);
+    if (to) return `по ${display(to)}`;
     return 'Всё время';
   }
 
@@ -364,11 +367,16 @@
         state.date_to = state.date_from;
         state.date_from = from;
       }
-      const label = labelForSelection(state.date_from, state.date_to, state.preset, state.periodMode);
+      // В режиме «От и до» незаполненная верхняя граница означает открытый период
+      // («с такого-то числа»). Подставлять сюда date_from нельзя: фильтр схлопнулся
+      // бы в один день, хотя пользователь просил всё начиная с даты.
+      const openRange = !single && periodModes && state.periodMode === 'range';
+      const appliedTo = state.date_to || (openRange ? '' : state.date_from);
+      const label = labelForSelection(state.date_from, appliedTo, state.preset, state.periodMode);
       options.onApply?.({
         preset: state.preset,
         date_from: state.date_from,
-        date_to: state.date_to || state.date_from,
+        date_to: appliedTo,
         label,
         period_mode: state.periodMode,
       });

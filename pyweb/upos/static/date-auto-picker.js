@@ -8,14 +8,16 @@
     const form = input.closest('form');
     const toInputName = input.dataset.uposDateTo || `${input.name || 'date'}_to`;
     const toInput = rangeMode && form ? form.querySelector(`[name="${CSS.escape(toInputName)}"]`) : null;
-    const dateToValue = rangeMode ? (toInput?.value || input.value || '') : (input.value || '');
+    // Пустое «До» при заполненном «От» — открытый период, сохраняем его как есть:
+    // подстановка input.value превратила бы «с 20.07» обратно в один день.
+    const dateToValue = rangeMode ? (toInput?.value || '') : (input.value || '');
     const periodMode = periodModes
-      ? window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', dateToValue || input.value || '')
+      ? window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', dateToValue)
       : '';
     const rangeLabel = rangeMode
       ? window.UPOS_DATE_RANGE.labelForSelection(
           input.value || '',
-          dateToValue || input.value || '',
+          dateToValue,
           'custom',
           periodMode
         )
@@ -35,7 +37,11 @@
       periodMode,
       onApply: (range) => {
         const next = range.date_from || range.date_to || '';
-        const nextTo = rangeMode ? (range.date_to || next) : next;
+        // В режиме диапазона пустое «До» — это открытый период «с даты и далее».
+        // Раньше сюда подставлялось «От», и фильтр схлопывался в один день.
+        const nextTo = rangeMode
+          ? (range.date_to || (range.period_mode === 'range' ? '' : next))
+          : next;
         input.value = next;
         if (toInput) {
           toInput.value = nextTo;
