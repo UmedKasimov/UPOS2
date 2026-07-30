@@ -7417,9 +7417,18 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        workspace_settings = load_workspace_settings(wid)
+        timezone_name = normalize_workspace_timezone(str(workspace_settings.get("timezone") or ""))
+        try:
+            today_date = datetime.now(ZoneInfo(timezone_name)).date()
+        except Exception:
+            today_date = datetime.now(timezone.utc).date()
         q_clean = q.strip().lower()
         date_from_clean = date_from.strip()
         date_to_clean = date_to.strip()
+        if "date_from" not in request.query_params and "date_to" not in request.query_params:
+            date_from_clean = today_date.isoformat()
+            date_to_clean = today_date.isoformat()
         if date_from_clean and date_to_clean and date_from_clean > date_to_clean:
             date_from_clean, date_to_clean = date_to_clean, date_from_clean
         doc_type_filter_options = [
@@ -7551,7 +7560,6 @@ def create_app() -> FastAPI:
         business_segments = _workspace_business_segments(wid)
         crm_stages = _crm_workspace_stages(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
-        today_date = datetime.now(timezone.utc).date()
         with session_scope() as session:
             requested_crm_id = str(crm_record_id or "").strip()
             if requested_crm_id:
