@@ -1088,11 +1088,29 @@
     const subtitle = dialog.querySelector(".settings-profile-modal-sub");
     const submit = dialog.querySelector('.crm-record-form-actions button[type="submit"]');
     const clientInput = form?.querySelector('input[name="client"]');
+    const contactInput = form?.querySelector('input[name="contact"]');
     const duplicateNote = dialog.querySelector("[data-crm-client-duplicate]");
+    const contactMatchNote = dialog.querySelector("[data-crm-contact-match]");
     const existingClients = new Set(
       Array.from(document.querySelectorAll("#crm-client-list option"))
         .map((option) => String(option.value || "").trim().toLocaleLowerCase())
         .filter(Boolean),
+    );
+    const normalizePhone = (value) => {
+      const digits = String(value || "").replace(/\D+/g, "");
+      if (digits.length < 7) return "";
+      return digits.length >= 9 ? digits.slice(-9) : digits;
+    };
+    const clientsByPhone = new Map(
+      Array.from(document.querySelectorAll("#crm-contact-list option"))
+        .map((option) => [
+          normalizePhone(option.value),
+          {
+            name: String(option.dataset.clientName || option.textContent || "").trim(),
+            phone: String(option.value || "").trim(),
+          },
+        ])
+        .filter(([phone, client]) => phone && client.name),
     );
 
     const syncDuplicateNotice = () => {
@@ -1100,9 +1118,29 @@
       duplicateNote.hidden = !existingClients.has(String(clientInput.value || "").trim().toLocaleLowerCase());
     };
 
+    const syncContactMatch = () => {
+      if (!contactInput || !contactMatchNote || !clientInput) return;
+      const match = clientsByPhone.get(normalizePhone(contactInput.value));
+      const previousMatch = String(clientInput.dataset.crmContactMatch || "");
+      if (!match) {
+        contactMatchNote.hidden = true;
+        contactMatchNote.textContent = "";
+        if (previousMatch && clientInput.value === previousMatch) clientInput.value = "";
+        delete clientInput.dataset.crmContactMatch;
+        syncDuplicateNotice();
+        return;
+      }
+      clientInput.value = match.name;
+      clientInput.dataset.crmContactMatch = match.name;
+      contactMatchNote.textContent = `Номер уже есть: ${match.name}. Сделка будет привязана к этому клиенту.`;
+      contactMatchNote.hidden = false;
+      syncDuplicateNotice();
+    };
+
     const syncConditionalFields = () => {
       if (!form) return;
       const kind = form.querySelector('input[name="item_type"]:checked')?.value || "deal";
+      const isCompactDeal = form.classList.contains("is-compact-deal-create");
       const status = form.querySelector('select[name="status"]')?.value || "new";
       const stage = form.querySelector('select[name="stage_id"]');
       const stageText = String(stage?.selectedOptions?.[0]?.textContent || "").toLocaleLowerCase();
@@ -1112,9 +1150,9 @@
       const dueDate = form.querySelector('input[name="due_date"]');
       const lostReason = form.querySelector('input[name="lost_reason"]');
       const lostField = form.querySelector("[data-crm-lost-reason-field]");
-      if (nextStep) nextStep.required = isOpenWork;
-      if (dueDate) dueDate.required = isOpenWork;
-      if (lostReason) lostReason.required = isLost;
+      if (nextStep) nextStep.required = !isCompactDeal && isOpenWork;
+      if (dueDate) dueDate.required = !isCompactDeal && isOpenWork;
+      if (lostReason) lostReason.required = !isCompactDeal && isLost;
       if (lostField) lostField.hidden = !isLost;
     };
 
@@ -1144,9 +1182,26 @@
       field.dispatchEvent(new Event("input", { bubbles: true }));
     };
 
+    const syncFormPresentation = (mode, kind) => {
+      if (!form) return;
+      const isCompactDeal = mode === "create" && kind === "deal";
+      form.classList.toggle("is-compact-deal-create", isCompactDeal);
+      if (contactInput) contactInput.required = isCompactDeal;
+      if (isCompactDeal) {
+        if (title) title.textContent = "Новая сделка";
+        if (subtitle) subtitle.textContent = "Основные данные сделки";
+        if (submit) submit.textContent = "Создать сделку";
+        const nextStep = form.querySelector('input[name="next_step"]');
+        if (nextStep && !nextStep.value) setField("next_step", "Связаться с клиентом");
+      }
+      syncConditionalFields();
+    };
+
     const resetDialog = () => {
       if (!form) return;
       form.reset();
+      form.dataset.crmDialogMode = "create";
+      form.classList.remove("is-compact-deal-create");
       form.setAttribute("action", defaultAction);
       setField("record_id", "");
       if (title) title.textContent = "Новая запись";
@@ -1154,6 +1209,7 @@
       if (submit) submit.textContent = "Сохранить запись";
       syncConditionalFields();
       syncDuplicateNotice();
+      syncContactMatch();
     };
 
     const fillPayload = (payload) => {
@@ -1179,6 +1235,7 @@
 
     const openDialog = (kind, payload = null, mode = "create") => {
       resetDialog();
+      form.dataset.crmDialogMode = mode;
       setKind(kind);
       if (payload) fillPayload(payload);
       if (mode === "edit" && payload?.id && form) {
@@ -1187,8 +1244,9 @@
         if (subtitle) subtitle.textContent = "Карточка клиента, этап, следующий шаг и история";
         if (submit) submit.textContent = "Сохранить изменения";
       }
-      syncConditionalFields();
+      syncFormPresentation(mode, kind);
       syncDuplicateNotice();
+      syncContactMatch();
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {
@@ -1214,10 +1272,17 @@
         openDialog(payload.item_type || "deal", payload, "edit");
       });
     });
-    form?.querySelectorAll('input[name="item_type"], select[name="status"], select[name="stage_id"]').forEach((field) => {
+    form?.querySelectorAll('input[name="item_type"]').forEach((field) => {
+      field.addEventListener("change", () => {
+        const kind = form.querySelector('input[name="item_type"]:checked')?.value || "deal";
+        syncFormPresentation(form.dataset.crmDialogMode || "create", kind);
+      });
+    });
+    form?.querySelectorAll('select[name="status"], select[name="stage_id"]').forEach((field) => {
       field.addEventListener("change", syncConditionalFields);
     });
     clientInput?.addEventListener("input", syncDuplicateNotice);
+    contactInput?.addEventListener("input", syncContactMatch);
     document.addEventListener("crm:edit-record", (event) => {
       const payload = parsePayload(event.detail?.payload);
       if (!payload?.id) return;
@@ -1291,6 +1356,8 @@
       setSelectByValueOrText("lead_source", params.get("crm_source") || "Telegram", params.get("crm_source") || "Telegram");
       setSelectByValueOrText("stage_id", params.get("crm_stage") || "leads", "лид");
       setSelectByValueOrText("status", params.get("crm_status") || "new", "нов");
+      syncFormPresentation("create", "deal");
+      syncContactMatch();
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {

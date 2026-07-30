@@ -5758,6 +5758,39 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.crm-deal-contact-field {
+  display: none;
+}
+
+.crm-record-form.is-compact-deal-create {
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.crm-record-form.is-compact-deal-create [data-crm-extended-field],
+.crm-record-form.is-compact-deal-create .crm-record-form-grid > label:not([data-crm-deal-create-field]) {
+  display: none;
+}
+
+.crm-record-form.is-compact-deal-create .crm-record-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.crm-record-form.is-compact-deal-create .crm-deal-contact-field {
+  display: grid;
+}
+
+.settings-profile-modal.crm-record-dialog:has(.crm-record-form.is-compact-deal-create) {
+  width: min(34rem, 94vw);
+  max-width: min(34rem, 94vw);
+}
+
+.crm-record-form.is-compact-deal-create .crm-record-form-actions {
+  position: static;
+  padding-top: 0.85rem;
+  background: var(--card);
+}
+
 .crm-record-form-actions {
   position: sticky;
   bottom: 0;

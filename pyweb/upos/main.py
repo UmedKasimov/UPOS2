@@ -10243,6 +10243,7 @@ def create_app() -> FastAPI:
         data = {
             "item_type": item_type,
             "client": str(form.get("client") or "").strip(),
+            "contact": str(form.get("contact") or "").strip(),
             "responsible": str(form.get("responsible") or "").strip(),
             "date": str(form.get("date") or "").strip(),
             "due_date": str(form.get("due_date") or "").strip(),
@@ -10283,6 +10284,7 @@ def create_app() -> FastAPI:
             "status": row.status,
             "status_label": _crm_status_label(row.status),
             "client": str(data.get("client") or ""),
+            "contact": str(data.get("contact") or ""),
             "responsible": str(data.get("responsible") or ""),
             "date": str(data.get("date") or ""),
             "due_date": row.due_date or str(data.get("due_date") or ""),
@@ -10316,6 +10318,7 @@ def create_app() -> FastAPI:
             "item_type",
             "title",
             "client",
+            "contact",
             "responsible",
             "lead_source",
             "stage_id",
@@ -12786,7 +12789,7 @@ def create_app() -> FastAPI:
         summary_pipeline_total = Decimal("0")
         summary_won = 0
         summary_lost = 0
-        crm_options = {"clients": [], "responsibles": []}
+        crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": []}
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_activity_settings = _crm_activity_settings(crm_workspace_settings)
@@ -13056,6 +13059,14 @@ def create_app() -> FastAPI:
                 column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
             crm_options = {
                 "clients": sorted({row.name for row in counterparty_rows if row.name} | {item["client"] for item in crm_records if item["client"]}),
+                "contacts": [
+                    {
+                        "name": row.name,
+                        "phone": str(row.phone or _counterparty_extra(row).get("phone") or "").strip(),
+                    }
+                    for row in counterparty_rows
+                    if str(row.phone or _counterparty_extra(row).get("phone") or "").strip()
+                ],
                 "responsibles": sorted({item["responsible"] for item in crm_records if item["responsible"]} | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())),
                 "deals": deal_options,
             }
@@ -15851,7 +15862,16 @@ def create_app() -> FastAPI:
         _crm_append_activity(data, "Карточка создана", _crm_actor_name(request))
         with session_scope() as session:
             counterparty_id = None
-            if data["client"]:
+            contact_match = (
+                _counterparty_duplicate(session, wid, phone=data["contact"])
+                if data["contact"]
+                else None
+            )
+            if contact_match and contact_match[1] == "phone":
+                counterparty = contact_match[0]
+                data["client"] = counterparty.name
+                counterparty_id = counterparty.id
+            elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
                 counterparty_id = counterparty.id if counterparty else None
             row = CrmRecord(
@@ -15897,7 +15917,16 @@ def create_app() -> FastAPI:
             if not row or row.workspace_owner_id != wid:
                 return RedirectResponse(url="/crm?error=" + quote("CRM-запись не найдена") + "#tasks", status_code=302)
             counterparty_id = None
-            if data["client"]:
+            contact_match = (
+                _counterparty_duplicate(session, wid, phone=data["contact"])
+                if data["contact"]
+                else None
+            )
+            if contact_match and contact_match[1] == "phone":
+                counterparty = contact_match[0]
+                data["client"] = counterparty.name
+                counterparty_id = counterparty.id
+            elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
                 counterparty_id = counterparty.id if counterparty else None
             old_data = _json_object(row.data)
