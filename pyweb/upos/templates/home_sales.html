@@ -383,6 +383,7 @@
           {% endif %}
         </header>
         <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Типы документов журнала">
+          <span class="sales-document-tabs-title">Разделы журнала</span>
           {% for tab in sales_options.document_tabs %}
             <a
               class="messenger-channel-tab sales-document-tab{% if tab.active %} active{% endif %}"

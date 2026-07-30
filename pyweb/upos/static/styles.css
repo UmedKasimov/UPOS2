@@ -10764,8 +10764,49 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-document-tabs {
-  margin: 0 0.75rem;
-  min-height: 2.95rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0.55rem 0.75rem 0.7rem;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  border-radius: 0;
+  background: color-mix(in srgb, var(--primary) 2%, var(--card));
+}
+
+.sales-document-tabs-title {
+  grid-column: 1 / -1;
+  margin: 0 0 0.4rem;
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.sales-document-tabs .sales-document-tab {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  justify-content: flex-start;
+  padding: 0.38rem 0.75rem;
+}
+
+.sales-document-tabs .sales-document-tab::before {
+  border-radius: 0;
+  transform: none;
+}
+
+.sales-document-tabs .sales-document-tab:first-of-type::before {
+  border-radius: var(--workbench-radius-xs, 6px) 0 0 var(--workbench-radius-xs, 6px);
+}
+
+.sales-document-tabs .sales-document-tab:last-of-type::before {
+  border-radius: 0 var(--workbench-radius-xs, 6px) var(--workbench-radius-xs, 6px) 0;
 }
 
 .sales-document-tab[data-channel-brand="all"] {
@@ -10802,11 +10843,12 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
     minmax(10rem, 1fr)
     minmax(10rem, 1fr);
   align-items: end;
-  gap: 0.55rem;
-  margin: 0;
-  padding: 0.2rem 0 0.1rem;
-  border: 0;
-  background: transparent;
+  gap: 1px;
+  margin: 0.1rem 0 0;
+  padding: 1px;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-xs, 6px);
+  background: var(--workbench-line, var(--border));
   box-shadow: none;
 }
 
@@ -10815,6 +10857,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   grid-template-rows: 0.95rem 2.55rem;
   gap: 0.2rem;
   min-width: 0;
+  padding: 0.48rem 0.58rem 0.55rem;
+  background: var(--card);
 }
 
 .sales-journal-filter .sales-journal-filter-field > span:not(.upos-date-auto) {
@@ -10863,13 +10907,13 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-filter .products-catalog-search::before {
-  top: calc(0.95rem + 0.2rem + 1.275rem);
-  left: 1rem;
+  top: calc(0.48rem + 0.95rem + 0.2rem + 1.275rem);
+  left: 1.58rem;
 }
 
 .sales-journal-filter .products-catalog-search::after {
-  top: calc(0.95rem + 0.2rem + 1.625rem);
-  left: 1.67rem;
+  top: calc(0.48rem + 0.95rem + 0.2rem + 1.625rem);
+  left: 2.25rem;
 }
 
 .sales-status-filter {
@@ -11035,6 +11079,16 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 @media (max-width: 640px) {
   .sales-journal-filter {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-document-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-document-tabs .sales-document-tab::before,
+  .sales-document-tabs .sales-document-tab:first-of-type::before,
+  .sales-document-tabs .sales-document-tab:last-of-type::before {
+    border-radius: var(--workbench-radius-xs, 6px);
   }
 }
 
