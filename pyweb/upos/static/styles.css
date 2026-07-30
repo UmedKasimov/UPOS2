@@ -27042,7 +27042,7 @@ html.dark .warehouse-adjustment-summary {
 .dashboard-head p,
 .dashboard-section header p {
   margin: 3px 0 0;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 
@@ -27059,7 +27059,7 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-period-form label > span {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 700;
 }
@@ -27138,7 +27138,7 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-kpi span {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 700;
 }
@@ -27154,7 +27154,7 @@ html.dark .warehouse-adjustment-summary {
 .dashboard-kpi small {
   margin-top: 6px;
   overflow: hidden;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -27199,7 +27199,7 @@ html.dark .warehouse-adjustment-summary {
   padding: 8px 11px;
   border-bottom: 1px solid var(--border);
   background: var(--muted);
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 10px;
   text-align: left;
   text-transform: uppercase;
@@ -27224,7 +27224,7 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-table td small {
   margin-top: 2px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 10px;
 }
 
@@ -27258,7 +27258,7 @@ html.dark .warehouse-adjustment-summary {
   height: 26px;
   border-radius: 50%;
   background: var(--muted);
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 800;
 }
@@ -27283,7 +27283,7 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-seller-row small {
   margin-top: 2px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 10px;
 }
 
@@ -27296,7 +27296,7 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-empty {
   padding: 24px !important;
-  color: var(--muted) !important;
+  color: var(--muted-foreground) !important;
   font-size: 12px;
   text-align: center;
 }
