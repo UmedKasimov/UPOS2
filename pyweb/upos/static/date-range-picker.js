@@ -102,12 +102,14 @@
 
   function createMount(root, options) {
     root.classList.add('upos-date');
+    const inlineLabel = Boolean(options.inlineLabel);
     root.innerHTML = `
       <button type="button" class="upos-date-trigger" aria-haspopup="dialog" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
         <span>Дата</span>
+        ${inlineLabel ? '<span class="upos-date-summary"></span>' : ''}
       </button>
-      <span class="upos-date-summary"></span>
+      ${inlineLabel ? '' : '<span class="upos-date-summary"></span>'}
     `;
     return {
       trigger: root.querySelector('.upos-date-trigger'),

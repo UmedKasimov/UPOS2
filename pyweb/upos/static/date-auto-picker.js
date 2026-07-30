@@ -3,6 +3,7 @@
     if (!input || input.dataset.uposDateEnhanced === '1' || !window.UPOS_DATE_RANGE) return;
     input.dataset.uposDateEnhanced = '1';
     const rangeMode = input.hasAttribute('data-upos-date-range');
+    const inlineLabel = input.hasAttribute('data-upos-date-inline-label');
     const form = input.closest('form');
     const toInputName = input.dataset.uposDateTo || `${input.name || 'date'}_to`;
     const toInput = rangeMode && form ? form.querySelector(`[name="${CSS.escape(toInputName)}"]`) : null;
@@ -20,6 +21,7 @@
       date_from: input.value || '',
       date_to: dateToValue,
       label: rangeLabel,
+      inlineLabel,
       onApply: (range) => {
         const next = range.date_from || range.date_to || '';
         const nextTo = rangeMode ? (range.date_to || next) : next;

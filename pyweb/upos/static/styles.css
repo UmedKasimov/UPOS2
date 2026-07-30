@@ -10835,13 +10835,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-journal-filter {
   grid-area: filters;
-  grid-template-columns:
-    minmax(15rem, 1.6fr)
-    minmax(10rem, 1fr)
-    minmax(12rem, 1.25fr)
-    minmax(12rem, 1.1fr)
-    minmax(10rem, 1fr)
-    minmax(10rem, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: end;
   gap: 1px;
   margin: 0.1rem 0 0;
@@ -10857,6 +10851,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   grid-template-rows: 0.95rem 2.55rem;
   gap: 0.2rem;
   min-width: 0;
+  height: 4.73rem;
   padding: 0.48rem 0.58rem 0.55rem;
   background: var(--card);
 }
@@ -10885,6 +10880,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   min-width: 0;
 }
 
+.sales-journal-filter-field > input {
+  height: 2.55rem;
+  min-height: 2.55rem;
+}
+
 .sales-journal-filter-date .upos-date-trigger {
   justify-content: flex-start;
   width: 100%;
@@ -10894,7 +10894,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-filter-date .upos-date-summary {
+  min-width: 0;
   overflow: hidden;
+  color: var(--foreground);
+  font-size: inherit;
+  font-weight: 700;
   text-overflow: ellipsis;
 }
 
