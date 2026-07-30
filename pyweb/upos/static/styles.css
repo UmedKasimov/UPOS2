@@ -27472,7 +27472,14 @@ html.dark .warehouse-adjustment-summary {
 .dashboard-content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  align-items: start;
   gap: 14px;
+}
+
+.dashboard-ranking-stack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
 }
 
 .dashboard-section {
@@ -27587,6 +27594,11 @@ html.dark .warehouse-adjustment-summary {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dashboard-segment-row strong i {
+  margin-right: 5px;
+  font-style: normal;
 }
 
 .dashboard-seller-row small {

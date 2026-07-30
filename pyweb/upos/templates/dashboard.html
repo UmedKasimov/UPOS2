@@ -139,28 +139,53 @@
         </div>
       </section>
 
-      <section class="dashboard-section" aria-labelledby="dashboard-sellers-title">
-        <header>
-          <div>
-            <h3 id="dashboard-sellers-title">Топ продавцов</h3>
-            <p>Рейтинг по сумме продаж</p>
+      <div class="dashboard-ranking-stack">
+        <section class="dashboard-section" aria-labelledby="dashboard-sellers-title">
+          <header>
+            <div>
+              <h3 id="dashboard-sellers-title">Топ продавцов</h3>
+              <p>Рейтинг по сумме продаж</p>
+            </div>
+          </header>
+          <div class="dashboard-seller-list">
+            {% for seller in dashboard.seller_rows %}
+              <article class="dashboard-seller-row">
+                <span class="dashboard-seller-rank">{{ seller.position }}</span>
+                <div>
+                  <strong>{{ seller.name }}</strong>
+                  <small>{{ seller.sale_count }} {{ "продажа" if seller.sale_count == 1 else "продаж" }}</small>
+                </div>
+                <b>{{ seller.amount_label }}</b>
+              </article>
+            {% else %}
+              <p class="dashboard-empty">Продаж за выбранный период нет.</p>
+            {% endfor %}
           </div>
-        </header>
-        <div class="dashboard-seller-list">
-          {% for seller in dashboard.seller_rows %}
-            <article class="dashboard-seller-row">
-              <span class="dashboard-seller-rank">{{ seller.position }}</span>
-              <div>
-                <strong>{{ seller.name }}</strong>
-                <small>{{ seller.sale_count }} {{ "продажа" if seller.sale_count == 1 else "продаж" }}</small>
-              </div>
-              <b>{{ seller.amount_label }}</b>
-            </article>
-          {% else %}
-            <p class="dashboard-empty">Продаж за выбранный период нет.</p>
-          {% endfor %}
-        </div>
-      </section>
+        </section>
+
+        <section class="dashboard-section" aria-labelledby="dashboard-segments-title">
+          <header>
+            <div>
+              <h3 id="dashboard-segments-title">Топ сегментов</h3>
+              <p>Кому продали за выбранный период</p>
+            </div>
+          </header>
+          <div class="dashboard-seller-list">
+            {% for segment in dashboard.segment_rows %}
+              <article class="dashboard-seller-row dashboard-segment-row">
+                <span class="dashboard-seller-rank">{{ segment.position }}</span>
+                <div>
+                  <strong>{% if segment.icon %}<i>{{ segment.icon }}</i>{% endif %}{{ segment.name }}</strong>
+                  <small>{{ segment.sale_count }} {{ "продажа" if segment.sale_count == 1 else "продаж" }}</small>
+                </div>
+                <b>{{ segment.amount_label }}</b>
+              </article>
+            {% else %}
+              <p class="dashboard-empty">Сегментов с продажами за выбранный период нет.</p>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
     </div>
   </section>
 {% endblock %}

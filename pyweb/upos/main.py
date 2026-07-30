@@ -7268,6 +7268,12 @@ def create_app() -> FastAPI:
         def money(value: Any) -> str:
             return f"{_sales_money_label(value)} {primary_currency}"
 
+        business_segments = _workspace_business_segments(wid)
+        business_segments_by_id = {
+            str(item.get("id") or ""): item
+            for item in business_segments
+            if str(item.get("id") or "").strip()
+        }
         with session_scope() as session:
             rows = list(
                 session.execute(
@@ -7276,6 +7282,39 @@ def create_app() -> FastAPI:
                     .order_by(SaleDocument.created_at.desc())
                 ).scalars()
             )
+            counterparties = list(
+                session.execute(
+                    select(Counterparty).where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind == "client",
+                    )
+                ).scalars()
+            )
+
+        client_segments_by_id: dict[str, dict[str, str]] = {}
+        client_segments_by_name: dict[str, dict[str, str]] = {}
+        for counterparty in counterparties:
+            extra = _counterparty_extra(counterparty)
+            segment_id = str(extra.get("business_segment_id") or "").strip()
+            configured_segment = business_segments_by_id.get(segment_id, {})
+            segment = {
+                "name": str(
+                    extra.get("business_segment")
+                    or configured_segment.get("name")
+                    or extra.get("industry")
+                    or ""
+                ).strip(),
+                "icon": str(
+                    extra.get("business_segment_icon")
+                    or configured_segment.get("icon")
+                    or extra.get("map_icon")
+                    or ""
+                ).strip(),
+            }
+            if not segment["name"]:
+                continue
+            client_segments_by_id[str(counterparty.id)] = segment
+            client_segments_by_name[str(counterparty.name or "").strip().casefold()] = segment
 
         totals = {
             "sale_count": 0,
@@ -7302,6 +7341,7 @@ def create_app() -> FastAPI:
         }
         daily: dict[str, dict[str, Any]] = {}
         sellers: dict[str, dict[str, Any]] = {}
+        segments: dict[str, dict[str, Any]] = {}
 
         for row in rows:
             data = _json_object(row.data)
@@ -7378,6 +7418,40 @@ def create_app() -> FastAPI:
             seller["sale_count"] += 1
             seller["amount"] += amount_primary
 
+            segment_id = str(data.get("business_segment_id") or "").strip()
+            configured_segment = business_segments_by_id.get(segment_id, {})
+            segment_name = str(
+                data.get("business_segment") or configured_segment.get("name") or ""
+            ).strip()
+            segment_icon = str(
+                data.get("business_segment_icon") or configured_segment.get("icon") or ""
+            ).strip()
+            if not segment_name:
+                client_segment = (
+                    client_segments_by_id.get(
+                        str(row.counterparty_id or data.get("counterparty_id") or "")
+                    )
+                    or client_segments_by_name.get(
+                        str(data.get("client") or "").strip().casefold()
+                    )
+                    or {}
+                )
+                segment_name = str(client_segment.get("name") or "").strip()
+                segment_icon = str(client_segment.get("icon") or "").strip()
+            segment_name = segment_name or "Без сегмента"
+            segment_key = segment_name.casefold()
+            segment = segments.setdefault(
+                segment_key,
+                {
+                    "name": segment_name,
+                    "icon": segment_icon,
+                    "sale_count": 0,
+                    "amount": Decimal("0"),
+                },
+            )
+            segment["sale_count"] += 1
+            segment["amount"] += amount_primary
+
         daily_rows = []
         for item in sorted(daily.values(), key=lambda value: value["date"], reverse=True):
             daily_rows.append(
@@ -7394,6 +7468,19 @@ def create_app() -> FastAPI:
             start=1,
         ):
             seller_rows.append(
+                {
+                    **item,
+                    "position": position,
+                    "amount_label": money(item["amount"]),
+                }
+            )
+
+        segment_rows = []
+        for position, item in enumerate(
+            sorted(segments.values(), key=lambda value: value["amount"], reverse=True)[:10],
+            start=1,
+        ):
+            segment_rows.append(
                 {
                     **item,
                     "position": position,
@@ -7448,6 +7535,7 @@ def create_app() -> FastAPI:
             ),
             "daily_rows": daily_rows,
             "seller_rows": seller_rows,
+            "segment_rows": segment_rows,
         }
         return tpl(
             request,
