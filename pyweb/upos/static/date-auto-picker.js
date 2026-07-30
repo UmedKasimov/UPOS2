@@ -4,12 +4,21 @@
     input.dataset.uposDateEnhanced = '1';
     const rangeMode = input.hasAttribute('data-upos-date-range');
     const inlineLabel = input.hasAttribute('data-upos-date-inline-label');
+    const periodModes = input.hasAttribute('data-upos-date-period-modes');
     const form = input.closest('form');
     const toInputName = input.dataset.uposDateTo || `${input.name || 'date'}_to`;
     const toInput = rangeMode && form ? form.querySelector(`[name="${CSS.escape(toInputName)}"]`) : null;
     const dateToValue = rangeMode ? (toInput?.value || input.value || '') : (input.value || '');
+    const periodMode = periodModes
+      ? window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', dateToValue || input.value || '')
+      : '';
     const rangeLabel = rangeMode
-      ? window.UPOS_DATE_RANGE.labelForRange(input.value || '', dateToValue || input.value || '', 'custom')
+      ? window.UPOS_DATE_RANGE.labelForSelection(
+          input.value || '',
+          dateToValue || input.value || '',
+          'custom',
+          periodMode
+        )
       : (input.value ? window.UPOS_DATE_RANGE.display(input.value) : '');
     input.classList.add('upos-date-hidden-input');
     const mount = document.createElement('span');
@@ -22,6 +31,8 @@
       date_to: dateToValue,
       label: rangeLabel,
       inlineLabel,
+      periodModes,
+      periodMode,
       onApply: (range) => {
         const next = range.date_from || range.date_to || '';
         const nextTo = rangeMode ? (range.date_to || next) : next;
@@ -33,27 +44,29 @@
         }
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        const nextLabel = rangeMode
-          ? window.UPOS_DATE_RANGE.labelForRange(next, nextTo, 'custom')
-          : (next ? window.UPOS_DATE_RANGE.display(next) : '');
         picker.setValue({
           preset: 'custom',
           date_from: next,
           date_to: nextTo,
-          label: nextLabel,
+          label: rangeMode ? range.label : (next ? window.UPOS_DATE_RANGE.display(next) : ''),
+          period_mode: range.period_mode,
         });
       },
     });
     input.addEventListener('change', () => {
       const nextTo = rangeMode ? (toInput?.value || input.value || '') : (input.value || '');
+      const nextPeriodMode = periodModes
+        ? window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', nextTo)
+        : '';
       const nextLabel = rangeMode
-        ? window.UPOS_DATE_RANGE.labelForRange(input.value || '', nextTo, 'custom')
+        ? window.UPOS_DATE_RANGE.labelForSelection(input.value || '', nextTo, 'custom', nextPeriodMode)
         : (input.value ? window.UPOS_DATE_RANGE.display(input.value) : '');
       picker.setValue({
         preset: 'custom',
         date_from: input.value || '',
         date_to: nextTo,
         label: nextLabel,
+        period_mode: nextPeriodMode,
       });
     });
   }

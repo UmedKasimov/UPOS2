@@ -2,7 +2,7 @@
 {% block title %}{{ _('schet.title_page') }}{% endblock %}
 {% block extra_head %}
   <meta name="csrf-token" content="{{ csrf_token }}" />
-  <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
+  <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=5" />
   <link rel="stylesheet" href="{{ url_for('static', path='schet-page.css') }}?v=33" />
 {% endblock %}
 {% block page_header %}
@@ -164,6 +164,6 @@
 {% block scripts %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
-  <script src="{{ url_for('static', path='date-range-picker.js') }}?v=13"></script>
+  <script src="{{ url_for('static', path='date-range-picker.js') }}?v=14"></script>
   <script src="{{ url_for('static', path='schet-page.js') }}?v=41" defer></script>
 {% endblock %}

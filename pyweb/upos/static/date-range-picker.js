@@ -1,7 +1,13 @@
 (() => {
   const DAY = 24 * 60 * 60 * 1000;
   const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+  const monthFullNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
   const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const periodModeOptions = [
+    ['day', 'День'],
+    ['month', 'Месяц'],
+    ['range', 'От и до'],
+  ];
   const presets = [
     ['today', 'Сегодня'],
     ['yesterday', 'Вчера'],
@@ -84,6 +90,28 @@
     return 'Всё время';
   }
 
+  function isFullMonth(from, to) {
+    const start = parseIso(from);
+    const end = parseIso(to);
+    if (!start || !end || !sameMonth(start, end) || start.getDate() !== 1) return false;
+    return end.getDate() === new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+  }
+
+  function inferPeriodMode(from, to) {
+    if (from && to && from === to) return 'day';
+    if (isFullMonth(from, to)) return 'month';
+    return 'range';
+  }
+
+  function labelForSelection(from, to, preset, periodMode) {
+    if (preset === 'all') return labelForRange(from, to, preset);
+    if (periodMode === 'month' && isFullMonth(from, to)) {
+      const date = parseIso(from);
+      return `${monthFullNames[date.getMonth()]} ${date.getFullYear()}`;
+    }
+    return labelForRange(from, to, preset);
+  }
+
   function monthStart(date) {
     return new Date(date.getFullYear(), date.getMonth(), 1);
   }
@@ -121,6 +149,7 @@
   function create(root, options = {}) {
     const parts = createMount(root, options);
     const single = options.mode === 'single';
+    const periodModes = Boolean(options.periodModes) && !single;
     const baseView = monthStart(parseIso(options.date_from) || new Date());
     const toView = monthStart(parseIso(options.date_to) || new Date(baseView.getFullYear(), baseView.getMonth() + 1, 1));
     const state = {
@@ -135,11 +164,14 @@
       yearBase: new Date().getFullYear(),
       pickerSide: 'from',
       selecting: 'from',
+      periodMode: periodModes
+        ? (options.periodMode || inferPeriodMode(options.date_from, options.date_to))
+        : (single ? 'day' : 'range'),
       panel: null,
     };
 
     function currentLabel() {
-      return options.label || labelForRange(state.date_from, state.date_to, state.preset);
+      return options.label || labelForSelection(state.date_from, state.date_to, state.preset, state.periodMode);
     }
 
     function sync() {
@@ -150,6 +182,14 @@
     function selectedText() {
       if (state.preset === 'all') return 'Выбранный период: за всё время';
       if (single && state.date_from) return `Дата: ${display(state.date_from)}`;
+      if (periodModes && state.periodMode === 'day') {
+        return state.date_from ? `День: ${display(state.date_from)}` : 'Выберите день';
+      }
+      if (periodModes && state.periodMode === 'month') {
+        return state.date_from && state.date_to
+          ? `Месяц: ${labelForSelection(state.date_from, state.date_to, 'custom', 'month')}`
+          : 'Выберите месяц';
+      }
       if (state.date_from && state.date_to) return `От: ${display(state.date_from)} · До: ${display(state.date_to)}`;
       if (state.date_from) return `От: ${display(state.date_from)} · выберите дату До`;
       return single ? 'Выберите дату' : 'Выберите дату От';
@@ -265,6 +305,13 @@
           ${presets.map(([key, label]) => `<button type="button" class="upos-date-preset${state.preset === key ? ' active' : ''}" data-upos-preset="${key}">${label}</button>`).join('')}
         </div>
         <div class="upos-date-main">
+          ${periodModes ? `
+            <div class="upos-date-period-modes" role="group" aria-label="Режим выбора периода">
+              ${periodModeOptions.map(([key, label]) => `
+                <button type="button" class="upos-date-period-mode${state.periodMode === key ? ' active' : ''}" data-upos-period-mode="${key}">${label}</button>
+              `).join('')}
+            </div>
+          ` : ''}
           <div class="upos-date-nav">
             <button type="button" data-upos-nav="-1" aria-label="Предыдущий месяц">‹</button>
             <div></div>
@@ -317,12 +364,13 @@
         state.date_to = state.date_from;
         state.date_from = from;
       }
-      const label = labelForRange(state.date_from, state.date_to, state.preset);
+      const label = labelForSelection(state.date_from, state.date_to, state.preset, state.periodMode);
       options.onApply?.({
         preset: state.preset,
         date_from: state.date_from,
         date_to: state.date_to || state.date_from,
         label,
+        period_mode: state.periodMode,
       });
       close();
     }
@@ -331,9 +379,12 @@
       state.preset = next.preset || state.preset || 'today';
       state.date_from = next.date_from || '';
       state.date_to = next.date_to || '';
+      state.periodMode = periodModes
+        ? (next.period_mode || inferPeriodMode(state.date_from, state.date_to))
+        : state.periodMode;
       options.label = next.label || '';
       syncViewsFromRange();
-      state.viewMode = 'days';
+      state.viewMode = periodModes && state.periodMode === 'month' ? 'months' : 'days';
       state.selecting = 'from';
       sync();
       renderPanel();
@@ -366,9 +417,26 @@
         state.preset = key;
         state.date_from = range.date_from;
         state.date_to = range.date_to;
+        if (periodModes) {
+          state.periodMode = ['today', 'yesterday', 'before-yesterday'].includes(key)
+            ? 'day'
+            : ['month', 'prev-month'].includes(key)
+              ? 'month'
+              : 'range';
+        }
         syncViewsFromRange();
-        state.viewMode = 'days';
+        state.viewMode = periodModes && state.periodMode === 'month' ? 'months' : 'days';
         state.selecting = 'from';
+        renderPanel();
+        return;
+      }
+      const periodMode = event.target.closest('[data-upos-period-mode]');
+      if (periodMode) {
+        state.periodMode = periodMode.getAttribute('data-upos-period-mode') || 'day';
+        state.preset = 'custom';
+        state.selecting = 'from';
+        state.viewMode = state.periodMode === 'month' ? 'months' : 'days';
+        syncViewsFromRange();
         renderPanel();
         return;
       }
@@ -417,6 +485,17 @@
       if (selectMonth) {
         const year = Number(selectMonth.getAttribute('data-upos-select-year')) || state.view.getFullYear();
         const month = Number(selectMonth.getAttribute('data-upos-select-month')) || 0;
+        if (periodModes && state.periodMode === 'month') {
+          const from = new Date(year, month, 1);
+          const to = new Date(year, month + 1, 0);
+          state.preset = 'custom';
+          state.date_from = iso(from);
+          state.date_to = iso(to);
+          setSideView('from', from);
+          state.viewMode = 'months';
+          renderPanel();
+          return;
+        }
         setSideView(state.pickerSide, new Date(year, month, 1));
         state.viewMode = 'days';
         renderPanel();
@@ -434,7 +513,7 @@
       if (day) {
         const value = day.getAttribute('data-upos-day') || '';
         state.preset = 'custom';
-        if (single) {
+        if (single || (periodModes && state.periodMode === 'day')) {
           state.date_from = value;
           state.date_to = value;
           state.selecting = 'from';
@@ -468,5 +547,12 @@
     return { setValue, open, close };
   }
 
-  window.UPOS_DATE_RANGE = { create, rangeForPreset, labelForRange, display };
+  window.UPOS_DATE_RANGE = {
+    create,
+    rangeForPreset,
+    labelForRange,
+    labelForSelection,
+    inferPeriodMode,
+    display,
+  };
 })();

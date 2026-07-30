@@ -15,7 +15,7 @@
       rel="stylesheet"
     />
   <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=360" />
-    <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=4" />
+    <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=5" />
     {% block extra_head %}{% endblock %}
   </head>
   <body
@@ -368,8 +368,8 @@
     <script src="{{ url_for('static', path='table-column-controls.js') }}?v=7" defer></script>
     <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=32" defer></script>
     <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
-    <script src="{{ url_for('static', path='date-range-picker.js') }}?v=13"></script>
-    <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=2" defer></script>
+    <script src="{{ url_for('static', path='date-range-picker.js') }}?v=14"></script>
+    <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=3" defer></script>
     {% if user %}
     <script>
       (() => {
