@@ -267,6 +267,7 @@ def _sales_document_details(payload: dict[str, Any]) -> list[dict[str, Any]]:
     for key in (
         "shipment_details",
         "order_details",
+        "purchase_details",
         "return_details",
         "details",
         "lines",
@@ -337,12 +338,17 @@ def _shipment_lines(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return lines
 
 
+def ibox_sales_document_lines(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build normalized sale, order, or return lines from a saved IBOX payload."""
+    return _shipment_lines(payload)
+
+
 def _ibox_sales_document_data(
     payload: dict[str, Any],
     entity_type: str,
 ) -> dict[str, Any]:
     created_at = _created_at(payload)
-    lines = _shipment_lines(payload)
+    lines = ibox_sales_document_lines(payload)
     first_line = lines[0] if lines else {}
     doc_type = {
         "orders": "order",

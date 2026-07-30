@@ -135,6 +135,7 @@ from upos.greenwhite_store import (
 )
 from upos.smpro_client import DEFAULT_MODULES, SMProError
 from upos.smpro_store import (
+    ibox_sales_document_lines,
     last_smpro_status,
     list_upos_branches,
     run_smpro_sync,
@@ -6345,6 +6346,11 @@ def create_app() -> FastAPI:
 
     def _sales_document_data(row: SaleDocument) -> dict[str, Any]:
         data = row.data if isinstance(row.data, dict) else {}
+        lines = data.get("lines") if isinstance(data.get("lines"), list) else []
+        if not lines:
+            ibox_payload = data.get("ibox_payload")
+            if isinstance(ibox_payload, dict):
+                lines = ibox_sales_document_lines(ibox_payload)
         paid_amount = _sales_decimal(data.get("paid_amount"))
         amount_value = _sales_decimal(row.amount)
         doc_type = str(data.get("doc_type") or "sale")
@@ -6412,7 +6418,7 @@ def create_app() -> FastAPI:
             "source_sale_id": str(data.get("source_sale_id") or ""),
             "source_order_id": str(data.get("source_order_id") or ""),
             "converted_sale_id": str(data.get("converted_sale_id") or ""),
-            "lines": data.get("lines") if isinstance(data.get("lines"), list) else [],
+            "lines": lines,
             "updated_at": row.updated_at,
         }
         item["detail_json"] = {

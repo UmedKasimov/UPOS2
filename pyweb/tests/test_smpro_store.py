@@ -92,12 +92,12 @@ class SMProStoreTests(unittest.TestCase):
             },
         )
 
-    def test_ibox_return_reads_nested_document_details(self) -> None:
+    def test_ibox_return_reads_purchase_details(self) -> None:
         document = _ibox_sales_document_data(
             {
                 "date": "2026-07-28",
                 "data": {
-                    "return_details": [
+                    "purchase_details": [
                         {
                             "product_id": 77,
                             "product_name": "Возвращённый товар",
