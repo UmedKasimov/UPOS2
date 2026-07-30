@@ -113,15 +113,15 @@
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
     {% macro render_sales_journal_filter() %}
-    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-workspace-view="journal order return debt"{% if sales_default_tab not in ['journal', 'order', 'return', 'debt'] %} hidden{% endif %}>
+    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-sales-journal-auto-filter data-workspace-view="journal order return debt"{% if sales_default_tab not in ['journal', 'order', 'return', 'debt'] %} hidden{% endif %}>
       <input type="hidden" name="journal_page_size" value="{{ sales_journal_pagination.page_size }}" />
       <input type="hidden" name="debt_page_size" value="{{ sales_debt_workspace.page_size }}" />
       {% if sales_filters.status != 'debt' %}<input type="hidden" name="view" value="journal" />{% endif %}
-      <label class="products-catalog-search">
+      <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
       </label>
-      <div class="sales-status-filter sales-doc-type-filter" data-sales-doc-type-filter>
+      <div class="sales-status-filter sales-doc-type-filter sales-journal-filter-field" data-sales-doc-type-filter>
         <span>Тип документа</span>
         <details class="sales-status-filter-details">
           <summary aria-label="Фильтр по типам документов">
@@ -147,16 +147,16 @@
           </div>
         </details>
       </div>
-      <label>
+      <label class="sales-journal-filter-field">
         <span>Клиент</span>
         <input name="client" list="sales-client-list" value="{{ sales_filters.client }}" />
       </label>
-      <label>
+      <label class="sales-journal-filter-field sales-journal-filter-date">
         <span>Дата</span>
         <input name="date_from" type="date" value="{{ sales_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" aria-label="Дата продажи от и до" />
         <input name="date_to" type="hidden" value="{{ sales_filters.date_to }}" />
       </label>
-      <div class="sales-status-filter sales-payment-status-filter" data-sales-payment-status-filter>
+      <div class="sales-status-filter sales-payment-status-filter sales-journal-filter-field" data-sales-payment-status-filter>
         <span>Оплата</span>
         <details class="sales-status-filter-details">
           <summary aria-label="Фильтр по состоянию оплаты">
@@ -182,7 +182,7 @@
           </div>
         </details>
       </div>
-      <div class="sales-status-filter" data-sales-status-filter>
+      <div class="sales-status-filter sales-journal-filter-field" data-sales-status-filter>
         <span>Статус</span>
         <details class="sales-status-filter-details">
           <summary aria-label="Фильтр по статусам">
@@ -208,8 +208,6 @@
           </div>
         </details>
       </div>
-      <button class="btn btn-secondary" type="submit">Применить</button>
-      <a class="btn btn-secondary" href="{{ url_for('sales_get') }}?view=journal#sales-journal">Очистить</a>
     </form>
     {% endmacro %}
     {% if sales_filters.status == 'debt' %}
@@ -1488,7 +1486,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=26" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=27" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=58" defer></script>
   {% if sales_embed %}
     <script>

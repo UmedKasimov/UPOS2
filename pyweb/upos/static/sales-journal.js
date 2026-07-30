@@ -887,7 +887,7 @@
     );
     var navigate = function () {
       var params = new URLSearchParams();
-      ["q", "client", "date_from", "date_to"].forEach(function (name) {
+      ["q", "client", "date_from", "date_to", "journal_page_size", "debt_page_size", "view"].forEach(function (name) {
         var field = form.querySelector("[name=\"" + name + "\"]");
         var value = field ? String(field.value || "").trim() : "";
         if (!value) return;
@@ -911,11 +911,28 @@
       event.preventDefault();
       navigate();
     });
+    var navigateTimer = 0;
+    var scheduleNavigate = function (delay) {
+      window.clearTimeout(navigateTimer);
+      navigateTimer = window.setTimeout(navigate, delay);
+    };
+    form.addEventListener("change", function (event) {
+      var field = event.target;
+      if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLSelectElement)) return;
+      scheduleNavigate(field.type === "checkbox" ? 650 : 120);
+    });
+    form.addEventListener("input", function (event) {
+      var field = event.target;
+      if (!(field instanceof HTMLInputElement)) return;
+      if (field.name !== "q" && field.name !== "client") return;
+      scheduleNavigate(450);
+    });
     var search = form.querySelector("input[name=\"q\"]");
     if (search) {
       search.addEventListener("keydown", function (event) {
         if (event.key !== "Enter") return;
         event.preventDefault();
+        window.clearTimeout(navigateTimer);
         navigate();
       });
     }
