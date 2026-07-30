@@ -3136,6 +3136,7 @@ def create_app() -> FastAPI:
                 "launcher": [
                     {"id": "tasks", "title": "Задачи", "subtitle": "Сроки и исполнители", "icon": "tasks"},
                     {"id": "deals", "title": "Сделки", "subtitle": "Клиенты и этапы", "icon": "deals"},
+                    {"id": "archive", "title": "Архив", "subtitle": "Закрытые и убранные сделки", "icon": "archive"},
                     {"id": "history", "title": "История", "subtitle": "Контакты и звонки", "icon": "history"},
                 ],
                 "filters": ["Клиент", "Ответственный", "Статус", "Срок", "Тип задачи"],

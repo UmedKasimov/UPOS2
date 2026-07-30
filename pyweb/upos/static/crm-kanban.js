@@ -760,8 +760,6 @@
   function initKanban(root) {
     let dragged = null;
     let selectedCard = null;
-    const archiveToggle = document.querySelector("[data-crm-archive-toggle]");
-    const archiveRow = document.querySelector("[data-crm-archive-row]");
     const archiveList = document.querySelector("[data-crm-archive-card-row]");
     const archiveCount = document.querySelector("[data-crm-archive-count]");
     const archiveSearch = document.querySelector("[data-crm-archive-search]");
@@ -822,6 +820,7 @@
       const item = document.createElement("article");
       item.className = "crm-archive-card";
       item.setAttribute("data-crm-archive-card", "");
+      item.dataset.crmRecordId = card.dataset.crmRecordId || "";
       const title = valueOrDash(card.dataset.crmDetailTitle);
       const client = valueOrDash(card.dataset.crmDetailClient);
       const amount = valueOrDash(card.dataset.crmDetailAmount);
@@ -843,6 +842,10 @@
             <span class="crm-kanban-order-count" hidden></span>
           </div>
         </div>
+        <form method="post" class="crm-archive-restore-form">
+          <input type="hidden" name="csrf_token" />
+          <button class="btn btn-secondary" type="submit">Вернуть из архива</button>
+        </form>
       `;
       item.querySelector(".crm-kanban-card-date").textContent = date;
       item.querySelector(".crm-kanban-card-top strong").textContent = title;
@@ -855,14 +858,19 @@
         orderBadge.textContent = `${orderCount}+`;
         orderBadge.setAttribute("aria-label", `${orderCount} заказов`);
       }
+      const restoreForm = item.querySelector(".crm-archive-restore-form");
+      const restoreTemplate = root.dataset.crmRestoreUrlTemplate || "/crm/__record__/restore";
+      if (restoreForm) {
+        restoreForm.action = restoreTemplate.replace("__record__", encodeURIComponent(item.dataset.crmRecordId));
+        restoreForm.querySelector('input[name="csrf_token"]').value = root.dataset.crmCsrf || "";
+      }
       archiveList.prepend(item);
       applyArchiveSearch();
     };
 
     const updateArchiveCount = () => {
       if (!archiveCount) return;
-      const current = Number.parseInt(archiveCount.textContent || "0", 10) || 0;
-      archiveCount.textContent = String(current + 1);
+      archiveCount.textContent = String(archiveList?.querySelectorAll("[data-crm-archive-card]").length || 0);
     };
 
     const showTrashDrop = () => {
@@ -952,15 +960,6 @@
         });
         if (column) updateColumnState(column);
       });
-    });
-
-    archiveToggle?.addEventListener("click", () => {
-      if (!archiveRow) return;
-      archiveRow.hidden = !archiveRow.hidden;
-      if (!archiveRow.hidden) {
-        applyArchiveSearch();
-        archiveSearch?.focus();
-      }
     });
 
     root.addEventListener("submit", (event) => {

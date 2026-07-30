@@ -5092,7 +5092,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-archive-row {
   display: grid;
   gap: 0.75rem;
-  margin: 0 0 0.85rem;
+  min-height: min(42rem, calc(100vh - 8rem));
   padding: 0.85rem;
   border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 8px);
@@ -5129,9 +5129,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-archive-card-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  align-content: start;
   gap: 0.7rem;
-  max-height: 18rem;
+  max-height: calc(100vh - 14rem);
   overflow: auto;
   padding-right: 0.15rem;
 }
@@ -6662,64 +6663,6 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   .crm-order-dialog-surface {
     border-radius: 0;
   }
-}
-
-.crm-archive-dialog {
-  width: min(52rem, 94vw);
-  max-width: min(52rem, 94vw);
-}
-
-.crm-archive-surface {
-  width: 100%;
-  max-height: min(84vh, 46rem);
-  overflow: hidden;
-}
-
-.crm-archive-list {
-  display: grid;
-  align-content: start;
-  gap: 0.55rem;
-  max-height: calc(84vh - 5rem);
-  overflow: auto;
-  padding: 1rem;
-}
-
-.crm-archive-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.9rem;
-  align-items: center;
-  padding: 0.72rem 0.8rem;
-  border: 1px solid var(--workbench-line, var(--border));
-  border-radius: var(--workbench-radius-sm, 8px);
-  background: var(--card);
-}
-
-.crm-archive-item div {
-  display: grid;
-  gap: 0.18rem;
-  min-width: 0;
-}
-
-.crm-archive-item div:last-child {
-  justify-items: end;
-}
-
-.crm-archive-item strong,
-.crm-archive-item span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crm-archive-item span,
-.crm-archive-empty {
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-
-.crm-archive-item div:last-child strong {
-  color: #16a34a;
 }
 
 .telephony-layout {
