@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=2">
-  <script defer src="/static/installer.js?v=2"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=3">
+  <script defer src="/static/installer.js?v=3"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -58,6 +58,9 @@
       </button>
       <button class="installer-tab" type="button" data-tab="done">
         <span>Готово</span><b id="installer-tab-done">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="archive">
+        <span>Архив</span><b id="installer-tab-archive">0</b>
       </button>
     </nav>
   </div>

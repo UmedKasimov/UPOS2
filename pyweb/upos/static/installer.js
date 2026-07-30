@@ -12,8 +12,9 @@
   const TAB_STATUSES = {
     new: ["new", "pending"],
     calendar: ["accepted", "date_negotiation", "scheduled", "postponed"],
-    work: ["en_route", "started", "in_progress", "awaiting_payment"],
-    done: ["completed", "cancelled"],
+    work: ["en_route", "started", "in_progress"],
+    done: ["awaiting_payment"],
+    archive: ["completed", "cancelled"],
   };
 
   const STATUS_ACTIONS = {
@@ -162,6 +163,7 @@
       calendar: state.orders.filter((order) => groupForStatus(order.status) === "calendar").length,
       work: state.orders.filter((order) => groupForStatus(order.status) === "work").length,
       done: state.orders.filter((order) => order.status === "completed").length,
+      archive: state.orders.filter((order) => groupForStatus(order.status) === "archive").length,
       today: state.orders.filter((order) => isToday(order.scheduled_at)).length,
     };
     document.getElementById("installer-count-new").textContent = counts.new;
@@ -173,6 +175,7 @@
     document.getElementById("installer-tab-work").textContent = counts.work;
     document.getElementById("installer-tab-done").textContent =
       state.orders.filter((order) => groupForStatus(order.status) === "done").length;
+    document.getElementById("installer-tab-archive").textContent = counts.archive;
   }
 
   function progressMarkup(order) {
@@ -245,7 +248,8 @@
         new: "Новых заказов пока нет",
         calendar: "В календаре пока нет установок",
         work: "Нет активных установок",
-        done: "Завершённых установок пока нет",
+        done: "Нет установок, ожидающих закрытия",
+        archive: "Архив завершённых проектов пока пуст",
       };
       listNode.innerHTML = `<div class="installer-empty">${messages[state.activeTab]}</div>`;
       return;
@@ -409,7 +413,7 @@
       }
       if (status === "completed") {
         detailDialog.close();
-        state.activeTab = "done";
+        state.activeTab = "archive";
         render();
       }
     } catch (error) {
