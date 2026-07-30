@@ -27504,13 +27504,23 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-table-wrap {
+  max-height: min(56vh, 560px);
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 42%, transparent) transparent;
+  scrollbar-gutter: stable;
 }
 
 .dashboard-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+}
+
+.dashboard-table thead {
+  position: sticky;
+  z-index: 2;
+  top: 0;
 }
 
 .dashboard-table th {
@@ -27554,6 +27564,25 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-seller-list {
   display: grid;
+  max-height: min(29vh, 280px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 42%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+
+.dashboard-table-wrap::-webkit-scrollbar,
+.dashboard-seller-list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dashboard-table-wrap::-webkit-scrollbar-thumb,
+.dashboard-seller-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted-foreground) 42%, transparent);
+  background-clip: padding-box;
 }
 
 .dashboard-seller-row {
@@ -27669,5 +27698,13 @@ html.dark .warehouse-adjustment-summary {
 
   .dashboard-table {
     min-width: 620px;
+  }
+
+  .dashboard-table-wrap {
+    max-height: 52vh;
+  }
+
+  .dashboard-seller-list {
+    max-height: 240px;
   }
 }
