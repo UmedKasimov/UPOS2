@@ -7375,6 +7375,12 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   white-space: nowrap;
 }
 
+.sales-detail-return-btn[hidden],
+[data-sales-detail-convert-form][hidden],
+.sales-document-detail-menu button[hidden] {
+  display: none !important;
+}
+
 .warehouse-purchase-detail-actions .warehouse-purchases-icon svg {
   width: 1.05rem;
   height: 1.05rem;
