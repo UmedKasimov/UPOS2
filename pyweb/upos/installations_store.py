@@ -12,9 +12,11 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from upos.db import session_scope
 from upos.db_models import (
@@ -23,8 +25,11 @@ from upos.db_models import (
     InstallationOrder,
     InstallationTask,
     InstallationTaskTemplate,
+    Role,
+    SaleDocument,
     User,
 )
+from upos.users_store import list_employees_safe
 
 # Порядок соответствует процессу из ТЗ. Держим кортежем: важен и состав, и очерёдность.
 INSTALLATION_STATUSES: tuple[tuple[str, str], ...] = (
@@ -71,6 +76,17 @@ PRIORITIES: tuple[tuple[str, str], ...] = (
 )
 
 PRIORITY_LABELS: dict[str, str] = dict(PRIORITIES)
+INSTALLATION_PRIORITIES: tuple[str, ...] = tuple(key for key, _label in PRIORITIES)
+INSTALLATION_PRIORITY_LABELS = PRIORITY_LABELS
+
+DEFAULT_TEMPLATE_NAME = "Стандартная установка"
+DEFAULT_TEMPLATE_TASKS: tuple[dict[str, Any], ...] = (
+    {"title": "Связаться с клиентом и подтвердить дату", "is_required": True},
+    {"title": "Проверить комплект заказа", "is_required": True},
+    {"title": "Установить и настроить U-POS", "is_required": True},
+    {"title": "Провести обучение клиента", "is_required": True},
+    {"title": "Получить подтверждение клиента", "is_required": True},
+)
 
 
 class InstallationError(ValueError):
@@ -527,6 +543,7 @@ def load_order(
 def list_templates(workspace_owner_id: str) -> list[dict[str, Any]]:
     """Активные шаблоны чек-листов для выпадающего списка у продавца."""
     with session_scope() as session:
+        ensure_default_installation_template(session, workspace_owner_id)
         rows = list(
             session.execute(
                 select(InstallationTaskTemplate)
@@ -549,3 +566,294 @@ def list_templates(workspace_owner_id: str) -> list[dict[str, Any]]:
             }
             for row in rows
         ]
+
+
+def _is_installer_profile(
+    *,
+    role_key: Any = "",
+    role_name: Any = "",
+    position: Any = "",
+    permissions: Any = None,
+) -> bool:
+    permission_map = permissions if isinstance(permissions, dict) else {}
+    key = _clean(role_key).casefold()
+    name = _clean(role_name).casefold()
+    job = _clean(position).casefold()
+    return (
+        bool(permission_map.get("installations"))
+        or key == "installer"
+        or "установ" in name
+        or "установ" in job
+        or "installer" in job
+    )
+
+
+def _parse_scheduled_at(raw: Any, timezone_name: str = "Asia/Tashkent") -> datetime | None:
+    value = _clean(raw)
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise InstallationError("Укажите корректные дату и время установки") from exc
+    if parsed.tzinfo is None:
+        try:
+            parsed = parsed.replace(tzinfo=ZoneInfo(timezone_name))
+        except Exception:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def ensure_default_installation_template(
+    session: Session,
+    workspace_owner_id: str,
+) -> InstallationTaskTemplate:
+    row = session.scalar(
+        select(InstallationTaskTemplate).where(
+            InstallationTaskTemplate.workspace_owner_id == workspace_owner_id,
+            InstallationTaskTemplate.name == DEFAULT_TEMPLATE_NAME,
+        )
+    )
+    if row is not None:
+        return row
+    row = InstallationTaskTemplate(
+        id=str(uuid.uuid4()),
+        workspace_owner_id=workspace_owner_id,
+        name=DEFAULT_TEMPLATE_NAME,
+        note="Базовый чек-лист установки U-POS",
+        tasks=[dict(item) for item in DEFAULT_TEMPLATE_TASKS],
+        is_active=True,
+        sort_order=0,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def list_installation_templates(workspace_owner_id: str) -> list[dict[str, Any]]:
+    return list_templates(workspace_owner_id)
+
+
+def list_installers(workspace_owner_id: str, organization_id: str = "") -> list[dict[str, Any]]:
+    installers: list[dict[str, Any]] = []
+    for employee in list_employees_safe(workspace_owner_id, organization_id):
+        if bool(employee.get("is_frozen")) or not _is_installer_profile(
+            role_key=employee.get("employee_role_key"),
+            role_name=employee.get("employee_role_name"),
+            position=employee.get("position"),
+            permissions=employee.get("employee_permissions"),
+        ):
+            continue
+        installers.append(
+            {
+                "id": _clean(employee.get("id")),
+                "name": _clean(employee.get("name") or employee.get("username")),
+                "position": _clean(
+                    employee.get("position") or employee.get("employee_role_name")
+                ),
+            }
+        )
+    return installers
+
+
+def _installer_for_workspace(
+    session: Session,
+    workspace_owner_id: str,
+    installer_user_id: str,
+) -> User:
+    installer = session.get(User, _clean(installer_user_id))
+    if (
+        installer is None
+        or installer.employer_user_id != workspace_owner_id
+        or bool(installer.is_frozen)
+    ):
+        raise InstallationError("Выберите активного установщика из сотрудников")
+    role = session.get(Role, installer.employee_role_id) if installer.employee_role_id else None
+    if role is not None and role.workspace_owner_id != workspace_owner_id:
+        role = None
+    if not _is_installer_profile(
+        role_key=getattr(role, "key", ""),
+        role_name=getattr(role, "name", ""),
+        position=installer.position,
+        permissions=getattr(role, "permissions", {}),
+    ):
+        raise InstallationError("Выберите сотрудника с ролью установщика")
+    return installer
+
+
+def _replace_unstarted_template_tasks(
+    session: Session,
+    *,
+    order: InstallationOrder,
+    template_id: str,
+) -> None:
+    tasks = order_tasks(session, order.id)
+    if any(task.is_done for task in tasks):
+        return
+    session.execute(
+        delete(InstallationTask).where(
+            InstallationTask.installation_order_id == order.id,
+        )
+    )
+    add_tasks(
+        session,
+        workspace_owner_id=order.workspace_owner_id,
+        order_id=order.id,
+        tasks=template_tasks(
+            session,
+            order.workspace_owner_id,
+            template_id,
+        ),
+    )
+
+
+def upsert_installation_for_order(
+    session: Session,
+    *,
+    workspace_owner_id: str,
+    sale_document: SaleDocument,
+    installer_user_id: str,
+    scheduled_at: Any,
+    template_id: str = "",
+    priority: str = "normal",
+    notes: str = "",
+    attachment_urls: list[str] | None = None,
+    actor_user_id: str | None = None,
+    timezone_name: str = "Asia/Tashkent",
+) -> InstallationOrder:
+    """Создаёт или обновляет назначение установки для заказа без дублей."""
+    installer = _installer_for_workspace(session, workspace_owner_id, installer_user_id)
+    parsed_schedule = _parse_scheduled_at(scheduled_at, timezone_name)
+    if parsed_schedule is None:
+        raise InstallationError("Укажите дату и время установки")
+
+    priority_key = _clean(priority).lower() or "normal"
+    if priority_key not in PRIORITY_LABELS:
+        priority_key = "normal"
+
+    template = None
+    clean_template_id = _clean(template_id)
+    if clean_template_id:
+        candidate = session.get(InstallationTaskTemplate, clean_template_id)
+        if (
+            candidate is not None
+            and candidate.workspace_owner_id == workspace_owner_id
+            and candidate.is_active
+        ):
+            template = candidate
+    if template is None:
+        template = ensure_default_installation_template(session, workspace_owner_id)
+
+    sale_data = sale_document.data if isinstance(sale_document.data, dict) else {}
+    contact = client_contact(session, sale_document.counterparty_id)
+    client_name = _clean(sale_data.get("client") or contact.get("name"))
+    client_phone = _clean(sale_data.get("client_phone") or contact.get("phone"))
+    client_address = _clean(sale_data.get("client_address") or contact.get("address"))
+    snapshot = {
+        "client_name": client_name,
+        "client_phone": client_phone,
+        "client_address": client_address,
+        "sale_lines": list(sale_data.get("lines") or []),
+        "template_id": template.id,
+        "template_name": template.name,
+        "installer_name": installer.name or installer.username,
+        "scheduled_at_local": _clean(scheduled_at),
+        "notes": _clean(notes),
+        "attachment_urls": [
+            _clean(url) for url in (attachment_urls or []) if _clean(url)
+        ],
+    }
+
+    order = session.scalar(
+        select(InstallationOrder).where(
+            InstallationOrder.workspace_owner_id == workspace_owner_id,
+            InstallationOrder.sale_document_id == sale_document.id,
+        )
+    )
+    previous_template_id = ""
+    if order is None:
+        order = create_installation(
+            session,
+            workspace_owner_id=workspace_owner_id,
+            installer_user_id=installer.id,
+            created_by_user_id=actor_user_id or "",
+            actor_name=_clean(sale_data.get("responsible")),
+            sale_document_id=sale_document.id,
+            counterparty_id=sale_document.counterparty_id or "",
+            branch_id=sale_document.branch_id or "",
+            scheduled_at=parsed_schedule,
+            priority=priority_key,
+            address=client_address,
+            amount=sale_document.amount,
+            currency=sale_document.currency,
+            template_id=template.id,
+            comment=notes,
+            data=snapshot,
+            external_source="sale",
+            external_id=sale_document.id,
+        )
+    else:
+        old_data = order.data if isinstance(order.data, dict) else {}
+        previous_template_id = _clean(old_data.get("template_id"))
+        order.installer_user_id = installer.id
+        order.counterparty_id = sale_document.counterparty_id
+        order.branch_id = sale_document.branch_id
+        order.scheduled_at = parsed_schedule
+        order.scheduled_confirmed = False
+        order.priority = priority_key
+        order.address = client_address
+        order.amount = _decimal(sale_document.amount)
+        order.currency = (_clean(sale_document.currency, 3) or "UZS").upper()
+        order.data = {**old_data, **snapshot}
+        flag_modified(order, "data")
+        if previous_template_id != template.id:
+            _replace_unstarted_template_tasks(
+                session,
+                order=order,
+                template_id=template.id,
+            )
+        log_event(
+            session,
+            workspace_owner_id=workspace_owner_id,
+            order_id=order.id,
+            kind="assignment_updated",
+            actor_user_id=actor_user_id or "",
+            detail=f"Назначение обновлено: {installer.name or installer.username}",
+            payload={
+                "installer_user_id": installer.id,
+                "scheduled_at": parsed_schedule.isoformat(),
+                "priority": priority_key,
+            },
+        )
+
+    conflicts = busy_conflicts(
+        session,
+        workspace_owner_id=workspace_owner_id,
+        installer_user_id=installer.id,
+        scheduled_at=parsed_schedule,
+        exclude_order_id=order.id,
+    )
+    conflict_warning = (
+        f"Рядом по времени уже назначен выезд {conflicts[0].number}" if conflicts else ""
+    )
+    order_data = order.data if isinstance(order.data, dict) else {}
+    order.data = {**order_data, "conflict_warning": conflict_warning}
+    flag_modified(order, "data")
+
+    sale_document.data = {
+        **sale_data,
+        "installation_id": order.id,
+        "installer_user_id": installer.id,
+        "installer_name": installer.name or installer.username,
+        "installation_scheduled_at": _clean(scheduled_at),
+        "installation_scheduled_at_utc": parsed_schedule.isoformat(),
+        "installation_template_id": template.id,
+        "installation_priority": priority_key,
+        "installation_notes": _clean(notes),
+        "installation_attachment_urls": snapshot["attachment_urls"],
+        "installation_status": order.status,
+        "installation_conflict_warning": conflict_warning,
+    }
+    flag_modified(sale_document, "data")
+    session.flush()
+    return order

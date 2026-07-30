@@ -8796,6 +8796,43 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   font-variant-numeric: tabular-nums;
 }
 
+.sales-installation-section {
+  margin-top: 0.15rem;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 4%, var(--card));
+}
+
+.sales-installation-section[hidden] {
+  display: none;
+}
+
+.sales-installation-section .sales-section-head p {
+  margin: 0.1rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+}
+
+.sales-installation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.sales-installation-grid > label {
+  min-width: 0;
+}
+
+.sales-installation-grid-wide {
+  grid-column: span 2;
+}
+
+.sales-installation-grid textarea {
+  min-height: 3.8rem;
+  resize: vertical;
+}
+
 .product-form-section {
   display: flex;
   flex-direction: column;
@@ -11630,6 +11667,10 @@ html.dark .sales-journal-task-completed {
     grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(9rem, 1fr));
   }
 
+  .sales-installation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .sales-form-id-field,
   .sales-form-currency-field {
     grid-column: auto;
@@ -11639,6 +11680,14 @@ html.dark .sales-journal-task-completed {
 @media (max-width: 720px) {
   .sales-form-identity-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-installation-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-installation-grid-wide {
+    grid-column: auto;
   }
 
   .sales-segment-icon-picker {

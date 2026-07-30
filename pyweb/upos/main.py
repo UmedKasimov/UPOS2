@@ -148,6 +148,13 @@ from upos.integrations import (
     integration_badges,
     integration_configured,
 )
+from upos.installations_store import (
+    INSTALLATION_PRIORITY_LABELS,
+    INSTALLATION_PRIORITIES,
+    list_installation_templates,
+    list_installers,
+    upsert_installation_for_order,
+)
 from upos.organizations_store import (
     create_organization,
     default_organization,
@@ -6418,6 +6425,24 @@ def create_app() -> FastAPI:
             "source_sale_id": str(data.get("source_sale_id") or ""),
             "source_order_id": str(data.get("source_order_id") or ""),
             "converted_sale_id": str(data.get("converted_sale_id") or ""),
+            "installation_id": str(data.get("installation_id") or ""),
+            "installer_user_id": str(data.get("installer_user_id") or ""),
+            "installer_name": str(data.get("installer_name") or ""),
+            "installation_scheduled_at": str(data.get("installation_scheduled_at") or ""),
+            "installation_template_id": str(data.get("installation_template_id") or ""),
+            "installation_priority": str(data.get("installation_priority") or "normal"),
+            "installation_notes": str(data.get("installation_notes") or ""),
+            "installation_attachment_urls": [
+                str(url).strip()
+                for url in (
+                    data.get("installation_attachment_urls")
+                    if isinstance(data.get("installation_attachment_urls"), list)
+                    else []
+                )
+                if str(url).strip()
+            ],
+            "installation_status": str(data.get("installation_status") or ""),
+            "installation_conflict_warning": str(data.get("installation_conflict_warning") or ""),
             "lines": lines,
             "updated_at": row.updated_at,
         }
@@ -6926,6 +6951,19 @@ def create_app() -> FastAPI:
             "note": str(form.get("note") or "").strip(),
             "crm_record_id": str(form.get("crm_record_id") or "").strip(),
             "source_sale_id": str(form.get("source_sale_id") or "").strip(),
+            "installer_user_id": str(form.get("installer_user_id") or "").strip(),
+            "installation_scheduled_at": str(form.get("installation_scheduled_at") or "").strip(),
+            "installation_template_id": str(form.get("installation_template_id") or "").strip(),
+            "installation_priority": str(form.get("installation_priority") or "normal").strip().lower(),
+            "installation_notes": str(form.get("installation_notes") or "").strip(),
+            "installation_attachment_urls": [
+                item.strip()
+                for item in re.split(
+                    r"[\r\n,]+",
+                    str(form.get("installation_attachment_urls") or ""),
+                )
+                if item.strip()
+            ],
             "lines": lines,
         }
         return data, amount, currency
@@ -7734,6 +7772,8 @@ def create_app() -> FastAPI:
         sales_prefill = {"crm_record_id": "", "client": client.strip()}
         business_segments = _workspace_business_segments(wid)
         crm_stages = _crm_workspace_stages(wid)
+        installer_options = list_installers(wid)
+        installation_templates = list_installation_templates(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
         with session_scope() as session:
             requested_crm_id = str(crm_record_id or "").strip()
@@ -8200,6 +8240,15 @@ def create_app() -> FastAPI:
                 "payment_status_filters": payment_status_filter_options,
                 "business_segments": business_segments,
                 "crm_stages": crm_stages,
+                "installers": installer_options,
+                "installation_templates": installation_templates,
+                "installation_priorities": [
+                    {
+                        "value": priority,
+                        "label": INSTALLATION_PRIORITY_LABELS[priority],
+                    }
+                    for priority in INSTALLATION_PRIORITIES
+                ],
                 "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
                 "next_numbers": next_numbers,
                 "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
@@ -8493,6 +8542,29 @@ def create_app() -> FastAPI:
                 data["inventory_applied"] = inventory_applied
                 data["warehouse_id"] = warehouse_row.id
                 data["counterparty_id"] = client_row.id
+                data["client_phone"] = str(client_row.phone or client_extra.get("phone") or "").strip()
+                data["client_address"] = str(client_extra.get("address") or "").strip()
+                if (
+                    editing_row is not None
+                    and str(data.get("doc_type") or "") == "order"
+                    and not str(data.get("installer_user_id") or "").strip()
+                    and not str(data.get("installation_scheduled_at") or "").strip()
+                ):
+                    for key in (
+                        "installation_id",
+                        "installer_user_id",
+                        "installer_name",
+                        "installation_scheduled_at",
+                        "installation_scheduled_at_utc",
+                        "installation_template_id",
+                        "installation_priority",
+                        "installation_notes",
+                        "installation_attachment_urls",
+                        "installation_status",
+                        "installation_conflict_warning",
+                    ):
+                        if key in old_data:
+                            data[key] = old_data[key]
             except ValueError as exc:
                 session.rollback()
                 return sales_form_redirect(error=str(exc))
@@ -8520,6 +8592,33 @@ def create_app() -> FastAPI:
                     data=data,
                 )
                 session.add(row)
+            try:
+                session.flush()
+                installer_user_id = str(data.get("installer_user_id") or "").strip()
+                installation_scheduled_at = str(data.get("installation_scheduled_at") or "").strip()
+                if data.get("doc_type") == "order" and (installer_user_id or installation_scheduled_at):
+                    if not installer_user_id:
+                        raise ValueError("Выберите установщика")
+                    if not installation_scheduled_at:
+                        raise ValueError("Укажите дату и время установки")
+                    upsert_installation_for_order(
+                        session,
+                        workspace_owner_id=wid,
+                        sale_document=row,
+                        installer_user_id=installer_user_id,
+                        scheduled_at=installation_scheduled_at,
+                        template_id=str(data.get("installation_template_id") or ""),
+                        priority=str(data.get("installation_priority") or "normal"),
+                        notes=str(data.get("installation_notes") or ""),
+                        attachment_urls=list(data.get("installation_attachment_urls") or []),
+                        actor_user_id=_session_user_id(session_user),
+                        timezone_name=normalize_workspace_timezone(
+                            str(load_workspace_settings(wid).get("timezone") or "")
+                        ),
+                    )
+            except ValueError as exc:
+                session.rollback()
+                return sales_form_redirect(error=str(exc))
             saved_sale_id = doc_id
             saved_sale_number = number
             if linked_crm_row is not None:

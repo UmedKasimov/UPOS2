@@ -902,6 +902,54 @@
             <input type="hidden" name="payment_lines" value="[]" data-sales-payment-lines />
           </div>
 
+          <section class="product-form-section sales-installation-section" data-sales-installation-section hidden>
+            <div class="sales-section-head">
+              <div>
+                <h3>Установка</h3>
+                <p>Назначение установщика и чек-листа по заказу</p>
+              </div>
+            </div>
+            <div class="sales-installation-grid">
+              <label>
+                <span>Установщик</span>
+                <select name="installer_user_id">
+                  <option value="">Не назначен</option>
+                  {% for installer in sales_options.installers %}
+                    <option value="{{ installer.id }}">{{ installer.name }}{% if installer.position %} · {{ installer.position }}{% endif %}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Дата и время установки</span>
+                <input type="datetime-local" name="installation_scheduled_at" />
+              </label>
+              <label>
+                <span>Шаблон задач</span>
+                <select name="installation_template_id">
+                  {% for template in sales_options.installation_templates %}
+                    <option value="{{ template.id }}">{{ template.name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Приоритет</span>
+                <select name="installation_priority">
+                  {% for priority in sales_options.installation_priorities %}
+                    <option value="{{ priority.value }}"{% if priority.value == "normal" %} selected{% endif %}>{{ priority.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="sales-installation-grid-wide">
+                <span>Задача установщику</span>
+                <textarea name="installation_notes" rows="2" placeholder="Что нужно учесть при установке"></textarea>
+              </label>
+              <label class="sales-installation-grid-wide">
+                <span>Вложения</span>
+                <textarea name="installation_attachment_urls" rows="2" placeholder="Ссылки на файлы, по одной в строке"></textarea>
+              </label>
+            </div>
+          </section>
+
           <section class="product-form-section">
             <div class="sales-section-head">
               <h3>Позиции</h3>

@@ -35,7 +35,18 @@ STAFF_ROLE_LABELS = {
 }
 
 
-ROLE_PERMISSION_KEYS = ("kassa", "schet", "reports", "adjustments", "shipments", "hr", "employees", "settings", "dictionary")
+ROLE_PERMISSION_KEYS = (
+    "kassa",
+    "schet",
+    "reports",
+    "adjustments",
+    "shipments",
+    "hr",
+    "employees",
+    "settings",
+    "dictionary",
+    "installations",
+)
 ROLE_PERMISSION_LABELS = {
     "kassa": "Касса",
     "schet": "Счёт",
@@ -46,6 +57,7 @@ ROLE_PERMISSION_LABELS = {
     "employees": "Сотрудники",
     "settings": "Настройки",
     "dictionary": "Справочники",
+    "installations": "Установки",
 }
 ROLE_BUTTON_PERMISSION_LABELS = {
     "kassa": {
@@ -177,6 +189,22 @@ DEFAULT_EMPLOYEE_ROLES = (
             "dictionary": False,
         },
     },
+    {
+        "key": "installer",
+        "name": "Установщик",
+        "permissions": {
+            "kassa": False,
+            "schet": False,
+            "reports": False,
+            "adjustments": False,
+            "shipments": False,
+            "hr": False,
+            "employees": False,
+            "settings": False,
+            "dictionary": False,
+            "installations": True,
+        },
+    },
 )
 STAFF_ROLE_TO_EMPLOYEE_ROLE = {
     "viewer": "cashier",
@@ -189,6 +217,7 @@ EMPLOYEE_ROLE_TO_STAFF_ROLE = {
     "hr_manager": "manager",
     "accountant": "editor",
     "cashier": "viewer",
+    "installer": "viewer",
 }
 
 

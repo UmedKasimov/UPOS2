@@ -905,6 +905,12 @@
       dateTo: root.querySelector('input[name="date_to"]')?.value || "",
       client: root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]')?.value || "",
       businessSegmentId: root.querySelector("[data-sales-segment-select]")?.value || "",
+      installerUserId: root.querySelector('select[name="installer_user_id"]')?.value || "",
+      installationScheduledAt: root.querySelector('input[name="installation_scheduled_at"]')?.value || "",
+      installationTemplateId: root.querySelector('select[name="installation_template_id"]')?.value || "",
+      installationPriority: root.querySelector('select[name="installation_priority"]')?.value || "normal",
+      installationNotes: root.querySelector('textarea[name="installation_notes"]')?.value || "",
+      installationAttachmentUrls: root.querySelector('textarea[name="installation_attachment_urls"]')?.value || "",
       currency: root.querySelector('select[name="currency"]')?.value || "",
       priceTypeId: root.querySelector('select[name="price_type_id"]')?.value || "",
       paidAmount: root.querySelector("[data-sales-paid-amount]")?.value || "",
@@ -1009,6 +1015,12 @@
     setDraftField(root, 'input[name="source_sale_id"]', draft.sourceSaleId);
     setDraftField(root, 'input[name="date"]', draft.date);
     setDraftField(root, 'input[name="date_to"]', draft.dateTo);
+    setDraftField(root, 'select[name="installer_user_id"]', draft.installerUserId);
+    setDraftField(root, 'input[name="installation_scheduled_at"]', draft.installationScheduledAt);
+    setDraftField(root, 'select[name="installation_template_id"]', draft.installationTemplateId);
+    setDraftField(root, 'select[name="installation_priority"]', draft.installationPriority);
+    setDraftField(root, 'textarea[name="installation_notes"]', draft.installationNotes);
+    setDraftField(root, 'textarea[name="installation_attachment_urls"]', draft.installationAttachmentUrls);
     setDraftField(root, 'select[name="currency"]', draft.currency);
     setDraftField(root, 'select[name="price_type_id"]', draft.priceTypeId);
     setDraftField(root, "[data-sales-paid-amount]", draft.paidAmount);
@@ -1049,6 +1061,7 @@
     if (editing && title) title.textContent = "Редактирование " + typeLabel + " " + (draft.number || "");
     if (editing && submit) submit.textContent = "Сохранить изменения";
     root.dataset.salesEditMode = editing ? "1" : "0";
+    syncInstallationSection(root);
     delete root.dataset.salesRestoringDraft;
     return true;
   }
@@ -2490,6 +2503,17 @@
     }
   }
 
+  function syncInstallationSection(root) {
+    var section = root.querySelector("[data-sales-installation-section]");
+    if (!section) return;
+    var docType = root.querySelector('input[name="doc_type"]')?.value || "sale";
+    var isOrder = docType === "order";
+    section.hidden = !isOrder;
+    section.querySelectorAll("input, select, textarea, button").forEach(function (control) {
+      control.disabled = !isOrder;
+    });
+  }
+
   function init() {
     var root = document.querySelector(".sales-form");
     if (!root) return;
@@ -2525,6 +2549,7 @@
     root.querySelectorAll('input[name="doc_type"]').forEach(function (input) {
       input.addEventListener("change", function () {
         syncDocumentNumber(root, options);
+        syncInstallationSection(root);
       });
     });
     syncDocumentNumber(root, options);
@@ -2552,6 +2577,7 @@
     } else {
       restoreSalesDraft(root, options);
     }
+    syncInstallationSection(root);
     hydratePaymentRows(root, parsePaymentLines(root));
     updatePaymentBreakdown(root);
     root.addEventListener("input", function () {

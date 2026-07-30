@@ -457,6 +457,14 @@
     draft.paymentType = sale.payment_type || "";
     draft.paymentLines = JSON.stringify(Array.isArray(sale.payment_lines) ? sale.payment_lines : []);
     draft.note = sale.note || "";
+    draft.installerUserId = sale.installer_user_id || "";
+    draft.installationScheduledAt = sale.installation_scheduled_at || "";
+    draft.installationTemplateId = sale.installation_template_id || "";
+    draft.installationPriority = sale.installation_priority || "normal";
+    draft.installationNotes = sale.installation_notes || "";
+    draft.installationAttachmentUrls = Array.isArray(sale.installation_attachment_urls)
+      ? sale.installation_attachment_urls.join("\n")
+      : "";
     return draft;
   }
 
