@@ -13336,6 +13336,32 @@ def create_app() -> FastAPI:
                     session.delete(row)
         return RedirectResponse(url="/clients?msg=deleted#clients", status_code=302)
 
+    @app.get("/api/clients/duplicates")
+    def api_clients_duplicates(request: Request):
+        """Отчёт по дубликатам контрагентов, созданным кассой."""
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "auth"}, status_code=401)
+        assert wid is not None
+        from upos.counterparty_merge import merge_cash_duplicates
+
+        return merge_cash_duplicates(wid, dry_run=True)
+
+    @app.post("/api/clients/duplicates/merge")
+    def api_clients_duplicates_merge(request: Request):
+        """Слить кассовые дубликаты контрагентов. Требует confirm=1."""
+        token = request.headers.get("X-CSRF-Token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "auth"}, status_code=401)
+        assert wid is not None
+        confirmed = str(request.query_params.get("confirm") or "") == "1"
+        from upos.counterparty_merge import merge_cash_duplicates
+
+        return merge_cash_duplicates(wid, dry_run=not confirmed)
+
     @app.post("/clients/routes/save", name="clients_route_save")
     async def clients_route_save(request: Request):
         form = await request.form()
