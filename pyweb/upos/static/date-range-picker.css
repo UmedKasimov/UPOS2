@@ -298,23 +298,34 @@
   font-weight: 800;
 }
 
-.upos-date-day.is-start::after,
+/* Метки разнесены по разным псевдоэлементам: когда «От» и «До» приходятся на один
+   день, обе должны быть видны. Раньше оба правила писали в ::after, и «До»
+   перекрывало «От» — метка начала диапазона не показывалась никогда. */
+.upos-date-day.is-start::before,
 .upos-date-day.is-end::after {
   position: absolute;
   top: 0.08rem;
-  right: 0.12rem;
   font-size: 0.48rem;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
 }
 
-.upos-date-day.is-start::after {
+.upos-date-day.is-start::before {
   content: "От";
+  left: 0.12rem;
 }
 
 .upos-date-day.is-end::after {
   content: "До";
+  right: 0.12rem;
+}
+
+/* В режиме «День» (и в одиночном выборе даты) выбран ровно один день —
+   границы диапазона подписывать незачем, достаточно подсветки. */
+.upos-date-panel[data-period-mode="day"] .upos-date-day.is-start::before,
+.upos-date-panel[data-period-mode="day"] .upos-date-day.is-end::after {
+  content: none;
 }
 
 .upos-date-footer {

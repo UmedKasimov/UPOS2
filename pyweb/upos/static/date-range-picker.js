@@ -298,6 +298,8 @@
 
     function renderPanel() {
       if (!state.panel) return;
+      // Режим нужен разметке: в «Дне» подписи границ диапазона скрываются.
+      state.panel.dataset.periodMode = single ? 'day' : state.periodMode;
       const content = state.viewMode === 'years'
         ? yearsHtml(state.yearBase || activeView().getFullYear())
         : state.viewMode === 'months'

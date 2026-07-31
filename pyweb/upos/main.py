@@ -252,8 +252,10 @@ CLIENT_WORKSPACES_DIR = BASE_DIR.parent / "client_workspaces"
 
 
 class CachedStaticFiles(StaticFiles):
-    """Статика с Cache-Control: версионированные ассеты (?v=N) кэшируются надолго,
-    остальные — сутки с ревалидацией по ETag/Last-Modified (их шлёт StaticFiles)."""
+    """Статика с Cache-Control. Ассеты с ?v=N в шаблонах кэшируются надолго: смена
+    версии меняет URL. Остальные обязаны ревалидироваться (no-cache) — иначе правка
+    файла без ?v= не дошла бы до пользователей, пока кэш не истечёт. Ревалидация
+    дешёвая: StaticFiles отвечает 304 по ETag/Last-Modified."""
 
     async def get_response(self, path: str, scope):  # type: ignore[override]
         response = await super().get_response(path, scope)
@@ -261,7 +263,7 @@ class CachedStaticFiles(StaticFiles):
             if b"v=" in (scope.get("query_string") or b""):
                 response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             else:
-                response.headers["Cache-Control"] = "public, max-age=86400"
+                response.headers["Cache-Control"] = "public, no-cache"
         return response
 
 
