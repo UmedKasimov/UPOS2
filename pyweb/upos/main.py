@@ -617,6 +617,10 @@ def safe_internal_path(raw: str | None, default: str = "/") -> str:
         return p
     if path_only == "/admin" or path_only.startswith("/admin/"):
         return p
+    if path_only == "/installer":
+        return p
+    if path_only == "/earnings" or path_only.startswith("/earnings/"):
+        return p
     return default
 
 
@@ -664,6 +668,12 @@ def post_login_redirect(user: dict, next_raw: str | None) -> str:
             if perms.get("employees")
             else "/settings"
             if perms.get("settings")
+            # Установщик без офисных прав живёт в PWA: отправлять его на /auth
+            # означало бесконечный редирект и «не могу зайти» на телефоне.
+            else "/installer"
+            if perms.get("installations")
+            else "/earnings"
+            if perms.get("earnings")
             else "/auth"
         )
     else:
@@ -903,6 +913,10 @@ def create_app() -> FastAPI:
             return "/settings?tab=dictionary"
         if _has_permission(user, "settings"):
             return "/settings"
+        if _has_permission(user, "installations"):
+            return "/installer"
+        if _has_permission(user, "earnings"):
+            return "/earnings"
         return "/auth"
 
     def _path_permission_requirement(path: str, method: str) -> tuple[str, ...]:
