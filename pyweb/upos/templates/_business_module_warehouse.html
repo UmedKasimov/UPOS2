@@ -242,11 +242,15 @@
           <span>Поставщик</span>
           <input name="supplier" list="warehouse-supplier-list" value="{{ warehouse_filters.supplier | default('') }}" placeholder="Все поставщики" />
         </label>
+        <label class="sales-journal-filter-field sales-journal-filter-date">
+          <span>Дата</span>
+          <input name="date_from" type="date" value="{{ warehouse_filters.date_from | default('') }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes aria-label="Период закупок: день, месяц или от и до" />
+          <input name="date_to" type="hidden" value="{{ warehouse_filters.date_to | default('') }}" />
+        </label>
         <input type="hidden" name="product" value="{{ warehouse_filters.product }}" />
         <input type="hidden" name="op_type" value="{{ warehouse_filters.op_type }}" />
         <input type="hidden" name="purchase_status" value="{{ warehouse_filters.purchase_status | default('') }}" />
         {% if warehouse_filters.critical %}<input type="hidden" name="critical" value="{{ warehouse_filters.critical }}" />{% endif %}
-        <button class="btn btn-secondary sales-journal-filter-btn" type="submit">Показать</button>
       </form>
     </header>
     <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы закупок">

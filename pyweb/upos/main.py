@@ -10386,11 +10386,11 @@ def create_app() -> FastAPI:
         active_status: str,
     ) -> list[dict[str, Any]]:
         """Разделы журнала закупок — как вкладки в журнале продаж."""
+        # Черновиков в закупках не бывает — вкладку убрали, чтобы не занимала место.
         specs = (
             ("", "Все", "ВС", "all"),
             ("ordered", "Заказы", "ЗК", "ordered"),
             ("purchased", "Завершённые", "ЗВ", "purchased"),
-            ("draft", "Черновики", "ЧР", "draft"),
         )
         tabs: list[dict[str, Any]] = []
         for status, label, logo, count_key in specs:
@@ -11999,6 +11999,12 @@ def create_app() -> FastAPI:
         assert wid is not None
         purchase_supplier_filter = str(request.query_params.get("supplier") or "").strip()
         purchase_status_filter = str(request.query_params.get("purchase_status") or "").strip()
+        purchase_date_from = str(request.query_params.get("date_from") or "").strip()
+        purchase_date_to = str(request.query_params.get("date_to") or "").strip()
+        # Перевёрнутый период пользователю ничего не находит — разворачиваем сами,
+        # как это уже делает журнал продаж.
+        if purchase_date_from and purchase_date_to and purchase_date_from > purchase_date_to:
+            purchase_date_from, purchase_date_to = purchase_date_to, purchase_date_from
         filters = {
             "q": q.strip(),
             "warehouse": warehouse.strip(),
@@ -12007,6 +12013,8 @@ def create_app() -> FastAPI:
             "critical": "1" if str(critical or "").strip() == "1" else "",
             "supplier": purchase_supplier_filter,
             "purchase_status": purchase_status_filter,
+            "date_from": purchase_date_from,
+            "date_to": purchase_date_to,
         }
         operation_preset = str(op or "").strip()
         if operation_preset not in {"in", "out", "transfer"}:
@@ -12129,6 +12137,11 @@ def create_app() -> FastAPI:
                 if filters["product"] and filters["product"].lower() not in line_products:
                     continue
                 if purchase_supplier_filter and purchase_supplier_filter.lower() not in str(item["supplier"]).lower():
+                    continue
+                purchase_date = str(item.get("date") or "").strip()
+                if purchase_date_from and (not purchase_date or purchase_date < purchase_date_from):
+                    continue
+                if purchase_date_to and (not purchase_date or purchase_date > purchase_date_to):
                     continue
                 # Счётчики вкладок считаем до фильтра по статусу, иначе выбранный
                 # раздел обнулял бы остальные вкладки.
