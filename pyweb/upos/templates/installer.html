@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=12">
-  <script defer src="/static/installer.js?v=12"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=14">
+  <script defer src="/static/installer.js?v=13"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -51,6 +51,8 @@
         Уведомления
         <b class="installer-menu-badge" id="installer-notify-badge" hidden>0</b>
       </button>
+      <button type="button" data-menu-action="new-order">Заказать</button>
+      <button type="button" data-menu-action="clients">Клиенты</button>
       <button type="button" data-menu-action="phonebook">Телефония</button>
       <button type="button" data-menu-action="earnings">Мой заработок</button>
       <button type="button" id="installer-push-toggle" hidden>Включить уведомления</button>
@@ -128,6 +130,78 @@
           <h3 id="installer-calendar-selected-title">Заказы на выбранный день</h3>
           <div class="installer-calendar-orders" id="installer-calendar-orders"></div>
         </section>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-new-order">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Новый заказ на установку</p>
+          <h2>Заказать</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-new-order-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <form class="installer-order-form" id="installer-order-form">
+          <label>
+            <span>Клиент*</span>
+            <input type="search" id="installer-order-client" list="installer-client-options" placeholder="Начните вводить название" autocomplete="off" required />
+            <datalist id="installer-client-options"></datalist>
+            <small>Если клиента нет в списке — впишите новое название, он создастся автоматически.</small>
+          </label>
+          <label id="installer-order-agent-wrap" hidden>
+            <span>Агент*</span>
+            <select id="installer-order-agent"></select>
+          </label>
+          <label>
+            <span>Дата и время установки*</span>
+            <input type="datetime-local" id="installer-order-date" required />
+          </label>
+          <label>
+            <span>Сумма</span>
+            <input type="text" inputmode="decimal" id="installer-order-amount" placeholder="0" />
+          </label>
+          <label>
+            <span>Комментарий</span>
+            <textarea id="installer-order-note" rows="2" placeholder="Что установить, особенности объекта"></textarea>
+          </label>
+          <button class="installer-primary-button" type="submit">Создать заказ</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-clients">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>База клиентов</p>
+          <h2>Клиенты</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-clients-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <form class="installer-order-form installer-client-form" id="installer-client-form">
+          <label>
+            <span>Название*</span>
+            <input type="text" id="installer-client-name" placeholder="Компания или имя" required />
+          </label>
+          <label>
+            <span>Телефон</span>
+            <input type="tel" id="installer-client-phone" placeholder="+998" />
+          </label>
+          <label>
+            <span>Адрес</span>
+            <input type="text" id="installer-client-address" placeholder="Город, улица" />
+          </label>
+          <button class="installer-primary-button" type="submit">Добавить клиента</button>
+        </form>
+        <label class="installer-phone-search">
+          <input type="search" id="installer-client-search" placeholder="Поиск клиента" />
+        </label>
+        <div class="installer-phone-list" id="installer-client-list"></div>
       </div>
     </div>
   </dialog>

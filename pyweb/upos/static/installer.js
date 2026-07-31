@@ -402,13 +402,153 @@
   }
 
   window.addEventListener("popstate", () => {
-    [notificationsDialog, earningsDialog, phonebookDialog, document.getElementById("installer-calendar")].forEach((dialog) => {
+    [notificationsDialog, earningsDialog, phonebookDialog, newOrderDialog, clientsDialog, document.getElementById("installer-calendar")].forEach((dialog) => {
       if (dialog?.open) dialog.close();
     });
   });
 
   const phonebookDialog = document.getElementById("installer-phonebook");
+  const newOrderDialog = document.getElementById("installer-new-order");
+  const clientsDialog = document.getElementById("installer-clients");
   let phonebookContacts = [];
+  let clientCache = [];
+
+  async function loadClients(query) {
+    const url = query ? `/api/installer/clients?q=${encodeURIComponent(query)}` : "/api/installer/clients";
+    const data = await apiRequest(url);
+    clientCache = data.clients || [];
+    return clientCache;
+  }
+
+  function renderClientList(rows) {
+    const list = document.getElementById("installer-client-list");
+    if (!list) return;
+    list.innerHTML = rows.length
+      ? rows.map((row) => `
+          <article class="installer-phone-item">
+            <div class="installer-phone-info">
+              <strong>${escapeHtml(row.name)}</strong>
+              <span>${escapeHtml(row.phone || "телефон не указан")}</span>
+              <small>${escapeHtml(row.address || "")}</small>
+            </div>
+          </article>`).join("")
+      : '<div class="installer-empty">Клиентов не найдено</div>';
+  }
+
+  async function openClients() {
+    closeInstallerMenu();
+    if (!clientsDialog) return;
+    const list = document.getElementById("installer-client-list");
+    if (list) list.innerHTML = '<div class="installer-loading">Загрузка...</div>';
+    openScreen(clientsDialog, "clients");
+    try {
+      renderClientList(await loadClients(""));
+    } catch (error) {
+      if (list) list.innerHTML = `<div class="installer-empty">${escapeHtml(error.message)}</div>`;
+    }
+  }
+
+  document.getElementById("installer-client-search")?.addEventListener("input", (event) => {
+    const needle = String(event.target.value || "").trim().toLowerCase();
+    renderClientList(
+      needle
+        ? clientCache.filter((row) => `${row.name} ${row.phone}`.toLowerCase().includes(needle))
+        : clientCache
+    );
+  });
+
+  document.getElementById("installer-client-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = document.getElementById("installer-client-name");
+    const phone = document.getElementById("installer-client-phone");
+    const address = document.getElementById("installer-client-address");
+    const submit = event.target.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      await apiRequest("/api/installer/clients", {
+        method: "POST",
+        body: JSON.stringify({name: name.value, phone: phone.value, address: address.value}),
+      });
+      showToast("Клиент добавлен");
+      name.value = ""; phone.value = ""; address.value = "";
+      renderClientList(await loadClients(""));
+    } catch (error) {
+      showToast(error.message || "Не удалось добавить", true);
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+
+  document.getElementById("installer-clients-close")?.addEventListener("click", () => {
+    closeScreen(clientsDialog);
+  });
+
+  async function openNewOrder() {
+    closeInstallerMenu();
+    if (!newOrderDialog) return;
+    openScreen(newOrderDialog, "new-order");
+    try {
+      const [clients, agents] = await Promise.all([
+        loadClients(""),
+        apiRequest("/api/installer/agents"),
+      ]);
+      const options = document.getElementById("installer-client-options");
+      if (options) {
+        options.innerHTML = clients
+          .map((row) => `<option value="${escapeHtml(row.name)}"></option>`)
+          .join("");
+      }
+      // Список агентов нужен только руководителю: установщик оформляет на себя.
+      const wrap = document.getElementById("installer-order-agent-wrap");
+      const select = document.getElementById("installer-order-agent");
+      if (wrap && select) {
+        const list = agents.agents || [];
+        wrap.hidden = !list.length;
+        select.innerHTML = list
+          .map((row) => `<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)}</option>`)
+          .join("");
+      }
+    } catch (error) {
+      showToast(error.message || "Не удалось загрузить справочники", true);
+    }
+  }
+
+  document.getElementById("installer-order-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const clientInput = document.getElementById("installer-order-client");
+    const typed = String(clientInput.value || "").trim();
+    const matched = clientCache.find((row) => row.name.toLowerCase() === typed.toLowerCase());
+    const agent = document.getElementById("installer-order-agent");
+    const agentWrap = document.getElementById("installer-order-agent-wrap");
+    const submit = event.target.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const payload = {
+        client_id: matched ? matched.id : "",
+        client_name: matched ? "" : typed,
+        scheduled_at: document.getElementById("installer-order-date").value,
+        amount: document.getElementById("installer-order-amount").value,
+        note: document.getElementById("installer-order-note").value,
+      };
+      if (agentWrap && !agentWrap.hidden && agent) payload.installer_user_id = agent.value;
+      const data = await apiRequest("/api/installer/orders/create", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      showToast(`Заказ ${data.order.number} создан`);
+      event.target.reset();
+      closeScreen(newOrderDialog);
+      loadOrders();
+    } catch (error) {
+      showToast(error.message || "Не удалось создать заказ", true);
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+
+  document.getElementById("installer-new-order-close")?.addEventListener("click", () => {
+    closeScreen(newOrderDialog);
+  });
 
   function renderPhonebook(filter) {
     const list = document.getElementById("installer-phone-list");
@@ -891,6 +1031,8 @@
     if (button.dataset.menuAction === "earnings") openEarnings();
     if (button.dataset.menuAction === "notifications") openNotifications();
     if (button.dataset.menuAction === "phonebook") openPhonebook();
+    if (button.dataset.menuAction === "new-order") openNewOrder();
+    if (button.dataset.menuAction === "clients") openClients();
   });
 
   menuClose?.addEventListener("click", closeInstallerMenu);

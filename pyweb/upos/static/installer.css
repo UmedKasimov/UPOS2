@@ -1364,3 +1364,49 @@ main {
   color: #94a3b8;
   font-size: 11px;
 }
+
+.installer-order-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.installer-order-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.installer-order-form input,
+.installer-order-form select,
+.installer-order-form textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 500;
+}
+
+.installer-order-form textarea {
+  min-height: 62px;
+  resize: vertical;
+}
+
+.installer-order-form small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.installer-client-form {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* display:grid у label перебивает атрибут hidden — возвращаем скрытие. */
+.installer-order-form label[hidden] {
+  display: none;
+}

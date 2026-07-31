@@ -7763,6 +7763,181 @@ def create_app() -> FastAPI:
             )
         return JSONResponse({"ok": True, "order": payload})
 
+    @app.get("/api/installer/clients", name="installer_clients_api")
+    def installer_clients_api(request: Request):
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        query = str(request.query_params.get("q") or "").strip().lower()
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(Counterparty)
+                    .where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.kind.in_(["client", "both"]),
+                    )
+                    .order_by(Counterparty.name.asc())
+                    .limit(500)
+                ).scalars()
+            )
+            clients = []
+            for row in rows:
+                extra = _counterparty_extra(row)
+                name = str(row.name or "")
+                phone = str(row.phone or "")
+                if query and query not in f"{name} {phone}".lower():
+                    continue
+                clients.append(
+                    {
+                        "id": row.id,
+                        "name": name,
+                        "phone": phone,
+                        "address": str(extra.get("address") or ""),
+                    }
+                )
+        return JSONResponse({"ok": True, "clients": clients[:200]})
+
+    @app.post("/api/installer/clients", name="installer_client_create_api")
+    async def installer_client_create_api(request: Request):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        name = " ".join(str((body or {}).get("name") or "").split())
+        if not name:
+            return _installer_api_error("Укажите название клиента", 400)
+        phone = str((body or {}).get("phone") or "").strip()
+        address = str((body or {}).get("address") or "").strip()
+        with session_scope() as session:
+            duplicate = _counterparty_duplicate(session, wid, counterparty_id="", name=name, phone=phone)
+            if duplicate:
+                return _installer_api_error(_counterparty_duplicate_message(duplicate), 409)
+            row = _ensure_counterparty(
+                session,
+                wid,
+                name=name,
+                role="client",
+                phone=phone,
+                data={"address": address, "client_type": "company", "status": "active"},
+            )
+            session.flush()
+            client = {"id": row.id, "name": row.name, "phone": row.phone or "", "address": address}
+        return JSONResponse({"ok": True, "client": client})
+
+    @app.post("/api/installer/orders/create", name="installer_order_create_api")
+    async def installer_order_create_api(request: Request, background_tasks: BackgroundTasks):
+        """Заказ, оформленный из приложения: попадает в продажи и в установки."""
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        client_id = str((body or {}).get("client_id") or "").strip()
+        client_name = " ".join(str((body or {}).get("client_name") or "").split())
+        scheduled_at = str((body or {}).get("scheduled_at") or "").strip()
+        note = str((body or {}).get("note") or "").strip()
+        amount = _sales_decimal((body or {}).get("amount"))
+        # Агента выбирает руководитель; установщик оформляет заказ на себя.
+        agent_id = str((body or {}).get("installer_user_id") or "").strip() if can_manage else installer_user_id
+        if not client_id and not client_name:
+            return _installer_api_error("Выберите клиента", 400)
+        if not agent_id:
+            return _installer_api_error("Выберите агента", 400)
+        if not scheduled_at:
+            return _installer_api_error("Укажите дату и время установки", 400)
+
+        actor = request.session.get("user") or {}
+        timezone_name = normalize_workspace_timezone(
+            str(load_workspace_settings(wid).get("timezone") or "")
+        )
+        try:
+            with session_scope() as session:
+                client_row = session.get(Counterparty, client_id) if client_id else None
+                if client_row is None or client_row.workspace_owner_id != wid:
+                    if not client_name:
+                        return _installer_api_error("Клиент не найден", 404)
+                    client_row = _ensure_counterparty(
+                        session, wid, name=client_name, role="client", data={"status": "active"}
+                    )
+                    session.flush()
+                number = _next_sales_document_number(session, wid, "order")
+                doc_id = str(uuid.uuid4())
+                data = {
+                    "doc_type": "order",
+                    "client": client_row.name,
+                    "counterparty_id": client_row.id,
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "note": note,
+                    "source": "installer_app",
+                    "installer_user_id": agent_id,
+                    "installation_scheduled_at": scheduled_at,
+                    "lines": [],
+                    "paid_amount": "0",
+                }
+                sale = SaleDocument(
+                    id=doc_id,
+                    workspace_owner_id=wid,
+                    number=number,
+                    amount=amount,
+                    currency="UZS",
+                    counterparty_id=client_row.id,
+                    data=data,
+                )
+                session.add(sale)
+                session.flush()
+                upsert_installation_for_order(
+                    session,
+                    workspace_owner_id=wid,
+                    sale_document=sale,
+                    installer_user_id=agent_id,
+                    scheduled_at=scheduled_at,
+                    notes=note,
+                    actor_user_id=_session_user_id(actor),
+                    timezone_name=timezone_name,
+                )
+                created = {"id": doc_id, "number": number, "client": client_row.name}
+        except (InstallationError, ValueError) as exc:
+            return _installer_api_error(str(exc), 400)
+
+        background_tasks.add_task(
+            push_notify_users,
+            wid,
+            [agent_id],
+            title="Новый заказ на установку",
+            body=f"Заказ {created['number']} · {created['client']}",
+            url="/installer",
+            tag=f"sale-{doc_id}",
+        )
+        return JSONResponse({"ok": True, "order": created})
+
+    @app.get("/api/installer/agents", name="installer_agents_api")
+    def installer_agents_api(request: Request):
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        if not can_manage:
+            return JSONResponse({"ok": True, "agents": [], "self_id": installer_user_id})
+        return JSONResponse(
+            {
+                "ok": True,
+                "self_id": "",
+                "agents": [
+                    {"id": str(item.get("id") or ""), "name": str(item.get("name") or item.get("username") or "")}
+                    for item in list_installers(wid)
+                ],
+            }
+        )
+
     @app.get("/api/installer/phonebook", name="installer_phonebook_api")
     def installer_phonebook_api(request: Request):
         """Телефоны клиентов по заказам установщика плюс его последние звонки."""
