@@ -3448,6 +3448,10 @@ def create_app() -> FastAPI:
         current_extra["is_client"] = row.kind in {"client", "both"}
         current_extra["is_supplier"] = row.kind in {"supplier", "both"}
         row.data = current_extra
+        # _counterparty_extra отдаёт сам row.data, поэтому присваивание выше кладёт
+        # на место тот же объект — SQLAlchemy считает атрибут неизменённым и UPDATE
+        # не уходит. Без этой пометки правки клиента молча терялись.
+        flag_modified(row, "data")
         row.external_source = row.external_source or "manual"
         row.external_id = row.external_id or _manual_counterparty_external_id(clean_name, tax_id)
         return row

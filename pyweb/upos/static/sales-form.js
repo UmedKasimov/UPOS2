@@ -337,6 +337,78 @@
     );
   }
 
+  function clientCardField(label, name, value, type) {
+    var input = type === "textarea"
+      ? '<textarea name="' + name + '" rows="2">' + escapeHtml(value || "") + "</textarea>"
+      : '<input type="' + (type || "text") + '" name="' + name + '" value="' + escapeHtml(value || "") + '" />';
+    return '<label><span>' + escapeHtml(label) + "</span>" + input + "</label>";
+  }
+
+  function clientCardSelect(label, name, value, options) {
+    var html = options.map(function (option) {
+      var selected = String(value || "") === option[0] ? " selected" : "";
+      return '<option value="' + escapeHtml(option[0]) + '"' + selected + ">" + escapeHtml(option[1]) + "</option>";
+    }).join("");
+    return '<label><span>' + escapeHtml(label) + '</span><select name="' + name + '">' + html + "</select></label>";
+  }
+
+  function clientCardEditForm(card) {
+    // clients_save перезаписывает карточку целиком: поля, которых нет в форме,
+    // затёрлись бы пустыми. Поэтому редкие атрибуты едут скрытыми полями.
+    var hiddenNames = [
+      "legal_name", "legal_address", "photo_url", "okved", "industry", "map_icon",
+      "business_segment_id", "program", "is_blacklisted", "sort_order",
+      "consignment_days", "cashback_percent", "delivery_frequency_days",
+      "owner_user", "owner_group", "latitude", "longitude", "crm_status",
+    ];
+    var hidden = hiddenNames.map(function (name) {
+      var raw = card[name];
+      if (name === "is_blacklisted") raw = card.is_blacklisted ? "1" : "";
+      return '<input type="hidden" name="' + name + '" value="' + escapeHtml(raw == null ? "" : String(raw)) + '" />';
+    }).join("");
+    var programs = Array.isArray(card.programs) ? card.programs : [];
+    hidden += programs.map(function (program) {
+      return '<input type="hidden" name="programs" value="' + escapeHtml(program) + '" />';
+    }).join("");
+    if (card.is_supplier) hidden += '<input type="hidden" name="is_supplier" value="1" />';
+
+    return (
+      '<form class="sales-client-card-form" data-sales-client-card-form data-client-id="' + escapeHtml(card.id || "") + '">' +
+      hidden +
+      '<input type="hidden" name="client_id" value="' + escapeHtml(card.id || "") + '" />' +
+      '<input type="hidden" name="response" value="json" />' +
+      '<div class="sales-client-card-form-grid">' +
+      clientCardField("Название*", "name", card.name) +
+      clientCardField("Официальное название", "official_name", card.official_name) +
+      clientCardField("Телефон", "phone", card.phone) +
+      clientCardField("Telegram", "telegram", card.telegram_phone || card.telegram) +
+      clientCardField("Email", "email", card.email, "email") +
+      clientCardField("ИНН", "tax_id", card.inn || card.tax_id) +
+      clientCardField("ПИНФЛ", "pinfl", card.pinfl) +
+      clientCardField("Категория", "category", card.category) +
+      clientCardField("Территория", "territory", card.territory) +
+      clientCardField("Маршрут", "route", card.route) +
+      clientCardField("Прайс-лист", "price_type", card.price_type) +
+      clientCardField("Кредитный лимит", "credit_limit", card.credit_limit) +
+      clientCardField("Код", "code", card.code) +
+      clientCardSelect("Тип клиента", "client_type", card.client_type, [["company", "Компания"], ["individual", "Физлицо"]]) +
+      clientCardSelect("Статус", "status", card.status, [["active", "Активный"], ["inactive", "Неактивный"]]) +
+      '<label class="wide"><span>Адрес</span><input type="text" name="address" value="' + escapeHtml(card.address || "") + '" /></label>' +
+      '<label class="wide"><span>Комментарий</span><textarea name="note" rows="2">' + escapeHtml(card.note || card.comment || "") + "</textarea></label>" +
+      "</div>" +
+      '<div class="sales-client-card-form-actions">' +
+      '<button class="btn" type="submit">Сохранить</button>' +
+      '<span class="sales-client-card-form-status" data-sales-client-card-form-status></span>' +
+      "</div>" +
+      '<dl class="sales-client-card-info sales-client-card-readonly">' +
+      "<div><dt>CRM статус</dt><dd>" + escapeHtml(card.crm_status_label || "-") + "</dd></div>" +
+      "<div><dt>Последний документ</dt><dd>" + escapeHtml(card.last_date || "-") + "</dd></div>" +
+      "<div><dt>Создан</dt><dd>" + escapeHtml(card.created_at || "-") + "</dd></div>" +
+      "</dl>" +
+      "</form>"
+    );
+  }
+
   function renderSalesClientCard(dialog, card) {
     var title = dialog.querySelector("[data-sales-client-card-title]");
     var metrics = dialog.querySelector("[data-sales-client-card-metrics]");
@@ -379,17 +451,7 @@
     var historyHtml = (card.history || []).length ? (card.history || []).map(function (row) {
       return '<article class="sales-client-card-event"><time>' + escapeHtml(row.date || "-") + '</time><strong>' + escapeHtml(row.title || "Событие") + '</strong><span>' + escapeHtml(row.detail || "") + '</span><small>' + escapeHtml([row.amount, row.status].filter(Boolean).join(" · ")) + '</small></article>';
     }).join("") : '<p class="sales-client-card-empty">История пока пуста.</p>';
-    var infoFields = [
-      ["Официальное название", card.official_name], ["Телефон", card.phone], ["Telegram", card.telegram_phone || card.telegram],
-      ["Email", card.email], ["ИНН", card.inn || card.tax_id], ["ПИНФЛ", card.pinfl], ["Категория", card.category],
-      ["Территория", card.territory], ["Маршрут", card.route], ["Адрес", card.address], ["Прайс-лист", card.price_type],
-      ["Кредитный лимит", card.credit_limit], ["CRM статус", card.crm_status_label], ["Статус", card.status],
-      ["Отрасль", card.industry], ["Код", card.code], ["Координаты", card.latitude && card.longitude ? card.latitude + ", " + card.longitude : ""],
-      ["Последний документ", card.last_date], ["Создан", card.created_at],
-    ];
-    var infoHtml = '<dl class="sales-client-card-info">' + infoFields.map(function (item) {
-      return '<div><dt>' + item[0] + '</dt><dd>' + escapeHtml(item[1] || "-") + '</dd></div>';
-    }).join("") + '</dl>';
+    var infoHtml = clientCardEditForm(card);
     var sections = [
       ["info", "Информация", infoHtml],
       ["documents", "Документы", clientCardTable(["№", "Тип", "Дата", "Сумма", "Статус"], documentRows, "Документов пока нет.")],
@@ -408,6 +470,63 @@
     if (loading) loading.hidden = true;
     if (error) error.hidden = true;
     if (content) content.hidden = false;
+  }
+
+  function submitClientCardForm(root, dialog, form) {
+    var url = String(root.dataset.salesClientSaveUrl || "");
+    var status = form.querySelector("[data-sales-client-card-form-status]");
+    var submit = form.querySelector('button[type="submit"]');
+    if (!url) return;
+    var body = new FormData(form);
+    var csrfInput = root.querySelector('input[name="csrf_token"]');
+    body.set("csrf_token", csrfInput ? csrfInput.value : "");
+    if (status) {
+      status.textContent = "Сохраняем...";
+      status.className = "sales-client-card-form-status";
+    }
+    if (submit) submit.disabled = true;
+    fetch(url, {method: "POST", body: body, headers: {Accept: "application/json"}})
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось сохранить");
+          return payload;
+        });
+      })
+      .then(function (payload) {
+        if (status) {
+          status.textContent = "Сохранено";
+          status.className = "sales-client-card-form-status is-ok";
+        }
+        var title = dialog.querySelector("[data-sales-client-card-title]");
+        if (title && payload.client && payload.client.name) title.textContent = payload.client.name;
+        // Метрики и списки считаются на сервере — перечитываем карточку целиком.
+        var template = String(root.dataset.salesClientCardUrlTemplate || "");
+        var clientId = form.getAttribute("data-client-id") || "";
+        if (template && clientId) {
+          fetch(template.replace("__client_id__", encodeURIComponent(clientId)), {headers: {Accept: "application/json"}})
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (card) {
+              if (!card) return;
+              renderSalesClientCard(dialog, card);
+              activateSalesClientCardTab(dialog, "info");
+              var freshStatus = dialog.querySelector("[data-sales-client-card-form-status]");
+              if (freshStatus) {
+                freshStatus.textContent = "Сохранено";
+                freshStatus.className = "sales-client-card-form-status is-ok";
+              }
+            })
+            .catch(function () {});
+        }
+      })
+      .catch(function (error) {
+        if (status) {
+          status.textContent = error.message || "Не удалось сохранить";
+          status.className = "sales-client-card-form-status is-error";
+        }
+      })
+      .then(function () {
+        if (submit) submit.disabled = false;
+      });
   }
 
   function activateSalesClientCardTab(dialog, tabName) {
@@ -2756,6 +2875,13 @@
         var tab = event.target.closest("[data-sales-client-card-tab]");
         if (tab) activateSalesClientCardTab(clientCardDialog, tab.getAttribute("data-sales-client-card-tab") || "info");
         if (event.target === clientCardDialog) closeSalesClientCard(clientCardDialog);
+      });
+      // Форма живёт внутри перерисовываемой панели, поэтому слушаем на диалоге.
+      clientCardDialog.addEventListener("submit", function (event) {
+        var form = event.target.closest("[data-sales-client-card-form]");
+        if (!form) return;
+        event.preventDefault();
+        submitClientCardForm(root, clientCardDialog, form);
       });
     }
     root.querySelectorAll("[data-sales-combobox]").forEach(function (combo) {

@@ -28892,3 +28892,64 @@ html.dark .crm-task-calendar-event {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Редактирование клиента прямо в карточке (вкладка «Информация»). */
+.sales-client-card-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.7rem;
+}
+
+.sales-client-card-form-grid label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.sales-client-card-form-grid label.wide {
+  grid-column: 1 / -1;
+}
+
+.sales-client-card-form-grid input,
+.sales-client-card-form-grid select,
+.sales-client-card-form-grid textarea {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 500;
+}
+
+.sales-client-card-form-grid textarea {
+  resize: vertical;
+}
+
+.sales-client-card-form-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+
+.sales-client-card-form-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.sales-client-card-form-status.is-ok {
+  color: #16a34a;
+}
+
+.sales-client-card-form-status.is-error {
+  color: var(--destructive, #dc2626);
+}
+
+.sales-client-card-readonly {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
