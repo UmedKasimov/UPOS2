@@ -221,56 +221,85 @@
     </form>
   </aside>
 
-  <article class="warehouse-purchases-board" data-workspace-view="purchases" hidden>
-    <header class="warehouse-purchases-head">
-      <h2>Закупки</h2>
-      <div class="warehouse-purchases-actions">
-        <button class="warehouse-purchases-icon" type="button" title="Избранное" aria-label="Избранное">☆</button>
-        <button type="button" class="btn" data-warehouse-open-operation>+ Закупка</button>
-        <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню">⋮</button>
+  <article class="products-list-panel warehouse-purchases-board" data-workspace-view="purchases" hidden>
+    <header class="products-panel-head sales-journal-head">
+      <div class="products-panel-title">
+        <h2>Закупки</h2>
+        <span>Всего: {{ warehouse_purchases_pagination.total }}</span>
       </div>
-      <form class="warehouse-purchases-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
+      <button type="button" class="btn sales-journal-create-btn" data-warehouse-open-operation>+ Закупка</button>
+      <form class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
         <input type="hidden" name="purchase_page_size" value="{{ warehouse_purchases_pagination.page_size }}" />
-        <label class="warehouse-purchases-search">
+        <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
           <span>Поиск</span>
-          <input name="q" type="search" value="{{ warehouse_filters.q }}" placeholder="Поиск" />
+          <input name="q" type="search" value="{{ warehouse_filters.q }}" placeholder="Номер, поставщик, склад" />
         </label>
-        <label>
-          <span>Дата закупки</span>
-          <input type="text" placeholder="Дата закупки" disabled />
-        </label>
-        <label>
-          <span>Ответственный</span>
-          <select disabled><option>Ответственный</option></select>
-        </label>
-        <label>
+        <label class="sales-journal-filter-field">
           <span>Склад</span>
-          <input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Склад" />
+          <input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Все склады" />
+        </label>
+        <label class="sales-journal-filter-field">
+          <span>Поставщик</span>
+          <input name="supplier" list="warehouse-supplier-list" value="{{ warehouse_filters.supplier | default('') }}" placeholder="Все поставщики" />
         </label>
         <input type="hidden" name="product" value="{{ warehouse_filters.product }}" />
         <input type="hidden" name="op_type" value="{{ warehouse_filters.op_type }}" />
+        <input type="hidden" name="purchase_status" value="{{ warehouse_filters.purchase_status | default('') }}" />
         {% if warehouse_filters.critical %}<input type="hidden" name="critical" value="{{ warehouse_filters.critical }}" />{% endif %}
-        <button class="warehouse-purchases-filter-btn" type="submit" aria-label="Фильтр">⌯</button>
+        <button class="btn btn-secondary sales-journal-filter-btn" type="submit">Показать</button>
       </form>
     </header>
-    <div class="warehouse-purchases-table-wrap">
-      <table class="warehouse-purchases-table" data-upos-column-controls>
+    <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы закупок">
+      <span class="sales-document-tabs-title">Разделы закупок</span>
+      {% for tab in warehouse_purchase_tabs %}
+        <a
+          class="messenger-channel-tab sales-document-tab{% if tab.active %} active{% endif %}"
+          href="{{ tab.href }}"
+          data-channel-brand="{{ tab.brand }}"
+          {% if tab.active %}aria-current="page"{% endif %}
+        >
+          <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
+          <span class="messenger-channel-label">{{ tab.label }}</span>
+          <b>{{ tab.count }}</b>
+        </a>
+      {% endfor %}
+    </nav>
+    <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
+      <table class="products-table products-catalog-table sales-table sales-journal-table warehouse-purchases-table" id="warehouse-purchases-table" data-upos-column-controls>
         <thead>
           <tr>
-            <th class="warehouse-purchases-check"><input type="checkbox" aria-label="Выбрать все закупки" /></th>
-            <th>Номер</th>
-            <th>Дата ↑</th>
-            <th>Поставщик</th>
-            <th>Сумма</th>
-            <th>Оплачено</th>
-            <th>Статус</th>
-            <th class="warehouse-purchases-actions-col"></th>
+            <th data-column-label="№">№</th>
+            <th data-column-label="Номер">Номер</th>
+            <th data-column-label="Дата" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Поставщик" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Поставщик</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Склад" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Склад</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th class="num" data-column-label="Сумма" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Сумма</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th class="num" data-column-label="Оплачено">Оплачено</th>
+            <th class="num" data-column-label="Долг">Долг</th>
+            <th data-column-label="Статус">Статус</th>
+            <th data-column-label="Действия" class="warehouse-purchases-actions-col"></th>
           </tr>
         </thead>
         <tbody>
           {% for doc in warehouse_purchases %}
-            <tr>
-              <td class="warehouse-purchases-check"><input type="checkbox" aria-label="Выбрать закупку {{ doc.number }}" /></td>
+            <tr class="sales-journal-row warehouse-purchase-row warehouse-purchase-row--{{ doc.status }}">
+              <td>{{ loop.index + warehouse_purchases_pagination.page_from - 1 }}</td>
               <td>
                 <a
                   class="warehouse-purchase-number"
@@ -282,29 +311,25 @@
                   <strong data-warehouse-purchase-highlight>{{ doc.number }}</strong>
                 </a>
               </td>
-              <td data-warehouse-purchase-highlight>{{ doc.date or "-" }}</td>
-              <td><a class="warehouse-purchase-supplier" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
-              <td class="warehouse-purchase-money" data-warehouse-purchase-highlight>
+              <td class="sales-journal-date-cell" data-warehouse-purchase-highlight>
+                {{ doc.date or "-" }}
+                {% if doc.payment_age_label %}<small>{{ doc.payment_age_label }}</small>{% endif %}
+              </td>
+              <td><a class="warehouse-purchase-supplier sales-journal-client-cell" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
+              <td data-warehouse-purchase-highlight>{{ doc.warehouse or "-" }}</td>
+              <td class="num warehouse-purchase-money" data-warehouse-purchase-highlight>
                 <strong>{{ doc.amount }} {{ doc.currency }}</strong>
               </td>
               <td
-                class="warehouse-purchase-money warehouse-purchase-paid"
+                class="num warehouse-purchase-money warehouse-purchase-paid"
                 data-payment-progress="{{ doc.payment_progress }}"
                 style="--purchase-paid-progress: {{ doc.payment_progress }}%;"
-                title="{{ doc.payment_progress }}%{% if doc.payment_age_label %} · {{ doc.payment_age_label }} после закупки{% endif %}"
+                title="{{ doc.payment_progress }}% оплачено"
               >
-                {% if doc.payment_age_label %}
-                  <span
-                    class="warehouse-purchase-paid-age"
-                    aria-label="{{ doc.payment_age_label }} после закупки"
-                  >{{ doc.payment_age_label }}</span>
-                {% endif %}
-                <span class="warehouse-purchase-paid-values">
-                  <span class="warehouse-purchase-paid-chip" data-warehouse-purchase-highlight>{{ doc.paid_amount }} {{ doc.currency }}</span>
-                  <span class="warehouse-purchase-rest-amount">
-                    Остаток <strong data-warehouse-purchase-highlight>{{ doc.debt_amount }} {{ doc.currency }}</strong>
-                  </span>
-                </span>
+                <span class="warehouse-purchase-paid-chip" data-warehouse-purchase-highlight>{{ doc.paid_amount }} {{ doc.currency }}</span>
+              </td>
+              <td class="num warehouse-purchase-debt-cell{% if doc.debt_amount and doc.debt_amount != '0' %} has-debt{% endif %}" data-warehouse-purchase-highlight>
+                {% if doc.debt_amount and doc.debt_amount != '0' %}{{ doc.debt_amount }} {{ doc.currency }}{% else %}-{% endif %}
               </td>
               <td>
                 <form class="warehouse-purchase-status-form" method="post" action="{{ url_for('warehouse_purchase_status', purchase_id=doc.id) }}">
@@ -353,30 +378,30 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="8">Документов закупки пока нет.</td></tr>
+            <tr><td colspan="10" class="sales-journal-empty">Документов закупки пока нет.</td></tr>
           {% endfor %}
-        </tbody>
-        {% if warehouse_purchase_totals %}
-          <tfoot>
-            <tr>
-              <td colspan="4"></td>
-              <td class="warehouse-purchase-money warehouse-purchase-total">
+          {% if warehouse_purchase_totals %}
+            <tr class="sales-journal-total-row">
+              <td colspan="5">ИТОГО</td>
+              <td class="num warehouse-purchase-total">
                 {% for total in warehouse_purchase_totals %}
                   <div>{{ total.amount }} {{ total.currency }}</div>
                 {% endfor %}
               </td>
-              <td class="warehouse-purchase-money warehouse-purchase-total warehouse-purchase-paid-total">
+              <td class="num warehouse-purchase-total">
                 {% for total in warehouse_purchase_paid_totals %}
-                  <div>Оплачено {{ total.amount }} {{ total.currency }}</div>
+                  <div>{{ total.amount }} {{ total.currency }}</div>
                 {% endfor %}
+              </td>
+              <td class="num warehouse-purchase-total warehouse-purchase-debt-total">
                 {% for total in warehouse_purchase_debt_totals %}
-                  <div class="warehouse-purchase-debt-total">Остаток {{ total.amount }} {{ total.currency }}</div>
+                  <div>{{ total.amount }} {{ total.currency }}</div>
                 {% endfor %}
               </td>
               <td colspan="2"></td>
             </tr>
-          </tfoot>
-        {% endif %}
+          {% endif %}
+        </tbody>
       </table>
     </div>
     <footer class="warehouse-purchases-footer">

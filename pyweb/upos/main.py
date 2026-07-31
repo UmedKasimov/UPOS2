@@ -1372,6 +1372,10 @@ def create_app() -> FastAPI:
                         )
         ctx.update(extra)
         ctx.setdefault("role_button_permission_labels", ROLE_BUTTON_PERMISSION_LABELS)
+        # base.html обращается к emp_perms в пунктах меню. Раньше переменную
+        # задавали только отдельные страницы, поэтому у сотрудника любая другая
+        # страница падала с UndefinedError — задаём её для всех шаблонов.
+        ctx.setdefault("emp_perms", _employee_permissions(sess_user))
         ctx["can_use_button"] = lambda section, action: _has_button_permission(sess_user, section, action)
         ctx["csrf_token"] = ensure_csrf_token(request)
         ctx.update(context_i18n(resolve_locale(request, sess_user)))
@@ -10376,6 +10380,40 @@ def create_app() -> FastAPI:
             unit = "дней"
         return f"{days} {unit}"
 
+    def _warehouse_purchase_tabs(
+        request: Request,
+        counts: dict[str, int],
+        active_status: str,
+    ) -> list[dict[str, Any]]:
+        """Разделы журнала закупок — как вкладки в журнале продаж."""
+        specs = (
+            ("", "Все", "ВС", "all"),
+            ("ordered", "Заказы", "ЗК", "ordered"),
+            ("purchased", "Завершённые", "ЗВ", "purchased"),
+            ("draft", "Черновики", "ЧР", "draft"),
+        )
+        tabs: list[dict[str, Any]] = []
+        for status, label, logo, count_key in specs:
+            pairs = [
+                (key, value)
+                for key, value in request.query_params.multi_items()
+                if key not in {"purchase_status", "purchase_page"}
+            ]
+            if status:
+                pairs.append(("purchase_status", status))
+            query = urlencode(pairs, doseq=True)
+            tabs.append(
+                {
+                    "label": label,
+                    "logo": logo,
+                    "brand": status or "all",
+                    "count": counts.get(count_key, 0),
+                    "active": (active_status or "") == status,
+                    "href": f"{request.url.path}{f'?{query}' if query else ''}#purchases",
+                }
+            )
+        return tabs
+
     def _purchase_document_data(row: PurchaseDocument) -> dict[str, Any]:
         data = _json_object(row.data)
         paid_amount = _sales_decimal(data.get("paid_amount"))
@@ -11959,12 +11997,16 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        purchase_supplier_filter = str(request.query_params.get("supplier") or "").strip()
+        purchase_status_filter = str(request.query_params.get("purchase_status") or "").strip()
         filters = {
             "q": q.strip(),
             "warehouse": warehouse.strip(),
             "product": product.strip(),
             "op_type": op_type.strip() or "all",
             "critical": "1" if str(critical or "").strip() == "1" else "",
+            "supplier": purchase_supplier_filter,
+            "purchase_status": purchase_status_filter,
         }
         operation_preset = str(op or "").strip()
         if operation_preset not in {"in", "out", "transfer"}:
@@ -11977,6 +12019,7 @@ def create_app() -> FastAPI:
         product_names: list[str] = []
         supplier_names: list[str] = []
         warehouse_stock_total = Decimal("0")
+        purchase_status_counts: dict[str, int] = {"all": 0}
         warehouse_purchase_totals: dict[str, Decimal] = {}
         warehouse_purchase_paid_totals: dict[str, Decimal] = {}
         warehouse_purchase_debt_totals: dict[str, Decimal] = {}
@@ -12084,6 +12127,16 @@ def create_app() -> FastAPI:
                 if filters["warehouse"] and item["warehouse"] != filters["warehouse"]:
                     continue
                 if filters["product"] and filters["product"].lower() not in line_products:
+                    continue
+                if purchase_supplier_filter and purchase_supplier_filter.lower() not in str(item["supplier"]).lower():
+                    continue
+                # Счётчики вкладок считаем до фильтра по статусу, иначе выбранный
+                # раздел обнулял бы остальные вкладки.
+                purchase_status_counts["all"] += 1
+                purchase_status_counts[str(item.get("status") or "")] = (
+                    purchase_status_counts.get(str(item.get("status") or ""), 0) + 1
+                )
+                if purchase_status_filter and str(item.get("status") or "") != purchase_status_filter:
                     continue
                 warehouse_purchases.append(item)
                 currency = str(row.currency or item["currency"] or "UZS").upper()
@@ -12247,6 +12300,11 @@ def create_app() -> FastAPI:
                 {"currency": currency, "amount": _sales_money_label(amount)}
                 for currency, amount in sorted(warehouse_purchase_debt_totals.items())
             ],
+            warehouse_purchase_tabs=_warehouse_purchase_tabs(
+                request,
+                purchase_status_counts,
+                purchase_status_filter,
+            ),
             warehouse_operation_preset=operation_preset,
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),

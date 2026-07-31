@@ -28953,3 +28953,44 @@ html.dark .crm-task-calendar-event {
   padding-top: 0.85rem;
   border-top: 1px solid var(--workbench-line, var(--border));
 }
+
+/* ===== Закупки в стиле журнала продаж ===== */
+.warehouse-purchases-board .sales-journal-date-cell small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.warehouse-purchase-debt-cell.has-debt {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.warehouse-purchases-table .warehouse-purchase-paid-chip {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warehouse-purchases-table tr.warehouse-purchase-row--purchased .warehouse-purchase-paid-chip {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.warehouse-purchases-table .warehouse-purchase-total {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.warehouse-purchases-table .warehouse-purchase-debt-total {
+  color: #dc2626;
+}
+
+.warehouse-purchases-board .sales-journal-empty {
+  padding: 1.5rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
