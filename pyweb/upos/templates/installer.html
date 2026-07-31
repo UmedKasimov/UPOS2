@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=15">
-  <script defer src="/static/installer.js?v=15"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=16">
+  <script defer src="/static/installer.js?v=17"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -192,6 +192,25 @@
         <button class="installer-icon-button" id="installer-clients-close" type="button" aria-label="Назад">←</button>
       </header>
       <div class="installer-earnings-body">
+        <button class="installer-primary-button installer-client-add-open" id="installer-client-add-open" type="button">＋ Добавить клиента</button>
+        <label class="installer-phone-search">
+          <input type="search" id="installer-client-search" placeholder="Поиск клиента" />
+        </label>
+        <div class="installer-phone-list" id="installer-client-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-client-new">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>База клиентов</p>
+          <h2>Новый клиент</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-client-new-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
         <form class="installer-order-form installer-client-form" id="installer-client-form">
           <label>
             <span>Название*</span>
@@ -207,10 +226,6 @@
           </label>
           <button class="installer-primary-button" type="submit">Добавить клиента</button>
         </form>
-        <label class="installer-phone-search">
-          <input type="search" id="installer-client-search" placeholder="Поиск клиента" />
-        </label>
-        <div class="installer-phone-list" id="installer-client-list"></div>
       </div>
     </div>
   </dialog>

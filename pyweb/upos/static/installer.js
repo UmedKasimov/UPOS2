@@ -384,13 +384,16 @@
   const earningsDialog = document.getElementById("installer-earnings");
   const notificationsDialog = document.getElementById("installer-notifications");
 
-  // Разделы меню — полноэкранные страницы, поэтому каждая добавляет запись в
-  // историю: системная кнопка «Назад» должна возвращать к заказам, а не
-  // закрывать приложение.
+  // Разделы меню — полноэкранные страницы, каждая добавляет запись в историю:
+  // системная кнопка «Назад» закрывает ВЕРХНИЙ экран (а не все сразу), поэтому
+  // из формы «Новый клиент» возвращаемся к списку клиентов, а не к заказам.
+  const screenStack = [];
+
   function openScreen(dialog, name) {
     if (!dialog) return;
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
+    screenStack.push(dialog);
     window.history.pushState({installerScreen: name}, "");
   }
 
@@ -402,9 +405,15 @@
   }
 
   window.addEventListener("popstate", () => {
-    [notificationsDialog, earningsDialog, phonebookDialog, newOrderDialog, clientsDialog, document.getElementById("installer-calendar")].forEach((dialog) => {
-      if (dialog?.open) dialog.close();
-    });
+    const top = screenStack.pop();
+    if (top?.open) top.close();
+    // Браузер при переходе по истории сам закрывает все модальные окна —
+    // возвращаем нижний экран стека, чтобы «Назад» снимал ровно один слой.
+    const below = screenStack[screenStack.length - 1];
+    if (below && !below.open) {
+      if (typeof below.showModal === "function") below.showModal();
+      else below.setAttribute("open", "");
+    }
   });
 
   const phonebookDialog = document.getElementById("installer-phonebook");
@@ -457,6 +466,17 @@
     );
   });
 
+  const clientNewDialog = document.getElementById("installer-client-new");
+
+  document.getElementById("installer-client-add-open")?.addEventListener("click", () => {
+    openScreen(clientNewDialog, "client-new");
+    document.getElementById("installer-client-name")?.focus();
+  });
+
+  document.getElementById("installer-client-new-close")?.addEventListener("click", () => {
+    closeScreen(clientNewDialog);
+  });
+
   document.getElementById("installer-client-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const name = document.getElementById("installer-client-name");
@@ -471,6 +491,8 @@
       });
       showToast("Клиент добавлен");
       name.value = ""; phone.value = ""; address.value = "";
+      // Возвращаемся к списку: новый клиент уже в нём.
+      closeScreen(clientNewDialog);
       renderClientList(await loadClients(""));
     } catch (error) {
       showToast(error.message || "Не удалось добавить", true);
