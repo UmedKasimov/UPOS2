@@ -975,6 +975,14 @@
       return;
     }
 
+    // Кэшированная версия приложения могла показать кнопку до того, как ключи
+    // убрали с сервера. Без ключа PushManager падает с непонятной ошибкой.
+    if (!state.pushKey) {
+      showToast("Push не настроен на сервере — обратитесь к администратору", true);
+      await syncPushButton();
+      return;
+    }
+
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
       showToast("Разрешите уведомления в настройках браузера", true);
