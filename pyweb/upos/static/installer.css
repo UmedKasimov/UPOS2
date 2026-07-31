@@ -1132,3 +1132,32 @@ main {
 .installer-earnings-row.is-payout b {
   color: #b91c1c;
 }
+
+/* Имя пользователя в шапке: длинное не должно ломать строку с кнопками. */
+.installer-identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.installer-identity h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .installer-identity h1 {
+    font-size: 17px;
+  }
+
+  /* На узком экране имя важнее статуса: «Онлайн» прячем, а «Офлайн»
+     оставляем — о потере связи сотрудник должен узнать сразу. */
+  .installer-connection:not(.is-offline) {
+    display: none;
+  }
+
+  .installer-header {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+}

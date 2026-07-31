@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=7">
-  <script defer src="/static/installer.js?v=7"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=9">
+  <script defer src="/static/installer.js?v=8"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -27,9 +27,11 @@
         aria-expanded="false"
         aria-controls="installer-menu"
       >☰</button>
-      <div>
+      <div class="installer-identity">
         <p class="installer-brand">U-POS</p>
-        <h1>Установщик</h1>
+        <h1 title="{{ (user.name or user.username or 'Установщик') | e }}">
+          {{ user.name or user.username or "Установщик" }}
+        </h1>
       </div>
       <div class="installer-header-actions">
         <span class="installer-connection" id="installer-connection">Онлайн</span>
