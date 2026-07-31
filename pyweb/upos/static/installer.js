@@ -384,6 +384,29 @@
   const earningsDialog = document.getElementById("installer-earnings");
   const notificationsDialog = document.getElementById("installer-notifications");
 
+  // Разделы меню — полноэкранные страницы, поэтому каждая добавляет запись в
+  // историю: системная кнопка «Назад» должна возвращать к заказам, а не
+  // закрывать приложение.
+  function openScreen(dialog, name) {
+    if (!dialog) return;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    window.history.pushState({installerScreen: name}, "");
+  }
+
+  function closeScreen(dialog) {
+    if (!dialog?.open) return;
+    // Закрытие идёт через историю, чтобы состояние совпадало с кнопкой «Назад».
+    if (window.history.state && window.history.state.installerScreen) window.history.back();
+    else dialog.close();
+  }
+
+  window.addEventListener("popstate", () => {
+    [notificationsDialog, earningsDialog, document.getElementById("installer-calendar")].forEach((dialog) => {
+      if (dialog?.open) dialog.close();
+    });
+  });
+
   function notifyTime(value) {
     if (!value) return "";
     const date = new Date(value);
@@ -428,8 +451,7 @@
     if (!notificationsDialog) return;
     const list = document.getElementById("installer-notify-list");
     if (list) list.innerHTML = '<div class="installer-loading">Загрузка...</div>';
-    if (typeof notificationsDialog.showModal === "function") notificationsDialog.showModal();
-    else notificationsDialog.setAttribute("open", "");
+    openScreen(notificationsDialog, "notifications");
     try {
       const data = await apiRequest("/api/installer/notifications");
       renderNotifications(data.items || []);
@@ -472,7 +494,7 @@
   });
 
   document.getElementById("installer-notifications-close")?.addEventListener("click", () => {
-    if (notificationsDialog?.open) notificationsDialog.close();
+    closeScreen(notificationsDialog);
   });
 
   function money(value) {
@@ -489,8 +511,7 @@
     if (!earningsDialog) return;
     totals.innerHTML = '<div class="installer-loading">Загрузка...</div>';
     list.innerHTML = "";
-    if (typeof earningsDialog.showModal === "function") earningsDialog.showModal();
-    else earningsDialog.setAttribute("open", "");
+    openScreen(earningsDialog, "earnings");
     try {
       const data = await apiRequest("/api/installer/earnings");
       if (title && data.employee_name) title.textContent = data.employee_name;
@@ -521,7 +542,7 @@
   }
 
   document.getElementById("installer-earnings-close")?.addEventListener("click", () => {
-    if (earningsDialog?.open) earningsDialog.close();
+    closeScreen(earningsDialog);
   });
 
   function openInstallerMenu() {
@@ -541,7 +562,7 @@
     const selectedDate = dateFromKey(state.calendarDate) || new Date();
     state.calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
     renderOrderCalendar();
-    if (!calendarDialog.open) calendarDialog.showModal();
+    if (!calendarDialog.open) openScreen(calendarDialog, "calendar");
   }
 
   function shiftCalendarMonth(offset) {

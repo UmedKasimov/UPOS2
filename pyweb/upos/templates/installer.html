@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=10">
-  <script defer src="/static/installer.js?v=10"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=11">
+  <script defer src="/static/installer.js?v=11"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -111,7 +111,7 @@
           <p>График установок</p>
           <h2 id="installer-calendar-title">Календарь заказов</h2>
         </div>
-        <button class="installer-icon-button" id="installer-calendar-close" type="button" aria-label="Закрыть">×</button>
+        <button class="installer-icon-button" id="installer-calendar-close" type="button" aria-label="Назад">←</button>
       </header>
       <div class="installer-calendar-body">
         <div class="installer-calendar-toolbar">
@@ -140,7 +140,7 @@
         </div>
         <div class="installer-notify-head-actions">
           <button class="installer-secondary-button" id="installer-notify-read-all" type="button">Прочитать все</button>
-          <button class="installer-icon-button" id="installer-notifications-close" type="button" aria-label="Закрыть">×</button>
+          <button class="installer-icon-button" id="installer-notifications-close" type="button" aria-label="Назад">←</button>
         </div>
       </header>
       <div class="installer-earnings-body">
@@ -156,7 +156,7 @@
           <p>Начисления и выплаты</p>
           <h2 id="installer-earnings-title">Мой заработок</h2>
         </div>
-        <button class="installer-icon-button" id="installer-earnings-close" type="button" aria-label="Закрыть">×</button>
+        <button class="installer-icon-button" id="installer-earnings-close" type="button" aria-label="Назад">←</button>
       </header>
       <div class="installer-earnings-body">
         <div class="installer-earnings-totals" id="installer-earnings-totals"></div>
