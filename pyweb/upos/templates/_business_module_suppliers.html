@@ -70,8 +70,10 @@
         <a class="products-filter-clear" href="{{ url_for('suppliers_get') }}#suppliers" aria-label="Очистить фильтр">×</a>
       </form>
     </header>
-    <div class="products-table-wrap suppliers-table-wrap">
-      <table id="suppliers-directory-table" class="products-table products-catalog-table clients-table suppliers-table" data-upos-column-controls>
+    <div class="products-table-wrap clients-table-wrap suppliers-table-wrap">
+      {# Та же 15-колоночная структура, что у клиентов: общий JS из clients.js
+         даёт сортировку и перетаскивание колонок, а CSS — компактные строки. #}
+      <table id="suppliers-directory-table" class="products-table products-catalog-table clients-table suppliers-table" data-upos-column-controls data-clients-directory-table>
         <thead>
           <tr>
             <th><input type="checkbox" aria-label="Выбрать всех поставщиков" /></th>
@@ -79,11 +81,15 @@
             <th>Название</th>
             <th>Официальное название</th>
             <th>Баланс</th>
-            <th>Последний документ</th>
+            <th>Последняя закупка</th>
+            <th>Telegram</th>
+            <th>Дата создания</th>
             <th>Телефон</th>
             <th>Категория</th>
             <th>ИНН</th>
+            <th>ПИНФЛ</th>
             <th>Адрес</th>
+            <th>Код</th>
             <th></th>
           </tr>
         </thead>
@@ -103,28 +109,34 @@
                   data-workspace-tab-title="{{ supplier.name }}"
                   data-workspace-tab-hash="supplier-card"
                   data-workspace-tab-href="{{ supplier_tab_href }}"
+                  title="{{ supplier.name }}"
                 >
                   <strong>{{ supplier.name }}</strong>
                   <small>{{ supplier.category or "Без категории" }}</small>
                 </a>
               </td>
-              <td>{{ supplier.official_name or "-" }}</td>
+              <td title="{{ supplier.official_name or '-' }}">{{ supplier.official_name or "-" }}</td>
               <td>
-                <span class="client-balance-pill client-balance-pill--{{ supplier.balance_kind }}">{{ supplier.balance_abs }} UZS</span>
-                {# balance_note написан со стороны клиента («Нам должны»), а по закупкам
-                   долг обратный — должны мы поставщику. #}
-                <small>
-                  {%- if supplier.balance_kind == 'debt' -%}Мы должны
-                  {%- elif supplier.balance_kind == 'advance' -%}Аванс поставщику
-                  {%- else -%}Нет долга
-                  {%- endif -%}
-                </small>
+                {% if supplier.balance_kind == "zero" %}
+                  <span class="client-balance-empty">-</span>
+                {% else %}
+                  {# Знак долга обратный клиентскому, поэтому показываем модуль:
+                     красная пилюля — «Мы должны», зелёная — аванс поставщику. #}
+                  <span
+                    class="client-balance-pill client-balance-pill--{{ supplier.balance_kind }}"
+                    title="{{ 'Мы должны' if supplier.balance_kind == 'debt' else 'Аванс поставщику' }}"
+                  >{{ supplier.balance_abs }} UZS</span>
+                {% endif %}
               </td>
-              <td>{{ supplier.last_date or "-" }}</td>
-              <td>{{ supplier.phone or "-" }}</td>
-              <td>{{ supplier.category or "-" }}</td>
-              <td>{{ supplier.inn or "-" }}</td>
-              <td>{{ supplier.address or "-" }}</td>
+              <td title="{{ supplier.last_date or '-' }}">{{ supplier.last_date or "-" }}</td>
+              <td title="{{ supplier.telegram_phone or '-' }}">{{ supplier.telegram_phone or "-" }}</td>
+              <td title="{{ supplier.created_at or '-' }}">{{ supplier.created_at or "-" }}</td>
+              <td title="{{ supplier.phone or '-' }}">{{ supplier.phone or "-" }}</td>
+              <td title="{{ supplier.category or '-' }}">{{ supplier.category or "-" }}</td>
+              <td title="{{ supplier.inn or '-' }}">{{ supplier.inn or "-" }}</td>
+              <td title="{{ supplier.pinfl or '-' }}">{{ supplier.pinfl or "-" }}</td>
+              <td title="{{ supplier.address or '-' }}">{{ supplier.address or "-" }}</td>
+              <td title="{{ supplier.code or '-' }}">{{ supplier.code or "-" }}</td>
               <td class="products-row-actions">
                 <form method="post" action="{{ url_for('suppliers_delete', counterparty_id=supplier.id) }}">
                   {% include "_csrf_field.html" %}
@@ -133,11 +145,44 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="11">Поставщики пока не добавлены.</td></tr>
+            <tr><td colspan="15">Поставщики пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
+        {% if supplier_balance_summary %}
+          <tfoot>
+            <tr class="clients-total-row">
+              <td colspan="4">Итого поставщики</td>
+              <td>
+                <div class="client-balance-total-lines">
+                  {% if supplier_balance_summary.debt_count %}
+                    <span class="client-balance-pill client-balance-pill--debt" title="Мы должны">{{ supplier_balance_summary.debt_display }} UZS</span>
+                  {% endif %}
+                  {% if supplier_balance_summary.advance_count %}
+                    <span class="client-balance-pill client-balance-pill--advance" title="Авансы поставщикам">{{ supplier_balance_summary.advance_display }} UZS</span>
+                  {% endif %}
+                  {% if not supplier_balance_summary.debt_count and not supplier_balance_summary.advance_count %}
+                    <span class="client-balance-empty">-</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td colspan="10">
+                <div class="client-balance-net">
+                  <span>Итоговый долг</span>
+                  <strong>{{ supplier_balance_summary.net_display }}{% if supplier_balance_summary.net_display != "-" %} UZS{% endif %}</strong>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        {% endif %}
       </table>
     </div>
+    <footer class="products-catalog-footer clients-catalog-footer">
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по списку поставщиков">
+          <span>Всего: {{ supplier_records|length }}</span>
+        </div>
+      </div>
+    </footer>
   </article>
 
 

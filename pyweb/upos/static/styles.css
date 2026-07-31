@@ -4190,7 +4190,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 92rem;
 }
 
-#clients-directory-table {
+:is(#clients-directory-table, #suppliers-directory-table) {
   width: 100%;
   min-width: 125rem;
   table-layout: fixed;
@@ -4230,57 +4230,57 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 600;
 }
 
-#clients-directory-table [data-client-column="name"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="name"] {
   width: 12rem;
 }
 
-#clients-directory-table [data-client-column="select"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="select"] {
   width: 2.75rem;
 }
 
-#clients-directory-table [data-client-column="id"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="id"] {
   width: 4.5rem;
 }
 
-#clients-directory-table [data-client-column="official_name"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="official_name"] {
   width: 12rem;
 }
 
-#clients-directory-table [data-client-column="balance"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="balance"] {
   width: 9rem;
 }
 
-#clients-directory-table [data-client-column="last_date"],
-#clients-directory-table [data-client-column="created_at"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="last_date"],
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="created_at"] {
   width: 8rem;
 }
 
-#clients-directory-table [data-client-column="telegram"],
-#clients-directory-table [data-client-column="phone"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="telegram"],
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="phone"] {
   width: 9rem;
 }
 
-#clients-directory-table [data-client-column="category"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="category"] {
   width: 8rem;
 }
 
-#clients-directory-table [data-client-column="inn"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="inn"] {
   width: 7rem;
 }
 
-#clients-directory-table [data-client-column="pinfl"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="pinfl"] {
   width: 8rem;
 }
 
-#clients-directory-table [data-client-column="address"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="address"] {
   width: 14rem;
 }
 
-#clients-directory-table [data-client-column="code"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="code"] {
   width: 5rem;
 }
 
-#clients-directory-table [data-client-column="actions"] {
+:is(#clients-directory-table, #suppliers-directory-table) [data-client-column="actions"] {
   width: 4rem;
 }
 
@@ -4309,26 +4309,26 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
-#clients-directory-table td {
+:is(#clients-directory-table, #suppliers-directory-table) td {
   height: 3.25rem;
   min-height: 3.25rem;
   padding: 0.35rem 0.55rem;
   line-height: 1.2;
 }
 
-#clients-directory-table tbody tr {
+:is(#clients-directory-table, #suppliers-directory-table) tbody tr {
   height: 3.25rem;
 }
 
-#clients-directory-table tbody td:not(.products-row-actions):not(.upos-table-column-control-cell) {
+:is(#clients-directory-table, #suppliers-directory-table) tbody td:not(.products-row-actions):not(.upos-table-column-control-cell) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-#clients-directory-table .client-open-link,
-#clients-directory-table .client-open-link strong,
-#clients-directory-table .client-open-link small {
+:is(#clients-directory-table, #suppliers-directory-table) .client-open-link,
+:is(#clients-directory-table, #suppliers-directory-table) .client-open-link strong,
+:is(#clients-directory-table, #suppliers-directory-table) .client-open-link small {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -4336,7 +4336,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   white-space: nowrap;
 }
 
-#clients-directory-table .client-open-link {
+:is(#clients-directory-table, #suppliers-directory-table) .client-open-link {
   display: grid;
   gap: 0.1rem;
 }

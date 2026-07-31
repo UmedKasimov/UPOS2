@@ -13465,6 +13465,26 @@ def create_app() -> FastAPI:
             "products": product_names,
             "warehouses": warehouse_names or ["Основной склад"],
         }
+        # Итоги для строки «Итого поставщики» — как clients_balance_summary,
+        # только знак обратный: положительный баланс закупок — должны мы.
+        supplier_debt_total = sum(
+            (item["balance_value"] for item in supplier_records if item["balance_value"] > 0),
+            Decimal("0"),
+        )
+        supplier_advance_total = sum(
+            (abs(item["balance_value"]) for item in supplier_records if item["balance_value"] < 0),
+            Decimal("0"),
+        )
+        supplier_net_total = supplier_debt_total - supplier_advance_total
+        supplier_balance_summary = {
+            # Модуль значений: у поставщиков минус клиентской конвенции не работает —
+            # красная пилюля и так значит «мы должны».
+            "debt_display": _sales_money_label(supplier_debt_total),
+            "advance_display": _sales_money_label(supplier_advance_total),
+            "net_display": _sales_money_label(abs(supplier_net_total)) if supplier_net_total else "-",
+            "debt_count": sum(1 for item in supplier_records if item["balance_value"] > 0),
+            "advance_count": sum(1 for item in supplier_records if item["balance_value"] < 0),
+        }
         return tpl(
             request,
             "home_business_module.html",
@@ -13474,6 +13494,7 @@ def create_app() -> FastAPI:
             supplier_filters=filters,
             supplier_options=supplier_options,
             supplier_records=supplier_records,
+            supplier_balance_summary=supplier_balance_summary,
             supplier_purchases=supplier_purchases,
             supplier_payables=supplier_payables,
             selected_supplier_card=selected_supplier_card,
