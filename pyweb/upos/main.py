@@ -3862,6 +3862,18 @@ def create_app() -> FastAPI:
         {"id": "won", "title": "Успешно", "hint": "Сделка закрыта"},
         {"id": "lost", "title": "Потеряно", "hint": "Отказ или пауза"},
     )
+    CRM_LOST_REASONS = (
+        "Дорого",
+        "Выбрал конкурента",
+        "Нет ответа",
+        "Не актуально",
+        "Нет бюджета",
+        "Отложил решение",
+        "Не устроили сроки",
+        "Не устроили условия",
+        "Купил у нас раньше",
+    )
+    CRM_LOST_REASON_MAX = 500
     CRM_LEAD_SOURCES = ("Сайт", "Instagram", "Telegram", "WhatsApp", "Facebook", "Звонок", "Ручной ввод")
     CRM_SERVICE_TYPES = (
         "Консультация",
@@ -4195,6 +4207,28 @@ def create_app() -> FastAPI:
     def _crm_actor_name(request: Request) -> str:
         user = request.session.get("user") or {}
         return str(user.get("name") or user.get("username") or user.get("login") or "UPOS").strip() or "UPOS"
+
+    def _crm_lost_reasons_from_form(form: Any) -> tuple[list[str], str]:
+        """Причин потери может быть несколько: галочки из справочника плюс своя
+        формулировка. Возвращает список причин и готовую строку для показа."""
+        picked: list[str] = []
+        raw_values: list[Any] = []
+        getlist = getattr(form, "getlist", None)
+        if callable(getlist):
+            raw_values.extend(getlist("lost_reasons"))
+        raw_values.append(form.get("lost_reason_custom"))
+        raw_values.append(form.get("lost_reason"))
+        for value in raw_values:
+            for part in str(value or "").split(";"):
+                reason = part.strip()
+                if reason and reason not in picked:
+                    picked.append(reason)
+        joined = "; ".join(picked)[:CRM_LOST_REASON_MAX]
+        return picked, joined
+
+    def _crm_store_lost_reasons(data: dict[str, Any], reasons: list[str], joined: str) -> None:
+        data["lost_reason"] = joined
+        data["lost_reasons"] = reasons
 
     def _crm_append_activity(data: dict[str, Any], action: str, actor: str = "", detail: str = "") -> None:
         raw = data.get("activity_log") if isinstance(data.get("activity_log"), list) else []
@@ -10384,9 +10418,10 @@ def create_app() -> FastAPI:
             "next_step": str(form.get("next_step") or "").strip(),
             "probability": _crm_probability_value(form.get("probability")),
             "note": str(form.get("note") or "").strip(),
-            "lost_reason": str(form.get("lost_reason") or "").strip()[:300],
             "tags": clean_tags(form.get("tags")),
         }
+        lost_reasons, lost_reason = _crm_lost_reasons_from_form(form)
+        _crm_store_lost_reasons(data, lost_reasons, lost_reason)
         if data["priority"] not in CRM_PRIORITY_LABELS:
             data["priority"] = "normal"
         return data, amount, currency
@@ -13282,6 +13317,7 @@ def create_app() -> FastAPI:
             crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
             crm_kanban_columns=crm_kanban_columns,
             crm_lead_sources=list(CRM_LEAD_SOURCES),
+            crm_lost_reasons=list(CRM_LOST_REASONS),
             crm_service_types=list(CRM_SERVICE_TYPES),
             crm_priorities=CRM_PRIORITY_LABELS,
             today=today_iso,
@@ -16148,10 +16184,10 @@ def create_app() -> FastAPI:
                 if row.item_type == "deal":
                     row.status = "lost" if result == "lost" else "won"
                     if row.status == "lost":
-                        lost_reason = str(form.get("lost_reason") or "").strip()
+                        lost_reasons, lost_reason = _crm_lost_reasons_from_form(form)
                         if not lost_reason:
                             return RedirectResponse(url="/crm?error=" + quote("Укажите причину потери сделки") + "#deals", status_code=302)
-                        data["lost_reason"] = lost_reason[:300]
+                        _crm_store_lost_reasons(data, lost_reasons, lost_reason)
                     target_stage = _crm_stage_for_client_status("lost" if row.status == "lost" else "our_client", stages)
                     _crm_apply_stage(data, stages, target_stage["id"])
                 else:
@@ -16199,7 +16235,7 @@ def create_app() -> FastAPI:
         stage_id = str(form.get("stage_id") or "").strip()
         stages = _crm_workspace_stages(wid)
         stage = _crm_stage_for_value(stage_id, stages)
-        lost_reason = str(form.get("lost_reason") or "").strip()
+        lost_reasons, lost_reason = _crm_lost_reasons_from_form(form)
         if _client_crm_status_from_stage(stage) == "lost" and not lost_reason:
             return JSONResponse({"ok": False, "error": "lost_reason_required"}, status_code=400)
         with session_scope() as session:
@@ -16210,8 +16246,12 @@ def create_app() -> FastAPI:
             previous_stage = str(data.get("stage") or "")
             _crm_apply_stage(data, stages, stage["id"])
             if lost_reason:
-                data["lost_reason"] = lost_reason[:300]
+                _crm_store_lost_reasons(data, lost_reasons, lost_reason)
             _crm_append_activity(data, "Этап изменён", _crm_actor_name(request), f"{previous_stage or '-'} → {stage['title']}")
+            # Диалог обещает «причина сохранится в истории сделки» — раньше туда
+            # попадала только смена этапа.
+            if lost_reason:
+                _crm_append_activity(data, "Причина потери", _crm_actor_name(request), lost_reason)
             row.data = data
             flag_modified(row, "data")
             if stage["id"] == "won":

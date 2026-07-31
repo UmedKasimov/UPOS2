@@ -11,6 +11,8 @@
   const calendarOrders = document.getElementById("installer-calendar-orders");
   const menuToggle = document.getElementById("installer-menu-toggle");
   const menuNode = document.getElementById("installer-menu");
+  const menuClose = document.getElementById("installer-menu-close");
+  const menuBackdrop = document.getElementById("installer-menu-backdrop");
   const helpDialog = document.getElementById("installer-help");
   const toastNode = document.getElementById("installer-toast");
 
@@ -378,8 +380,15 @@
       : '<div class="installer-empty">На выбранный день установок нет</div>';
   }
 
+  function openInstallerMenu() {
+    menuNode.hidden = false;
+    if (menuBackdrop) menuBackdrop.hidden = false;
+    menuToggle.setAttribute("aria-expanded", "true");
+  }
+
   function closeInstallerMenu() {
     menuNode.hidden = true;
+    if (menuBackdrop) menuBackdrop.hidden = true;
     menuToggle.setAttribute("aria-expanded", "false");
   }
 
@@ -631,9 +640,8 @@
   }
 
   menuToggle.addEventListener("click", () => {
-    const willOpen = menuNode.hidden;
-    menuNode.hidden = !willOpen;
-    menuToggle.setAttribute("aria-expanded", String(willOpen));
+    if (menuNode.hidden) openInstallerMenu();
+    else closeInstallerMenu();
   });
 
   menuNode.addEventListener("click", (event) => {
@@ -642,8 +650,11 @@
     if (button.dataset.menuAction === "orders-calendar") openOrderCalendar();
   });
 
-  document.addEventListener("click", (event) => {
-    if (!menuNode.hidden && !event.target.closest(".installer-menu-wrap")) closeInstallerMenu();
+  menuClose?.addEventListener("click", closeInstallerMenu);
+  menuBackdrop?.addEventListener("click", closeInstallerMenu);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menuNode.hidden) closeInstallerMenu();
   });
 
   document.getElementById("installer-calendar-prev").addEventListener("click", () => {

@@ -1,11 +1,15 @@
 (() => {
-  function postStage(root, recordId, stageId, lostReason = "") {
+  function postStage(root, recordId, stageId, lostReasons = []) {
     const template = root.dataset.crmStageUrlTemplate || "/crm/__record__/stage";
     const url = template.replace("__record__", encodeURIComponent(recordId));
     const body = new URLSearchParams();
     body.set("csrf_token", root.dataset.crmCsrf || "");
     body.set("stage_id", stageId);
-    if (lostReason) body.set("lost_reason", lostReason);
+    // Причин может быть несколько — отправляем повторяющимся ключом, сервер
+    // собирает их через form.getlist.
+    (Array.isArray(lostReasons) ? lostReasons : [lostReasons])
+      .filter(Boolean)
+      .forEach((reason) => body.append("lost_reasons", reason));
     return fetch(url, {
       method: "POST",
       headers: {
@@ -654,7 +658,7 @@
       showMessengerThread("");
       fillFeed(taskFeed, card, "template[data-crm-card-tasks]", "Задач пока нет.");
       fillFeed(commentFeed, card, "template[data-crm-card-comments]", "Комментариев пока нет.");
-      showDetailPane("history");
+      showDetailPane("comments");
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {
@@ -839,14 +843,18 @@
     const trashDrop = document.querySelector("[data-crm-trash-drop]");
     const lostDialog = document.getElementById("crm-lost-reason-dialog");
 
+    // Резолвится списком причин: пустой список означает отмену.
     const requestLostReason = () =>
       new Promise((resolve) => {
         if (!lostDialog) {
-          resolve(window.prompt("Почему сделка потеряна?") || "");
+          const typed = String(window.prompt("Почему сделка потеряна?") || "").trim();
+          resolve(typed ? [typed] : []);
           return;
         }
         const form = lostDialog.querySelector("[data-crm-lost-reason-form]");
-        const input = form?.querySelector('[name="lost_reason"]');
+        const checkboxes = Array.from(form?.querySelectorAll('[name="lost_reasons"]') || []);
+        const custom = form?.querySelector('[name="lost_reason_custom"]');
+        const hint = form?.querySelector("[data-crm-lost-hint]");
         let settled = false;
         const finish = (value) => {
           if (settled) return;
@@ -859,24 +867,31 @@
         };
         const onSubmit = (event) => {
           event.preventDefault();
-          const value = String(input?.value || "").trim();
-          if (!value) {
-            input?.focus();
+          const picked = checkboxes.filter((box) => box.checked).map((box) => box.value.trim());
+          const typed = String(custom?.value || "").trim();
+          if (typed) picked.push(typed);
+          if (!picked.length) {
+            if (hint) hint.hidden = false;
+            (checkboxes[0] || custom)?.focus();
             return;
           }
-          finish(value);
+          finish(picked);
         };
         const onCancel = (event) => {
           event?.preventDefault?.();
-          finish("");
+          finish([]);
         };
-        if (input) input.value = "";
+        checkboxes.forEach((box) => {
+          box.checked = false;
+        });
+        if (custom) custom.value = "";
+        if (hint) hint.hidden = true;
         form?.addEventListener("submit", onSubmit);
         lostDialog.querySelectorAll("[data-crm-lost-cancel]").forEach((button) => button.addEventListener("click", onCancel));
         lostDialog.addEventListener("cancel", onCancel);
         if (typeof lostDialog.showModal === "function") lostDialog.showModal();
         else lostDialog.setAttribute("open", "");
-        input?.focus();
+        (checkboxes[0] || custom)?.focus();
       });
 
     const setSelectedCard = (card) => {
@@ -1116,8 +1131,8 @@
         const card = dragged || root.querySelector(`[data-crm-record-id="${CSS.escape(recordId)}"]`);
         const stageId = column.dataset.crmStageId || "";
         if (!card || !recordId || !stageId) return;
-        const lostReason = column.dataset.crmStageOutcome === "lost" ? await requestLostReason() : "";
-        if (column.dataset.crmStageOutcome === "lost" && !lostReason) return;
+        const lostReasons = column.dataset.crmStageOutcome === "lost" ? await requestLostReason() : [];
+        if (column.dataset.crmStageOutcome === "lost" && !lostReasons.length) return;
         const previousColumn = card.closest(".crm-kanban-column");
         const previousRect = card.getBoundingClientRect();
         moveCardToTop(dropzone, card);
@@ -1126,7 +1141,7 @@
         if (previousColumn) updateColumnState(previousColumn);
         updateColumnState(column);
         animateCardMove(card, previousRect);
-        postStage(root, recordId, stageId, lostReason)
+        postStage(root, recordId, stageId, lostReasons)
           .then(() => {
             column.classList.add("is-saved");
             window.setTimeout(() => column.classList.remove("is-saved"), 900);
@@ -1220,11 +1235,15 @@
       const isOpenWork = kind !== "history" && !isLost && !["done", "won", "lost", "archived"].includes(status);
       const nextStep = form.querySelector('input[name="next_step"]');
       const dueDate = form.querySelector('input[name="due_date"]');
-      const lostReason = form.querySelector('input[name="lost_reason"]');
+      const lostBoxes = Array.from(form.querySelectorAll('[name="lost_reasons"]'));
+      const lostCustom = form.querySelector('[name="lost_reason_custom"]');
       const lostField = form.querySelector("[data-crm-lost-reason-field]");
       if (nextStep) nextStep.required = !isCompactDeal && isOpenWork;
       if (dueDate) dueDate.required = !isCompactDeal && isOpenWork;
-      if (lostReason) lostReason.required = !isCompactDeal && isLost;
+      // Причин может быть несколько: required вешаем на поле «своя причина»
+      // и только пока ни одна галочка не отмечена — иначе браузер требовал бы
+      // заполнить его даже при выбранной причине из списка.
+      if (lostCustom) lostCustom.required = !isCompactDeal && isLost && !lostBoxes.some((box) => box.checked);
       if (lostField) lostField.hidden = !isLost;
     };
 
@@ -1350,7 +1369,7 @@
         syncFormPresentation(form.dataset.crmDialogMode || "create", kind);
       });
     });
-    form?.querySelectorAll('select[name="status"], select[name="stage_id"]').forEach((field) => {
+    form?.querySelectorAll('select[name="status"], select[name="stage_id"], [name="lost_reasons"]').forEach((field) => {
       field.addEventListener("change", syncConditionalFields);
     });
     clientInput?.addEventListener("input", syncDuplicateNotice);

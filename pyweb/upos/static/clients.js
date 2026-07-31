@@ -45,10 +45,13 @@
 
   function markerGlyph(type = "") {
     const raw = String(type || "").trim();
+    if (!raw) return "";
+    // Иконку сегмента пользователь выбирает сам и может ввести произвольный эмодзи
+    // («Своя иконка»), поэтому список допустимых значений здесь не годится: берём
+    // первый пиктографический символ, каким бы он ни был.
+    const pictographic = raw.match(/\p{Extended_Pictographic}(?:️)?(?:‍\p{Extended_Pictographic}(?:️)?)*/u);
+    if (pictographic) return pictographic[0];
     const normalized = raw.toLowerCase();
-    const customIcon = ["🍽️", "🍽", "☕", "🍔", "🏪", "🛒", "🛍️", "🛍", "📦", "🧰", "🚗", "👕", "🧴", "🥣", "🏷️", "🏷"]
-      .find((icon) => raw.includes(icon));
-    if (customIcon) return customIcon;
     if (normalized.includes("продукт") || normalized.includes("grocery")) return "🛒";
     if (normalized.includes("ресторан") || normalized.includes("restaurant")) return "🍽";
     if (normalized.includes("кафе") || normalized.includes("coffee") || normalized.includes("cafe")) return "☕";
@@ -105,7 +108,9 @@
     const initials = glyph ? "" : categoryInitials(category);
     let mark;
     if (glyph) {
-      mark = `<text x="16" y="19" text-anchor="middle" font-size="13" font-family="Arial, sans-serif" fill="white">${glyph}</text>`;
+      // Сам эмодзи накладывается поверх HTML-слоем (см. markerIcon): в SVG <text>
+      // составные эмодзи с variation selector рисуются ненадёжно.
+      mark = "";
     } else if (initials) {
       mark = `<text x="16" y="19.5" text-anchor="middle" font-size="${initials.length > 1 ? 10 : 13}" font-weight="700" font-family="Inter, Arial, sans-serif" fill="white">${escapeHtml(initials)}</text>`;
     } else {
@@ -128,8 +133,12 @@
   }
 
   function markerIcon(label = "Клиент", type = "", category = "") {
+    const glyph = markerGlyph(type);
+    const glyphMarkup = glyph
+      ? `<span class="client-leaflet-marker-glyph" aria-hidden="true">${escapeHtml(glyph)}</span>`
+      : "";
     return window.L.divIcon({
-      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
+      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}${glyphMarkup}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
       className: "client-leaflet-marker-wrap",
       iconSize: [92, 54],
       iconAnchor: [16, 40],

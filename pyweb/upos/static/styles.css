@@ -4607,9 +4607,25 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-leaflet-marker {
+  position: relative;
   width: 32px;
   height: 40px;
   filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.35));
+}
+
+/* Иконка сегмента ложится в «голову» капли поверх SVG. */
+.client-leaflet-marker-glyph {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 22px;
+  font-size: 15px;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .client-leaflet-marker-label {
@@ -6655,7 +6671,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .crm-lost-reason-form textarea {
   width: 100%;
-  min-height: 7rem;
+  min-height: 4.5rem;
   padding: 0.7rem;
   resize: vertical;
   border: 1px solid var(--workbench-line, var(--border));
@@ -6663,6 +6679,55 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   background: var(--input-background, var(--card));
   color: var(--foreground);
   font: inherit;
+}
+
+.crm-lost-reason-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crm-lost-reason-options legend {
+  padding: 0 0 0.45rem;
+  font-weight: 800;
+}
+
+/* Специфичнее, чем общее `.crm-lost-reason-form label { display: grid }`,
+   иначе галочка и подпись встают друг под другом. */
+.crm-lost-reason-form .crm-lost-reason-option,
+.crm-lost-reason-field .crm-lost-reason-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crm-lost-reason-option input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+
+.crm-lost-reason-option span {
+  font-weight: 600;
+}
+
+.crm-lost-reason-hint {
+  margin: 0;
+  color: var(--destructive, #dc2626);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.crm-lost-reason-hint[hidden] {
+  display: none;
 }
 
 @media (max-width: 980px) {
@@ -27834,19 +27899,32 @@ html.dark .warehouse-adjustment-summary {
   min-width: 92px;
 }
 
+/* Календарь занимает весь экран: в нём сетка на 7 колонок с карточками заказов,
+   в окне с полями и рамками она сжималась и уезжала в горизонтальный скролл. */
 .sales-installation-calendar-dialog {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  inset: 0;
 }
 
 .sales-installation-calendar-surface {
   display: flex;
-  width: min(1180px, calc(100vw - 32px));
+  width: 100%;
   max-width: none;
-  max-height: calc(100vh - 32px);
+  height: 100%;
+  max-height: none;
   padding: 0;
   overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   flex-direction: column;
 }
 
@@ -28096,11 +28174,6 @@ html.dark .sales-installation-calendar-order.is-completed {
 }
 
 @media (max-width: 760px) {
-  .sales-installation-calendar-surface {
-    width: calc(100vw - 16px);
-    max-height: calc(100vh - 16px);
-  }
-
   .sales-installation-calendar-toolbar {
     grid-template-columns: 1fr auto;
   }

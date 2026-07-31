@@ -12,36 +12,40 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=4">
-  <script defer src="/static/installer.js?v=4"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=5">
+  <script defer src="/static/installer.js?v=5"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
     <header class="installer-header">
+      <button
+        class="installer-icon-button installer-menu-toggle"
+        id="installer-menu-toggle"
+        type="button"
+        title="Меню"
+        aria-label="Меню"
+        aria-expanded="false"
+        aria-controls="installer-menu"
+      >☰</button>
       <div>
         <p class="installer-brand">U-POS</p>
         <h1>Установщик</h1>
       </div>
       <div class="installer-header-actions">
         <span class="installer-connection" id="installer-connection">Онлайн</span>
-        <div class="installer-menu-wrap">
-          <button
-            class="installer-icon-button"
-            id="installer-menu-toggle"
-            type="button"
-            title="Меню"
-            aria-label="Меню"
-            aria-expanded="false"
-            aria-controls="installer-menu"
-          >☰</button>
-          <div class="installer-menu" id="installer-menu" hidden>
-            <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
-          </div>
-        </div>
         <button class="installer-icon-button" id="installer-refresh" type="button" title="Обновить" aria-label="Обновить">↻</button>
         <button class="installer-install-button" id="installer-install" type="button">Установить</button>
       </div>
     </header>
+
+    <div class="installer-menu-backdrop" id="installer-menu-backdrop" hidden></div>
+    <nav class="installer-menu" id="installer-menu" aria-label="Главное меню" hidden>
+      <div class="installer-menu-head">
+        <strong>Меню</strong>
+        <button type="button" class="installer-menu-close" id="installer-menu-close" aria-label="Закрыть меню">×</button>
+      </div>
+      <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
+    </nav>
 
     <main>
       <section class="installer-summary" aria-label="Сводка">

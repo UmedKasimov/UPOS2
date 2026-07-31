@@ -628,7 +628,18 @@
           <label class="wide" data-crm-deal-create-field><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" placeholder="0" /></label>
           <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
           <label class="wide" data-crm-next-step-field><span>Следующий шаг*</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
-          <label class="wide crm-lost-reason-field" data-crm-lost-reason-field hidden><span>Причина потери*</span><input name="lost_reason" placeholder="Почему клиент отказался" /></label>
+          <div class="wide crm-lost-reason-field" data-crm-lost-reason-field hidden>
+            <fieldset class="crm-lost-reason-options">
+              <legend>Причина потери*</legend>
+              {% for reason in crm_lost_reasons %}
+                <label class="crm-lost-reason-option">
+                  <input type="checkbox" name="lost_reasons" value="{{ reason }}" />
+                  <span>{{ reason }}</span>
+                </label>
+              {% endfor %}
+            </fieldset>
+            <label class="crm-lost-reason-custom"><span>Своя причина</span><input name="lost_reason_custom" placeholder="Если нужной причины нет в списке" /></label>
+          </div>
           <label class="wide"><span>Комментарий</span><input name="note" /></label>
         </div>
         <div class="product-form-actions crm-record-form-actions">
@@ -645,15 +656,25 @@
     <header class="settings-profile-modal-head">
       <div class="settings-profile-modal-head-text">
         <h2 id="crm-lost-reason-title" class="settings-profile-modal-title">Причина потери</h2>
-        <p class="settings-profile-modal-sub">Причина сохранится в истории сделки.</p>
+        <p class="settings-profile-modal-sub">Можно выбрать несколько. Причины сохранятся в истории сделки.</p>
       </div>
       <button type="button" class="settings-profile-modal-close" data-crm-lost-cancel aria-label="Закрыть">×</button>
     </header>
     <form class="crm-lost-reason-form" data-crm-lost-reason-form>
-      <label>
-        <span>Почему сделка потеряна*</span>
-        <textarea name="lost_reason" rows="4" maxlength="300" required placeholder="Например: выбрал конкурента, дорого, нет ответа"></textarea>
+      <fieldset class="crm-lost-reason-options">
+        <legend>Почему сделка потеряна*</legend>
+        {% for reason in crm_lost_reasons %}
+          <label class="crm-lost-reason-option">
+            <input type="checkbox" name="lost_reasons" value="{{ reason }}" />
+            <span>{{ reason }}</span>
+          </label>
+        {% endfor %}
+      </fieldset>
+      <label class="crm-lost-reason-custom">
+        <span>Своя причина</span>
+        <textarea name="lost_reason_custom" rows="2" maxlength="300" placeholder="Если нужной причины нет в списке"></textarea>
       </label>
+      <p class="crm-lost-reason-hint" data-crm-lost-hint hidden>Выберите хотя бы одну причину или впишите свою.</p>
       <div class="product-form-actions">
         <button class="btn" type="submit">Сохранить и перенести</button>
         <button class="btn btn-secondary" type="button" data-crm-lost-cancel>Отмена</button>
@@ -726,11 +747,11 @@
           <button class="btn crm-card-detail-order-btn" type="button" data-crm-card-detail-order hidden>+ Добавить заказ</button>
         </div>
         <nav class="crm-card-detail-tabs" aria-label="Разделы карточки">
-          <button type="button" class="is-active" data-crm-detail-tab="history">История</button>
+          <button type="button" class="is-active" data-crm-detail-tab="comments">Комментарии</button>
           <button type="button" data-crm-detail-tab="documents">Заказы/отгрузки</button>
           <button type="button" data-crm-detail-tab="chat">Чат</button>
           <button type="button" data-crm-detail-tab="tasks">Задачи</button>
-          <button type="button" data-crm-detail-tab="comments">Комментарии</button>
+          <button type="button" data-crm-detail-tab="history">История</button>
         </nav>
         <div class="crm-card-detail-chatbox" data-crm-detail-pane="chat" hidden>
           <div class="crm-card-detail-messengers" data-crm-card-detail-messengers></div>
