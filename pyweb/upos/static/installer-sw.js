@@ -1,10 +1,10 @@
-const CACHE_NAME = "upos-installer-v22";
+const CACHE_NAME = "upos-installer-v23";
 // Версии совпадают с installer.html: иначе в кэш кладётся URL, который страница
 // никогда не запрашивает, и предзагрузка не работает.
 const APP_SHELL = [
   "/installer",
-  "/static/installer.css?v=19",
-  "/static/installer.js?v=19",
+  "/static/installer.css?v=20",
+  "/static/installer.js?v=20",
   "/static/installer-softphone.js?v=1",
   "/static/jssip.min.js?v=1",
   "/static/installer-manifest.webmanifest",

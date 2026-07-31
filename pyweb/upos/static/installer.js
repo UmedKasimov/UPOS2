@@ -920,6 +920,7 @@
     if (list) list.innerHTML = '<div class="installer-loading">Загрузка...</div>';
     if (calls) calls.innerHTML = "";
     openScreen(phonebookDialog, "phonebook");
+    activatePhoneTab("dial");
     loadSipAccounts();
     try {
       const data = await apiRequest("/api/installer/phonebook");
@@ -960,6 +961,21 @@
   document.getElementById("installer-phone-calls")?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-call-phone]");
     if (row) placeCall(row.dataset.callPhone, row.dataset.callName || "");
+  });
+
+  // Нижние вкладки телефонии: Набор / Журнал / Контакты — как в UposSip.
+  function activatePhoneTab(name) {
+    phonebookDialog?.querySelectorAll("[data-phone-tab]").forEach((tab) => {
+      tab.hidden = tab.dataset.phoneTab !== name;
+    });
+    phonebookDialog?.querySelectorAll("[data-phone-nav]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.phoneNav === name);
+    });
+  }
+
+  phonebookDialog?.querySelector(".installer-phone-nav")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-phone-nav]");
+    if (button) activatePhoneTab(button.dataset.phoneNav);
   });
 
   document.getElementById("installer-phonebook-close")?.addEventListener("click", () => {

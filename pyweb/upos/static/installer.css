@@ -1737,3 +1737,43 @@ main {
 .installer-phone-call-row.is-missed strong {
   color: #dc2626;
 }
+
+/* ===== Телефония: нижние вкладки Набор / Журнал / Контакты ===== */
+.installer-phone-body {
+  padding-bottom: 74px;
+}
+
+.installer-phone-nav {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid #dbe3ef;
+  background: #fff;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.installer-phone-nav button {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 9px 4px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-phone-nav button.is-active {
+  color: #1673dc;
+}
+
+.installer-phone-nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.installer-phone-tab[hidden] {
+  display: none;
+}
