@@ -31,9 +31,33 @@ from upos.telegram_store import (
     upsert_subscriber_request,
     workspace_display_name,
 )
+from upos.telegram_business_store import (
+    save_connection as save_business_connection,
+    save_message as save_business_message,
+)
 from upos.transactions_store import decide_transaction_telegram_limit_approval
 
 logger = logging.getLogger(__name__)
+
+
+def _handle_business_message(workspace_owner_id: str, bot_id: int, message: dict[str, Any]) -> None:
+    """Личная переписка владельца: сохраняем сообщение в базу.
+
+    Направление определяем по отправителю: если пишет сам владелец (с телефона
+    или из программы), это исходящее — иначе входящее от клиента.
+    """
+    connection_id = str(message.get("business_connection_id") or "").strip()
+    sender = message.get("from") if isinstance(message.get("from"), dict) else {}
+    chat = message.get("chat") if isinstance(message.get("chat"), dict) else {}
+    # В личной переписке chat.id совпадает с id собеседника; если отправитель
+    # тот же — сообщение пришло от клиента, иначе его написал владелец.
+    direction = "in" if int(sender.get("id") or 0) == int(chat.get("id") or 0) else "out"
+    save_business_message(
+        workspace_owner_id,
+        message,
+        connection_id=connection_id,
+        direction=direction,
+    )
 
 _PHONE_RE = re.compile(r"\+?\d[\d\s\-()]{6,}\d")
 _ADMIN_STATUSES = frozenset({"administrator", "creator"})
@@ -165,6 +189,18 @@ def _handle_telegram_update_inner(workspace_owner_id: str, update: dict[str, Any
     if isinstance(update.get("my_chat_member"), dict):
         _handle_my_chat_member(workspace_owner_id, token, bot_id, update["my_chat_member"], org_name)
         return
+
+    # Telegram для бизнеса: личные переписки владельца. Их не нужно проводить
+    # через сценарии бота — они просто попадают в раздел «Мессенджеры».
+    if isinstance(update.get("business_connection"), dict):
+        save_business_connection(workspace_owner_id, update["business_connection"])
+        return
+
+    for key in ("business_message", "edited_business_message"):
+        business = update.get(key)
+        if isinstance(business, dict):
+            _handle_business_message(workspace_owner_id, bot_id, business)
+            return
 
     message = update.get("message")
     if not isinstance(message, dict):

@@ -400,11 +400,50 @@
         var current = currentThread();
         var value = String(text.value || "").trim();
         if (!current || !value) return;
-        current.messages = threadMessages(current).slice();
-        current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
-        text.value = "";
-        rememberThread(current);
-        renderMessages(root, current);
+
+        // Личные переписки Telegram уходят клиенту по-настоящему; остальные
+        // каналы пока только показывают ответ локально.
+        if (current.source !== "telegram_business" || !current.chat_id) {
+          current.messages = threadMessages(current).slice();
+          current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
+          text.value = "";
+          rememberThread(current);
+          renderMessages(root, current);
+          return;
+        }
+
+        var csrfInput = document.querySelector('input[name="csrf_token"]');
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var csrf = csrfInput ? csrfInput.value : csrfMeta ? csrfMeta.content : "";
+        send.disabled = true;
+        fetch("/api/telegram/business/send", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrf,
+          },
+          body: JSON.stringify({ chat_id: current.chat_id, text: value }),
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+              if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось отправить");
+              return payload;
+            });
+          })
+          .then(function () {
+            current.messages = threadMessages(current).slice();
+            current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
+            text.value = "";
+            rememberThread(current);
+            renderMessages(root, current);
+          })
+          .catch(function (error) {
+            window.alert(error.message || "Не удалось отправить сообщение");
+          })
+          .then(function () {
+            send.disabled = false;
+          });
       });
     }
 

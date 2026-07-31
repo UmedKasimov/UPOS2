@@ -905,6 +905,82 @@ class TelegramSubscriber(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TelegramBusinessConnection(Base):
+    """Подключение бота к личному аккаунту через Telegram для бизнеса.
+
+    Владелец включает бота в настройках Telegram, и тот получает доступ к
+    личным перепискам. Идентификатор подключения нужен, чтобы отвечать
+    клиенту от имени владельца, а не от бота.
+    """
+
+    __tablename__ = "telegram_business_connections"
+    __table_args__ = (
+        UniqueConstraint("connection_id", name="uq_telegram_business_connection_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    connection_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Telegram-аккаунт владельца, к которому подключён бот.
+    user_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    username: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    can_reply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TelegramBusinessMessage(Base):
+    """Сообщение из личной переписки владельца: и входящее, и наш ответ."""
+
+    __tablename__ = "telegram_business_messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "chat_id",
+            "message_id",
+            name="uq_telegram_business_message",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    connection_id: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    message_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    # in — написал клиент, out — ответили мы (из программы или из телефона).
+    direction: Mapped[str] = mapped_column(String(8), nullable=False, default="in", server_default=text("'in'"))
+    sender_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    sender_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    sender_username: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    sender_phone: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    text_body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Вложения и прочее, что не укладывается в текст.
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class UserAuthSession(Base):
     __tablename__ = "user_auth_sessions"
 

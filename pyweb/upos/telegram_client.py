@@ -11,7 +11,16 @@ import httpx
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
-DEFAULT_ALLOWED_UPDATES = ["message", "my_chat_member", "callback_query"]
+DEFAULT_ALLOWED_UPDATES = [
+    "message",
+    "my_chat_member",
+    "callback_query",
+    # Telegram Business: личные переписки владельца приходят отдельными типами
+    # апдейтов и только после того, как бот подключён в настройках аккаунта.
+    "business_connection",
+    "business_message",
+    "edited_business_message",
+]
 _MAX_MESSAGE_LEN = 4096
 
 _client: httpx.Client | None = None
@@ -174,7 +183,10 @@ def send_message(
     parse_mode: str = "HTML",
     disable_web_page_preview: bool = True,
     reply_markup: dict[str, Any] | None = None,
+    business_connection_id: str = "",
 ) -> dict[str, Any]:
+    """Отправляет сообщение. С business_connection_id оно уходит от имени
+    владельца аккаунта, а не от бота — так отвечают в личные переписки."""
     chunks = _split_text(text)
     last: dict[str, Any] = {}
     for idx, chunk in enumerate(chunks):
@@ -184,6 +196,10 @@ def send_message(
             "parse_mode": parse_mode,
             "disable_web_page_preview": disable_web_page_preview,
         }
+        if business_connection_id:
+            body["business_connection_id"] = str(business_connection_id)
+            # У сообщений от имени владельца клавиатуры недоступны.
+            reply_markup = None
         if reply_markup and idx == 0:
             body["reply_markup"] = reply_markup
         result = _api_call(token, "sendMessage", json_body=body, timeout=10.0)

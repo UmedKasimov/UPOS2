@@ -31,6 +31,11 @@ from upos.telegram_events import hub
 from upos.telegram_handlers import handle_telegram_update
 from upos.telegram_notifier import send_test_report
 from upos.telegram_scheduler import ensure_scheduler_running, reschedule_workspace
+from upos.telegram_business_store import (
+    active_connection as business_active_connection,
+    save_message as business_save_message,
+    thread_messages as business_thread_messages,
+)
 from upos.telegram_store import (
     decide_subscriber,
     delete_chat,
@@ -470,6 +475,84 @@ def register_telegram_routes(
         assert oid is not None
         if not delete_chat(oid, chat_row_id):
             return JSONResponse({"error": "not_found"}, status_code=404)
+        return {"ok": True}
+
+    @app.get("/api/telegram/business/status")
+    def api_telegram_business_status(request: Request):
+        oid, err = _telegram_workspace_owner(request)
+        if err:
+            return err
+        assert oid is not None
+        connection = business_active_connection(oid)
+        return {
+            "ok": True,
+            "connected": bool(connection),
+            "connection": connection or {},
+        }
+
+    @app.get("/api/telegram/business/threads/{chat_id}")
+    def api_telegram_business_thread(chat_id: int, request: Request):
+        oid, err = _telegram_workspace_owner(request)
+        if err:
+            return err
+        assert oid is not None
+        return {"ok": True, "messages": business_thread_messages(oid, int(chat_id))}
+
+    @app.post("/api/telegram/business/send")
+    async def api_telegram_business_send(request: Request):
+        """Ответ клиенту в личную переписку — уходит от имени владельца."""
+        csrf_error = _csrf_or_error(request)
+        if csrf_error:
+            return csrf_error
+        user = request.session.get("user") or {}
+        if not can_manage_telegram(user):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        oid, err = _telegram_workspace_owner(request)
+        if err:
+            return err
+        assert oid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        text = str((body or {}).get("text") or "").strip()[:4000]
+        chat_id = int((body or {}).get("chat_id") or 0)
+        if not text:
+            return JSONResponse({"error": "message_required"}, status_code=400)
+        if not chat_id:
+            return JSONResponse({"error": "chat_required"}, status_code=400)
+        cfg, token = get_bot_config_with_token(oid)
+        if not cfg or not token:
+            return JSONResponse({"error": "not_connected"}, status_code=400)
+        connection = business_active_connection(oid)
+        if not connection:
+            return JSONResponse({"error": "business_not_connected"}, status_code=400)
+        if not connection.get("can_reply"):
+            return JSONResponse({"error": "business_reply_denied"}, status_code=400)
+        try:
+            sent = tg_send_message(
+                token,
+                chat_id,
+                text,
+                parse_mode="",
+                business_connection_id=str(connection.get("connection_id") or ""),
+            )
+        except TelegramApiError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        # Telegram не присылает business_message на наш же ответ, поэтому
+        # записываем его в переписку сами.
+        business_save_message(
+            oid,
+            {
+                "message_id": int((sent or {}).get("message_id") or 0),
+                "chat": {"id": chat_id},
+                "from": {"first_name": str(user.get("name") or user.get("username") or "Вы")},
+                "text": text,
+                "date": int((sent or {}).get("date") or 0),
+            },
+            connection_id=str(connection.get("connection_id") or ""),
+            direction="out",
+        )
         return {"ok": True}
 
     @app.post("/api/telegram/chats/{chat_row_id}/send")

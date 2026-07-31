@@ -181,6 +181,11 @@ from upos.earnings_store import (
     settlement_act as earning_settlement_act,
     summary_by_employee as earning_summary_by_employee,
 )
+from upos.telegram_business_store import (
+    active_connection as telegram_business_connection,
+    list_threads as list_business_threads,
+    thread_messages as business_thread_messages,
+)
 from upos.push_store import (
     drop_subscription as drop_push_subscription,
     has_subscription as push_has_subscription,
@@ -14849,6 +14854,15 @@ def create_app() -> FastAPI:
             return "/static/" + raw.lstrip("/")
         return ""
 
+    def _parse_iso_datetime(value: Any) -> datetime | None:
+        raw = str(value or "").strip()
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+
     def _messenger_presence(updated_at: Any, status_value: str = "") -> tuple[str, str]:
         if str(status_value or "") == "waiting":
             return "waiting", "Ожидает"
@@ -14952,6 +14966,50 @@ def create_app() -> FastAPI:
 
         social_data = load_workspace_settings(workspace_owner_id).get("social_links")
         social_links = social_data if isinstance(social_data, dict) else {}
+
+        # Личные переписки из Telegram для бизнеса — это настоящие диалоги с
+        # текстами, поэтому они идут выше карточек подписчиков.
+        for thread in list_business_threads(workspace_owner_id):
+            waiting = bool(thread.get("waiting"))
+            status_value = "waiting" if waiting else "active"
+            presence, presence_label = _messenger_presence(
+                _parse_iso_datetime(thread.get("last_at")),
+                status_value,
+            )
+            rows.insert(
+                0,
+                {
+                    "id": thread["thread_id"],
+                    "chat_id": thread["chat_id"],
+                    "source": "telegram_business",
+                    "channel": "Telegram",
+                    "contact": thread.get("name") or "Клиент",
+                    "client": thread.get("name") or "",
+                    "username": thread.get("username") or "",
+                    "phone": thread.get("phone") or "",
+                    "topic": ("@" + thread["username"]) if thread.get("username") else "Личная переписка",
+                    "last_message": thread.get("last_text") or "Вложение",
+                    "responsible": "",
+                    "status": status_value,
+                    "status_label": _messenger_status_label(status_value),
+                    "presence": presence,
+                    "presence_label": presence_label,
+                    "avatar_url": "",
+                    "avatar_ttl_days": 5,
+                    "is_new": waiting,
+                    "counterparty_id": thread.get("counterparty_id") or "",
+                    "updated_at": _parse_iso_datetime(thread.get("last_at")),
+                    "messages": [
+                        {
+                            "author": message["sender_name"] or "Клиент" if message["direction"] == "in" else "Вы",
+                            "text": message["text"] or ("Вложение" if message["has_attachment"] else ""),
+                            "kind": "in" if message["direction"] == "in" else "out",
+                            "created_at": message["sent_at"],
+                        }
+                        for message in business_thread_messages(workspace_owner_id, thread["chat_id"])
+                    ],
+                },
+            )
 
         def _social_value(*keys: str) -> str:
             for key in keys:
