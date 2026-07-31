@@ -1006,3 +1006,129 @@ main {
     display: none;
   }
 }
+
+.installer-earnings {
+  width: min(560px, 100vw);
+  max-width: 100vw;
+  max-height: 100vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.installer-earnings-shell {
+  display: flex;
+  overflow: hidden;
+  max-height: 100vh;
+  flex-direction: column;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.installer-earnings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.installer-earnings-head p {
+  margin: 0 0 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-earnings-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.installer-earnings-body {
+  overflow: auto;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+}
+
+.installer-earnings-card {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.installer-earnings-card > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.installer-earnings-card dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.installer-earnings-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.installer-earnings-card dt {
+  color: #64748b;
+}
+
+.installer-earnings-card dd {
+  margin: 0;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.installer-earnings-card .is-balance {
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.installer-earnings-card .is-balance dd {
+  color: #b91c1c;
+}
+
+.installer-earnings-subtitle {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.installer-earnings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.installer-earnings-row strong {
+  display: block;
+  font-size: 14px;
+}
+
+.installer-earnings-row small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.installer-earnings-row b {
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.installer-earnings-row.is-payout b {
+  color: #b91c1c;
+}

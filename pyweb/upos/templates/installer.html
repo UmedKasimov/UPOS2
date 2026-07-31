@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=6">
-  <script defer src="/static/installer.js?v=6"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=7">
+  <script defer src="/static/installer.js?v=7"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -45,6 +45,7 @@
         <button type="button" class="installer-menu-close" id="installer-menu-close" aria-label="Закрыть меню">×</button>
       </div>
       <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
+      <button type="button" data-menu-action="earnings">Мой заработок</button>
       <button type="button" id="installer-push-toggle" hidden>Включить уведомления</button>
     </nav>
 
@@ -120,6 +121,23 @@
           <h3 id="installer-calendar-selected-title">Заказы на выбранный день</h3>
           <div class="installer-calendar-orders" id="installer-calendar-orders"></div>
         </section>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-earnings">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Начисления и выплаты</p>
+          <h2 id="installer-earnings-title">Мой заработок</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-earnings-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="installer-earnings-body">
+        <div class="installer-earnings-totals" id="installer-earnings-totals"></div>
+        <h3 class="installer-earnings-subtitle">Движения</h3>
+        <div class="installer-earnings-list" id="installer-earnings-list"></div>
       </div>
     </div>
   </dialog>

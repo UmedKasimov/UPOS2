@@ -381,6 +381,57 @@
       : '<div class="installer-empty">На выбранный день установок нет</div>';
   }
 
+  const earningsDialog = document.getElementById("installer-earnings");
+
+  function money(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) return String(value || "0");
+    return number.toLocaleString("ru-RU", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  async function openEarnings() {
+    closeInstallerMenu();
+    const totals = document.getElementById("installer-earnings-totals");
+    const list = document.getElementById("installer-earnings-list");
+    const title = document.getElementById("installer-earnings-title");
+    if (!earningsDialog) return;
+    totals.innerHTML = '<div class="installer-loading">Загрузка...</div>';
+    list.innerHTML = "";
+    if (typeof earningsDialog.showModal === "function") earningsDialog.showModal();
+    else earningsDialog.setAttribute("open", "");
+    try {
+      const data = await apiRequest("/api/installer/earnings");
+      if (title && data.employee_name) title.textContent = data.employee_name;
+      totals.innerHTML = data.totals.length
+        ? data.totals.map((row) => `
+            <article class="installer-earnings-card">
+              <span>${escapeHtml(row.currency)}</span>
+              <dl>
+                <div><dt>Начислено</dt><dd>${money(row.accrued)}</dd></div>
+                <div><dt>Выплачено</dt><dd>${money(row.paid)}</dd></div>
+                <div class="is-balance"><dt>К выплате</dt><dd>${money(row.balance)}</dd></div>
+              </dl>
+            </article>`).join("")
+        : '<div class="installer-empty">Начислений пока нет</div>';
+      list.innerHTML = data.entries.length
+        ? data.entries.map((row) => `
+            <article class="installer-earnings-row${row.kind === "payout" ? " is-payout" : ""}">
+              <div>
+                <strong>${escapeHtml(row.title || row.kind_label)}</strong>
+                <small>${escapeHtml(row.date)}${row.auto ? " · авто" : ""}</small>
+              </div>
+              <b>${row.kind === "payout" ? "−" : "+"}${money(row.amount)} ${escapeHtml(row.currency)}</b>
+            </article>`).join("")
+        : '<div class="installer-empty">Движений пока нет</div>';
+    } catch (error) {
+      totals.innerHTML = `<div class="installer-empty">${escapeHtml(error.message || "Не удалось загрузить")}</div>`;
+    }
+  }
+
+  document.getElementById("installer-earnings-close")?.addEventListener("click", () => {
+    if (earningsDialog?.open) earningsDialog.close();
+  });
+
   function openInstallerMenu() {
     menuNode.hidden = false;
     if (menuBackdrop) menuBackdrop.hidden = false;
@@ -649,6 +700,7 @@
     const button = event.target.closest("[data-menu-action]");
     if (!button) return;
     if (button.dataset.menuAction === "orders-calendar") openOrderCalendar();
+    if (button.dataset.menuAction === "earnings") openEarnings();
   });
 
   menuClose?.addEventListener("click", closeInstallerMenu);

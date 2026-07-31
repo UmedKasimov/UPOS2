@@ -7760,6 +7760,49 @@ def create_app() -> FastAPI:
             )
         return JSONResponse({"ok": True, "order": payload})
 
+    @app.get("/api/installer/earnings", name="installer_earnings_api")
+    def installer_earnings_api(request: Request):
+        """Свой заработок установщика: начислено, выплачено, остаток и движения."""
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        # Руководитель в этом же приложении смотрит свои записи, установщик — свои.
+        target_id = installer_user_id or _session_user_id(request.session.get("user") or {})
+        if not target_id:
+            return _installer_api_error("Не удалось определить сотрудника", 400)
+        totals = earning_summary_by_employee(wid, employee_user_id=target_id)
+        summary = totals[0] if totals else {"accrued": {}, "paid": {}, "balance": {}, "employee_name": ""}
+        entries = list_earning_entries(wid, employee_user_id=target_id, limit=100)
+        return JSONResponse(
+            {
+                "ok": True,
+                "employee_name": summary.get("employee_name") or "",
+                "can_manage": can_manage,
+                "totals": [
+                    {
+                        "currency": currency,
+                        "accrued": str(summary["accrued"].get(currency, 0)),
+                        "paid": str(summary["paid"].get(currency, 0)),
+                        "balance": str(amount),
+                    }
+                    for currency, amount in sorted(summary["balance"].items())
+                ],
+                "entries": [
+                    {
+                        "id": item["id"],
+                        "kind": item["kind"],
+                        "kind_label": item["kind_label"],
+                        "amount": str(item["amount"]),
+                        "currency": item["currency"],
+                        "title": item["title"],
+                        "date": item["earned_on"],
+                        "auto": item["source"] == "installation",
+                    }
+                    for item in entries
+                ],
+            }
+        )
+
     @app.get("/api/installer/push/key", name="installer_push_key_api")
     def installer_push_key_api(request: Request):
         wid, _installer_user_id, _can_manage = _installer_request_scope(request)
