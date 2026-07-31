@@ -3128,9 +3128,9 @@ def create_app() -> FastAPI:
                 "heading": "Складской учет",
                 "action": "+ Операция",
                 "launcher": [
-                    {"id": "warehouses", "title": "Склады", "subtitle": "Создание и настройки", "icon": "warehouse"},
-                    {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
                     {"id": "purchases", "title": "Закупки", "subtitle": "Приход от поставщиков", "icon": "purchase"},
+                    {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
+                    {"id": "warehouses", "title": "Склады", "subtitle": "Создание и настройки", "icon": "warehouse"},
                     {"id": "adjustments", "title": "Корректировки", "subtitle": "Приход и списание", "icon": "adjustment"},
                 ],
                 "filters": ["Поиск", "Склад", "Товар", "Дата", "Тип операции"],
