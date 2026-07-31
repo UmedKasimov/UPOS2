@@ -1115,6 +1115,67 @@ class InstallationEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class EmployeeEarning(Base):
+    """Начисление или выплата сотруднику.
+
+    Начисления создаются автоматически при завершении установки (по ставке
+    сотрудника) и вручную; выплаты вносит руководитель. Остаток к выплате —
+    разница сумм по сотруднику, отсюда же строится акт сверки.
+    """
+
+    __tablename__ = "employee_earnings"
+    __table_args__ = (
+        # Один автоматический начисляемый заказ — одно начисление. Ручные записи
+        # хранят NULL в installation_order_id, а NULL в Postgres не конфликтуют,
+        # поэтому их количество не ограничено.
+        UniqueConstraint(
+            "installation_order_id",
+            "kind",
+            name="uq_employee_earnings_order_kind",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    employee_user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # accrual — начислено сотруднику, payout — выплачено ему.
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="accrual", server_default=text("'accrual'"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    # installation — посчитано по ставке с заказа, manual — внесено руками.
+    source: Mapped[str] = mapped_column(String(24), nullable=False, default="manual", server_default=text("'manual'"))
+    installation_order_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("installation_orders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    earned_on: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Как посчитано: тип ставки, процент, база начисления.
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class InstallationPushSubscription(Base):
     """Web Push подписка устройства установщика."""
 

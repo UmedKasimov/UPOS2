@@ -66,6 +66,14 @@ class Settings(BaseSettings):
         default="v20.0",
         validation_alias=AliasChoices("META_GRAPH_VERSION", "FACEBOOK_GRAPH_VERSION"),
     )
+    # Web Push (VAPID). Пара ключей генерируется один раз, публичный уходит в браузер
+    # при подписке, приватным подписываются запросы к push-сервису.
+    vapid_public_key: str = Field(default="", validation_alias=AliasChoices("VAPID_PUBLIC_KEY"))
+    vapid_private_key: str = Field(default="", validation_alias=AliasChoices("VAPID_PRIVATE_KEY"))
+    vapid_contact_email: str = Field(
+        default="",
+        validation_alias=AliasChoices("VAPID_CONTACT_EMAIL", "VAPID_SUBJECT"),
+    )
 
 
 def schema_align_on_startup() -> bool:

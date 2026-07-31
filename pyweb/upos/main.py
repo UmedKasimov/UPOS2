@@ -171,6 +171,24 @@ from upos.installations_store import (
     task_progress,
     upsert_installation_for_order,
 )
+from upos.earnings_store import (
+    RATE_TYPES as EARNING_RATE_TYPES,
+    add_entry as add_earning_entry,
+    delete_entry as delete_earning_entry,
+    list_entries as list_earning_entries,
+    load_rules as load_earning_rules,
+    save_rules as save_earning_rules,
+    settlement_act as earning_settlement_act,
+    summary_by_employee as earning_summary_by_employee,
+)
+from upos.push_store import (
+    drop_subscription as drop_push_subscription,
+    has_subscription as push_has_subscription,
+    notify_users as push_notify_users,
+    public_key as push_public_key,
+    push_enabled,
+    save_subscription as save_push_subscription,
+)
 from upos.organizations_store import (
     create_organization,
     default_organization,
@@ -895,6 +913,8 @@ def create_app() -> FastAPI:
             return ("hr",)
         if path == "/employees" or path.startswith("/employees/"):
             return ("employees",)
+        if path == "/earnings" or path.startswith("/earnings/") or path.startswith("/api/earnings"):
+            return ("earnings",)
         if path == "/settings" or path.startswith("/settings/"):
             return ("settings", "employees", "dictionary")
         if path.startswith("/api/employees"):
@@ -7593,7 +7613,11 @@ def create_app() -> FastAPI:
         return JSONResponse({"ok": True, "orders": payload})
 
     @app.post("/api/installer/orders/{order_id}/status", name="installer_order_status_api")
-    async def installer_order_status_api(request: Request, order_id: str):
+    async def installer_order_status_api(
+        request: Request,
+        order_id: str,
+        background_tasks: BackgroundTasks,
+    ):
         if not _installer_csrf_valid(request):
             return _installer_api_error("Форма устарела. Обновите страницу.", 403)
         wid, installer_user_id, can_manage = _installer_request_scope(request)
@@ -7643,6 +7667,19 @@ def create_app() -> FastAPI:
                 order,
                 timezone_name=timezone_name,
                 can_manage=can_manage,
+            )
+            order_number = str(order.number or "")
+            order_installer_id = str(order.installer_user_id or "")
+        # Уведомление шлём после коммита: до него смена статуса может откатиться.
+        if target == "completed" and order_installer_id:
+            background_tasks.add_task(
+                push_notify_users,
+                wid,
+                [order_installer_id],
+                title="Установка завершена",
+                body=f"Заказ {order_number} закрыт. Вознаграждение начислено.",
+                url="/earnings",
+                tag=f"order-{order_id}",
             )
         return JSONResponse({"ok": True, "order": payload})
 
@@ -7713,6 +7750,59 @@ def create_app() -> FastAPI:
                 can_manage=can_manage,
             )
         return JSONResponse({"ok": True, "order": payload})
+
+    @app.get("/api/installer/push/key", name="installer_push_key_api")
+    def installer_push_key_api(request: Request):
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        user_id = _session_user_id(request.session.get("user") or {})
+        return JSONResponse(
+            {
+                "ok": True,
+                "enabled": push_enabled(),
+                "public_key": push_public_key(),
+                "subscribed": bool(user_id) and push_has_subscription(wid, user_id),
+            }
+        )
+
+    @app.post("/api/installer/push/subscribe", name="installer_push_subscribe_api")
+    async def installer_push_subscribe_api(request: Request):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        user_id = _session_user_id(request.session.get("user") or {})
+        if not user_id:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            return _installer_api_error("Некорректные данные")
+        saved = save_push_subscription(
+            wid,
+            user_id,
+            (body or {}).get("subscription") or {},
+            user_agent=request.headers.get("user-agent") or "",
+        )
+        if not saved:
+            return _installer_api_error("Подписка не сохранена: браузер прислал неполные данные")
+        return JSONResponse({"ok": True})
+
+    @app.post("/api/installer/push/unsubscribe", name="installer_push_unsubscribe_api")
+    async def installer_push_unsubscribe_api(request: Request):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            return _installer_api_error("Некорректные данные")
+        drop_push_subscription(wid, str((body or {}).get("endpoint") or ""))
+        return JSONResponse({"ok": True})
 
     @app.post(
         "/api/installer/orders/{order_id}/tasks/{task_id}",
@@ -8945,8 +9035,10 @@ def create_app() -> FastAPI:
         return JSONResponse({"ok": True, "segment": segment})
 
     @app.post("/sales/save", name="sales_save")
-    async def sales_save(request: Request):
+    async def sales_save(request: Request, background_tasks: BackgroundTasks):
         form = await request.form()
+        assigned_installer_user_id = ""
+        assigned_installation_when = ""
         sales_embed = str(form.get("embed") or "").strip() == "1"
         form_doc_type = str(form.get("doc_type") or "sale").strip() or "sale"
         form_crm_record_id = str(form.get("crm_record_id") or "").strip()
@@ -9156,6 +9248,8 @@ def create_app() -> FastAPI:
                         raise ValueError("Выберите установщика")
                     if not installation_scheduled_at:
                         raise ValueError("Укажите дату и время установки")
+                    assigned_installer_user_id = installer_user_id
+                    assigned_installation_when = installation_scheduled_at
                     upsert_installation_for_order(
                         session,
                         workspace_owner_id=wid,
@@ -9205,6 +9299,18 @@ def create_app() -> FastAPI:
                 url=f"/sales?{redirect_context}&error={quote('Продажа сохранена, но операция кассы не записалась')}#sales-form",
                 status_code=302,
             )
+        # Установщику сообщаем о назначении только после успешного сохранения.
+        if assigned_installer_user_id:
+            background_tasks.add_task(
+                push_notify_users,
+                wid,
+                [assigned_installer_user_id],
+                title="Новый заказ на установку",
+                body=f"Заказ {saved_sale_number}: {assigned_installation_when}".strip().rstrip(":"),
+                url="/installer",
+                tag=f"sale-{saved_sale_id}",
+            )
+
         saved_message = (
             "updated"
             if editing_sale_id
@@ -9637,8 +9743,9 @@ def create_app() -> FastAPI:
             )
 
     @app.post("/sales/{sale_id}/pay", name="sales_pay")
-    async def sales_pay(request: Request, sale_id: str):
+    async def sales_pay(request: Request, sale_id: str, background_tasks: BackgroundTasks):
         form = await request.form()
+        paid_installer_user_id = ""
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
         wid, redir = _product_workspace_owner(request)
@@ -9697,6 +9804,7 @@ def create_app() -> FastAPI:
             session.add(row)
             saved_sale_id = row.id
             saved_sale_number = row.number
+            paid_installer_user_id = str(data.get("installer_user_id") or "")
         try:
             _sync_sales_cash_transactions(
                 wid,
@@ -9712,6 +9820,21 @@ def create_app() -> FastAPI:
             return RedirectResponse(
                 url="/sales?error=" + quote("Оплата внесена, но операция кассы не записалась") + "#sales-journal",
                 status_code=302,
+            )
+        if paid_installer_user_id:
+            rest = _sales_decimal(amount) - _sales_decimal(data.get("paid_amount"))
+            background_tasks.add_task(
+                push_notify_users,
+                wid,
+                [paid_installer_user_id],
+                title="Оплата по заказу",
+                body=(
+                    f"Заказ {saved_sale_number} оплачен полностью"
+                    if rest <= 0
+                    else f"Заказ {saved_sale_number}: остаток долга {_sales_money_label(rest)} {currency}"
+                ),
+                url="/installer",
+                tag=f"pay-{saved_sale_id}",
             )
         return RedirectResponse(url=f"/sales?msg=paid&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
 
@@ -16334,7 +16457,7 @@ def create_app() -> FastAPI:
         return JSONResponse({"ok": True, "tags": tags[:8]})
 
     @app.post("/crm/{record_id}/activity", name="crm_activity_add")
-    async def crm_activity_add(request: Request, record_id: str):
+    async def crm_activity_add(request: Request, record_id: str, background_tasks: BackgroundTasks):
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
@@ -16390,6 +16513,22 @@ def create_app() -> FastAPI:
             data["activity_log"] = events
             row.data = data
             flag_modified(row, "data")
+            record_title = str(row.title or data.get("client") or "")
+        # Ответственный в карточке задаётся именем, а не идентификатором, поэтому
+        # ищем сотрудника по совпадению имени/логина.
+        if kind == "task" and assignee:
+            assignee_id = _employee_user_id_by_name(wid, assignee)
+            if assignee_id:
+                when = " · ".join(part for part in (due_date, due_time) if part)
+                background_tasks.add_task(
+                    push_notify_users,
+                    wid,
+                    [assignee_id],
+                    title="Новая задача",
+                    body=f"{text}{f' ({when})' if when else ''} · {record_title}".strip(" ·"),
+                    url="/crm",
+                    tag=f"crm-task-{record_id}",
+                )
         return JSONResponse({"ok": True, "event": event})
 
     @app.post("/crm/{record_id}/delete", name="crm_delete")
@@ -19449,6 +19588,180 @@ def create_app() -> FastAPI:
         confirmed_day = confirm_delivery_shipment(oid, shipment_id)
         msg = "shipment_confirmed" if confirmed_day else "shipment_not_found"
         return RedirectResponse(url=f"/shipments?msg={quote(msg)}#shipment-{quote(str(shipment_id or '').strip())}", status_code=302)
+
+    def _employee_user_id_by_name(workspace_owner_id: str, name: str) -> str:
+        needle = str(name or "").strip().lower()
+        if not needle:
+            return ""
+        for employee in list_employees_safe(workspace_owner_id):
+            for candidate in (employee.get("name"), employee.get("username")):
+                if str(candidate or "").strip().lower() == needle:
+                    return str(employee.get("id") or "")
+        return ""
+
+    def _earnings_scope(request: Request) -> tuple[str, str]:
+        """Возвращает (workspace, ограничение по сотруднику).
+
+        Сотрудник видит только свой заработок; владелец и роли с доступом к
+        разделу — всех. Ограничение считаем здесь, чтобы каждый роут не
+        повторял проверку.
+        """
+        user = request.session.get("user") or {}
+        wid = str(user.get("workspace_owner_id") or user.get("user_id") or "").strip()
+        own_only = str(user.get("user_id") or "") if user.get("is_employee") else ""
+        return wid, own_only
+
+    @app.get("/earnings", response_class=HTMLResponse, name="home_earnings")
+    def home_earnings(request: Request):
+        oid, redir = _current_org_html_owner(request)
+        if redir:
+            return redir
+        assert oid is not None
+        _wid, own_only = _earnings_scope(request)
+        today = datetime.now()
+        date_from = str(request.query_params.get("date_from") or today.replace(day=1).strftime("%Y-%m-%d"))[:10]
+        date_to = str(request.query_params.get("date_to") or today.strftime("%Y-%m-%d"))[:10]
+        selected_employee = own_only or str(request.query_params.get("employee_user_id") or "").strip()
+        return tpl(
+            request,
+            "home_earnings.html",
+            variant="user",
+            active="home_earnings",
+            inside_organization=True,
+            selected_organization_id=oid,
+            date_from=date_from,
+            date_to=date_to,
+            selected_employee_id=selected_employee,
+            own_only=bool(own_only),
+            employees=[] if own_only else list_employees_safe(oid),
+            summary=earning_summary_by_employee(
+                oid,
+                date_from=date_from,
+                date_to=date_to,
+                employee_user_id=selected_employee,
+            ),
+            entries=list_earning_entries(
+                oid,
+                employee_user_id=selected_employee,
+                date_from=date_from,
+                date_to=date_to,
+            ),
+            rules=load_earning_rules(oid),
+            rate_types=list(EARNING_RATE_TYPES),
+            flash_ok=request.query_params.get("msg"),
+            flash_err=request.query_params.get("error"),
+        )
+
+    @app.get("/earnings/act/{employee_id}", response_class=HTMLResponse, name="home_earnings_act")
+    def home_earnings_act(request: Request, employee_id: str):
+        oid, redir = _current_org_html_owner(request)
+        if redir:
+            return redir
+        assert oid is not None
+        _wid, own_only = _earnings_scope(request)
+        if own_only and own_only != employee_id:
+            return RedirectResponse(url="/earnings", status_code=302)
+        today = datetime.now()
+        date_from = str(request.query_params.get("date_from") or today.replace(day=1).strftime("%Y-%m-%d"))[:10]
+        date_to = str(request.query_params.get("date_to") or today.strftime("%Y-%m-%d"))[:10]
+        return tpl(
+            request,
+            "home_earnings_act.html",
+            variant="user",
+            active="home_earnings",
+            inside_organization=True,
+            selected_organization_id=oid,
+            act=earning_settlement_act(oid, employee_id, date_from=date_from, date_to=date_to),
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+    @app.post("/earnings/entry", name="earnings_entry_save")
+    async def earnings_entry_save(request: Request, background_tasks: BackgroundTasks):
+        oid, redir = _current_org_html_owner(request)
+        if redir:
+            return redir
+        assert oid is not None
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/earnings?error=csrf", status_code=302)
+        _wid, own_only = _earnings_scope(request)
+        if own_only:
+            # Сотрудник свой заработок только смотрит.
+            return RedirectResponse(url="/earnings?error=" + quote("Недостаточно прав"), status_code=302)
+        employee_user_id = str(form.get("employee_user_id") or "")
+        kind = str(form.get("kind") or "accrual")
+        try:
+            saved = add_earning_entry(
+                oid,
+                employee_user_id=employee_user_id,
+                kind=kind,
+                amount=form.get("amount"),
+                currency=str(form.get("currency") or "UZS"),
+                title=str(form.get("title") or ""),
+                note=str(form.get("note") or ""),
+                earned_on=str(form.get("earned_on") or ""),
+                created_by_user_id=_session_user_id(request.session.get("user") or {}),
+            )
+        except ValueError as exc:
+            return RedirectResponse(url="/earnings?error=" + quote(str(exc)), status_code=302)
+        currency = str(form.get("currency") or "UZS").upper()
+        background_tasks.add_task(
+            push_notify_users,
+            oid,
+            [employee_user_id],
+            title="Выплата" if saved["kind"] == "payout" else "Начисление заработка",
+            body=f"{saved['amount']} {currency} · {str(form.get('title') or '').strip() or 'без основания'}",
+            url="/earnings",
+            tag=f"earning-{saved['id']}",
+        )
+        return RedirectResponse(url="/earnings?msg=" + quote("Запись добавлена"), status_code=302)
+
+    @app.post("/earnings/entry/{entry_id}/delete", name="earnings_entry_delete")
+    async def earnings_entry_delete(request: Request, entry_id: str):
+        oid, redir = _current_org_html_owner(request)
+        if redir:
+            return redir
+        assert oid is not None
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/earnings?error=csrf", status_code=302)
+        _wid, own_only = _earnings_scope(request)
+        if own_only:
+            return RedirectResponse(url="/earnings?error=" + quote("Недостаточно прав"), status_code=302)
+        delete_earning_entry(oid, entry_id)
+        return RedirectResponse(url="/earnings?msg=" + quote("Запись удалена"), status_code=302)
+
+    @app.post("/earnings/rules", name="earnings_rules_save")
+    async def earnings_rules_save(request: Request):
+        oid, redir = _current_org_html_owner(request)
+        if redir:
+            return redir
+        assert oid is not None
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/earnings?error=csrf", status_code=302)
+        _wid, own_only = _earnings_scope(request)
+        if own_only:
+            return RedirectResponse(url="/earnings?error=" + quote("Недостаточно прав"), status_code=302)
+        by_user: dict[str, Any] = {}
+        for key in form.keys():
+            if not key.startswith("rate_value__"):
+                continue
+            user_id = key[len("rate_value__"):]
+            raw_value = str(form.get(key) or "").strip()
+            if not raw_value:
+                continue
+            by_user[user_id] = {
+                "type": str(form.get(f"rate_type__{user_id}") or "percent"),
+                "value": raw_value,
+            }
+        save_earning_rules(
+            oid,
+            {"type": str(form.get("default_rate_type") or "percent"), "value": form.get("default_rate_value")},
+            by_user,
+        )
+        return RedirectResponse(url="/earnings?msg=" + quote("Ставки сохранены"), status_code=302)
 
     @app.get("/hr", response_class=HTMLResponse, name="home_hr")
     def home_hr(request: Request):

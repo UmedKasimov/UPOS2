@@ -28704,3 +28704,191 @@ html.dark .crm-task-calendar-event {
     grid-column: 1 / -1;
   }
 }
+
+/* ===== Заработок: начисления, выплаты, акт сверки ===== */
+.earnings-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius, 12px);
+  background: var(--card);
+}
+
+.earnings-filters label,
+.earnings-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.earnings-section {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius, 12px);
+  background: var(--card);
+}
+
+.earnings-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.earnings-hint {
+  margin: -0.5rem 0 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.earnings-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.earnings-card {
+  padding: 0.85rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--background);
+}
+
+.earnings-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.6rem;
+}
+
+.earnings-card-link {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.earnings-card dl {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.earnings-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.earnings-card dt {
+  color: var(--muted-foreground);
+}
+
+.earnings-card dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.earnings-balance {
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.earnings-balance.is-due dd {
+  color: #dc2626;
+}
+
+.earnings-balance.is-overpaid dd {
+  color: #16a34a;
+}
+
+.earnings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.earnings-form label.wide {
+  grid-column: 1 / -1;
+}
+
+.earnings-rules-form .earnings-rules-list {
+  display: grid;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+}
+
+.earnings-rule-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 1fr) minmax(7rem, 0.6fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.earnings-table-wrap {
+  overflow-x: auto;
+}
+
+.earnings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.earnings-table th,
+.earnings-table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  text-align: left;
+  white-space: nowrap;
+}
+
+.earnings-table th.num,
+.earnings-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.earnings-table tr.is-payout td {
+  color: #16a34a;
+}
+
+.earnings-auto-badge {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.earnings-empty {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+
+.earnings-act-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.earnings-act-period {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .earnings-rule-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

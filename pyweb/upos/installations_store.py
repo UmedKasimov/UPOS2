@@ -8,6 +8,7 @@ sale_documents необязательная (SET NULL) — удаление пр
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -30,6 +31,8 @@ from upos.db_models import (
     User,
 )
 from upos.users_store import list_employees_safe
+
+logger = logging.getLogger(__name__)
 
 # Порядок соответствует процессу из ТЗ. Держим кортежем: важен и состав, и очерёдность.
 INSTALLATION_STATUSES: tuple[tuple[str, str], ...] = (
@@ -362,6 +365,17 @@ def set_status(
         order.started_at = now
     if clean_target == "completed":
         order.completed_at = now
+        # Вознаграждение начисляем в той же транзакции: откат смены статуса
+        # снимет и начисление. Повторов не будет — «Завершён» терминальный,
+        # а в accrue_for_installation стоит проверка на существующую запись.
+        try:
+            from upos.earnings_store import accrue_for_installation
+
+            accrue_for_installation(session, order)
+        except Exception:
+            logger.exception(
+                "[upos] не удалось начислить вознаграждение за установку %s", order.id
+            )
 
     event_payload = {"from": current, "to": clean_target}
     if payload:

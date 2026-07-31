@@ -1,8 +1,10 @@
-const CACHE_NAME = "upos-installer-v4";
+const CACHE_NAME = "upos-installer-v6";
+// Версии совпадают с installer.html: иначе в кэш кладётся URL, который страница
+// никогда не запрашивает, и предзагрузка не работает.
 const APP_SHELL = [
   "/installer",
-  "/static/installer.css?v=4",
-  "/static/installer.js?v=4",
+  "/static/installer.css?v=6",
+  "/static/installer.js?v=6",
   "/static/installer-manifest.webmanifest",
   "/static/favicon.svg"
 ];
@@ -19,6 +21,44 @@ self.addEventListener("activate", (event) => {
     )
   );
   self.clients.claim();
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (error) {
+    payload = { body: event.data ? event.data.text() : "" };
+  }
+  const title = payload.title || "U-POS Установщик";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: payload.body || "",
+      icon: "/static/installer-icon-192.png",
+      badge: "/static/installer-icon-192.png",
+      // tag схлопывает повторные уведомления об одном и том же заказе.
+      tag: payload.tag || undefined,
+      renotify: Boolean(payload.tag),
+      data: { url: payload.url || "/installer" }
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/installer";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Если приложение уже открыто — фокусируем его, а не плодим вкладки.
+      for (const client of clientList) {
+        if (client.url.includes("/installer") && "focus" in client) {
+          client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    })
+  );
 });
 
 self.addEventListener("fetch", (event) => {

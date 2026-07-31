@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=5">
-  <script defer src="/static/installer.js?v=5"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=6">
+  <script defer src="/static/installer.js?v=6"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -45,6 +45,7 @@
         <button type="button" class="installer-menu-close" id="installer-menu-close" aria-label="Закрыть меню">×</button>
       </div>
       <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
+      <button type="button" id="installer-push-toggle" hidden>Включить уведомления</button>
     </nav>
 
     <main>

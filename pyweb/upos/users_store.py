@@ -46,6 +46,7 @@ ROLE_PERMISSION_KEYS = (
     "settings",
     "dictionary",
     "installations",
+    "earnings",
 )
 ROLE_PERMISSION_LABELS = {
     "kassa": "Касса",
@@ -58,6 +59,7 @@ ROLE_PERMISSION_LABELS = {
     "settings": "Настройки",
     "dictionary": "Справочники",
     "installations": "Установки",
+    "earnings": "Заработок",
 }
 ROLE_BUTTON_PERMISSION_LABELS = {
     "kassa": {
@@ -203,6 +205,8 @@ DEFAULT_EMPLOYEE_ROLES = (
             "settings": False,
             "dictionary": False,
             "installations": True,
+            # Свой заработок установщик видит — чужой закрыт на уровне роута.
+            "earnings": True,
         },
     },
 )

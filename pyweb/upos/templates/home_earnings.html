@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Заработок{% endblock %}
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">Расчёты с сотрудниками</span>
+    <h1 class="page-title settings-ios-page-title">Заработок</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    {% if flash_ok %}<div class="flash ok settings-ios-flash">{{ flash_ok }}</div>{% endif %}
+    {% if flash_err %}<div class="flash err settings-ios-flash">{{ flash_err }}</div>{% endif %}
+
+    <form class="earnings-filters" method="get" action="{{ url_for('home_earnings') }}">
+      <label><span>Период с</span><input type="date" name="date_from" value="{{ date_from }}" /></label>
+      <label><span>по</span><input type="date" name="date_to" value="{{ date_to }}" /></label>
+      {% if not own_only %}
+        <label>
+          <span>Сотрудник</span>
+          <select name="employee_user_id">
+            <option value="">Все сотрудники</option>
+            {% for employee in employees %}
+              <option value="{{ employee.id }}" {% if employee.id == selected_employee_id %}selected{% endif %}>
+                {{ employee.name or employee.username }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+      {% endif %}
+      <button class="btn" type="submit">Показать</button>
+    </form>
+
+    <section class="earnings-section">
+      <h2>Итоги за период</h2>
+      {% if summary %}
+        <div class="earnings-cards">
+          {% for row in summary %}
+            <article class="earnings-card">
+              <header>
+                <strong>{{ row.employee_name }}</strong>
+                <a class="earnings-card-link" href="{{ url_for('home_earnings_act', employee_id=row.employee_user_id) }}?date_from={{ date_from }}&amp;date_to={{ date_to }}">Акт сверки</a>
+              </header>
+              <dl>
+                {% for currency, amount in row.balance.items() %}
+                  <div>
+                    <dt>Начислено</dt>
+                    <dd>{{ '{:,.2f}'.format(row.accrued.get(currency, 0)|float).replace(',', ' ') }} {{ currency }}</dd>
+                  </div>
+                  <div>
+                    <dt>Выплачено</dt>
+                    <dd>{{ '{:,.2f}'.format(row.paid.get(currency, 0)|float).replace(',', ' ') }} {{ currency }}</dd>
+                  </div>
+                  <div class="earnings-balance {% if amount > 0 %}is-due{% elif amount < 0 %}is-overpaid{% endif %}">
+                    <dt>К выплате</dt>
+                    <dd>{{ '{:,.2f}'.format(amount|float).replace(',', ' ') }} {{ currency }}</dd>
+                  </div>
+                {% endfor %}
+              </dl>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="earnings-empty">За выбранный период начислений нет.</p>
+      {% endif %}
+    </section>
+
+    {% if not own_only %}
+      <section class="earnings-section">
+        <h2>Добавить начисление или выплату</h2>
+        <form class="earnings-form" method="post" action="{{ url_for('earnings_entry_save') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <label>
+            <span>Сотрудник*</span>
+            <select name="employee_user_id" required>
+              <option value="">Выберите</option>
+              {% for employee in employees %}
+                <option value="{{ employee.id }}">{{ employee.name or employee.username }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Тип*</span>
+            <select name="kind">
+              <option value="accrual">Начисление</option>
+              <option value="payout">Выплата</option>
+            </select>
+          </label>
+          <label><span>Сумма*</span><input name="amount" inputmode="decimal" placeholder="0" required /></label>
+          <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+          <label><span>Дата</span><input type="date" name="earned_on" value="{{ date_to }}" /></label>
+          <label><span>Основание</span><input name="title" maxlength="255" placeholder="Премия, аванс, установка" /></label>
+          <label class="wide"><span>Комментарий</span><input name="note" /></label>
+          <button class="btn" type="submit">Добавить</button>
+        </form>
+      </section>
+
+      <section class="earnings-section">
+        <h2>Ставки начисления за установку</h2>
+        <p class="earnings-hint">Начисление создаётся автоматически, когда установка переходит в статус «Завершён».</p>
+        <form class="earnings-form earnings-rules-form" method="post" action="{{ url_for('earnings_rules_save') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <label>
+            <span>По умолчанию</span>
+            <select name="default_rate_type">
+              {% for key, label in rate_types %}
+                <option value="{{ key }}" {% if rules.default.type == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label><span>Значение</span><input name="default_rate_value" inputmode="decimal" value="{{ rules.default.value }}" /></label>
+          <div class="earnings-rules-list">
+            {% for employee in employees %}
+              {% set rule = rules.by_user.get(employee.id) %}
+              <div class="earnings-rule-row">
+                <span>{{ employee.name or employee.username }}</span>
+                <select name="rate_type__{{ employee.id }}">
+                  {% for key, label in rate_types %}
+                    <option value="{{ key }}" {% if rule and rule.type == key %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <input name="rate_value__{{ employee.id }}" inputmode="decimal" value="{{ rule.value if rule else '' }}" placeholder="по умолчанию" />
+              </div>
+            {% endfor %}
+          </div>
+          <button class="btn" type="submit">Сохранить ставки</button>
+        </form>
+      </section>
+    {% endif %}
+
+    <section class="earnings-section">
+      <h2>Движения за период</h2>
+      {% if entries %}
+        <div class="earnings-table-wrap">
+          <table class="earnings-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Сотрудник</th>
+                <th>Тип</th>
+                <th>Основание</th>
+                <th class="num">Сумма</th>
+                {% if not own_only %}<th></th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in entries %}
+                <tr class="{% if entry.kind == 'payout' %}is-payout{% endif %}">
+                  <td>{{ entry.earned_on }}</td>
+                  <td>{{ entry.employee_name }}</td>
+                  <td>{{ entry.kind_label }}</td>
+                  <td>
+                    {{ entry.title or '-' }}
+                    {% if entry.source == 'installation' %}<span class="earnings-auto-badge">авто</span>{% endif %}
+                  </td>
+                  <td class="num">{{ '{:,.2f}'.format(entry.amount|float).replace(',', ' ') }} {{ entry.currency }}</td>
+                  {% if not own_only %}
+                    <td>
+                      <form method="post" action="{{ url_for('earnings_entry_delete', entry_id=entry.id) }}" onsubmit="return confirm('Удалить запись?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <button class="btn btn-secondary btn-sm" type="submit">Удалить</button>
+                      </form>
+                    </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="earnings-empty">Движений за период нет.</p>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

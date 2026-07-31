@@ -47,6 +47,7 @@
     calendarDate: "",
     deferredInstallPrompt: null,
     busy: false,
+    pushKey: "",
   };
 
   function escapeHtml(value) {
@@ -773,9 +774,96 @@
     if (!document.hidden) loadOrders({ quiet: true });
   });
 
+  // --- Push-уведомления ---------------------------------------------------
+
+  function urlBase64ToUint8Array(base64) {
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const normalized = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = window.atob(normalized);
+    return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+  }
+
+  function pushSupported() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+
+  async function syncPushButton() {
+    const button = document.getElementById("installer-push-toggle");
+    if (!button) return;
+    if (!pushSupported()) {
+      button.hidden = true;
+      return;
+    }
+    try {
+      const info = await apiRequest("/api/installer/push/key");
+      if (!info.enabled) {
+        button.hidden = true;
+        return;
+      }
+      state.pushKey = info.public_key || "";
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      const active = Boolean(subscription) && Boolean(info.subscribed);
+      button.hidden = false;
+      button.dataset.state = active ? "on" : "off";
+      button.textContent = active ? "Уведомления включены" : "Включить уведомления";
+    } catch (error) {
+      button.hidden = true;
+    }
+  }
+
+  async function togglePush() {
+    const button = document.getElementById("installer-push-toggle");
+    if (!button || !pushSupported()) return;
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+
+    if (button.dataset.state === "on" && existing) {
+      const endpoint = existing.endpoint;
+      await existing.unsubscribe().catch(() => {});
+      await apiRequest("/api/installer/push/unsubscribe", {
+        method: "POST",
+        body: JSON.stringify({ endpoint })
+      }).catch(() => {});
+      showToast("Уведомления отключены");
+      await syncPushButton();
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      showToast("Разрешите уведомления в настройках браузера", true);
+      return;
+    }
+    try {
+      const subscription =
+        existing ||
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(state.pushKey)
+        }));
+      await apiRequest("/api/installer/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({ subscription: subscription.toJSON() })
+      });
+      showToast("Уведомления включены");
+    } catch (error) {
+      showToast(error.message || "Не удалось включить уведомления", true);
+    }
+    await syncPushButton();
+  }
+
+  document.getElementById("installer-push-toggle")?.addEventListener("click", () => {
+    closeInstallerMenu();
+    togglePush();
+  });
+
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/installer-sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("/installer-sw.js")
+        .then(() => syncPushButton())
+        .catch(() => {});
     });
   }
 

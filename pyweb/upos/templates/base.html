@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=368" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=369" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=6" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -196,6 +196,12 @@
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
                 <span class="nav-label">Месенджеры</span>
               </a>
+              {% if not user.get('is_employee') or (user.get('employee_permissions') or {}).get('earnings') %}
+              <a href="{{ url_for('home_earnings') }}" class="nav-link {{ 'active' if active == 'home_earnings' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span class="nav-label">Заработок</span>
+              </a>
+              {% endif %}
               {% if not user.get('is_employee') or emp_perms.get('reports') %}
               <a href="{{ url_for('home_reports') }}" class="nav-link {{ 'active' if active == 'home_reports' else '' }}">
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
