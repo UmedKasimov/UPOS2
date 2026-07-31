@@ -12,8 +12,10 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=17">
-  <script defer src="/static/installer.js?v=18"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=19">
+  <script defer src="/static/jssip.min.js?v=1"></script>
+  <script defer src="/static/installer-softphone.js?v=1"></script>
+  <script defer src="/static/installer.js?v=19"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -321,6 +323,26 @@
       <button class="installer-primary-button" data-close-help type="button">Понятно</button>
     </div>
   </dialog>
+
+  <div class="installer-call-screen" id="installer-call-screen" hidden>
+    <div class="installer-call-inner">
+      <div class="installer-call-avatar" id="installer-call-avatar" aria-hidden="true"></div>
+      <h2 class="installer-call-name" id="installer-call-name">Клиент</h2>
+      <p class="installer-call-number" id="installer-call-number"></p>
+      <p class="installer-call-state" id="installer-call-state">Вызов…</p>
+      <p class="installer-call-timer" id="installer-call-timer" hidden>00:00</p>
+      <div class="installer-call-actions" id="installer-call-actions-incoming" hidden>
+        <button type="button" class="installer-call-btn is-decline" id="installer-call-decline" aria-label="Отклонить">&#128222;</button>
+        <button type="button" class="installer-call-btn is-accept" id="installer-call-accept" aria-label="Принять">&#128222;</button>
+      </div>
+      <div class="installer-call-actions" id="installer-call-actions-active">
+        <button type="button" class="installer-call-btn is-mute" id="installer-call-mute" aria-label="Микрофон">&#127908;</button>
+        <button type="button" class="installer-call-btn is-hangup" id="installer-call-hangup" aria-label="Завершить">&#128222;</button>
+        <button type="button" class="installer-call-btn is-speaker" id="installer-call-speaker" aria-label="Динамик">&#128266;</button>
+      </div>
+      <audio id="installer-call-audio" autoplay></audio>
+    </div>
+  </div>
 
   <div class="installer-toast" id="installer-toast" role="status" aria-live="polite"></div>
 </body>

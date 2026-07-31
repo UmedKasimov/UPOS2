@@ -8005,23 +8005,50 @@ def create_app() -> FastAPI:
             }
         )
 
+    def _installer_sip_ws_url(provider_host: str, raw_ws: str) -> str:
+        ws = str(raw_ws or "").strip()
+        if ws:
+            return ws
+        host = str(provider_host or "").strip()
+        if not host:
+            return ""
+        # По умолчанию — типовой адрес Asterisk (res_http_websocket, порт 8089).
+        return f"wss://{host}:8089/ws"
+
     @app.get("/api/installer/sip", name="installer_sip_api")
     def installer_sip_api(request: Request):
-        """SIP-аккаунты организации для экрана телефонии — без паролей."""
+        """SIP-аккаунты организации для экрана телефонии.
+
+        Софтфон в браузере регистрируется на SIP-сервере сам, поэтому данные для
+        регистрации (включая пароль) отдаются авторизованному установщику по
+        HTTPS — так же, как их получает десктопный UposSip.
+        """
         wid, _installer_user_id, _can_manage = _installer_request_scope(request)
         if not wid:
             return _installer_api_error("Нужно войти заново", 401)
         data = load_workspace_settings(wid)
+        provider_ws = {}
+        for provider in data.get("telephony_providers") or []:
+            if isinstance(provider, dict):
+                provider_ws[str(provider.get("id") or "")] = str(provider.get("ws_url") or "")
         accounts = []
         for account in _telephony_sip_accounts_for_softphone(data):
+            host = str(account.get("host") or "")
+            ws_url = _installer_sip_ws_url(host, provider_ws.get(str(account.get("provider_id") or "")))
             accounts.append(
                 {
                     "id": account.get("id"),
                     "label": account.get("label"),
                     "extension": account.get("extension"),
+                    "auth_id": account.get("auth_id") or account.get("extension"),
+                    "password": account.get("password"),
                     "server": account.get("server"),
+                    "host": host,
                     "transport": account.get("transport"),
                     "status": account.get("status"),
+                    "display_name": account.get("display_name") or account.get("label"),
+                    "ws_url": ws_url,
+                    "sip_uri": f"sip:{account.get('extension')}@{host}" if host else "",
                 }
             )
         return JSONResponse({"ok": True, "accounts": accounts})
@@ -8069,6 +8096,8 @@ def create_app() -> FastAPI:
                 "phone": str(row.get("phone") or row.get("number") or ""),
                 "name": str(row.get("client") or row.get("contact") or ""),
                 "direction": str(row.get("direction") or "outgoing"),
+                "status": str(row.get("status") or ""),
+                "duration": int(row.get("duration") or 0) if str(row.get("duration") or "").isdigit() else 0,
                 "started_at": str(row.get("started_at") or row.get("created_at") or ""),
             }
             for row in calls
@@ -8093,27 +8122,43 @@ def create_app() -> FastAPI:
         phone = str((body or {}).get("phone") or "").strip()
         if not phone:
             return _installer_api_error("Не указан номер", 400)
+        direction = "incoming" if str((body or {}).get("direction") or "") == "incoming" else "outgoing"
+        status = str((body or {}).get("status") or "dialed").strip()[:20] or "dialed"
+        try:
+            duration = max(0, int((body or {}).get("duration") or 0))
+        except (TypeError, ValueError):
+            duration = 0
         settings = load_workspace_settings(wid)
         calls = settings.get("telephony_calls") if isinstance(settings.get("telephony_calls"), list) else []
-        calls.insert(
-            0,
-            {
-                "id": str(uuid.uuid4()),
-                "phone": phone,
-                "client": str((body or {}).get("name") or ""),
-                "direction": "outgoing",
-                "status": "dialed",
-                "source": "installer_app",
-                "user_id": actor_id,
-                "user_name": str(user.get("name") or user.get("username") or ""),
-                "started_at": datetime.now(timezone.utc).isoformat(),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
-        )
+        now_iso = datetime.now(timezone.utc).isoformat()
+        entry = {
+            "id": str(uuid.uuid4()),
+            "phone": phone,
+            "client": str((body or {}).get("name") or ""),
+            "direction": direction,
+            "status": status,
+            "duration": duration,
+            "source": "installer_app",
+            "user_id": actor_id,
+            "user_name": str(user.get("name") or user.get("username") or ""),
+            "started_at": now_iso,
+            "created_at": now_iso,
+        }
+        # Софтфон дописывает исход и длительность к уже начатому звонку по id.
+        update_id = str((body or {}).get("id") or "").strip()
+        if update_id:
+            existing = next((row for row in calls if isinstance(row, dict) and str(row.get("id")) == update_id), None)
+            if existing is not None:
+                existing["status"] = status
+                existing["duration"] = duration
+                settings["telephony_calls"] = calls[:500]
+                save_workspace_settings(wid, settings)
+                return JSONResponse({"ok": True, "id": update_id})
+        calls.insert(0, entry)
         # Журнал живёт в настройках воркспейса — держим его ограниченным.
         settings["telephony_calls"] = calls[:500]
         save_workspace_settings(wid, settings)
-        return JSONResponse({"ok": True})
+        return JSONResponse({"ok": True, "id": entry["id"]})
 
     @app.get("/api/installer/notifications", name="installer_notifications_api")
     def installer_notifications_api(request: Request):
@@ -16073,6 +16118,9 @@ def create_app() -> FastAPI:
             "password": password,
             "codec": str(form.get("codec") or "G711").strip(),
             "transport": str(form.get("transport") or "UDP").strip().upper(),
+            # WebSocket-адрес для звонков из браузера (софтфон в PWA). Обычный
+            # SIP по UDP/TCP браузер не умеет, поэтому нужен wss://host:port/ws.
+            "ws_url": str(form.get("ws_url") or "").strip(),
             "employee": str(form.get("employee") or "").strip(),
             "note": str(form.get("note") or "").strip(),
             "created_at": existing.get("created_at") or datetime.now(timezone.utc).isoformat(),

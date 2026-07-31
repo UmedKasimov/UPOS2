@@ -700,10 +700,95 @@
       : '<div class="installer-empty">Клиентов с телефоном не найдено</div>';
   }
 
-  // --- Номеронабиратель ---------------------------------------------------
+  // --- Номеронабиратель и SIP-звонки -------------------------------------
+
+  let sipAccounts = [];
+  const callScreen = document.getElementById("installer-call-screen");
+  let callTimer = null;
+  let callSeconds = 0;
+  let callLogId = "";
 
   function dialInput() {
     return document.getElementById("installer-dial-number");
+  }
+
+  function currentSipAccount() {
+    const id = document.getElementById("installer-sip-account")?.value || "";
+    return sipAccounts.find((account) => String(account.id) === id) || sipAccounts[0] || null;
+  }
+
+  function fmtCallTime(sec) {
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function setCallState(text) {
+    const node = document.getElementById("installer-call-state");
+    if (node) node.textContent = text;
+  }
+
+  function startCallTimer() {
+    callSeconds = 0;
+    const timer = document.getElementById("installer-call-timer");
+    if (timer) { timer.hidden = false; timer.textContent = "00:00"; }
+    setCallState("Разговор");
+    window.clearInterval(callTimer);
+    callTimer = window.setInterval(() => {
+      callSeconds += 1;
+      if (timer) timer.textContent = fmtCallTime(callSeconds);
+    }, 1000);
+  }
+
+  function openCallScreen(name, number, incoming) {
+    if (!callScreen) return;
+    document.getElementById("installer-call-name").textContent = name || number || "Клиент";
+    document.getElementById("installer-call-number").textContent = number || "";
+    document.getElementById("installer-call-avatar").textContent = (name || number || "?").trim().charAt(0).toUpperCase();
+    document.getElementById("installer-call-timer").hidden = true;
+    document.getElementById("installer-call-actions-incoming").hidden = !incoming;
+    document.getElementById("installer-call-actions-active").hidden = incoming;
+    setCallState(incoming ? "Входящий вызов" : "Вызов…");
+    callScreen.hidden = false;
+    callScreen.classList.add("is-ringing");
+  }
+
+  function closeCallScreen() {
+    window.clearInterval(callTimer);
+    callTimer = null;
+    if (callScreen) {
+      callScreen.hidden = true;
+      callScreen.classList.remove("is-ringing");
+    }
+    const mute = document.getElementById("installer-call-mute");
+    if (mute) mute.classList.remove("is-on");
+  }
+
+  // Софтфон доступен только когда у аккаунта есть WebSocket-адрес и он
+  // зарегистрировался. Иначе звоним через телефон (SIM).
+  function placeCall(number, name) {
+    const clean = String(number || "").replace(/[^\d+*#]/g, "");
+    if (!clean) { showToast("Введите номер", true); return; }
+    const account = currentSipAccount();
+    const sip = window.InstallerSoftphone;
+
+    logCall({phone: clean, name: name || "", status: "dialed"}).then((id) => { callLogId = id; });
+
+    if (sip && sip.isRegistered() && sip.call(clean)) {
+      openCallScreen(name, clean, false);
+      return;
+    }
+    // Резервный путь — набор средствами телефона.
+    window.location.href = `tel:${clean}`;
+  }
+
+  async function logCall(payload) {
+    try {
+      const data = await apiRequest("/api/installer/calls", {method: "POST", body: JSON.stringify(payload)});
+      return data.id || "";
+    } catch (_e) {
+      return "";
+    }
   }
 
   document.getElementById("installer-dialpad")?.addEventListener("click", (event) => {
@@ -711,6 +796,11 @@
     if (!key) return;
     const input = dialInput();
     if (input) input.value += key.dataset.dial;
+    // Во время разговора цифра уходит тоном (DTMF).
+    const sip = window.InstallerSoftphone;
+    if (sip && sip.isRegistered() && callScreen && !callScreen.hidden && typeof sip.sendDtmf === "function") {
+      sip.sendDtmf(key.dataset.dial);
+    }
   });
 
   document.getElementById("installer-dial-backspace")?.addEventListener("click", () => {
@@ -719,18 +809,51 @@
   });
 
   document.getElementById("installer-dial-call")?.addEventListener("click", () => {
-    const raw = String(dialInput()?.value || "").trim();
-    const clean = raw.replace(/[^\d+*#]/g, "");
-    if (!clean) {
-      showToast("Введите номер", true);
-      return;
-    }
-    apiRequest("/api/installer/calls", {
-      method: "POST",
-      body: JSON.stringify({phone: clean, name: ""}),
-    }).catch(() => {});
-    window.location.href = `tel:${clean}`;
+    placeCall(dialInput()?.value, "");
   });
+
+  // Кнопки экрана звонка.
+  document.getElementById("installer-call-hangup")?.addEventListener("click", () => {
+    window.InstallerSoftphone?.hangup();
+    closeCallScreen();
+  });
+  document.getElementById("installer-call-accept")?.addEventListener("click", () => {
+    window.InstallerSoftphone?.answer();
+  });
+  document.getElementById("installer-call-decline")?.addEventListener("click", () => {
+    window.InstallerSoftphone?.hangup();
+    closeCallScreen();
+  });
+  document.getElementById("installer-call-mute")?.addEventListener("click", (event) => {
+    const on = !event.currentTarget.classList.contains("is-on");
+    event.currentTarget.classList.toggle("is-on", on);
+    window.InstallerSoftphone?.setMuted(on);
+  });
+
+  function wireSoftphoneEvents() {
+    const sip = window.InstallerSoftphone;
+    if (!sip) return;
+    sip.on("progress", () => setCallState("Идёт вызов…"));
+    sip.on("accepted", () => {
+      document.getElementById("installer-call-actions-incoming").hidden = true;
+      document.getElementById("installer-call-actions-active").hidden = false;
+      callScreen?.classList.remove("is-ringing");
+      startCallTimer();
+    });
+    sip.on("incoming", (detail) => {
+      openCallScreen(detail && detail.name, detail && detail.from, true);
+    });
+    const finish = (status) => {
+      if (callLogId) logCall({id: callLogId, phone: dialInput()?.value || "", status: status, duration: callSeconds});
+      callLogId = "";
+      closeCallScreen();
+    };
+    sip.on("ended", () => finish(callSeconds > 0 ? "answered" : "cancelled"));
+    sip.on("failed", (detail) => {
+      finish("missed");
+      showToast("Звонок не удался" + (detail && detail.cause ? `: ${detail.cause}` : ""), true);
+    });
+  }
 
   async function loadSipAccounts() {
     const select = document.getElementById("installer-sip-account");
@@ -738,22 +861,56 @@
     if (!select) return;
     try {
       const data = await apiRequest("/api/installer/sip");
-      const accounts = data.accounts || [];
-      if (!accounts.length) {
+      sipAccounts = data.accounts || [];
+      if (!sipAccounts.length) {
         select.innerHTML = '<option value="">SIP не настроен</option>';
         dot?.classList.remove("is-online");
         return;
       }
-      select.innerHTML = accounts
-        .map((account) => `<option value="${escapeHtml(account.id || "")}">${escapeHtml(account.label || account.extension || "Аккаунт")} · ${escapeHtml(account.server || "")}</option>`)
+      select.innerHTML = sipAccounts
+        .map((acc) => `<option value="${escapeHtml(acc.id || "")}">${escapeHtml(acc.label || acc.extension || "Аккаунт")} · ${escapeHtml(acc.server || "")}</option>`)
         .join("");
-      const online = accounts.some((account) => /online|connected|active|актив/i.test(String(account.status || "")));
-      dot?.classList.toggle("is-online", online);
+      // Пытаемся зарегистрировать выбранный аккаунт на SIP-сервере.
+      registerSelectedAccount();
     } catch (error) {
       select.innerHTML = '<option value="">SIP недоступен</option>';
       dot?.classList.remove("is-online");
     }
   }
+
+  function registerSelectedAccount() {
+    const dot = document.getElementById("installer-sip-dot");
+    const account = currentSipAccount();
+    const sip = window.InstallerSoftphone;
+    if (!account || !sip || !sip.available() || !account.ws_url || !account.sip_uri) {
+      dot?.classList.remove("is-online");
+      return;
+    }
+    setSipHint("Подключение к SIP…");
+    sip.connect(account)
+      .then(() => { dot?.classList.add("is-online"); setSipHint(""); })
+      .catch(() => {
+        dot?.classList.remove("is-online");
+        // Тихо переходим в режим набора через SIM — не пугаем установщика.
+        setSipHint("Звонки идут через телефон");
+      });
+  }
+
+  function setSipHint(text) {
+    let hint = document.getElementById("installer-sip-hint");
+    if (!hint) {
+      const panel = document.querySelector(".installer-sip-panel");
+      if (!panel) return;
+      hint = document.createElement("small");
+      hint.id = "installer-sip-hint";
+      hint.className = "installer-sip-hint";
+      panel.insertBefore(hint, panel.querySelector(".installer-dial-row"));
+    }
+    hint.textContent = text || "";
+    hint.hidden = !text;
+  }
+
+  document.getElementById("installer-sip-account")?.addEventListener("change", registerSelectedAccount);
 
   async function openPhonebook() {
     closeInstallerMenu();
@@ -770,14 +927,19 @@
       renderPhonebook(document.getElementById("installer-phone-search")?.value);
       if (calls) {
         calls.innerHTML = (data.calls || []).length
-          ? data.calls.map((row) => `
-              <article class="installer-phone-call-row">
+          ? data.calls.map((row) => {
+              const missed = row.status === "missed" || row.status === "cancelled";
+              const icon = row.direction === "incoming" ? "↙" : "↗";
+              const meta = [notifyTime(row.started_at), row.duration ? fmtCallTime(row.duration) : ""].filter(Boolean).join(" · ");
+              return `
+              <article class="installer-phone-call-row${missed ? " is-missed" : ""}" data-call-phone="${escapeHtml(row.phone)}" data-call-name="${escapeHtml(row.name || "")}">
                 <div>
-                  <strong>${escapeHtml(row.name || row.phone)}</strong>
-                  <small>${escapeHtml(notifyTime(row.started_at))}</small>
+                  <strong>${escapeHtml(icon)} ${escapeHtml(row.name || row.phone)}</strong>
+                  <small>${escapeHtml(meta)}</small>
                 </div>
                 <span>${escapeHtml(row.phone)}</span>
-              </article>`).join("")
+              </article>`;
+            }).join("")
           : '<div class="installer-empty">Звонков пока нет</div>';
       }
     } catch (error) {
@@ -792,14 +954,12 @@
   document.getElementById("installer-phone-list")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-call-phone]");
     if (!button) return;
-    const phone = button.dataset.callPhone;
-    // Звонок уходит средствами телефона, а факт набора пишем в журнал,
-    // чтобы руководитель видел активность по клиентам.
-    apiRequest("/api/installer/calls", {
-      method: "POST",
-      body: JSON.stringify({phone: phone, name: button.dataset.callName || ""}),
-    }).catch(() => {});
-    window.location.href = `tel:${String(phone).replace(/[^\d+]/g, "")}`;
+    placeCall(button.dataset.callPhone, button.dataset.callName || "");
+  });
+
+  document.getElementById("installer-phone-calls")?.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-call-phone]");
+    if (row) placeCall(row.dataset.callPhone, row.dataset.callName || "");
   });
 
   document.getElementById("installer-phonebook-close")?.addEventListener("click", () => {
@@ -1468,6 +1628,7 @@
 
   if (canManage) document.getElementById("installer-manager-note").hidden = false;
   updateConnection();
+  wireSoftphoneEvents();
   refreshNotifyBadge();
   window.setInterval(refreshNotifyBadge, 120000);
   loadOrders();

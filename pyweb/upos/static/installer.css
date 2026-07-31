@@ -1610,3 +1610,130 @@ main {
   min-height: 48px;
   font-size: 16px;
 }
+
+/* ===== Экран активного звонка ===== */
+.installer-call-screen {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #0f172a, #1e293b);
+  color: #fff;
+}
+
+.installer-call-screen[hidden] {
+  display: none;
+}
+
+.installer-call-inner {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.installer-call-avatar {
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 108px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 44px;
+  font-weight: 800;
+}
+
+/* Пульсация, пока идёт дозвон/входящий. */
+.installer-call-screen.is-ringing .installer-call-avatar {
+  animation: installerCallPulse 1.4s ease-out infinite;
+}
+
+@keyframes installerCallPulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.55); }
+  100% { box-shadow: 0 0 0 26px rgba(59, 130, 246, 0); }
+}
+
+.installer-call-name {
+  margin: 6px 0 0;
+  font-size: 24px;
+}
+
+.installer-call-number {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.installer-call-state {
+  margin: 4px 0 0;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.installer-call-timer {
+  margin: 0;
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.installer-call-actions {
+  display: flex;
+  gap: 34px;
+  margin-top: 26px;
+}
+
+/* Атрибут hidden должен побеждать display:flex. */
+.installer-call-actions[hidden] {
+  display: none;
+}
+
+.installer-call-timer[hidden] {
+  display: none;
+}
+
+.installer-call-btn {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 28px;
+  color: #fff;
+}
+
+.installer-call-btn.is-hangup,
+.installer-call-btn.is-decline {
+  background: #dc2626;
+  transform: rotate(135deg);
+}
+
+.installer-call-btn.is-accept {
+  background: #16a34a;
+}
+
+.installer-call-btn.is-mute,
+.installer-call-btn.is-speaker {
+  width: 58px;
+  height: 58px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 24px;
+}
+
+.installer-call-btn.is-mute.is-on {
+  background: #f59e0b;
+}
+
+.installer-sip-hint {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.installer-phone-call-row.is-missed strong {
+  color: #dc2626;
+}
