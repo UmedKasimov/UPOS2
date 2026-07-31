@@ -7168,10 +7168,11 @@ def create_app() -> FastAPI:
             account = accounts_by_id.get(clean_id) if clean_id else None
             if account is None and clean_label:
                 account = accounts_by_name.get(clean_label.casefold())
-            if clean_id and account is None:
-                raise ValueError("Выбранный счёт оплаты не найден или отключён")
             if account is None:
-                # Legacy demo payments used generic labels such as cash/bank.
+                # Неизвестный account_id не должен блокировать документ: у старых
+                # продаж в строках оплаты лежат ярлыки вроде «cash», и жёсткая
+                # ошибка ломала и доплату, и досинхронизацию кассы по ним.
+                # Совпадение по имени уже проверено выше — дальше первый счёт.
                 account = accounts[0]
 
             item = dict(payment)
@@ -8741,6 +8742,13 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        # Досинхронизация кассы запускалась только с экрана кассы, поэтому
+        # расхождение «оплата есть — транзакции нет» висело, пока туда не зайдут.
+        # Вызов затроттлен 30 секундами, журналу продаж он почти ничего не стоит.
+        try:
+            _ensure_sales_cash_transactions(wid)
+        except Exception:
+            logger.exception("[sales] failed to ensure sales cash transactions for %s", wid)
         workspace_settings = load_workspace_settings(wid)
         timezone_name = normalize_workspace_timezone(str(workspace_settings.get("timezone") or ""))
         try:
