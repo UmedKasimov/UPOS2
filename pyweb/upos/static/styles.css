@@ -11517,8 +11517,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-journal-table td:nth-child(3),
 .sales-journal-table th:nth-child(4),
 .sales-journal-table td:nth-child(4),
-.sales-journal-table th:nth-child(11),
-.sales-journal-table td:nth-child(11) {
+.sales-journal-table th:nth-child(12),
+.sales-journal-table td:nth-child(12) {
   width: 8rem;
   min-width: 8rem;
 }
@@ -11541,8 +11541,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   text-align: right;
 }
 
-.sales-journal-table th:nth-child(12),
-.sales-journal-table td:nth-child(12) {
+.sales-journal-table th:nth-child(11),
+.sales-journal-table td:nth-child(11) {
+  width: 10.5rem;
+  min-width: 10.5rem;
+  text-align: center;
+}
+
+.sales-journal-table th:nth-child(13),
+.sales-journal-table td:nth-child(13) {
   width: 6.2rem;
   min-width: 6.2rem;
   text-align: center;
@@ -11630,6 +11637,30 @@ html.dark .sales-journal-task-completed {
 
 .sales-journal-no-tasks {
   color: var(--muted-foreground);
+}
+
+.sales-journal-crm-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  padding: 0.2rem 0.5rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 42%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-box, #2d6cdf) 9%, var(--card));
+  color: var(--brand-box, #2d6cdf);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sales-journal-crm-empty {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .sales-journal-client-name {
@@ -11721,8 +11752,31 @@ html.dark .sales-journal-task-completed {
   color: var(--brand-box, #2d6cdf);
 }
 
+/* Единый акцентный цвет журнала продаж: ID, дата, клиент, склад и сумма
+   подсвечиваются одним цветом, чтобы строка читалась как одно целое. */
+.sales-journal-table {
+  --sales-journal-accent: var(--brand-box, #2d6cdf);
+}
+
+html.dark .sales-journal-table {
+  --sales-journal-accent: #7ea9f5;
+}
+
+.sales-journal-table tbody td:nth-child(2),
+.sales-journal-table tbody td:nth-child(3),
+.sales-journal-table tbody td:nth-child(5),
+.sales-journal-table tbody td:nth-child(6),
+.sales-journal-table tbody td:nth-child(7) {
+  color: var(--sales-journal-accent);
+}
+
+.sales-journal-table tbody td:nth-child(2) > strong,
+.sales-journal-table tbody td:nth-child(2) > small,
+.sales-journal-client-name {
+  color: inherit;
+}
+
 .sales-journal-table td:nth-child(7) {
-  color: var(--brand-box, #2d6cdf);
   font-weight: 800;
   white-space: nowrap;
 }

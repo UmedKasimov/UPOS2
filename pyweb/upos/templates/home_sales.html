@@ -443,6 +443,11 @@
                     <span>Задачи</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
+                <th data-column-label="Этап CRM" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Этап CRM</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="Статус" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
                     <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -509,6 +514,13 @@
                       <span class="sales-journal-no-tasks">-</span>
                     {% endif %}
                   </td>
+                  <td class="sales-journal-crm-cell" data-sort-value="{{ sale.crm_status_label or '' }}">
+                    {% if sale.crm_status %}
+                      <span class="sales-journal-crm-tag" data-status="{{ sale.crm_status }}" title="Этап CRM: {{ sale.crm_status_label }}">{{ sale.crm_status_label }}</span>
+                    {% else %}
+                      <span class="sales-journal-crm-empty">{{ sale.crm_status_label or "Не назначен" }}</span>
+                    {% endif %}
+                  </td>
                   <td>
                     {% set status_style = 'confirmed' if sale.status in ['completed', 'archived'] else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['shipped', 'installation'] else 'draft')) %}
                     <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">
@@ -553,7 +565,7 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="12">Пока нет продаж. Создайте первую продажу справа.</td>
+                  <td colspan="13">Пока нет продаж. Создайте первую продажу справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -578,7 +590,7 @@
                       {% endif %}
                     {% endfor %}
                   </td>
-                  <td colspan="3"></td>
+                  <td colspan="4"></td>
                 </tr>
               </tfoot>
             {% endif %}
