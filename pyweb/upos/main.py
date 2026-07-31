@@ -44,6 +44,7 @@ from upos.db_models import (
     Counterparty,
     CrmRecord,
     EmployeeAccountAccess,
+    ExpenseDocument,
     FinanceAccount,
     FinanceCategory,
     InstallationOrder,
@@ -17862,6 +17863,89 @@ def create_app() -> FastAPI:
                         for date, amount in sorted(day_totals.items())
                     ],
                     "rows": sales_report_rows[:200],
+                }
+
+                # ===== Отчёт о прибыли: выручка, себестоимость и все расходы =====
+                # Кассовые доходы категории «Продажа» — это те же продажи, что и в
+                # выручке; исключаем, чтобы не задваивать. Оплат закупок в кассе
+                # нет (закупка меняет только paid_amount документа), поэтому
+                # операционные расходы с себестоимостью не пересекаются.
+                _sales_income_categories = {"продажа", "возврат продажи"}
+                profit_other_income_rows: list[dict[str, Any]] = []
+                other_income_primary = Decimal("0")
+                for entry in pnl.get("income") or []:
+                    name = str(entry.get("name") or "Без категории")
+                    if name.strip().lower() in _sales_income_categories:
+                        continue
+                    amount_primary = report_to_primary(entry.get("amount"), str(entry.get("currency") or ""))
+                    other_income_primary += amount_primary
+                    profit_other_income_rows.append(
+                        {
+                            "name": name,
+                            "amount": _report_money(entry.get("amount"), entry.get("currency")),
+                            "amount_primary": amount_primary,
+                            "count": int(entry.get("count") or 0),
+                        }
+                    )
+                profit_expense_rows: list[dict[str, Any]] = []
+                expenses_primary = Decimal("0")
+                for entry in pnl.get("expense") or []:
+                    amount_primary = report_to_primary(entry.get("amount"), str(entry.get("currency") or ""))
+                    expenses_primary += amount_primary
+                    profit_expense_rows.append(
+                        {
+                            "name": str(entry.get("name") or "Без категории"),
+                            "amount": _report_money(entry.get("amount"), entry.get("currency")),
+                            "amount_primary": amount_primary,
+                            "count": int(entry.get("count") or 0),
+                        }
+                    )
+                # Зарплаты, импортированные из IBOX, лежат отдельными документами
+                # расходов — без них отчёт занижал бы затраты. Оплаты поставщикам
+                # (payments_made) не берём: это закуп товара, он уже в себестоимости.
+                salary_primary = Decimal("0")
+                salary_count = 0
+                with session_scope() as salary_session:
+                    for expense_doc in salary_session.execute(
+                        select(ExpenseDocument).where(
+                            ExpenseDocument.workspace_owner_id == wid,
+                            ExpenseDocument.external_id.like("salary:%"),
+                        )
+                    ).scalars():
+                        doc_day = expense_doc.created_at.date().isoformat() if expense_doc.created_at else ""
+                        if not _report_in_period(doc_day):
+                            continue
+                        salary_primary += report_to_primary(expense_doc.amount, expense_doc.currency)
+                        salary_count += 1
+                if salary_primary > 0:
+                    profit_expense_rows.append(
+                        {
+                            "name": "Зарплата (IBOX)",
+                            "amount": _report_money(salary_primary, primary_currency),
+                            "amount_primary": salary_primary,
+                            "count": salary_count,
+                        }
+                    )
+                    expenses_primary += salary_primary
+                profit_expense_rows.sort(key=lambda item: item["amount_primary"], reverse=True)
+                max_expense = max((float(item["amount_primary"]) for item in profit_expense_rows), default=0.0)
+                for item in profit_expense_rows:
+                    item["bar_width"] = 0 if max_expense <= 0 else max(4, round(float(item["amount_primary"]) / max_expense * 100))
+                net_profit_total = profit_total + other_income_primary - expenses_primary
+                business_reports["profit"] = {
+                    "summary": {
+                        "period": report_data["period_label"],
+                        "revenue": _report_money(net_sales_total, primary_currency),
+                        "cost": _report_money(cost_total, primary_currency),
+                        "gross": _report_money(profit_total, primary_currency),
+                        "other_income": _report_money(other_income_primary, primary_currency),
+                        "expenses": _report_money(expenses_primary, primary_currency),
+                        "net": _report_money(net_profit_total, primary_currency),
+                        "net_negative": net_profit_total < 0,
+                        "expense_count": len(profit_expense_rows),
+                    },
+                    "expenses": profit_expense_rows[:100],
+                    "other_income": profit_other_income_rows[:50],
                 }
 
                 stock_movements: dict[str, dict[str, Any]] = {}

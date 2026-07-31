@@ -74,6 +74,13 @@
         <span>Продажи</span>
         <small>Сумма, клиенты, товары</small>
       </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="profit" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><path d="m4 20 4-4"/><path d="M4 16v4h4"/></svg>
+        </span>
+        <span>Прибыль</span>
+        <small>Доходы и все расходы</small>
+      </button>
       <button type="button" class="general-report-card" role="tab" data-org-report-card="stock-movement" aria-selected="false">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 13h10"/><path d="m8 17-3-3 3-3"/><path d="m16 11 3 3-3 3"/></svg>
@@ -323,6 +330,62 @@
             {% else %}
               <div class="reports-empty-state">Нет данных для графика.</div>
             {% endfor %}
+          </div>
+        </article>
+      </section>
+
+      <section class="reports-panel" id="report-profit" data-org-report-panel="profit" hidden>
+        {% set profit = business_reports.profit or {} %}
+        {% set profit_summary = profit.summary or {} %}
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Прибыль</p>
+            <h2>Отчёт о прибыли</h2>
+            <p>{{ profit_summary.period }} · статей расходов: {{ profit_summary.expense_count or 0 }}</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
+          </div>
+        </header>
+        <div class="reports-sales-kpis">
+          <article><span>Выручка</span><strong>{{ profit_summary.revenue or "0 UZS" }}</strong></article>
+          <article><span>Себестоимость</span><strong>{{ profit_summary.cost or "0 UZS" }}</strong></article>
+          <article class="is-profit"><span>Валовая прибыль</span><strong>{{ profit_summary.gross or "0 UZS" }}</strong></article>
+          <article><span>Прочие доходы</span><strong>{{ profit_summary.other_income or "0 UZS" }}</strong></article>
+          <article class="is-return"><span>Расходы</span><strong>{{ profit_summary.expenses or "0 UZS" }}</strong></article>
+          <article class="{{ 'is-debt' if profit_summary.net_negative else 'is-profit' }}"><span>Чистая прибыль</span><strong>{{ profit_summary.net or "0 UZS" }}</strong></article>
+        </div>
+        <div class="reports-analysis-grid">
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Все расходы</h3><p>Касса и зарплаты за период</p></div></div>
+            <div class="reports-category-list">
+              {% for row in profit.expenses %}
+                <div class="reports-category-row">
+                  <div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong>{{ row.amount }}</strong></div>
+                  <div class="reports-category-meta"><div class="reports-bar-track"><span style="width: {{ row.bar_width }}%"></span></div></div>
+                </div>
+              {% else %}
+                <div class="reports-empty-state">Расходов за период нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Прочие доходы</h3><p>Кассовые поступления вне продаж</p></div></div>
+            <div class="reports-category-list">
+              {% for row in profit.other_income %}
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong>{{ row.amount }}</strong></div></div>
+              {% else %}
+                <div class="reports-empty-state">Прочих доходов за период нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+        <article class="reports-flow">
+          <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Как считается</h3><p>Формула отчёта</p></div></div>
+          <div class="reports-category-list">
+            <div class="reports-category-row"><div class="reports-category-main"><span>Выручка − Себестоимость</span><strong>= Валовая прибыль</strong></div></div>
+            <div class="reports-category-row"><div class="reports-category-main"><span>Валовая + Прочие доходы − Все расходы</span><strong>= Чистая прибыль</strong></div></div>
+            <div class="reports-category-row"><div class="reports-category-main"><span><small>Оплаты поставщикам за товар не входят в расходы — закуп уже учтён в себестоимости.</small></span></div></div>
           </div>
         </article>
       </section>
