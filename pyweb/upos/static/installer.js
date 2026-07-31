@@ -634,7 +634,8 @@
     if (!list) return;
     list.innerHTML = items.length
       ? items.map((item) => `
-          <article class="installer-notify-item${item.is_read ? " is-read" : ""}" data-notify-id="${escapeHtml(item.id)}">
+          <article class="installer-notify-item${item.is_read ? " is-read" : ""}"
+            data-notify-id="${escapeHtml(item.id)}" data-notify-tag="${escapeHtml(item.tag || "")}">
             <div class="installer-notify-top">
               <strong>${escapeHtml(item.title || "Уведомление")}</strong>
               ${item.is_read ? "" : '<span class="installer-notify-new">NEW</span>'}
@@ -678,9 +679,30 @@
 
   // Читаем по клику на само уведомление — так пользователь сам решает,
   // что уже просмотрел.
+  // Тег события вида sale-<id> / order-<id> указывает на конкретный заказ.
+  function orderIdFromTag(tag) {
+    const raw = String(tag || "");
+    const orderMatch = /^order-(.+)$/.exec(raw);
+    if (orderMatch) return state.orders.find((item) => item.id === orderMatch[1])?.id || "";
+    const saleMatch = /^(?:sale|pay)-(.+)$/.exec(raw);
+    if (saleMatch) {
+      return state.orders.find((item) => item.sale_document_id === saleMatch[1])?.id || "";
+    }
+    return "";
+  }
+
   document.getElementById("installer-notify-list")?.addEventListener("click", async (event) => {
     const item = event.target.closest("[data-notify-id]");
-    if (!item || item.classList.contains("is-read")) return;
+    if (!item) return;
+
+    // Уведомление о заказе открывает его карточку, не покидая приложение.
+    const orderId = orderIdFromTag(item.dataset.notifyTag);
+    if (orderId) {
+      closeScreen(notificationsDialog);
+      openDetail(orderId);
+    }
+
+    if (item.classList.contains("is-read")) return;
     item.classList.add("is-read");
     item.querySelector(".installer-notify-new")?.remove();
     try {

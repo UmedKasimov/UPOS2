@@ -174,6 +174,9 @@ def list_notifications(workspace_owner_id: str, user_id: str, limit: int = 60) -
                 "title": row.title,
                 "body": row.body,
                 "url": row.url,
+                # Тег хранит ссылку на событие (sale-…, order-…) — по нему
+                # приложение открывает нужный заказ прямо из уведомления.
+                "tag": row.tag,
                 "is_read": bool(row.is_read),
                 "created_at": row.created_at.isoformat() if row.created_at else "",
             }
