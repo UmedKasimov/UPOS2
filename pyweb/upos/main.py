@@ -7181,13 +7181,28 @@ def create_app() -> FastAPI:
             normalized.append(item)
         return normalized
 
+    def _workspace_today_iso(workspace_owner_id: str) -> str:
+        """Сегодняшняя дата в часовом поясе воркспейса."""
+        tz_id = normalize_workspace_timezone(
+            str(load_workspace_settings(workspace_owner_id).get("timezone") or "")
+        )
+        try:
+            return datetime.now(ZoneInfo(tz_id)).date().isoformat()
+        except Exception:
+            return datetime.now(timezone.utc).date().isoformat()
+
     def _document_payment_entries_from_form(
         form: Any,
         document_currency: str,
         debt_amount: Decimal,
         workspace_owner_id: str,
+        payment_date: str = "",
     ) -> tuple[list[dict[str, str]], Decimal, str]:
         currency = str(document_currency or "UZS").strip().upper() or "UZS"
+        # Без даты платежа входящие оплаты нечем датировать: раньше в строке
+        # хранились только сумма и счёт, а дата бралась от документа, из-за чего
+        # доплата спустя месяц выглядела как оплата в день продажи.
+        entry_date = str(payment_date or "").strip() or _workspace_today_iso(workspace_owner_id)
         rate = _workspace_usd_uzs_rate(workspace_owner_id)
         raw_entries: list[dict[str, Any]] = []
         raw_payment_lines = str(form.get("payment_lines") or "").strip()
@@ -7233,6 +7248,7 @@ def create_app() -> FastAPI:
                     "type": payment_type,
                     "account": account_label,
                     "account_id": str(item.get("account_id") or "").strip(),
+                    "date": str(item.get("date") or "").strip() or entry_date,
                 }
             )
             paid_in_document_currency += converted_amount
@@ -7244,6 +7260,7 @@ def create_app() -> FastAPI:
                     "type": "Оплата",
                     "account": "Наличные",
                     "account_id": "",
+                    "date": entry_date,
                 }
             )
             paid_in_document_currency = debt_amount
@@ -9554,10 +9571,14 @@ def create_app() -> FastAPI:
         editing_sale_id = str(form.get("sale_id") or "").strip()
         try:
             data, amount, currency = _sales_document_payload(form)
-            data["payment_lines"] = _normalize_sales_payment_lines(
-                wid,
-                list(data.get("payment_lines") or []),
-            )
+            data["payment_lines"] = [
+                # Оплата, внесённая сразу в документе, датируется самим документом.
+                {**item, "date": str(item.get("date") or "").strip() or str(data.get("date") or "")}
+                for item in _normalize_sales_payment_lines(
+                    wid,
+                    list(data.get("payment_lines") or []),
+                )
+            ]
         except ValueError as exc:
             return sales_form_redirect(error=str(exc))
         session_user = request.session.get("user") or {}
@@ -11314,6 +11335,55 @@ def create_app() -> FastAPI:
             else:
                 sales.append(item)
 
+        # Входящие платежи собираем построчно: сколько, чем и по какому документу
+        # заплатил клиент. Раньше раздел был заглушкой и отсылал к акту сверки.
+        incoming_payments: list[dict[str, Any]] = []
+        incoming_payment_totals: dict[str, Decimal] = {}
+        for sale_row in sorted(matched_sale_rows, key=sale_document_sort_key, reverse=True):
+            data = _json_object(sale_row.data)
+            item = _sales_document_data(sale_row)
+            if item["doc_type"] == "return":
+                continue
+            raw_lines = data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []
+            payment_rows = [line for line in raw_lines if isinstance(line, dict)]
+            lines_total = sum((_sales_decimal(line.get("amount")) for line in payment_rows), Decimal("0"))
+            paid_amount = _sales_decimal(data.get("paid_amount"))
+            if paid_amount > lines_total:
+                # Старые документы хранили только итог «Оплачено» без разбивки.
+                payment_rows = payment_rows + [
+                    {
+                        "amount": _decimal_plain_text(paid_amount - lines_total),
+                        "currency": item["currency"],
+                        "type": str(data.get("payment_type") or "Оплата"),
+                        "account": "",
+                    }
+                ]
+            for line in payment_rows:
+                line_amount = _sales_decimal(line.get("amount"))
+                if line_amount <= 0:
+                    continue
+                line_currency = str(line.get("currency") or item["currency"] or "UZS").strip().upper() or "UZS"
+                incoming_payment_totals[line_currency] = (
+                    incoming_payment_totals.get(line_currency, Decimal("0")) + line_amount
+                )
+                incoming_payments.append(
+                    {
+                        "date": str(line.get("date") or "").strip() or item["date"] or sale_document_day_label(sale_row, item["date"]),
+                        "document": f"{item['doc_type_label']} {item['number']}",
+                        "document_id": item["id"],
+                        "account": str(line.get("account") or "").strip(),
+                        "type": str(line.get("type") or "Оплата").strip() or "Оплата",
+                        "amount": _sales_money_label(line_amount),
+                        "currency": line_currency,
+                    }
+                )
+        incoming_payments.sort(key=lambda entry: str(entry.get("date") or ""), reverse=True)
+        incoming_payments_total = [
+            f"{_sales_money_label(total)} {currency_code}"
+            for currency_code, total in sorted(incoming_payment_totals.items())
+            if total > 0
+        ]
+
         reconciliation_rows: list[dict[str, str]] = []
         running_balance = Decimal("0")
         reconciliation_total_debit = Decimal("0")
@@ -11528,6 +11598,9 @@ def create_app() -> FastAPI:
                 "deals": deals[:12],
                 "correspondence": correspondence[:12],
                 "conversations": conversations[:8],
+                "payments": incoming_payments[:40],
+                "payments_total": incoming_payments_total,
+                "payments_count": len(incoming_payments),
                 "reconciliation": reconciliation_rows[-18:],
                 "reconciliation_totals": {
                     "debit": _sales_money_label(reconciliation_total_debit),

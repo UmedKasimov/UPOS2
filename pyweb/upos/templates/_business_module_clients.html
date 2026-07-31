@@ -717,10 +717,39 @@
         <header>
           <div>
             <h3>Входящие платежи</h3>
-            <span>Оплаты клиента в акте сверки</span>
+            <span>
+              {% if selected_client_card.payments_total %}
+                Принято: {{ selected_client_card.payments_total | join(' · ') }}
+              {% else %}
+                Оплаты клиента по документам
+              {% endif %}
+            </span>
           </div>
         </header>
-        <p class="client-card-empty">Платежи отображаются в акте сверки по связанным документам.</p>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Счёт</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.payments %}
+                <tr>
+                  <td>{{ row.date or "-" }}</td>
+                  <td>{{ row.document }}</td>
+                  <td>{{ row.account or row.type }}</td>
+                  <td class="num">{{ row.amount }} {{ row.currency }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4">Оплат от клиента пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </article>
       <article class="client-card-panel" id="note" data-client-section-panel="note">
         <header>
