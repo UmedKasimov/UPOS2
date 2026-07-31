@@ -483,21 +483,120 @@
     closeScreen(clientsDialog);
   });
 
+  let productCache = [];
+  let orderLines = [];
+  let selectedClientId = "";
+
+  // Свой список подсказок: <datalist> на телефонах открывается ненадёжно.
+  function renderSuggest(node, rows, render) {
+    if (!node) return;
+    node.innerHTML = rows.length ? rows.map(render).join("") : "";
+    node.hidden = !rows.length;
+  }
+
+  function renderOrderLines() {
+    const box = document.getElementById("installer-order-lines");
+    const amount = document.getElementById("installer-order-amount");
+    const hint = document.getElementById("installer-order-amount-hint");
+    if (!box) return;
+    box.innerHTML = orderLines.length
+      ? orderLines.map((line, index) => `
+          <article class="installer-order-line">
+            <div>
+              <strong>${escapeHtml(line.name)}</strong>
+              <small>${escapeHtml(line.price)} × ${escapeHtml(String(line.qty))}</small>
+            </div>
+            <div class="installer-order-line-actions">
+              <button type="button" data-line-minus="${index}">−</button>
+              <b>${escapeHtml(String(line.qty))}</b>
+              <button type="button" data-line-plus="${index}">+</button>
+              <button type="button" data-line-remove="${index}" aria-label="Удалить">×</button>
+            </div>
+          </article>`).join("")
+      : '<p class="installer-order-lines-empty">Товары не добавлены</p>';
+    const total = orderLines.reduce((sum, line) => sum + numberValue(line.price) * line.qty, 0);
+    if (amount) {
+      amount.readOnly = orderLines.length > 0;
+      if (orderLines.length) amount.value = String(total);
+    }
+    if (hint) hint.hidden = !orderLines.length;
+  }
+
+  document.getElementById("installer-order-lines")?.addEventListener("click", (event) => {
+    const plus = event.target.closest("[data-line-plus]");
+    const minus = event.target.closest("[data-line-minus]");
+    const remove = event.target.closest("[data-line-remove]");
+    if (plus) orderLines[Number(plus.dataset.linePlus)].qty += 1;
+    if (minus) {
+      const line = orderLines[Number(minus.dataset.lineMinus)];
+      line.qty = Math.max(1, line.qty - 1);
+    }
+    if (remove) orderLines.splice(Number(remove.dataset.lineRemove), 1);
+    if (plus || minus || remove) renderOrderLines();
+  });
+
+  document.getElementById("installer-order-client")?.addEventListener("input", (event) => {
+    selectedClientId = "";
+    const needle = String(event.target.value || "").trim().toLowerCase();
+    const rows = needle
+      ? clientCache.filter((row) => `${row.name} ${row.phone}`.toLowerCase().includes(needle)).slice(0, 8)
+      : clientCache.slice(0, 8);
+    renderSuggest(
+      document.getElementById("installer-client-suggest"),
+      rows,
+      (row) => `<button type="button" data-client-id="${escapeHtml(row.id)}" data-client-name="${escapeHtml(row.name)}">
+          <strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.phone || "")}</small></button>`
+    );
+  });
+
+  document.getElementById("installer-client-suggest")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-client-id]");
+    if (!button) return;
+    selectedClientId = button.dataset.clientId;
+    document.getElementById("installer-order-client").value = button.dataset.clientName;
+    const node = document.getElementById("installer-client-suggest");
+    node.hidden = true;
+  });
+
+  document.getElementById("installer-order-product")?.addEventListener("input", (event) => {
+    const needle = String(event.target.value || "").trim().toLowerCase();
+    const rows = needle
+      ? productCache.filter((row) => `${row.name} ${row.sku}`.toLowerCase().includes(needle)).slice(0, 8)
+      : productCache.slice(0, 8);
+    renderSuggest(
+      document.getElementById("installer-product-suggest"),
+      rows,
+      (row) => `<button type="button" data-product-id="${escapeHtml(row.id)}" data-product-name="${escapeHtml(row.name)}" data-product-price="${escapeHtml(row.price)}">
+          <strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.price)} ${escapeHtml(row.unit || "")}</small></button>`
+    );
+  });
+
+  document.getElementById("installer-product-suggest")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-product-id]");
+    if (!button) return;
+    const id = button.dataset.productId;
+    const existing = orderLines.find((line) => line.id === id);
+    if (existing) existing.qty += 1;
+    else orderLines.push({id: id, name: button.dataset.productName, price: button.dataset.productPrice, qty: 1});
+    document.getElementById("installer-order-product").value = "";
+    document.getElementById("installer-product-suggest").hidden = true;
+    renderOrderLines();
+  });
+
   async function openNewOrder() {
     closeInstallerMenu();
     if (!newOrderDialog) return;
+    orderLines = [];
+    selectedClientId = "";
     openScreen(newOrderDialog, "new-order");
+    renderOrderLines();
     try {
-      const [clients, agents] = await Promise.all([
+      const [, agents, products] = await Promise.all([
         loadClients(""),
         apiRequest("/api/installer/agents"),
+        apiRequest("/api/installer/products"),
       ]);
-      const options = document.getElementById("installer-client-options");
-      if (options) {
-        options.innerHTML = clients
-          .map((row) => `<option value="${escapeHtml(row.name)}"></option>`)
-          .join("");
-      }
+      productCache = products.products || [];
       // Список агентов нужен только руководителю: установщик оформляет на себя.
       const wrap = document.getElementById("installer-order-agent-wrap");
       const select = document.getElementById("installer-order-agent");
@@ -517,7 +616,10 @@
     event.preventDefault();
     const clientInput = document.getElementById("installer-order-client");
     const typed = String(clientInput.value || "").trim();
-    const matched = clientCache.find((row) => row.name.toLowerCase() === typed.toLowerCase());
+    // Выбор из подсказок точнее, чем сверка по имени: названия повторяются.
+    const matched = selectedClientId
+      ? {id: selectedClientId}
+      : clientCache.find((row) => row.name.toLowerCase() === typed.toLowerCase());
     const agent = document.getElementById("installer-order-agent");
     const agentWrap = document.getElementById("installer-order-agent-wrap");
     const submit = event.target.querySelector('button[type="submit"]');
@@ -529,6 +631,7 @@
         scheduled_at: document.getElementById("installer-order-date").value,
         amount: document.getElementById("installer-order-amount").value,
         note: document.getElementById("installer-order-note").value,
+        lines: orderLines.map((line) => ({id: line.id, name: line.name, price: line.price, qty: line.qty})),
       };
       if (agentWrap && !agentWrap.hidden && agent) payload.installer_user_id = agent.value;
       const data = await apiRequest("/api/installer/orders/create", {
@@ -537,6 +640,9 @@
       });
       showToast(`Заказ ${data.order.number} создан`);
       event.target.reset();
+      orderLines = [];
+      selectedClientId = "";
+      renderOrderLines();
       closeScreen(newOrderDialog);
       loadOrders();
     } catch (error) {

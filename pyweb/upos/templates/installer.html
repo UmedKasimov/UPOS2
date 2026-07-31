@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=14">
-  <script defer src="/static/installer.js?v=14"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=15">
+  <script defer src="/static/installer.js?v=15"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -147,8 +147,8 @@
         <form class="installer-order-form" id="installer-order-form">
           <label>
             <span>Клиент*</span>
-            <input type="search" id="installer-order-client" list="installer-client-options" placeholder="Начните вводить название" autocomplete="off" required />
-            <datalist id="installer-client-options"></datalist>
+            <input type="search" id="installer-order-client" placeholder="Начните вводить название" autocomplete="off" required />
+            <div class="installer-suggest" id="installer-client-suggest" hidden></div>
             <small>Если клиента нет в списке — впишите новое название, он создастся автоматически.</small>
           </label>
           <label id="installer-order-agent-wrap" hidden>
@@ -159,9 +159,18 @@
             <span>Дата и время установки*</span>
             <input type="datetime-local" id="installer-order-date" required />
           </label>
+          <div class="installer-order-goods">
+            <span class="installer-order-goods-title">Товары</span>
+            <div class="installer-order-goods-picker">
+              <input type="search" id="installer-order-product" placeholder="Найти товар" autocomplete="off" />
+              <div class="installer-suggest" id="installer-product-suggest" hidden></div>
+            </div>
+            <div class="installer-order-lines" id="installer-order-lines"></div>
+          </div>
           <label>
             <span>Сумма</span>
             <input type="text" inputmode="decimal" id="installer-order-amount" placeholder="0" />
+            <small id="installer-order-amount-hint" hidden>Считается по добавленным товарам</small>
           </label>
           <label>
             <span>Комментарий</span>

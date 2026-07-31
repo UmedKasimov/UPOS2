@@ -7846,7 +7846,32 @@ def create_app() -> FastAPI:
         client_name = " ".join(str((body or {}).get("client_name") or "").split())
         scheduled_at = str((body or {}).get("scheduled_at") or "").strip()
         note = str((body or {}).get("note") or "").strip()
-        amount = _sales_decimal((body or {}).get("amount"))
+        # Позиции приходят из приложения; сумма считается по ним, а введённая
+        # вручную используется, только если товаров нет.
+        raw_lines = (body or {}).get("lines")
+        lines: list[dict[str, Any]] = []
+        lines_total = Decimal("0")
+        if isinstance(raw_lines, list):
+            for item in raw_lines[:50]:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("name") or "").strip()
+                if not title:
+                    continue
+                qty = _sales_decimal(item.get("qty") or 1) or Decimal("1")
+                price = _sales_decimal(item.get("price"))
+                total = qty * price
+                lines_total += total
+                lines.append(
+                    {
+                        "product_id": str(item.get("id") or ""),
+                        "product": title,
+                        "qty": str(qty),
+                        "price": str(price),
+                        "total": str(total),
+                    }
+                )
+        amount = lines_total if lines else _sales_decimal((body or {}).get("amount"))
         # Агента выбирает руководитель; установщик оформляет заказ на себя.
         agent_id = str((body or {}).get("installer_user_id") or "").strip() if can_manage else installer_user_id
         if not client_id and not client_name:
@@ -7881,7 +7906,7 @@ def create_app() -> FastAPI:
                     "source": "installer_app",
                     "installer_user_id": agent_id,
                     "installation_scheduled_at": scheduled_at,
-                    "lines": [],
+                    "lines": lines,
                     "paid_amount": "0",
                 }
                 sale = SaleDocument(
@@ -7919,6 +7944,34 @@ def create_app() -> FastAPI:
             tag=f"sale-{doc_id}",
         )
         return JSONResponse({"ok": True, "order": created})
+
+    @app.get("/api/installer/products", name="installer_products_api")
+    def installer_products_api(request: Request):
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(Product)
+                    .where(Product.workspace_owner_id == wid)
+                    .order_by(Product.name.asc())
+                    .limit(500)
+                ).scalars()
+            )
+            products = []
+            for row in rows:
+                extra = _json_object(row.data)
+                products.append(
+                    {
+                        "id": row.id,
+                        "name": str(row.name or ""),
+                        "sku": str(row.sku or ""),
+                        "price": str(extra.get("price") or extra.get("sale_price") or "0"),
+                        "unit": str(extra.get("unit") or "шт"),
+                    }
+                )
+        return JSONResponse({"ok": True, "products": products})
 
     @app.get("/api/installer/agents", name="installer_agents_api")
     def installer_agents_api(request: Request):
