@@ -244,7 +244,7 @@
         </label>
         <label class="sales-journal-filter-field sales-journal-filter-date">
           <span>Дата</span>
-          <input name="date_from" type="date" value="{{ warehouse_filters.date_from | default('') }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes aria-label="Период закупок: день, месяц или от и до" />
+          <input name="date_from" type="date" value="{{ warehouse_filters.date_from | default('') }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период закупок: день, месяц или от и до" />
           <input name="date_to" type="hidden" value="{{ warehouse_filters.date_to | default('') }}" />
         </label>
         <input type="hidden" name="product" value="{{ warehouse_filters.product }}" />

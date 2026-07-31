@@ -11,8 +11,12 @@
     // Пустое «До» при заполненном «От» — открытый период, сохраняем его как есть:
     // подстановка input.value превратила бы «с 20.07» обратно в один день.
     const dateToValue = rangeMode ? (toInput?.value || '') : (input.value || '');
+    // Поле может задать стартовый режим явно (data-upos-date-period-mode="range").
+    // Иначе режим угадывается по значениям, и пустой фильтр каждый раз
+    // открывался одиночным днём вместо периода.
+    const forcedPeriodMode = String(input.dataset.uposDatePeriodMode || '').trim();
     const periodMode = periodModes
-      ? window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', dateToValue)
+      ? forcedPeriodMode || window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', dateToValue)
       : '';
     const rangeLabel = rangeMode
       ? window.UPOS_DATE_RANGE.labelForSelection(
@@ -62,7 +66,7 @@
     input.addEventListener('change', () => {
       const nextTo = rangeMode ? (toInput?.value || input.value || '') : (input.value || '');
       const nextPeriodMode = periodModes
-        ? window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', nextTo)
+        ? forcedPeriodMode || window.UPOS_DATE_RANGE.inferPeriodMode(input.value || '', nextTo)
         : '';
       const nextLabel = rangeMode
         ? window.UPOS_DATE_RANGE.labelForSelection(input.value || '', nextTo, 'custom', nextPeriodMode)
