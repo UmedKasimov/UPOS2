@@ -1828,6 +1828,19 @@ def _ensure_counterparty(
         )
     ).scalar_one_or_none()
     if row is None:
+        # Контрагент, заведённый через «Клиенты»/«Поставщики», имеет другой
+        # external_id (manual:<слаг>), и поиск только по кассовому ключу
+        # плодил дубликат на каждый платёж. Ищем и по имени тоже.
+        row = session.execute(
+            select(Counterparty)
+            .where(
+                Counterparty.workspace_owner_id == workspace_owner_id,
+                func.lower(Counterparty.name) == name_row.strip().lower(),
+            )
+            .order_by(Counterparty.created_at.asc())
+            .limit(1)
+        ).scalar_one_or_none()
+    if row is None:
         row = Counterparty(
             id=str(uuid.uuid4()),
             workspace_owner_id=workspace_owner_id,

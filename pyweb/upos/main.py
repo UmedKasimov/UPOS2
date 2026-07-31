@@ -3409,13 +3409,16 @@ def create_app() -> FastAPI:
             return None
         manual_ext = _manual_counterparty_external_id(clean_name)
         row = session.execute(
-            select(Counterparty).where(
+            select(Counterparty)
+            .where(
                 Counterparty.workspace_owner_id == workspace_owner_id,
                 or_(
                     func.lower(Counterparty.name) == clean_name.lower(),
                     Counterparty.external_id == manual_ext,
                 ),
             )
+            # При дублях имён берём самого старого — у него история документов.
+            .order_by(Counterparty.created_at.asc())
         ).scalars().first()
         if row is None:
             return None
@@ -3496,6 +3499,9 @@ def create_app() -> FastAPI:
         extra["is_client"] = has_client
         extra["is_supplier"] = has_supplier
         row.data = extra
+        # _counterparty_extra отдаёт сам row.data — без пометки JSONB-флаги
+        # ролей не доезжали до базы (kind обновлялся, а data нет).
+        flag_modified(row, "data")
         return True
 
     def _resolve_product_row(session: Any, workspace_owner_id: str, raw_value: str) -> Product | None:
@@ -13354,6 +13360,9 @@ def create_app() -> FastAPI:
             extra["route_agent"] = str(form.get("route_agent") or "").strip()
             extra["status"] = str(extra.get("status") or "active")
             row.data = extra
+            # _counterparty_extra отдаёт сам row.data — без пометки маршрут
+            # «сохранялся» только на экране и молча терялся.
+            flag_modified(row, "data")
         return RedirectResponse(url="/clients?msg=saved#routes", status_code=302)
 
     @app.get("/suppliers", response_class=HTMLResponse, name="suppliers_get")
