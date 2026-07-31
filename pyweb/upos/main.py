@@ -17931,13 +17931,17 @@ def create_app() -> FastAPI:
                 max_expense = max((float(item["amount_primary"]) for item in profit_expense_rows), default=0.0)
                 for item in profit_expense_rows:
                     item["bar_width"] = 0 if max_expense <= 0 else max(4, round(float(item["amount_primary"]) / max_expense * 100))
-                net_profit_total = profit_total + other_income_primary - expenses_primary
+                # Валовая — строго по формуле «Выручка − Себестоимость»: прибыль
+                # из отчёта продаж (profit_total) считается только по архивным
+                # документам и здесь противоречила бы собственным KPI отчёта.
+                gross_profit_total = net_sales_total - cost_total
+                net_profit_total = gross_profit_total + other_income_primary - expenses_primary
                 business_reports["profit"] = {
                     "summary": {
                         "period": report_data["period_label"],
                         "revenue": _report_money(net_sales_total, primary_currency),
                         "cost": _report_money(cost_total, primary_currency),
-                        "gross": _report_money(profit_total, primary_currency),
+                        "gross": _report_money(gross_profit_total, primary_currency),
                         "other_income": _report_money(other_income_primary, primary_currency),
                         "expenses": _report_money(expenses_primary, primary_currency),
                         "net": _report_money(net_profit_total, primary_currency),
