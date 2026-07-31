@@ -120,6 +120,48 @@ def _record_timing(key: str, started: float) -> None:
     _startup_timings_ms[key] = round((time.perf_counter() - started) * 1000.0, 2)
 
 
+# Индексы под горячие запросы (страницы schet/kassa/sales и отчёты).
+# CREATE INDEX IF NOT EXISTS — идемпотентно, безопасно выполняется на каждом старте.
+_PERFORMANCE_INDEXES: tuple[str, ...] = (
+    # transactions: фильтр по workspace + диапазон/сортировка по дате
+    "CREATE INDEX IF NOT EXISTS ix_transactions_ws_created"
+    " ON transactions (workspace_owner_id, created_at DESC)",
+    # transactions: PnL/отчёты — фильтр по типу и подтверждению
+    "CREATE INDEX IF NOT EXISTS ix_transactions_ws_type_confirmed"
+    " ON transactions (workspace_owner_id, type, is_confirmed, created_at)",
+    # transactions: видимость по счетам для сотрудников (OR from/to)
+    "CREATE INDEX IF NOT EXISTS ix_transactions_from_account"
+    " ON transactions (from_account_id) WHERE from_account_id IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix_transactions_to_account"
+    " ON transactions (to_account_id) WHERE to_account_id IS NOT NULL",
+    # transaction_entries: пересчёт/сторнирование проводок по транзакции
+    "CREATE INDEX IF NOT EXISTS ix_transaction_entries_tx"
+    " ON transaction_entries (transaction_id)",
+    "CREATE INDEX IF NOT EXISTS ix_transaction_entries_account"
+    " ON transaction_entries (account_id)",
+    # sale/purchase documents: журналы сортируются по updated_at DESC
+    "CREATE INDEX IF NOT EXISTS ix_sale_documents_ws_updated"
+    " ON sale_documents (workspace_owner_id, updated_at DESC)",
+    "CREATE INDEX IF NOT EXISTS ix_purchase_documents_ws_updated"
+    " ON purchase_documents (workspace_owner_id, updated_at DESC)",
+    # sale_documents: балансы клиентов группируются по контрагенту
+    "CREATE INDEX IF NOT EXISTS ix_sale_documents_ws_counterparty"
+    " ON sale_documents (workspace_owner_id, counterparty_id)",
+    # crm_records: журнал продаж строит индекс CRM по workspace
+    "CREATE INDEX IF NOT EXISTS ix_crm_records_ws_updated"
+    " ON crm_records (workspace_owner_id, updated_at DESC)",
+)
+
+
+def _ensure_performance_indexes(engine: Engine) -> None:
+    for ddl in _PERFORMANCE_INDEXES:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+        except Exception as exc:
+            logger.warning("[upos] index skipped (%s): %s", ddl.split(" ON ")[0], exc)
+
+
 def init_db() -> None:
     global _startup_timings_ms
     _startup_timings_ms = {}
@@ -156,6 +198,11 @@ def init_db() -> None:
             logger.info("[upos] Dropped legacy constraint transactions_number_key if it existed.")
         except Exception as exc:
             logger.warning("[upos] Failed to drop legacy transactions_number_key: %s", exc)
+
+    if engine.dialect.name == "postgresql":
+        t0 = time.perf_counter()
+        _ensure_performance_indexes(engine)
+        _record_timing("perf_indexes", t0)
 
     cn = ""
     try:

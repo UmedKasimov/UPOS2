@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import socket
+import time
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime, timezone
@@ -26,6 +27,7 @@ from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, FastAPI, Form, Query, Request, UploadFile, File
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook, load_workbook
@@ -241,9 +243,26 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-templates.env.auto_reload = True
+# В проде (Railway) шаблоны не меняются на диске — отключаем auto_reload,
+# чтобы Jinja не делала os.stat() по всей цепочке шаблонов на каждый рендер.
+_templates_dev_reload = not os.environ.get("RAILWAY_ENVIRONMENT")
+templates.env.auto_reload = _templates_dev_reload
 templates.env.cache = {}
 CLIENT_WORKSPACES_DIR = BASE_DIR.parent / "client_workspaces"
+
+
+class CachedStaticFiles(StaticFiles):
+    """Статика с Cache-Control: версионированные ассеты (?v=N) кэшируются надолго,
+    остальные — сутки с ревалидацией по ETag/Last-Modified (их шлёт StaticFiles)."""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304):
+            if b"v=" in (scope.get("query_string") or b""):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
 
 
 def billing_root_credentials() -> tuple[str, str]:
@@ -691,7 +710,7 @@ def create_app() -> FastAPI:
 
     app.mount(
         "/static",
-        StaticFiles(directory=str(BASE_DIR / "static")),
+        CachedStaticFiles(directory=str(BASE_DIR / "static")),
         name="static",
     )
 
@@ -6341,8 +6360,12 @@ def create_app() -> FastAPI:
 
     def _next_sales_document_number(session: Session, workspace_owner_id: str, doc_type: str) -> str:
         prefix = _sales_number_prefix(doc_type)
+        # Выбираем только номера с нужным префиксом, а не все документы workspace.
         existing_numbers = session.execute(
-            select(SaleDocument.number).where(SaleDocument.workspace_owner_id == workspace_owner_id)
+            select(SaleDocument.number).where(
+                SaleDocument.workspace_owner_id == workspace_owner_id,
+                SaleDocument.number.ilike(f"{prefix}%"),
+            )
         ).scalars().all()
         pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$", re.IGNORECASE)
         used_indexes = [
@@ -7276,7 +7299,18 @@ def create_app() -> FastAPI:
             return count
         return 1 if _sales_decimal(data.get("paid_amount")) > 0 else 0
 
+    # Троттлинг страховочной синхронизации на GET /api/transactions: сканировать
+    # продажи не чаще раза в 30 с на workspace — при сохранении/оплате продажи
+    # синхронизация и так выполняется напрямую (_sync_sales_cash_transactions).
+    _sales_cash_ensure_ts: dict[str, float] = {}
+    _SALES_CASH_ENSURE_TTL = 30.0
+
     def _ensure_sales_cash_transactions(workspace_owner_id: str) -> None:
+        now = time.monotonic()
+        last = _sales_cash_ensure_ts.get(workspace_owner_id, 0.0)
+        if now - last < _SALES_CASH_ENSURE_TTL:
+            return
+        _sales_cash_ensure_ts[workspace_owner_id] = now
         with session_scope() as session:
             sale_rows = list(
                 session.execute(
@@ -8563,9 +8597,9 @@ def create_app() -> FastAPI:
             )
             client_balance_by_id: dict[str, dict[str, Decimal]] = {}
             client_balance_by_name: dict[str, dict[str, Decimal]] = {}
-            for sale_row in session.execute(
-                select(SaleDocument).where(SaleDocument.workspace_owner_id == wid)
-            ).scalars():
+            # Переиспользуем rows, загруженные выше, вместо второго полного
+            # скана sale_documents в рамках того же запроса.
+            for sale_row in rows:
                 sale_data = _json_object(sale_row.data)
                 sale_client = str(sale_data.get("client") or "").strip()
                 if not sale_client:
@@ -8747,8 +8781,14 @@ def create_app() -> FastAPI:
         if redir or not wid:
             return JSONResponse({"error": "workspace"}, status_code=403)
         with session_scope() as session:
-            balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
-            balance_currency_by_id, balance_currency_by_name = _sales_rollup_currency_maps(session, wid)
+            (
+                balance_by_id,
+                balance_by_name,
+                last_date_by_id,
+                last_date_by_name,
+                balance_currency_by_id,
+                balance_currency_by_name,
+            ) = _sales_rollup_all(session, wid)
             crm_rows = list(
                 session.execute(
                     select(CrmRecord)
@@ -9952,40 +9992,25 @@ def create_app() -> FastAPI:
         }
         return data, amount, currency
 
-    def _sales_rollup_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, str], dict[str, str]]:
+    def _sales_rollup_all(
+        session: Any, workspace_owner_id: str
+    ) -> tuple[
+        dict[str, Decimal],
+        dict[str, Decimal],
+        dict[str, str],
+        dict[str, str],
+        dict[str, dict[str, Decimal]],
+        dict[str, dict[str, Decimal]],
+    ]:
+        """Балансы и даты последних продаж по клиентам одним сканом sale_documents
+        (ранее — два одинаковых полных прохода в _sales_rollup_maps и
+        _sales_rollup_currency_maps)."""
         balance_by_id: dict[str, Decimal] = {}
         balance_by_name: dict[str, Decimal] = {}
         last_date_by_id: dict[str, str] = {}
         last_date_by_name: dict[str, str] = {}
-        rows = session.execute(
-            select(SaleDocument)
-            .where(SaleDocument.workspace_owner_id == workspace_owner_id)
-            .order_by(SaleDocument.updated_at.desc())
-        ).scalars()
-        for row in rows:
-            data = _json_object(row.data)
-            doc_type = str(data.get("doc_type") or "sale")
-            if not _sales_status_records_debt(_sales_workflow_status(data), doc_type):
-                continue
-            signed = Decimal("-1") if doc_type == "return" else Decimal("1")
-            balance = signed * (_sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount")))
-            name = str(data.get("client") or "").strip()
-            counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
-            doc_date = str(data.get("date") or "")
-            if counterparty_id:
-                balance_by_id[counterparty_id] = balance_by_id.get(counterparty_id, Decimal("0")) + balance
-                if doc_date and doc_date >= last_date_by_id.get(counterparty_id, ""):
-                    last_date_by_id[counterparty_id] = doc_date
-            if name:
-                lowered = name.lower()
-                balance_by_name[lowered] = balance_by_name.get(lowered, Decimal("0")) + balance
-                if doc_date and doc_date >= last_date_by_name.get(lowered, ""):
-                    last_date_by_name[lowered] = doc_date
-        return balance_by_id, balance_by_name, last_date_by_id, last_date_by_name
-
-    def _sales_rollup_currency_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, dict[str, Decimal]], dict[str, dict[str, Decimal]]]:
-        balance_by_id: dict[str, dict[str, Decimal]] = {}
-        balance_by_name: dict[str, dict[str, Decimal]] = {}
+        currency_by_id: dict[str, dict[str, Decimal]] = {}
+        currency_by_name: dict[str, dict[str, Decimal]] = {}
         rows = session.execute(
             select(SaleDocument)
             .where(SaleDocument.workspace_owner_id == workspace_owner_id)
@@ -10001,44 +10026,47 @@ def create_app() -> FastAPI:
             currency = str(row.currency or "UZS").strip().upper() or "UZS"
             name = str(data.get("client") or "").strip()
             counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
-            if counterparty_id:
-                bucket = balance_by_id.setdefault(counterparty_id, {})
-                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
-            if name:
-                bucket = balance_by_name.setdefault(name.lower(), {})
-                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
-        return balance_by_id, balance_by_name
-
-    def _purchase_rollup_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, str], dict[str, str]]:
-        balance_by_id: dict[str, Decimal] = {}
-        balance_by_name: dict[str, Decimal] = {}
-        last_date_by_id: dict[str, str] = {}
-        last_date_by_name: dict[str, str] = {}
-        rows = session.execute(
-            select(PurchaseDocument)
-            .where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
-            .order_by(PurchaseDocument.updated_at.desc())
-        ).scalars()
-        for row in rows:
-            data = _json_object(row.data)
-            balance = _sales_decimal(row.amount) - _sales_decimal(data.get("paid_amount"))
-            name = str(data.get("supplier") or "").strip()
-            counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
             doc_date = str(data.get("date") or "")
             if counterparty_id:
                 balance_by_id[counterparty_id] = balance_by_id.get(counterparty_id, Decimal("0")) + balance
                 if doc_date and doc_date >= last_date_by_id.get(counterparty_id, ""):
                     last_date_by_id[counterparty_id] = doc_date
+                bucket = currency_by_id.setdefault(counterparty_id, {})
+                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
             if name:
                 lowered = name.lower()
                 balance_by_name[lowered] = balance_by_name.get(lowered, Decimal("0")) + balance
                 if doc_date and doc_date >= last_date_by_name.get(lowered, ""):
                     last_date_by_name[lowered] = doc_date
-        return balance_by_id, balance_by_name, last_date_by_id, last_date_by_name
+                bucket = currency_by_name.setdefault(lowered, {})
+                bucket[currency] = bucket.get(currency, Decimal("0")) + balance
+        return (
+            balance_by_id,
+            balance_by_name,
+            last_date_by_id,
+            last_date_by_name,
+            currency_by_id,
+            currency_by_name,
+        )
 
-    def _purchase_rollup_currency_maps(session: Any, workspace_owner_id: str) -> tuple[dict[str, dict[str, Decimal]], dict[str, dict[str, Decimal]]]:
-        balance_by_id: dict[str, dict[str, Decimal]] = {}
-        balance_by_name: dict[str, dict[str, Decimal]] = {}
+    def _purchase_rollup_all(
+        session: Any, workspace_owner_id: str
+    ) -> tuple[
+        dict[str, Decimal],
+        dict[str, Decimal],
+        dict[str, str],
+        dict[str, str],
+        dict[str, dict[str, Decimal]],
+        dict[str, dict[str, Decimal]],
+    ]:
+        """Балансы и даты последних закупок по поставщикам одним сканом
+        purchase_documents (ранее — два одинаковых полных прохода)."""
+        balance_by_id: dict[str, Decimal] = {}
+        balance_by_name: dict[str, Decimal] = {}
+        last_date_by_id: dict[str, str] = {}
+        last_date_by_name: dict[str, str] = {}
+        currency_by_id: dict[str, dict[str, Decimal]] = {}
+        currency_by_name: dict[str, dict[str, Decimal]] = {}
         rows = session.execute(
             select(PurchaseDocument)
             .where(PurchaseDocument.workspace_owner_id == workspace_owner_id)
@@ -10050,13 +10078,28 @@ def create_app() -> FastAPI:
             currency = str(row.currency or "UZS").strip().upper() or "UZS"
             name = str(data.get("supplier") or "").strip()
             counterparty_id = str(data.get("counterparty_id") or row.counterparty_id or "").strip()
+            doc_date = str(data.get("date") or "")
             if counterparty_id:
-                bucket = balance_by_id.setdefault(counterparty_id, {})
+                balance_by_id[counterparty_id] = balance_by_id.get(counterparty_id, Decimal("0")) + balance
+                if doc_date and doc_date >= last_date_by_id.get(counterparty_id, ""):
+                    last_date_by_id[counterparty_id] = doc_date
+                bucket = currency_by_id.setdefault(counterparty_id, {})
                 bucket[currency] = bucket.get(currency, Decimal("0")) + balance
             if name:
-                bucket = balance_by_name.setdefault(name.lower(), {})
+                lowered = name.lower()
+                balance_by_name[lowered] = balance_by_name.get(lowered, Decimal("0")) + balance
+                if doc_date and doc_date >= last_date_by_name.get(lowered, ""):
+                    last_date_by_name[lowered] = doc_date
+                bucket = currency_by_name.setdefault(lowered, {})
                 bucket[currency] = bucket.get(currency, Decimal("0")) + balance
-        return balance_by_id, balance_by_name
+        return (
+            balance_by_id,
+            balance_by_name,
+            last_date_by_id,
+            last_date_by_name,
+            currency_by_id,
+            currency_by_name,
+        )
 
     def _client_balance_display(amount: Any) -> str:
         amount = _sales_decimal(amount)
@@ -11893,8 +11936,14 @@ def create_app() -> FastAPI:
         client_balances: list[dict[str, Any]] = []
         selected_client_card: dict[str, Any] | None = None
         with session_scope() as session:
-            balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _sales_rollup_maps(session, wid)
-            balance_currency_by_id, balance_currency_by_name = _sales_rollup_currency_maps(session, wid)
+            (
+                balance_by_id,
+                balance_by_name,
+                last_date_by_id,
+                last_date_by_name,
+                balance_currency_by_id,
+                balance_currency_by_name,
+            ) = _sales_rollup_all(session, wid)
             settings_payload = load_workspace_settings(wid)
             raw_calls = settings_payload.get("telephony_calls") if isinstance(settings_payload.get("telephony_calls"), list) else []
             crm_rows_for_contact = list(
@@ -12524,8 +12573,14 @@ def create_app() -> FastAPI:
         product_names: list[str] = []
         warehouse_names: list[str] = []
         with session_scope() as session:
-            balance_by_id, balance_by_name, last_date_by_id, last_date_by_name = _purchase_rollup_maps(session, wid)
-            balance_currency_by_id, balance_currency_by_name = _purchase_rollup_currency_maps(session, wid)
+            (
+                balance_by_id,
+                balance_by_name,
+                last_date_by_id,
+                last_date_by_name,
+                balance_currency_by_id,
+                balance_currency_by_name,
+            ) = _purchase_rollup_all(session, wid)
             selected_supplier_id = supplier.strip()
             if selected_supplier_id:
                 selected_supplier_card = _supplier_card_context(
@@ -21902,6 +21957,10 @@ def create_app() -> FastAPI:
         same_site="lax",
         https_only=cookie_https_only,
     )
+
+    # Добавлен последним — оборачивает всё приложение снаружи: сжимает HTML/JS/CSS/JSON
+    # (styles.css ~665 КБ → ~80 КБ). minimum_size — мелкие ответы не трогаем.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     return app
 
