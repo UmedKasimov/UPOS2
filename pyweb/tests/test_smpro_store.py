@@ -35,6 +35,7 @@ from upos.smpro_store import (
     _ibox_payment_credit,
     _ibox_product_data,
     _ibox_price_type_rows,
+    _ibox_purchase_document_data,
     _ibox_sales_document_data,
     _ibox_shipment_status,
     _shipment_document_data,
@@ -115,6 +116,55 @@ class SMProStoreTests(unittest.TestCase):
         self.assertEqual(document["status"], "completed")
         self.assertEqual(document["lines"][0]["product"], "Возвращённый товар")
         self.assertEqual(document["lines"][0]["quantity"], "2")
+
+    def test_ibox_purchase_becomes_purchases_board_document(self) -> None:
+        # Реальная форма payload из SMPro: поставщик в outlet_name,
+        # строки в purchase_details с вложенными product и warehouse.
+        document = _ibox_purchase_document_data(
+            {
+                "id": 8180,
+                "date": "2026-06-30T06:35:17.000000Z",
+                "total": 1900000,
+                "number": "104",
+                "status": 13,
+                "outlet_id": 1223,
+                "outlet_name": "Zigo",
+                "currency_code": "UZS",
+                "_ibox_filial_id": "1",
+                "purchase_details": [
+                    {
+                        "price": 380000,
+                        "total": 1900000,
+                        "product": {
+                            "id": 2846,
+                            "name": "Рация BaoFeng 777",
+                            "storage_unit": {"short_name": "шт"},
+                        },
+                        "quantity": 5,
+                        "warehouse": {"id": 1, "name": "Офис Склад"},
+                        "product_id": 2846,
+                    }
+                ],
+            },
+            "purchases",
+        )
+
+        self.assertEqual(document["supplier"], "Zigo")
+        self.assertEqual(document["date"], "2026-06-30")
+        self.assertEqual(document["status"], "purchased")
+        self.assertEqual(document["warehouse"], "Офис Склад")
+        self.assertFalse(document["is_supplier_return"])
+        self.assertEqual(document["lines"][0]["product"], "Рация BaoFeng 777")
+        self.assertEqual(document["lines"][0]["quantity"], "5")
+        self.assertEqual(document["lines"][0]["unit"], "шт")
+
+    def test_ibox_supplier_return_is_marked(self) -> None:
+        document = _ibox_purchase_document_data(
+            {"outlet_name": "Zigo", "total": 100, "currency_code": "UZS"},
+            "supplier_returns",
+        )
+        self.assertTrue(document["is_supplier_return"])
+        self.assertIn("Возврат поставщику", document["note"])
 
     def test_shipment_becomes_sales_journal_document(self) -> None:
         payload = {

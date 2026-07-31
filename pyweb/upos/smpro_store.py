@@ -411,6 +411,206 @@ def _shipment_document_data(payload: dict[str, Any]) -> dict[str, Any]:
     return _ibox_sales_document_data(payload, "shipments")
 
 
+def _ibox_purchase_document_data(
+    payload: dict[str, Any],
+    entity_type: str,
+) -> dict[str, Any]:
+    """Привести закупку IBOX к формату раздела «Закупки».
+
+    Сырой payload SMPro хранит поставщика в outlet_name, а строки в
+    purchase_details — раздел закупок этих ключей не знает, поэтому
+    документы показывались без поставщика, товаров и оплат.
+    """
+    created_at = _created_at(payload)
+    lines = _shipment_lines(payload)
+    first_line = lines[0] if lines else {}
+    supplier = _text(
+        payload,
+        "outlet_name",
+        "supplier_name",
+        "client_name",
+        "counterparty_name",
+    )
+    return {
+        "date": created_at.date().isoformat(),
+        "supplier": supplier or "Поставщик IBOX",
+        "warehouse": (
+            str(first_line.get("warehouse") or "").strip()
+            or _text(payload, "warehouse_name")
+            or "Основной склад"
+        ),
+        # Из IBOX приходят уже совершившиеся приходы — это «Завершённые».
+        # Возврат поставщику отражаем тем же статусом, но помечаем в data.
+        "status": "purchased",
+        "workflow_status": "purchased",
+        "is_supplier_return": entity_type == "supplier_returns",
+        "paid_amount": "0",
+        "payment_type": "",
+        "payment_lines": [],
+        "note": (
+            "Возврат поставщику из IBOX"
+            if entity_type == "supplier_returns"
+            else "Импортировано из IBOX"
+        ),
+        "lines": lines,
+        "source": INTEGRATION,
+        "ibox_document_id": _scalar(payload, "id", "document_id"),
+        "ibox_filial_id": (
+            _scalar(payload, "_ibox_filial_id")
+            or _scalar(payload, "filial_id")
+        ),
+        "ibox_status": payload.get("status"),
+        "ibox_payload": payload,
+    }
+
+
+def _ensure_ibox_supplier(
+    session,
+    workspace_owner_id: str,
+    payload: dict[str, Any],
+) -> str | None:
+    """Найти или завести контрагента-поставщика для закупки IBOX."""
+    outlet_id = _scalar(payload, "outlet_id", "supplier_id", "counterparty_id")
+    name = _text(
+        payload,
+        "outlet_name",
+        "supplier_name",
+        "client_name",
+        "counterparty_name",
+    )
+    external_id = f"supplier:{outlet_id}" if outlet_id else ""
+    if external_id:
+        existing = session.execute(
+            select(Counterparty)
+            .where(
+                Counterparty.workspace_owner_id == workspace_owner_id,
+                Counterparty.external_source == INTEGRATION,
+                Counterparty.external_id == external_id,
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if existing is not None:
+            return str(existing.id)
+    if name:
+        # Совпадение по имени: не плодим дубликаты, если поставщика уже
+        # завели руками или он пришёл из справочника клиентов IBOX.
+        existing = session.execute(
+            select(Counterparty)
+            .where(
+                Counterparty.workspace_owner_id == workspace_owner_id,
+                func.lower(Counterparty.name) == name.lower(),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if existing is not None:
+            if existing.kind not in ("supplier", "both"):
+                existing.kind = "both" if existing.kind == "client" else "supplier"
+            return str(existing.id)
+    if not name and not outlet_id:
+        return None
+    supplier = Counterparty(
+        id=str(uuid.uuid4()),
+        workspace_owner_id=workspace_owner_id,
+        kind="supplier",
+        name=name or f"Поставщик IBOX {outlet_id}",
+        external_source=INTEGRATION,
+        external_id=external_id or f"supplier:{_payload_hash(payload)}"[:180],
+        data={"source": INTEGRATION, "outlet_id": outlet_id},
+    )
+    session.add(supplier)
+    session.flush()
+    return str(supplier.id)
+
+
+def _reconcile_ibox_supplier_payments(session, workspace_owner_id: str) -> None:
+    """Разнести оплаты поставщикам (payments_made) по закупкам IBOX.
+
+    Зеркало _reconcile_ibox_payments: платежи распределяются по документам
+    того же контрагента в той же валюте от старых к новым, заполняя
+    «Оплачено», строки оплат и статус оплаты — из них раздел закупок
+    считает долг и взаиморасчёты с поставщиком.
+    """
+    expense_rows = session.execute(
+        select(ExpenseDocument)
+        .where(
+            ExpenseDocument.workspace_owner_id == workspace_owner_id,
+            ExpenseDocument.external_source == INTEGRATION,
+            ExpenseDocument.external_id.like("payments_made%"),
+        )
+        .order_by(ExpenseDocument.created_at.asc(), ExpenseDocument.id.asc())
+    ).scalars().all()
+    credits: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    fallback_credits: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for expense in expense_rows:
+        payload = expense.data if isinstance(expense.data, dict) else {}
+        credit = _ibox_payment_credit(payload)
+        if not credit:
+            continue
+        party_key = credit["party_key"]
+        key = (party_key[0], party_key[1], credit["currency"])
+        credits.setdefault(key, []).append(credit)
+        fallback_credits.setdefault((party_key[1], credit["currency"]), []).append(credit)
+
+    purchase_rows = session.execute(
+        select(PurchaseDocument)
+        .where(
+            PurchaseDocument.workspace_owner_id == workspace_owner_id,
+            PurchaseDocument.external_source == INTEGRATION,
+            PurchaseDocument.external_id.like("purchases:%"),
+        )
+        .order_by(PurchaseDocument.created_at.asc(), PurchaseDocument.id.asc())
+    ).scalars().all()
+    for purchase in purchase_rows:
+        data = dict(purchase.data) if isinstance(purchase.data, dict) else {}
+        payload = data.get("ibox_payload")
+        payload = payload if isinstance(payload, dict) else {}
+        party_key = _ibox_party_key(payload)
+        currency = str(purchase.currency or "UZS").upper()
+        candidates = credits.get((party_key[0], party_key[1], currency))
+        if candidates is None:
+            candidates = fallback_credits.get((party_key[1], currency), [])
+        outstanding = max(Decimal("0"), _decimal_value(purchase.amount))
+        paid = Decimal("0")
+        payment_lines: list[dict[str, Any]] = []
+        for credit in candidates:
+            remaining = _decimal_value(credit.get("remaining"))
+            if remaining <= 0 or paid >= outstanding:
+                continue
+            allocated = min(remaining, outstanding - paid)
+            credit["remaining"] = remaining - allocated
+            paid += allocated
+            payment_lines.append(
+                {
+                    "amount": _decimal_text(allocated),
+                    "currency": currency,
+                    "type": str(credit.get("type") or "Оплата IBOX"),
+                    "account": str(credit.get("account") or "IBOX"),
+                    "account_id": "",
+                    "date": str(credit.get("date") or ""),
+                    "number": str(credit.get("number") or ""),
+                    "source": INTEGRATION,
+                    "external_id": str(credit.get("external_id") or ""),
+                }
+            )
+        data["paid_amount"] = _decimal_text(paid)
+        data["payment_lines"] = payment_lines
+        data["payment_type"] = ", ".join(
+            dict.fromkeys(
+                str(item.get("type") or "")
+                for item in payment_lines
+                if str(item.get("type") or "")
+            )
+        )
+        data["payment_status"] = (
+            "paid"
+            if paid >= outstanding and outstanding > 0
+            else "partial"
+            if paid > 0
+            else "unpaid"
+        )
+        purchase.data = data
+
+
 def _ibox_shipment_status(amount: Any, paid: Any) -> str:
     total = max(Decimal("0"), _decimal_value(amount))
     paid_amount = max(Decimal("0"), _decimal_value(paid))
@@ -1156,6 +1356,8 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
                 total += 1
         if "shipments" in entities or "payments_received" in entities:
             _reconcile_ibox_payments(session, workspace_owner_id)
+        if "purchases" in entities or "payments_made" in entities:
+            _reconcile_ibox_supplier_payments(session, workspace_owner_id)
         if any(
             key in entities
             for key in (
@@ -1256,6 +1458,7 @@ def _normalize(
             document_common,
             payload,
             target_branch_id=target_branch_id,
+            entity_type=entity_type,
         )
     elif entity_type.startswith("payments_received"):
         payment_common = {**common, "external_id": f"{entity_type}:{ext_id}"[:180]}
@@ -1280,22 +1483,36 @@ def _upsert_document(
         "shipments",
         "returns",
     }
-    document_data = (
-        _ibox_sales_document_data(payload, entity_type)
-        if is_ibox_sales_document
-        else payload
-    )
+    is_ibox_purchase_document = model is PurchaseDocument and entity_type in {
+        "purchases",
+        "supplier_returns",
+    }
     if is_ibox_sales_document:
+        document_data = _ibox_sales_document_data(payload, entity_type)
         document_data = _resolve_shipment_products(
             session,
             str(common["workspace_owner_id"]),
             document_data,
         )
-    counterparty_id = (
-        _shipment_counterparty_id(session, str(common["workspace_owner_id"]), payload)
-        if is_ibox_sales_document
-        else None
-    )
+    elif is_ibox_purchase_document:
+        document_data = _ibox_purchase_document_data(payload, entity_type)
+        document_data = _resolve_shipment_products(
+            session,
+            str(common["workspace_owner_id"]),
+            document_data,
+        )
+    else:
+        document_data = payload
+    if is_ibox_sales_document:
+        counterparty_id = _shipment_counterparty_id(
+            session, str(common["workspace_owner_id"]), payload
+        )
+    elif is_ibox_purchase_document:
+        counterparty_id = _ensure_ibox_supplier(
+            session, str(common["workspace_owner_id"]), payload
+        )
+    else:
+        counterparty_id = None
     values = {
         **common,
         "number": _text(payload, "number", "document_number", "code"),
