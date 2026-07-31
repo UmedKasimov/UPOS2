@@ -233,6 +233,7 @@ from upos.shipments_store import (
 )
 from upos.users_store import (
     ROLE_BUTTON_PERMISSION_LABELS,
+    ROLE_PERMISSION_DEFAULT_ON,
     ROLE_PERMISSION_KEYS,
     ROLE_PERMISSION_LABELS,
     STAFF_ROLE_LABELS,
@@ -778,6 +779,12 @@ def create_app() -> FastAPI:
         raw = (user or {}).get("employee_permissions")
         src = raw if isinstance(raw, dict) else {}
         out = {key: bool(src.get(key)) for key in ROLE_PERMISSION_KEYS}
+        # Разделы, добавленные позже базового набора: у сохранённых ролей этих
+        # ключей нет, и «нет ключа» должно означать «доступно», иначе после
+        # обновления сотрудники разом потеряют модули, в которых работают.
+        for key in ROLE_PERMISSION_DEFAULT_ON:
+            if key not in src:
+                out[key] = True
         if "shipments" not in src:
             out["shipments"] = bool(src.get("kassa") or src.get("reports"))
         if "hr" not in src:
@@ -862,6 +869,44 @@ def create_app() -> FastAPI:
             return True
         categories = list_categories(workspace_owner_id)
         return any(str(cat.get("id") or "") in allowed_ids and str(cat.get("name") or "") == cat_name for cat in categories)
+
+    # Куда отправить сотрудника, у которого нет прав на запрошенный модуль:
+    # первый разрешённый раздел из этого списка (порядок = порядок меню).
+    _MODULE_PERMISSION_URLS = (
+        ("dashboard", "/dashboard"),
+        ("sales", "/sales"),
+        ("finance", "/schet"),
+        ("products", "/products"),
+        ("warehouse", "/warehouse"),
+        ("clients", "/clients"),
+        ("suppliers", "/suppliers"),
+        ("crm", "/crm"),
+        ("telephony", "/telephony"),
+        ("messengers", "/messengers"),
+        ("earnings", "/earnings"),
+        ("reports", "/reports"),
+        ("installations", "/installer"),
+        ("settings", "/settings"),
+    )
+
+    def _employee_module_redirect(request: Request, key: str) -> Response | None:
+        """Редирект, если у сотрудника нет права на модуль. None — доступ есть."""
+        user = request.session.get("user") or {}
+        if not user.get("is_employee"):
+            return None
+        perms = _employee_permissions(user)
+        if perms.get(key):
+            return None
+        for perm_key, url in _MODULE_PERMISSION_URLS:
+            if perms.get(perm_key):
+                return RedirectResponse(url=url, status_code=302)
+        # Ни одного разрешённого раздела — конфигурация роли сломана; редирект
+        # зациклился бы, поэтому отвечаем страницей с понятным текстом.
+        return HTMLResponse(
+            "<h1>Доступ ограничен</h1><p>Вашей роли не назначен ни один раздел. "
+            "Обратитесь к администратору.</p>",
+            status_code=403,
+        )
 
     def _has_permission(user: dict | None, key: str) -> bool:
         u = user or {}
@@ -3056,6 +3101,9 @@ def create_app() -> FastAPI:
 
     @app.get("/finance", response_class=HTMLResponse, name="home_finance")
     def home_finance(request: Request):
+        module_redirect = _employee_module_redirect(request, "finance")
+        if module_redirect is not None:
+            return module_redirect
         return tpl(
             request,
             "home_finance.html",
@@ -5497,6 +5545,9 @@ def create_app() -> FastAPI:
         price_brand: str = "",
         price_status: str = "all",
     ):
+        module_redirect = _employee_module_redirect(request, "products")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -8384,6 +8435,9 @@ def create_app() -> FastAPI:
         date_from: str = "",
         date_to: str = "",
     ):
+        module_redirect = _employee_module_redirect(request, "dashboard")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -8744,6 +8798,9 @@ def create_app() -> FastAPI:
         crm_record_id: str = "",
         embed: str = "",
     ):
+        module_redirect = _employee_module_redirect(request, "sales")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -12091,6 +12148,9 @@ def create_app() -> FastAPI:
         purchase_page: int = 1,
         purchase_page_size: int = 100,
     ):
+        module_redirect = _employee_module_redirect(request, "warehouse")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -12731,6 +12791,9 @@ def create_app() -> FastAPI:
         balance_page: str = "1",
         client: str = "",
     ):
+        module_redirect = _employee_module_redirect(request, "clients")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -13399,6 +13462,9 @@ def create_app() -> FastAPI:
         category: str = "",
         supplier: str = "",
     ):
+        module_redirect = _employee_module_redirect(request, "suppliers")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -13756,6 +13822,9 @@ def create_app() -> FastAPI:
         date_from: str = "",
         date_to: str = "",
     ):
+        module_redirect = _employee_module_redirect(request, "crm")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -15872,6 +15941,9 @@ def create_app() -> FastAPI:
         date_from: str = "",
         date_to: str = "",
     ):
+        module_redirect = _employee_module_redirect(request, "telephony")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -16757,6 +16829,9 @@ def create_app() -> FastAPI:
         responsible: str = "",
         status: str = "all",
     ):
+        module_redirect = _employee_module_redirect(request, "messengers")
+        if module_redirect is not None:
+            return module_redirect
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir

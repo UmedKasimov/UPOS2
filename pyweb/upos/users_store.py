@@ -36,8 +36,18 @@ STAFF_ROLE_LABELS = {
 
 
 ROLE_PERMISSION_KEYS = (
+    "dashboard",
+    "sales",
+    "finance",
     "kassa",
     "schet",
+    "products",
+    "warehouse",
+    "clients",
+    "suppliers",
+    "crm",
+    "telephony",
+    "messengers",
     "reports",
     "adjustments",
     "shipments",
@@ -48,9 +58,36 @@ ROLE_PERMISSION_KEYS = (
     "installations",
     "earnings",
 )
+# Разделы, появившиеся позже базового набора прав. У сохранённых ролей этих
+# ключей нет — считаем их разрешёнными, чтобы обновление не спрятало модули,
+# которыми сотрудники пользуются сегодня. Владелец может выключить их в роли.
+ROLE_PERMISSION_DEFAULT_ON = frozenset(
+    {
+        "dashboard",
+        "sales",
+        "finance",
+        "products",
+        "warehouse",
+        "clients",
+        "suppliers",
+        "crm",
+        "telephony",
+        "messengers",
+    }
+)
 ROLE_PERMISSION_LABELS = {
+    "dashboard": "Дашборд",
+    "sales": "Продажи",
+    "finance": "Финансы",
     "kassa": "Касса",
     "schet": "Счёт",
+    "products": "Товары",
+    "warehouse": "Склад",
+    "clients": "Клиенты",
+    "suppliers": "Поставщики",
+    "crm": "CRM",
+    "telephony": "Телефония",
+    "messengers": "Мессенджеры",
     "reports": "Отчёты",
     "adjustments": "Корректировки",
     "shipments": "Отгрузки",
@@ -62,6 +99,61 @@ ROLE_PERMISSION_LABELS = {
     "earnings": "Заработок",
 }
 ROLE_BUTTON_PERMISSION_LABELS = {
+    "sales": {
+        "create": "Создать продажу",
+        "edit": "Редактировать",
+        "delete": "Удалить документ",
+        "pay": "Принять оплату",
+        "status": "Менять статус",
+        "convert": "Заказ в продажу",
+        "print": "Печать чека",
+    },
+    "products": {
+        "create": "Добавить товар",
+        "edit": "Редактировать товар",
+        "delete": "Удалить товар",
+        "prices": "Прайс-листы",
+        "photos": "Фото товара",
+    },
+    "warehouse": {
+        "purchase_create": "Создать закупку",
+        "purchase_edit": "Редактировать закупку",
+        "purchase_delete": "Удалить закупку",
+        "transfer": "Перемещения",
+        "adjustment": "Корректировки склада",
+    },
+    "clients": {
+        "create": "Добавить клиента",
+        "edit": "Редактировать клиента",
+        "delete": "Удалить клиента",
+        "routes": "Маршруты",
+        "map": "Карта клиентов",
+        "debts": "Должники",
+    },
+    "suppliers": {
+        "create": "Добавить поставщика",
+        "edit": "Редактировать поставщика",
+        "delete": "Удалить поставщика",
+        "purchases": "Закупки",
+        "payables": "Кредиторка",
+    },
+    "crm": {
+        "create": "Создать сделку",
+        "edit": "Редактировать сделку",
+        "delete": "Удалить сделку",
+        "stage": "Менять этап",
+        "tasks": "Задачи",
+    },
+    "telephony": {
+        "call": "Звонить",
+        "history": "Журнал звонков",
+        "settings": "Настройки SIP",
+    },
+    "messengers": {
+        "read": "Читать диалоги",
+        "send": "Отправлять сообщения",
+        "connect": "Подключать каналы",
+    },
     "kassa": {
         "create": "Добавить операцию",
         "edit": "Редактировать",
@@ -150,8 +242,18 @@ DEFAULT_EMPLOYEE_ROLES = (
         "key": "hr_manager",
         "name": "HR",
         "permissions": {
+            "dashboard": True,
+            "sales": False,
+            "finance": False,
             "kassa": False,
             "schet": False,
+            "products": False,
+            "warehouse": False,
+            "clients": False,
+            "suppliers": False,
+            "crm": False,
+            "telephony": True,
+            "messengers": True,
             "reports": False,
             "adjustments": False,
             "shipments": False,
@@ -165,8 +267,18 @@ DEFAULT_EMPLOYEE_ROLES = (
         "key": "accountant",
         "name": "Бухгалтер",
         "permissions": {
+            "dashboard": True,
+            "sales": True,
+            "finance": True,
             "kassa": True,
             "schet": True,
+            "products": True,
+            "warehouse": True,
+            "clients": True,
+            "suppliers": True,
+            "crm": False,
+            "telephony": False,
+            "messengers": False,
             "reports": True,
             "adjustments": True,
             "shipments": True,
@@ -180,8 +292,18 @@ DEFAULT_EMPLOYEE_ROLES = (
         "key": "cashier",
         "name": "Кассир",
         "permissions": {
+            "dashboard": True,
+            "sales": True,
+            "finance": True,
             "kassa": True,
             "schet": False,
+            "products": True,
+            "warehouse": False,
+            "clients": True,
+            "suppliers": False,
+            "crm": False,
+            "telephony": True,
+            "messengers": False,
             "reports": False,
             "adjustments": False,
             "shipments": True,
@@ -195,8 +317,18 @@ DEFAULT_EMPLOYEE_ROLES = (
         "key": "installer",
         "name": "Установщик",
         "permissions": {
+            "dashboard": False,
+            "sales": False,
+            "finance": False,
             "kassa": False,
             "schet": False,
+            "products": False,
+            "warehouse": False,
+            "clients": False,
+            "suppliers": False,
+            "crm": False,
+            "telephony": True,
+            "messengers": False,
             "reports": False,
             "adjustments": False,
             "shipments": False,
@@ -240,7 +372,13 @@ def staff_role_valid(role: str) -> bool:
 
 def normalize_role_permissions(raw: dict[str, Any] | None) -> dict[str, Any]:
     src = raw if isinstance(raw, dict) else {}
-    out: dict[str, Any] = {key: bool(src.get(key)) for key in ROLE_PERMISSION_KEYS}
+    out: dict[str, Any] = {
+        # Ключи, появившиеся позже базового набора, у сохранённых ролей
+        # отсутствуют — считаем их включёнными, иначе нормализация запишет
+        # явный False и сотрудники после обновления потеряют свои модули.
+        key: bool(src[key]) if key in src else (key in ROLE_PERMISSION_DEFAULT_ON)
+        for key in ROLE_PERMISSION_KEYS
+    }
     if "shipments" not in src:
         out["shipments"] = bool(src.get("kassa") or src.get("reports"))
     if "hr" not in src:
