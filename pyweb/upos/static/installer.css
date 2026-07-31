@@ -1161,3 +1161,86 @@ main {
     padding-inline: 12px;
   }
 }
+
+.installer-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.installer-menu-badge {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: #dc2626;
+  font-size: 12px;
+  text-align: center;
+}
+
+.installer-menu-badge[hidden] {
+  display: none;
+}
+
+.installer-notify-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.installer-notify-item {
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #dbe7f6;
+  border-left: 3px solid #1673dc;
+  border-radius: 10px;
+  background: #f4f9ff;
+  cursor: pointer;
+}
+
+/* Прочитанное уходит в серый и теряет акцентную полосу. */
+.installer-notify-item.is-read {
+  border-color: #e2e8f0;
+  border-left-color: #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: default;
+}
+
+.installer-notify-item.is-read strong {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.installer-notify-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.installer-notify-item strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.installer-notify-new {
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: #dc2626;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.installer-notify-item p {
+  margin: 5px 0 4px;
+  font-size: 13px;
+}
+
+.installer-notify-item small {
+  color: #94a3b8;
+  font-size: 11px;
+}

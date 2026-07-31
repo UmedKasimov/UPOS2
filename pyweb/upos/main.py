@@ -189,10 +189,13 @@ from upos.telegram_business_store import (
 from upos.push_store import (
     drop_subscription as drop_push_subscription,
     has_subscription as push_has_subscription,
+    list_notifications as push_list_notifications,
+    mark_read as push_mark_read,
     notify_users as push_notify_users,
     public_key as push_public_key,
     push_enabled,
     save_subscription as save_push_subscription,
+    unread_count as push_unread_count,
 )
 from upos.organizations_store import (
     create_organization,
@@ -7759,6 +7762,39 @@ def create_app() -> FastAPI:
                 can_manage=can_manage,
             )
         return JSONResponse({"ok": True, "order": payload})
+
+    @app.get("/api/installer/notifications", name="installer_notifications_api")
+    def installer_notifications_api(request: Request):
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        user_id = _session_user_id(request.session.get("user") or {})
+        if not user_id:
+            return _installer_api_error("Нужно войти заново", 401)
+        return JSONResponse(
+            {
+                "ok": True,
+                "unread": push_unread_count(wid, user_id),
+                "items": push_list_notifications(wid, user_id),
+            }
+        )
+
+    @app.post("/api/installer/notifications/read", name="installer_notifications_read_api")
+    async def installer_notifications_read_api(request: Request):
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        user_id = _session_user_id(request.session.get("user") or {})
+        if not user_id:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        marked = push_mark_read(wid, user_id, str((body or {}).get("id") or ""))
+        return JSONResponse({"ok": True, "marked": marked, "unread": push_unread_count(wid, user_id)})
 
     @app.get("/api/installer/earnings", name="installer_earnings_api")
     def installer_earnings_api(request: Request):

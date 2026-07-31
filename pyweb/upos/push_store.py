@@ -16,11 +16,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from upos.config import get_settings
 from upos.db import session_scope
-from upos.db_models import InstallationPushSubscription
+from upos.db_models import InstallationPushSubscription, UserNotification
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,91 @@ def _mark_used(subscription_id: str) -> None:
             row.last_used_at = datetime.now(timezone.utc)
 
 
+def _store_notifications(
+    workspace_owner_id: str,
+    user_ids: list[str],
+    *,
+    title: str,
+    body: str,
+    url: str,
+    tag: str,
+) -> None:
+    try:
+        with session_scope() as session:
+            for user_id in user_ids:
+                session.add(
+                    UserNotification(
+                        id=str(uuid.uuid4()),
+                        workspace_owner_id=workspace_owner_id,
+                        user_id=user_id,
+                        title=str(title or "")[:160],
+                        body=str(body or ""),
+                        url=str(url or "")[:255],
+                        tag=str(tag or "")[:120],
+                    )
+                )
+    except Exception:
+        logger.exception("[upos] не удалось записать уведомление")
+
+
+def list_notifications(workspace_owner_id: str, user_id: str, limit: int = 60) -> list[dict[str, Any]]:
+    with session_scope() as session:
+        rows = list(
+            session.execute(
+                select(UserNotification)
+                .where(
+                    UserNotification.workspace_owner_id == workspace_owner_id,
+                    UserNotification.user_id == user_id,
+                )
+                .order_by(UserNotification.created_at.desc())
+                .limit(max(1, min(int(limit or 60), 200)))
+            ).scalars()
+        )
+        return [
+            {
+                "id": row.id,
+                "title": row.title,
+                "body": row.body,
+                "url": row.url,
+                "is_read": bool(row.is_read),
+                "created_at": row.created_at.isoformat() if row.created_at else "",
+            }
+            for row in rows
+        ]
+
+
+def unread_count(workspace_owner_id: str, user_id: str) -> int:
+    with session_scope() as session:
+        return int(
+            session.execute(
+                select(func.count(UserNotification.id)).where(
+                    UserNotification.workspace_owner_id == workspace_owner_id,
+                    UserNotification.user_id == user_id,
+                    UserNotification.is_read.is_(False),
+                )
+            ).scalar_one()
+            or 0
+        )
+
+
+def mark_read(workspace_owner_id: str, user_id: str, notification_id: str = "") -> int:
+    """Отмечает одно уведомление прочитанным или все сразу, если id не задан."""
+    now = datetime.now(timezone.utc)
+    with session_scope() as session:
+        stmt = select(UserNotification).where(
+            UserNotification.workspace_owner_id == workspace_owner_id,
+            UserNotification.user_id == user_id,
+            UserNotification.is_read.is_(False),
+        )
+        if notification_id:
+            stmt = stmt.where(UserNotification.id == notification_id)
+        rows = list(session.execute(stmt).scalars())
+        for row in rows:
+            row.is_read = True
+            row.read_at = now
+        return len(rows)
+
+
 def notify_users(
     workspace_owner_id: str,
     user_ids: Iterable[str],
@@ -145,6 +230,11 @@ def notify_users(
     targets = [str(uid).strip() for uid in user_ids if str(uid or "").strip()]
     if not targets:
         return {"ok": True, "sent": 0, "skipped": "no_targets"}
+
+    # Историю пишем до отправки и независимо от неё: уведомление должно быть
+    # видно в приложении, даже если push выключен или устройство не подписано.
+    _store_notifications(workspace_owner_id, targets, title=title, body=body, url=url, tag=tag)
+
     if not push_enabled():
         return {"ok": True, "sent": 0, "skipped": "not_configured"}
 

@@ -382,6 +382,98 @@
   }
 
   const earningsDialog = document.getElementById("installer-earnings");
+  const notificationsDialog = document.getElementById("installer-notifications");
+
+  function notifyTime(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString("ru-RU", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"});
+  }
+
+  function renderNotifications(items) {
+    const list = document.getElementById("installer-notify-list");
+    if (!list) return;
+    list.innerHTML = items.length
+      ? items.map((item) => `
+          <article class="installer-notify-item${item.is_read ? " is-read" : ""}" data-notify-id="${escapeHtml(item.id)}">
+            <div class="installer-notify-top">
+              <strong>${escapeHtml(item.title || "Уведомление")}</strong>
+              ${item.is_read ? "" : '<span class="installer-notify-new">NEW</span>'}
+            </div>
+            ${item.body ? `<p>${escapeHtml(item.body)}</p>` : ""}
+            <small>${escapeHtml(notifyTime(item.created_at))}</small>
+          </article>`).join("")
+      : '<div class="installer-empty">Уведомлений пока нет</div>';
+  }
+
+  function setNotifyBadge(count) {
+    const badge = document.getElementById("installer-notify-badge");
+    if (!badge) return;
+    badge.textContent = String(count || 0);
+    badge.hidden = !count;
+  }
+
+  async function refreshNotifyBadge() {
+    try {
+      const data = await apiRequest("/api/installer/notifications");
+      setNotifyBadge(data.unread);
+    } catch (error) {
+      setNotifyBadge(0);
+    }
+  }
+
+  async function openNotifications() {
+    closeInstallerMenu();
+    if (!notificationsDialog) return;
+    const list = document.getElementById("installer-notify-list");
+    if (list) list.innerHTML = '<div class="installer-loading">Загрузка...</div>';
+    if (typeof notificationsDialog.showModal === "function") notificationsDialog.showModal();
+    else notificationsDialog.setAttribute("open", "");
+    try {
+      const data = await apiRequest("/api/installer/notifications");
+      renderNotifications(data.items || []);
+      setNotifyBadge(data.unread);
+    } catch (error) {
+      if (list) list.innerHTML = `<div class="installer-empty">${escapeHtml(error.message || "Не удалось загрузить")}</div>`;
+    }
+  }
+
+  // Читаем по клику на само уведомление — так пользователь сам решает,
+  // что уже просмотрел.
+  document.getElementById("installer-notify-list")?.addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-notify-id]");
+    if (!item || item.classList.contains("is-read")) return;
+    item.classList.add("is-read");
+    item.querySelector(".installer-notify-new")?.remove();
+    try {
+      const data = await apiRequest("/api/installer/notifications/read", {
+        method: "POST",
+        body: JSON.stringify({id: item.dataset.notifyId}),
+      });
+      setNotifyBadge(data.unread);
+    } catch (error) {
+      /* пометка о прочтении не критична */
+    }
+  });
+
+  document.getElementById("installer-notify-read-all")?.addEventListener("click", async () => {
+    try {
+      const data = await apiRequest("/api/installer/notifications/read", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setNotifyBadge(data.unread);
+      const fresh = await apiRequest("/api/installer/notifications");
+      renderNotifications(fresh.items || []);
+    } catch (error) {
+      showToast(error.message || "Не удалось отметить", true);
+    }
+  });
+
+  document.getElementById("installer-notifications-close")?.addEventListener("click", () => {
+    if (notificationsDialog?.open) notificationsDialog.close();
+  });
 
   function money(value) {
     const number = Number(value || 0);
@@ -701,6 +793,7 @@
     if (!button) return;
     if (button.dataset.menuAction === "orders-calendar") openOrderCalendar();
     if (button.dataset.menuAction === "earnings") openEarnings();
+    if (button.dataset.menuAction === "notifications") openNotifications();
   });
 
   menuClose?.addEventListener("click", closeInstallerMenu);
@@ -921,6 +1014,8 @@
 
   if (canManage) document.getElementById("installer-manager-note").hidden = false;
   updateConnection();
+  refreshNotifyBadge();
+  window.setInterval(refreshNotifyBadge, 120000);
   loadOrders();
   window.setInterval(() => loadOrders({ quiet: true }), 60000);
 })();

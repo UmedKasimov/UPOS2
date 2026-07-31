@@ -1252,6 +1252,36 @@ class EmployeeEarning(Base):
     )
 
 
+class UserNotification(Base):
+    """Уведомление сотрудника: то же, что уходит push-ом, но с историей.
+
+    Пишется всегда, даже когда push не настроен или устройство не подписано,
+    поэтому список в приложении не зависит от доставки.
+    """
+
+    __tablename__ = "user_notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    url: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    # Ключ события: позволяет не плодить дубли по одному и тому же заказу.
+    tag: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class InstallationPushSubscription(Base):
     """Web Push подписка устройства установщика."""
 

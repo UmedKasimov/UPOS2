@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=9">
-  <script defer src="/static/installer.js?v=8"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=10">
+  <script defer src="/static/installer.js?v=9"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -47,6 +47,10 @@
         <button type="button" class="installer-menu-close" id="installer-menu-close" aria-label="Закрыть меню">×</button>
       </div>
       <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
+      <button type="button" data-menu-action="notifications">
+        Уведомления
+        <b class="installer-menu-badge" id="installer-notify-badge" hidden>0</b>
+      </button>
       <button type="button" data-menu-action="earnings">Мой заработок</button>
       <button type="button" id="installer-push-toggle" hidden>Включить уведомления</button>
     </nav>
@@ -123,6 +127,24 @@
           <h3 id="installer-calendar-selected-title">Заказы на выбранный день</h3>
           <div class="installer-calendar-orders" id="installer-calendar-orders"></div>
         </section>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-notifications">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Центр уведомлений</p>
+          <h2>Уведомления</h2>
+        </div>
+        <div class="installer-notify-head-actions">
+          <button class="installer-secondary-button" id="installer-notify-read-all" type="button">Прочитать все</button>
+          <button class="installer-icon-button" id="installer-notifications-close" type="button" aria-label="Закрыть">×</button>
+        </div>
+      </header>
+      <div class="installer-earnings-body">
+        <div class="installer-notify-list" id="installer-notify-list"></div>
       </div>
     </div>
   </dialog>
