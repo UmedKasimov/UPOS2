@@ -6419,6 +6419,11 @@ def create_app() -> FastAPI:
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "debt_value": str(debt_amount if debt_amount > 0 else 0),
             "has_debt": debt_amount > 0,
+            # Долг в отчётности появляется только на определённых статусах, а
+            # оплатить документ можно с самого начала — поэтому кнопка оплаты
+            # опирается на остаток к оплате, а не на «бухгалтерский» долг.
+            "outstanding_amount": _sales_money_label(raw_debt_amount),
+            "outstanding_value": str(raw_debt_amount),
             "payment_progress": payment_progress,
             "payment_type": str(data.get("payment_type") or ""),
             "payment_lines": [

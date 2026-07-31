@@ -11639,28 +11639,25 @@ html.dark .sales-journal-task-completed {
   color: var(--muted-foreground);
 }
 
-.sales-journal-crm-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 100%;
-  padding: 0.2rem 0.5rem;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 42%, var(--border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--brand-box, #2d6cdf) 9%, var(--card));
-  color: var(--brand-box, #2d6cdf);
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .sales-journal-crm-empty {
   color: var(--muted-foreground);
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.sales-journal-table .sales-journal-crm-select {
+  min-width: 0;
+  width: 100%;
+  border-color: color-mix(in srgb, var(--brand-box, #2d6cdf) 42%, var(--border));
+  background-color: color-mix(in srgb, var(--brand-box, #2d6cdf) 9%, var(--card));
+  color: var(--sales-journal-accent, var(--brand-box, #2d6cdf));
+  font-size: 0.72rem;
+}
+
+.sales-journal-table .sales-journal-crm-select[data-crm-status="unassigned"] {
+  border-color: var(--border);
+  background-color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .sales-journal-client-name {

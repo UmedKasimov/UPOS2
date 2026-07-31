@@ -515,8 +515,21 @@
                     {% endif %}
                   </td>
                   <td class="sales-journal-crm-cell" data-sort-value="{{ sale.crm_status_label or '' }}">
-                    {% if sale.crm_status %}
-                      <span class="sales-journal-crm-tag" data-status="{{ sale.crm_status }}" title="Этап CRM: {{ sale.crm_status_label }}">{{ sale.crm_status_label }}</span>
+                    {% if sales_options.crm_stages %}
+                      <select
+                        class="kassa-status-select sales-journal-crm-select"
+                        data-sales-journal-crm-stage
+                        data-sale-id="{{ sale.id }}"
+                        data-action-template="{{ url_for('sales_crm_stage_update', sale_id='__sale_id__') }}"
+                        data-crm-status="{{ sale.crm_status or 'unassigned' }}"
+                        aria-label="Этап CRM для {{ sale.number }}"
+                        title="Этап CRM: {{ sale.crm_status_label or 'Не назначен' }}"
+                      >
+                        <option value="" disabled {% if not sale.crm_status %}selected{% endif %}>Не назначен</option>
+                        {% for stage in sales_options.crm_stages %}
+                          <option value="{{ stage.id }}" {% if sale.crm_status == stage.id %}selected{% endif %}>{{ stage.title }}</option>
+                        {% endfor %}
+                      </select>
                     {% else %}
                       <span class="sales-journal-crm-empty">{{ sale.crm_status_label or "Не назначен" }}</span>
                     {% endif %}
@@ -741,7 +754,7 @@
                 <strong data-sales-payment-paid>0 UZS</strong>
               </div>
               <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--debt">
-                <span>Остаток долга</span>
+                <span>Остаток к оплате</span>
                 <strong data-sales-payment-debt>0 UZS</strong>
               </div>
             </section>
@@ -1619,7 +1632,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=27" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=28" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=59" defer></script>
   {% if sales_embed %}
     <script>

@@ -647,23 +647,34 @@
     });
   }
 
+  // Остаток к оплате: долг в отчётности появляется только на поздних статусах,
+  // а оплатить продажу или заказ можно сразу после создания.
+  function salesOutstanding(sale) {
+    var outstanding = amountNumber(sale.outstanding_value || sale.outstanding_amount);
+    if (outstanding > 0) return outstanding;
+    if (sale.outstanding_value != null || sale.outstanding_amount != null) return Math.max(0, outstanding);
+    var total = amountNumber(sale.amount || sale.amount_value);
+    var paid = amountNumber(sale.paid_amount || sale.paid_value);
+    return Math.max(0, total - paid);
+  }
+
   function updatePaymentButton(panel, sale) {
     var form = panel.querySelector("[data-sales-payment-form]");
     var button = panel.querySelector("[data-sales-payment-pay]");
     if (!form || !button) return;
     var saleId = String(sale.id || panel.dataset.saleId || "").trim();
     var template = String(form.dataset.salesPaymentUrlTemplate || "");
-    var debt = amountNumber(sale.debt_amount || sale.debt_value);
+    var outstanding = salesOutstanding(sale);
     var isReturn = String(sale.doc_type || "").toLowerCase() === "return";
     if (saleId && template) {
       form.action = template.replace("__sale_id__", encodeURIComponent(saleId));
     }
-    form.dataset.paymentDue = String(debt);
+    form.dataset.paymentDue = String(outstanding);
     form.dataset.paymentCurrency = String(sale.currency || "UZS").toUpperCase();
-    var canPay = Boolean(saleId && debt > 0 && !isReturn);
+    var canPay = Boolean(saleId && outstanding > 0 && !isReturn);
     form.hidden = !canPay;
     button.disabled = !canPay;
-    button.textContent = canPay ? "Оплатить " + moneyWithCurrency(debt, sale.currency || "UZS") : "Оплачено";
+    button.textContent = canPay ? "Оплатить " + moneyWithCurrency(outstanding, sale.currency || "UZS") : "Оплачено";
   }
 
   function renderSalesPayments(panel, sale) {
@@ -720,11 +731,11 @@
     var currency = String(sale.currency || "UZS").toUpperCase();
     var total = amountNumber(sale.amount || sale.amount_value);
     var paid = amountNumber(sale.paid_amount || sale.paid_value);
-    var debt = Math.max(0, amountNumber(sale.debt_amount || sale.debt_value));
+    var outstanding = salesOutstanding(sale);
     setText(summary, "[data-sales-payment-total]", moneyWithCurrency(total, currency));
     setText(summary, "[data-sales-payment-paid]", moneyWithCurrency(paid, currency));
-    setText(summary, "[data-sales-payment-debt]", moneyWithCurrency(debt, currency));
-    summary.dataset.paymentState = debt > 0 ? (paid > 0 ? "partial" : "debt") : "paid";
+    setText(summary, "[data-sales-payment-debt]", moneyWithCurrency(outstanding, currency));
+    summary.dataset.paymentState = outstanding > 0 ? (paid > 0 ? "partial" : "debt") : "paid";
   }
 
   function renderDetail(panel, sale) {
@@ -751,7 +762,7 @@
     setText(panel, "[data-sales-detail-note]", sale.note || "Комментарий не указан");
     var paymentPane = panel.querySelector('[data-sales-detail-pane="payment"]');
     if (paymentPane) {
-      paymentPane.dataset.paymentState = amountNumber(sale.debt_amount || sale.debt_value) > 0 ? "debt" : "paid";
+      paymentPane.dataset.paymentState = salesOutstanding(sale) > 0 ? "debt" : "paid";
     }
     renderSalesPayments(panel, sale);
     renderSalesPaymentSummary(panel, sale);
@@ -1139,6 +1150,68 @@
             crm_status_label: payload.crm_status_label || select.options[select.selectedIndex].text,
           });
           if (updatedSale) renderDetail(panel, updatedSale);
+        } catch (error) {
+          select.value = previousStage;
+          window.alert(error && error.message ? error.message : "Не удалось сохранить этап CRM");
+        } finally {
+          select.disabled = false;
+          select.removeAttribute("aria-busy");
+        }
+      });
+    });
+    // Этап CRM можно менять прямо в строке журнала, не открывая карточку —
+    // используется тот же endpoint, что и селект внутри карточки.
+    scope.querySelectorAll("[data-sales-journal-crm-stage]").forEach(function (select) {
+      if (select.dataset.salesJournalCrmReady === "1") return;
+      select.dataset.salesJournalCrmReady = "1";
+      select.addEventListener("click", function (event) {
+        event.stopPropagation();
+      });
+      select.addEventListener("change", async function () {
+        var saleId = String(select.dataset.saleId || "").trim();
+        var stageId = String(select.value || "").trim();
+        if (!saleId || !stageId) return;
+        var sale = readSale(saleId) || {};
+        var previousStage = String(sale.crm_status || "");
+        var row = select.closest("tr");
+        var csrf = row ? row.querySelector('input[name="csrf_token"]') : null;
+        var action = String(select.dataset.actionTemplate || "").replace(
+          "__sale_id__",
+          encodeURIComponent(saleId)
+        );
+        if (!action) return;
+        var formData = new FormData();
+        formData.set("csrf_token", csrf ? csrf.value : "");
+        formData.set("stage_id", stageId);
+        select.disabled = true;
+        select.setAttribute("aria-busy", "true");
+        try {
+          var response = await fetch(action, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          });
+          var payload = {};
+          try {
+            payload = await response.json();
+          } catch (_err) {}
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "Не удалось сохранить этап CRM");
+          }
+          var stageLabel = payload.crm_status_label || select.options[select.selectedIndex].text;
+          select.dataset.crmStatus = payload.crm_status || stageId;
+          select.title = "Этап CRM: " + stageLabel;
+          var cell = select.closest("td");
+          if (cell) cell.dataset.sortValue = stageLabel;
+          var updated = updateSale(saleId, {
+            crm_record_id: payload.crm_record_id || sale.crm_record_id || "",
+            crm_status: payload.crm_status || stageId,
+            crm_status_label: stageLabel,
+          });
+          var panel = scope.querySelector("[data-sales-journal-detail]");
+          if (updated && panel && panel.dataset.saleId === saleId && !panel.hidden) {
+            renderDetail(panel, updated);
+          }
         } catch (error) {
           select.value = previousStage;
           window.alert(error && error.message ? error.message : "Не удалось сохранить этап CRM");
