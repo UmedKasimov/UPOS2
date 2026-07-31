@@ -10057,6 +10057,17 @@ def create_app() -> FastAPI:
                 except ValueError as exc:
                     return RedirectResponse(url="/sales?error=" + quote(str(exc)) + "#sales-journal", status_code=302)
                 deleted_sale_id = row.id
+                # Заявка на монтаж переживает удаление документа (SET NULL) ради
+                # истории выездов, но открытую заявку надо отменить — иначе
+                # установщик поедет по уже удалённому заказу.
+                for install_row in session.execute(
+                    select(InstallationOrder).where(
+                        InstallationOrder.workspace_owner_id == wid,
+                        InstallationOrder.sale_document_id == row.id,
+                    )
+                ).scalars():
+                    if install_row.status not in ("completed", "cancelled"):
+                        install_row.status = "cancelled"
                 session.delete(row)
         if deleted_sale_id:
             try:
