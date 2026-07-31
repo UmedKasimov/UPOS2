@@ -6512,7 +6512,9 @@ def create_app() -> FastAPI:
             "stages": stages,
         }
 
-    def _sales_crm_context(item: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
+    def _sales_crm_links(
+        item: dict[str, Any], index: dict[str, Any]
+    ) -> tuple[CrmRecord | None, CrmRecord | None]:
         records_by_id = index["records_by_id"]
         counterparty_id = str(item.get("counterparty_id") or "").strip()
         client_key = str(item.get("client") or "").strip().casefold()
@@ -6527,22 +6529,33 @@ def create_app() -> FastAPI:
             linked_deal = index["deals_by_counterparty"].get(counterparty_id)
         if linked_deal is None and client_key:
             linked_deal = index["deals_by_client"].get(client_key)
+        return linked_deal, direct_record
 
+    # Отдельно от _sales_crm_context: этап нужен ещё до отбора документов,
+    # чтобы работал фильтр по этапам CRM, а полный контекст со списком задач
+    # считается уже только для текущей страницы журнала.
+    def _sales_crm_stage_context(item: dict[str, Any], index: dict[str, Any]) -> dict[str, str]:
+        linked_deal, direct_record = _sales_crm_links(item, index)
         status_record = linked_deal or direct_record
-        crm_status = ""
-        crm_status_label = "Не назначен"
-        if status_record:
-            status_data = _json_object(status_record.data)
-            if status_record.item_type == "deal":
-                stage = _crm_stage_for_value(
-                    status_data.get("stage_id") or status_data.get("stage"),
-                    index["stages"],
-                )
-                crm_status = stage["id"]
-                crm_status_label = stage["title"]
-            else:
-                crm_status = str(status_record.status or "new")
-                crm_status_label = _crm_status_label(crm_status)
+        if not status_record:
+            return {"crm_status": "", "crm_status_label": "Не назначен"}
+        status_data = _json_object(status_record.data)
+        if status_record.item_type == "deal":
+            stage = _crm_stage_for_value(
+                status_data.get("stage_id") or status_data.get("stage"),
+                index["stages"],
+            )
+            return {"crm_status": stage["id"], "crm_status_label": stage["title"]}
+        crm_status = str(status_record.status or "new")
+        return {"crm_status": crm_status, "crm_status_label": _crm_status_label(crm_status)}
+
+    def _sales_crm_context(item: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
+        counterparty_id = str(item.get("counterparty_id") or "").strip()
+        client_key = str(item.get("client") or "").strip().casefold()
+        linked_deal, direct_record = _sales_crm_links(item, index)
+        stage_context = _sales_crm_stage_context(item, index)
+        crm_status = stage_context["crm_status"]
+        crm_status_label = stage_context["crm_status_label"]
 
         completed_tasks: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -8174,6 +8187,32 @@ def create_app() -> FastAPI:
             )
         else:
             payment_status_summary = f"Выбрано: {len(selected_payment_statuses)}"
+        crm_stages = _crm_workspace_stages(wid)
+        crm_stage_filter_options = [
+            {"value": stage["id"], "label": stage["title"]} for stage in crm_stages
+        ]
+        crm_stage_filter_options.append({"value": "unassigned", "label": "Не назначен"})
+        allowed_crm_stages = {item["value"] for item in crm_stage_filter_options}
+        selected_crm_stages = list(
+            dict.fromkeys(
+                value
+                for value in (
+                    str(item or "").strip()
+                    for item in request.query_params.getlist("crm_stage")
+                )
+                if value in allowed_crm_stages
+            )
+        )
+        if not selected_crm_stages:
+            crm_stage_summary = "Все"
+        elif len(selected_crm_stages) == 1:
+            crm_stage_summary = next(
+                item["label"]
+                for item in crm_stage_filter_options
+                if item["value"] == selected_crm_stages[0]
+            )
+        else:
+            crm_stage_summary = f"Выбрано: {len(selected_crm_stages)}"
         filters = {
             "q": q.strip(),
             "doc_type": doc_type_filter,
@@ -8184,6 +8223,8 @@ def create_app() -> FastAPI:
             "status_summary": status_summary,
             "payment_statuses": selected_payment_statuses,
             "payment_status_summary": payment_status_summary,
+            "crm_stages": selected_crm_stages,
+            "crm_stage_summary": crm_stage_summary,
             "client": client.strip(),
             "date_from": date_from_clean,
             "date_to": date_to_clean,
@@ -8203,7 +8244,6 @@ def create_app() -> FastAPI:
         next_numbers: dict[str, str] = {}
         sales_prefill = {"crm_record_id": "", "client": client.strip()}
         business_segments = _workspace_business_segments(wid)
-        crm_stages = _crm_workspace_stages(wid)
         installer_options = list_installers(wid)
         installation_templates = list_installation_templates(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
@@ -8235,6 +8275,14 @@ def create_app() -> FastAPI:
                 "order": 0,
                 "return": 0,
             }
+            crm_rows_for_sales = list(
+                session.execute(
+                    select(CrmRecord)
+                    .where(CrmRecord.workspace_owner_id == wid)
+                    .order_by(CrmRecord.updated_at.desc())
+                ).scalars()
+            )
+            sales_crm_index = _sales_crm_index(crm_rows_for_sales, crm_stages)
 
             def document_tab_url(tab_doc_type: str = "") -> str:
                 pairs = [
@@ -8275,6 +8323,11 @@ def create_app() -> FastAPI:
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
                     continue
+                if filters["crm_stages"]:
+                    item.update(_sales_crm_stage_context(item, sales_crm_index))
+                    stage_key = str(item.get("crm_status") or "") or "unassigned"
+                    if stage_key not in filters["crm_stages"]:
+                        continue
                 item_date = str(item.get("date") or "").strip()
                 if filters["date_from"] and (not item_date or item_date < filters["date_from"]):
                     continue
@@ -8470,17 +8523,6 @@ def create_app() -> FastAPI:
                 if str(item.get("warehouse") or "").strip()
             ]
             sales = sales[journal_page_start:journal_page_end]
-            crm_rows_for_sales = list(
-                session.execute(
-                    select(CrmRecord)
-                    .where(CrmRecord.workspace_owner_id == wid)
-                    .order_by(CrmRecord.updated_at.desc())
-                ).scalars()
-            )
-            sales_crm_index = _sales_crm_index(
-                crm_rows_for_sales,
-                crm_stages,
-            )
             for item in sales:
                 crm_context = _sales_crm_context(item, sales_crm_index)
                 item.update(crm_context)
@@ -8674,6 +8716,7 @@ def create_app() -> FastAPI:
                 "document_tabs": document_tabs,
                 "status_filters": status_filter_options,
                 "payment_status_filters": payment_status_filter_options,
+                "crm_stage_filters": crm_stage_filter_options,
                 "business_segments": business_segments,
                 "crm_stages": crm_stages,
                 "installers": installer_options,

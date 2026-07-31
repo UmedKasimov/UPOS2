@@ -147,10 +147,7 @@
           </div>
         </details>
       </div>
-      <label class="sales-journal-filter-field">
-        <span>Клиент</span>
-        <input name="client" list="sales-client-list" value="{{ sales_filters.client }}" />
-      </label>
+      {# Отдельного поля «Клиент» нет: поиск сверху уже ищет по номеру, клиенту и складу. #}
       <label class="sales-journal-filter-field sales-journal-filter-date">
         <span>Дата</span>
         <input name="date_from" type="date" value="{{ sales_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes aria-label="Период продаж: день, месяц или от и до" />
@@ -175,6 +172,32 @@
                   value="{{ option.value }}"
                   data-sales-payment-status-option
                   {% if option.value in sales_filters.payment_statuses %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      <div class="sales-status-filter sales-crm-stage-filter sales-journal-filter-field" data-sales-crm-stage-filter>
+        <span>Этап CRM</span>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по этапам CRM">
+            <span data-sales-crm-stage-summary>{{ sales_filters.crm_stage_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-crm-stage-all {% if not sales_filters.crm_stages %}checked{% endif %} />
+              <span>Все этапы</span>
+            </label>
+            {% for option in sales_options.crm_stage_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="crm_stage"
+                  value="{{ option.value }}"
+                  data-sales-crm-stage-option
+                  {% if option.value in sales_filters.crm_stages %}checked{% endif %}
                 />
                 <span>{{ option.label }}</span>
               </label>
@@ -1632,7 +1655,7 @@
 {% endblock %}
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=28" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=29" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=59" defer></script>
   {% if sales_embed %}
     <script>
