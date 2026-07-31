@@ -1523,3 +1523,90 @@ main {
   width: 100%;
   margin-bottom: 12px;
 }
+
+/* ===== Телефония: SIP-панель и номеронабиратель ===== */
+.installer-sip-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.installer-sip-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.installer-sip-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.installer-sip-dot.is-online {
+  background: #22c55e;
+}
+
+.installer-sip-status select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.installer-dial-row {
+  display: flex;
+  gap: 8px;
+}
+
+.installer-dial-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.installer-dial-row .installer-icon-button {
+  width: 46px;
+  height: 46px;
+}
+
+.installer-dialpad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.installer-dialpad button {
+  min-height: 52px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.installer-dialpad button:active {
+  background: #e2edfb;
+}
+
+.installer-dial-call {
+  min-height: 48px;
+  font-size: 16px;
+}

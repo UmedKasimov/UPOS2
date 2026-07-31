@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=16">
-  <script defer src="/static/installer.js?v=17"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=17">
+  <script defer src="/static/installer.js?v=18"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -240,6 +240,32 @@
         <button class="installer-icon-button" id="installer-phonebook-close" type="button" aria-label="Назад">←</button>
       </header>
       <div class="installer-earnings-body">
+        <div class="installer-sip-panel">
+          <div class="installer-sip-status">
+            <i class="installer-sip-dot" id="installer-sip-dot" aria-hidden="true"></i>
+            <select id="installer-sip-account" aria-label="SIP-аккаунт"></select>
+          </div>
+          <div class="installer-dial-row">
+            <input id="installer-dial-number" type="tel" inputmode="tel" placeholder="Номер" autocomplete="off" />
+            <button type="button" class="installer-icon-button" id="installer-dial-backspace" aria-label="Стереть">⌫</button>
+          </div>
+          <div class="installer-dialpad" id="installer-dialpad">
+            <button type="button" data-dial="1">1</button>
+            <button type="button" data-dial="2">2</button>
+            <button type="button" data-dial="3">3</button>
+            <button type="button" data-dial="4">4</button>
+            <button type="button" data-dial="5">5</button>
+            <button type="button" data-dial="6">6</button>
+            <button type="button" data-dial="7">7</button>
+            <button type="button" data-dial="8">8</button>
+            <button type="button" data-dial="9">9</button>
+            <button type="button" data-dial="*">*</button>
+            <button type="button" data-dial="0">0</button>
+            <button type="button" data-dial="#">#</button>
+          </div>
+          <button type="button" class="installer-primary-button installer-dial-call" id="installer-dial-call">&#128222; Позвонить</button>
+        </div>
+        <h3 class="installer-earnings-subtitle">Контакты по заказам</h3>
         <label class="installer-phone-search">
           <input type="search" id="installer-phone-search" placeholder="Поиск по имени или номеру" />
         </label>

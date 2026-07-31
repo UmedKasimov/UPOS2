@@ -700,6 +700,61 @@
       : '<div class="installer-empty">Клиентов с телефоном не найдено</div>';
   }
 
+  // --- Номеронабиратель ---------------------------------------------------
+
+  function dialInput() {
+    return document.getElementById("installer-dial-number");
+  }
+
+  document.getElementById("installer-dialpad")?.addEventListener("click", (event) => {
+    const key = event.target.closest("[data-dial]");
+    if (!key) return;
+    const input = dialInput();
+    if (input) input.value += key.dataset.dial;
+  });
+
+  document.getElementById("installer-dial-backspace")?.addEventListener("click", () => {
+    const input = dialInput();
+    if (input) input.value = input.value.slice(0, -1);
+  });
+
+  document.getElementById("installer-dial-call")?.addEventListener("click", () => {
+    const raw = String(dialInput()?.value || "").trim();
+    const clean = raw.replace(/[^\d+*#]/g, "");
+    if (!clean) {
+      showToast("Введите номер", true);
+      return;
+    }
+    apiRequest("/api/installer/calls", {
+      method: "POST",
+      body: JSON.stringify({phone: clean, name: ""}),
+    }).catch(() => {});
+    window.location.href = `tel:${clean}`;
+  });
+
+  async function loadSipAccounts() {
+    const select = document.getElementById("installer-sip-account");
+    const dot = document.getElementById("installer-sip-dot");
+    if (!select) return;
+    try {
+      const data = await apiRequest("/api/installer/sip");
+      const accounts = data.accounts || [];
+      if (!accounts.length) {
+        select.innerHTML = '<option value="">SIP не настроен</option>';
+        dot?.classList.remove("is-online");
+        return;
+      }
+      select.innerHTML = accounts
+        .map((account) => `<option value="${escapeHtml(account.id || "")}">${escapeHtml(account.label || account.extension || "Аккаунт")} · ${escapeHtml(account.server || "")}</option>`)
+        .join("");
+      const online = accounts.some((account) => /online|connected|active|актив/i.test(String(account.status || "")));
+      dot?.classList.toggle("is-online", online);
+    } catch (error) {
+      select.innerHTML = '<option value="">SIP недоступен</option>';
+      dot?.classList.remove("is-online");
+    }
+  }
+
   async function openPhonebook() {
     closeInstallerMenu();
     if (!phonebookDialog) return;
@@ -708,6 +763,7 @@
     if (list) list.innerHTML = '<div class="installer-loading">Загрузка...</div>';
     if (calls) calls.innerHTML = "";
     openScreen(phonebookDialog, "phonebook");
+    loadSipAccounts();
     try {
       const data = await apiRequest("/api/installer/phonebook");
       phonebookContacts = data.contacts || [];
@@ -1211,7 +1267,8 @@
     }
     const orderButton = event.target.closest("[data-calendar-order-id]");
     if (orderButton) {
-      calendarDialog.close();
+      // Карточка открывается поверх календаря: закрыл её — вернулся к календарю,
+      // а не вылетел на главный экран.
       openDetail(orderButton.dataset.calendarOrderId);
       return;
     }

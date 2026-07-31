@@ -8005,6 +8005,27 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.get("/api/installer/sip", name="installer_sip_api")
+    def installer_sip_api(request: Request):
+        """SIP-аккаунты организации для экрана телефонии — без паролей."""
+        wid, _installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        data = load_workspace_settings(wid)
+        accounts = []
+        for account in _telephony_sip_accounts_for_softphone(data):
+            accounts.append(
+                {
+                    "id": account.get("id"),
+                    "label": account.get("label"),
+                    "extension": account.get("extension"),
+                    "server": account.get("server"),
+                    "transport": account.get("transport"),
+                    "status": account.get("status"),
+                }
+            )
+        return JSONResponse({"ok": True, "accounts": accounts})
+
     @app.get("/api/installer/phonebook", name="installer_phonebook_api")
     def installer_phonebook_api(request: Request):
         """Телефоны клиентов по заказам установщика плюс его последние звонки."""
