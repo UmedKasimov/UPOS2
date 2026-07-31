@@ -7763,6 +7763,95 @@ def create_app() -> FastAPI:
             )
         return JSONResponse({"ok": True, "order": payload})
 
+    @app.get("/api/installer/phonebook", name="installer_phonebook_api")
+    def installer_phonebook_api(request: Request):
+        """Телефоны клиентов по заказам установщика плюс его последние звонки."""
+        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        actor_id = installer_user_id or _session_user_id(request.session.get("user") or {})
+        timezone_name = normalize_workspace_timezone(
+            str(load_workspace_settings(wid).get("timezone") or "")
+        )
+        contacts: list[dict[str, Any]] = []
+        seen_phones: set[str] = set()
+        with session_scope() as session:
+            orders = installer_orders(
+                session,
+                workspace_owner_id=wid,
+                installer_user_id="" if can_manage else installer_user_id,
+            )
+            for order in orders:
+                payload = _installer_order_payload(
+                    session, order, timezone_name=timezone_name, can_manage=can_manage
+                )
+                client = payload.get("client") or {}
+                phone = str(client.get("phone") or "").strip()
+                if not phone or phone in seen_phones:
+                    continue
+                seen_phones.add(phone)
+                contacts.append(
+                    {
+                        "name": str(client.get("name") or "Клиент"),
+                        "phone": phone,
+                        "address": str(client.get("address") or ""),
+                        "order_number": str(payload.get("number") or ""),
+                        "status_label": str(payload.get("status_label") or ""),
+                    }
+                )
+        raw_calls = load_workspace_settings(wid).get("telephony_calls")
+        calls = raw_calls if isinstance(raw_calls, list) else []
+        own_calls = [
+            {
+                "phone": str(row.get("phone") or row.get("number") or ""),
+                "name": str(row.get("client") or row.get("contact") or ""),
+                "direction": str(row.get("direction") or "outgoing"),
+                "started_at": str(row.get("started_at") or row.get("created_at") or ""),
+            }
+            for row in calls
+            if isinstance(row, dict) and str(row.get("user_id") or "") == actor_id
+        ][:30]
+        return JSONResponse({"ok": True, "contacts": contacts, "calls": own_calls})
+
+    @app.post("/api/installer/calls", name="installer_call_log_api")
+    async def installer_call_log_api(request: Request):
+        """Отмечает совершённый звонок, чтобы он попал в журнал телефонии."""
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        user = request.session.get("user") or {}
+        actor_id = installer_user_id or _session_user_id(user)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        phone = str((body or {}).get("phone") or "").strip()
+        if not phone:
+            return _installer_api_error("Не указан номер", 400)
+        settings = load_workspace_settings(wid)
+        calls = settings.get("telephony_calls") if isinstance(settings.get("telephony_calls"), list) else []
+        calls.insert(
+            0,
+            {
+                "id": str(uuid.uuid4()),
+                "phone": phone,
+                "client": str((body or {}).get("name") or ""),
+                "direction": "outgoing",
+                "status": "dialed",
+                "source": "installer_app",
+                "user_id": actor_id,
+                "user_name": str(user.get("name") or user.get("username") or ""),
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        # Журнал живёт в настройках воркспейса — держим его ограниченным.
+        settings["telephony_calls"] = calls[:500]
+        save_workspace_settings(wid, settings)
+        return JSONResponse({"ok": True})
+
     @app.get("/api/installer/notifications", name="installer_notifications_api")
     def installer_notifications_api(request: Request):
         wid, _installer_user_id, _can_manage = _installer_request_scope(request)

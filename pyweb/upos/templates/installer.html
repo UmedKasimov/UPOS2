@@ -12,8 +12,8 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=11">
-  <script defer src="/static/installer.js?v=11"></script>
+  <link rel="stylesheet" href="/static/installer.css?v=12">
+  <script defer src="/static/installer.js?v=12"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -51,6 +51,7 @@
         Уведомления
         <b class="installer-menu-badge" id="installer-notify-badge" hidden>0</b>
       </button>
+      <button type="button" data-menu-action="phonebook">Телефония</button>
       <button type="button" data-menu-action="earnings">Мой заработок</button>
       <button type="button" id="installer-push-toggle" hidden>Включить уведомления</button>
     </nav>
@@ -127,6 +128,26 @@
           <h3 id="installer-calendar-selected-title">Заказы на выбранный день</h3>
           <div class="installer-calendar-orders" id="installer-calendar-orders"></div>
         </section>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-phonebook">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Клиенты по вашим заказам</p>
+          <h2>Телефония</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-phonebook-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <label class="installer-phone-search">
+          <input type="search" id="installer-phone-search" placeholder="Поиск по имени или номеру" />
+        </label>
+        <div class="installer-phone-list" id="installer-phone-list"></div>
+        <h3 class="installer-earnings-subtitle">Последние звонки</h3>
+        <div class="installer-phone-calls" id="installer-phone-calls"></div>
       </div>
     </div>
   </dialog>

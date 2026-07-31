@@ -402,9 +402,84 @@
   }
 
   window.addEventListener("popstate", () => {
-    [notificationsDialog, earningsDialog, document.getElementById("installer-calendar")].forEach((dialog) => {
+    [notificationsDialog, earningsDialog, phonebookDialog, document.getElementById("installer-calendar")].forEach((dialog) => {
       if (dialog?.open) dialog.close();
     });
+  });
+
+  const phonebookDialog = document.getElementById("installer-phonebook");
+  let phonebookContacts = [];
+
+  function renderPhonebook(filter) {
+    const list = document.getElementById("installer-phone-list");
+    if (!list) return;
+    const needle = String(filter || "").trim().toLowerCase();
+    const rows = needle
+      ? phonebookContacts.filter((row) =>
+          `${row.name} ${row.phone} ${row.order_number}`.toLowerCase().includes(needle))
+      : phonebookContacts;
+    list.innerHTML = rows.length
+      ? rows.map((row) => `
+          <article class="installer-phone-item">
+            <div class="installer-phone-info">
+              <strong>${escapeHtml(row.name)}</strong>
+              <span>${escapeHtml(row.phone)}</span>
+              <small>${escapeHtml([row.order_number, row.address].filter(Boolean).join(" · "))}</small>
+            </div>
+            <button type="button" class="installer-primary-button installer-phone-call"
+              data-call-phone="${escapeHtml(row.phone)}" data-call-name="${escapeHtml(row.name)}">Позвонить</button>
+          </article>`).join("")
+      : '<div class="installer-empty">Клиентов с телефоном не найдено</div>';
+  }
+
+  async function openPhonebook() {
+    closeInstallerMenu();
+    if (!phonebookDialog) return;
+    const list = document.getElementById("installer-phone-list");
+    const calls = document.getElementById("installer-phone-calls");
+    if (list) list.innerHTML = '<div class="installer-loading">Загрузка...</div>';
+    if (calls) calls.innerHTML = "";
+    openScreen(phonebookDialog, "phonebook");
+    try {
+      const data = await apiRequest("/api/installer/phonebook");
+      phonebookContacts = data.contacts || [];
+      renderPhonebook(document.getElementById("installer-phone-search")?.value);
+      if (calls) {
+        calls.innerHTML = (data.calls || []).length
+          ? data.calls.map((row) => `
+              <article class="installer-phone-call-row">
+                <div>
+                  <strong>${escapeHtml(row.name || row.phone)}</strong>
+                  <small>${escapeHtml(notifyTime(row.started_at))}</small>
+                </div>
+                <span>${escapeHtml(row.phone)}</span>
+              </article>`).join("")
+          : '<div class="installer-empty">Звонков пока нет</div>';
+      }
+    } catch (error) {
+      if (list) list.innerHTML = `<div class="installer-empty">${escapeHtml(error.message || "Не удалось загрузить")}</div>`;
+    }
+  }
+
+  document.getElementById("installer-phone-search")?.addEventListener("input", (event) => {
+    renderPhonebook(event.target.value);
+  });
+
+  document.getElementById("installer-phone-list")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-call-phone]");
+    if (!button) return;
+    const phone = button.dataset.callPhone;
+    // Звонок уходит средствами телефона, а факт набора пишем в журнал,
+    // чтобы руководитель видел активность по клиентам.
+    apiRequest("/api/installer/calls", {
+      method: "POST",
+      body: JSON.stringify({phone: phone, name: button.dataset.callName || ""}),
+    }).catch(() => {});
+    window.location.href = `tel:${String(phone).replace(/[^\d+]/g, "")}`;
+  });
+
+  document.getElementById("installer-phonebook-close")?.addEventListener("click", () => {
+    closeScreen(phonebookDialog);
   });
 
   function notifyTime(value) {
@@ -815,6 +890,7 @@
     if (button.dataset.menuAction === "orders-calendar") openOrderCalendar();
     if (button.dataset.menuAction === "earnings") openEarnings();
     if (button.dataset.menuAction === "notifications") openNotifications();
+    if (button.dataset.menuAction === "phonebook") openPhonebook();
   });
 
   menuClose?.addEventListener("click", closeInstallerMenu);

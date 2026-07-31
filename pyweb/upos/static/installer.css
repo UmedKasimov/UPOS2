@@ -1299,3 +1299,68 @@ main {
 .installer-calendar-body {
   max-height: none;
 }
+
+.installer-phone-search input {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.installer-phone-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.installer-phone-info {
+  min-width: 0;
+}
+
+.installer-phone-info strong {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-phone-info span {
+  color: #334155;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.installer-phone-info small {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.installer-phone-call {
+  flex: 0 0 auto;
+}
+
+.installer-phone-call-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 13px;
+}
+
+.installer-phone-call-row small {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+}
