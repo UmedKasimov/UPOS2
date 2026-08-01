@@ -518,6 +518,7 @@
               <button type="button" class="shipment-employee-toggle" data-hr-adjustment-employee-toggle aria-label="Открыть список сотрудников">⌄</button>
               <div class="shipment-employee-menu org-hr-employee-menu" data-hr-adjustment-employee-menu role="listbox" hidden></div>
             </div>
+            <p class="org-hr-adjustment-balance" data-hr-adjustment-balance hidden></p>
           </label>
           <label>
             <span>Дата</span>
@@ -1451,16 +1452,60 @@
         search.setAttribute('aria-expanded', 'false');
       }
 
+      // Остаток по акту сверки выбранного сотрудника — сразу под полем выбора.
+      const balanceNode = modal.querySelector('[data-hr-adjustment-balance]');
+      let balanceRequestId = 0;
+      async function showBalance(id) {
+        if (!balanceNode) return;
+        const requestId = ++balanceRequestId;
+        if (!id) {
+          balanceNode.hidden = true;
+          balanceNode.textContent = '';
+          return;
+        }
+        balanceNode.hidden = false;
+        balanceNode.textContent = 'Загружаем остаток...';
+        try {
+          const url = new URL(`/api/hr/salary-act/${encodeURIComponent(id)}`, window.location.origin);
+          const dateValue = modal.querySelector('input[name="work_date"]')?.value || '';
+          if (dateValue) url.searchParams.set('date', dateValue);
+          let organizationId = '';
+          try {
+            organizationId = String(JSON.parse(dataNode.textContent || '{}').organizationId || '');
+          } catch (err) {
+            organizationId = '';
+          }
+          if (organizationId) url.searchParams.set('organization_id', organizationId);
+          const response = await fetch(url, { headers: { Accept: 'application/json' } });
+          const data = await response.json();
+          if (requestId !== balanceRequestId) return;
+          if (!response.ok || !data.ok) throw new Error('salary_act_failed');
+          const act = data.act || {};
+          const amount = `${act.balance_uzs_label || '0'} UZS`;
+          balanceNode.textContent = act.balance_state === 'overpaid'
+            ? `Остаток: сотрудник должен ${amount}`
+            : act.balance_state === 'closed'
+              ? 'Остаток: баланс закрыт (0 UZS)'
+              : `Остаток: мы должны ${amount}`;
+        } catch (error) {
+          if (requestId !== balanceRequestId) return;
+          balanceNode.textContent = 'Не удалось загрузить остаток.';
+        }
+      }
+
       function selectEmployee(id, name) {
         hidden.value = id || '';
         search.value = name || '';
         search.classList.toggle('org-ops-employee-selected', Boolean(id));
         closeMenu();
+        showBalance(hidden.value);
       }
 
       function syncEmployee() {
         const exact = employeeByName.get(String(search.value || '').trim().toLocaleLowerCase('ru-RU'));
+        const previous = hidden.value;
         hidden.value = exact ? exact.id : '';
+        if (previous !== hidden.value) showBalance(hidden.value);
         search.classList.toggle('org-ops-employee-selected', Boolean(exact));
       }
 

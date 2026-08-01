@@ -22606,6 +22606,17 @@ body:has(dialog[open]) {
   min-width: 0;
 }
 
+/* Остаток по акту сверки в окне «Приход/Расход». */
+.org-hr-adjustment-balance {
+  margin: 0.5rem 0 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  color: var(--foreground);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 /* Фильтр по дате в шапке карточки сотрудника. */
 .org-hr-card-head {
   align-items: center;
