@@ -498,7 +498,8 @@
                   <td data-products-search-highlight>{{ product.sku or "-" }}</td>
                   <td>{{ product.barcode or "-" }}</td>
                   <td>{{ product.unit or "-" }}</td>
-                  <td class="products-catalog-number">{{ product.quantity_display }}</td>
+                  {# У услуг склада нет — остаток не показываем. #}
+                  <td class="products-catalog-number">{% if product.kind == 'service' %}<span class="products-quantity-na">—</span>{% else %}{{ product.quantity_display }}{% endif %}</td>
                   <td class="products-price-list-cell products-purchase-price-cell">
                     <div class="products-price-list-values">
                       {% for price in product.purchase_prices %}
