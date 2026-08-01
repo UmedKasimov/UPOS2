@@ -14155,6 +14155,7 @@ def create_app() -> FastAPI:
                     "note": str(form.get("note") or "").strip(),
                     "email": email,
                     "address": str(form.get("address") or "").strip(),
+                    "telegram_phone": str(form.get("telegram_phone") or "").strip(),
                     "is_client": is_client,
                     "is_supplier": True,
                 },

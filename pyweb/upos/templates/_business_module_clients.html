@@ -352,7 +352,15 @@
       <label><span>ИНН</span><input name="tax_id" /></label>
       <label><span>ПИНФЛ</span><input name="pinfl" /></label>
       <label><span>Категория</span><input name="category" list="client-category-list" /></label>
-      <label><span>Отрасль</span><input name="industry" list="client-industry-list" placeholder="Продуктовый, ресторан..." /></label>
+      <label>
+        <span>Отрасль</span>
+        <select name="industry">
+          <option value="">Не выбрана</option>
+          {% for industry_name in ["Продуктовый", "Ресторан", "Кафе", "Одежда", "Аксессуар"] %}
+            <option value="{{ industry_name }}">{{ industry_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <label>
         <span>Иконка на карте</span>
         <select name="map_icon" data-client-map-icon>
@@ -898,7 +906,19 @@
         <label><span>ИНН</span><input name="tax_id" value="{{ selected_client_card.inn or '' }}" /></label>
         <label><span>ПИНФЛ</span><input name="pinfl" value="{{ selected_client_card.pinfl or '' }}" /></label>
         <label><span>Категория</span><input name="category" list="client-category-list" value="{{ selected_client_card.category or '' }}" /></label>
-        <label><span>Отрасль</span><input name="industry" list="client-industry-list" value="{{ selected_client_card.industry or '' }}" placeholder="Продуктовый, ресторан..." /></label>
+        <label>
+          <span>Отрасль</span>
+          <select name="industry">
+            <option value="">Не выбрана</option>
+            {% set known_industries = ["Продуктовый", "Ресторан", "Кафе", "Одежда", "Аксессуар"] %}
+            {% for industry_name in known_industries %}
+              <option value="{{ industry_name }}" {% if selected_client_card.industry == industry_name %}selected{% endif %}>{{ industry_name }}</option>
+            {% endfor %}
+            {% if selected_client_card.industry and selected_client_card.industry not in known_industries %}
+              <option value="{{ selected_client_card.industry }}" selected>{{ selected_client_card.industry }}</option>
+            {% endif %}
+          </select>
+        </label>
         <label>
           <span>Иконка на карте</span>
           <select name="map_icon" data-client-map-icon>

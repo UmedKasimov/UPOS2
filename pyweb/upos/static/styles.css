@@ -22624,6 +22624,16 @@ body:has(dialog[open]) {
   background: color-mix(in srgb, var(--muted-foreground) 6%, var(--card));
 }
 
+/* Балансы в таблицах клиентов и поставщиков — просто цветные цифры,
+   без плашек-«кружков»; дизайн обеих таблиц идентичен. */
+.clients-table .client-balance-pill {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 /* Чип сегмента с иконкой в таблицах клиентов и поставщиков. */
 .client-segment-chip {
   display: inline-flex;

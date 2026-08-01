@@ -337,6 +337,7 @@
       <label class="wide"><span>Название поставщика*</span><input name="name" required /></label>
       <label><span>Официальное название</span><input name="official_name" /></label>
       <label><span>Телефон</span><input name="phone" /></label>
+      <label><span>Telegram номер</span><input name="telegram_phone" /></label>
       <label><span>ИНН</span><input name="tax_id" /></label>
       <label><span>Категория</span><input name="category" list="supplier-category-list" /></label>
       <label><span>Email</span><input name="email" /></label>
@@ -378,6 +379,7 @@
         <label class="wide"><span>Название поставщика*</span><input name="name" value="{{ selected_supplier_card.name }}" required /></label>
         <label><span>Официальное название</span><input name="official_name" value="{{ selected_supplier_card.official_name or '' }}" /></label>
         <label><span>Телефон</span><input name="phone" value="{{ selected_supplier_card.phone or '' }}" /></label>
+        <label><span>Telegram номер</span><input name="telegram_phone" value="{{ selected_supplier_card.telegram_phone or '' }}" /></label>
         <label><span>ИНН</span><input name="tax_id" value="{{ selected_supplier_card.inn or '' }}" /></label>
         <label><span>Категория</span><input name="category" list="supplier-category-list" value="{{ selected_supplier_card.category or '' }}" /></label>
         <label><span>Email</span><input name="email" value="{{ selected_supplier_card.email or '' }}" /></label>
