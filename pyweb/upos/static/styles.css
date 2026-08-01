@@ -2431,16 +2431,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--muted-foreground) 8%, var(--card));
 }
 
-#products-catalog-table .products-check-col {
-  position: sticky;
-  left: 7.2rem;
-  z-index: 3;
-  background: var(--card);
+/* Чекбокс не закрепляем: sticky с ручным left наезжал на стенку и оставлял
+   пустой «родной» слот колонки. Стенке — тень-разделитель. */
+#products-catalog-table .products-history-col {
   box-shadow: 6px 0 8px -6px rgb(15 23 42 / 0.14);
 }
 
-#products-catalog-table thead .products-history-col,
-#products-catalog-table thead .products-check-col {
+#products-catalog-table thead .products-history-col {
   z-index: 5;
 }
 
