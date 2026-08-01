@@ -26153,6 +26153,69 @@ table.upos-table-resizable-columns {
   font-size: var(--text-xs);
 }
 
+/* Элементы этикетки перетаскиваются мышкой и выделяются кликом. */
+.price-tag-card [data-tag-element] {
+  cursor: move;
+  outline: 1px dashed transparent;
+  outline-offset: 1px;
+  touch-action: none;
+}
+
+.price-tag-card [data-tag-element]:hover {
+  outline-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.price-tag-card [data-tag-element].is-selected {
+  outline: 1px solid var(--primary);
+}
+
+.price-tag-card.is-dragging {
+  user-select: none;
+}
+
+.price-tag-style-panel {
+  display: grid;
+  gap: 0.55rem;
+  width: min(100%, 32rem);
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.price-tag-style-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.price-tag-style-head span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.price-tag-style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.price-tag-style-grid .price-tag-field--wide {
+  grid-column: 1 / -1;
+}
+
+.price-tag-style-grid select {
+  width: 100%;
+  min-height: 2.3rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--control-bg);
+  color: var(--control-fg);
+  box-sizing: border-box;
+}
+
 @media (max-width: 1100px) {
   .price-tag-layout {
     grid-template-columns: 1fr;

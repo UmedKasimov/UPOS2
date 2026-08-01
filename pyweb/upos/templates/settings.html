@@ -679,7 +679,48 @@
 
                 <div class="price-tag-stage">
                   <div class="price-tag-preview" data-price-tag-preview aria-label="Предпросмотр ценника"></div>
-                  <p class="price-tag-hint">Пример товара: «Kungaboqar yog'i Ласка, tozalangan, 1 litr» — 30 000</p>
+                  <p class="price-tag-hint">Перетащите элемент мышкой, чтобы разместить его на этикетке. Клик — настройки шрифта.</p>
+
+                  <section class="price-tag-style-panel" data-price-tag-style-panel hidden>
+                    <div class="price-tag-style-head">
+                      <strong>Настройки шрифта</strong>
+                      <span data-price-tag-style-name></span>
+                    </div>
+                    <div class="price-tag-style-grid">
+                      <label class="price-tag-field">
+                        <span>Размер шрифта</span>
+                        <select data-price-tag-style="size">
+                          <option value="">По умолчанию</option>
+                          {% for size in [8, 10, 12, 14, 16, 18, 20, 24, 28, 30, 36, 42, 48] %}
+                            <option value="{{ size }}">{{ size }}px</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="price-tag-field">
+                        <span>Жирность</span>
+                        <select data-price-tag-style="weight">
+                          <option value="">По умолчанию</option>
+                          {% for weight in [300, 400, 500, 600, 700, 800, 900] %}
+                            <option value="{{ weight }}">{{ weight }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="price-tag-field">
+                        <span>Расположение</span>
+                        <select data-price-tag-style="align">
+                          <option value="">По умолчанию</option>
+                          <option value="left">Слева</option>
+                          <option value="center">По центру</option>
+                          <option value="right">Справа</option>
+                        </select>
+                      </label>
+                      <label class="price-tag-field price-tag-field--wide">
+                        <span>Текст</span>
+                        <input type="text" data-price-tag-style="text" maxlength="120" placeholder="Оставьте пустым — значение товара" />
+                      </label>
+                    </div>
+                    <button class="btn btn-secondary btn-xs" type="button" data-price-tag-reset-layout>Сбросить раскладку</button>
+                  </section>
                 </div>
               </div>
             </section>
@@ -2178,7 +2219,7 @@
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
   <script src="{{ url_for('static', path='price-template-editor.js') }}?v=4" defer></script>
-  <script src="{{ url_for('static', path='price-tag.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', path='price-tag.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=29" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

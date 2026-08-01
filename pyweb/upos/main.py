@@ -22689,10 +22689,46 @@ def create_app() -> FastAPI:
             key: bool(fields_source.get(key, key in defaults))
             for key in PRICE_TAG_FIELDS
         }
+        # Свободное размещение и шрифт каждого элемента.
+        raw_positions = source.get("positions")
+        positions: dict[str, dict[str, float]] = {}
+        if isinstance(raw_positions, dict):
+            for key, spot in raw_positions.items():
+                if key not in PRICE_TAG_FIELDS or not isinstance(spot, dict):
+                    continue
+                positions[key] = {
+                    "x": clean_size(spot.get("x"), 0, 0, 300),
+                    "y": clean_size(spot.get("y"), 0, 0, 300),
+                }
+
+        raw_styles = source.get("styles")
+        styles: dict[str, dict[str, object]] = {}
+        if isinstance(raw_styles, dict):
+            for key, style in raw_styles.items():
+                if key not in PRICE_TAG_FIELDS or not isinstance(style, dict):
+                    continue
+                entry: dict[str, object] = {}
+                size = clean_size(style.get("size"), 0, 0, 200)
+                if size:
+                    entry["size"] = size
+                weight = clean_text(style.get("weight"), 4)
+                if weight.isdigit() and 100 <= int(weight) <= 900:
+                    entry["weight"] = int(weight)
+                align = clean_text(style.get("align"), 8)
+                if align in {"left", "center", "right"}:
+                    entry["align"] = align
+                text_value = clean_text(style.get("text"), 120)
+                if text_value:
+                    entry["text"] = text_value
+                if entry:
+                    styles[key] = entry
+
         return {
             "name": clean_text(source.get("name"), 80) or "Ценник 58×40",
             "width": clean_size(source.get("width"), 58, 20, 210),
             "height": clean_size(source.get("height"), 40, 15, 297),
+            "positions": positions,
+            "styles": styles,
             "format_price": bool(source.get("format_price", True)),
             "price_suffix": clean_text(source.get("price_suffix"), 16) or "so'm",
             "custom_text": clean_text(source.get("custom_text"), 120),
