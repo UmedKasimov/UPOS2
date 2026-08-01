@@ -20973,12 +20973,44 @@ def create_app() -> FastAPI:
         )
         return RedirectResponse(url="/earnings?msg=" + quote("Ставки сохранены"), status_code=302)
 
+    def _sync_program_employees_to_hr(workspace_owner_id: str) -> None:
+        """Сотрудники, заведённые в программе, автоматически появляются в HR.
+
+        Совпадение ищем по набору слов имени, чтобы «Иванов Иван» и
+        «Иван Иванов» не задваивались.
+        """
+        try:
+            existing = {
+                frozenset(str(emp.get("full_name") or "").lower().split())
+                for emp in list_hr_employees(workspace_owner_id)
+            }
+            for emp in list_employees_safe(workspace_owner_id):
+                name = str(emp.get("name") or emp.get("username") or "").strip()
+                if not name:
+                    continue
+                key = frozenset(name.lower().split())
+                if key in existing:
+                    continue
+                parts = name.split()
+                create_hr_employee(
+                    workspace_owner_id,
+                    {
+                        "first_name": parts[0],
+                        "last_name": " ".join(parts[1:]),
+                        "position": str(emp.get("position") or emp.get("employee_role_name") or ""),
+                    },
+                )
+                existing.add(key)
+        except Exception:
+            logger.exception("[upos] sync program employees to HR failed")
+
     @app.get("/hr", response_class=HTMLResponse, name="home_hr")
     def home_hr(request: Request):
         oid, redir = _current_org_html_owner(request)
         if redir:
             return redir
         assert oid is not None
+        _sync_program_employees_to_hr(oid)
         selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d"))[:10]
         return tpl(
             request,

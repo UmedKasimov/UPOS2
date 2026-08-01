@@ -107,12 +107,12 @@
         </div>
         <div class="org-hr-toolbar">
           <div class="org-hr-toolbar-left">
-            <button type="button" class="btn" data-org-modal-open="hr-employee-create-modal">Добавить сотрудника</button>
+            <button type="button" class="btn" data-org-modal-open="hr-salary-adjustment-modal" data-hr-adjustment-preset="bonus">Приход</button>
+            <button type="button" class="btn btn-secondary" data-org-modal-open="hr-salary-adjustment-modal" data-hr-adjustment-preset="penalty">Расход</button>
             <button type="button" class="btn btn-secondary org-hr-archive-btn" data-org-modal-open="hr-employee-archive-modal">
               Архив
               <span class="org-hr-archive-count">{{ archived_employees|length }}</span>
             </button>
-            <button type="button" class="btn btn-secondary" data-org-modal-open="hr-salary-adjustment-modal">Начисление</button>
           </div>
           <label class="org-hr-staff-search">
             <span>Поиск</span>
@@ -495,7 +495,7 @@
         <header class="director-modal-head">
           <div>
             <p class="settings-ios-footnote">Зарплата</p>
-            <h2>Начисление или штраф</h2>
+            <h2 data-hr-adjustment-title>Приход или расход</h2>
           </div>
           <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
             ×
@@ -526,8 +526,8 @@
           <label>
             <span>Тип</span>
             <select name="adjustment_type" required>
-              <option value="bonus">Начисление</option>
-              <option value="penalty">Штраф</option>
+              <option value="bonus">Приход (начисление)</option>
+              <option value="penalty">Расход (штраф, удержание)</option>
             </select>
           </label>
           <label>
@@ -1375,6 +1375,19 @@
       }
 
       summary.textContent = `${monthLabel}: сотрудников ${employees.length}, пришёл ${totalPresent}, не пришёл ${totalAbsent}`;
+    })();
+
+    (() => {
+      // Кнопки «Приход»/«Расход» открывают одну модалку с нужным типом операции.
+      document.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-hr-adjustment-preset]');
+        if (!trigger) return;
+        const modal = document.getElementById('hr-salary-adjustment-modal');
+        const select = modal?.querySelector('select[name="adjustment_type"]');
+        const title = modal?.querySelector('[data-hr-adjustment-title]');
+        if (select) select.value = trigger.dataset.hrAdjustmentPreset;
+        if (title) title.textContent = trigger.dataset.hrAdjustmentPreset === 'penalty' ? 'Расход' : 'Приход';
+      });
     })();
 
     (() => {
