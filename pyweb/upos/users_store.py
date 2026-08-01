@@ -1148,7 +1148,14 @@ def session_payload(rec: dict[str, Any]) -> dict[str, Any]:
             out["employee_role_id"] = str(role_payload.get("id") or "")
             out["employee_role_key"] = str(role_payload.get("key") or "")
             out["employee_role_name"] = str(role_payload.get("name") or "")
-            out["employee_permissions"] = role_payload.get("permissions") or {}
+            # Сессия живёт в cookie с лимитом 4 КБ: полный словарь прав с
+            # button_access перестал влезать, и Set-Cookie молча отбрасывался —
+            # сотрудники не могли войти. В куке держим только булевы разделы,
+            # тяжёлые части (кнопки, категории) читаются из роли по запросу.
+            compact_permissions = dict(role_payload.get("permissions") or {})
+            compact_permissions.pop("button_access", None)
+            compact_permissions.pop("category_access", None)
+            out["employee_permissions"] = compact_permissions
         owner = get_by_id(str(emp))
         if owner:
             out["workspace_owner_name"] = str(

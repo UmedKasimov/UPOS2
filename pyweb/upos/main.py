@@ -245,6 +245,7 @@ from upos.users_store import (
     ensure_all_user_ids,
     ensure_account_ids,
     ensure_default_roles,
+    get_role_safe,
     get_by_username,
     get_employee_for_owner,
     list_employee_organizations_safe,
@@ -792,10 +793,35 @@ def create_app() -> FastAPI:
             out["hr"] = bool(src.get("employees"))
         return out
 
+    # Тяжёлые части прав (кнопки, категории) больше не хранятся в cookie-сессии
+    # (не влезали в лимит 4 КБ) — подгружаем их из роли с коротким кэшем.
+    _role_perm_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+
+    def _employee_role_permissions(user: dict | None) -> dict[str, Any]:
+        u = user or {}
+        role_id = str(u.get("employee_role_id") or "").strip()
+        wid = str(u.get("workspace_owner_id") or "").strip()
+        if not role_id or not wid:
+            return {}
+        cache_key = (wid, role_id)
+        cached = _role_perm_cache.get(cache_key)
+        now = time.monotonic()
+        if cached and now - cached[0] < 30:
+            return cached[1]
+        role = get_role_safe(wid, role_id)
+        permissions = role.get("permissions") if isinstance(role, dict) else {}
+        permissions = permissions if isinstance(permissions, dict) else {}
+        _role_perm_cache[cache_key] = (now, permissions)
+        if len(_role_perm_cache) > 500:
+            _role_perm_cache.clear()
+        return permissions
+
     def _employee_button_access(user: dict | None) -> dict[str, dict[str, bool]]:
         raw = (user or {}).get("employee_permissions")
         perms = raw if isinstance(raw, dict) else {}
         raw_button_access = perms.get("button_access")
+        if raw_button_access is None:
+            raw_button_access = _employee_role_permissions(user).get("button_access")
         button_src = raw_button_access if isinstance(raw_button_access, dict) else {}
         access: dict[str, dict[str, bool]] = {}
         for section, actions in ROLE_BUTTON_PERMISSION_LABELS.items():
@@ -814,6 +840,8 @@ def create_app() -> FastAPI:
         raw_perms = u.get("employee_permissions")
         perms = raw_perms if isinstance(raw_perms, dict) else {}
         raw_access = perms.get("category_access")
+        if raw_access is None:
+            raw_access = _employee_role_permissions(user).get("category_access")
         access = raw_access if isinstance(raw_access, dict) else {}
         if not access.get("enabled"):
             return None
