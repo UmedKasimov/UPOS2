@@ -29253,3 +29253,11 @@ html.dark .crm-task-calendar-event {
 .reports-stock-history-tr:hover td {
   background: color-mix(in srgb, var(--primary) 7%, transparent);
 }
+
+/* Кнопки истории в ячейке товара «Анализа остатков» */
+.reports-stock-history-actions {
+  display: inline-flex;
+  gap: 0.3rem;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
