@@ -268,33 +268,67 @@
       </div>
     </div>
     <div class="clients-map-list">
-      {% for client in map_clients %}
-        <article
-          data-client-overview-point
-          data-client-id="{{ client.id }}"
-          data-lat="{{ client.latitude }}"
-          data-lon="{{ client.longitude }}"
-          data-name="{{ client.name }}"
-          data-address="{{ client.address or '' }}"
-          data-client-type="{{ client.client_type }}"
-          data-category="{{ client.category or '' }}"
-          data-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
-          data-programs="{{ client.program or '' }}"
-          data-status="{{ client.status }}"
-        >
-          <strong>{{ client.name }}</strong>
-          <span>{{ client.address or "Адрес не указан" }}</span>
-          {% if client.latitude and client.longitude %}
-            <a href="https://www.openstreetmap.org/?mlat={{ client.latitude }}&mlon={{ client.longitude }}#map=17/{{ client.latitude }}/{{ client.longitude }}" target="_blank" rel="noreferrer">Открыть карту</a>
-          {% elif client.address %}
-            <small>Будет найден по адресу</small>
+      <table class="org-ops-table clients-map-table" data-upos-no-column-controls>
+        <thead>
+          <tr>
+            <th>Клиент</th>
+            <th>Сегмент</th>
+            <th>Адрес</th>
+            <th>Карта</th>
+            <th class="num">№</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for client in map_clients %}
+            <tr
+              data-client-overview-point
+              data-client-id="{{ client.id }}"
+              data-lat="{{ client.latitude }}"
+              data-lon="{{ client.longitude }}"
+              data-name="{{ client.name }}"
+              data-address="{{ client.address or '' }}"
+              data-client-type="{{ client.client_type }}"
+              data-category="{{ client.category or '' }}"
+              data-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+              data-programs="{{ client.program or '' }}"
+              data-status="{{ client.status }}"
+            >
+              <td><strong>{{ client.name }}</strong></td>
+              <td>
+                {% if client.business_segment %}
+                  <span class="client-segment-chip">{{ client.business_segment_icon }} {{ client.business_segment }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ client.address or "Адрес не указан" }}</td>
+              <td>
+                {% if client.latitude and client.longitude %}
+                  <a href="https://www.openstreetmap.org/?mlat={{ client.latitude }}&mlon={{ client.longitude }}#map=17/{{ client.latitude }}/{{ client.longitude }}" target="_blank" rel="noreferrer">Открыть</a>
+                {% elif client.address %}
+                  <small>По адресу</small>
+                {% else %}
+                  <small>Нет данных</small>
+                {% endif %}
+              </td>
+              <td class="num">{{ loop.index }}</td>
+            </tr>
           {% else %}
-            <small>Нет адреса и координат</small>
-          {% endif %}
-        </article>
-      {% else %}
-        <p>Клиенты пока не добавлены.</p>
-      {% endfor %}
+            <tr><td colspan="5" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if map_clients %}
+          <tfoot>
+            <tr>
+              <td colspan="5">
+                Итого: {{ map_clients|length }}
+                · с координатами: {{ map_clients | selectattr("latitude") | selectattr("longitude") | list | length }}
+                · только адрес: {{ map_clients | rejectattr("latitude") | selectattr("address") | list | length }}
+              </td>
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
     </div>
   </div>
 </section>

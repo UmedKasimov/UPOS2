@@ -22606,6 +22606,24 @@ body:has(dialog[open]) {
   min-width: 0;
 }
 
+/* Список точек рядом с картой клиентов — таблица с нумерацией и итогами. */
+.clients-map-table th.num,
+.clients-map-table td.num {
+  width: 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+.clients-map-table td {
+  vertical-align: top;
+}
+
+.clients-map-table tfoot td {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--muted-foreground) 6%, var(--card));
+}
+
 /* Чип сегмента с иконкой в таблицах клиентов и поставщиков. */
 .client-segment-chip {
   display: inline-flex;
