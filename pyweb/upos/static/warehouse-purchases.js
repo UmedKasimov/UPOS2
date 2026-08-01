@@ -2118,9 +2118,70 @@
     }, 180);
   }
 
+  function purchaseAmountNumber(raw) {
+    const match = String(raw || "").match(/-?[\d\s]+(?:[.,]\d+)?/);
+    if (!match) return 0;
+    return Number(match[0].replace(/\s+/g, "").replace(",", ".")) || 0;
+  }
+
+  function purchaseSortValue(row, columnIndex, kind) {
+    const cell = row.cells[columnIndex];
+    if (!cell) return kind === "text" ? "" : 0;
+    const select = cell.querySelector("select");
+    const raw = select
+      ? select.options[select.selectedIndex]?.textContent || ""
+      : cell.dataset.sortValue || cell.textContent || "";
+    if (kind === "number") return purchaseAmountNumber(raw);
+    if (kind === "date") {
+      const match = String(raw).trim().match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      if (match) return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).getTime();
+      const timestamp = Date.parse(String(raw).trim());
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+    return String(raw).trim().toLocaleLowerCase("ru-RU");
+  }
+
+  function initPurchasesSort(root) {
+    const table = (root || document).querySelector("#warehouse-purchases-table");
+    if (!table || table.dataset.purchasesSortReady === "1") return;
+    table.dataset.purchasesSortReady = "1";
+    table.querySelectorAll("thead .sales-journal-sort-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        const header = button.closest("th");
+        const body = table.tBodies[0];
+        if (!header || !body) return;
+        const columnIndex = header.cellIndex;
+        const kind = header.dataset.sortKind || "text";
+        const direction = header.getAttribute("aria-sort") === "descending" ? "ascending" : "descending";
+        const rows = Array.from(body.querySelectorAll("tr.warehouse-purchase-row"));
+        rows.forEach((row, index) => {
+          if (!row.dataset.purchaseOriginalIndex) row.dataset.purchaseOriginalIndex = String(index);
+        });
+        rows.sort((left, right) => {
+          const a = purchaseSortValue(left, columnIndex, kind);
+          const b = purchaseSortValue(right, columnIndex, kind);
+          let result = kind === "text"
+            ? String(a).localeCompare(String(b), "ru-RU", { numeric: true, sensitivity: "base" })
+            : a - b;
+          if (!result) result = Number(left.dataset.purchaseOriginalIndex) - Number(right.dataset.purchaseOriginalIndex);
+          return direction === "ascending" ? result : -result;
+        });
+        table.querySelectorAll("thead th[aria-sort]").forEach((item) => {
+          item.setAttribute("aria-sort", item === header ? direction : "none");
+          const arrow = item.querySelector(".org-shipments-sort-arrow");
+          if (arrow) arrow.textContent = item === header ? (direction === "ascending" ? "↑" : "↓") : "↕";
+        });
+        const totalRow = body.querySelector("tr.sales-journal-total-row");
+        rows.forEach((row) => body.appendChild(row));
+        if (totalRow) body.appendChild(totalRow);
+      });
+    });
+  }
+
   function init(root = document) {
     initPurchaseEntry(root);
     initWarehouseAdjustment(root);
+    initPurchasesSort(root);
     root.querySelectorAll("[data-warehouse-purchases-filter]").forEach((form) => {
       if (form.dataset.warehousePurchasesReady === "1") return;
       form.dataset.warehousePurchasesReady = "1";
