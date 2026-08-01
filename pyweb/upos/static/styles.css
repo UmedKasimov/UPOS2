@@ -29585,3 +29585,37 @@ html.dark .crm-task-calendar-event {
 .warehouse-purchases-table th {
   border-color: var(--border);
 }
+
+/* 5. Все контролы в таблицах — одна форма и видимая рамка одного цвета:
+      не бывает «кнопки с линией» и «кнопки без линии». */
+.products-action-icon,
+.upos-table-column-btn,
+.kassa-status-select,
+.sales-status-select,
+.warehouse-purchase-status,
+.products-table select,
+.org-ops-table select,
+.reports-data-table select {
+  border-radius: var(--radius) !important;
+}
+
+.products-action-icon,
+.products-catalog-table .products-action-icon,
+.sales-journal-table .products-action-icon,
+.clients-table .products-action-icon,
+.warehouse-purchases-table .products-action-icon {
+  border: 1px solid var(--border) !important;
+  background: var(--card);
+}
+
+.products-action-icon:hover:not(:disabled) {
+  border-color: color-mix(in srgb, currentColor 45%, var(--border)) !important;
+  background: color-mix(in srgb, currentColor 8%, var(--card));
+}
+
+.kassa-status-select,
+.sales-status-select,
+.warehouse-purchase-status,
+.upos-table-column-btn {
+  border: 1px solid var(--border);
+}
