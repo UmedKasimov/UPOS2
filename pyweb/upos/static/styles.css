@@ -29504,3 +29504,84 @@ html.dark .crm-task-calendar-event {
 .sales-journal-table td:has(> select) {
   overflow: hidden;
 }
+
+/* ============================================================
+   БРЕНДБУК §7 — единый стандарт таблиц данных.
+   Один фон, одни границы, содержимое не выходит за колонку.
+   ============================================================ */
+
+/* 1. Служебные колонки (шестерёнка, действия) живут в фоне своей строки,
+      а не отдельным цветным блоком. */
+.products-catalog-table .upos-table-column-control-cell,
+.sales-journal-table .upos-table-column-control-cell,
+.clients-table .upos-table-column-control-cell,
+.warehouse-purchases-table .upos-table-column-control-cell,
+.org-ops-table .upos-table-column-control-cell,
+.products-table[data-upos-column-controls] .upos-table-column-control-cell {
+  background: var(--card) !important;
+  border-left: 1px solid var(--border);
+}
+
+.products-catalog-table thead .upos-table-column-control-cell,
+.sales-journal-table thead .upos-table-column-control-cell,
+.clients-table thead .upos-table-column-control-cell,
+.warehouse-purchases-table thead .upos-table-column-control-cell,
+.org-ops-table thead .upos-table-column-control-cell,
+.products-table[data-upos-column-controls] thead .upos-table-column-control-cell {
+  background: color-mix(in srgb, var(--primary) 10%, var(--card)) !important;
+}
+
+.products-catalog-table tfoot .upos-table-column-control-cell,
+.sales-journal-table tfoot .upos-table-column-control-cell,
+.clients-table tfoot .upos-table-column-control-cell,
+.warehouse-purchases-table tfoot .upos-table-column-control-cell {
+  background: color-mix(in srgb, var(--primary) 5%, var(--card)) !important;
+}
+
+/* 2. Кнопка настройки столбцов — та же форма, что у остальных иконок. */
+.upos-table-column-btn {
+  border-radius: var(--workbench-radius-sm, 10px);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 22%);
+  background: color-mix(in srgb, var(--card), var(--primary) 8%);
+  box-shadow: none;
+}
+
+/* 3. Содержимое ячеек не выходит за границы колонки. */
+.products-catalog-table td,
+.sales-journal-table td,
+.clients-table td,
+.warehouse-purchases-table td,
+.reports-data-table td {
+  overflow: hidden;
+}
+
+.sales-journal-table td > *,
+.products-catalog-table td > *,
+.clients-table td > *,
+.warehouse-purchases-table td > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sales-journal-table td select,
+.products-catalog-table td select,
+.clients-table td select,
+.warehouse-purchases-table td select,
+.sales-journal-table td input,
+.products-catalog-table td input[type="text"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 4. Границы одной толщины и одного цвета. */
+.products-catalog-table td,
+.products-catalog-table th,
+.sales-journal-table td,
+.sales-journal-table th,
+.clients-table td,
+.clients-table th,
+.warehouse-purchases-table td,
+.warehouse-purchases-table th {
+  border-color: var(--border);
+}
