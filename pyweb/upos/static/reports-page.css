@@ -1452,7 +1452,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-stock-alert {
   margin-right: 0.35rem;
-  color: #f97316;
+  color: #64748b;
   font-size: 0.9rem;
 }
 
@@ -2134,7 +2134,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-sales-kpis .is-debt,
 .reports-sales-kpis .is-order {
-  border-left-color: #eab308;
+  border-left-color: #64748b;
 }
 
 .reports-sales-kpis .is-profit {
@@ -2165,7 +2165,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 .reports-sales-row--order td {
-  background: color-mix(in srgb, #facc15 11%, var(--card));
+  background: color-mix(in srgb, #94a3b8 11%, var(--card));
 }
 
 .reports-sales-type {

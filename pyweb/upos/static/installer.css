@@ -162,7 +162,7 @@ button {
 }
 
 .installer-connection.is-offline {
-  border-color: rgba(253, 186, 116, 0.5);
+  border-color: rgba(148, 163, 184, 0.5);
   color: #fed7aa;
 }
 
@@ -223,7 +223,7 @@ button {
 .installer-danger-button {
   border-color: #cbd5e1;
   color: #b42318;
-  background: #fff7f7;
+  background: #f1f5f9;
 }
 
 main {
@@ -883,7 +883,7 @@ main {
   padding: 9px 10px;
   border-left: 3px solid #64748b;
   color: #7c3f00;
-  background: #fff7e6;
+  background: #f1f5f9;
   font-size: 12px;
 }
 

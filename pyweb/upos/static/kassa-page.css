@@ -1603,7 +1603,7 @@ html.dark .kassa-status-select--confirmed {
 .kassa-transfer-status-pill--pending {
   color: #8a4b00;
   border-color: #f6c36f;
-  background: #fff6de;
+  background: #f1f5f9;
 }
 
 .kassa-transfer-status-pill--rejected {

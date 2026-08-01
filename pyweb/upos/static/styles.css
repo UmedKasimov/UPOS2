@@ -2115,7 +2115,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .products-search-hit {
   padding: 0 0.08rem;
   border-radius: 3px;
-  background: #fff176;
+  background: #dbeafe;
   color: inherit;
 }
 
@@ -2214,7 +2214,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0.62rem 0.75rem;
   border: 1px solid color-mix(in srgb, #f0c74a 55%, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
-  background: color-mix(in srgb, #fff0b8 72%, var(--card));
+  background: color-mix(in srgb, #dbeafe 72%, var(--card));
 }
 
 .products-bulk-toolbar[hidden] {
@@ -5456,7 +5456,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-card-activity--yellow {
-  --crm-activity-color: #eab308;
+  --crm-activity-color: #64748b;
 }
 
 .crm-card-activity--red {
@@ -5632,7 +5632,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-search-hit {
   padding: 0 0.08rem;
   border-radius: 0.22rem;
-  background: #fef08a;
+  background: #dbeafe;
   color: #713f12;
   font: inherit;
 }
@@ -10407,7 +10407,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-payment-summary-card.is-overpaid {
   border-color: rgba(220, 38, 38, 0.35);
-  background: #fff7f7;
+  background: #f1f5f9;
 }
 
 .sales-payment-summary-row--over span,
@@ -10832,7 +10832,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-search-mark {
   padding: 0 0.08em;
   border-radius: 0.18rem;
-  background: #ffe36e;
+  background: #bfdbfe;
   color: #1f2937;
 }
 
@@ -10849,12 +10849,14 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   background: color-mix(in srgb, var(--primary) 11%, var(--card));
 }
 
+/* Тихие уровни: тип документа отличается слабой примесью синего/нейтрали,
+   без жёлтого и красного. */
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--order td {
-  background: color-mix(in srgb, #facc15 19%, var(--card));
+  background: color-mix(in srgb, #64748b 8%, var(--card));
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--order:hover td {
-  background: color-mix(in srgb, #facc15 27%, var(--card));
+  background: color-mix(in srgb, #64748b 13%, var(--card));
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
@@ -11738,7 +11740,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-task-total {
-  background: color-mix(in srgb, #eab308 12%, var(--card));
+  background: color-mix(in srgb, #64748b 12%, var(--card));
   color: #a16207;
 }
 
@@ -25572,7 +25574,7 @@ button.general-module-tab {
 }
 
 .org-shipments-status--open {
-  background: color-mix(in srgb, #f97316 15%, var(--card));
+  background: color-mix(in srgb, #64748b 15%, var(--card));
   color: #9a3412;
 }
 
@@ -26793,9 +26795,9 @@ body.is-sidebar-collapsed .upos-floating-phone,
 
 .telephony-search-hit {
   padding: 0.04em 0.14em;
-  border: 1px solid #eab308;
+  border: 1px solid #64748b;
   border-radius: 3px;
-  background: #fef08a;
+  background: #dbeafe;
   color: #1f2937;
   font: inherit;
 }
@@ -27174,7 +27176,7 @@ html.dark .upos-floating-phone-status[data-state="pending"] {
 html.dark .upos-floating-phone-status[data-state="error"] {
   border-color: color-mix(in oklch, #f43f5e, transparent 58%);
   background: color-mix(in oklch, #f43f5e, var(--card) 88%);
-  color: #fda4af;
+  color: #94a3b8;
 }
 
 html.dark .telephony-kpi-card,
@@ -28129,7 +28131,7 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .sales-installation-calendar-day.is-weekend {
-  background: #fffaf0;
+  background: #f8fafc;
 }
 
 .sales-installation-calendar-day.is-outside {
@@ -28568,7 +28570,7 @@ html.dark .sales-installation-calendar-order.is-completed {
 .crm-task-priority--high,
 .crm-task-state--overdue {
   border-color: #e8a5a1;
-  background: #fff0ef;
+  background: #f1f5f9;
   color: #b72f2a;
 }
 
@@ -28581,7 +28583,7 @@ html.dark .sales-installation-calendar-order.is-completed {
 .crm-task-priority--normal,
 .crm-task-state--today {
   border-color: #e5c675;
-  background: #fff7dc;
+  background: #f1f5f9;
   color: #75540b;
 }
 
@@ -28712,7 +28714,7 @@ html.dark .sales-installation-calendar-order.is-completed {
 
 .crm-task-calendar-event.is-overdue {
   border-color: #e8a5a1;
-  background: #fff0ef;
+  background: #f1f5f9;
   color: #a52925;
 }
 
