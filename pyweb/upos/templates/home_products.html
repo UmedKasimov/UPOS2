@@ -109,7 +109,9 @@
               <a class="btn" href="{{ url_for('products_get') }}?kind=product#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
                 + Товар
               </a>
-              <a class="btn" href="{{ url_for('products_get') }}?kind=service#product-form" data-workspace-trigger="create-service" data-workspace-tab-title="Новая услуга" data-workspace-tab-hash="product-form">
+              {# trigger тот же, что у товара: панель формы одна (view «create»),
+                 отдельный trigger открывал пустую вкладку. #}
+              <a class="btn" href="{{ url_for('products_get') }}?kind=service#product-form" data-workspace-trigger="create" data-workspace-tab-title="Новая услуга" data-workspace-tab-hash="product-form" data-workspace-tab-href="{{ url_for('products_get') }}?kind=service">
                 + Услуга
               </a>
               <a class="btn btn-secondary" href="#categories" data-workspace-card="categories" data-workspace-tab-title="Категории" data-workspace-tab-hash="categories">Категории</a>
@@ -671,6 +673,39 @@
               <label><span>Статус</span><select name="status"><option value="active" {% if current.status != 'inactive' %}selected{% endif %}>Активный</option><option value="inactive" {% if current.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
             </div>
           </section>
+
+          <section class="product-form-section product-form-section--primary" data-service-extra {% if current.kind != 'service' %}hidden{% endif %}>
+            <div class="product-form-section-head">
+              <h3>Услуга: цена и бонус</h3>
+            </div>
+            <div class="product-form-grid">
+              <label><span>Продажная цена</span><input name="service_sale_price" inputmode="decimal" value="{{ current.sale_price or '' }}" placeholder="0" /></label>
+              <label>
+                <span>Валюта</span>
+                <select name="service_sale_currency">
+                  <option value="UZS" {% if (current.sale_currency or 'UZS') == 'UZS' %}selected{% endif %}>UZS</option>
+                  <option value="USD" {% if current.sale_currency == 'USD' %}selected{% endif %}>USD</option>
+                </select>
+              </label>
+              <label><span>Бонус сотрудникам, %</span><input name="service_bonus_percent" inputmode="decimal" value="{{ service_bonus_percent or '' }}" placeholder="0" /></label>
+            </div>
+            <p class="earnings-hint">Цена попадёт в прайс-лист по умолчанию. Бонус начисляется сотруднику при завершении установки с этой услугой.</p>
+          </section>
+          <script>
+            (function () {
+              var form = document.currentScript.closest('form');
+              var section = form && form.querySelector('[data-service-extra]');
+              if (!form || !section) return;
+              var sync = function () {
+                var service = form.querySelector('input[name="kind"][value="service"]');
+                section.hidden = !(service && service.checked);
+              };
+              form.querySelectorAll('input[name="kind"]').forEach(function (radio) {
+                radio.addEventListener('change', sync);
+              });
+              sync();
+            })();
+          </script>
 
           {% for price in prices %}
             <input type="hidden" name="price_name" value="{{ price.name or 'Продажная цена' }}" />

@@ -5719,6 +5719,10 @@ def create_app() -> FastAPI:
             products_total=products_total,
             catalog_kind_counts=catalog_kind_counts,
             default_price_type_id=_workspace_default_price_type_id(wid) or "1",
+            service_bonus_percent=(
+                load_earning_rules(wid).get("by_service", {}).get(str(edit_product.get("id") or ""))
+                if edit_product else ""
+            ) or "",
             product_page_size=product_page_size,
             product_page=product_page,
             product_total_pages=product_total_pages,
@@ -6077,7 +6081,8 @@ def create_app() -> FastAPI:
                 value = _sales_decimal(price_text)
                 price_uzs = _convert_product_currency(value, price_ccy or "UZS", "UZS", usd_rate)
                 prices[str(row.id)] = {
-                    "display": _report_money(value, price_ccy or "UZS") if value else "-",
+                    # _report_money живёт внутри home_reports — здесь форматируем сами.
+                    "display": f"{_sales_money_label(value)} {(price_ccy or 'UZS').upper()}" if value else "-",
                     "raw": _decimal_plain_text(value) if value else "0",
                     "uzs": _decimal_plain_text(price_uzs) if value else "0",
                 }
@@ -6362,7 +6367,38 @@ def create_app() -> FastAPI:
                     data["photo_url"] = f"/products/{product_id}/photo"
                 else:
                     session.delete(photo)
+            # Услуга: цена из формы попадает в прайс-лист по умолчанию,
+            # процент бонуса — в правила заработка.
+            if str(data.get("kind") or "product") == "service":
+                service_price = str(form.get("service_sale_price") or "").strip()
+                if service_price:
+                    service_currency = str(form.get("service_sale_currency") or "UZS").strip().upper()
+                    if service_currency not in {"UZS", "USD"}:
+                        service_currency = "UZS"
+                    default_pt_id = _workspace_default_price_type_id(wid) or "1"
+                    prices = [dict(item) for item in data.get("prices", []) if isinstance(item, dict)]
+                    entry = next(
+                        (item for item in prices if str(item.get("price_type_id") or "") == default_pt_id),
+                        None,
+                    )
+                    if entry is None:
+                        entry = {"price_type_id": default_pt_id}
+                        prices.append(entry)
+                    entry.update({
+                        "price": _decimal_plain_text(_sales_decimal(service_price)),
+                        "currency": service_currency,
+                        "manual_override": True,
+                    })
+                    data["prices"] = prices
+                    data["sale_price"] = _decimal_plain_text(_sales_decimal(service_price))
+                    data["sale_currency"] = service_currency
             row.data = data
+        service_bonus_raw = str(form.get("service_bonus_percent") or "").strip()
+        if str(data.get("kind") or "product") == "service" and service_bonus_raw:
+            rules = load_earning_rules(wid)
+            by_service = dict(rules.get("by_service") or {})
+            by_service[product_id] = service_bonus_raw
+            save_earning_rules(wid, rules.get("default"), rules.get("by_user"), by_service)
         return RedirectResponse(url="/products?msg=saved", status_code=302)
 
     @app.post("/products/categories/save", name="products_category_save")
