@@ -29395,6 +29395,19 @@ html.dark .crm-task-calendar-event {
   min-width: 1.25rem;
 }
 
+/* Нумерация 1, 2, 3… считается счётчиком по видимому порядку строк,
+   поэтому не сбивается при клиентской сортировке таблицы. */
+#products-catalog-table tbody,
+.reports-stock-analysis-table tbody {
+  counter-reset: history-row;
+}
+
+#products-catalog-table tbody .product-history-index::before,
+.reports-stock-analysis-table tbody .product-history-index::before {
+  counter-increment: history-row;
+  content: counter(history-row);
+}
+
 #products-catalog-table .product-history-actions .product-history-index,
 .reports-stock-analysis-table .product-history-actions .product-history-index {
   padding: 0 0.15rem 0 0.4rem;

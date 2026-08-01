@@ -517,7 +517,7 @@
                 <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %}>
                   <td class="reports-history-col" data-sort-value="{{ loop.index }}">
                     <div class="product-history-actions">
-                      <span class="product-history-index">{{ loop.index }}-</span>
+                      <span class="product-history-index"></span>
                       <button type="button" class="products-action-icon product-history-btn" data-product-history="{{ row.product_id }}" data-product-history-name="{{ row.product }}" title="История товара" aria-label="История товара {{ row.product }}">
                         <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
                       </button>
