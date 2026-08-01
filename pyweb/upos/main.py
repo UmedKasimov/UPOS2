@@ -18478,12 +18478,35 @@ def create_app() -> FastAPI:
                         continue
                     ccy = str(purchase.currency or "UZS").upper()
                     payables_by_currency[ccy] = payables_by_currency.get(ccy, Decimal("0")) + debt
+                # Дебиторка для баланса — полная, по всем документам с признанным
+                # долгом (receivable_rows выше ограничены выбранным периодом).
+                balance_receivables_by_currency: dict[str, Decimal] = {}
+                balance_debtors: set[str] = set()
+                for sale_row in sales_rows:
+                    sale_data = _json_object(sale_row.data)
+                    sale_doc_type = str(sale_data.get("doc_type") or "sale")
+                    if not _sales_status_records_debt(_sales_workflow_status(sale_data), sale_doc_type):
+                        continue
+                    sign = Decimal("-1") if sale_doc_type == "return" else Decimal("1")
+                    debt = sign * (_sales_decimal(sale_row.amount) - _sales_decimal(sale_data.get("paid_amount")))
+                    if not debt:
+                        continue
+                    ccy = str(sale_row.currency or "UZS").upper()
+                    balance_receivables_by_currency[ccy] = balance_receivables_by_currency.get(ccy, Decimal("0")) + debt
+                    if debt > 0:
+                        balance_debtors.add(
+                            str(sale_data.get("counterparty_id") or sale_row.counterparty_id or sale_data.get("client") or "")
+                        )
                 business_reports["company_balance"] = {
                     "money_total": report_data["balance_summary"],
                     "accounts": report_data["balance_accounts"],
                     "stock_total": _report_money(stock_analysis_cost_total, "UZS"),
-                    "receivable_total": _report_money(receivable_total, primary_currency),
-                    "receivable_clients": len(receivable_rows),
+                    "receivables": [
+                        {"currency": ccy, "amount": _report_money(amount, ccy)}
+                        for ccy, amount in sorted(balance_receivables_by_currency.items())
+                        if amount
+                    ],
+                    "receivable_clients": len(balance_debtors),
                     "payables": [
                         {"currency": ccy, "amount": _report_money(amount, ccy)}
                         for ccy, amount in sorted(payables_by_currency.items())

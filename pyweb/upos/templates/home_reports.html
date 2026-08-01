@@ -577,7 +577,11 @@
             <article><span>Деньги ({{ row.currency }})</span><strong>{{ row.amount }} {{ row.currency }}</strong></article>
           {% endfor %}
           <article><span>Склад по себестоимости</span><strong>{{ company_balance.stock_total or "0 UZS" }}</strong></article>
-          <article class="is-profit"><span>Нам должны клиенты</span><strong>{{ company_balance.receivable_total or "0 UZS" }}</strong><small>{{ company_balance.receivable_clients or 0 }} должников</small></article>
+          {% for row in company_balance.receivables %}
+            <article class="is-profit"><span>Нам должны клиенты ({{ row.currency }})</span><strong>{{ row.amount }}</strong><small>{{ company_balance.receivable_clients or 0 }} должников</small></article>
+          {% else %}
+            <article class="is-profit"><span>Нам должны клиенты</span><strong>0 UZS</strong></article>
+          {% endfor %}
           {% for row in company_balance.payables %}
             <article class="is-debt"><span>Мы должны поставщикам ({{ row.currency }})</span><strong>{{ row.amount }}</strong></article>
           {% else %}
