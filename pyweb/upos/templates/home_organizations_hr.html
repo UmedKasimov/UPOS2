@@ -740,76 +740,31 @@
         <header class="director-modal-head">
           <div>
             <p class="settings-ios-footnote">Карточка сотрудника</p>
-            <h2>Редактировать сотрудника</h2>
+            <h2>Зарплата сотрудника</h2>
           </div>
           <button type="button" class="director-modal-close" data-org-modal-close aria-label="{{ _('settings.profile.close') }}">
             ×
           </button>
         </header>
         <div class="org-hr-form">
+          {# Данные сотрудника приходят из программы и здесь не редактируются —
+             меняется только зарплата. Скрытые поля сохраняют текущие значения. #}
           {% include "_csrf_field.html" %}
           <input type="hidden" name="employee_id" data-hr-edit-field="employee_id" />
-          <label>
-            <span>Имя</span>
-            <input name="first_name" type="text" maxlength="120" required data-hr-edit-field="first_name" />
-          </label>
-          <label>
-            <span>Фамилия</span>
-            <input name="last_name" type="text" maxlength="120" required data-hr-edit-field="last_name" />
-          </label>
-          <label>
-            <span>Должность</span>
-            <div class="org-position-select" data-position-select data-organization-id="{{ selected_organization_id or user.active_org_id or user.workspace_owner_id or '' }}">
-              <input type="hidden" name="position_id" data-position-id />
-              <input type="hidden" name="position" data-position-name />
-              <button type="button" class="org-position-select-btn" data-position-trigger aria-haspopup="listbox" aria-expanded="false">
-                <span data-position-label>Выберите должность</span>
-                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-              <div class="org-position-menu" data-position-menu hidden>
-                <div class="org-position-options" data-position-options role="listbox" aria-label="Должности">
-                  {% for pos in positions %}
-                    <div class="org-position-row" data-position-row data-id="{{ pos.id }}" data-name="{{ pos.name }}">
-                      <button type="button" class="org-position-option" data-position-option>{{ pos.name }}</button>
-                      <button type="button" class="org-position-action" data-position-edit aria-label="Редактировать должность {{ pos.name }}">✎</button>
-                      <button type="button" class="org-position-action" data-position-delete aria-label="Удалить должность {{ pos.name }}">×</button>
-                    </div>
-                  {% endfor %}
-                </div>
-                <button type="button" class="org-position-add-row" data-position-add-toggle>+ Добавить должность</button>
-                <div class="org-position-inline" data-position-inline hidden>
-                  <span data-position-inline-title>Новая должность:</span>
-                  <div class="org-position-inline-controls">
-                    <input type="text" maxlength="160" placeholder="Введите название..." data-position-input />
-                    <button type="button" class="org-position-save" data-position-save aria-label="Сохранить должность">✓</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </label>
-          <label>
-            <span>Серия паспорта</span>
-            <input name="passport_series" type="text" maxlength="16" data-hr-edit-field="passport_series" />
-          </label>
-          <label>
-            <span>Номер паспорта</span>
-            <input name="passport_number" type="text" maxlength="32" data-hr-edit-field="passport_number" />
-          </label>
-          <label>
+          <input type="hidden" name="first_name" data-hr-edit-field="first_name" />
+          <input type="hidden" name="last_name" data-hr-edit-field="last_name" />
+          <div data-position-select hidden>
+            <input type="hidden" name="position_id" data-position-id />
+            <input type="hidden" name="position" data-position-name />
+          </div>
+          <input type="hidden" name="passport_series" data-hr-edit-field="passport_series" />
+          <input type="hidden" name="passport_number" data-hr-edit-field="passport_number" />
+          <input type="hidden" name="hired_at" data-hr-edit-field="hired_at" />
+          <label class="org-hr-form-wide">
             <span>Зарплата за месяц</span>
             <input name="monthly_salary" type="text" inputmode="decimal" placeholder="0" data-hr-edit-field="monthly_salary" data-upos-money-format data-upos-money-decimals="0" />
           </label>
-          <label>
-            <span>Дата приема</span>
-            <input name="hired_at" type="date" data-hr-edit-field="hired_at" />
-          </label>
-          <label>
-            <span>Фото</span>
-            <input name="photo" type="file" accept="image/*" />
-          </label>
-          <label class="org-hr-checkline org-hr-checkline--wide">
+          <label class="org-hr-checkline org-hr-checkline--wide" hidden>
             <input name="is_courier" type="checkbox" value="1" data-hr-edit-field="is_courier" />
             <span>Доставщик</span>
           </label>
