@@ -29370,10 +29370,29 @@ html.dark .crm-task-calendar-event {
   display: inline-flex;
   align-items: center;
   gap: 0;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: 9px;
   background: var(--card);
+}
+
+/* Группа обязана помещаться внутри закреплённой колонки 7.2rem. */
+#products-catalog-table .products-history-col,
+.reports-stock-analysis-table .reports-history-col {
+  padding-inline: 0.3rem !important;
+}
+
+#products-catalog-table .product-history-actions .product-history-btn,
+.reports-stock-analysis-table .product-history-actions .product-history-btn {
+  width: 1.7rem;
+  height: 1.75rem;
+}
+
+#products-catalog-table .product-history-actions .product-history-index,
+.reports-stock-analysis-table .product-history-actions .product-history-index {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
 }
 
 #products-catalog-table .product-history-actions .product-history-index,
