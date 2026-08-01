@@ -18,6 +18,7 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='products-table.js') }}?v=11" defer></script>
+  <script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
 {% endblock %}
 
 {% block main %}
@@ -326,6 +327,7 @@
                 <th data-column-label="Выбор" class="products-check-col">
                   <input type="checkbox" class="products-bulk-checkbox" data-products-select-all aria-label="Выбрать все товары" />
                 </th>
+                <th data-column-label="История" class="products-history-col"></th>
                 <th data-column-label="Фото" class="products-photo-col"></th>
                 <th data-column-label="Название" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="name">
@@ -407,6 +409,30 @@
                       data-products-select
                       aria-label="Выбрать товар {{ product.name }}"
                     />
+                  </td>
+                  <td class="products-history-col">
+                    <div class="product-history-actions">
+                      <button
+                        type="button"
+                        class="products-action-icon product-history-btn"
+                        data-product-history="{{ product.id }}"
+                        data-product-history-name="{{ product.name }}"
+                        title="История товара"
+                        aria-label="История товара {{ product.name }}"
+                      >
+                        <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="products-action-icon product-history-btn"
+                        data-product-price-history="{{ product.id }}"
+                        data-product-history-name="{{ product.name }}"
+                        title="История изменения цен"
+                        aria-label="История цен {{ product.name }}"
+                      >
+                        <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18"/><path d="m7 13 3-3 3 2 5-6"/><circle cx="7" cy="13" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="13" cy="12" r="1"/><circle cx="18" cy="6" r="1"/></svg>
+                      </button>
+                    </div>
                   </td>
                   <td class="products-photo-col">
                     {% if product.photo_url %}
@@ -528,14 +554,14 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="13">Пока нет товаров. Создайте первый товар справа.</td>
+                  <td colspan="14">Пока нет товаров. Создайте первый товар справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
             {% if products_total %}
               <tfoot>
                 <tr class="products-catalog-total-row">
-                  <td colspan="6"><strong>Итого по выбранному каталогу</strong></td>
+                  <td colspan="7"><strong>Итого по выбранному каталогу</strong></td>
                   <td class="products-catalog-number">
                     {% for total in catalog_totals.quantities %}
                       <span>{{ total.value }} {{ total.unit }}</span>

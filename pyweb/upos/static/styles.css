@@ -28937,6 +28937,133 @@ html.dark .crm-task-calendar-event {
   border-top: 1px solid var(--workbench-line, var(--border));
 }
 
+/* ===== История товара и цен в каталоге ===== */
+.products-history-col {
+  width: 4.6rem;
+  min-width: 4.6rem;
+}
+
+.product-history-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.product-history-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.product-history-btn:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  color: var(--primary);
+}
+
+.product-history-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.product-history-dialog {
+  width: min(60rem, calc(100vw - 2rem));
+  padding: 0;
+  border: none;
+  border-radius: var(--workbench-radius-sm, 12px);
+  background: transparent;
+}
+
+.product-history-dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
+}
+
+.product-history-surface {
+  overflow: hidden;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 12px);
+  background: var(--card);
+  box-shadow: 0 24px 60px rgb(15 23 42 / 0.25);
+}
+
+.product-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem 0.8rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.product-history-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.product-history-head p {
+  margin: 0.15rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+}
+
+.product-history-close {
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.product-history-body {
+  max-height: min(60vh, 34rem);
+  padding: 0.9rem 1.2rem 1.1rem;
+  overflow: auto;
+}
+
+.product-history-table td small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.product-history-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-history-delta.is-in {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.product-history-delta.is-out {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.product-history-arrow {
+  color: var(--muted-foreground);
+}
+
+.product-history-loading,
+.product-history-empty {
+  margin: 0.4rem 0;
+  color: var(--muted-foreground);
+}
+
 /* ===== Закупки в стиле журнала продаж ===== */
 /* В закупках фильтров четыре, а не шесть как в продажах: без своей сетки
    поля жались влево и справа оставалась пустая полоса. */

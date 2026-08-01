@@ -6053,6 +6053,183 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "private, no-cache"},
         )
 
+    @app.get("/api/products/{product_id}/history", name="product_history_api")
+    def product_history_api(request: Request, product_id: str):
+        """История движений и цен товара из продаж, закупок и складских операций."""
+        wid, redir = _product_workspace_owner(request)
+        if redir or not wid:
+            return JSONResponse({"error": "auth"}, status_code=401)
+        with session_scope() as session:
+            product = session.get(Product, product_id)
+            if product is None or product.workspace_owner_id != wid:
+                return JSONResponse({"error": "not_found"}, status_code=404)
+            product_names = {product.name.strip().lower()}
+            movements: list[dict[str, Any]] = []
+            prices: list[dict[str, Any]] = []
+
+            def line_matches(line: dict[str, Any]) -> bool:
+                if str(line.get("product_id") or "").strip() == product.id:
+                    return True
+                return str(line.get("product") or "").strip().lower() in product_names
+
+            def doc_moment(row: Any, data: dict[str, Any]) -> str:
+                raw = str(data.get("date") or "").strip()
+                stamp = row.updated_at or row.created_at
+                if raw and "T" not in raw and stamp:
+                    return f"{raw}T{stamp:%H:%M:%S}"
+                return raw or (stamp.isoformat() if stamp else "")
+
+            for row in session.execute(
+                select(SaleDocument).where(SaleDocument.workspace_owner_id == wid)
+            ).scalars():
+                data = _json_object(row.data)
+                doc_type = str(data.get("doc_type") or "sale")
+                type_label = {"sale": "Продажа", "order": "Заказ", "return": "Возврат"}.get(doc_type, "Продажа")
+                applied = _sales_inventory_applied(data)
+                for line in data.get("lines") or []:
+                    if not isinstance(line, dict) or not line_matches(line):
+                        continue
+                    quantity = _sales_decimal(line.get("quantity"))
+                    if quantity <= 0:
+                        continue
+                    delta = quantity if doc_type == "return" else -quantity
+                    movements.append(
+                        {
+                            "moment": doc_moment(row, data),
+                            "document": row.number,
+                            "type": type_label,
+                            "warehouse": str(line.get("warehouse") or data.get("warehouse") or ""),
+                            "delta": delta if applied else Decimal("0"),
+                            "delta_label": _sales_money_label(delta),
+                            "applied": applied,
+                            "price": _sales_money_label(_sales_decimal(line.get("price"))),
+                            "currency": str(row.currency or "UZS"),
+                            "actor": str(data.get("manager") or ""),
+                        }
+                    )
+                    if doc_type != "order":
+                        prices.append(
+                            {
+                                "moment": doc_moment(row, data),
+                                "kind": "Продажная",
+                                "price": _sales_money_label(_sales_decimal(line.get("price"))),
+                                "currency": str(row.currency or "UZS"),
+                                "document": f"{type_label} {row.number}",
+                                "actor": str(data.get("manager") or ""),
+                            }
+                        )
+
+            for row in session.execute(
+                select(PurchaseDocument).where(PurchaseDocument.workspace_owner_id == wid)
+            ).scalars():
+                data = _json_object(row.data)
+                is_return = bool(data.get("is_supplier_return"))
+                type_label = "Возврат поставщику" if is_return else "Закупка"
+                for line in data.get("lines") or []:
+                    if not isinstance(line, dict) or not line_matches(line):
+                        continue
+                    quantity = _sales_decimal(line.get("quantity"))
+                    if quantity <= 0:
+                        continue
+                    delta = -quantity if is_return else quantity
+                    movements.append(
+                        {
+                            "moment": doc_moment(row, data),
+                            "document": row.number,
+                            "type": type_label,
+                            "warehouse": str(line.get("warehouse") or data.get("warehouse") or ""),
+                            "delta": delta,
+                            "delta_label": _sales_money_label(delta),
+                            "applied": True,
+                            "price": _sales_money_label(_sales_decimal(line.get("price"))),
+                            "currency": str(row.currency or "UZS"),
+                            "actor": str(data.get("manager") or data.get("supplier") or ""),
+                        }
+                    )
+                    if not is_return:
+                        prices.append(
+                            {
+                                "moment": doc_moment(row, data),
+                                "kind": "Закупочная",
+                                "price": _sales_money_label(_sales_decimal(line.get("price"))),
+                                "currency": str(row.currency or "UZS"),
+                                "document": f"Закупка {row.number}",
+                                "actor": str(data.get("supplier") or ""),
+                            }
+                        )
+
+            for row in session.execute(
+                select(WarehouseOperation).where(WarehouseOperation.workspace_owner_id == wid)
+            ).scalars():
+                data = _json_object(row.data)
+                if str(data.get("product") or "").strip().lower() not in product_names:
+                    continue
+                op_type = str(data.get("operation_type") or data.get("type") or "")
+                type_label = {"in": "Корректировка: приход", "out": "Корректировка: списание", "transfer": "Перемещение"}.get(op_type, "Складская операция")
+                quantity = _sales_decimal(data.get("quantity"))
+                delta = quantity if op_type == "in" else -quantity if op_type == "out" else Decimal("0")
+                movements.append(
+                    {
+                        "moment": str(data.get("date") or (row.created_at.isoformat() if row.created_at else "")),
+                        "document": str(data.get("number") or row.id[:8]),
+                        "type": type_label,
+                        "warehouse": str(data.get("warehouse") or data.get("warehouse_from") or ""),
+                        "delta": delta,
+                        "delta_label": _sales_money_label(delta),
+                        "applied": True,
+                        "price": "",
+                        "currency": "",
+                        "actor": str(data.get("responsible") or ""),
+                    }
+                )
+
+            movements.sort(key=lambda item: str(item.get("moment") or ""), reverse=True)
+            # Остатки «до/после» восстанавливаем от текущего остатка назад во
+            # времени: стартовые остатки iBox не оформлены документами, поэтому
+            # прямой пересчёт от нуля с реальностью бы не сошёлся.
+            running = sum(
+                (_sales_decimal(stock.get("quantity")) for stock in _product_stocks(product)),
+                Decimal("0"),
+            )
+            for item in movements:
+                if item["applied"]:
+                    item["after"] = _sales_money_label(running)
+                    running -= item["delta"]
+                    item["before"] = _sales_money_label(running)
+                else:
+                    item["after"] = "-"
+                    item["before"] = "-"
+                item.pop("delta", None)
+                item.pop("applied", None)
+                moment = str(item.get("moment") or "")
+                item["date"] = moment[:10]
+                item["time"] = moment[11:16]
+                item.pop("moment", None)
+
+            # История цен: только фактические изменения (последовательные
+            # одинаковые значения не интересны).
+            prices.sort(key=lambda item: str(item.get("moment") or ""))
+            changes: list[dict[str, Any]] = []
+            last_by_kind: dict[str, str] = {}
+            for entry in prices:
+                key = f"{entry['kind']}:{entry['currency']}"
+                if last_by_kind.get(key) == entry["price"]:
+                    continue
+                entry["old_price"] = last_by_kind.get(key) or "0"
+                last_by_kind[key] = entry["price"]
+                moment = str(entry.get("moment") or "")
+                entry["date"] = moment[:10]
+                entry["time"] = moment[11:16]
+                entry.pop("moment", None)
+                changes.append(entry)
+            changes.reverse()
+
+        return {
+            "product": {"name": product.name, "sku": product.sku or "", "unit": str(_json_object(product.data).get("unit") or "")},
+            "movements": movements[:200],
+            "prices": changes[:100],
+        }
+
     @app.post("/products/save", name="products_save")
     async def products_save(request: Request):
         form = await request.form()
