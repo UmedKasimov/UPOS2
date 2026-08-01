@@ -119,6 +119,13 @@
         <span>Шаблон ценника</span>
         <small>Коммерческое предложение</small>
       </a>
+      <a class="general-report-card general-settings-card {{ 'active' if active_settings_tab == 'price-tag' else '' }}" href="{{ settings_base_url }}?tab=price-tag" {% if active_settings_tab == 'price-tag' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M20.6 12.6 12 21.2a2 2 0 0 1-2.8 0l-6.4-6.4a2 2 0 0 1 0-2.8l8.6-8.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v5.2a2 2 0 0 1-.4 1.6Z"/><path d="M16.5 7.5h.01"/></svg>
+        </span>
+        <span>Ценники</span>
+        <small>Этикетки для печати</small>
+      </a>
       {% endif %}
       {% if telegram_can_manage | default(false) %}
       <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=telegram#telegram-limits">

@@ -21385,7 +21385,7 @@ def create_app() -> FastAPI:
                 if default_allowed_tab not in allowed_tabs:
                     default_allowed_tab = "employees"
             if settings_can_manage_config:
-                allowed_tabs.update({"telegram", "integrations", "crm", "price-template"})
+                allowed_tabs.update({"telegram", "integrations", "crm", "price-template", "price-tag"})
             if settings_can_manage_dictionary:
                 allowed_tabs.add("dictionary")
                 if default_allowed_tab not in allowed_tabs:
@@ -22020,7 +22020,7 @@ def create_app() -> FastAPI:
             if default_allowed_tab not in allowed_tabs:
                 default_allowed_tab = "employees"
         if settings_can_manage_config:
-            allowed_tabs.update({"telegram", "integrations", "social", "crm", "price-template"})
+            allowed_tabs.update({"telegram", "integrations", "social", "crm", "price-template", "price-tag"})
         if settings_can_manage_dictionary:
             allowed_tabs.add("dictionary")
             if default_allowed_tab not in allowed_tabs:
