@@ -343,6 +343,14 @@
             <h2>Отчёт о прибыли</h2>
             <p>{{ profit_summary.period }} · статей расходов: {{ profit_summary.expense_count or 0 }}</p>
           </div>
+          <form class="reports-profit-period" method="get" action="{{ url_for('home_reports') }}" data-reports-period-form>
+            <input type="hidden" name="period" value="custom" />
+            <label class="sales-journal-filter-field sales-journal-filter-date">
+              <span>Период</span>
+              <input name="date_from" type="date" value="{{ reports.period_date_from or '' }}" onchange="this.form.submit()" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период отчёта о прибыли" />
+              <input name="date_to" type="hidden" value="{{ reports.period_date_to or '' }}" />
+            </label>
+          </form>
           <div class="reports-balance-total">
             <span><b>{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
           </div>
@@ -700,7 +708,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='date-range-picker.js') }}?v=16"></script>
+<script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
 <script>
 (() => {
   const dataNode = document.getElementById('delivery-shipments-report-data');

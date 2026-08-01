@@ -63,6 +63,17 @@
         });
       },
     });
+    if (forcedPeriodMode) {
+      // create() до сих пор кое-где переугадывает режим по значениям —
+      // фиксируем принудительный режим через setValue, он надёжен.
+      picker.setValue({
+        preset: 'custom',
+        date_from: input.value || '',
+        date_to: dateToValue,
+        label: rangeLabel,
+        period_mode: forcedPeriodMode,
+      });
+    }
     input.addEventListener('change', () => {
       const nextTo = rangeMode ? (toInput?.value || input.value || '') : (input.value || '');
       const nextPeriodMode = periodModes

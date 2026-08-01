@@ -179,7 +179,7 @@
         <input type="hidden" name="provider" value="{{ telephony_filters.provider }}" />
         <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
         <input type="hidden" name="status" value="{{ telephony_filters.status }}" />
-        <input name="date_from" type="date" value="{{ telephony_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" aria-label="Дата звонков от и до" />
+        <input name="date_from" type="date" value="{{ telephony_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Дата звонков от и до" />
         <input name="date_to" type="hidden" value="{{ telephony_filters.date_to }}" />
       </form>
     </header>
