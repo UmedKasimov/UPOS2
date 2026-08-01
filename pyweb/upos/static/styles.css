@@ -2480,15 +2480,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.35rem;
 }
 
+/* Кнопки истории везде в рамках — единый вид со «стенкой» отчётов. */
 #products-catalog-table .product-history-btn {
-  border-color: transparent;
-  background: transparent;
-  color: color-mix(in srgb, var(--foreground) 62%, transparent);
-}
-
-#products-catalog-table .product-history-btn:hover {
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-  color: var(--primary);
+  border-color: var(--workbench-line, var(--border));
+  background: var(--card);
 }
 
 .products-photo-col {
@@ -29295,4 +29290,28 @@ html.dark .crm-task-calendar-event {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+}
+
+/* Колонка настройки столбцов закреплена справа — «не изменяется» при
+   горизонтальной прокрутке анализа остатков. */
+.reports-stock-analysis-table .upos-table-column-control-cell {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--card);
+  box-shadow: -6px 0 8px -6px rgb(15 23 42 / 0.14);
+}
+
+.reports-stock-analysis-table thead .upos-table-column-control-cell {
+  z-index: 5;
+  background: var(--workbench-muted-surface);
+}
+
+/* Колонка шестерёнки — ровно под кнопку, не растягивается. */
+.reports-stock-analysis-table .upos-table-column-control-cell {
+  width: 3rem !important;
+  min-width: 3rem !important;
+  max-width: 3rem !important;
+  padding: 0.3rem !important;
+  text-align: center;
 }
