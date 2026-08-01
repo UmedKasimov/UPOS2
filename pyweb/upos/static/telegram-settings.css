@@ -21,11 +21,11 @@
 }
 
 .tg-status[data-variant="ok"] {
-  color: var(--green-strong, #0a7a3e);
+  color: var(--green-strong, #1e40af);
 }
 
 .tg-status[data-variant="err"] {
-  color: var(--red-strong, #c0392b);
+  color: var(--red-strong, #2563eb);
 }
 
 .tg-org-picker {
@@ -57,9 +57,9 @@
 }
 
 .tg-status-pill[data-variant="ok"] {
-  border-color: color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 65%);
-  color: var(--green-strong, #0a7a3e);
-  background: color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 92%);
+  border-color: color-mix(in srgb, var(--green-strong, #1e40af), transparent 65%);
+  color: var(--green-strong, #1e40af);
+  background: color-mix(in srgb, var(--green-strong, #1e40af), transparent 92%);
 }
 
 .tg-connect-actions,
@@ -91,7 +91,7 @@
   height: 2rem;
   place-items: center;
   border-radius: 50%;
-  background: #229ed9;
+  background: #2563eb;
   color: #fff;
   font-weight: 800;
 }
@@ -229,11 +229,11 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #229ed9;
+  background: #2563eb;
   color: #fff;
   font-weight: 800;
   font-size: var(--text-lg);
-  box-shadow: 0 4px 14px color-mix(in srgb, #229ed9, transparent 55%);
+  box-shadow: 0 4px 14px color-mix(in srgb, #2563eb, transparent 55%);
 }
 
 .tg-hub-name {
@@ -267,8 +267,8 @@
 }
 
 .tg-activity-dot.is-online {
-  background: var(--green-strong, #0a7a3e);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 80%);
+  background: var(--green-strong, #1e40af);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-strong, #1e40af), transparent 80%);
   animation: tgPulse 2s ease-in-out infinite;
 }
 
@@ -278,8 +278,8 @@
 }
 
 .tg-activity-dot.is-err {
-  background: var(--red-strong, #c0392b);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red-strong, #c0392b), transparent 82%);
+  background: var(--red-strong, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red-strong, #2563eb), transparent 82%);
 }
 
 @keyframes tgPulse {
@@ -332,17 +332,17 @@
 }
 
 .tg-icon-btn--danger:hover {
-  border-color: color-mix(in srgb, var(--red-strong, #c0392b), transparent 55%);
-  color: var(--red-strong, #c0392b);
-  background: color-mix(in srgb, var(--red-strong, #c0392b), transparent 92%);
+  border-color: color-mix(in srgb, var(--red-strong, #2563eb), transparent 55%);
+  color: var(--red-strong, #2563eb);
+  background: color-mix(in srgb, var(--red-strong, #2563eb), transparent 92%);
 }
 
 .tg-webhook-banner {
   margin: 0.65rem 0 0;
   padding: 0.55rem 0.7rem;
   border-radius: var(--settings-ios-radius-sm, 10px);
-  background: color-mix(in srgb, var(--red-strong, #c0392b), transparent 92%);
-  color: var(--red-strong, #c0392b);
+  background: color-mix(in srgb, var(--red-strong, #2563eb), transparent 92%);
+  color: var(--red-strong, #2563eb);
   font-size: var(--text-sm);
   font-weight: 600;
 }
@@ -583,7 +583,7 @@
   margin: 0.5rem 0 0;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--green-strong, #0a7a3e);
+  color: var(--green-strong, #1e40af);
 }
 
 .tg-rules-shell {

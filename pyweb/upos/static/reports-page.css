@@ -4,10 +4,10 @@
 }
 
 .reports-root {
-  --reports-income: #0f8a5f;
-  --reports-income-soft: color-mix(in srgb, #0f8a5f 11%, var(--card));
-  --reports-expense: #d34242;
-  --reports-expense-soft: color-mix(in srgb, #d34242 10%, var(--card));
+  --reports-income: #1e40af;
+  --reports-income-soft: color-mix(in srgb, #1e40af 11%, var(--card));
+  --reports-expense: #2563eb;
+  --reports-expense-soft: color-mix(in srgb, #2563eb 10%, var(--card));
   --reports-ink: var(--foreground);
   --reports-muted: var(--muted-foreground);
   --reports-line: var(--border);
@@ -832,11 +832,11 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 .reports-courier-balance-bar--credit b {
-  background: #0f8a5f;
+  background: #1e40af;
 }
 
 .reports-courier-balance-bar--debt b {
-  background: #d34242;
+  background: #2563eb;
 }
 
 .reports-courier-balance-stack {
@@ -864,11 +864,11 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 .reports-courier-stack-credit {
-  background: #0f8a5f;
+  background: #1e40af;
 }
 
 .reports-courier-stack-debt {
-  background: #d34242;
+  background: #2563eb;
 }
 
 .reports-courier-stack-legend {
@@ -934,7 +934,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   display: block;
   width: 100%;
   min-height: 0.35rem;
-  background: #f07070;
+  background: #93c5fd;
 }
 
 .reports-courier-rank-card strong,
@@ -978,7 +978,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   width: 4.1rem;
   height: 4.1rem;
   border-radius: 999px;
-  background: #d34242;
+  background: #2563eb;
 }
 
 .reports-courier-share-ring span {
@@ -1058,7 +1058,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 .reports-courier-limit-card.is-over {
-  border-color: color-mix(in srgb, #d34242, var(--border) 42%);
+  border-color: color-mix(in srgb, #2563eb, var(--border) 42%);
 }
 
 .reports-courier-limit-head {
@@ -1088,11 +1088,11 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   width: 4.2rem;
   height: 4.2rem;
   border-radius: 999px;
-  background: #0f8a5f;
+  background: #1e40af;
 }
 
 .reports-courier-limit-ring.is-over {
-  background: #d34242;
+  background: #2563eb;
 }
 
 .reports-courier-limit-ring span {
@@ -1114,11 +1114,11 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   height: 100%;
   min-width: 0.25rem;
   border-radius: inherit;
-  background: #0f8a5f;
+  background: #1e40af;
 }
 
 .reports-courier-limit-card.is-over .reports-courier-limit-track span {
-  background: #d34242;
+  background: #2563eb;
 }
 
 .reports-courier-limit-values {
@@ -2203,7 +2203,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 .reports-stock-row--negative td:nth-child(n + 2) {
-  color: var(--destructive, #c62828);
+  color: var(--destructive, #2563eb);
   font-weight: 900;
 }
 

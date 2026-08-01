@@ -974,21 +974,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .messenger-channel-tab[data-channel-brand="telegram"] {
-  --channel-brand: #229ed9;
+  --channel-brand: #2563eb;
   --channel-brand-strong: #0b76b7;
   --channel-brand-soft: #e4f5fe;
 }
 
 .messenger-channel-tab[data-channel-brand="instagram"] {
-  --channel-brand: #e1306c;
+  --channel-brand: #2563eb;
   --channel-brand-strong: #833ab4;
   --channel-brand-soft: #fff0f6;
 }
 
 .messenger-channel-tab[data-channel-brand="whatsapp"] {
-  --channel-brand: #25d366;
-  --channel-brand-strong: #128c7e;
-  --channel-brand-soft: #e7f9ef;
+  --channel-brand: #2563eb;
+  --channel-brand-strong: #1e40af;
+  --channel-brand-soft: #dbeafe;
 }
 
 .messenger-channel-tab[data-channel-brand="facebook"] {
@@ -1106,21 +1106,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .messenger-channel-overview[data-channel-brand="telegram"] {
-  --channel-brand: #229ed9;
+  --channel-brand: #2563eb;
   --channel-brand-strong: #0b76b7;
   --channel-brand-soft: #e4f5fe;
 }
 
 .messenger-channel-overview[data-channel-brand="instagram"] {
-  --channel-brand: #e1306c;
+  --channel-brand: #2563eb;
   --channel-brand-strong: #833ab4;
   --channel-brand-soft: #fff0f6;
 }
 
 .messenger-channel-overview[data-channel-brand="whatsapp"] {
-  --channel-brand: #25d366;
-  --channel-brand-strong: #128c7e;
-  --channel-brand-soft: #e7f9ef;
+  --channel-brand: #2563eb;
+  --channel-brand-strong: #1e40af;
+  --channel-brand-soft: #dbeafe;
 }
 
 .messenger-channel-overview[data-channel-brand="facebook"] {
@@ -1343,8 +1343,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-payment-add-btn,
 .sales-payment-submit {
-  border-color: color-mix(in srgb, #168a43 78%, var(--border));
-  background: #168a43;
+  border-color: color-mix(in srgb, #1e40af 78%, var(--border));
+  background: #1e40af;
   color: #fff;
 }
 
@@ -1352,8 +1352,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .sales-payment-add-btn:focus-visible,
 .sales-payment-submit:hover,
 .sales-payment-submit:focus-visible {
-  border-color: #0f7135;
-  background: #0f7135;
+  border-color: #1e40af;
+  background: #1e40af;
   color: #fff;
 }
 
@@ -1446,7 +1446,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .sales-payment-breakdown-row--paid strong {
-  color: #168a43;
+  color: #1e40af;
 }
 
 .sales-payment-breakdown-row--debt strong {
@@ -2212,7 +2212,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.62rem 0.75rem;
-  border: 1px solid color-mix(in srgb, #f0c74a 55%, var(--border));
+  border: 1px solid color-mix(in srgb, #2563eb 55%, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
   background: color-mix(in srgb, #dbeafe 72%, var(--card));
 }
@@ -2620,14 +2620,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-telegram-head [data-variant="ok"],
 .social-telegram-head [data-variant="ok"] {
-  background: color-mix(in srgb, #20a36a, white 86%);
-  color: #116241;
+  background: color-mix(in srgb, #2563eb, white 86%);
+  color: #1e40af;
 }
 
 .messenger-telegram-head [data-variant="warn"],
 .social-telegram-head [data-variant="warn"] {
-  background: color-mix(in srgb, #f0b429, white 82%);
-  color: #7a4d00;
+  background: color-mix(in srgb, #2563eb, white 82%);
+  color: #1e40af;
 }
 
 .messenger-telegram-head [data-variant="err"],
@@ -2746,7 +2746,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .messenger-telegram-dot[data-enabled="1"] {
-  background: #20a36a;
+  background: #2563eb;
 }
 
 .messenger-telegram-empty {
@@ -5633,7 +5633,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0 0.08rem;
   border-radius: 0.22rem;
   background: #dbeafe;
-  color: #713f12;
+  color: #1e40af;
   font: inherit;
 }
 
@@ -8088,7 +8088,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .purchase-document-payment-summary-item--debt strong {
-  color: #c42121;
+  color: #2563eb;
 }
 
 .purchase-document-payment-summary[data-payment-state="paid"] .purchase-document-payment-summary-item--debt strong {
@@ -9186,7 +9186,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-client-balance[data-balance-kind="debt"] {
-  color: #c42121;
+  color: #2563eb;
 }
 
 .sales-client-balance[data-balance-kind="advance"] {
@@ -10412,7 +10412,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-payment-summary-row--over span,
 .sales-payment-summary-row--over strong {
-  color: #b42318;
+  color: #2563eb;
 }
 
 .sales-payment-submit:disabled {
@@ -10818,7 +10818,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-combo-balance[data-balance-kind="debt"] {
-  color: #c42121;
+  color: #2563eb;
 }
 
 .sales-combo-balance[data-balance-kind="advance"] {
@@ -10844,7 +10844,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-table-row--saved {
-  outline: 2px solid color-mix(in srgb, var(--primary) 70%, #7dd3fc);
+  outline: 2px solid color-mix(in srgb, var(--primary) 70%, #93c5fd);
   outline-offset: -2px;
   background: color-mix(in srgb, var(--primary) 11%, var(--card));
 }
@@ -11208,8 +11208,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-journal-search-match {
   padding: 0.05em 0.12em;
   border-radius: 3px;
-  background: #fde047;
-  color: #422006;
+  background: #2563eb;
+  color: #1e40af;
   font-weight: 900;
   box-shadow: 0 0 0 1px rgb(202 138 4 / 30%);
 }
@@ -11331,7 +11331,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-debt-metric--today strong {
-  color: #9a5b00;
+  color: #1e40af;
 }
 
 .sales-debt-metric--upcoming strong {
@@ -11741,7 +11741,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-journal-task-total {
   background: color-mix(in srgb, #64748b 12%, var(--card));
-  color: #a16207;
+  color: #1e40af;
 }
 
 .sales-journal-task-completed {
@@ -11750,11 +11750,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 html.dark .sales-journal-task-total {
-  color: #fde047;
+  color: #2563eb;
 }
 
 html.dark .sales-journal-task-completed {
-  color: #4ade80;
+  color: #2563eb;
 }
 
 .sales-journal-no-tasks {
@@ -11924,7 +11924,7 @@ html.dark .sales-journal-table {
 }
 
 html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > span {
-  color: #4ade80;
+  color: #2563eb;
 }
 
 .sales-journal-debt-cell > span {
@@ -12025,7 +12025,7 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
   min-width: 2rem;
   min-height: 2rem;
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, #f02d3a 8%, var(--card));
+  background: color-mix(in srgb, #2563eb 8%, var(--card));
 }
 
 .sales-status {
@@ -12042,19 +12042,19 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
 
 .sales-status--paid {
   color: #1d4ed8;
-  background: color-mix(in srgb, #2fb463, transparent 84%);
+  background: color-mix(in srgb, #2563eb, transparent 84%);
 }
 
 .sales-status--partial,
 .sales-status--reserved {
   color: #475569;
-  background: color-mix(in srgb, #f1a500, transparent 84%);
+  background: color-mix(in srgb, #2563eb, transparent 84%);
 }
 
 .sales-status--debt,
 .sales-status--return {
   color: #334155;
-  background: color-mix(in srgb, #e44d4d, transparent 86%);
+  background: color-mix(in srgb, #2563eb, transparent 86%);
 }
 
 .sales-status-form {
@@ -13637,7 +13637,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   border: 1px solid color-mix(in srgb, #2563eb 44%, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
   background: color-mix(in srgb, #dbeafe 86%, white);
-  color: #14532d;
+  color: #1e40af;
   font-weight: 800;
   box-shadow: 0 16px 34px rgba(22, 163, 74, 0.2);
   animation: billingPushIn 520ms cubic-bezier(0.2, 0.85, 0.2, 1), billingPushPulse 900ms ease-out 520ms;
@@ -14383,8 +14383,8 @@ html.dark .employees-page-wrap {
 }
 
 .device-session-badge--online {
-  background: color-mix(in srgb, #0f8a5f, transparent 82%);
-  color: #0f8a5f;
+  background: color-mix(in srgb, #1e40af, transparent 82%);
+  color: #1e40af;
 }
 
 .device-session-badge--current {
@@ -15368,7 +15368,7 @@ html.dark .settings-tab.settings-tab--rail.active {
 }
 
 .settings-flag--uz {
-  background: #0099b5;
+  background: #2563eb;
 }
 
 .settings-theme-picker-compact {
@@ -15712,11 +15712,11 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-save-status.is-success {
-  color: #16824b;
+  color: #1e40af;
 }
 
 .price-template-save-status.is-error {
-  color: #c43333;
+  color: #2563eb;
 }
 
 .price-template-builder-layout {
@@ -16321,7 +16321,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   display: inline-flex;
   gap: 0.32rem;
   align-items: baseline;
-  color: #9a3412;
+  color: #1e40af;
   font-size: var(--text-xs);
   font-weight: 750;
 }
@@ -16392,7 +16392,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-table th {
-  background: #37bff0;
+  background: #2563eb;
   font-weight: 900;
 }
 
@@ -16499,11 +16499,11 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   width: 19px;
   height: 19px;
   place-items: center;
-  border: 1px solid #dc5757;
+  border: 1px solid #2563eb;
   border-radius: 3px;
   padding: 0;
   background: #fff;
-  color: #bb2929;
+  color: #2563eb;
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
@@ -16601,7 +16601,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   width: 20px;
   height: 8px;
   background: #55a4de;
-  box-shadow: 26px 0 0 #f1b342;
+  box-shadow: 26px 0 0 #2563eb;
 }
 
 .price-template-product-img--printer {
@@ -19612,7 +19612,7 @@ html.dark .organization-edit-form {
 }
 
 .director-history-btn--expense {
-  color: color-mix(in srgb, #b42318, var(--foreground) 24%);
+  color: color-mix(in srgb, #2563eb, var(--foreground) 24%);
   background: color-mix(in srgb, var(--card), #e2e8f0 8%);
 }
 
@@ -21259,15 +21259,15 @@ body:has(dialog[open]) {
 }
 
 .integr-status-pill[data-variant="ok"] {
-  border-color: color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 65%);
-  color: var(--green-strong, #0a7a3e);
-  background: color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 92%);
+  border-color: color-mix(in srgb, var(--green-strong, #1e40af), transparent 65%);
+  color: var(--green-strong, #1e40af);
+  background: color-mix(in srgb, var(--green-strong, #1e40af), transparent 92%);
 }
 
 .integr-status-pill[data-variant="err"] {
-  border-color: color-mix(in srgb, var(--red-strong, #c0392b), transparent 65%);
-  color: var(--red-strong, #c0392b);
-  background: color-mix(in srgb, var(--red-strong, #c0392b), transparent 92%);
+  border-color: color-mix(in srgb, var(--red-strong, #2563eb), transparent 65%);
+  color: var(--red-strong, #2563eb);
+  background: color-mix(in srgb, var(--red-strong, #2563eb), transparent 92%);
 }
 
 .settings-integr-modal .settings-profile-modal-surface {
@@ -22961,12 +22961,12 @@ body:has(dialog[open]) {
 }
 
 .org-hr-calendar-day.is-present {
-  color: #087a45;
-  background: color-mix(in srgb, #19a463 13%, var(--card));
+  color: #1e40af;
+  background: color-mix(in srgb, #2563eb 13%, var(--card));
 }
 
 .org-hr-calendar-day.is-absent {
-  color: #c62828;
+  color: #2563eb;
   background: color-mix(in srgb, #475569 12%, var(--card));
 }
 
@@ -23852,11 +23852,11 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-salary-detail-balance--due strong {
-  color: #b42318;
+  color: #2563eb;
 }
 
 .org-hr-salary-detail-balance--overpaid strong {
-  color: #027a48;
+  color: #1e40af;
 }
 
 .org-hr-salary-detail-balance--closed strong {
@@ -25575,7 +25575,7 @@ button.general-module-tab {
 
 .org-shipments-status--open {
   background: color-mix(in srgb, #64748b 15%, var(--card));
-  color: #9a3412;
+  color: #1e40af;
 }
 
 .org-shipments-status--partial {
@@ -26543,11 +26543,11 @@ body.upos-table-column-resizing * {
   align-items: center;
   gap: 7px;
   margin-top: 10px;
-  border: 1px solid #cfe8d8;
+  border: 1px solid #dbeafe;
   border-radius: var(--workbench-radius-sm, 10px);
   padding: 8px 9px;
   background: #f0fff6;
-  color: #087443;
+  color: #1e40af;
   font-size: 12px;
   font-weight: 800;
 }
@@ -26971,7 +26971,7 @@ body.is-sidebar-collapsed .upos-floating-phone,
 }
 
 .telephony-recording-pending {
-  color: #a16207;
+  color: #1e40af;
 }
 
 .telephony-calls-table th:nth-child(7) {
@@ -27169,7 +27169,7 @@ html.dark .upos-floating-phone-links a:hover {
 html.dark .upos-floating-phone-status {
   border-color: color-mix(in srgb, #2563eb, transparent 62%);
   background: color-mix(in srgb, #2563eb, var(--card) 88%);
-  color: #6ee7b7;
+  color: #93c5fd;
 }
 
 html.dark .upos-floating-phone-status[data-state="pending"] {
@@ -27250,7 +27250,7 @@ html.dark .telephony-state--active,
 html.dark .telephony-direction--incoming > span,
 html.dark .telephony-calls-table .telephony-call-status-cell--answered {
   background: color-mix(in srgb, #2563eb, var(--card) 88%);
-  color: #86efac;
+  color: #93c5fd;
 }
 
 html.dark .telephony-status-filter--missed,
@@ -27258,7 +27258,7 @@ html.dark .telephony-status-filter--blocked,
 html.dark .telephony-calls-table .telephony-call-status-cell--missed,
 html.dark .telephony-calls-table .telephony-call-status-cell--blocked {
   background: color-mix(in srgb, #475569, var(--card) 88%);
-  color: #fca5a5;
+  color: #93c5fd;
 }
 
 html.dark .telephony-status-filter--planned,
@@ -27505,13 +27505,13 @@ html.dark .clients-map-empty {
 html.dark .warehouse-adjustment-direction {
   border-color: color-mix(in srgb, #2563eb, transparent 55%);
   background: color-mix(in srgb, #2563eb, var(--card) 88%);
-  color: #86efac;
+  color: #93c5fd;
 }
 
 html.dark .warehouse-adjustment-direction--out {
   border-color: color-mix(in srgb, #475569, transparent 55%);
   background: color-mix(in srgb, #475569, var(--card) 88%);
-  color: #fca5a5;
+  color: #93c5fd;
 }
 
 html.dark .warehouse-adjustment-table tr.is-insufficient td {
@@ -27875,7 +27875,7 @@ html.dark .warehouse-adjustment-summary {
 
 .dashboard-seller-row:nth-child(-n + 3) .dashboard-seller-rank {
   background: color-mix(in srgb, #64748b 15%, var(--card));
-  color: #916100;
+  color: #1e40af;
 }
 
 .dashboard-seller-row > div {
@@ -28181,9 +28181,9 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .sales-installation-calendar-order.is-completed {
-  border-color: #96d4ac;
-  background: #e9f8ef;
-  color: #145b2d;
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .sales-installation-calendar-order strong,
@@ -28255,9 +28255,9 @@ html.dark .sales-installation-calendar-order {
 }
 
 html.dark .sales-installation-calendar-order.is-completed {
-  border-color: #35734c;
-  background: #193b27;
-  color: #dff5e7;
+  border-color: #1e40af;
+  background: #1e40af;
+  color: #dbeafe;
 }
 
 @media (max-width: 760px) {
@@ -28354,11 +28354,11 @@ html.dark .sales-installation-calendar-order.is-completed {
 }
 
 .crm-task-metrics .is-alert strong {
-  color: #c2413a;
+  color: #2563eb;
 }
 
 .crm-task-metrics .is-complete strong {
-  color: #16814a;
+  color: #1e40af;
 }
 
 .crm-task-toolbar {
@@ -28484,11 +28484,11 @@ html.dark .sales-installation-calendar-order.is-completed {
 }
 
 .crm-task-table tr.is-overdue {
-  background: color-mix(in srgb, #dc3d37 7%, var(--card));
+  background: color-mix(in srgb, #2563eb 7%, var(--card));
 }
 
 .crm-task-table tr.is-complete {
-  background: color-mix(in srgb, #189b58 7%, var(--card));
+  background: color-mix(in srgb, #2563eb 7%, var(--card));
 }
 
 .crm-task-table tr.is-complete .crm-task-title-button {
@@ -28548,9 +28548,9 @@ html.dark .sales-installation-calendar-order.is-completed {
 
 .crm-task-complete-cell button:hover,
 .crm-task-complete-mark {
-  border-color: #2aa460;
-  background: #e8f7ee;
-  color: #13743f;
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .crm-task-priority,
@@ -28568,28 +28568,28 @@ html.dark .sales-installation-calendar-order.is-completed {
 
 .crm-task-priority--high,
 .crm-task-state--overdue {
-  border-color: #e8a5a1;
+  border-color: #93c5fd;
   background: #f1f5f9;
-  color: #b72f2a;
+  color: #2563eb;
 }
 
 .crm-task-priority--urgent {
-  border-color: #d47770;
-  background: #da433c;
+  border-color: #2563eb;
+  background: #2563eb;
   color: #fff;
 }
 
 .crm-task-priority--normal,
 .crm-task-state--today {
-  border-color: #e5c675;
+  border-color: #93c5fd;
   background: #f1f5f9;
-  color: #75540b;
+  color: #1e40af;
 }
 
 .crm-task-state--done {
-  border-color: #9ed5b3;
-  background: #e9f7ef;
-  color: #146d3c;
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .crm-task-empty {
@@ -28672,7 +28672,7 @@ html.dark .sales-installation-calendar-order.is-completed {
 }
 
 .crm-task-calendar-day.is-weekend {
-  background: color-mix(in srgb, #d8a13a 5%, var(--card));
+  background: color-mix(in srgb, #2563eb 5%, var(--card));
 }
 
 .crm-task-calendar-day.is-outside {
@@ -28712,15 +28712,15 @@ html.dark .sales-installation-calendar-order.is-completed {
 }
 
 .crm-task-calendar-event.is-overdue {
-  border-color: #e8a5a1;
+  border-color: #93c5fd;
   background: #f1f5f9;
-  color: #a52925;
+  color: #2563eb;
 }
 
 .crm-task-calendar-event.is-complete {
-  border-color: #9ed5b3;
-  background: #e9f7ef;
-  color: #146d3c;
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1e40af;
   text-decoration: line-through;
 }
 
@@ -28736,24 +28736,24 @@ html.dark .crm-task-complete-cell button:hover,
 html.dark .crm-task-complete-mark,
 html.dark .crm-task-state--done,
 html.dark .crm-task-calendar-event.is-complete {
-  border-color: #34764e;
-  background: #183a26;
-  color: #dff5e7;
+  border-color: #1e40af;
+  background: #1e40af;
+  color: #dbeafe;
 }
 
 html.dark .crm-task-priority--high,
 html.dark .crm-task-state--overdue,
 html.dark .crm-task-calendar-event.is-overdue {
-  border-color: #783d3b;
-  background: #3d2020;
-  color: #ffd9d7;
+  border-color: #2563eb;
+  background: #1e40af;
+  color: #dbeafe;
 }
 
 html.dark .crm-task-priority--normal,
 html.dark .crm-task-state--today {
-  border-color: #75622f;
-  background: #382f18;
-  color: #f8e6a8;
+  border-color: #1e40af;
+  background: #1e40af;
+  color: #93c5fd;
 }
 
 html.dark .crm-task-calendar-event {
@@ -29195,7 +29195,7 @@ html.dark .crm-task-calendar-event {
 }
 
 .warehouse-purchases-table tr.warehouse-purchase-row--purchased .warehouse-purchase-paid-chip {
-  border-color: #86efac;
+  border-color: #93c5fd;
   background: #eff6ff;
   color: #1e40af;
 }
