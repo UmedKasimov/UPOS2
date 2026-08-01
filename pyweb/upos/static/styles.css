@@ -1,12 +1,24 @@
-/* UPOS FINANCE — дизайн-система в духе прежнего UI (shadcn / legacy globals.css) */
+/* UPOS FINANCE — брендбук.
+   Правила:
+   1. Один акцентный цвет — синий #2563eb (--primary). Никаких зелёных,
+      красных и жёлтых акцентов: смысловые состояния — оттенками синего
+      (#1e40af текст, #dbeafe фон) и грифельно-синими нейтралями (#334155,
+      #475569, #64748b, #e2e8f0).
+   2. Никаких градиентов — только плоские цвета.
+   3. Фирменная кнопка — «3D»: плоская заливка + нижняя грань 3px
+      (--btn-edge), нажатие утапливает (см. .btn).
+   4. Шрифт Inter; размеры только из шкалы --text-*; веса 400/600/700/800.
+   5. Скругления только из шкалы --radius (контролы) / --radius-lg /
+      --radius-xl (карточки); пилюли — 999px.
+   6. Тени только --shadow-sm / --shadow-md / --shadow-lg. */
 
 :root {
   --radius: 0.7rem;
   --radius-lg: calc(var(--radius) * 1.3);
   --radius-xl: calc(var(--radius) * 1.55);
   --brand-navy: #141d2e;
-  --brand-box: #2d6cdf;
-  --brand-accent: #5eb8ff;
+  --brand-box: #2563eb;
+  --brand-accent: #2563eb;
 
   --background: oklch(0.985 0.004 264);
   --foreground: oklch(0.21 0.032 264);
@@ -16,9 +28,10 @@
   --muted-foreground: oklch(0.48 0.03 264);
   --accent: oklch(0.93 0.025 258);
   --accent-foreground: oklch(0.26 0.06 258);
-  --primary: oklch(0.52 0.18 258);
+  --primary: #2563eb;
   --primary-foreground: oklch(0.99 0.005 258);
-  --destructive: oklch(0.577 0.245 27.325);
+  --btn-edge: #1d4ed8;
+  --destructive: oklch(0.577 0.03 264);
   --border: oklch(0.9 0.012 264);
   --input: oklch(0.9 0.012 264);
   --ring: oklch(0.52 0.18 258);
@@ -65,8 +78,9 @@ html.dark {
   --accent: oklch(0.285 0.012 265);
   --accent-foreground: oklch(0.95 0.006 265);
   --primary: oklch(0.68 0.135 255);
+  --btn-edge: oklch(0.5 0.15 255);
   --primary-foreground: oklch(0.985 0.004 255);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: oklch(0.704 0.03 264);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.68 0.135 255);
@@ -399,11 +413,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-radius: var(--radius-lg);
   border: 1px solid color-mix(in oklch, var(--sidebar-border), transparent 18%);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--sidebar-accent), transparent 40%),
-      color-mix(in oklch, var(--sidebar), transparent 0%) 58%
-    );
+    color-mix(in oklch, var(--sidebar-accent), transparent 40%);
   color: var(--sidebar-foreground);
   cursor: pointer;
   transition:
@@ -936,7 +946,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 7px) var(--workbench-radius-sm, 7px) 0 0;
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), white 93%), color-mix(in oklch, var(--background), var(--primary) 4%));
+    color-mix(in oklch, var(--primary), white 93%);
 }
 
 .messenger-channel-tab {
@@ -1063,7 +1073,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-channel-tab:hover::before,
 .messenger-channel-tab.active::before {
   border-color: color-mix(in oklch, var(--channel-brand), black 4%);
-  background: linear-gradient(180deg, color-mix(in oklch, var(--channel-brand), white 15%), var(--channel-brand-strong));
+  background: color-mix(in oklch, var(--channel-brand), white 15%);
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 45%) inset,
     0 10px 16px color-mix(in oklch, var(--channel-brand), transparent 78%);
@@ -1091,9 +1101,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0.9rem 1rem;
   border: 1px solid color-mix(in oklch, var(--channel-brand), white 58%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background:
-    linear-gradient(90deg, color-mix(in oklch, var(--channel-brand-soft), white 15%), var(--card) 62%),
-    var(--card);
+  background: var(--card);
   box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
 }
 
@@ -1133,7 +1141,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 999px;
-  background: linear-gradient(180deg, color-mix(in oklch, var(--channel-brand), white 8%), var(--channel-brand-strong));
+  background: color-mix(in oklch, var(--channel-brand), white 8%);
   color: white;
   box-shadow: 0 12px 24px color-mix(in oklch, var(--channel-brand), transparent 78%);
   font-size: 0.78rem;
@@ -1356,9 +1364,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 100%;
   margin-top: 0.85rem;
   padding: 0.8rem 2.6rem 0.8rem 0.95rem;
-  border: 1px solid color-mix(in srgb, #16a34a 25%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, #2563eb 25%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 8px);
-  background: color-mix(in srgb, #22c55e 7%, var(--card));
+  background: color-mix(in srgb, #2563eb 7%, var(--card));
 }
 
 .sales-payment-breakdown[hidden] {
@@ -1374,10 +1382,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: center;
   width: 1.65rem;
   height: 1.65rem;
-  border: 1px solid color-mix(in oklch, #ef4444, transparent 55%);
+  border: 1px solid color-mix(in oklch, #475569, transparent 55%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in oklch, #ef4444, white 92%);
-  color: #b91c1c;
+  background: color-mix(in oklch, #475569, white 92%);
+  color: #334155;
   font-size: 1rem;
   font-weight: 900;
   line-height: 1;
@@ -1386,8 +1394,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .sales-payment-breakdown-clear:hover,
 .sales-payment-breakdown-clear:focus-visible {
-  border-color: #ef4444;
-  background: color-mix(in oklch, #ef4444, white 86%);
+  border-color: #475569;
+  background: color-mix(in oklch, #475569, white 86%);
   outline: none;
 }
 
@@ -1407,7 +1415,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .sales-payment-breakdown-row strong {
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
   white-space: nowrap;
 }
@@ -1433,8 +1441,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .sales-payment-breakdown-row--paid {
-  border-color: color-mix(in srgb, #16a34a 24%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, #22c55e 7%, var(--card));
+  border-color: color-mix(in srgb, #2563eb 24%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #2563eb 7%, var(--card));
 }
 
 .sales-payment-breakdown-row--paid strong {
@@ -1442,7 +1450,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .sales-payment-breakdown-row--debt strong {
-  color: #c2410c;
+  color: #475569;
 }
 
 .sales-payment-breakdown-row--rest {
@@ -1452,7 +1460,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .sales-payment-breakdown-row--rest strong {
-  color: #c2410c;
+  color: #475569;
 }
 
 .sales-payment-breakdown-lines {
@@ -1520,7 +1528,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-color: var(--workbench-line);
   border-radius: var(--workbench-radius-sm, 10px);
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card), white 10%), var(--card));
+    color-mix(in oklch, var(--card), white 10%);
   box-shadow: var(--workspace-module-panel-shadow);
 }
 
@@ -2359,8 +2367,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .products-catalog-table {
-  --products-table-blue: var(--brand-accent, #5eb8ff);
-  --products-table-blue-strong: var(--brand-box, #2d6cdf);
+  --products-table-blue: var(--brand-accent, #2563eb);
+  --products-table-blue-strong: var(--brand-box, #2563eb);
   --products-table-head-bg: color-mix(in srgb, var(--products-table-blue) 22%, var(--card));
   --products-table-row-alt-bg: color-mix(in srgb, var(--products-table-blue) 8%, var(--card));
   --products-table-row-hover-bg: color-mix(in srgb, var(--products-table-blue-strong) 10%, var(--card));
@@ -2565,7 +2573,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .social-telegram-card {
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: linear-gradient(180deg, color-mix(in oklch, var(--card), white 10%), var(--card));
+  background: color-mix(in oklch, var(--card), white 10%);
   box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
 }
 
@@ -2705,7 +2713,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 2.15rem;
   height: 2.15rem;
   border-radius: 50%;
-  background: linear-gradient(180deg, #2ea3f2, #1d74d8);
+  background: #2563eb;
   color: white;
   font-size: 0.72rem;
   font-weight: 800;
@@ -2783,7 +2791,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow-y: auto;
   padding: 1rem;
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--background), white 5%), var(--background));
+    color-mix(in oklch, var(--background), white 5%);
 }
 
 .messenger-telegram-placeholder {
@@ -3044,7 +3052,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 2.35rem;
   overflow: hidden;
   border-radius: 50%;
-  background: linear-gradient(180deg, #2ea3f2, #1d74d8);
+  background: #2563eb;
   color: white;
   font-size: 0.72rem;
   font-weight: 800;
@@ -3073,17 +3081,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-presence-dot--online,
 .messenger-thread-presence--online::before {
-  background: #22c55e;
+  background: #2563eb;
 }
 
 .messenger-presence-dot--recent,
 .messenger-thread-presence--recent::before {
-  background: #f59e0b;
+  background: #64748b;
 }
 
 .messenger-presence-dot--waiting,
 .messenger-thread-presence--waiting::before {
-  background: #3b82f6;
+  background: #2563eb;
 }
 
 .messenger-dialog-main {
@@ -3157,7 +3165,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   overflow: hidden;
   border: 1px solid color-mix(in oklch, var(--primary), white 55%);
   border-radius: 50%;
-  background: linear-gradient(180deg, #2ea3f2, #1d74d8);
+  background: #2563eb;
   color: white;
   cursor: pointer;
   font: inherit;
@@ -3373,7 +3381,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 9rem;
   overflow: hidden;
   border-radius: 50%;
-  background: linear-gradient(180deg, #2ea3f2, #1d74d8);
+  background: #2563eb;
   color: white;
   font-size: 2rem;
   font-weight: 900;
@@ -3439,7 +3447,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   padding: 0.85rem 0.95rem;
   border: 1px solid color-mix(in oklch, var(--primary), white 55%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: linear-gradient(180deg, color-mix(in oklch, var(--primary), white 88%), var(--card));
+  background: color-mix(in oklch, var(--primary), white 88%);
   box-shadow: 0 18px 42px rgb(15 23 42 / 0.18);
 }
 
@@ -3622,19 +3630,19 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-crm-tag[data-status="invoice"] {
   border-color: rgba(217, 119, 6, 0.25);
   background: rgba(245, 158, 11, 0.13);
-  color: #b45309;
+  color: #475569;
 }
 
 .client-crm-tag[data-status="our_client"] {
   border-color: rgba(22, 163, 74, 0.24);
   background: rgba(22, 163, 74, 0.11);
-  color: #15803d;
+  color: #1e40af;
 }
 
 .client-crm-tag[data-status="in_work"] {
   border-color: rgba(217, 119, 6, 0.25);
   background: rgba(245, 158, 11, 0.13);
-  color: #b45309;
+  color: #475569;
 }
 
 .client-crm-tag[data-status="paused"] {
@@ -3646,7 +3654,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-crm-tag[data-status="lost"] {
   border-color: rgba(220, 38, 38, 0.22);
   background: rgba(220, 38, 38, 0.1);
-  color: #b91c1c;
+  color: #334155;
 }
 
 .client-profile-layout {
@@ -3682,10 +3690,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 4.3rem;
   height: 4.3rem;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at 50% 34%, #f8fafc 0 0.72rem, transparent 0.76rem),
-    radial-gradient(circle at 50% 92%, #f8fafc 0 1.7rem, transparent 1.75rem),
-    #c7cbd1;
+  background: #c7cbd1;
 }
 
 .client-profile-photo--edit {
@@ -3978,11 +3983,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-balance-line--debt {
-  color: #b91c1c;
+  color: #334155;
 }
 
 .client-balance-line--advance {
-  color: #047857;
+  color: #1e40af;
 }
 
 .client-balance-line--zero {
@@ -4046,14 +4051,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-act-total-row td {
-  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 28%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
+  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 28%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 7%, var(--card));
   color: var(--foreground);
   font-weight: 800;
 }
 
 .client-act-total-row td:last-child {
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
 }
 
@@ -4232,7 +4237,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-history-item--payment::before {
-  background: #16a34a;
+  background: #2563eb;
   box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.14);
 }
 
@@ -4247,7 +4252,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-history-item--location::before {
-  background: #0891b2;
+  background: #2563eb;
   box-shadow: 0 0 0 4px rgba(8, 145, 178, 0.13);
 }
 
@@ -4482,15 +4487,15 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .client-balance-pill--debt {
-  color: #b91c1c;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
+  color: #334155;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
 }
 
 .client-balance-pill--advance {
-  color: #047857;
-  background: #d1fae5;
-  border: 1px solid #a7f3d0;
+  color: #1e40af;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
 }
 
 .client-balance-pill--zero {
@@ -4544,9 +4549,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-height: 21rem;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
-  background:
-    linear-gradient(135deg, rgba(226, 239, 255, 0.84), rgba(238, 247, 255, 0.96)),
-    var(--card);
+  background: var(--card);
   overflow: hidden;
   position: relative;
   cursor: crosshair;
@@ -4596,9 +4599,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   position: absolute;
   inset: 0;
   opacity: 0.54;
-  background-image:
-    linear-gradient(rgba(37, 99, 235, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(37, 99, 235, 0.09) 1px, transparent 1px);
+  background: rgba(37, 99, 235, 0.09);
   background-size: 44px 44px;
 }
 
@@ -4941,17 +4942,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-service-metric:nth-child(2) strong,
 .crm-kanban-column-total,
 .crm-kanban-card-money strong {
-  color: #16a34a !important;
+  color: #2563eb !important;
 }
 
 .crm-service-metric.is-alert {
-  border-color: color-mix(in srgb, #ef4444 45%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, #ef4444 7%, var(--card));
+  border-color: color-mix(in srgb, #475569 45%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #475569 7%, var(--card));
 }
 
 .crm-service-metric.is-warning {
-  border-color: color-mix(in srgb, #f59e0b 45%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, #f59e0b 7%, var(--card));
+  border-color: color-mix(in srgb, #64748b 45%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #64748b 7%, var(--card));
 }
 
 .crm-next-actions {
@@ -5019,13 +5020,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-next-action[data-state="overdue"] {
-  border-color: color-mix(in srgb, #ef4444 38%, var(--border));
-  background: color-mix(in srgb, #ef4444 8%, var(--card));
+  border-color: color-mix(in srgb, #475569 38%, var(--border));
+  background: color-mix(in srgb, #475569 8%, var(--card));
 }
 
 .crm-next-action[data-state="today"] {
-  border-color: color-mix(in srgb, #22c55e 35%, var(--border));
-  background: color-mix(in srgb, #22c55e 8%, var(--card));
+  border-color: color-mix(in srgb, #2563eb 35%, var(--border));
+  background: color-mix(in srgb, #2563eb 8%, var(--card));
 }
 
 .crm-next-action-empty {
@@ -5131,7 +5132,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-radius: var(--radius);
   color: var(--foreground);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card) 88%, white), var(--card));
+    color-mix(in srgb, var(--card) 88%, white);
   font-size: var(--text-sm);
   font-weight: 800;
   cursor: pointer;
@@ -5311,9 +5312,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .crm-trash-drop.is-over,
 .crm-trash-drop.is-saving {
-  border-color: color-mix(in srgb, #ef4444 54%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, #ef4444 12%, var(--card));
-  color: #dc2626;
+  border-color: color-mix(in srgb, #475569 54%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, #475569 12%, var(--card));
+  color: #475569;
   box-shadow: 0 0 0 4px rgb(239 68 68 / 0.16), 0 22px 46px rgb(15 23 42 / 0.24);
   transform: translateY(-4px) scale(1.06);
 }
@@ -5446,12 +5447,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: var(--crm-activity-fill, 100%);
   height: 100%;
   border-radius: 0 999px 999px 0;
-  background: var(--crm-activity-color, #16a34a);
+  background: var(--crm-activity-color, #2563eb);
   transition: width 240ms ease, background 240ms ease;
 }
 
 .crm-card-activity--green {
-  --crm-activity-color: #16a34a;
+  --crm-activity-color: #2563eb;
 }
 
 .crm-card-activity--yellow {
@@ -5459,7 +5460,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-card-activity--red {
-  --crm-activity-color: #ef4444;
+  --crm-activity-color: #475569;
 }
 
 .crm-kanban-card:hover {
@@ -5763,13 +5764,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .crm-kanban-card-tags span[data-priority="high"],
 .crm-kanban-card-tags span[data-priority="urgent"],
 .crm-kanban-card-tags span[data-state="overdue"] {
-  color: #991b1b;
-  background: color-mix(in srgb, #ef4444 12%, var(--card));
+  color: #334155;
+  background: color-mix(in srgb, #475569 12%, var(--card));
 }
 
 .crm-kanban-card-tags span[data-state="today"] {
-  color: #166534;
-  background: color-mix(in srgb, #22c55e 13%, var(--card));
+  color: #1e40af;
+  background: color-mix(in srgb, #2563eb 13%, var(--card));
 }
 
 .crm-kanban-client {
@@ -5795,18 +5796,18 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-kanban-age--green {
-  color: #047857;
-  background: color-mix(in srgb, #22c55e 14%, var(--card));
+  color: #1e40af;
+  background: color-mix(in srgb, #2563eb 14%, var(--card));
 }
 
 .crm-kanban-age--yellow {
-  color: #92400e;
-  background: color-mix(in srgb, #f59e0b 18%, var(--card));
+  color: #334155;
+  background: color-mix(in srgb, #64748b 18%, var(--card));
 }
 
 .crm-kanban-age--red {
-  color: #991b1b;
-  background: color-mix(in srgb, #ef4444 14%, var(--card));
+  color: #334155;
+  background: color-mix(in srgb, #475569 14%, var(--card));
 }
 
 .crm-kanban-chat {
@@ -5883,7 +5884,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   justify-content: flex-end;
   padding-top: 0.75rem;
   border-top: 1px solid var(--workbench-line, var(--border));
-  background: linear-gradient(180deg, transparent, var(--card) 24%);
+  background: transparent;
 }
 
 .settings-profile-modal.crm-card-detail-dialog {
@@ -6020,7 +6021,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .crm-card-detail-money {
-  color: #16a34a;
+  color: #2563eb;
 }
 
 .crm-card-detail-panel--timeline {
@@ -6298,7 +6299,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .crm-card-detail-messenger em {
-  color: #16a34a;
+  color: #2563eb;
   font-size: var(--text-xs);
   font-style: normal;
   font-weight: 800;
@@ -6396,8 +6397,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .crm-task-status {
   flex: 0 0 auto;
   border-radius: 999px;
-  background: color-mix(in srgb, #f59e0b 12%, var(--card));
-  color: #92400e;
+  background: color-mix(in srgb, #64748b 12%, var(--card));
+  color: #334155;
   font-size: var(--text-xs);
   font-style: normal;
   font-weight: 800;
@@ -6405,8 +6406,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .crm-task-status--done {
-  background: color-mix(in srgb, #16a34a 12%, var(--card));
-  color: #15803d;
+  background: color-mix(in srgb, #2563eb 12%, var(--card));
+  color: #1e40af;
 }
 
 .crm-task-meta {
@@ -6427,16 +6428,16 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .crm-card-detail-event--chat {
-  border-left: 3px solid #0ea5e9;
+  border-left: 3px solid #2563eb;
 }
 
 .crm-card-detail-event--task {
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid #64748b;
 }
 
 .crm-card-detail-event--done {
-  border-left-color: #16a34a;
-  background: color-mix(in srgb, #16a34a 5%, var(--card));
+  border-left-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 5%, var(--card));
 }
 
 .crm-card-detail-event--comment {
@@ -6477,7 +6478,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .crm-card-detail-event--sale {
-  border-left: 3px solid #16a34a;
+  border-left: 3px solid #2563eb;
 }
 
 .crm-card-detail-document {
@@ -6489,7 +6490,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .crm-card-detail-document:hover,
 .crm-card-detail-document.is-open {
-  border-color: color-mix(in srgb, #16a34a 54%, var(--workbench-line, var(--border)));
+  border-color: color-mix(in srgb, #2563eb 54%, var(--workbench-line, var(--border)));
   box-shadow: 0 5px 14px rgb(15 23 42 / 7%);
 }
 
@@ -6511,7 +6512,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .crm-card-detail-document-trigger:hover,
 .crm-card-detail-document-trigger:focus-visible,
 .crm-card-detail-document.is-open .crm-card-detail-document-trigger {
-  background: color-mix(in srgb, #16a34a 5%, var(--card));
+  background: color-mix(in srgb, #2563eb 5%, var(--card));
   outline: none;
 }
 
@@ -6713,7 +6714,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .crm-client-duplicate-note {
   display: block;
   margin-top: 0.25rem;
-  color: #b45309;
+  color: #475569;
   font-size: var(--text-xs);
   line-height: 1.35;
 }
@@ -6791,7 +6792,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .crm-lost-reason-hint {
   margin: 0;
-  color: var(--destructive, #dc2626);
+  color: var(--destructive, #475569);
   font-size: 0.85rem;
   font-weight: 700;
 }
@@ -6870,7 +6871,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .telephony-provider-password.is-missing {
-  color: #dc2626;
+  color: #475569;
   font-family: inherit;
 }
 
@@ -6920,17 +6921,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   height: 28px;
   padding: 0;
   place-items: center;
-  border: 1px solid color-mix(in srgb, #dc2626 35%, var(--border));
+  border: 1px solid color-mix(in srgb, #475569 35%, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, #dc2626 6%, var(--card));
-  color: #dc2626;
+  background: color-mix(in srgb, #475569 6%, var(--card));
+  color: #475569;
   cursor: pointer;
 }
 
 .telephony-provider-unbind:hover,
 .telephony-provider-unbind:focus-visible {
-  border-color: #dc2626;
-  background: color-mix(in srgb, #dc2626 13%, var(--card));
+  border-color: #475569;
+  background: color-mix(in srgb, #475569 13%, var(--card));
   outline: none;
 }
 
@@ -6950,7 +6951,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   height: 28px;
   place-items: center;
   border-radius: 50%;
-  background: #16a34a;
+  background: #2563eb;
   color: #fff;
   box-shadow: 0 4px 12px rgba(22, 163, 74, 0.22);
 }
@@ -7064,7 +7065,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-stock-critical td {
-  background: color-mix(in srgb, #ef4444 10%, var(--card));
+  background: color-mix(in srgb, #475569 10%, var(--card));
 }
 
 .warehouse-purchases-board {
@@ -7205,8 +7206,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-purchases-table {
-  --products-table-blue: var(--brand-accent, #5eb8ff);
-  --products-table-blue-strong: var(--brand-box, #2d6cdf);
+  --products-table-blue: var(--brand-accent, #2563eb);
+  --products-table-blue-strong: var(--brand-box, #2563eb);
   --products-table-head-bg: color-mix(in srgb, var(--products-table-blue) 22%, var(--card));
   --products-table-row-alt-bg: color-mix(in srgb, var(--products-table-blue) 8%, var(--card));
   --products-table-row-hover-bg: color-mix(in srgb, var(--products-table-blue-strong) 10%, var(--card));
@@ -7325,7 +7326,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   width: var(--purchase-paid-progress, 0%);
   height: 0.26rem;
   border-radius: 0 999px 999px 0;
-  background: #16a34a;
+  background: #2563eb;
   content: "";
   pointer-events: none;
   transition: width 420ms ease;
@@ -7342,7 +7343,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   display: inline-flex;
   align-items: center;
   min-height: 1.35rem;
-  color: #166534;
+  color: #1e40af;
   font-size: var(--text-xs);
   font-weight: 900;
   line-height: 1;
@@ -7357,10 +7358,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   display: inline-flex;
   margin-top: 0.28rem;
   padding: 0.24rem 0.48rem;
-  border: 1px solid color-mix(in srgb, #16a34a 35%, var(--border));
+  border: 1px solid color-mix(in srgb, #2563eb 35%, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, #dcfce7 70%, var(--card));
-  color: #15803d;
+  background: color-mix(in srgb, #dbeafe 70%, var(--card));
+  color: #1e40af;
   font-size: var(--text-xs);
   font-weight: 800;
 }
@@ -7403,9 +7404,9 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-purchase-status--purchased {
-  border-color: color-mix(in srgb, #16a34a 38%, var(--border));
-  background: color-mix(in srgb, #dcfce7 72%, var(--card));
-  color: #15803d;
+  border-color: color-mix(in srgb, #2563eb 38%, var(--border));
+  background: color-mix(in srgb, #dbeafe 72%, var(--card));
+  color: #1e40af;
 }
 
 .warehouse-purchases-actions-col,
@@ -7496,7 +7497,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   min-height: 4.4rem;
   padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--workbench-line, var(--border));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--products-table-blue) 14%, var(--card)), var(--card));
+  background: color-mix(in srgb, var(--products-table-blue) 14%, var(--card));
 }
 
 .warehouse-purchase-detail-head p {
@@ -7783,7 +7784,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   width: 1rem;
   height: 1rem;
   margin: 0.12rem 0 0;
-  accent-color: #16a34a;
+  accent-color: #2563eb;
   opacity: 1;
 }
 
@@ -7908,7 +7909,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-purchase-detail-payment-summary .warehouse-purchase-detail-payment-debt strong {
-  color: var(--danger, oklch(0.58 0.18 25));
+  color: var(--danger, oklch(0.58 0.03 264));
 }
 
 .warehouse-purchase-detail-totals td:nth-child(3) strong,
@@ -8083,7 +8084,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .purchase-document-payment-summary-item--paid strong {
-  color: #178239;
+  color: #2563eb;
 }
 
 .purchase-document-payment-summary-item--debt strong {
@@ -8091,7 +8092,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .purchase-document-payment-summary[data-payment-state="paid"] .purchase-document-payment-summary-item--debt strong {
-  color: #178239;
+  color: #2563eb;
 }
 
 .purchase-document-note-table {
@@ -8468,7 +8469,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 22%, var(--workbench-line, var(--border)));
   border-radius: 0.55rem;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--products-table-blue, #5eb8ff) 10%, var(--card)), var(--card));
+    color-mix(in srgb, var(--products-table-blue, #2563eb) 10%, var(--card));
   box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground), transparent 94%);
   overflow: hidden;
 }
@@ -8739,7 +8740,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .products-category-dialog .settings-profile-modal-head {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-accent, var(--primary)) 9%, var(--card)), var(--card));
+  background: transparent;
 }
 
 .products-category-dialog .settings-profile-modal-head p {
@@ -8796,7 +8797,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border: 1px solid color-mix(in srgb, var(--brand-box, var(--primary)) 16%, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card), white 9%), var(--card));
+    color-mix(in oklch, var(--card), white 9%);
 }
 
 .product-kind-toggle {
@@ -9189,7 +9190,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-client-balance[data-balance-kind="advance"] {
-  color: #178239;
+  color: #2563eb;
 }
 
 .sales-combobox {
@@ -9204,17 +9205,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-form input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]),
 .sales-form select {
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 22%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 22%, var(--workbench-line, var(--border)));
 }
 
 .sales-form input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):focus,
 .sales-form select:focus {
-  border-color: var(--brand-box, #2d6cdf);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent, #5eb8ff) 22%, transparent);
+  border-color: var(--brand-box, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent, #2563eb) 22%, transparent);
 }
 
 .sales-form input[readonly] {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 7%, var(--card));
   color: var(--muted-foreground);
   cursor: default;
   font-weight: 800;
@@ -9245,10 +9246,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   height: 1.75rem;
   place-items: center;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 20%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 20%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 12%, var(--card));
-  color: var(--brand-box, #2d6cdf);
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 12%, var(--card));
+  color: var(--brand-box, #2563eb);
   cursor: pointer;
   font: inherit;
   font-weight: 900;
@@ -9257,7 +9258,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-combo-add {
   inset-inline-end: 2.22rem;
-  background: var(--brand-box, #2d6cdf);
+  background: var(--brand-box, #2563eb);
   color: white;
 }
 
@@ -9269,17 +9270,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-combo-edit:focus,
 .sales-combo-add:hover,
 .sales-combo-add:focus {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 24%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 24%, var(--card));
   outline: none;
 }
 
 .sales-combo-add:hover,
 .sales-combo-add:focus {
-  background: color-mix(in srgb, var(--brand-box, #2d6cdf) 86%, white);
+  background: color-mix(in srgb, var(--brand-box, #2563eb) 86%, white);
 }
 
 .sales-combobox.is-locked input {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 8%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 8%, var(--card));
   color: var(--foreground);
   cursor: default;
 }
@@ -9380,8 +9381,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-lines-table {
-  --products-table-blue: var(--brand-accent, #5eb8ff);
-  --products-table-blue-strong: var(--brand-box, #2d6cdf);
+  --products-table-blue: var(--brand-accent, #2563eb);
+  --products-table-blue-strong: var(--brand-box, #2563eb);
   --products-table-head-bg: color-mix(in srgb, var(--products-table-blue) 22%, var(--card));
   width: 100%;
   min-width: 0;
@@ -9485,7 +9486,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-line-total {
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
   text-align: right;
   white-space: nowrap;
@@ -9511,17 +9512,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   width: 2.15rem;
   min-width: 2.15rem;
   height: 2.05rem;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 26%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 26%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
-  color: var(--brand-box, #2d6cdf);
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 10%, var(--card));
+  color: var(--brand-box, #2563eb);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
 }
 
 .sales-discount-mode[data-mode="markup"] {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .sales-discount-control input,
@@ -9534,7 +9535,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-discount-control select {
   appearance: none;
   padding-inline: 0.35rem;
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 800;
 }
 
@@ -9545,7 +9546,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   z-index: 5200;
   min-width: 9.5rem;
   padding: 0.25rem;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 24%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 24%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   box-shadow: 0 16px 34px rgb(15 23 42 / 0.18);
@@ -9571,7 +9572,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-discount-menu button:hover {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 18%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 18%, var(--card));
 }
 
 .sales-lines-table input {
@@ -9591,8 +9592,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-lines-table input:focus {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
-  outline: 2px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 52%, transparent);
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 10%, var(--card));
+  outline: 2px solid color-mix(in srgb, var(--brand-box, #2563eb) 52%, transparent);
   outline-offset: -2px;
 }
 
@@ -9620,17 +9621,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   min-height: 2.3rem;
   margin: 0 0 0.3rem;
   padding: 0.45rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 20%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 20%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 12%, var(--card));
-  color: var(--brand-box, #2d6cdf);
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 12%, var(--card));
+  color: var(--brand-box, #2563eb);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
 }
 
 .sales-combo-create:hover {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 20%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 20%, var(--card));
 }
 
 .sales-combobox[data-sales-combobox="client"] .sales-combo-panel {
@@ -9744,10 +9745,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   justify-content: center;
   width: 1.85rem;
   height: 1.85rem;
-  border: 1px solid color-mix(in srgb, #a62626 20%, var(--workbench-line, var(--border)));
+  border: 1px solid color-mix(in srgb, #334155 20%, var(--workbench-line, var(--border)));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, #a62626 6%, var(--card));
-  color: #a62626;
+  background: color-mix(in srgb, #334155 6%, var(--card));
+  color: #334155;
   font: inherit;
   font-size: 1rem;
   font-weight: 900;
@@ -9761,8 +9762,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-line-remove:hover,
 .sales-line-remove:focus-visible {
-  background: color-mix(in srgb, #a62626 13%, var(--card));
-  outline: 2px solid color-mix(in srgb, #a62626 30%, transparent);
+  background: color-mix(in srgb, #334155 13%, var(--card));
+  outline: 2px solid color-mix(in srgb, #334155 30%, transparent);
   outline-offset: 1px;
 }
 
@@ -9773,8 +9774,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   gap: 1rem;
   margin-top: 0.85rem;
   padding: 0.7rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 18%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 10%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 18%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 10%, var(--card));
   color: var(--foreground);
   font-weight: 800;
   text-transform: uppercase;
@@ -9784,14 +9785,14 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-total-bar:hover,
 .sales-total-bar:focus-visible {
-  border-color: color-mix(in srgb, var(--brand-box, #2d6cdf) 42%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 16%, var(--card));
+  border-color: color-mix(in srgb, var(--brand-box, #2563eb) 42%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 16%, var(--card));
   outline: none;
 }
 
 .sales-total-bar output {
   min-width: 8rem;
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
   text-align: right;
   text-transform: none;
@@ -9955,25 +9956,25 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-purchase-entry-table input:focus {
-  outline: 2px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 76%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--brand-box, #2563eb) 76%, transparent);
   outline-offset: -2px;
-  background: color-mix(in srgb, var(--card) 88%, var(--brand-box, #2d6cdf) 12%);
+  background: color-mix(in srgb, var(--card) 88%, var(--brand-box, #2563eb) 12%);
 }
 
 .warehouse-purchase-entry-row--attention td {
-  background: color-mix(in srgb, var(--brand-box, #2d6cdf) 15%, var(--card));
+  background: color-mix(in srgb, var(--brand-box, #2563eb) 15%, var(--card));
   transition: background 0.25s ease;
 }
 
 .warehouse-purchase-entry-table strong {
   display: block;
   text-align: right;
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
 }
 
 .warehouse-purchase-entry-summary-row td {
-  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 28%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
+  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 28%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 7%, var(--card));
   padding: 0.38rem 0.65rem;
   text-align: right;
 }
@@ -9989,7 +9990,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-entry-summary-row output {
   display: block;
   margin-top: 0.15rem;
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-size: var(--text-xs);
   font-weight: 900;
   line-height: 1.1;
@@ -10223,8 +10224,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-subtotal-row td {
-  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 28%, var(--workbench-line, var(--border)));
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 7%, var(--card));
+  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 28%, var(--workbench-line, var(--border)));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 7%, var(--card));
   color: var(--foreground);
   font-weight: 800;
   text-transform: uppercase;
@@ -10240,7 +10241,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-subtotal-row output {
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
   text-transform: none;
   font-variant-numeric: tabular-nums;
@@ -10249,8 +10250,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-total-discount {
   padding: 0.18rem 0.45rem;
   border-radius: 999px;
-  background: color-mix(in srgb, #0f7b36 13%, var(--card));
-  color: #0f7b36;
+  background: color-mix(in srgb, #1d4ed8 13%, var(--card));
+  color: #1d4ed8;
   font-size: var(--text-xs);
   font-weight: 900;
   text-transform: none;
@@ -10281,7 +10282,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-price-cell-adjusted input[name="line_price"] {
   width: 100%;
   min-width: 0;
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
   text-align: right;
 }
@@ -10357,10 +10358,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   place-items: center;
   width: 2.35rem;
   height: 2.35rem;
-  border: 1px solid color-mix(in srgb, #a62626 32%, var(--border));
+  border: 1px solid color-mix(in srgb, #334155 32%, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
-  background: color-mix(in srgb, #a62626 8%, var(--card));
-  color: #a62626;
+  background: color-mix(in srgb, #334155 8%, var(--card));
+  color: #334155;
   cursor: pointer;
   font: inherit;
   font-weight: 900;
@@ -10461,11 +10462,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-product-dialog-status[data-variant="ok"] {
-  color: #0f7b36;
+  color: #1d4ed8;
 }
 
 .sales-product-dialog-status[data-variant="err"] {
-  color: #a62626;
+  color: #334155;
 }
 
 .settings-profile-modal.sales-client-card-dialog {
@@ -10502,7 +10503,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-client-card-error {
-  color: #a62626;
+  color: #334155;
 }
 
 .sales-client-card-content {
@@ -10821,7 +10822,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-combo-balance[data-balance-kind="advance"] {
-  color: #178239;
+  color: #2563eb;
 }
 
 .sales-combo-balance strong {
@@ -10857,19 +10858,19 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
-  background: color-mix(in srgb, #22c55e 7%, var(--card));
+  background: color-mix(in srgb, #2563eb 7%, var(--card));
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale:hover td {
-  background: color-mix(in srgb, #22c55e 12%, var(--card));
+  background: color-mix(in srgb, #2563eb 12%, var(--card));
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--return td {
-  background: color-mix(in srgb, #b91c1c 11%, var(--card));
+  background: color-mix(in srgb, #334155 11%, var(--card));
 }
 
 .sales-journal-table.products-catalog-table tbody tr.sales-table-row--return:hover td {
-  background: color-mix(in srgb, #b91c1c 17%, var(--card));
+  background: color-mix(in srgb, #334155 17%, var(--card));
 }
 
 .sales-journal-doc-type-cell {
@@ -10878,11 +10879,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-table-row--sale .sales-journal-doc-type-cell {
-  color: #087a35;
+  color: #1d4ed8;
 }
 
 .sales-table-row--order .sales-journal-doc-type-cell {
-  color: #8a5a00;
+  color: #475569;
 }
 
 .sales-journal-create-btn {
@@ -10940,28 +10941,29 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border-radius: 0 var(--workbench-radius-xs, 6px) var(--workbench-radius-xs, 6px) 0;
 }
 
+/* Брендбук: вкладки разделов — только синий и грифельные нейтрали. */
 .sales-document-tab[data-channel-brand="all"] {
-  --channel-brand: #4f7ecb;
-  --channel-brand-strong: #245ca8;
+  --channel-brand: #2563eb;
+  --channel-brand-strong: #1d4ed8;
   --channel-brand-soft: #eaf2ff;
 }
 
 .sales-document-tab[data-channel-brand="sale"] {
-  --channel-brand: #22a45d;
-  --channel-brand-strong: #087a35;
-  --channel-brand-soft: #e8f8ef;
+  --channel-brand: #2563eb;
+  --channel-brand-strong: #1d4ed8;
+  --channel-brand-soft: #e8f0fe;
 }
 
 .sales-document-tab[data-channel-brand="order"] {
-  --channel-brand: #d59a22;
-  --channel-brand-strong: #8a5a00;
-  --channel-brand-soft: #fff6dc;
+  --channel-brand: #64748b;
+  --channel-brand-strong: #475569;
+  --channel-brand-soft: #eef2f7;
 }
 
 .sales-document-tab[data-channel-brand="return"] {
-  --channel-brand: #d95c65;
-  --channel-brand-strong: #9f2430;
-  --channel-brand-soft: #fff0f1;
+  --channel-brand: #475569;
+  --channel-brand-strong: #334155;
+  --channel-brand-soft: #e8edf3;
 }
 
 .crm-document-type-tabs.sales-document-tabs {
@@ -11331,7 +11333,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-debt-metric--upcoming strong {
-  color: #087a35;
+  color: #1d4ed8;
 }
 
 .sales-debt-table-wrap {
@@ -11391,15 +11393,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-debt-client-row--overdue td {
-  background: color-mix(in srgb, #ef4444 9%, var(--card));
+  background: color-mix(in srgb, #475569 9%, var(--card));
 }
 
 .sales-debt-client-row--today td {
-  background: color-mix(in srgb, #f59e0b 11%, var(--card));
+  background: color-mix(in srgb, #64748b 11%, var(--card));
 }
 
 .sales-debt-client-row--upcoming td {
-  background: color-mix(in srgb, #22c55e 7%, var(--card));
+  background: color-mix(in srgb, #2563eb 7%, var(--card));
 }
 
 .sales-debt-client {
@@ -11487,7 +11489,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-debt-document-main strong {
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
 }
 
 .sales-debt-document-main span,
@@ -11534,22 +11536,22 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-debt-pill--overdue {
-  border-color: color-mix(in srgb, #ef4444 40%, transparent);
-  background: color-mix(in srgb, #ef4444 13%, var(--card));
-  color: #a62626;
+  border-color: color-mix(in srgb, #475569 40%, transparent);
+  background: color-mix(in srgb, #475569 13%, var(--card));
+  color: #334155;
 }
 
 .sales-debt-pill--today {
-  border-color: color-mix(in srgb, #f59e0b 45%, transparent);
-  background: color-mix(in srgb, #f59e0b 15%, var(--card));
-  color: #8a5a00;
+  border-color: color-mix(in srgb, #64748b 45%, transparent);
+  background: color-mix(in srgb, #64748b 15%, var(--card));
+  color: #475569;
 }
 
 .sales-debt-pill--upcoming,
 .sales-debt-pill--none {
-  border-color: color-mix(in srgb, #22c55e 35%, transparent);
-  background: color-mix(in srgb, #22c55e 10%, var(--card));
-  color: #087a35;
+  border-color: color-mix(in srgb, #2563eb 35%, transparent);
+  background: color-mix(in srgb, #2563eb 10%, var(--card));
+  color: #1d4ed8;
 }
 
 .sales-debt-pay-btn {
@@ -11741,8 +11743,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-journal-task-completed {
-  background: color-mix(in srgb, #16a34a 10%, var(--card));
-  color: #15803d;
+  background: color-mix(in srgb, #2563eb 10%, var(--card));
+  color: #1e40af;
 }
 
 html.dark .sales-journal-task-total {
@@ -11766,9 +11768,9 @@ html.dark .sales-journal-task-completed {
 .sales-journal-table .sales-journal-crm-select {
   min-width: 0;
   width: 100%;
-  border-color: color-mix(in srgb, var(--brand-box, #2d6cdf) 42%, var(--border));
-  background-color: color-mix(in srgb, var(--brand-box, #2d6cdf) 9%, var(--card));
-  color: var(--sales-journal-accent, var(--brand-box, #2d6cdf));
+  border-color: color-mix(in srgb, var(--brand-box, #2563eb) 42%, var(--border));
+  background-color: color-mix(in srgb, var(--brand-box, #2563eb) 9%, var(--card));
+  color: var(--sales-journal-accent, var(--brand-box, #2563eb));
   font-size: 0.72rem;
 }
 
@@ -11864,13 +11866,13 @@ html.dark .sales-journal-task-completed {
 
 .sales-journal-id-cell:hover strong,
 .sales-journal-id-cell:focus-visible strong {
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
 }
 
 /* Единый акцентный цвет журнала продаж: ID, дата, клиент, склад и сумма
    подсвечиваются одним цветом, чтобы строка читалась как одно целое. */
 .sales-journal-table {
-  --sales-journal-accent: var(--brand-box, #2d6cdf);
+  --sales-journal-accent: var(--brand-box, #2563eb);
 }
 
 html.dark .sales-journal-table {
@@ -11902,10 +11904,10 @@ html.dark .sales-journal-table {
   justify-content: flex-end;
   min-height: 1.65rem;
   padding: 0.18rem 0.42rem;
-  border: 1px solid color-mix(in srgb, #16a34a 46%, var(--border));
+  border: 1px solid color-mix(in srgb, #2563eb 46%, var(--border));
   border-radius: 0.35rem;
-  background: color-mix(in srgb, #16a34a 9%, var(--card));
-  color: #15803d;
+  background: color-mix(in srgb, #2563eb 9%, var(--card));
+  color: #1e40af;
   font-size: calc(1em + 1px);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
@@ -11943,7 +11945,7 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
   width: var(--sales-payment-progress, 0%);
   height: 0.26rem;
   border-radius: 0 999px 999px 0;
-  background: #16a34a;
+  background: #2563eb;
   content: "";
   pointer-events: none;
   transition: width 420ms ease;
@@ -11957,7 +11959,7 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
 
 .sales-journal-debt-cell .sales-journal-debt-amount,
 .sales-journal-total-row .sales-journal-debt-amount {
-  color: #dc2626;
+  color: #475569;
   font-weight: 800;
 }
 
@@ -11968,15 +11970,15 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
   gap: 0.08rem;
   min-width: max-content;
   padding: 0.24rem 0.42rem;
-  border: 1px solid color-mix(in srgb, #dc2626 68%, var(--border));
+  border: 1px solid color-mix(in srgb, #475569 68%, var(--border));
   border-radius: var(--workbench-radius-xs, 5px);
-  background: color-mix(in srgb, #dc2626 7%, var(--card));
-  box-shadow: 0 0 0 1px color-mix(in srgb, #dc2626 8%, transparent) inset;
+  background: color-mix(in srgb, #475569 7%, var(--card));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #475569 8%, transparent) inset;
   white-space: nowrap;
 }
 
 .sales-journal-debt-badge > small {
-  color: color-mix(in srgb, #dc2626 78%, var(--muted-foreground));
+  color: color-mix(in srgb, #475569 78%, var(--muted-foreground));
   font-size: 0.66rem;
   font-weight: 700;
   line-height: 1.1;
@@ -12001,7 +12003,7 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
 
 .sales-journal-total-row span {
   display: block;
-  color: var(--brand-box, #2d6cdf);
+  color: var(--brand-box, #2563eb);
   font-weight: 900;
   white-space: nowrap;
 }
@@ -12037,19 +12039,19 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
 }
 
 .sales-status--paid {
-  color: #0f7b36;
+  color: #1d4ed8;
   background: color-mix(in oklch, #2fb463, transparent 84%);
 }
 
 .sales-status--partial,
 .sales-status--reserved {
-  color: #8a5a00;
+  color: #475569;
   background: color-mix(in oklch, #f1a500, transparent 84%);
 }
 
 .sales-status--debt,
 .sales-status--return {
-  color: #a62626;
+  color: #334155;
   background: color-mix(in oklch, #e44d4d, transparent 86%);
 }
 
@@ -12083,13 +12085,13 @@ html.dark .sales-journal-payment-progress:not([data-payment-progress="0"]) > spa
 }
 
 .kassa-status-select--confirmed {
-  border-color: color-mix(in oklch, oklch(0.55 0.14 150), transparent 55%);
-  background-color: color-mix(in oklch, oklch(0.62 0.15 150), transparent 88%);
-  color: oklch(0.42 0.15 150);
+  border-color: color-mix(in oklch, oklch(0.55 0.14 258), transparent 55%);
+  background-color: color-mix(in oklch, oklch(0.62 0.15 258), transparent 88%);
+  color: oklch(0.42 0.15 258);
 }
 
 html.dark .kassa-status-select--confirmed {
-  color: oklch(0.72 0.15 150);
+  color: oklch(0.72 0.15 258);
 }
 
 .kassa-status-select--draft {
@@ -12377,11 +12379,11 @@ body.sidebar-rail .nav-folder-chevron {
 }
 
 .sidebar-ibox-sync[data-state="success"] .sidebar-ibox-sync-dot {
-  background: var(--success, oklch(0.62 0.17 145));
+  background: var(--success, oklch(0.62 0.17 258));
 }
 
 .sidebar-ibox-sync[data-state="partial"] .sidebar-ibox-sync-dot {
-  background: var(--warning, oklch(0.72 0.16 75));
+  background: var(--warning, oklch(0.72 0.03 264));
 }
 
 .sidebar-ibox-sync[data-state="error"] .sidebar-ibox-sync-dot {
@@ -13057,6 +13059,8 @@ select {
 }
 
 /* ——— Buttons ——— */
+/* Брендбук: фирменная 3D-кнопка — плоский синий без градиента, объём
+   даёт нижняя «грань» (тень цветом --btn-edge). Нажатие утапливает кнопку. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -13066,15 +13070,16 @@ select {
   border-radius: var(--radius);
   border: none;
   font-size: var(--text-base);
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   background: var(--primary);
   color: var(--primary-foreground);
   text-decoration: none;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 3px 0 var(--btn-edge, #1d4ed8), var(--shadow-sm);
   transition:
     filter 0.15s ease,
-    transform 0.1s ease;
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
 }
 
 .btn:hover {
@@ -13082,19 +13087,25 @@ select {
 }
 
 .btn:active {
-  transform: translateY(0.5px);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--btn-edge, #1d4ed8);
 }
 
 .btn-secondary {
-  background: color-mix(in oklch, var(--muted), transparent 25%);
+  background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--border);
-  box-shadow: none;
+  box-shadow: 0 3px 0 color-mix(in oklch, var(--border), var(--foreground) 12%), var(--shadow-sm);
 }
 
 .btn-secondary:hover {
   background: var(--accent);
   filter: none;
+}
+
+.btn-secondary:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--border), var(--foreground) 12%);
 }
 
 .btn-xs {
@@ -13104,7 +13115,7 @@ select {
 
 .btn-danger-ghost {
   background: transparent;
-  color: color-mix(in oklch, var(--destructive), oklch(0.4 0.15 27) 15%);
+  color: color-mix(in oklch, var(--destructive), oklch(0.4 0.03 264) 15%);
   border: 1px solid color-mix(in oklch, var(--destructive), transparent 72%);
   box-shadow: none;
 }
@@ -13115,12 +13126,12 @@ select {
 }
 
 html.dark .btn-danger-ghost {
-  color: oklch(0.82 0.12 25);
-  border-color: oklch(0.45 0.14 25);
+  color: oklch(0.82 0.03 264);
+  border-color: oklch(0.45 0.03 264);
 }
 
 html.dark .btn-danger-ghost:hover {
-  background: oklch(0.28 0.06 25);
+  background: oklch(0.28 0.03 264);
 }
 
 /* ——— Alerts ——— */
@@ -13141,7 +13152,7 @@ html.dark .btn-danger-ghost:hover {
 .flash.err {
   border: 1px solid color-mix(in oklch, var(--destructive), transparent 55%);
   background: color-mix(in oklch, var(--destructive), transparent 88%);
-  color: color-mix(in oklch, var(--destructive), oklch(0.25 0.1 27) 10%);
+  color: color-mix(in oklch, var(--destructive), oklch(0.25 0.03 264) 10%);
 }
 
 .settings-ios-flash,
@@ -13337,9 +13348,7 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   justify-content: center;
   padding: calc(2rem + env(safe-area-inset-top, 0px)) calc(1rem + env(safe-area-inset-right, 0px)) calc(2rem + env(safe-area-inset-bottom, 0px)) calc(1rem + env(safe-area-inset-left, 0px));
   background: var(--background);
-  background-image:
-    radial-gradient(ellipse 100% 80% at 50% -40%, color-mix(in oklch, var(--primary), transparent 88%), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 100%, color-mix(in oklch, var(--brand-box), transparent 92%), transparent);
+  background-image: transparent;
 }
 
 .auth-shell {
@@ -13623,9 +13632,9 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   width: max-content;
   margin: -4px 0 10px auto;
   padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, #16a34a 44%, var(--border));
+  border: 1px solid color-mix(in srgb, #2563eb 44%, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, #dcfce7 86%, white);
+  background: color-mix(in srgb, #dbeafe 86%, white);
   color: #14532d;
   font-weight: 800;
   box-shadow: 0 16px 34px rgba(22, 163, 74, 0.2);
@@ -13923,12 +13932,12 @@ details.user-tile > summary::marker {
 }
 
 .tag-main {
-  background: color-mix(in oklch, oklch(0.75 0.12 85), transparent 78%);
-  color: oklch(0.38 0.09 85);
+  background: color-mix(in oklch, oklch(0.75 0.03 264), transparent 78%);
+  color: oklch(0.38 0.03 264);
 }
 
 html.dark .tag-main {
-  background: oklch(0.35 0.06 85);
+  background: oklch(0.35 0.03 264);
   color: oklch(0.93 0.04 85);
 }
 
@@ -14063,8 +14072,8 @@ html.dark .employees-page-wrap {
   min-width: min(18rem, calc(100vw - 2rem));
   max-width: calc(100vw - 2rem);
   border-radius: var(--settings-ios-radius-sm);
-  background: color-mix(in oklch, var(--success, oklch(0.62 0.17 145)), transparent 88%);
-  color: color-mix(in oklch, var(--success, oklch(0.45 0.14 145)), var(--foreground) 25%);
+  background: color-mix(in oklch, var(--success, oklch(0.62 0.17 258)), transparent 88%);
+  color: color-mix(in oklch, var(--success, oklch(0.45 0.14 258)), var(--foreground) 25%);
   font-size: var(--text-base);
   font-weight: 600;
   text-align: center;
@@ -14107,12 +14116,7 @@ html.dark .employees-page-wrap {
   border-radius: var(--settings-ios-radius, 1rem);
   border: 1px solid color-mix(in oklch, var(--settings-ios-hairline), var(--primary) 35%);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--card), var(--primary) 4%) 0%,
-      var(--card) 48%,
-      color-mix(in oklch, var(--card), var(--muted) 12%) 100%
-    );
+    color-mix(in oklch, var(--card), var(--primary) 4%);
   box-shadow:
     0 1px 0 color-mix(in oklch, var(--foreground), transparent 94%),
     0 12px 40px color-mix(in oklch, var(--foreground), transparent 94%);
@@ -14126,11 +14130,7 @@ html.dark .employees-page-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    145deg,
-    color-mix(in oklch, var(--primary), white 12%),
-    color-mix(in oklch, var(--primary), black 8%)
-  );
+  background: color-mix(in oklch, var(--primary), white 12%);
   color: var(--primary-foreground);
   font-size: var(--text-lg);
   font-weight: 600;
@@ -14682,7 +14682,7 @@ html.dark #employee-edit-dialog .employees-role-select {
   margin: 0.1rem 0 0;
   font-size: var(--text-sm);
   line-height: 1.35;
-  color: var(--destructive, oklch(0.55 0.2 25));
+  color: var(--destructive, oklch(0.55 0.03 264));
 }
 
 .settings-profile-password-panel {
@@ -14707,8 +14707,8 @@ html.dark #employee-edit-dialog .employees-role-select {
   margin: 0 0 0.75rem;
   padding: 0.5rem 0.65rem;
   border-radius: var(--settings-ios-radius-sm);
-  background: color-mix(in oklch, var(--destructive, oklch(0.55 0.2 25)), transparent 88%);
-  color: var(--destructive, oklch(0.5 0.18 25));
+  background: color-mix(in oklch, var(--destructive, oklch(0.55 0.03 264)), transparent 88%);
+  color: var(--destructive, oklch(0.5 0.03 264));
   font-size: var(--text-sm);
 }
 
@@ -14727,20 +14727,20 @@ html.dark #employee-edit-dialog .employees-role-select {
   height: 100%;
   width: 0;
   border-radius: inherit;
-  background: var(--destructive, oklch(0.55 0.2 25));
+  background: var(--destructive, oklch(0.55 0.03 264));
   transition: width 0.2s ease, background 0.2s ease;
 }
 
 .settings-pw-strength-bar[data-level='fair'] {
-  background: oklch(0.72 0.14 85);
+  background: oklch(0.72 0.03 264);
 }
 
 .settings-pw-strength-bar[data-level='good'] {
-  background: oklch(0.68 0.14 145);
+  background: oklch(0.68 0.14 258);
 }
 
 .settings-pw-strength-bar[data-level='strong'] {
-  background: oklch(0.62 0.17 145);
+  background: oklch(0.62 0.17 258);
 }
 
 .settings-pw-strength-label {
@@ -14779,8 +14779,8 @@ html.dark #employee-edit-dialog .employees-role-select {
 }
 
 .settings-pw-check.is-met .settings-pw-check-ic {
-  border-color: color-mix(in oklch, var(--success, oklch(0.55 0.17 145)), transparent 10%);
-  background: color-mix(in oklch, var(--success, oklch(0.55 0.17 145)), transparent 82%);
+  border-color: color-mix(in oklch, var(--success, oklch(0.55 0.17 258)), transparent 10%);
+  background: color-mix(in oklch, var(--success, oklch(0.55 0.17 258)), transparent 82%);
 }
 
 .settings-pw-check.is-met .settings-pw-check-ic::after {
@@ -14790,7 +14790,7 @@ html.dark #employee-edit-dialog .employees-role-select {
   top: 0.12rem;
   width: 0.28rem;
   height: 0.48rem;
-  border: solid color-mix(in oklch, var(--success, oklch(0.45 0.14 145)), var(--foreground) 10%);
+  border: solid color-mix(in oklch, var(--success, oklch(0.45 0.14 258)), var(--foreground) 10%);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -15358,20 +15358,15 @@ html.dark .settings-tab.settings-tab--rail.active {
 }
 
 .settings-flag--ru {
-  background: linear-gradient(to bottom, #fff 0 33.33%, #1c57a5 33.33% 66.66%, #d52b1e 66.66% 100%);
+  background: #fff;
 }
 
 .settings-flag--gb {
-  background:
-    linear-gradient(33deg, transparent 0 42%, #fff 42% 47%, #c8102e 47% 53%, #fff 53% 58%, transparent 58%),
-    linear-gradient(147deg, transparent 0 42%, #fff 42% 47%, #c8102e 47% 53%, #fff 53% 58%, transparent 58%),
-    linear-gradient(to bottom, transparent 0 37%, #fff 37% 43%, #c8102e 43% 57%, #fff 57% 63%, transparent 63%),
-    linear-gradient(to right, transparent 0 37%, #fff 37% 43%, #c8102e 43% 57%, #fff 57% 63%, transparent 63%),
-    #012169;
+  background: #012169;
 }
 
 .settings-flag--uz {
-  background: linear-gradient(to bottom, #0099b5 0 31%, #ce1126 31% 34%, #fff 34% 63%, #ce1126 63% 66%, #1eb53a 66% 100%);
+  background: #0099b5;
 }
 
 .settings-theme-picker-compact {
@@ -15636,7 +15631,7 @@ details.integr-card--ios[open] > summary .integr-card-chevron--ios svg {
 }
 
 .integr-sync-status[data-variant="ok"] {
-  color: oklch(0.52 0.13 160);
+  color: oklch(0.52 0.13 258);
 }
 
 .integr-sync-status[data-variant="err"] {
@@ -15905,7 +15900,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-formula-input:focus {
-  box-shadow: inset 0 0 0 2px #1683e8;
+  box-shadow: inset 0 0 0 2px #2563eb;
 }
 
 .price-template-formula-input:disabled {
@@ -16041,9 +16036,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-preview.is-grid-editing {
   background-color: #fff;
-  background-image:
-    linear-gradient(rgb(22 131 232 / 8%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(22 131 232 / 8%) 1px, transparent 1px);
+  background: rgb(22 131 232 / 8%);
   background-size: 6px 6px;
 }
 
@@ -16057,7 +16050,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   border: 1px solid #0d72cf;
   border-radius: 5px;
   padding: 0;
-  background: #1683e8;
+  background: #2563eb;
   color: #fff;
   box-shadow: 0 4px 12px rgb(15 23 42 / 24%);
   font-size: 17px;
@@ -16090,7 +16083,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 .price-template-preview [data-price-layout-key].is-layout-selected {
   position: relative;
   z-index: 4;
-  outline: 2px solid #1683e8;
+  outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 
@@ -16118,7 +16111,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-brand:hover,
 .price-template-brand:focus-visible {
-  border-color: #1683e8;
+  border-color: #2563eb;
   outline: 0;
   background: rgb(22 131 232 / 6%);
 }
@@ -16147,7 +16140,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   bottom: 0.45rem;
   padding: 0.25rem 0.45rem;
   border-radius: 4px;
-  background: #1683e8;
+  background: #2563eb;
   color: white;
   font-size: 10px;
   font-weight: 800;
@@ -16332,18 +16325,18 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .warehouse-purchase-rest-amount strong {
-  color: #c2410c;
+  color: #475569;
   font-weight: 900;
 }
 
 .warehouse-purchase-paid[data-payment-progress="100"] .warehouse-purchase-rest-amount,
 .warehouse-purchase-paid[data-payment-progress="100"] .warehouse-purchase-rest-amount strong {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .warehouse-purchase-debt-total {
   margin-top: 0.18rem;
-  color: #c2410c;
+  color: #475569;
 }
 
 .price-template-extra-table td {
@@ -16358,7 +16351,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-extra-table [data-price-cell].is-selected {
-  box-shadow: inset 0 0 0 2px #1683e8;
+  box-shadow: inset 0 0 0 2px #2563eb;
   background: rgb(22 131 232 / 8%);
 }
 
@@ -16371,10 +16364,10 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   width: 30px;
   height: 25px;
   place-items: center;
-  border: 1px solid #1683e8;
+  border: 1px solid #2563eb;
   border-radius: 4px;
   padding: 0;
-  background: #1683e8;
+  background: #2563eb;
   color: #fff;
   font-size: 16px;
   line-height: 1;
@@ -16432,7 +16425,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 .price-template-note [data-price-cell].is-selected,
 .price-template-custom-text [data-price-cell].is-selected {
   border-radius: 1px;
-  box-shadow: inset 0 0 0 3px #1683e8;
+  box-shadow: inset 0 0 0 3px #2563eb;
   background: rgb(22 131 232 / 8%);
 }
 
@@ -16541,7 +16534,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-product-img.is-photo-selected {
-  outline: 3px solid #1683e8;
+  outline: 3px solid #2563eb;
   outline-offset: -3px;
   box-shadow: 0 0 0 2px rgb(255 255 255 / 85%);
 }
@@ -16558,9 +16551,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-product-img--monitor {
-  background:
-    radial-gradient(circle at 77% 13%, #f3c14d 0 8px, transparent 9px),
-    linear-gradient(140deg, #151515 0 36%, #274f87 36% 66%, #f5a623 66% 100%);
+  background: #151515;
 }
 
 .price-template-product-img--monitor::before {
@@ -16571,7 +16562,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   width: 38px;
   height: 25px;
   border: 3px solid #111;
-  background: linear-gradient(140deg, #2b6ed3, #071933);
+  background: #2b6ed3;
   box-shadow: 0 20px 0 -16px #111;
 }
 
@@ -16586,9 +16577,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 }
 
 .price-template-product-img--scale {
-  background:
-    linear-gradient(90deg, transparent 58%, #fff 58% 62%, transparent 62%),
-    linear-gradient(#ededed, #c9c9c9 58%, #202b35 58% 100%);
+  background: #ededed;
 }
 
 .price-template-product-img--scale::before {
@@ -16615,7 +16604,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
 
 .price-template-product-img--printer {
   background:
-    linear-gradient(90deg, #f9fbff 0 45%, #f0f6ff 45% 100%);
+    #f9fbff;
 }
 
 .price-template-product-img--printer::before {
@@ -16626,7 +16615,7 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   width: 27px;
   height: 34px;
   border-radius: 4px;
-  background: linear-gradient(#1a1f27, #090b10);
+  background: #1a1f27;
   box-shadow: 0 -6px 0 #2e3745 inset;
 }
 
@@ -16637,13 +16626,11 @@ html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
   top: 14px;
   width: 30px;
   height: 38px;
-  background: repeating-linear-gradient(#1f77d4 0 3px, transparent 3px 7px);
+  background: repeating-#1f77d4;
 }
 
 .price-template-product-img--empty {
-  background:
-    linear-gradient(135deg, transparent 46%, #a9b2bd 47% 53%, transparent 54%),
-    #f5f7f9;
+  background: #f5f7f9;
 }
 
 .price-template-product-img--empty::before {
@@ -17337,12 +17324,7 @@ html.dark .price-template-toggle-face::after {
   border-radius: var(--settings-ios-radius, 1rem);
   border: 1px solid color-mix(in oklch, var(--settings-ios-hairline), var(--primary) 22%);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--card), var(--primary) 2%) 0%,
-      var(--card) 55%,
-      color-mix(in oklch, var(--card), var(--muted) 8%) 100%
-    );
+    color-mix(in oklch, var(--card), var(--primary) 2%);
   box-shadow:
     0 1px 0 color-mix(in oklch, var(--foreground), transparent 96%),
     0 4px 14px color-mix(in oklch, var(--foreground), transparent 96%);
@@ -17356,11 +17338,7 @@ html.dark .price-template-toggle-face::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    145deg,
-    color-mix(in oklch, var(--primary), white 10%),
-    color-mix(in oklch, var(--primary), black 8%)
-  );
+  background: color-mix(in oklch, var(--primary), white 10%);
   color: var(--primary-foreground);
   font-size: var(--text-base);
   font-weight: 600;
@@ -17447,7 +17425,7 @@ html.dark .price-template-toggle-face::after {
   border: 1px solid rgba(59, 130, 246, 0.28);
   border-radius: 999px;
   background: rgba(219, 234, 254, 0.72);
-  color: #1e3a8a;
+  color: #1e40af;
   font-size: var(--text-sm);
   font-weight: 500;
   line-height: 1.2;
@@ -18571,9 +18549,9 @@ html.dark .organizations-page-wrap {
 }
 
 .org-card-integration.is-active {
-  border-color: color-mix(in oklch, #16a34a, transparent 55%);
-  background: color-mix(in oklch, #16a34a, transparent 91%);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, #16a34a, transparent 80%);
+  border-color: color-mix(in oklch, #2563eb, transparent 55%);
+  background: color-mix(in oklch, #2563eb, transparent 91%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, #2563eb, transparent 80%);
 }
 
 .org-card-integration.is-muted {
@@ -18717,9 +18695,9 @@ html.dark .organization-edit-form {
 /* General organizations director panel */
 .director-org-workspace {
   --director-blue: oklch(0.52 0.16 255);
-  --director-green: oklch(0.49 0.14 150);
-  --director-red: oklch(0.55 0.16 28);
-  --director-gold: oklch(0.62 0.13 78);
+  --director-green: oklch(0.49 0.14 258);
+  --director-red: oklch(0.55 0.03 264);
+  --director-gold: oklch(0.62 0.03 264);
   --director-line: color-mix(in oklch, var(--border), var(--primary) 12%);
 }
 
@@ -18730,9 +18708,7 @@ html.dark .organization-edit-form {
   overflow: hidden;
   border: 1px solid var(--director-line);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 64%),
-    var(--card);
+  background: var(--card);
   box-shadow:
     0 18px 42px color-mix(in oklch, var(--primary), transparent 92%),
     0 1px 0 color-mix(in oklch, white, transparent 58%) inset;
@@ -18745,7 +18721,7 @@ html.dark .organization-edit-form {
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: linear-gradient(90deg, var(--primary), var(--director-blue), var(--director-green));
+  background: var(--primary);
 }
 
 .director-org-hero {
@@ -18787,9 +18763,7 @@ html.dark .organization-edit-form {
   padding: 0.78rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 94%), transparent 56%),
-    color-mix(in oklch, var(--card), var(--muted) 5%);
+  background: color-mix(in oklch, var(--card), var(--muted) 5%);
   box-shadow: 0 10px 22px color-mix(in oklch, black, transparent 96%);
 }
 
@@ -18815,9 +18789,7 @@ html.dark .organization-edit-form {
 
 .director-org-metric--active {
   border-color: color-mix(in oklch, var(--director-green), transparent 62%);
-  background:
-    linear-gradient(145deg, color-mix(in oklch, var(--director-green), transparent 91%), transparent 58%),
-    var(--card);
+  background: var(--card);
 }
 
 .org-balance-chips {
@@ -18929,9 +18901,7 @@ html.dark .organization-edit-form {
   min-width: 0;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 60%),
-    color-mix(in oklch, var(--card), var(--muted) 4%);
+  background: color-mix(in oklch, var(--card), var(--muted) 4%);
 }
 
 .director-create-card {
@@ -18989,9 +18959,7 @@ html.dark .organization-edit-form {
   min-height: 2.72rem;
   border-color: color-mix(in oklch, var(--border), var(--primary) 16%);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 88%), transparent),
-    color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in oklch, var(--background), var(--primary) 3%);
   font-weight: 600;
 }
 
@@ -19023,9 +18991,7 @@ html.dark .organization-edit-form {
 .director-nav-card:hover {
   transform: translateY(-1px);
   border-color: color-mix(in oklch, var(--primary), transparent 55%);
-  background:
-    linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 91%), transparent 62%),
-    var(--card);
+  background: var(--card);
 }
 
 .director-nav-icon {
@@ -19192,9 +19158,7 @@ html.dark .organization-edit-form {
   gap: 0.9rem;
   padding: 0.95rem;
   border-color: color-mix(in oklch, var(--border), var(--primary) 14%);
-  background:
-    linear-gradient(160deg, color-mix(in oklch, var(--primary), transparent 94%), transparent 42%),
-    var(--card);
+  background: var(--card);
   box-shadow: 0 14px 30px color-mix(in oklch, black, transparent 96%);
 }
 
@@ -19203,7 +19167,7 @@ html.dark .organization-edit-form {
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: linear-gradient(var(--primary), var(--director-green));
+  background: var(--primary);
 }
 
 .director-org-card.organization-card--selected {
@@ -19457,9 +19421,7 @@ html.dark .organization-edit-form {
   padding: 0.75rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 96%), transparent),
-    color-mix(in oklch, var(--card), var(--muted) 4%);
+  background: color-mix(in oklch, var(--card), var(--muted) 4%);
   box-shadow: 0 12px 28px color-mix(in oklch, black, transparent 94%);
 }
 
@@ -19510,9 +19472,7 @@ html.dark .organization-edit-form {
   padding: 0.78rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 56%),
-    color-mix(in oklch, var(--card), var(--muted) 4%);
+  background: color-mix(in oklch, var(--card), var(--muted) 4%);
 }
 
 .director-signal-card small {
@@ -19646,23 +19606,17 @@ html.dark .organization-edit-form {
 
 .director-history-btn--all {
   color: color-mix(in oklch, var(--primary), var(--foreground) 16%);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 88%), transparent),
-    color-mix(in oklch, var(--card), var(--primary) 6%);
+  background: color-mix(in oklch, var(--card), var(--primary) 6%);
 }
 
 .director-history-btn--expense {
   color: color-mix(in oklch, #b42318, var(--foreground) 24%);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, #f97316, transparent 91%), transparent),
-    color-mix(in oklch, var(--card), #fee2e2 8%);
+  background: color-mix(in oklch, var(--card), #e2e8f0 8%);
 }
 
 .director-history-btn--income {
   color: color-mix(in oklch, var(--director-green), var(--foreground) 18%);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--director-green), transparent 90%), transparent),
-    color-mix(in oklch, var(--card), var(--director-green) 5%);
+  background: color-mix(in oklch, var(--card), var(--director-green) 5%);
 }
 
 .director-org-edit--inline {
@@ -19736,9 +19690,7 @@ html.dark .organization-edit-form {
   padding: 1.1rem;
   border: 1px solid var(--director-line);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 62%),
-    var(--card);
+  background: var(--card);
   box-shadow:
     0 18px 42px color-mix(in oklch, var(--primary), transparent 92%),
     0 1px 0 color-mix(in oklch, white, transparent 58%) inset;
@@ -19749,7 +19701,7 @@ html.dark .organization-edit-form {
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: linear-gradient(90deg, var(--primary), var(--director-blue), var(--director-green));
+  background: var(--primary);
 }
 
 .director-capital-main {
@@ -19799,9 +19751,7 @@ html.dark .organization-edit-form {
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
   border-radius: var(--workbench-radius, 14px);
   padding: 0.5rem 0.65rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 88%), transparent),
-    color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in oklch, var(--background), var(--primary) 3%);
   color: var(--foreground);
   font: inherit;
   font-weight: 600;
@@ -19825,9 +19775,7 @@ html.dark .organization-edit-form {
   padding: 0.78rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
   border-radius: var(--workbench-radius, 14px);
-  background:
-    linear-gradient(145deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 58%),
-    color-mix(in oklch, var(--card), var(--muted) 4%);
+  background: color-mix(in oklch, var(--card), var(--muted) 4%);
 }
 
 .director-capital-signals small {
@@ -19921,9 +19869,7 @@ html.dark .organization-edit-form {
   overflow: hidden;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
   border-radius: 15px;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 40%),
-    var(--card);
+  background: var(--card);
   box-shadow: 0 28px 70px color-mix(in oklch, black, transparent 76%);
 }
 
@@ -20717,11 +20663,11 @@ body[data-shell="admin"] .sidebar {
 }
 
 .ccy-add-status[data-variant="ok"] {
-  color: color-mix(in oklch, var(--success, oklch(0.45 0.14 145)), var(--foreground) 20%);
+  color: color-mix(in oklch, var(--success, oklch(0.45 0.14 258)), var(--foreground) 20%);
 }
 
 .ccy-add-status[data-variant="err"] {
-  color: var(--danger, oklch(0.58 0.18 25));
+  color: var(--danger, oklch(0.58 0.03 264));
 }
 
 .ccy-check-item {
@@ -20861,8 +20807,8 @@ button.settings-cat-icon:hover {
 
 .cat-type-icon--income,
 .settings-cat-icon--income {
-  background: color-mix(in oklch, oklch(0.62 0.16 150), transparent 84%);
-  color: oklch(0.46 0.15 150);
+  background: color-mix(in oklch, oklch(0.62 0.16 258), transparent 84%);
+  color: oklch(0.46 0.15 258);
 }
 
 .cat-type-icon--expense,
@@ -21457,9 +21403,9 @@ body:has(dialog[open]) {
   gap: 0.65rem;
   margin: 0 1rem 1rem;
   padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 18%, var(--settings-ios-hairline, var(--border)));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 18%, var(--settings-ios-hairline, var(--border)));
   border-radius: var(--settings-ios-radius-sm, 8px);
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 8%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 8%, var(--card));
 }
 
 .settings-fx-rate-card label {
@@ -21474,7 +21420,7 @@ body:has(dialog[open]) {
 .settings-fx-rate-card input {
   min-height: 2.35rem;
   padding: 0.45rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--brand-box, #2d6cdf) 22%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 22%, var(--border));
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
@@ -21489,11 +21435,11 @@ body:has(dialog[open]) {
 }
 
 .settings-fx-rate-card small[data-variant="ok"] {
-  color: #0f7b36;
+  color: #1d4ed8;
 }
 
 .settings-fx-rate-card small[data-variant="err"] {
-  color: #a62626;
+  color: #334155;
 }
 
 .ccy-check-item--inactive {
@@ -22414,9 +22360,7 @@ body:has(dialog[open]) {
   padding-inline: 0.32rem;
   border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 76%),
-    color-mix(in oklch, var(--primary), transparent 89%);
+  background: color-mix(in oklch, var(--primary), transparent 89%);
   color: var(--primary);
   font-size: var(--text-xs);
   font-weight: 800;
@@ -22508,9 +22452,7 @@ body:has(dialog[open]) {
   height: 2.25rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 14%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 74%),
-    color-mix(in oklch, var(--card), var(--primary) 4%);
+  background: color-mix(in oklch, var(--card), var(--primary) 4%);
   color: var(--primary);
   cursor: pointer;
   box-shadow:
@@ -22711,7 +22653,7 @@ body:has(dialog[open]) {
 }
 
 .org-hr-act-row--negative td.num {
-  color: var(--destructive, #dc2626);
+  color: var(--destructive, #475569);
 }
 
 .org-hr-act-row--payment td.num {
@@ -22742,9 +22684,7 @@ body:has(dialog[open]) {
   padding: 0.9rem;
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 10%), transparent 78%),
-    color-mix(in oklch, var(--muted), transparent 76%);
+  background: color-mix(in oklch, var(--muted), transparent 76%);
 }
 
 .org-hr-card-avatar {
@@ -22938,7 +22878,7 @@ body:has(dialog[open]) {
 }
 
 .org-hr-card-balance.is-overpaid strong {
-  color: oklch(0.56 0.14 72);
+  color: oklch(0.56 0.03 264);
 }
 
 .org-hr-card-balance.is-closed strong {
@@ -23025,7 +22965,7 @@ body:has(dialog[open]) {
 
 .org-hr-calendar-day.is-absent {
   color: #c62828;
-  background: color-mix(in oklch, #ef4444 12%, var(--card));
+  background: color-mix(in oklch, #475569 12%, var(--card));
 }
 
 .org-hr-calendar-panel {
@@ -23153,7 +23093,7 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-month-day.is-marked {
-  border-color: color-mix(in oklch, #16a34a, var(--primary) 18%);
+  border-color: color-mix(in oklch, #2563eb, var(--primary) 18%);
 }
 
 .org-hr-month-day-check {
@@ -23165,7 +23105,7 @@ button.org-hr-month-day:hover {
   width: 1.12rem;
   height: 1.12rem;
   border-radius: 999px;
-  background: #16a34a;
+  background: #2563eb;
   color: white;
   font-size: 0.72rem;
   font-weight: 900;
@@ -23570,7 +23510,7 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-picked-table tr.is-absent .org-hr-picked-status {
-  background: #dc2626;
+  background: #475569;
 }
 
 .org-hr-picked-remove {
@@ -23578,10 +23518,10 @@ button.org-hr-month-day:hover {
   place-items: center;
   width: 1.9rem;
   height: 1.9rem;
-  border: 1px solid color-mix(in oklch, #dc2626, transparent 45%);
+  border: 1px solid color-mix(in oklch, #475569, transparent 45%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in oklch, #dc2626, transparent 91%);
-  color: #b91c1c;
+  background: color-mix(in oklch, #475569, transparent 91%);
+  color: #334155;
   cursor: pointer;
   font: inherit;
   font-size: 1rem;
@@ -23590,7 +23530,7 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-picked-remove:hover {
-  background: #dc2626;
+  background: #475569;
   color: white;
 }
 
@@ -23801,8 +23741,8 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-radio-pill.is-absent {
-  border-color: color-mix(in oklch, #dc2626, transparent 45%);
-  color: #dc2626;
+  border-color: color-mix(in oklch, #475569, transparent 45%);
+  color: #475569;
 }
 
 .org-hr-radio-pill.is-present:has(input:checked) {
@@ -23813,10 +23753,10 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-radio-pill.is-absent:has(input:checked) {
-  border-color: #dc2626;
-  background: #dc2626;
+  border-color: #475569;
+  background: #475569;
   color: white;
-  box-shadow: 0 8px 16px color-mix(in oklch, #dc2626, transparent 84%);
+  box-shadow: 0 8px 16px color-mix(in oklch, #475569, transparent 84%);
 }
 
 .org-hr-rollcall-actions {
@@ -23992,9 +23932,9 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-pill.is-absent {
-  border-color: color-mix(in oklch, oklch(0.52 0.16 25), transparent 58%);
-  color: oklch(0.42 0.14 25);
-  background: color-mix(in oklch, oklch(0.52 0.16 25), transparent 91%);
+  border-color: color-mix(in oklch, oklch(0.52 0.03 264), transparent 58%);
+  color: oklch(0.42 0.03 264);
+  background: color-mix(in oklch, oklch(0.52 0.03 264), transparent 91%);
 }
 
 .org-hr-attendance-actions {
@@ -24015,8 +23955,8 @@ button.org-hr-month-day:hover {
 }
 
 .org-hr-attendance-actions .btn.is-danger {
-  border-color: oklch(0.52 0.16 25);
-  background: oklch(0.52 0.16 25);
+  border-color: oklch(0.52 0.03 264);
+  background: oklch(0.52 0.03 264);
 }
 
 .org-hr-modal {
@@ -24148,9 +24088,7 @@ button.org-hr-month-day:hover {
 }
 
 .page-body {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 97%), transparent 18rem),
-    var(--background);
+  background: var(--background);
 }
 
 .organizations-page-wrap,
@@ -24182,9 +24120,7 @@ button.org-hr-month-day:hover {
   padding: 0.48rem 0.55rem 0;
   border-color: var(--workspace-line);
   border-radius: 8px 8px 0 0;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 22%), transparent 62%),
-    color-mix(in oklch, var(--primary), var(--background) 90%);
+  background: color-mix(in oklch, var(--primary), var(--background) 90%);
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 40%) inset,
     0 10px 24px color-mix(in oklch, var(--primary), transparent 94%);
@@ -24197,7 +24133,7 @@ button.org-hr-month-day:hover {
   border-bottom-color: color-mix(in oklch, var(--border), transparent 18%);
   color: var(--workspace-navy);
   background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), color-mix(in oklch, var(--card), var(--primary) 3%));
+    color-mix(in oklch, white, transparent 8%);
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 22%) inset,
     0 1px 2px color-mix(in oklch, black, transparent 94%);
@@ -24207,14 +24143,14 @@ button.org-hr-month-day:hover {
 .general-module-tab:hover {
   color: var(--workspace-blue);
   background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 5%), color-mix(in oklch, var(--card), var(--primary) 6%));
+    color-mix(in oklch, white, transparent 5%);
 }
 
 .general-module-tab.active {
   border-color: color-mix(in oklch, var(--workspace-blue), transparent 8%);
   color: white;
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--workspace-blue), white 12%), color-mix(in oklch, var(--workspace-blue), var(--workspace-navy) 20%));
+    color-mix(in oklch, var(--workspace-blue), white 12%);
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 38%) inset,
     0 10px 20px color-mix(in oklch, var(--workspace-blue), transparent 78%);
@@ -24226,9 +24162,7 @@ button.org-hr-month-day:hover {
 .director-org-actions,
 .director-org-directory {
   border-color: var(--workspace-line);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 96%), transparent 64%),
-    var(--workspace-panel);
+  background: var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
 }
 
@@ -24243,7 +24177,7 @@ button.org-hr-month-day:hover {
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: linear-gradient(90deg, var(--workspace-navy), var(--workspace-blue));
+  background: var(--workspace-navy);
 }
 
 .org-ops-panel > * {
@@ -24252,9 +24186,7 @@ button.org-hr-month-day:hover {
 }
 
 .org-ops-table th {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 16%), transparent 68%),
-    color-mix(in oklch, var(--primary), var(--card) 91%);
+  background: color-mix(in oklch, var(--primary), var(--card) 91%);
   color: color-mix(in oklch, var(--workspace-navy), var(--muted-foreground) 18%);
 }
 
@@ -24305,16 +24237,12 @@ body {
 
 .page-header {
   padding: 1.25rem 1.75rem 1.18rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 26%), transparent 76%),
-    color-mix(in oklch, var(--background), var(--card) 18%);
+  background: color-mix(in oklch, var(--background), var(--card) 18%);
 }
 
 .page-body {
   padding: 1.55rem 1.75rem 2.35rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 97%), transparent 17rem),
-    var(--background);
+  background: var(--background);
 }
 
 .page-title {
@@ -24398,18 +24326,14 @@ textarea::placeholder {
 }
 
 .btn {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 84%), transparent 70%),
-    var(--primary);
+  background: var(--primary);
   box-shadow:
     0 1px 0 color-mix(in oklch, white, transparent 42%) inset,
     0 8px 18px color-mix(in oklch, var(--primary), transparent 86%);
 }
 
 .btn-secondary {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 10%), transparent 76%),
-    color-mix(in oklch, var(--muted), transparent 38%);
+  background: color-mix(in oklch, var(--muted), transparent 38%);
   border-color: var(--workbench-line);
   box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 40%) inset;
 }
@@ -24435,9 +24359,7 @@ textarea::placeholder {
 .kassa-overview-grid {
   border-color: var(--workbench-line);
   border-radius: var(--workbench-radius);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 16%), transparent 70%),
-    var(--workbench-surface);
+  background: var(--workbench-surface);
   box-shadow: var(--workbench-shadow);
 }
 
@@ -24764,19 +24686,19 @@ html.dark .products-table tbody tr:hover td {
 }
 
 html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale td {
-  background: color-mix(in srgb, #22c55e 10%, var(--card));
+  background: color-mix(in srgb, #2563eb 10%, var(--card));
 }
 
 html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--sale:hover td {
-  background: color-mix(in srgb, #22c55e 16%, var(--card));
+  background: color-mix(in srgb, #2563eb 16%, var(--card));
 }
 
 html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--return td {
-  background: color-mix(in srgb, #ef4444 15%, var(--card));
+  background: color-mix(in srgb, #475569 15%, var(--card));
 }
 
 html.dark .sales-journal-table.products-catalog-table tbody tr.sales-table-row--return:hover td {
-  background: color-mix(in srgb, #ef4444 21%, var(--card));
+  background: color-mix(in srgb, #475569 21%, var(--card));
 }
 
 .schet-ccy-line-amt,
@@ -24888,9 +24810,7 @@ button.general-module-tab {
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
   border-top: 0;
   border-radius: 0 0 7px 7px;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 20%), transparent 60%),
-    color-mix(in oklch, var(--background), var(--primary) 2%);
+  background: color-mix(in oklch, var(--background), var(--primary) 2%);
   box-shadow:
     0 12px 28px color-mix(in oklch, var(--primary), transparent 94%),
     0 1px 0 color-mix(in oklch, white, transparent 48%) inset;
@@ -24912,7 +24832,7 @@ button.general-module-tab {
   border: 1px solid color-mix(in oklch, var(--primary), transparent 35%);
   color: white;
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary), white 16%), color-mix(in oklch, var(--primary), var(--brand-navy) 18%));
+    color-mix(in oklch, var(--primary), white 16%);
   box-shadow:
     0 14px 24px color-mix(in oklch, var(--primary), transparent 80%),
     0 1px 0 color-mix(in oklch, white, transparent 38%) inset;
@@ -24928,7 +24848,7 @@ button.general-module-tab {
 
 .general-report-card.active,
 .general-report-card[aria-selected="true"] {
-  background: linear-gradient(180deg, var(--primary), color-mix(in oklch, var(--primary), var(--brand-navy) 22%));
+  background: var(--primary);
   box-shadow:
     0 0 0 3px color-mix(in oklch, var(--primary), transparent 82%),
     0 15px 30px color-mix(in oklch, var(--primary), transparent 72%);
@@ -25125,9 +25045,7 @@ button.general-module-tab {
   text-align: left;
   font-size: var(--text-base);
   font-weight: 700;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 12%), transparent 78%),
-    color-mix(in oklch, var(--primary), transparent 96%);
+  background: color-mix(in oklch, var(--primary), transparent 96%);
 }
 
 .org-position-add-row:hover {
@@ -25193,8 +25111,8 @@ button.general-module-tab {
 }
 
 .org-ops-table.org-ops-table--shipments-entry {
-  --shipments-table-blue: var(--brand-accent, #5eb8ff);
-  --shipments-table-blue-strong: var(--brand-box, #2d6cdf);
+  --shipments-table-blue: var(--brand-accent, #2563eb);
+  --shipments-table-blue-strong: var(--brand-box, #2563eb);
   --shipments-table-head-bg: color-mix(in srgb, var(--shipments-table-blue) 22%, var(--card));
   --shipments-table-row-alt-bg: color-mix(in srgb, var(--shipments-table-blue) 8%, var(--card));
   --shipments-table-row-hover-bg: color-mix(in srgb, var(--shipments-table-blue-strong) 10%, var(--card));
@@ -25308,9 +25226,7 @@ button.general-module-tab {
   margin: 0 0.12rem;
   border: 1px solid color-mix(in oklch, var(--workbench-line, var(--border)), var(--primary) 12%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 76%),
-    var(--card);
+  background: var(--card);
   color: var(--foreground);
   cursor: pointer;
   font: inherit;
@@ -25355,9 +25271,7 @@ button.general-module-tab {
   padding: 0.72rem;
   border: 1px solid color-mix(in oklch, var(--workbench-line, var(--border)), var(--primary) 14%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 8%), transparent 76%),
-    color-mix(in oklch, var(--card), var(--primary) 3%);
+  background: color-mix(in oklch, var(--card), var(--primary) 3%);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
@@ -25663,13 +25577,13 @@ button.general-module-tab {
 }
 
 .org-shipments-status--partial {
-  background: color-mix(in srgb, #0ea5e9 14%, var(--card));
+  background: color-mix(in srgb, #2563eb 14%, var(--card));
   color: #0369a1;
 }
 
 .org-shipments-status--paid {
-  background: color-mix(in srgb, #22c55e 14%, var(--card));
-  color: #15803d;
+  background: color-mix(in srgb, #2563eb 14%, var(--card));
+  color: #1e40af;
 }
 
 .org-shipments-doc-status {
@@ -25685,13 +25599,13 @@ button.general-module-tab {
 }
 
 .org-shipments-doc-status--new {
-  background: color-mix(in srgb, var(--brand-accent, #5eb8ff) 18%, var(--card));
-  color: color-mix(in srgb, var(--brand-box, #2d6cdf) 82%, var(--brand-navy));
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 18%, var(--card));
+  color: color-mix(in srgb, var(--brand-box, #2563eb) 82%, var(--brand-navy));
 }
 
 .org-shipments-doc-status--confirmed {
-  background: color-mix(in srgb, #22c55e 15%, var(--card));
-  color: #15803d;
+  background: color-mix(in srgb, #2563eb 15%, var(--card));
+  color: #1e40af;
 }
 
 .org-shipments-document-actions {
@@ -25953,9 +25867,7 @@ button.general-module-tab {
   border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
   border-top: 0;
   border-radius: 0 0 7px 7px;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 20%), transparent 62%),
-    color-mix(in oklch, var(--background), var(--primary) 2%);
+  background: color-mix(in oklch, var(--background), var(--primary) 2%);
   box-shadow:
     0 12px 28px color-mix(in oklch, var(--primary), transparent 94%),
     0 1px 0 color-mix(in oklch, white, transparent 48%) inset;
@@ -26033,7 +25945,7 @@ table.upos-table-resizable-columns {
   width: 8px;
   height: 13px;
   background:
-    radial-gradient(circle, currentColor 1.25px, transparent 1.45px) 0 0 / 4px 4px;
+    transparent 0 0 / 4px 4px;
   content: "";
 }
 
@@ -26287,7 +26199,7 @@ body.upos-table-column-resizing * {
   width: 10px;
   height: 14px;
   background:
-    radial-gradient(circle, currentColor 1.5px, transparent 1.7px) 0 0 / 5px 5px;
+    transparent 0 0 / 5px 5px;
 }
 
 .upos-table-column-drag-handle:hover {
@@ -26343,7 +26255,7 @@ body.upos-table-column-resizing * {
 }
 .price-type-card {
   border: 1px solid rgba(24, 119, 242, 0.22);
-  background: linear-gradient(180deg, #ffffff 0%, #f2f8ff 100%);
+  background: #ffffff;
   border-radius: var(--workbench-radius-sm, 10px);
   padding: 12px;
   box-shadow: 0 10px 24px rgba(31, 86, 140, 0.08);
@@ -26491,7 +26403,7 @@ body.upos-table-column-resizing * {
   height: 56px;
   border: 1px solid rgba(96, 165, 250, 0.55);
   border-radius: 18px;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: #2563eb;
   color: #fff;
   cursor: pointer;
   box-shadow: 0 18px 34px rgba(37, 99, 235, 0.32);
@@ -26637,7 +26549,7 @@ body.upos-table-column-resizing * {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #10b981;
+  background: #2563eb;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
 }
 
@@ -26653,8 +26565,8 @@ body.upos-table-column-resizing * {
 }
 
 .upos-floating-phone-status[data-state="error"] {
-  border-color: #fecaca;
-  background: #fff1f2;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
   color: #be123c;
 }
 
@@ -26718,7 +26630,7 @@ body.is-sidebar-collapsed .upos-floating-phone,
   border: 1px solid rgba(30, 64, 175, 0.18);
   border-radius: var(--workbench-radius-sm, 10px);
   padding: 14px;
-  background: linear-gradient(180deg, rgba(30, 64, 175, 0.08), rgba(255, 255, 255, 0.9));
+  background: rgba(30, 64, 175, 0.08);
   color: #172033;
 }
 
@@ -26743,7 +26655,7 @@ body.is-sidebar-collapsed .upos-floating-phone,
 }
 
 .telephony-kpi-card.danger strong {
-  color: #dc2626;
+  color: #475569;
 }
 
 .telephony-dashboard-columns {
@@ -26808,8 +26720,8 @@ body.is-sidebar-collapsed .upos-floating-phone,
 .telephony-state--online,
 .telephony-state--connected,
 .telephony-state--active {
-  background: #dcfce7;
-  color: #15803d;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .telephony-calls-table {
@@ -26988,13 +26900,13 @@ body.is-sidebar-collapsed .upos-floating-phone,
 
 .telephony-status-filter--answered {
   background: #ecfdf3;
-  color: #166534;
+  color: #1e40af;
 }
 
 .telephony-status-filter--missed,
 .telephony-status-filter--blocked {
-  background: #fff1f2;
-  color: #b91c1c;
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .telephony-status-filter--planned {
@@ -27021,11 +26933,11 @@ body.is-sidebar-collapsed .upos-floating-phone,
 }
 
 .telephony-direction--incoming {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .telephony-direction--incoming > span {
-  background: #dcfce7;
+  background: #dbeafe;
 }
 
 .telephony-direction--outgoing {
@@ -27069,14 +26981,14 @@ body.is-sidebar-collapsed .upos-floating-phone,
 }
 
 .telephony-calls-table .telephony-call-status-cell--answered {
-  background: #dcfce7;
-  color: #166534;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .telephony-calls-table .telephony-call-status-cell--missed,
 .telephony-calls-table .telephony-call-status-cell--blocked {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .telephony-calls-table .telephony-call-status-cell--planned {
@@ -27248,8 +27160,8 @@ html.dark .upos-floating-phone-links a:hover {
 }
 
 html.dark .upos-floating-phone-status {
-  border-color: color-mix(in oklch, #10b981, transparent 62%);
-  background: color-mix(in oklch, #10b981, var(--card) 88%);
+  border-color: color-mix(in oklch, #2563eb, transparent 62%);
+  background: color-mix(in oklch, #2563eb, var(--card) 88%);
   color: #6ee7b7;
 }
 
@@ -27330,7 +27242,7 @@ html.dark .telephony-state--connected,
 html.dark .telephony-state--active,
 html.dark .telephony-direction--incoming > span,
 html.dark .telephony-calls-table .telephony-call-status-cell--answered {
-  background: color-mix(in oklch, #22c55e, var(--card) 88%);
+  background: color-mix(in oklch, #2563eb, var(--card) 88%);
   color: #86efac;
 }
 
@@ -27338,7 +27250,7 @@ html.dark .telephony-status-filter--missed,
 html.dark .telephony-status-filter--blocked,
 html.dark .telephony-calls-table .telephony-call-status-cell--missed,
 html.dark .telephony-calls-table .telephony-call-status-cell--blocked {
-  background: color-mix(in oklch, #ef4444, var(--card) 88%);
+  background: color-mix(in oklch, #475569, var(--card) 88%);
   color: #fca5a5;
 }
 
@@ -27376,18 +27288,18 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-direction {
   flex: 0 0 auto;
   padding: 6px 10px;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #bfdbfe;
   border-radius: 6px;
-  background: #f0fdf4;
-  color: #15803d;
+  background: #eff6ff;
+  color: #1e40af;
   font-size: 12px;
   font-weight: 800;
 }
 
 .warehouse-adjustment-direction--out {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .warehouse-adjustment-form {
@@ -27509,7 +27421,7 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-change > span {
   text-align: center;
-  color: #b91c1c;
+  color: #334155;
   font-size: 16px;
   font-weight: 900;
 }
@@ -27517,20 +27429,20 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-change > span,
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-line-total,
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-summary strong {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-line-total,
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-summary strong {
-  color: #b91c1c;
+  color: #334155;
 }
 
 .warehouse-adjustment-table tr.is-insufficient td {
-  background: #fff1f2;
+  background: #f1f5f9;
 }
 
 .warehouse-adjustment-table tr.is-insufficient [data-adjustment-after] {
-  color: #b91c1c;
+  color: #334155;
 }
 
 .warehouse-adjustment-summary {
@@ -27556,7 +27468,7 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-error {
   min-height: 18px;
   margin: 6px 0 0;
-  color: #b91c1c;
+  color: #334155;
   font-size: 12px;
   font-weight: 700;
   text-align: right;
@@ -27584,19 +27496,19 @@ html.dark .clients-map-empty {
 }
 
 html.dark .warehouse-adjustment-direction {
-  border-color: color-mix(in oklch, #22c55e, transparent 55%);
-  background: color-mix(in oklch, #22c55e, var(--card) 88%);
+  border-color: color-mix(in oklch, #2563eb, transparent 55%);
+  background: color-mix(in oklch, #2563eb, var(--card) 88%);
   color: #86efac;
 }
 
 html.dark .warehouse-adjustment-direction--out {
-  border-color: color-mix(in oklch, #ef4444, transparent 55%);
-  background: color-mix(in oklch, #ef4444, var(--card) 88%);
+  border-color: color-mix(in oklch, #475569, transparent 55%);
+  background: color-mix(in oklch, #475569, var(--card) 88%);
   color: #fca5a5;
 }
 
 html.dark .warehouse-adjustment-table tr.is-insufficient td {
-  background: color-mix(in oklch, #ef4444, var(--card) 90%);
+  background: color-mix(in oklch, #475569, var(--card) 90%);
 }
 
 html.dark .warehouse-adjustment-summary {
@@ -27728,7 +27640,7 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-kpi--orders .dashboard-kpi-icon {
-  background: color-mix(in srgb, #d69b19 15%, var(--card));
+  background: color-mix(in srgb, #64748b 15%, var(--card));
   color: #a36d00;
 }
 
@@ -27789,8 +27701,8 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-kpi-currencies--orders > span {
-  border-color: color-mix(in srgb, #d69b19 28%, var(--border));
-  background: color-mix(in srgb, #d69b19 7%, var(--card));
+  border-color: color-mix(in srgb, #64748b 28%, var(--border));
+  background: color-mix(in srgb, #64748b 7%, var(--card));
 }
 
 .dashboard-kpi-currencies--average > span {
@@ -27961,7 +27873,7 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-seller-row:nth-child(-n + 3) .dashboard-seller-rank {
-  background: color-mix(in srgb, #d69b19 15%, var(--card));
+  background: color-mix(in srgb, #64748b 15%, var(--card));
   color: #916100;
 }
 
@@ -28974,11 +28886,11 @@ html.dark .crm-task-calendar-event {
 }
 
 .earnings-balance.is-due dd {
-  color: #dc2626;
+  color: #475569;
 }
 
 .earnings-balance.is-overpaid dd {
-  color: #16a34a;
+  color: #2563eb;
 }
 
 .earnings-form {
@@ -29030,7 +28942,7 @@ html.dark .crm-task-calendar-event {
 }
 
 .earnings-table tr.is-payout td {
-  color: #16a34a;
+  color: #2563eb;
 }
 
 .earnings-auto-badge {
@@ -29115,11 +29027,11 @@ html.dark .crm-task-calendar-event {
 }
 
 .sales-client-card-form-status.is-ok {
-  color: #16a34a;
+  color: #2563eb;
 }
 
 .sales-client-card-form-status.is-error {
-  color: var(--destructive, #dc2626);
+  color: var(--destructive, #475569);
 }
 
 .sales-client-card-readonly {
@@ -29236,12 +29148,12 @@ html.dark .crm-task-calendar-event {
 }
 
 .product-history-delta.is-in {
-  color: #15803d;
+  color: #1e40af;
   font-weight: 700;
 }
 
 .product-history-delta.is-out {
-  color: #dc2626;
+  color: #475569;
   font-weight: 700;
 }
 
@@ -29269,7 +29181,7 @@ html.dark .crm-task-calendar-event {
 }
 
 .warehouse-purchase-debt-cell.has-debt {
-  color: #dc2626;
+  color: #475569;
   font-weight: 700;
 }
 
@@ -29283,8 +29195,8 @@ html.dark .crm-task-calendar-event {
 
 .warehouse-purchases-table tr.warehouse-purchase-row--purchased .warehouse-purchase-paid-chip {
   border-color: #86efac;
-  background: #f0fdf4;
-  color: #15803d;
+  background: #eff6ff;
+  color: #1e40af;
 }
 
 .warehouse-purchases-table .warehouse-purchase-total {
@@ -29293,7 +29205,7 @@ html.dark .crm-task-calendar-event {
 }
 
 .warehouse-purchases-table .warehouse-purchase-debt-total {
-  color: #dc2626;
+  color: #475569;
 }
 
 .warehouse-purchases-board .sales-journal-empty {
@@ -29328,7 +29240,7 @@ html.dark .crm-task-calendar-event {
 
 /* Бейдж прайс-листа по умолчанию */
 .price-type-default-badge {
-  color: #15803d;
+  color: #1e40af;
   font-weight: 700;
 }
 
@@ -29343,12 +29255,12 @@ html.dark .crm-task-calendar-event {
 }
 
 .reports-stock-price-input.is-saved {
-  border-color: #16a34a;
+  border-color: #2563eb;
   box-shadow: 0 0 0 2px rgb(22 163 74 / 0.18);
 }
 
 .reports-stock-price-input.is-error {
-  border-color: #dc2626;
+  border-color: #475569;
 }
 
 .reports-stock-history-table th,

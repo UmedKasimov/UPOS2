@@ -156,7 +156,7 @@ button {
   padding: 4px 7px;
   border: 1px solid rgba(134, 239, 172, 0.45);
   border-radius: 999px;
-  color: #bbf7d0;
+  color: #bfdbfe;
   font-size: 11px;
   font-weight: 700;
 }
@@ -188,7 +188,7 @@ button {
 
 .installer-icon-button:hover,
 .installer-icon-button:focus-visible {
-  border-color: #3b82f6;
+  border-color: #2563eb;
   outline: 2px solid rgba(59, 130, 246, 0.18);
 }
 
@@ -221,7 +221,7 @@ button {
 }
 
 .installer-danger-button {
-  border-color: #fecaca;
+  border-color: #cbd5e1;
   color: #b42318;
   background: #fff7f7;
 }
@@ -271,7 +271,7 @@ main {
 .installer-manager-note {
   margin-top: 10px;
   padding: 9px 11px;
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid #2563eb;
   color: #334155;
   background: #eaf3ff;
   font-size: 12px;
@@ -295,7 +295,7 @@ main {
   width: 100%;
   padding: 14px;
   border: 1px solid #d5dfec;
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #2563eb;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
@@ -303,7 +303,7 @@ main {
 
 .installer-order-card[data-priority="urgent"],
 .installer-order-card[data-priority="high"] {
-  border-left-color: #dc2626;
+  border-left-color: #475569;
 }
 
 .installer-order-card:hover {
@@ -393,7 +393,7 @@ main {
 .installer-progress-track i {
   display: block;
   height: 100%;
-  background: #16a34a;
+  background: #2563eb;
 }
 
 .installer-order-bottom {
@@ -881,7 +881,7 @@ main {
 
 .installer-warning {
   padding: 9px 10px;
-  border-left: 3px solid #d97706;
+  border-left: 3px solid #64748b;
   color: #7c3f00;
   background: #fff7e6;
   font-size: 12px;
@@ -944,7 +944,7 @@ main {
 }
 
 .installer-toast.is-error {
-  background: #991b1b;
+  background: #334155;
 }
 
 @media (max-width: 600px) {
@@ -1096,7 +1096,7 @@ main {
 }
 
 .installer-earnings-card .is-balance dd {
-  color: #b91c1c;
+  color: #334155;
 }
 
 .installer-earnings-subtitle {
@@ -1124,13 +1124,13 @@ main {
 }
 
 .installer-earnings-row b {
-  color: #15803d;
+  color: #1e40af;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .installer-earnings-row.is-payout b {
-  color: #b91c1c;
+  color: #334155;
 }
 
 /* Имя пользователя в шапке: длинное не должно ломать строку с кнопками. */
@@ -1174,7 +1174,7 @@ main {
   padding: 2px 7px;
   border-radius: 999px;
   color: #fff;
-  background: #dc2626;
+  background: #475569;
   font-size: 12px;
   text-align: center;
 }
@@ -1229,7 +1229,7 @@ main {
   padding: 1px 7px;
   border-radius: 999px;
   color: #fff;
-  background: #dc2626;
+  background: #475569;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.03em;
@@ -1550,7 +1550,7 @@ main {
 }
 
 .installer-sip-dot.is-online {
-  background: #22c55e;
+  background: #2563eb;
 }
 
 .installer-sip-status select {
@@ -1618,7 +1618,7 @@ main {
   inset: 0;
   display: grid;
   place-items: center;
-  background: linear-gradient(160deg, #0f172a, #1e293b);
+  background: #0f172a;
   color: #fff;
 }
 
@@ -1708,12 +1708,12 @@ main {
 
 .installer-call-btn.is-hangup,
 .installer-call-btn.is-decline {
-  background: #dc2626;
+  background: #475569;
   transform: rotate(135deg);
 }
 
 .installer-call-btn.is-accept {
-  background: #16a34a;
+  background: #2563eb;
 }
 
 .installer-call-btn.is-mute,
@@ -1725,7 +1725,7 @@ main {
 }
 
 .installer-call-btn.is-mute.is-on {
-  background: #f59e0b;
+  background: #64748b;
 }
 
 .installer-sip-hint {
@@ -1735,7 +1735,7 @@ main {
 }
 
 .installer-phone-call-row.is-missed strong {
-  color: #dc2626;
+  color: #475569;
 }
 
 /* ===== Телефония: нижние вкладки Набор / Журнал / Контакты ===== */

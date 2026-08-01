@@ -210,11 +210,7 @@
   padding: 1rem 1.05rem 0.9rem;
   border-radius: var(--settings-ios-radius, 14px);
   border: 1px solid color-mix(in oklch, var(--accent-primary, #2563eb), transparent 72%);
-  background: linear-gradient(
-    145deg,
-    color-mix(in oklch, var(--card), var(--accent-primary, #2563eb) 6%) 0%,
-    color-mix(in oklch, var(--card), var(--background) 8%) 100%
-  );
+  background: color-mix(in oklch, var(--card), var(--accent-primary, #2563eb) 6%);
   box-shadow:
     0 12px 32px color-mix(in oklch, var(--foreground), transparent 92%),
     0 0 0 1px color-mix(in oklch, var(--foreground), transparent 96%);
@@ -233,7 +229,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #229ed9, #1a7fb8);
+  background: #229ed9;
   color: #fff;
   font-weight: 800;
   font-size: var(--text-lg);
@@ -277,8 +273,8 @@
 }
 
 .tg-activity-dot.is-warn {
-  background: #d97706;
-  box-shadow: 0 0 0 3px color-mix(in oklch, #d97706, transparent 82%);
+  background: #64748b;
+  box-shadow: 0 0 0 3px color-mix(in oklch, #64748b, transparent 82%);
 }
 
 .tg-activity-dot.is-err {

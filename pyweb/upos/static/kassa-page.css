@@ -136,7 +136,7 @@
 }
 
 .kassa-transfer-confirm-warning {
-  color: #b45309;
+  color: #475569;
   font-weight: 500;
 }
 
@@ -2486,9 +2486,7 @@ html.dark .kassa-transfer-badge--in {
 .kassa-filters-shell {
   border-color: var(--border);
   border-radius: var(--radius-xl);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 12%), transparent 66%),
-    var(--card);
+  background: var(--card);
   box-shadow: var(--shadow-md);
 }
 
@@ -2727,9 +2725,7 @@ html.dark .kassa-transfer-badge--in {
 .kassa-overview-grid {
   border-color: var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius, var(--radius-xl));
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 16%), transparent 70%),
-    var(--card);
+  background: var(--card);
   box-shadow: var(--workbench-shadow, var(--shadow-md));
 }
 
@@ -2837,11 +2833,11 @@ html.dark .kassa-transfer-badge--in {
 }
 
 .kassa-summary-stack--income .kassa-summary-original .kassa-ccy-chip-amt {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .kassa-summary-stack--expense .kassa-summary-original .kassa-ccy-chip-amt {
-  color: #dc2626;
+  color: #475569;
 }
 
 .kassa-summary-stack--transfer .kassa-summary-original .kassa-ccy-chip-amt {
@@ -2883,11 +2879,11 @@ html.dark .kassa-transfer-badge--in {
 }
 
 .kassa-summary-total--income .kassa-summary-total-amt {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .kassa-summary-total--expense .kassa-summary-total-amt {
-  color: #dc2626;
+  color: #475569;
 }
 
 .kassa-summary-total--transfer .kassa-summary-total-amt {
@@ -2978,11 +2974,11 @@ html.dark .kassa-transfer-badge--in {
 }
 
 .kassa-courier-result [data-tone="plus"] {
-  color: #15803d;
+  color: #1e40af;
 }
 
 .kassa-courier-result [data-tone="minus"] {
-  color: #dc2626;
+  color: #475569;
 }
 
 .kassa-col-courier-summary {

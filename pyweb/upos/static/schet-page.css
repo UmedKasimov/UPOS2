@@ -1118,11 +1118,7 @@ html.dark .schet-change--negative {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklch, var(--primary), transparent 15%),
-    color-mix(in oklch, var(--brand-accent), transparent 35%)
-  );
+  background: color-mix(in oklch, var(--primary), transparent 15%);
   border-radius: 3px 0 0 3px;
   opacity: 0.9;
 }
@@ -2101,9 +2097,7 @@ html.dark .schet-change--negative {
 .schet-detail-surface {
   border-color: var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius, var(--radius-xl));
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white, transparent 16%), transparent 70%),
-    var(--card);
+  background: var(--card);
   box-shadow: var(--workbench-shadow, var(--shadow-md));
 }
 
