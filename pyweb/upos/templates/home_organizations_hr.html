@@ -129,7 +129,6 @@
               <tr>
                 <th>Фото</th>
                 <th>Сотрудник</th>
-                <th>Паспорт</th>
                 <th>Зарплата</th>
                 <th>Акт сверки зарплаты</th>
                 <th>К выплате</th>
@@ -185,7 +184,6 @@
                       <small>Уволен {{ emp.dismissed_at }}</small>
                     {% endif %}
                   </td>
-                  <td>{{ emp.passport_series }} {{ emp.passport_number }}</td>
                   <td>{{ emp.monthly_salary_label }} UZS</td>
                   <td>
                     <strong>{{ emp.salary_due_label }} UZS</strong>
@@ -215,10 +213,10 @@
                   </td>
                 </tr>
               {% else %}
-                <tr><td colspan="8" class="org-ops-empty">Активных сотрудников пока нет.</td></tr>
+                <tr><td colspan="7" class="org-ops-empty">Активных сотрудников пока нет.</td></tr>
               {% endfor %}
               <tr data-hr-staff-search-empty hidden>
-                <td colspan="8" class="org-ops-empty">Сотрудники не найдены.</td>
+                <td colspan="7" class="org-ops-empty">Сотрудники не найдены.</td>
               </tr>
             </tbody>
           </table>
