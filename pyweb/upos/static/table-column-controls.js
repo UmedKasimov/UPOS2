@@ -231,6 +231,7 @@
       ...overrides,
     };
     let totalWidth = 0;
+    let sized = 0;
 
     columns(table).forEach((column) => {
       const value = Number(widths[column.key]);
@@ -243,11 +244,37 @@
         cell.style.minWidth = `${width}px`;
         cell.style.maxWidth = `${width}px`;
       });
+      sized += 1;
       if (!hidden.has(column.key)) totalWidth += width;
     });
 
-    const controlWidth = headerRow(table)?.querySelector(`:scope > .${CONTROL_CELL}`)?.getBoundingClientRect().width || 48;
-    table.style.setProperty('--upos-table-column-total-width', `${Math.ceil(totalWidth + controlWidth)}px`);
+    // Ширины ещё не сняты (панель была скрыта) — не сжимаем таблицу в полоску,
+    // а оставляем обычную ширину 100%, пока не появится настоящий замер.
+    if (!sized || sized < columns(table).length) {
+      table.style.removeProperty('--upos-table-column-total-width');
+      return;
+    }
+    table.style.setProperty('--upos-table-column-total-width', `${Math.ceil(totalWidth)}px`);
+  }
+
+  /* Панели с таблицами открываются вкладками: пока панель скрыта, замерить
+     колонки нельзя. Досняем ширины, как только таблица становится видимой. */
+  function watchVisibility(table) {
+    if (table._uposVisibilityWatched || typeof ResizeObserver !== 'function') return;
+    table._uposVisibilityWatched = true;
+    const observer = new ResizeObserver(() => {
+      if (table._uposBaseColumnWidths && Object.keys(table._uposBaseColumnWidths).length) {
+        observer.disconnect();
+        return;
+      }
+      if (table.getBoundingClientRect().width < MIN_COLUMN_WIDTH) return;
+      captureBaseWidths(table);
+      if (table._uposBaseColumnWidths) {
+        applyWidths(table);
+        observer.disconnect();
+      }
+    });
+    observer.observe(table);
   }
 
   function enhanceHeaderInteractions(table) {
@@ -550,6 +577,7 @@
     applyVisibility(table);
     enhanceHeaderInteractions(table);
     applyWidths(table);
+    watchVisibility(table);
   }
 
   function initAll(root = document) {

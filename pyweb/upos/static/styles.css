@@ -29619,6 +29619,31 @@ html.dark .crm-task-calendar-event {
   border: 1px solid var(--border);
 }
 
+/* 6. Одинаковые отступы ячеек: было 0.52…0.72rem вразнобой по таблицам. */
+.products-table th,
+.products-table td,
+.org-ops-table th,
+.org-ops-table td,
+.reports-data-table th,
+.reports-data-table td,
+.warehouse-purchases-table th,
+.warehouse-purchases-table td,
+.sales-journal-table th,
+.sales-journal-table td {
+  padding: 0.62rem 0.8rem;
+}
+
+/* Заголовки — один размер, вес и регистр во всех таблицах. */
+.products-table th,
+.org-ops-table th,
+.reports-data-table th,
+.warehouse-purchases-table th,
+.sales-journal-table th {
+  font-size: var(--text-xs);
+  font-weight: 800;
+  vertical-align: middle;
+}
+
 /* Настройка столбцов живёт в заголовке колонки «Действия» — отдельной
    служебной колонки в строках больше нет. */
 .upos-table-column-control-slot {
