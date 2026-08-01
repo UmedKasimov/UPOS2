@@ -83,9 +83,26 @@
             <option value="inactive" {% if client_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
           </select>
         </label>
-        <button class="products-filter-apply" type="submit">Фильтр</button>
-        <a class="products-filter-clear" href="{{ url_for('clients_get') }}#clients" aria-label="Очистить фильтр">×</a>
       </form>
+      <script>
+        (() => {
+          // Фильтр применяется сам: поиск с задержкой, списки — сразу.
+          const form = document.getElementById('clients-filter-form');
+          if (!form || form.dataset.autoFilterReady === '1') return;
+          form.dataset.autoFilterReady = '1';
+          let timer = 0;
+          form.addEventListener('input', (event) => {
+            if (!(event.target instanceof HTMLInputElement)) return;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => form.submit(), 500);
+          });
+          form.addEventListener('change', (event) => {
+            if (!(event.target instanceof HTMLSelectElement)) return;
+            window.clearTimeout(timer);
+            form.submit();
+          });
+        })();
+      </script>
     </header>
 
     <div class="products-table-wrap clients-table-wrap">
@@ -129,10 +146,16 @@
               </td>
               <td title="{{ client.official_name or '-' }}">{{ client.official_name or "-" }}</td>
               <td>
-                {% if client.balance_kind == "zero" %}
+                {# Балансы по каждой валюте отдельно — как у поставщиков. #}
+                {% set balance_lines = client.balance_lines | rejectattr("kind", "equalto", "zero") | list %}
+                {% if not balance_lines %}
                   <span class="client-balance-empty">-</span>
                 {% else %}
-                  <span class="client-balance-pill client-balance-pill--{{ client.balance_kind }}">{{ client.balance_display }} UZS</span>
+                  <div class="client-balance-total-lines">
+                    {% for line in balance_lines %}
+                      <span class="client-balance-pill client-balance-pill--{{ line.kind }}">{{ line.display }} {{ line.currency }}</span>
+                    {% endfor %}
+                  </div>
                 {% endif %}
               </td>
               <td title="{{ client.last_date or '-' }}">{{ client.last_date or "-" }}</td>
@@ -147,10 +170,24 @@
               <td title="{{ client.phone or '-' }}">{{ client.phone or "-" }}</td>
               <td title="{{ client.category or '-' }}">{{ client.category or "-" }}</td>
               <td class="products-row-actions">
-                <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}">
-                  {% include "_csrf_field.html" %}
-                  <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить {{ client.name }}" aria-label="Удалить {{ client.name }}">🗑</button>
-                </form>
+                <div class="products-row-actions-inner">
+                  <a
+                    class="products-action-icon products-action-icon--edit"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-workspace-trigger="client-edit-{{ client.id }}"
+                    data-workspace-tab-id="client-edit-{{ client.id }}"
+                    data-workspace-view-id="client_edit"
+                    data-workspace-tab-title="Редактировать {{ client.name }}"
+                    data-workspace-tab-hash="client-edit"
+                    data-workspace-tab-href="{{ client_tab_href }}"
+                    title="Редактировать {{ client.name }}"
+                    aria-label="Редактировать {{ client.name }}"
+                  >✎</a>
+                  <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}">
+                    {% include "_csrf_field.html" %}
+                    <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить {{ client.name }}" aria-label="Удалить {{ client.name }}">🗑</button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% else %}
@@ -162,13 +199,13 @@
             <td colspan="4">Итого клиенты</td>
             <td>
               <div class="client-balance-total-lines">
-                {% if clients_balance_summary.debt_count %}
-                  <span class="client-balance-pill client-balance-pill--debt">{{ clients_balance_summary.debt_display }} UZS</span>
-                {% endif %}
-                {% if clients_balance_summary.advance_count %}
-                  <span class="client-balance-pill client-balance-pill--advance">{{ clients_balance_summary.advance_display }} UZS</span>
-                {% endif %}
-                {% if not clients_balance_summary.debt_count and not clients_balance_summary.advance_count %}
+                {% for line in clients_balance_summary.debt_lines %}
+                  <span class="client-balance-pill client-balance-pill--debt">{{ line.display }} {{ line.currency }}</span>
+                {% endfor %}
+                {% for line in clients_balance_summary.advance_lines %}
+                  <span class="client-balance-pill client-balance-pill--advance">{{ line.display }} {{ line.currency }}</span>
+                {% endfor %}
+                {% if not clients_balance_summary.debt_lines and not clients_balance_summary.advance_lines %}
                   <span class="client-balance-empty">-</span>
                 {% endif %}
               </div>
@@ -176,7 +213,13 @@
             <td colspan="6">
               <div class="client-balance-net">
                 <span>Итоговый баланс</span>
-                <strong>{{ clients_balance_summary.net_display }}{% if clients_balance_summary.net_display != "-" %} UZS{% endif %}</strong>
+                {% if clients_balance_summary.net_lines %}
+                  {% for line in clients_balance_summary.net_lines %}
+                    <strong>{{ line.display }} {{ line.currency }}</strong>
+                  {% endfor %}
+                {% else %}
+                  <strong>-</strong>
+                {% endif %}
               </div>
             </td>
           </tr>
@@ -346,9 +389,9 @@
       <label class="wide"><span>Название клиента*</span><input name="name" required /></label>
       <label><span>Официальное название</span><input name="official_name" /></label>
       <label><span>Тип клиента</span><select name="client_type"><option value="company">Компания</option><option value="individual">Физическое лицо</option></select></label>
-      <label><span>Телефон</span><input name="phone" /></label>
+      <label><span>Телефон</span><input name="phone" data-uz-phone placeholder="+998 90 123 45 67" /></label>
       <label><span>Email</span><input name="email" type="email" /></label>
-      <label><span>Telegram номер</span><input name="telegram_phone" /></label>
+      <label><span>Telegram номер</span><input name="telegram_phone" data-uz-phone placeholder="+998 90 123 45 67" /></label>
       <label><span>ИНН</span><input name="tax_id" /></label>
       <label><span>ПИНФЛ</span><input name="pinfl" /></label>
       <label><span>Категория</span><input name="category" list="client-category-list" /></label>
@@ -900,9 +943,9 @@
         <label class="wide"><span>Название клиента*</span><input name="name" value="{{ selected_client_card.name }}" required /></label>
         <label><span>Официальное название</span><input name="official_name" value="{{ selected_client_card.official_name or '' }}" /></label>
         <label><span>Тип клиента</span><select name="client_type"><option value="company" {% if selected_client_card.client_type == 'company' %}selected{% endif %}>Компания</option><option value="individual" {% if selected_client_card.client_type == 'individual' %}selected{% endif %}>Физическое лицо</option></select></label>
-        <label><span>Телефон</span><input name="phone" value="{{ selected_client_card.phone or '' }}" /></label>
+        <label><span>Телефон</span><input name="phone" data-uz-phone placeholder="+998 90 123 45 67" value="{{ selected_client_card.phone or '' }}" /></label>
         <label><span>Email</span><input name="email" type="email" value="{{ selected_client_card.email or '' }}" /></label>
-        <label><span>Telegram номер</span><input name="telegram_phone" value="{{ selected_client_card.telegram_phone or '' }}" /></label>
+        <label><span>Telegram номер</span><input name="telegram_phone" data-uz-phone placeholder="+998 90 123 45 67" value="{{ selected_client_card.telegram_phone or '' }}" /></label>
         <label><span>ИНН</span><input name="tax_id" value="{{ selected_client_card.inn or '' }}" /></label>
         <label><span>ПИНФЛ</span><input name="pinfl" value="{{ selected_client_card.pinfl or '' }}" /></label>
         <label><span>Категория</span><input name="category" list="client-category-list" value="{{ selected_client_card.category or '' }}" /></label>
