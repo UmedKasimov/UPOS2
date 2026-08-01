@@ -39,7 +39,7 @@
 
 .upos-date-trigger:hover,
 .upos-date-trigger:focus-visible {
-  border-color: color-mix(in oklch, var(--primary), var(--border) 38%);
+  border-color: color-mix(in srgb, var(--primary), var(--border) 38%);
   outline: none;
 }
 
@@ -64,7 +64,7 @@
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius, 12px);
   background: var(--card);
-  box-shadow: 0 22px 70px color-mix(in oklch, var(--foreground), transparent 82%);
+  box-shadow: 0 22px 70px color-mix(in srgb, var(--foreground), transparent 82%);
   overflow: hidden;
 }
 
@@ -74,7 +74,7 @@
   gap: 0.1rem;
   padding: 0.7rem;
   border-right: 1px solid var(--workbench-line, var(--border));
-  background: color-mix(in oklch, var(--muted), transparent 74%);
+  background: color-mix(in srgb, var(--muted), transparent 74%);
 }
 
 .upos-date-preset {
@@ -110,7 +110,7 @@
   padding: 0.2rem;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
-  background: color-mix(in oklch, var(--muted), transparent 70%);
+  background: color-mix(in srgb, var(--muted), transparent 70%);
 }
 
 .upos-date-period-mode {
@@ -155,7 +155,7 @@
 
 .upos-date-nav button:hover {
   border-color: var(--workbench-line, var(--border));
-  background: color-mix(in oklch, var(--muted), transparent 70%);
+  background: color-mix(in srgb, var(--muted), transparent 70%);
   color: var(--foreground);
 }
 
@@ -194,8 +194,8 @@
 .upos-date-title-btn:focus-visible,
 .upos-date-year-title:hover,
 .upos-date-year-title:focus-visible {
-  border-color: color-mix(in oklch, var(--primary), transparent 58%);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
+  border-color: color-mix(in srgb, var(--primary), transparent 58%);
+  background: color-mix(in srgb, var(--primary), transparent 91%);
   color: var(--primary);
   outline: none;
 }
@@ -233,8 +233,8 @@
 
 .upos-date-pick-cell:hover,
 .upos-date-pick-cell:focus-visible {
-  border-color: color-mix(in oklch, var(--primary), transparent 44%);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
+  border-color: color-mix(in srgb, var(--primary), transparent 44%);
+  background: color-mix(in srgb, var(--primary), transparent 91%);
   color: var(--primary);
   outline: none;
 }
@@ -279,16 +279,16 @@
 
 .upos-date-day:hover,
 .upos-date-day:focus-visible {
-  background: color-mix(in oklch, var(--primary), transparent 88%);
+  background: color-mix(in srgb, var(--primary), transparent 88%);
   outline: none;
 }
 
 .upos-date-day.is-muted {
-  color: color-mix(in oklch, var(--muted-foreground), transparent 35%);
+  color: color-mix(in srgb, var(--muted-foreground), transparent 35%);
 }
 
 .upos-date-day.in-range {
-  background: color-mix(in oklch, var(--primary), transparent 88%);
+  background: color-mix(in srgb, var(--primary), transparent 88%);
 }
 
 .upos-date-day.is-start,

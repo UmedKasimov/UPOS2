@@ -57,9 +57,9 @@
 }
 
 .tg-status-pill[data-variant="ok"] {
-  border-color: color-mix(in oklch, var(--green-strong, #0a7a3e), transparent 65%);
+  border-color: color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 65%);
   color: var(--green-strong, #0a7a3e);
-  background: color-mix(in oklch, var(--green-strong, #0a7a3e), transparent 92%);
+  background: color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 92%);
 }
 
 .tg-connect-actions,
@@ -209,11 +209,11 @@
 .tg-hub-card {
   padding: 1rem 1.05rem 0.9rem;
   border-radius: var(--settings-ios-radius, 14px);
-  border: 1px solid color-mix(in oklch, var(--accent-primary, #2563eb), transparent 72%);
-  background: color-mix(in oklch, var(--card), var(--accent-primary, #2563eb) 6%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary, #2563eb), transparent 72%);
+  background: color-mix(in srgb, var(--card), var(--accent-primary, #2563eb) 6%);
   box-shadow:
-    0 12px 32px color-mix(in oklch, var(--foreground), transparent 92%),
-    0 0 0 1px color-mix(in oklch, var(--foreground), transparent 96%);
+    0 12px 32px color-mix(in srgb, var(--foreground), transparent 92%),
+    0 0 0 1px color-mix(in srgb, var(--foreground), transparent 96%);
 }
 
 .tg-hub-main {
@@ -233,7 +233,7 @@
   color: #fff;
   font-weight: 800;
   font-size: var(--text-lg);
-  box-shadow: 0 4px 14px color-mix(in oklch, #229ed9, transparent 55%);
+  box-shadow: 0 4px 14px color-mix(in srgb, #229ed9, transparent 55%);
 }
 
 .tg-hub-name {
@@ -268,18 +268,18 @@
 
 .tg-activity-dot.is-online {
   background: var(--green-strong, #0a7a3e);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--green-strong, #0a7a3e), transparent 80%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-strong, #0a7a3e), transparent 80%);
   animation: tgPulse 2s ease-in-out infinite;
 }
 
 .tg-activity-dot.is-warn {
   background: #64748b;
-  box-shadow: 0 0 0 3px color-mix(in oklch, #64748b, transparent 82%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #64748b, transparent 82%);
 }
 
 .tg-activity-dot.is-err {
   background: var(--red-strong, #c0392b);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--red-strong, #c0392b), transparent 82%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red-strong, #c0392b), transparent 82%);
 }
 
 @keyframes tgPulse {
@@ -305,7 +305,7 @@
   gap: 0.45rem;
   margin-top: 0.85rem;
   padding-top: 0.75rem;
-  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  border-top: 1px solid color-mix(in srgb, var(--border), transparent 35%);
 }
 
 .tg-hub-toolbar-item {
@@ -318,30 +318,30 @@
   width: 2.35rem;
   height: 2.35rem;
   padding: 0;
-  border: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 25%);
   border-radius: 50%;
-  background: color-mix(in oklch, var(--muted), transparent 88%);
+  background: color-mix(in srgb, var(--muted), transparent 88%);
   color: var(--foreground);
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
 .tg-icon-btn:hover {
-  background: color-mix(in oklch, var(--muted), transparent 70%);
+  background: color-mix(in srgb, var(--muted), transparent 70%);
   transform: translateY(-1px);
 }
 
 .tg-icon-btn--danger:hover {
-  border-color: color-mix(in oklch, var(--red-strong, #c0392b), transparent 55%);
+  border-color: color-mix(in srgb, var(--red-strong, #c0392b), transparent 55%);
   color: var(--red-strong, #c0392b);
-  background: color-mix(in oklch, var(--red-strong, #c0392b), transparent 92%);
+  background: color-mix(in srgb, var(--red-strong, #c0392b), transparent 92%);
 }
 
 .tg-webhook-banner {
   margin: 0.65rem 0 0;
   padding: 0.55rem 0.7rem;
   border-radius: var(--settings-ios-radius-sm, 10px);
-  background: color-mix(in oklch, var(--red-strong, #c0392b), transparent 92%);
+  background: color-mix(in srgb, var(--red-strong, #c0392b), transparent 92%);
   color: var(--red-strong, #c0392b);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -358,7 +358,7 @@
   border: 1px solid var(--border);
   border-radius: var(--settings-ios-radius, 14px);
   background: var(--card);
-  box-shadow: 0 16px 40px color-mix(in oklch, var(--foreground), transparent 88%);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--foreground), transparent 88%);
   animation: tgPopoverIn 0.2s ease;
 }
 
@@ -410,7 +410,7 @@
   color: var(--card-foreground);
   border-radius: var(--radius-xl, 16px);
   border: 1px solid var(--border);
-  box-shadow: 0 24px 48px color-mix(in oklch, var(--foreground), transparent 88%);
+  box-shadow: 0 24px 48px color-mix(in srgb, var(--foreground), transparent 88%);
   overflow: hidden;
 }
 
@@ -420,7 +420,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 1rem 1.1rem 0.75rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 35%);
 }
 
 .tg-modal-title {
@@ -442,7 +442,7 @@
   height: 2rem;
   border: none;
   border-radius: var(--radius, 8px);
-  background: color-mix(in oklch, var(--muted), transparent 55%);
+  background: color-mix(in srgb, var(--muted), transparent 55%);
   color: var(--foreground);
   font-size: var(--text-lg);
   line-height: 1;
@@ -456,7 +456,7 @@
 }
 
 .tg-modal-tab {
-  border: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 25%);
   border-radius: 999px;
   background: transparent;
   color: var(--muted-foreground, var(--text-muted));
@@ -484,8 +484,8 @@
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 0.75rem 1.1rem;
-  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
-  background: color-mix(in oklch, var(--muted), transparent 92%);
+  border-top: 1px solid color-mix(in srgb, var(--border), transparent 35%);
+  background: color-mix(in srgb, var(--muted), transparent 92%);
 }
 
 .settings-ios-toggle {
@@ -509,9 +509,9 @@
   width: 2.65rem;
   height: 1.55rem;
   border-radius: 999px;
-  background: color-mix(in oklch, var(--muted), transparent 35%);
+  background: color-mix(in srgb, var(--muted), transparent 35%);
   transition: background 0.2s ease;
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground), transparent 90%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground), transparent 90%);
 }
 
 .settings-ios-toggle-ui::after {
@@ -523,7 +523,7 @@
   height: 1.15rem;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 4px color-mix(in oklch, var(--foreground), transparent 75%);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--foreground), transparent 75%);
   transition: transform 0.2s ease;
 }
 
@@ -541,7 +541,7 @@
   justify-content: space-between;
   gap: 0.85rem;
   padding: 0.65rem 0;
-  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 40%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 40%);
 }
 
 .tg-pref-row:last-of-type {
@@ -614,7 +614,7 @@
 }
 
 .tg-rules-tab.active {
-  background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 88%);
+  background: color-mix(in srgb, var(--accent-primary, #2563eb), transparent 88%);
 }
 
 .tg-rules-content,
@@ -634,9 +634,9 @@
   align-items: center;
   justify-content: space-between;
   min-height: 3.8rem;
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 10%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 90%);
+  background: color-mix(in srgb, var(--accent-primary, #2563eb), transparent 90%);
   padding: 0.9rem 1rem;
 }
 
@@ -658,7 +658,7 @@
 }
 
 .tg-telephony-settings {
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 10%);
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   overflow: hidden;
@@ -669,7 +669,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
   align-items: center;
   gap: 1rem;
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 10%);
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   padding: 0.75rem 1rem;
@@ -707,7 +707,7 @@
   justify-content: space-between;
   gap: 1rem;
   min-height: 4.25rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 35%);
   cursor: pointer;
   padding: 0.75rem 1rem;
 }
@@ -727,7 +727,7 @@
 }
 
 .tg-rule {
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 10%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 10%);
   border-radius: var(--workbench-radius-sm, 10px);
   overflow: hidden;
   background: var(--card);
@@ -736,9 +736,9 @@
 .tg-report-note {
   display: grid;
   gap: 0.25rem;
-  border: 1px solid color-mix(in oklch, var(--accent-primary, #2563eb), transparent 72%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary, #2563eb), transparent 72%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 93%);
+  background: color-mix(in srgb, var(--accent-primary, #2563eb), transparent 93%);
   color: var(--foreground);
   padding: 0.85rem 1rem;
 }
@@ -762,7 +762,7 @@
   width: 100%;
   min-height: 3.8rem;
   border: 0;
-  background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 90%);
+  background: color-mix(in srgb, var(--accent-primary, #2563eb), transparent 90%);
   color: var(--foreground);
   cursor: pointer;
   font-size: var(--text-lg);
@@ -820,7 +820,7 @@
 
 .tg-route-field select {
   min-height: 2.55rem;
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 12%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 12%);
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
@@ -841,7 +841,7 @@
   width: 100%;
   min-height: 7.5rem;
   resize: vertical;
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 12%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 12%);
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);
@@ -861,9 +861,9 @@
 .tg-limit-card {
   display: grid;
   gap: 0.9rem;
-  border: 1px solid color-mix(in oklch, var(--accent-primary, #2563eb), transparent 72%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary, #2563eb), transparent 72%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in oklch, var(--accent-primary, #2563eb), transparent 94%);
+  background: color-mix(in srgb, var(--accent-primary, #2563eb), transparent 94%);
   padding: 0.95rem 1rem;
 }
 
@@ -912,7 +912,7 @@
 
 .tg-limit-field input {
   min-height: 2.55rem;
-  border: 1px solid color-mix(in oklch, var(--border), var(--accent-primary, #2563eb) 12%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--accent-primary, #2563eb) 12%);
   border-radius: var(--workbench-radius-sm, 10px);
   background: var(--card);
   color: var(--foreground);

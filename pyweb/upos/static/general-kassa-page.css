@@ -106,7 +106,7 @@
 }
 
 .general-reports-root .gk-schet-hero-chips .general-kassa-chip + .general-kassa-chip {
-  border-left: 1px solid color-mix(in oklch, var(--border), var(--primary) 22%);
+  border-left: 1px solid color-mix(in srgb, var(--border), var(--primary) 22%);
 }
 
 .general-reports-root .gk-schet-hero-chips .general-kassa-chip:first-child {
@@ -189,9 +189,9 @@
   justify-content: space-between;
   gap: 0.65rem;
   padding: 0.55rem;
-  border: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 25%);
   border-radius: var(--settings-ios-radius-sm, 10px);
-  background: color-mix(in oklch, var(--muted), transparent 82%);
+  background: color-mix(in srgb, var(--muted), transparent 82%);
 }
 
 .gk-filters-toolbar-fields {
@@ -281,7 +281,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted-foreground);
-  background: color-mix(in oklch, var(--muted), transparent 55%);
+  background: color-mix(in srgb, var(--muted), transparent 55%);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -294,7 +294,7 @@
 }
 
 .general-kassa-table tbody tr:hover td {
-  background: color-mix(in oklch, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .general-kassa-empty {
@@ -329,21 +329,21 @@
 }
 
 .gk-badge--in {
-  background: color-mix(in oklch, oklch(0.62 0.17 145) 22%, var(--card));
+  background: color-mix(in srgb, oklch(0.62 0.17 145) 22%, var(--card));
   color: oklch(0.35 0.12 145);
 }
 
 .gk-badge--out {
-  background: color-mix(in oklch, oklch(0.62 0.2 25) 18%, var(--card));
+  background: color-mix(in srgb, oklch(0.62 0.2 25) 18%, var(--card));
   color: oklch(0.4 0.14 25);
 }
 
 .gk-badge--tr {
-  background: color-mix(in oklch, var(--brand-accent) 16%, var(--card));
+  background: color-mix(in srgb, var(--brand-accent) 16%, var(--card));
 }
 
 .gk-badge--cashout {
-  background: color-mix(in oklch, oklch(0.58 0.08 264) 22%, var(--card));
+  background: color-mix(in srgb, oklch(0.58 0.08 264) 22%, var(--card));
 }
 
 .gk-src { font-size: var(--text-sm); font-weight: 500; }
@@ -357,7 +357,7 @@
   border-radius: 999px;
   font-size: var(--text-sm);
   font-weight: 600;
-  background: color-mix(in oklch, var(--primary) 14%, var(--card));
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -431,7 +431,7 @@
 }
 
 .general-reports-root .gk-org-card-totals .general-kassa-chip + .general-kassa-chip {
-  border-left: 1px solid color-mix(in oklch, var(--border), var(--primary) 22%);
+  border-left: 1px solid color-mix(in srgb, var(--border), var(--primary) 22%);
 }
 
 .general-reports-root .gk-org-card-totals .general-kassa-chip:first-child {
@@ -503,7 +503,7 @@ button.general-module-tab {
   width: 2rem;
   min-height: 2.28rem;
   flex: 0 0 auto;
-  border-left: 1px solid color-mix(in oklch, currentColor, transparent 78%);
+  border-left: 1px solid color-mix(in srgb, currentColor, transparent 78%);
   font-size: var(--text-md);
   line-height: 1;
   opacity: 0.78;
@@ -511,7 +511,7 @@ button.general-module-tab {
 
 .general-module-tab-close:hover {
   opacity: 1;
-  background: color-mix(in oklch, currentColor, transparent 88%);
+  background: color-mix(in srgb, currentColor, transparent 88%);
 }
 
 .general-report-launcher {
@@ -523,13 +523,13 @@ button.general-module-tab {
   width: 100%;
   padding: 12px;
   overflow-x: auto;
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 12%);
   border-top: 0;
   border-radius: 0 0 7px 7px;
-  background: color-mix(in oklch, var(--background), var(--primary) 2%);
+  background: color-mix(in srgb, var(--background), var(--primary) 2%);
   box-shadow:
-    0 12px 28px color-mix(in oklch, var(--primary), transparent 94%),
-    0 1px 0 color-mix(in oklch, white, transparent 48%) inset;
+    0 12px 28px color-mix(in srgb, var(--primary), transparent 94%),
+    0 1px 0 color-mix(in srgb, white, transparent 48%) inset;
 }
 
 .general-report-launcher[hidden],
@@ -550,14 +550,14 @@ button.general-module-tab {
   min-height: 147px;
   max-height: 147px;
   padding: 1rem;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 35%);
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 35%);
   border-radius: var(--workbench-radius-sm, 10px);
   color: white;
   background:
-    color-mix(in oklch, var(--primary), white 16%);
+    color-mix(in srgb, var(--primary), white 16%);
   box-shadow:
-    0 14px 24px color-mix(in oklch, var(--primary), transparent 80%),
-    0 1px 0 color-mix(in oklch, white, transparent 38%) inset;
+    0 14px 24px color-mix(in srgb, var(--primary), transparent 80%),
+    0 1px 0 color-mix(in srgb, white, transparent 38%) inset;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
@@ -565,14 +565,14 @@ button.general-module-tab {
 .general-report-card:hover {
   transform: translateY(-1px);
   filter: brightness(1.03);
-  box-shadow: 0 15px 28px color-mix(in oklch, var(--primary), transparent 74%);
+  box-shadow: 0 15px 28px color-mix(in srgb, var(--primary), transparent 74%);
 }
 
 .general-report-card.active {
   background: var(--primary);
   box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--primary), transparent 82%),
-    0 15px 30px color-mix(in oklch, var(--primary), transparent 72%);
+    0 0 0 3px color-mix(in srgb, var(--primary), transparent 82%),
+    0 15px 30px color-mix(in srgb, var(--primary), transparent 72%);
 }
 
 .general-report-card-icon {
@@ -602,7 +602,7 @@ button.general-module-tab {
 }
 
 .general-report-card small {
-  color: color-mix(in oklch, white, transparent 10%);
+  color: color-mix(in srgb, white, transparent 10%);
   font-size: var(--text-sm);
   font-weight: 500;
   line-height: 1.18;
@@ -624,7 +624,7 @@ button.general-module-tab {
   gap: 0.28rem;
   padding: 0.22rem;
   border-radius: var(--settings-ios-radius-sm, 10px);
-  background: color-mix(in oklch, var(--muted), transparent 55%);
+  background: color-mix(in srgb, var(--muted), transparent 55%);
   border: 1px solid var(--border);
 }
 
@@ -642,7 +642,7 @@ button.general-module-tab {
 
 .general-reports-tab.active {
   background: var(--card);
-  border-color: color-mix(in oklch, var(--primary), transparent 78%);
+  border-color: color-mix(in srgb, var(--primary), transparent 78%);
   color: var(--foreground);
   box-shadow: var(--shadow-sm);
 }
@@ -720,7 +720,7 @@ button.general-module-tab {
   border: 1px solid var(--border);
   border-radius: var(--settings-ios-radius-sm, 10px);
   padding: 0.65rem 0.75rem;
-  background: color-mix(in oklch, var(--card), var(--muted) 8%);
+  background: color-mix(in srgb, var(--card), var(--muted) 8%);
 }
 
 .general-reports-org-strip h4 {
@@ -732,8 +732,8 @@ button.general-module-tab {
 .general-kassa-error {
   padding: 1.25rem;
   border-radius: var(--settings-ios-radius, 13px);
-  border: 1px solid color-mix(in oklch, var(--destructive) 35%, var(--border));
-  background: color-mix(in oklch, var(--destructive) 8%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--destructive) 35%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 8%, var(--card));
 }
 
 .gk-empty-state {
@@ -763,7 +763,7 @@ button.general-module-tab {
 .gk-skeleton {
   min-height: 4.1rem;
   border-radius: var(--settings-ios-radius-sm, 10px);
-  background: color-mix(in oklch, var(--muted), transparent 40%);
+  background: color-mix(in srgb, var(--muted), transparent 40%);
   background-size: 200% 100%;
   animation: gk-shimmer 1.2s ease-in-out infinite;
 }
@@ -772,7 +772,7 @@ button.general-module-tab {
   height: 2.75rem;
   border-radius: var(--settings-ios-radius-sm, 10px);
   margin-bottom: 0.45rem;
-  background: color-mix(in oklch, var(--muted), transparent 40%);
+  background: color-mix(in srgb, var(--muted), transparent 40%);
   background-size: 200% 100%;
   animation: gk-shimmer 1.2s ease-in-out infinite;
 }
@@ -826,9 +826,9 @@ button.general-module-tab {
 /* Director workspace redesign */
 :root {
   --gk-ink: var(--foreground);
-  --gk-muted: color-mix(in oklch, var(--muted-foreground), var(--foreground) 8%);
-  --gk-line: color-mix(in oklch, var(--border), var(--primary) 10%);
-  --gk-panel: color-mix(in oklch, var(--card), var(--primary) 3%);
+  --gk-muted: color-mix(in srgb, var(--muted-foreground), var(--foreground) 8%);
+  --gk-line: color-mix(in srgb, var(--border), var(--primary) 10%);
+  --gk-panel: color-mix(in srgb, var(--card), var(--primary) 3%);
   --gk-income: oklch(0.48 0.14 150);
   --gk-expense: oklch(0.54 0.17 27);
   --gk-blue: oklch(0.52 0.13 245);
@@ -839,9 +839,9 @@ button.general-module-tab {
 .general-schet-root,
 .general-reports-root {
   --gk-ink: var(--foreground);
-  --gk-muted: color-mix(in oklch, var(--muted-foreground), var(--foreground) 8%);
-  --gk-line: color-mix(in oklch, var(--border), var(--primary) 10%);
-  --gk-panel: color-mix(in oklch, var(--card), var(--primary) 3%);
+  --gk-muted: color-mix(in srgb, var(--muted-foreground), var(--foreground) 8%);
+  --gk-line: color-mix(in srgb, var(--border), var(--primary) 10%);
+  --gk-panel: color-mix(in srgb, var(--card), var(--primary) 3%);
   --gk-income: oklch(0.48 0.14 150);
   --gk-expense: oklch(0.54 0.17 27);
   --gk-blue: oklch(0.52 0.13 245);
@@ -857,16 +857,16 @@ button.general-module-tab {
 
 .page-header-inner:has(.general-page-header),
 .page-header-inner:has(.general-reports-header) {
-  border-bottom-color: color-mix(in oklch, var(--border), var(--primary) 12%);
+  border-bottom-color: color-mix(in srgb, var(--border), var(--primary) 12%);
 }
 
 .general-page-kicker {
   width: fit-content;
   padding: 0.22rem 0.55rem;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 72%);
   border-radius: 999px;
   color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
+  background: color-mix(in srgb, var(--primary), transparent 91%);
   letter-spacing: 0;
 }
 
@@ -889,8 +889,8 @@ button.general-module-tab {
   border-radius: var(--workbench-radius, 14px);
   background: var(--gk-panel);
   box-shadow:
-    0 18px 42px color-mix(in oklch, var(--primary), transparent 92%),
-    0 1px 0 color-mix(in oklch, white, transparent 55%) inset;
+    0 18px 42px color-mix(in srgb, var(--primary), transparent 92%),
+    0 1px 0 color-mix(in srgb, white, transparent 55%) inset;
 }
 
 .gk-kpi-strip::before,
@@ -939,10 +939,10 @@ button.general-module-tab {
   min-height: 5.6rem;
   padding: 0.78rem;
   column-gap: 0.62rem;
-  border: 1px solid color-mix(in oklch, var(--border), transparent 12%);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 12%);
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--card), var(--muted) 7%);
-  box-shadow: 0 10px 22px color-mix(in oklch, black, transparent 96%);
+  background: color-mix(in srgb, var(--card), var(--muted) 7%);
+  box-shadow: 0 10px 22px color-mix(in srgb, black, transparent 96%);
 }
 
 .general-metric::after {
@@ -950,14 +950,14 @@ button.general-module-tab {
   position: absolute;
   inset: auto 0 0;
   height: 2px;
-  background: color-mix(in oklch, var(--primary), transparent 62%);
+  background: color-mix(in srgb, var(--primary), transparent 62%);
 }
 
-.general-metric--income::after { background: color-mix(in oklch, var(--gk-income), transparent 30%); }
-.general-metric--expense::after { background: color-mix(in oklch, var(--gk-expense), transparent 30%); }
-.general-metric--net::after { background: color-mix(in oklch, var(--gk-blue), transparent 28%); }
-.general-metric--transfer::after { background: color-mix(in oklch, var(--gk-violet), transparent 28%); }
-.general-metric--cashout::after { background: color-mix(in oklch, oklch(0.62 0.13 80), transparent 30%); }
+.general-metric--income::after { background: color-mix(in srgb, var(--gk-income), transparent 30%); }
+.general-metric--expense::after { background: color-mix(in srgb, var(--gk-expense), transparent 30%); }
+.general-metric--net::after { background: color-mix(in srgb, var(--gk-blue), transparent 28%); }
+.general-metric--transfer::after { background: color-mix(in srgb, var(--gk-violet), transparent 28%); }
+.general-metric--cashout::after { background: color-mix(in srgb, oklch(0.62 0.13 80), transparent 30%); }
 
 .gk-metric-icon {
   grid-row: 1 / span 2;
@@ -966,10 +966,10 @@ button.general-module-tab {
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 70%);
   border-radius: var(--workbench-radius-sm, 10px);
   color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 88%);
+  background: color-mix(in srgb, var(--primary), transparent 88%);
 }
 
 .gk-metric-icon svg {
@@ -979,32 +979,32 @@ button.general-module-tab {
 
 .general-metric--income .gk-metric-icon {
   color: var(--gk-income);
-  background: color-mix(in oklch, var(--gk-income), transparent 89%);
-  border-color: color-mix(in oklch, var(--gk-income), transparent 70%);
+  background: color-mix(in srgb, var(--gk-income), transparent 89%);
+  border-color: color-mix(in srgb, var(--gk-income), transparent 70%);
 }
 
 .general-metric--expense .gk-metric-icon {
   color: var(--gk-expense);
-  background: color-mix(in oklch, var(--gk-expense), transparent 89%);
-  border-color: color-mix(in oklch, var(--gk-expense), transparent 70%);
+  background: color-mix(in srgb, var(--gk-expense), transparent 89%);
+  border-color: color-mix(in srgb, var(--gk-expense), transparent 70%);
 }
 
 .general-metric--net .gk-metric-icon {
   color: var(--gk-blue);
-  background: color-mix(in oklch, var(--gk-blue), transparent 89%);
-  border-color: color-mix(in oklch, var(--gk-blue), transparent 70%);
+  background: color-mix(in srgb, var(--gk-blue), transparent 89%);
+  border-color: color-mix(in srgb, var(--gk-blue), transparent 70%);
 }
 
 .general-metric--transfer .gk-metric-icon {
   color: var(--gk-violet);
-  background: color-mix(in oklch, var(--gk-violet), transparent 89%);
-  border-color: color-mix(in oklch, var(--gk-violet), transparent 70%);
+  background: color-mix(in srgb, var(--gk-violet), transparent 89%);
+  border-color: color-mix(in srgb, var(--gk-violet), transparent 70%);
 }
 
 .general-metric--cashout .gk-metric-icon {
   color: oklch(0.52 0.12 78);
-  background: color-mix(in oklch, oklch(0.68 0.13 80), transparent 89%);
-  border-color: color-mix(in oklch, oklch(0.62 0.13 80), transparent 70%);
+  background: color-mix(in srgb, oklch(0.68 0.13 80), transparent 89%);
+  border-color: color-mix(in srgb, oklch(0.62 0.13 80), transparent 70%);
 }
 
 .general-metric .general-metric-value {
@@ -1036,10 +1036,10 @@ button.general-module-tab {
 }
 
 .general-kassa-chip {
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 75%);
-  color: color-mix(in oklch, var(--foreground), var(--primary) 12%);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
-  box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 62%) inset;
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 75%);
+  color: color-mix(in srgb, var(--foreground), var(--primary) 12%);
+  background: color-mix(in srgb, var(--primary), transparent 91%);
+  box-shadow: 0 1px 0 color-mix(in srgb, white, transparent 62%) inset;
 }
 
 .general-kassa-chip-muted {
@@ -1081,7 +1081,7 @@ button.general-module-tab {
 }
 
 .gk-field span {
-  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 12%);
+  color: color-mix(in srgb, var(--muted-foreground), var(--foreground) 12%);
   font-size: var(--text-sm);
   font-weight: 800;
   letter-spacing: 0;
@@ -1090,19 +1090,19 @@ button.general-module-tab {
 .gk-field select,
 .gk-field input[type="date"] {
   min-height: 2.65rem;
-  border-color: color-mix(in oklch, var(--border), var(--primary) 16%);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 16%);
   border-radius: var(--workbench-radius, 14px);
   color: var(--foreground);
   font-weight: 600;
-  background: color-mix(in oklch, var(--background), var(--primary) 3%);
-  box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 60%) inset;
+  background: color-mix(in srgb, var(--background), var(--primary) 3%);
+  box-shadow: 0 1px 0 color-mix(in srgb, white, transparent 60%) inset;
 }
 
 .gk-field select:focus,
 .gk-field input[type="date"]:focus {
-  border-color: color-mix(in oklch, var(--primary), transparent 25%);
+  border-color: color-mix(in srgb, var(--primary), transparent 25%);
   outline: 0;
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 86%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary), transparent 86%);
 }
 
 .general-kassa-status {
@@ -1119,18 +1119,18 @@ button.general-module-tab {
   position: sticky;
   top: 0;
   z-index: 1;
-  color: color-mix(in oklch, var(--muted-foreground), var(--primary) 12%);
+  color: color-mix(in srgb, var(--muted-foreground), var(--primary) 12%);
   font-size: var(--text-xs);
   font-weight: 800;
   letter-spacing: 0;
   text-transform: none;
-  background: color-mix(in oklch, var(--card), var(--primary) 6%);
-  border-bottom-color: color-mix(in oklch, var(--border), var(--primary) 16%);
+  background: color-mix(in srgb, var(--card), var(--primary) 6%);
+  border-bottom-color: color-mix(in srgb, var(--border), var(--primary) 16%);
 }
 
 .general-kassa-table td {
-  color: color-mix(in oklch, var(--foreground), var(--muted-foreground) 8%);
-  border-bottom-color: color-mix(in oklch, var(--border), transparent 18%);
+  color: color-mix(in srgb, var(--foreground), var(--muted-foreground) 8%);
+  border-bottom-color: color-mix(in srgb, var(--border), transparent 18%);
 }
 
 .general-kassa-table tbody tr {
@@ -1138,7 +1138,7 @@ button.general-module-tab {
 }
 
 .general-kassa-table tbody tr:hover td {
-  background: color-mix(in oklch, var(--primary), transparent 95%);
+  background: color-mix(in srgb, var(--primary), transparent 95%);
 }
 
 .general-kassa-table .gk-col-num,
@@ -1158,59 +1158,59 @@ button.general-module-tab {
 .gk-org-badge {
   max-width: 12rem;
   color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
-  border-color: color-mix(in oklch, var(--primary), transparent 75%);
+  background: color-mix(in srgb, var(--primary), transparent 91%);
+  border-color: color-mix(in srgb, var(--primary), transparent 75%);
 }
 
 .gk-badge--in,
 .gk-src--smart {
   color: var(--gk-income);
-  background: color-mix(in oklch, var(--gk-income), transparent 90%);
-  border-color: color-mix(in oklch, var(--gk-income), transparent 70%);
+  background: color-mix(in srgb, var(--gk-income), transparent 90%);
+  border-color: color-mix(in srgb, var(--gk-income), transparent 70%);
 }
 
 .gk-badge--out {
   color: var(--gk-expense);
-  background: color-mix(in oklch, var(--gk-expense), transparent 90%);
-  border-color: color-mix(in oklch, var(--gk-expense), transparent 70%);
+  background: color-mix(in srgb, var(--gk-expense), transparent 90%);
+  border-color: color-mix(in srgb, var(--gk-expense), transparent 70%);
 }
 
 .gk-badge--tr {
   color: var(--gk-blue);
-  background: color-mix(in oklch, var(--gk-blue), transparent 90%);
-  border-color: color-mix(in oklch, var(--gk-blue), transparent 70%);
+  background: color-mix(in srgb, var(--gk-blue), transparent 90%);
+  border-color: color-mix(in srgb, var(--gk-blue), transparent 70%);
 }
 
 .gk-badge--cashout {
   color: oklch(0.52 0.12 78);
-  background: color-mix(in oklch, oklch(0.65 0.13 80), transparent 90%);
-  border-color: color-mix(in oklch, oklch(0.62 0.13 80), transparent 70%);
+  background: color-mix(in srgb, oklch(0.65 0.13 80), transparent 90%);
+  border-color: color-mix(in srgb, oklch(0.62 0.13 80), transparent 70%);
 }
 
 .gk-src--man {
-  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 18%);
-  background: color-mix(in oklch, var(--muted), transparent 45%);
-  border-color: color-mix(in oklch, var(--border), transparent 18%);
+  color: color-mix(in srgb, var(--muted-foreground), var(--foreground) 18%);
+  background: color-mix(in srgb, var(--muted), transparent 45%);
+  border-color: color-mix(in srgb, var(--border), transparent 18%);
 }
 
 .gk-open-btn {
   min-height: 2.15rem;
-  border-color: color-mix(in oklch, var(--primary), transparent 68%);
+  border-color: color-mix(in srgb, var(--primary), transparent 68%);
   color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 93%);
+  background: color-mix(in srgb, var(--primary), transparent 93%);
   font-weight: 800;
 }
 
 .gk-open-btn:hover {
-  background: color-mix(in oklch, var(--primary), transparent 88%);
+  background: color-mix(in srgb, var(--primary), transparent 88%);
 }
 
 .gk-empty-state,
 .general-kassa-error {
-  border: 1px dashed color-mix(in oklch, var(--primary), transparent 62%);
+  border: 1px dashed color-mix(in srgb, var(--primary), transparent 62%);
   border-radius: var(--workbench-radius, 14px);
   color: var(--gk-muted);
-  background: color-mix(in oklch, var(--primary), transparent 95%);
+  background: color-mix(in srgb, var(--primary), transparent 95%);
 }
 
 .gk-org-card-grid {
@@ -1221,9 +1221,9 @@ button.general-module-tab {
 .gk-org-card {
   position: relative;
   overflow: hidden;
-  border-color: color-mix(in oklch, var(--border), var(--primary) 14%);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 14%);
   background: var(--card);
-  box-shadow: 0 14px 30px color-mix(in oklch, black, transparent 96%);
+  box-shadow: 0 14px 30px color-mix(in srgb, black, transparent 96%);
 }
 
 .gk-org-card::before {
@@ -1257,9 +1257,9 @@ button.general-module-tab {
 }
 
 .gk-org-pocket {
-  border-color: color-mix(in oklch, var(--border), var(--primary) 10%);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 10%);
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in srgb, var(--background), var(--primary) 3%);
 }
 
 .gk-org-pocket-amt {
@@ -1276,7 +1276,7 @@ button.general-module-tab {
 }
 
 .gs-wallet-dialog::backdrop {
-  background: color-mix(in oklch, var(--foreground), transparent 55%);
+  background: color-mix(in srgb, var(--foreground), transparent 55%);
   backdrop-filter: blur(6px);
 }
 
@@ -1285,7 +1285,7 @@ button.general-module-tab {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--card);
-  box-shadow: 0 30px 70px color-mix(in oklch, black, transparent 72%);
+  box-shadow: 0 30px 70px color-mix(in srgb, black, transparent 72%);
 }
 
 .gs-wallet-modal-head,
@@ -1302,7 +1302,7 @@ button.general-module-tab {
   justify-content: flex-end;
   border-top: 1px solid var(--border);
   border-bottom: 0;
-  background: color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in srgb, var(--background), var(--primary) 3%);
 }
 
 .gs-wallet-modal-title {
@@ -1351,9 +1351,9 @@ button.general-module-tab {
   gap: 0.65rem;
   min-height: 5.25rem;
   padding: 0.75rem;
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 8%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 8%);
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in srgb, var(--background), var(--primary) 3%);
   color: var(--foreground);
   text-align: left;
   cursor: pointer;
@@ -1362,8 +1362,8 @@ button.general-module-tab {
 .gs-wallet-template:hover,
 .gs-wallet-template.is-active {
   border-color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary), transparent 72%);
+  background: color-mix(in srgb, var(--primary), transparent 91%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary), transparent 72%);
 }
 
 .gs-wallet-template-icon {
@@ -1372,7 +1372,7 @@ button.general-module-tab {
   width: 2.35rem;
   height: 2.35rem;
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--primary), transparent 86%);
+  background: color-mix(in srgb, var(--primary), transparent 86%);
   color: var(--primary);
   font-size: 1rem;
   font-weight: 900;
@@ -1417,10 +1417,10 @@ button.general-module-tab {
   display: flex !important;
   flex-direction: column;
   max-height: min(86vh, 820px);
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 16%);
   border-radius: 18px;
   background: var(--card);
-  box-shadow: 0 32px 72px color-mix(in oklch, black, transparent 72%);
+  box-shadow: 0 32px 72px color-mix(in srgb, black, transparent 72%);
 }
 
 .gs-wallet-dialog .gs-wallet-modal-head {
@@ -1440,9 +1440,9 @@ button.general-module-tab {
   width: 2.15rem;
   height: 2.15rem;
   flex: 0 0 auto;
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 10%);
   border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in oklch, var(--background), var(--primary) 4%);
+  background: color-mix(in srgb, var(--background), var(--primary) 4%);
   color: var(--foreground);
   font-size: 1.1rem;
   line-height: 1;
@@ -1494,9 +1494,9 @@ button.general-module-tab {
 
 .general-reports-tabs {
   padding: 0.24rem;
-  border-color: color-mix(in oklch, var(--border), var(--primary) 14%);
-  background: color-mix(in oklch, var(--primary), transparent 94%);
-  box-shadow: 0 1px 0 color-mix(in oklch, white, transparent 64%) inset;
+  border-color: color-mix(in srgb, var(--border), var(--primary) 14%);
+  background: color-mix(in srgb, var(--primary), transparent 94%);
+  box-shadow: 0 1px 0 color-mix(in srgb, white, transparent 64%) inset;
 }
 
 .general-reports-tab {
@@ -1510,7 +1510,7 @@ button.general-module-tab {
 .general-reports-tab.active {
   color: var(--primary);
   background: var(--card);
-  box-shadow: 0 8px 18px color-mix(in oklch, var(--primary), transparent 88%);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary), transparent 88%);
 }
 
 .gk-reports-kpi-grid {
@@ -1521,10 +1521,10 @@ button.general-module-tab {
   position: relative;
   overflow: hidden;
   min-height: 6.9rem;
-  border-color: color-mix(in oklch, var(--border), var(--primary) 12%);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 12%);
   border-top-width: 1px;
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--card), var(--muted) 5%);
+  background: color-mix(in srgb, var(--card), var(--muted) 5%);
 }
 
 .gk-reports-kpi-card::before {
@@ -1550,9 +1550,9 @@ button.general-module-tab {
 
 .general-reports-section {
   overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 10%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 10%);
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--card), var(--primary) 2%);
+  background: color-mix(in srgb, var(--card), var(--primary) 2%);
 }
 
 .general-reports-section + .general-reports-section {
@@ -1562,15 +1562,15 @@ button.general-module-tab {
 .general-reports-h3 {
   margin: 0;
   padding: 0.82rem 0.95rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--border), var(--primary) 12%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border), var(--primary) 12%);
   color: var(--foreground);
-  background: color-mix(in oklch, var(--primary), transparent 95%);
+  background: color-mix(in srgb, var(--primary), transparent 95%);
   letter-spacing: 0;
 }
 
 .general-reports-ccy-table {
   overflow: hidden;
-  border-color: color-mix(in oklch, var(--border), var(--primary) 10%);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 10%);
   border-radius: var(--workbench-radius, 14px);
   background: var(--card);
 }
@@ -1582,19 +1582,19 @@ button.general-module-tab {
 
 .general-reports-ccy-head {
   color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 94%);
+  background: color-mix(in srgb, var(--primary), transparent 94%);
 }
 
 .general-reports-ccy-row.is-inc {
-  background: color-mix(in oklch, var(--gk-income), transparent 95%);
+  background: color-mix(in srgb, var(--gk-income), transparent 95%);
 }
 
 .general-reports-ccy-row.is-exp {
-  background: color-mix(in oklch, var(--gk-expense), transparent 95%);
+  background: color-mix(in srgb, var(--gk-expense), transparent 95%);
 }
 
 .general-reports-org-strip {
-  border-color: color-mix(in oklch, var(--border), var(--primary) 12%);
+  border-color: color-mix(in srgb, var(--border), var(--primary) 12%);
   border-radius: var(--workbench-radius, 14px);
   background: var(--card);
 }
@@ -1605,7 +1605,7 @@ button.general-module-tab {
 
 .gk-skeleton {
   border-radius: var(--workbench-radius, 14px);
-  background: color-mix(in oklch, var(--muted), transparent 36%);
+  background: color-mix(in srgb, var(--muted), transparent 36%);
 }
 
 @media (max-width: 1100px) {
@@ -1759,7 +1759,7 @@ button.general-module-tab {
 .gk-table-footer {
   padding: 0.75rem 0.95rem;
   border-top: 1px solid var(--gk-line);
-  background: color-mix(in oklch, var(--primary), transparent 97%);
+  background: color-mix(in srgb, var(--primary), transparent 97%);
 }
 
 .gk-pagination-toolbar {
@@ -1802,9 +1802,9 @@ button.general-module-tab {
   width: 2.15rem;
   height: 2.15rem;
   padding: 0;
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 16%);
   border-radius: 9px;
-  background: color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in srgb, var(--background), var(--primary) 3%);
   color: var(--foreground);
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
@@ -1815,14 +1815,14 @@ button.general-module-tab {
 }
 
 .gk-page-nav-btn:hover:not(:disabled) {
-  border-color: color-mix(in oklch, var(--primary), transparent 58%);
-  background: color-mix(in oklch, var(--background), var(--primary) 6%);
+  border-color: color-mix(in srgb, var(--primary), transparent 58%);
+  background: color-mix(in srgb, var(--background), var(--primary) 6%);
 }
 
 .gk-page-nav-btn:focus-visible {
   outline: none;
-  border-color: color-mix(in oklch, var(--primary), transparent 30%);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 86%);
+  border-color: color-mix(in srgb, var(--primary), transparent 30%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary), transparent 86%);
 }
 
 .gk-page-nav-btn:disabled {
@@ -1861,16 +1861,16 @@ button.general-module-tab {
   min-height: 2rem;
   padding: 0.25rem 0.5rem;
   font-size: var(--text-sm);
-  border: 1px solid color-mix(in oklch, var(--border), var(--primary) 16%);
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 16%);
   border-radius: 9px;
-  background: color-mix(in oklch, var(--background), var(--primary) 3%);
+  background: color-mix(in srgb, var(--background), var(--primary) 3%);
   color: var(--foreground);
   outline: none;
 }
 
 .gk-page-size-select:focus {
-  border-color: color-mix(in oklch, var(--primary), transparent 25%);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary), transparent 86%);
+  border-color: color-mix(in srgb, var(--primary), transparent 25%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary), transparent 86%);
 }
 
 /* Shared workbench finish for organization pages. */
@@ -1890,7 +1890,7 @@ button.general-module-tab {
   border-color: var(--workbench-line, var(--border)) !important;
   border-radius: var(--workbench-radius, 13px) !important;
   background:
-    color-mix(in oklch, white, transparent 16%),
+    color-mix(in srgb, white, transparent 16%),
     var(--card) !important;
   box-shadow: var(--workbench-shadow, var(--shadow-md)) !important;
 }
@@ -1915,7 +1915,7 @@ button.general-module-tab {
 .general-kassa-table th {
   height: var(--workbench-table-head-height, 41px) !important;
   padding: 0.48rem 0.78rem !important;
-  background: var(--workbench-muted-surface, color-mix(in oklch, var(--muted), transparent 64%)) !important;
+  background: var(--workbench-muted-surface, color-mix(in srgb, var(--muted), transparent 64%)) !important;
   color: var(--muted-foreground) !important;
   font-size: var(--text-xs) !important;
   font-weight: 800 !important;
@@ -1930,7 +1930,7 @@ button.general-module-tab {
 }
 
 .general-kassa-table tbody tr:hover td {
-  background: color-mix(in oklch, var(--muted), transparent 78%) !important;
+  background: color-mix(in srgb, var(--muted), transparent 78%) !important;
 }
 
 .general-report-launcher,
