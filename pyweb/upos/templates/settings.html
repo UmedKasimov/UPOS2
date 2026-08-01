@@ -235,6 +235,18 @@
               <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="M20 10V7a2 2 0 0 0-2-2h-3"/><path d="M4 10V7a2 2 0 0 1 2-2h3"/><path d="M4 14v3a2 2 0 0 0 2 2h3"/><path d="M20 14v3a2 2 0 0 1-2 2h-3"/><path d="M8 9h8"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
               <span class="settings-tab-title">Шаблон ценника</span>
             </button>
+            <button
+              type="button"
+              role="tab"
+              class="settings-tab settings-tab--rail"
+              id="tab-price-tag"
+              data-settings-tab="price-tag"
+              aria-selected="false"
+              aria-controls="panel-price-tag"
+            >
+              <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path d="M20.6 12.6 12 21.2a2 2 0 0 1-2.8 0l-6.4-6.4a2 2 0 0 1 0-2.8l8.6-8.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v5.2a2 2 0 0 1-.4 1.6Z"/><path d="M16.5 7.5h.01"/></svg>
+              <span class="settings-tab-title">Ценники</span>
+            </button>
             {% endif %}
             {% if settings_can_manage_dictionary | default(false) %}
             <button
@@ -571,6 +583,101 @@
           </div>
 
           {% if settings_can_manage_settings | default(false) %}
+          {% set price_tag = settings.get("price_tag", {}) %}
+          {% set tag_fields = price_tag.get("fields", {}) %}
+          {% set tag_default_suffix = "so'm" %}
+          <div
+            class="settings-panel"
+            id="panel-price-tag"
+            data-settings-panel="price-tag"
+            role="tabpanel"
+            aria-labelledby="tab-price-tag"
+            hidden
+          >
+            <section class="settings-ios-group settings-business-panel settings-business-panel--wide price-tag-settings" data-price-tag-editor>
+              <script type="application/json" data-price-tag-initial>{{ price_tag | tojson }}</script>
+              <div class="settings-dict-head">
+                <div>
+                  <p class="settings-ios-footnote">Ценники</p>
+                  <p class="settings-business-note">Размер этикетки и набор полей. Предпросмотр показывает, как ценник уйдёт на печать.</p>
+                </div>
+                <div class="price-tag-actions">
+                  <span class="price-tag-status" data-price-tag-status role="status"></span>
+                  <button class="btn btn-secondary" type="button" data-price-tag-print>Печать</button>
+                  <button class="btn" type="button" data-price-tag-save>Сохранить</button>
+                </div>
+              </div>
+
+              <div class="price-tag-layout">
+                <div class="price-tag-controls">
+                  <div class="price-tag-size-row">
+                    <label class="price-tag-field price-tag-field--wide">
+                      <span>Название</span>
+                      <input type="text" data-price-tag-input="name" value="{{ price_tag.get('name', 'Ценник 58×40') }}" maxlength="80" />
+                    </label>
+                    <label class="price-tag-field">
+                      <span>Ширина, мм</span>
+                      <input type="number" min="20" max="210" step="1" data-price-tag-input="width" value="{{ price_tag.get('width', 58) }}" />
+                    </label>
+                    <label class="price-tag-field">
+                      <span>Высота, мм</span>
+                      <input type="number" min="15" max="297" step="1" data-price-tag-input="height" value="{{ price_tag.get('height', 40) }}" />
+                    </label>
+                  </div>
+
+                  <h4 class="price-tag-subtitle">Настройки цены</h4>
+                  <label class="price-tag-check">
+                    <input type="checkbox" data-price-tag-input="format_price" {% if price_tag.get('format_price', True) %}checked{% endif %} />
+                    <span>Разделять разряды цены</span>
+                  </label>
+                  <label class="price-tag-field price-tag-field--wide">
+                    <span>Приписка к цене</span>
+                    <input type="text" data-price-tag-input="price_suffix" value="{{ price_tag.get('price_suffix') or tag_default_suffix }}" maxlength="16" placeholder="{{ tag_default_suffix }}" />
+                  </label>
+
+                  <h4 class="price-tag-subtitle">Элементы ценника</h4>
+                  <div class="price-tag-fields">
+                    {% for key, label in [
+                      ('name', 'Название'), ('price', 'Цена'), ('old_price', 'Старая цена'),
+                      ('wholesale_price', 'Оптовая цена'), ('sku', 'Артикул'), ('created_at', 'Дата создания'),
+                      ('custom_text', 'Свой текст'), ('custom_text2', 'Свой текст 2'), ('custom_text3', 'Свой текст 3'),
+                      ('old_price_label', 'Подпись старой цены'), ('printed_at', 'Дата печати'),
+                      ('barcode', 'Штрихкод'), ('logo', 'Логотип')
+                    ] %}
+                      <label class="price-tag-check">
+                        <input type="checkbox" data-price-tag-field="{{ key }}" {% if tag_fields.get(key, key in ['name','price','sku','custom_text','barcode','logo']) %}checked{% endif %} />
+                        <span>{{ label }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+
+                  <h4 class="price-tag-subtitle">Свои тексты</h4>
+                  <label class="price-tag-field price-tag-field--wide">
+                    <span>Свой текст</span>
+                    <input type="text" data-price-tag-input="custom_text" value="{{ price_tag.get('custom_text', '') }}" maxlength="120" />
+                  </label>
+                  <label class="price-tag-field price-tag-field--wide">
+                    <span>Свой текст 2</span>
+                    <input type="text" data-price-tag-input="custom_text2" value="{{ price_tag.get('custom_text2', '') }}" maxlength="120" />
+                  </label>
+                  <label class="price-tag-field price-tag-field--wide">
+                    <span>Свой текст 3</span>
+                    <input type="text" data-price-tag-input="custom_text3" value="{{ price_tag.get('custom_text3', '') }}" maxlength="120" />
+                  </label>
+                  <label class="price-tag-field price-tag-field--wide">
+                    <span>Подпись старой цены</span>
+                    <input type="text" data-price-tag-input="old_price_label" value="{{ price_tag.get('old_price_label', 'Старая цена') }}" maxlength="60" />
+                  </label>
+                </div>
+
+                <div class="price-tag-stage">
+                  <div class="price-tag-preview" data-price-tag-preview aria-label="Предпросмотр ценника"></div>
+                  <p class="price-tag-hint">Пример товара: «Kungaboqar yog'i Ласка, tozalangan, 1 litr» — 30 000</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
           <div
             class="settings-panel"
             id="panel-price-template"
@@ -2064,6 +2171,7 @@
   </script>
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
   <script src="{{ url_for('static', path='price-template-editor.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='price-tag.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='settings-page.js') }}?v=29" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

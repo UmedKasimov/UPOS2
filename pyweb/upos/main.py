@@ -22652,6 +22652,78 @@ def create_app() -> FastAPI:
             "rows": rows,
         }
 
+    # Конструктор ценников: размер этикетки в мм и набор печатаемых полей.
+    PRICE_TAG_FIELDS = (
+        "name",
+        "price",
+        "old_price",
+        "wholesale_price",
+        "sku",
+        "created_at",
+        "custom_text",
+        "custom_text2",
+        "custom_text3",
+        "old_price_label",
+        "printed_at",
+        "barcode",
+        "logo",
+    )
+
+    def _clean_price_tag_payload(raw: object) -> dict[str, object]:
+        source = raw if isinstance(raw, dict) else {}
+
+        def clean_text(value: object, limit: int) -> str:
+            return " ".join(str(value or "").split())[:limit]
+
+        def clean_size(value: object, fallback: float, low: float, high: float) -> float:
+            try:
+                size = float(str(value).replace(",", "."))
+            except (TypeError, ValueError):
+                return fallback
+            return round(min(max(size, low), high), 1)
+
+        raw_fields = source.get("fields")
+        fields_source = raw_fields if isinstance(raw_fields, dict) else {}
+        defaults = {"name", "price", "sku", "custom_text", "barcode", "logo"}
+        fields = {
+            key: bool(fields_source.get(key, key in defaults))
+            for key in PRICE_TAG_FIELDS
+        }
+        return {
+            "name": clean_text(source.get("name"), 80) or "Ценник 58×40",
+            "width": clean_size(source.get("width"), 58, 20, 210),
+            "height": clean_size(source.get("height"), 40, 15, 297),
+            "format_price": bool(source.get("format_price", True)),
+            "price_suffix": clean_text(source.get("price_suffix"), 16) or "so'm",
+            "custom_text": clean_text(source.get("custom_text"), 120),
+            "custom_text2": clean_text(source.get("custom_text2"), 120),
+            "custom_text3": clean_text(source.get("custom_text3"), 120),
+            "old_price_label": clean_text(source.get("old_price_label"), 60) or "Старая цена",
+            "fields": fields,
+        }
+
+    @app.post("/api/settings/price-tag")
+    async def api_settings_price_tag(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        user = request.session.get("user") or {}
+        if user.get("is_employee") and not _has_permission(user, "settings"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        wid, err = _workspace_settings_owner_id(request, allow_general=True)
+        if err:
+            return err
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        tag = _clean_price_tag_payload((body or {}).get("price_tag"))
+        data = load_workspace_settings(wid)
+        data["price_tag"] = tag
+        _save_workspace_settings_from_user(request, data)
+        return {"ok": True, "price_tag": tag}
+
     @app.post("/api/settings/price-template")
     async def api_settings_price_template(request: Request):
         token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
