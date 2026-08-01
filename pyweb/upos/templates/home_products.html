@@ -106,8 +106,11 @@
           </div>
           <div class="products-panel-top-actions">
             <div class="products-panel-actions">
-              <a class="btn" href="{{ url_for('products_get') }}?kind={{ product_filters.kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
-                {% if product_filters.kind == 'service' %}+ Услуга{% else %}+ Товар{% endif %}
+              <a class="btn" href="{{ url_for('products_get') }}?kind=product#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form">
+                + Товар
+              </a>
+              <a class="btn" href="{{ url_for('products_get') }}?kind=service#product-form" data-workspace-trigger="create-service" data-workspace-tab-title="Новая услуга" data-workspace-tab-hash="product-form">
+                + Услуга
               </a>
               <a class="btn btn-secondary" href="#categories" data-workspace-card="categories" data-workspace-tab-title="Категории" data-workspace-tab-hash="categories">Категории</a>
               <form method="get" action="{{ url_for('products_export') }}" class="products-filter-inline-form">
@@ -320,6 +323,21 @@
             </div>
           </dialog>
         </form>
+        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы каталога">
+          <span class="sales-document-tabs-title">Разделы каталога</span>
+          {% for kind_key, kind_logo, kind_label in [('all', 'ВС', 'Все'), ('product', 'ТВ', 'Товары'), ('service', 'УС', 'Услуги')] %}
+            <a
+              class="messenger-channel-tab sales-document-tab{% if product_filters.kind == kind_key %} active{% endif %}"
+              href="{{ url_for('products_get') }}?kind={{ kind_key }}#catalog"
+              data-channel-brand="{{ kind_key }}"
+              {% if product_filters.kind == kind_key %}aria-current="page"{% endif %}
+            >
+              <span class="messenger-channel-logo" aria-hidden="true">{{ kind_logo }}</span>
+              <span class="messenger-channel-label">{{ kind_label }}</span>
+              <b>{{ catalog_kind_counts.get(kind_key, 0) }}</b>
+            </a>
+          {% endfor %}
+        </nav>
         <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
           <table class="products-table products-catalog-table" id="products-catalog-table" data-upos-column-controls data-products-table>
             <thead>
@@ -561,8 +579,20 @@
             </tbody>
             {% if products_total %}
               <tfoot>
+                {# Итог разложен по колонкам один в один со строками: с colspan
+                   скрытие колонок сдвигало значения, и «Штука» уезжала из-под
+                   «На складе». Первые две ячейки — sticky-стенка. #}
                 <tr class="products-catalog-total-row">
-                  <td colspan="7"><strong>Итого по выбранному каталогу</strong></td>
+                  <td class="products-history-col products-total-sticky"></td>
+                  <td class="products-check-col products-total-sticky"></td>
+                  <td></td>
+                  <td>
+                    <strong>Итого по выбранному каталогу</strong>
+                    <small>{{ products_total }} позиций</small>
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
                   <td class="products-catalog-number">
                     {% for total in catalog_totals.quantities %}
                       <span>{{ total.value }} {{ total.unit }}</span>
@@ -570,21 +600,18 @@
                       <span>0</span>
                     {% endfor %}
                   </td>
-                  <td class="products-price-list-cell products-purchase-price-cell">
-                    <small>Себестоимость остатка</small>
-                    {% for total in catalog_totals.purchase_values %}
-                      <strong>{{ total.value }} {{ total.currency }}</strong>
-                    {% else %}
-                      <strong>0</strong>
-                    {% endfor %}
-                  </td>
+                  {# Себестоимость остатка из итога убрана по просьбе владельца —
+                     ячейка остаётся, чтобы колонки не съезжали. #}
+                  <td class="products-price-list-cell products-purchase-price-cell"></td>
                   <td class="products-price-list-cell products-price-list-name-cell">
                     {% for total in catalog_totals.price_values %}<strong>{{ total.name }}</strong>{% endfor %}
                   </td>
                   <td class="products-price-list-cell products-price-value-cell">
                     {% for total in catalog_totals.price_values %}<strong>{{ total.value }} {{ total.currency }}</strong>{% endfor %}
                   </td>
-                  <td colspan="3"></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
                 </tr>
               </tfoot>
             {% endif %}
@@ -736,8 +763,20 @@
                 {% if item.is_for_purchases %}<span>В закупках</span>{% endif %}
                 <span class="{{ 'is-ok' if item.is_active else 'is-muted' }}">{{ "Активный" if item.is_active else "Неактивный" }}</span>
                 <span>{{ item.product_count }} цен</span>
+                {% if default_price_type_id == item.id|string %}
+                  <span class="price-type-default-badge">✓ По умолчанию</span>
+                {% endif %}
               </div>
               <div class="price-type-card-actions">
+                {% if default_price_type_id != item.id|string %}
+                  <form method="post" action="{{ url_for('products_price_type_default') }}">
+                    {% include "_csrf_field.html" %}
+                    <input type="hidden" name="price_type_id" value="{{ item.id }}" />
+                    <button class="products-action-icon" type="submit" title="Сделать прайс-листом по умолчанию" aria-label="Сделать {{ item.name }} прайс-листом по умолчанию">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                    </button>
+                  </form>
+                {% endif %}
                 <button type="button" class="products-action-icon products-action-icon--edit" data-price-type-open
                   data-id="{{ item.id }}" data-name="{{ item.name }}" data-sort-order="{{ item.sort_order }}"
                   data-for-sales="{{ '1' if item.is_for_sales else '0' }}" data-for-purchases="{{ '1' if item.is_for_purchases else '0' }}"
@@ -777,6 +816,7 @@
           <form class="products-catalog-filter price-type-filter" method="get" action="{{ url_for('products_get') }}#price-type-detail">
             <input type="hidden" name="price_type" value="{{ selected_price.id }}" />
             <label class="products-catalog-search"><span>Поиск</span><input name="price_q" value="{{ price_type_state.filters.q }}" placeholder="Поиск" /></label>
+            <label><span>Вид</span><select name="price_kind"><option value="">Все</option><option value="product" {% if price_type_state.filters.kind == 'product' %}selected{% endif %}>Товары</option><option value="service" {% if price_type_state.filters.kind == 'service' %}selected{% endif %}>Услуги</option></select></label>
             <label><span>Категория</span><select name="price_category"><option value="">Все</option>{% for item in product_options.categories %}<option value="{{ item }}" {% if price_type_state.filters.category == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
             <label><span>Группа</span><select name="price_group"><option value="">Все</option>{% for item in product_options.groups %}<option value="{{ item }}" {% if price_type_state.filters.group == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
             <label><span>Бренд</span><select name="price_brand"><option value="">Все</option>{% for item in product_options.brands %}<option value="{{ item }}" {% if price_type_state.filters.brand == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>

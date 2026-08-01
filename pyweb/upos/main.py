@@ -5120,7 +5120,11 @@ def create_app() -> FastAPI:
             if str(value)
         }
         display_price_list_ids = set(explicit_price_list_ids)
+        preferred_default_id = _workspace_default_price_type_id(workspace_owner_id)
         default_price_list = next(
+            (item for item in price_lists if preferred_default_id and str(item.get("id") or "") == preferred_default_id),
+            None,
+        ) or next(
             (item for item in price_lists if str(item.get("id") or "") == "1"),
             None,
         ) or next(
@@ -5570,6 +5574,7 @@ def create_app() -> FastAPI:
         price_page: str = "1",
         price_q: str = "",
         price_category: str = "",
+        price_kind: str = "",
         price_group: str = "",
         price_brand: str = "",
         price_status: str = "all",
@@ -5612,6 +5617,12 @@ def create_app() -> FastAPI:
                     .order_by(Product.name.asc())
                 ).scalars()
             ]
+        # Счётчики для вкладок «Все / Товары / Услуги» — по всему справочнику.
+        catalog_kind_counts = {
+            "all": len(price_products),
+            "product": sum(1 for item in price_products if item.get("kind") != "service"),
+            "service": sum(1 for item in price_products if item.get("kind") == "service"),
+        }
         products_total = len(products)
         catalog_totals = _product_catalog_totals(products)
         product_total_pages = max(1, math.ceil(products_total / product_page_size))
@@ -5644,6 +5655,10 @@ def create_app() -> FastAPI:
             ]
         if price_category:
             price_rows = [row for row in price_rows if row.get("category") == price_category]
+        if price_kind == "service":
+            price_rows = [row for row in price_rows if row.get("kind") == "service"]
+        elif price_kind == "product":
+            price_rows = [row for row in price_rows if row.get("kind") != "service"]
         if price_group:
             price_rows = [row for row in price_rows if row.get("group") == price_group]
         if price_brand:
@@ -5680,6 +5695,7 @@ def create_app() -> FastAPI:
             "filters": {
                 "q": price_q,
                 "category": price_category,
+                "kind": price_kind,
                 "group": price_group,
                 "brand": price_brand,
                 "status": price_status,
@@ -5701,6 +5717,8 @@ def create_app() -> FastAPI:
             active="products",
             products=products,
             products_total=products_total,
+            catalog_kind_counts=catalog_kind_counts,
+            default_price_type_id=_workspace_default_price_type_id(wid) or "1",
             product_page_size=product_page_size,
             product_page=product_page,
             product_total_pages=product_total_pages,
@@ -6415,6 +6433,28 @@ def create_app() -> FastAPI:
         next_items.append(payload)
         _save_workspace_price_types(wid, next_items)
         return _price_type_redirect(price_type_id)
+
+    def _workspace_default_price_type_id(workspace_owner_id: str) -> str:
+        return str(load_workspace_settings(workspace_owner_id).get("default_price_type_id") or "").strip()
+
+    @app.post("/products/price-types/default", name="products_price_type_default")
+    async def products_price_type_default(request: Request):
+        """Отметить прайс-лист, который используется по умолчанию."""
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf#price-types", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        price_type_id = str(form.get("price_type_id") or "").strip()
+        settings = load_workspace_settings(wid)
+        settings["default_price_type_id"] = price_type_id
+        save_workspace_settings(wid, settings)
+        return RedirectResponse(
+            url="/products?msg=" + quote("Прайс-лист по умолчанию сохранён") + "#price-types",
+            status_code=302,
+        )
 
     @app.post("/products/price-types/toggle", name="products_price_type_toggle")
     async def products_price_type_toggle(request: Request):
@@ -9484,6 +9524,11 @@ def create_app() -> FastAPI:
                 }
                 for item in active_sales_price_types
             ]
+            # Прайс-лист «по умолчанию» ставим первым: форма продажи выбирает
+            # первый вариант из списка.
+            _default_pt = _workspace_default_price_type_id(wid)
+            if _default_pt:
+                price_type_options.sort(key=lambda item: item["id"] != _default_pt)
             product_rows = list(
                 session.execute(
                     select(Product)

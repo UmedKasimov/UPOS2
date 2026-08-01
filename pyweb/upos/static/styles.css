@@ -29199,3 +29199,22 @@ html.dark .crm-task-calendar-event {
   color: var(--muted-foreground);
   font-size: 0.78rem;
 }
+
+/* Итоговая строка каталога: закреплённые ячейки стенки в цвет итога. */
+#products-catalog-table tfoot .products-total-sticky {
+  border-right-color: transparent !important;
+  background: color-mix(in srgb, var(--products-table-blue) 14%, var(--card));
+}
+
+.products-catalog-total-row td small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/* Бейдж прайс-листа по умолчанию */
+.price-type-default-badge {
+  color: #15803d;
+  font-weight: 700;
+}
