@@ -102,10 +102,6 @@
             <th>Дата создания</th>
             <th>Телефон</th>
             <th>Категория</th>
-            <th>ИНН</th>
-            <th>ПИНФЛ</th>
-            <th>Адрес</th>
-            <th>Код</th>
             <th></th>
           </tr>
         </thead>
@@ -144,10 +140,6 @@
               <td title="{{ client.created_at or '-' }}">{{ client.created_at or "-" }}</td>
               <td title="{{ client.phone or '-' }}">{{ client.phone or "-" }}</td>
               <td title="{{ client.category or '-' }}">{{ client.category or "-" }}</td>
-              <td title="{{ client.inn or '-' }}">{{ client.inn or "-" }}</td>
-              <td title="{{ client.pinfl or '-' }}">{{ client.pinfl or "-" }}</td>
-              <td title="{{ client.address or '-' }}">{{ client.address or "-" }}</td>
-              <td title="{{ client.code or '-' }}">{{ client.code or "-" }}</td>
               <td class="products-row-actions">
                 <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}">
                   {% include "_csrf_field.html" %}
@@ -156,7 +148,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="15">Клиенты пока не добавлены.</td></tr>
+            <tr><td colspan="11">Клиенты пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
         <tfoot>
@@ -175,7 +167,7 @@
                 {% endif %}
               </div>
             </td>
-            <td colspan="10">
+            <td colspan="6">
               <div class="client-balance-net">
                 <span>Итоговый баланс</span>
                 <strong>{{ clients_balance_summary.net_display }}{% if clients_balance_summary.net_display != "-" %} UZS{% endif %}</strong>

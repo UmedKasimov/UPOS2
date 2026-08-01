@@ -716,10 +716,6 @@
     { key: "created_at", kind: "date" },
     { key: "phone", kind: "text" },
     { key: "category", kind: "text" },
-    { key: "inn", kind: "text" },
-    { key: "pinfl", kind: "text" },
-    { key: "address", kind: "text" },
-    { key: "code", kind: "text" },
     { key: "actions", sortable: false, movable: false },
   ];
 
