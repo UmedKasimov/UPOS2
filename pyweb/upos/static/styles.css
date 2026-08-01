@@ -25915,14 +25915,25 @@ html.dark .org-settings-panel-surface {
   display: none !important;
 }
 
-/* Excel-поведение: ширина таблицы равна ровно сумме колонок. Тянешь одну
-   границу — меняется только эта колонка, соседние остаются на месте;
-   когда сумма больше экрана, появляется горизонтальная прокрутка. */
+/* Excel-поведение: таблица всегда во всю ширину, свободное место добирает
+   колонка-заполнитель. Тянешь границу — меняется только своя колонка,
+   остаток уходит в заполнитель; сумма больше экрана — горизонтальная
+   прокрутка. */
 table.upos-table-resizable-columns {
-  width: var(--upos-table-column-total-width, 100%) !important;
-  min-width: var(--upos-table-column-total-width, 100%) !important;
+  width: max(100%, var(--upos-table-column-total-width, 100%)) !important;
+  min-width: 100% !important;
   max-width: none !important;
   table-layout: fixed !important;
+}
+
+.upos-table-filler {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-bottom-color: var(--border) !important;
 }
 
 .upos-table-interactive-header {

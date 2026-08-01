@@ -33,8 +33,30 @@
     return label || fallback;
   }
 
+  const FILLER_CELL = 'upos-table-filler';
+
   function directCells(row) {
-    return Array.from(row?.children || []).filter((cell) => !cell.classList.contains(CONTROL_CELL));
+    return Array.from(row?.children || []).filter(
+      (cell) => !cell.classList.contains(CONTROL_CELL) && !cell.classList.contains(FILLER_CELL),
+    );
+  }
+
+  /* Колонка-заполнитель добирает свободное место справа, как пустые столбцы
+     в Excel: строки идут во всю ширину, а перетаскивание границы меняет
+     только свою колонку — остаток забирает заполнитель. */
+  function ensureFillerCells(table) {
+    const groups = [table.tHead, ...Array.from(table.tBodies || []), table.tFoot].filter(Boolean);
+    groups.forEach((group) => {
+      Array.from(group.rows || []).forEach((row) => {
+        if (row.querySelector(`:scope > .${FILLER_CELL}`)) return;
+        const cells = directCells(row);
+        if (cells.length === 1 && Number(cells[0].getAttribute('colspan') || cells[0].colSpan || 1) > 1) return;
+        const cell = document.createElement(group === table.tHead ? 'th' : 'td');
+        cell.className = FILLER_CELL;
+        cell.setAttribute('aria-hidden', 'true');
+        row.append(cell);
+      });
+    });
   }
 
   function hasTextSelection() {
@@ -572,6 +594,7 @@
     captureBaseWidths(table);
     dropControlCells(table);
     mountControl(table);
+    ensureFillerCells(table);
     ensureColumnKeys(table);
     applyOrder(table);
     applyVisibility(table);
@@ -947,6 +970,7 @@
     });
     tablesToRefresh.forEach((table) => {
       dropControlCells(table);
+      ensureFillerCells(table);
       ensureColumnKeys(table);
       applyOrder(table);
       applyVisibility(table);
