@@ -497,6 +497,7 @@
           <table class="reports-data-table reports-stock-analysis-table" data-upos-column-controls>
             <thead>
               <tr>
+                <th class="reports-history-col" data-report-no-sort>№</th>
                 <th>Товар</th>
                 <th>На складе</th>
                 <th>Средняя себестоимость</th>
@@ -508,15 +509,18 @@
             <tbody>
               {% for row in business_reports.stock_analysis.rows %}
                 <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %}>
-                  <td data-sort-value="{{ row.product }}">
-                    <span class="product-history-actions reports-stock-history-actions">
+                  <td class="reports-history-col" data-sort-value="{{ loop.index }}">
+                    <div class="product-history-actions">
+                      <span class="product-history-index">{{ loop.index }}-</span>
                       <button type="button" class="products-action-icon product-history-btn" data-product-history="{{ row.product_id }}" data-product-history-name="{{ row.product }}" title="История товара" aria-label="История товара {{ row.product }}">
                         <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
                       </button>
                       <button type="button" class="products-action-icon product-history-btn" data-product-price-history="{{ row.product_id }}" data-product-history-name="{{ row.product }}" title="История изменения цен" aria-label="История цен {{ row.product }}">
                         <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18"/><path d="m7 13 3-3 3 2 5-6"/><circle cx="7" cy="13" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="13" cy="12" r="1"/><circle cx="18" cy="6" r="1"/></svg>
                       </button>
-                    </span>
+                    </div>
+                  </td>
+                  <td data-sort-value="{{ row.product }}">
                     <button type="button" class="reports-stock-product" data-stock-history-product="{{ row.product_id }}" data-stock-history-name="{{ row.product }}" aria-label="Показать историю приходов: {{ row.product }}">
                       <span class="reports-stock-thumb">
                         {% if row.photo_url %}
@@ -550,11 +554,12 @@
                   <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}" data-stock-revenue-cell>{{ row.expected_revenue }}</span></td>
                 </tr>
               {% else %}
-                <tr><td colspan="6" class="reports-empty-cell">Остатков пока нет.</td></tr>
+                <tr><td colspan="7" class="reports-empty-cell">Остатков пока нет.</td></tr>
               {% endfor %}
             </tbody>
             <tfoot>
               <tr>
+                <td class="reports-history-col"></td>
                 <td>Итого</td>
                 <td>{{ business_reports.stock_analysis.summary.quantity }}</td>
                 <td></td>
@@ -950,7 +955,7 @@
   function enhanceSortableTables() {
     document.querySelectorAll('.reports-data-table').forEach((table) => {
       table.querySelectorAll('thead th').forEach((header, columnIndex) => {
-        if (header.querySelector('.reports-sort-button') || !header.textContent.trim()) return;
+        if (header.querySelector('.reports-sort-button') || !header.textContent.trim() || header.hasAttribute('data-report-no-sort')) return;
         const label = header.textContent.trim();
         header.textContent = '';
         const button = document.createElement('button');

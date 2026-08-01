@@ -29261,3 +29261,38 @@ html.dark .crm-task-calendar-event {
   margin-right: 0.5rem;
   vertical-align: middle;
 }
+
+/* Стенка «№ + история» в анализе остатков — как в каталоге товаров. */
+.reports-stock-analysis-table .reports-history-col {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 7.2rem !important;
+  min-width: 7.2rem !important;
+  max-width: 7.2rem !important;
+  border-right: 6px solid var(--background, #eef2f8) !important;
+  background: color-mix(in srgb, var(--muted-foreground) 8%, var(--card));
+  box-shadow: 6px 0 8px -6px rgb(15 23 42 / 0.14);
+}
+
+.reports-stock-analysis-table thead .reports-history-col {
+  z-index: 5;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.reports-stock-analysis-table tbody tr:nth-child(2n) .reports-history-col {
+  background: color-mix(in srgb, var(--muted-foreground) 13%, var(--card));
+}
+
+.reports-stock-analysis-table .reports-history-col .upos-table-header-drag-handle,
+.reports-stock-analysis-table .reports-history-col .upos-table-column-resize-handle {
+  display: none !important;
+}
+
+.reports-stock-analysis-table .product-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
