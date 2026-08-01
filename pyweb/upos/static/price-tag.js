@@ -54,6 +54,9 @@
      этикетки, координаты храним в миллиметрах — так же, как размер. */
   function applyPositions(root) {
     const positions = root._priceTagPositions || {};
+    const state = readState(root);
+    const maxX = Number(state.width) || 58;
+    const maxY = Number(state.height) || 40;
     root.querySelectorAll("[data-tag-element]").forEach((node) => {
       const spot = positions[node.dataset.tagElement];
       if (!spot) {
@@ -62,9 +65,10 @@
         node.style.top = "";
         return;
       }
+      // Даже сохранённые ранее координаты держим внутри этикетки.
       node.style.position = "absolute";
-      node.style.left = `${spot.x}mm`;
-      node.style.top = `${spot.y}mm`;
+      node.style.left = `${Math.min(Math.max(0, spot.x), maxX)}mm`;
+      node.style.top = `${Math.min(Math.max(0, spot.y), maxY)}mm`;
     });
   }
 
@@ -89,9 +93,18 @@
       }
       card.classList.add("is-dragging");
 
+      const state = readState(root);
+      const cardWidthMm = Number(state.width) || 58;
+      const cardHeightMm = Number(state.height) || 40;
+      const nodeWidthMm = nodeRect.width * mmPerPx;
+      const nodeHeightMm = nodeRect.height * mmPerPx;
+
       const move = (moveEvent) => {
-        const x = Math.max(0, (moveEvent.clientX - cardRect.left - grabX) * mmPerPx);
-        const y = Math.max(0, (moveEvent.clientY - cardRect.top - grabY) * mmPerPx);
+        // Элемент не должен вылезать за пределы этикетки.
+        const rawX = (moveEvent.clientX - cardRect.left - grabX) * mmPerPx;
+        const rawY = (moveEvent.clientY - cardRect.top - grabY) * mmPerPx;
+        const x = Math.min(Math.max(0, rawX), Math.max(0, cardWidthMm - nodeWidthMm));
+        const y = Math.min(Math.max(0, rawY), Math.max(0, cardHeightMm - nodeHeightMm));
         root._priceTagPositions = root._priceTagPositions || {};
         root._priceTagPositions[node.dataset.tagElement] = {
           x: Math.round(x * 10) / 10,

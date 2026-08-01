@@ -26028,6 +26028,9 @@ table.upos-table-resizable-columns {
 }
 
 .price-tag-card {
+  /* Обязательно: перетащенные элементы позиционируются относительно
+     этикетки, иначе они улетают за её пределы. */
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
