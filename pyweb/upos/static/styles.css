@@ -2416,6 +2416,39 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   text-align: center !important;
 }
 
+/* Левая «стенка» каталога: выбор и история закреплены и не уезжают при
+   горизонтальной прокрутке таблицы — как в iBox. */
+#products-catalog-table .products-check-col,
+#products-catalog-table .products-history-col {
+  position: sticky;
+  z-index: 3;
+  background: var(--card);
+}
+
+#products-catalog-table .products-check-col {
+  left: 0;
+}
+
+#products-catalog-table .products-history-col {
+  left: 3rem;
+  box-shadow: 6px 0 8px -6px rgb(15 23 42 / 0.18);
+}
+
+#products-catalog-table thead .products-check-col,
+#products-catalog-table thead .products-history-col {
+  z-index: 5;
+}
+
+#products-catalog-table tbody tr:nth-child(2n) .products-check-col,
+#products-catalog-table tbody tr:nth-child(2n) .products-history-col {
+  background: color-mix(in srgb, var(--products-table-blue) 7%, var(--card));
+}
+
+#products-catalog-table tfoot .products-check-col,
+#products-catalog-table tfoot .products-history-col {
+  z-index: 4;
+}
+
 .products-photo-col {
   width: 4.2rem;
   min-width: 4.2rem;
