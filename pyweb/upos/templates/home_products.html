@@ -324,10 +324,10 @@
           <table class="products-table products-catalog-table" id="products-catalog-table" data-upos-column-controls data-products-table>
             <thead>
               <tr>
+                <th data-column-label="№" class="products-history-col">№</th>
                 <th data-column-label="Выбор" class="products-check-col">
                   <input type="checkbox" class="products-bulk-checkbox" data-products-select-all aria-label="Выбрать все товары" />
                 </th>
-                <th data-column-label="История" class="products-history-col"></th>
                 <th data-column-label="Фото" class="products-photo-col"></th>
                 <th data-column-label="Название" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="name">
@@ -399,19 +399,9 @@
                   data-sort-category="{{ (product.category or '')|lower }}"
                   data-sort-status="{{ product.status or '' }}"
                 >
-                  <td class="products-check-col">
-                    <input
-                      type="checkbox"
-                      class="products-bulk-checkbox"
-                      name="product_ids"
-                      value="{{ product.id }}"
-                      form="products-bulk-form"
-                      data-products-select
-                      aria-label="Выбрать товар {{ product.name }}"
-                    />
-                  </td>
                   <td class="products-history-col">
                     <div class="product-history-actions">
+                      <span class="product-history-index">{{ (product_page_from or 1) + loop.index0 }}-</span>
                       <button
                         type="button"
                         class="products-action-icon product-history-btn"
@@ -433,6 +423,17 @@
                         <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18"/><path d="m7 13 3-3 3 2 5-6"/><circle cx="7" cy="13" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="13" cy="12" r="1"/><circle cx="18" cy="6" r="1"/></svg>
                       </button>
                     </div>
+                  </td>
+                  <td class="products-check-col">
+                    <input
+                      type="checkbox"
+                      class="products-bulk-checkbox"
+                      name="product_ids"
+                      value="{{ product.id }}"
+                      form="products-bulk-form"
+                      data-products-select
+                      aria-label="Выбрать товар {{ product.name }}"
+                    />
                   </td>
                   <td class="products-photo-col">
                     {% if product.photo_url %}

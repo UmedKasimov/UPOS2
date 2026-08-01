@@ -2416,37 +2416,82 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   text-align: center !important;
 }
 
-/* Левая «стенка» каталога: выбор и история закреплены и не уезжают при
-   горизонтальной прокрутке таблицы — как в iBox. */
-#products-catalog-table .products-check-col,
+/* Левая «стенка» каталога, как в iBOX: колонка «№ + история» идёт первой,
+   ещё до галочек, серым отдельным блоком, отделена зазором от таблицы и
+   закреплена при горизонтальной прокрутке. */
 #products-catalog-table .products-history-col {
   position: sticky;
+  left: 0;
   z-index: 3;
-  background: var(--card);
+  width: 7.2rem !important;
+  min-width: 7.2rem !important;
+  max-width: 7.2rem !important;
+  /* Зазор-«воздух» между стенкой и таблицей — правая граница цветом подложки. */
+  border-right: 6px solid var(--background, #eef2f8) !important;
+  background: color-mix(in srgb, var(--muted-foreground) 8%, var(--card));
 }
 
 #products-catalog-table .products-check-col {
-  left: 0;
+  position: sticky;
+  left: 7.2rem;
+  z-index: 3;
+  background: var(--card);
+  box-shadow: 6px 0 8px -6px rgb(15 23 42 / 0.14);
 }
 
-#products-catalog-table .products-history-col {
-  left: 3rem;
-  box-shadow: 6px 0 8px -6px rgb(15 23 42 / 0.18);
-}
-
-#products-catalog-table thead .products-check-col,
-#products-catalog-table thead .products-history-col {
+#products-catalog-table thead .products-history-col,
+#products-catalog-table thead .products-check-col {
   z-index: 5;
 }
 
-#products-catalog-table tbody tr:nth-child(2n) .products-check-col,
+#products-catalog-table thead .products-history-col {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
 #products-catalog-table tbody tr:nth-child(2n) .products-history-col {
+  background: color-mix(in srgb, var(--muted-foreground) 13%, var(--card));
+}
+
+#products-catalog-table tbody tr:nth-child(2n) .products-check-col {
   background: color-mix(in srgb, var(--products-table-blue) 7%, var(--card));
 }
 
-#products-catalog-table tfoot .products-check-col,
-#products-catalog-table tfoot .products-history-col {
+#products-catalog-table tfoot .products-history-col,
+#products-catalog-table tfoot .products-check-col {
   z-index: 4;
+}
+
+/* Стенка «не меняется»: без перетаскивания и изменения ширины. */
+#products-catalog-table .products-history-col .upos-table-header-drag-handle,
+#products-catalog-table .products-history-col .upos-table-column-resize-handle {
+  display: none !important;
+}
+
+.product-history-index {
+  min-width: 1.4rem;
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+#products-catalog-table .product-history-actions {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+}
+
+#products-catalog-table .product-history-btn {
+  border-color: transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+}
+
+#products-catalog-table .product-history-btn:hover {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
 }
 
 .products-photo-col {
