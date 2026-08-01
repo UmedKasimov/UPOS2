@@ -29315,3 +29315,33 @@ html.dark .crm-task-calendar-event {
   padding: 0.3rem !important;
   text-align: center;
 }
+
+/* Длинные названия в «Анализе остатков» не выпирают за ячейку —
+   обрезаются многоточием, полный текст показывает подсказка при наведении. */
+.reports-stock-analysis-table td {
+  overflow: hidden;
+}
+
+.reports-stock-product {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.reports-stock-product > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reports-stock-product strong,
+.reports-stock-product small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
