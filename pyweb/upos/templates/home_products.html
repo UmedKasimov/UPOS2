@@ -655,7 +655,10 @@
               <small>Изображение для каталога</small>
             </summary>
             <div class="product-form-grid product-photo-grid">
-              <label class="wide"><span>Фото URL</span><input name="photo_url" type="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
+              {# type="text": после загрузки фото сюда попадает внутренний путь
+                 /products/<id>/photo, а type="url" требует абсолютный адрес и
+                 браузер блокировал сабмит с ошибкой «Введите URL». #}
+              <label class="wide"><span>Фото URL</span><input name="photo_url" type="text" inputmode="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
               <label class="wide"><span>Выбрать из ПК</span><input name="photo_file" type="file" accept="image/*" /></label>
             </div>
           </details>
