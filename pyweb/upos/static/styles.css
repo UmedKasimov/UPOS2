@@ -22606,6 +22606,27 @@ body:has(dialog[open]) {
   min-width: 0;
 }
 
+/* Фильтр по дате в шапке карточки сотрудника. */
+.org-hr-card-head {
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.org-hr-card-filter--head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  margin-right: 0.5rem;
+}
+
+.org-hr-card-filter--head p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 /* Единая таблица акта сверки в карточке сотрудника. */
 .org-hr-card-act-wrap {
   max-height: 24rem;

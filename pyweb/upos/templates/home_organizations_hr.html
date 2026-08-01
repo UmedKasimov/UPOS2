@@ -778,17 +778,12 @@
 
     <dialog class="director-org-modal org-hr-modal" id="hr-employee-card-modal">
       <section class="director-modal-card org-hr-modal-card org-hr-employee-card" data-hr-card-modal-card>
-        <header class="director-modal-head">
+        <header class="director-modal-head org-hr-card-head">
           <div>
             <p class="settings-ios-footnote">Карточка сотрудника</p>
             <h2 data-hr-card-name>Сотрудник</h2>
           </div>
-          <button type="button" class="director-modal-close" data-hr-card-close aria-label="{{ _('settings.profile.close') }}">
-            ×
-          </button>
-        </header>
-        <div class="org-hr-card-body">
-          <div class="org-hr-card-filter">
+          <div class="org-hr-card-filter org-hr-card-filter--head">
             <label>
               <span>Период</span>
               <input type="hidden" value="{{ selected_date }}" data-hr-card-date-from />
@@ -797,6 +792,11 @@
             </label>
             <p data-hr-card-period>{{ selected_date }}</p>
           </div>
+          <button type="button" class="director-modal-close" data-hr-card-close aria-label="{{ _('settings.profile.close') }}">
+            ×
+          </button>
+        </header>
+        <div class="org-hr-card-body">
           <div class="org-hr-card-layout">
             <div class="org-hr-card-profile">
               <div class="org-hr-card-person">
