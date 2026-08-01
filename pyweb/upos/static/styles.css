@@ -22606,6 +22606,20 @@ body:has(dialog[open]) {
   min-width: 0;
 }
 
+/* Кнопки действий в строках клиентов и поставщиков — рядом, по центру. */
+.clients-table .products-row-actions {
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.products-row-actions-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
 /* Остаток по акту сверки в окне «Приход/Расход». */
 .org-hr-adjustment-balance {
   margin: 0.5rem 0 0;

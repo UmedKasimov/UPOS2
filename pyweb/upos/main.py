@@ -14058,6 +14058,7 @@ def create_app() -> FastAPI:
         name = " ".join(str(form.get("name") or "").split())
         if not name:
             return RedirectResponse(url="/suppliers?error=" + quote("Название поставщика обязательно") + "#suppliers", status_code=302)
+        supplier_id = str(form.get("supplier_id") or "").strip()
         is_client = str(form.get("is_client") or "").strip() == "1"
         phone = str(form.get("phone") or "").strip()
         tax_id = str(form.get("tax_id") or "").strip()
@@ -14066,19 +14067,22 @@ def create_app() -> FastAPI:
             duplicate = _counterparty_duplicate(
                 session,
                 wid,
+                counterparty_id=supplier_id,
                 name=name,
                 phone=phone,
                 email=email,
                 tax_id=tax_id,
             )
             if duplicate:
+                target = "supplier-edit" if supplier_id else "supplier-create"
                 return RedirectResponse(
-                    url="/suppliers?error=" + quote(_counterparty_duplicate_message(duplicate)) + "#supplier-create",
+                    url="/suppliers?error=" + quote(_counterparty_duplicate_message(duplicate)) + f"#{target}",
                     status_code=302,
                 )
             _ensure_counterparty(
                 session,
                 wid,
+                counterparty_id=supplier_id,
                 name=name,
                 role="both" if is_client else "supplier",
                 phone=phone,
@@ -14094,6 +14098,8 @@ def create_app() -> FastAPI:
                     "is_supplier": True,
                 },
             )
+        if supplier_id:
+            return RedirectResponse(url=f"/suppliers?supplier={quote(supplier_id)}&msg=saved#supplier-card", status_code=302)
         return RedirectResponse(url="/suppliers?msg=saved#suppliers", status_code=302)
 
     @app.post("/suppliers/{counterparty_id}/delete", name="suppliers_delete")

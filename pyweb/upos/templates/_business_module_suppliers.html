@@ -66,9 +66,26 @@
             <option value="inactive" {% if supplier_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
           </select>
         </label>
-        <button class="products-filter-apply" type="submit">Фильтр</button>
-        <a class="products-filter-clear" href="{{ url_for('suppliers_get') }}#suppliers" aria-label="Очистить фильтр">×</a>
       </form>
+      <script>
+        (() => {
+          // Фильтр применяется сам: поиск с задержкой, списки — сразу.
+          const form = document.getElementById('suppliers-filter-form');
+          if (!form || form.dataset.autoFilterReady === '1') return;
+          form.dataset.autoFilterReady = '1';
+          let timer = 0;
+          form.addEventListener('input', (event) => {
+            if (!(event.target instanceof HTMLInputElement)) return;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => form.submit(), 500);
+          });
+          form.addEventListener('change', (event) => {
+            if (!(event.target instanceof HTMLSelectElement)) return;
+            window.clearTimeout(timer);
+            form.submit();
+          });
+        })();
+      </script>
     </header>
     <div class="products-table-wrap clients-table-wrap suppliers-table-wrap">
       {# Та же 15-колоночная структура, что у клиентов: общий JS из clients.js
@@ -130,10 +147,24 @@
               <td title="{{ supplier.phone or '-' }}">{{ supplier.phone or "-" }}</td>
               <td title="{{ supplier.category or '-' }}">{{ supplier.category or "-" }}</td>
               <td class="products-row-actions">
-                <form method="post" action="{{ url_for('suppliers_delete', counterparty_id=supplier.id) }}">
-                  {% include "_csrf_field.html" %}
-                  <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить {{ supplier.name }}" aria-label="Удалить {{ supplier.name }}">🗑</button>
-                </form>
+                <div class="products-row-actions-inner">
+                  <a
+                    class="products-action-icon products-action-icon--edit"
+                    href="{{ supplier_tab_href }}#supplier-edit"
+                    data-workspace-trigger="supplier-edit-{{ supplier.id }}"
+                    data-workspace-tab-id="supplier-edit-{{ supplier.id }}"
+                    data-workspace-view-id="supplier_edit"
+                    data-workspace-tab-title="Редактировать {{ supplier.name }}"
+                    data-workspace-tab-hash="supplier-edit"
+                    data-workspace-tab-href="{{ supplier_tab_href }}"
+                    title="Редактировать {{ supplier.name }}"
+                    aria-label="Редактировать {{ supplier.name }}"
+                  >✎</a>
+                  <form method="post" action="{{ url_for('suppliers_delete', counterparty_id=supplier.id) }}">
+                    {% include "_csrf_field.html" %}
+                    <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить {{ supplier.name }}" aria-label="Удалить {{ supplier.name }}">🗑</button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% else %}
@@ -314,6 +345,35 @@
     data-workspace-tab-href="{{ selected_supplier_href }}"
   ></span>
 
+  <section id="supplier-edit" class="products-list-panel client-create-shell client-edit-shell" data-workspace-view="supplier_edit" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Редактировать поставщика</h2>
+        <span>{{ selected_supplier_card.name }}</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('suppliers_save') }}" class="product-form client-create-form">
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="supplier_id" value="{{ selected_supplier_card.id }}" />
+      <div class="product-form-grid">
+        <label class="wide"><span>Название поставщика*</span><input name="name" value="{{ selected_supplier_card.name }}" required /></label>
+        <label><span>Официальное название</span><input name="official_name" value="{{ selected_supplier_card.official_name or '' }}" /></label>
+        <label><span>Телефон</span><input name="phone" value="{{ selected_supplier_card.phone or '' }}" /></label>
+        <label><span>ИНН</span><input name="tax_id" value="{{ selected_supplier_card.inn or '' }}" /></label>
+        <label><span>Категория</span><input name="category" list="supplier-category-list" value="{{ selected_supplier_card.category or '' }}" /></label>
+        <label><span>Email</span><input name="email" value="{{ selected_supplier_card.email or '' }}" /></label>
+        <label><span>Адрес</span><input name="address" value="{{ selected_supplier_card.address or '' }}" /></label>
+        <label><span>Статус</span><select name="status"><option value="active" {% if selected_supplier_card.status != 'inactive' %}selected{% endif %}>Активный</option><option value="inactive" {% if selected_supplier_card.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
+        <label><span>Также клиент</span><select name="is_client"><option value="0">Нет</option><option value="1" {% if selected_supplier_card.is_client %}selected{% endif %}>Да</option></select></label>
+        <label class="wide"><span>Комментарий</span><input name="note" value="{{ selected_supplier_card.note or '' }}" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить поставщика</button>
+        <a class="btn btn-secondary" href="{{ selected_supplier_href }}#supplier-card">Отмена</a>
+      </div>
+    </form>
+  </section>
+
   <section class="client-card-shell" id="supplier-card" data-workspace-view="profile" hidden>
     <header class="client-card-header">
       <div>
@@ -325,6 +385,18 @@
         <p>{{ selected_supplier_card.official_name or selected_supplier_card.category or "Поставщик и закупки" }}</p>
       </div>
       <div class="client-card-actions">
+        <a
+          class="products-action-icon products-action-icon--edit"
+          href="{{ selected_supplier_href }}#supplier-edit"
+          data-workspace-trigger="supplier-edit-{{ selected_supplier_card.id }}"
+          data-workspace-tab-id="supplier-edit-{{ selected_supplier_card.id }}"
+          data-workspace-view-id="supplier_edit"
+          data-workspace-tab-title="Редактировать {{ selected_supplier_card.name }}"
+          data-workspace-tab-hash="supplier-edit"
+          data-workspace-tab-href="{{ selected_supplier_href }}"
+          title="Редактировать поставщика"
+          aria-label="Редактировать поставщика"
+        >✎</a>
         <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}#payables">Кредиторка</a>
         <a class="btn" href="{{ url_for('suppliers_get') }}#purchases">+ Новая закупка</a>
       </div>
