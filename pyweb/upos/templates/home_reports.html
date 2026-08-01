@@ -509,7 +509,6 @@
                     {% endfor %}
                   </select>
                 </th>
-                <th>Ожидаемая выручка</th>
               </tr>
             </thead>
             <tbody>
@@ -546,10 +545,9 @@
                   <td data-sort-value="{{ row.cost_sum_uzs }}"><span data-stock-money data-money-uzs="{{ row.cost_sum_uzs }}">{{ row.cost_sum }}</span></td>
                   {# Цена в отчёте только для чтения — правится в прайс-листах. #}
                   <td data-sort-value="{{ row.sale_price_raw }}" class="reports-stock-price-cell" data-stock-price-cell data-product-id="{{ row.product_id }}" data-quantity="{{ row.quantity_raw }}">{{ row.sale_price_display }}</td>
-                  <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}" data-stock-revenue-cell>{{ row.expected_revenue }}</span></td>
                 </tr>
               {% else %}
-                <tr><td colspan="7" class="reports-empty-cell">Остатков пока нет.</td></tr>
+                <tr><td colspan="6" class="reports-empty-cell">Остатков пока нет.</td></tr>
               {% endfor %}
             </tbody>
             <tfoot>
@@ -560,7 +558,6 @@
                 <td></td>
                 <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.cost_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.cost_total }}</span></td>
                 <td></td>
-                <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.revenue_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.revenue_total }}</span></td>
               </tr>
             </tfoot>
           </table>
@@ -1797,8 +1794,8 @@
     if (event.key === 'Escape') closeStockHistory();
   });
 
-  // Выбор прайс-листа для колонки «Продажная цена»: цены и ожидаемая
-  // выручка обновляются на месте, без перезагрузки страницы.
+  // Выбор прайс-листа для колонки цены: значения обновляются на месте,
+  // без перезагрузки страницы.
   document.addEventListener('change', async (event) => {
     const select = event.target.closest('[data-stock-price-type-select]');
     if (!select) return;
@@ -1810,27 +1807,11 @@
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const payload = await response.json();
       const prices = payload.prices || {};
-      let revenueTotal = 0;
       document.querySelectorAll('[data-stock-price-cell]').forEach((cell) => {
         const entry = prices[cell.dataset.productId] || null;
-        const qty = Number(cell.dataset.quantity || 0);
         cell.textContent = entry ? entry.display : '-';
         cell.setAttribute('data-sort-value', entry ? entry.raw : '0');
-        const revenue = qty * (entry ? Number(entry.uzs) || 0 : 0);
-        revenueTotal += revenue;
-        const revenueCell = cell.closest('tr')?.querySelector('[data-stock-revenue-cell]');
-        if (revenueCell) {
-          revenueCell.dataset.moneyUzs = String(revenue);
-          revenueCell.textContent = revenue.toLocaleString('ru-RU') + ' UZS';
-        }
       });
-      const totalCell = document.querySelector('#report-stock-analysis tfoot [data-stock-money]:last-of-type');
-      const totals = document.querySelectorAll('#report-stock-analysis tfoot [data-stock-money]');
-      const revenueTotalCell = totals[totals.length - 1];
-      if (revenueTotalCell) {
-        revenueTotalCell.dataset.moneyUzs = String(revenueTotal);
-        revenueTotalCell.textContent = revenueTotal.toLocaleString('ru-RU') + ' UZS';
-      }
       // Запоминаем выбор в адресе, чтобы обновление страницы его сохранило.
       const url = new URL(window.location.href);
       url.searchParams.set('stock_price_type', select.value);
