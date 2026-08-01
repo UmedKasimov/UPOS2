@@ -29408,6 +29408,32 @@ html.dark .crm-task-calendar-event {
   content: counter(history-row);
 }
 
+/* Заголовки отчётных таблиц: текст не выпирает за свою колонку и не
+   накладывается на соседние — обрезка с многоточием в одну строку. */
+.reports-data-table thead th {
+  overflow: hidden;
+}
+
+.reports-data-table .reports-sort-button {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reports-data-table .reports-sort-button > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reports-stock-analysis-table thead th {
+  font-size: 0.74rem;
+}
+
+.reports-stock-price-select {
+  max-width: 100%;
+}
+
 #products-catalog-table .product-history-actions .product-history-index,
 .reports-stock-analysis-table .product-history-actions .product-history-index {
   padding: 0 0.15rem 0 0.4rem;
