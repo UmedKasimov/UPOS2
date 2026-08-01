@@ -41,22 +41,11 @@
     );
   }
 
-  /* Колонка-заполнитель добирает свободное место справа, как пустые столбцы
-     в Excel: строки идут во всю ширину, а перетаскивание границы меняет
-     только свою колонку — остаток забирает заполнитель. */
+  /* Пустых колонок-заполнителей быть не должно: свободное место занимают
+     сами колонки (см. captureBaseWidths — ширины растягиваются на всю
+     таблицу). Старые заполнители из ранее отрисованных таблиц убираем. */
   function ensureFillerCells(table) {
-    const groups = [table.tHead, ...Array.from(table.tBodies || []), table.tFoot].filter(Boolean);
-    groups.forEach((group) => {
-      Array.from(group.rows || []).forEach((row) => {
-        if (row.querySelector(`:scope > .${FILLER_CELL}`)) return;
-        const cells = directCells(row);
-        if (cells.length === 1 && Number(cells[0].getAttribute('colspan') || cells[0].colSpan || 1) > 1) return;
-        const cell = document.createElement(group === table.tHead ? 'th' : 'td');
-        cell.className = FILLER_CELL;
-        cell.setAttribute('aria-hidden', 'true');
-        row.append(cell);
-      });
-    });
+    table.querySelectorAll(`.${FILLER_CELL}`).forEach((cell) => cell.remove());
   }
 
   function hasTextSelection() {
@@ -239,7 +228,20 @@
         widths[key] = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, width));
       }
     });
-    if (Object.keys(widths).length) table._uposBaseColumnWidths = widths;
+    if (!Object.keys(widths).length) return;
+
+    // Растягиваем колонки на всю ширину таблицы: пустых мест справа быть
+    // не должно, а лишнее место браузер иначе раскидает сам и при
+    // перетаскивании поедут сразу несколько колонок.
+    const available = (table.parentElement || table).clientWidth;
+    const total = Object.values(widths).reduce((sum, value) => sum + value, 0);
+    if (available > total && total > 0) {
+      const factor = available / total;
+      Object.keys(widths).forEach((key) => {
+        widths[key] = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.floor(widths[key] * factor)));
+      });
+    }
+    table._uposBaseColumnWidths = widths;
   }
 
   function applyWidths(table, overrides = {}) {

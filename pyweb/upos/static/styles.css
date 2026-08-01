@@ -25926,14 +25926,9 @@ table.upos-table-resizable-columns {
   table-layout: fixed !important;
 }
 
+/* Пустых колонок-заполнителей нет — место занимают сами колонки. */
 .upos-table-filler {
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  padding: 0 !important;
-  border-top: 0 !important;
-  border-right: 0 !important;
-  border-bottom-color: var(--border) !important;
+  display: none !important;
 }
 
 .upos-table-interactive-header {
