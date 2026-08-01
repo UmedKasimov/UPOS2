@@ -20744,177 +20744,39 @@ def create_app() -> FastAPI:
             )
         return rows
 
-    @app.get("/shipments", response_class=HTMLResponse, name="home_shipments")
+    # Модуль «Отгрузки» удалён по решению владельца: маршруты оставлены
+    # заглушками-редиректами, чтобы старые ссылки и url_for не ломались.
+    @app.get("/shipments", name="home_shipments")
     def home_shipments(request: Request):
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        u = request.session.get("user") or {}
-        try:
-            recompute_delivery_debts(oid)
-        except Exception:
-            logger.exception("[upos] recompute_delivery_debts failed before organization shipments view")
-        selected = {
-            "id": oid,
-            "name": str(u.get("active_organization_name") or u.get("workspace_owner_name") or "Организация"),
-        }
-        shipments_rows = list_delivery_shipments(oid)
-        return tpl(
-            request,
-            "home_organizations_shipments.html",
-            variant="user",
-            active="home_shipments",
-            inside_organization=True,
-            selected_organization=selected,
-            selected_organization_id=oid,
-            organizations_for_filters=[selected],
-            shipments=shipments_rows,
-            shipment_daily_journal=_shipment_daily_journal(shipments_rows),
-            shipment_totals=shipment_totals(oid),
-            courier_debts=list_courier_debts(oid, include_zero=True),
-            hr_employees=list_hr_employees(oid),
-            today=datetime.now().strftime("%Y-%m-%d"),
-            flash_ok=request.query_params.get("msg"),
-            flash_err=request.query_params.get("error"),
-        )
+        return RedirectResponse(url="/finance", status_code=302)
 
     @app.post("/shipments/create", name="home_shipments_create")
     async def home_shipments_create(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/shipments?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        shipment_date = str(form.get("shipment_date") or "").strip()
-        try:
-            create_delivery_shipments(
-                oid,
-                _shipment_rows_from_form(form),
-                shipment_date,
-                employee_workspace_owner_id=oid,
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/shipments?error={quote(str(exc) or 'shipments')}", status_code=302)
-        return RedirectResponse(url="/shipments?msg=shipments_created", status_code=302)
+        return RedirectResponse(url="/finance", status_code=302)
 
-    @app.get("/shipments/day/{day}", response_class=HTMLResponse, name="home_shipments_day")
+    @app.get("/shipments/day/{day}", name="home_shipments_day")
     def home_shipments_day(request: Request, day: str):
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        u = request.session.get("user") or {}
-        try:
-            recompute_delivery_debts(oid)
-        except Exception:
-            logger.exception("[upos] recompute_delivery_debts failed before organization shipments day view")
-        selected = {
-            "id": oid,
-            "name": str(u.get("active_organization_name") or u.get("workspace_owner_name") or "Организация"),
-        }
-        shipments_rows, courier_summary, document_status = _shipment_day_summary(list_delivery_shipments(oid, limit=2000), day)
-        return tpl(
-            request,
-            "home_shipments_day.html",
-            variant="user",
-            active="home_shipments",
-            inside_organization=True,
-            selected_organization=selected,
-            selected_organization_id=oid,
-            organizations_for_filters=[selected],
-            day=str(day or "")[:10],
-            shipments=shipments_rows,
-            courier_summary=courier_summary,
-            document_status=document_status,
-        )
+        return RedirectResponse(url="/finance", status_code=302)
 
     @app.post("/shipments/day/{day}/update", name="home_shipments_day_update")
     async def home_shipments_day_update(request: Request, day: str):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/shipments?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        clean_day = str(day or "").strip()[:10]
-        return_shipment_id = str(form.get("return_shipment_id") or "").strip()
-        return_hash = f"#shipment-{quote(return_shipment_id)}" if return_shipment_id else f"#day-{quote(clean_day)}"
-        try:
-            ok = update_delivery_shipment_document(
-                oid,
-                clean_day,
-                _shipment_rows_from_form(form),
-                employee_workspace_owner_id=oid,
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/shipments?error={quote(str(exc) or 'shipments')}{return_hash}", status_code=302)
-        msg = "shipment_updated" if ok else "shipment_not_found"
-        return RedirectResponse(url=f"/shipments?msg={quote(msg)}{return_hash}", status_code=302)
+        return RedirectResponse(url="/finance", status_code=302)
 
     @app.post("/shipments/day/{day}/confirm", name="home_shipments_day_confirm")
     async def home_shipments_day_confirm(request: Request, day: str):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/shipments?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        clean_day = str(day or "").strip()[:10]
-        ok = confirm_delivery_shipment_document(oid, clean_day)
-        msg = "shipment_confirmed" if ok else "shipment_not_found"
-        return RedirectResponse(url=f"/shipments?msg={quote(msg)}#day-{quote(clean_day)}", status_code=302)
+        return RedirectResponse(url="/finance", status_code=302)
 
     @app.post("/shipments/day/{day}/delete", name="home_shipments_day_delete")
     async def home_shipments_day_delete(request: Request, day: str):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/shipments?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        clean_day = str(day or "").strip()[:10]
-        ok = delete_delivery_shipment_document(oid, clean_day)
-        msg = "shipment_deleted" if ok else "shipment_not_found"
-        return RedirectResponse(url=f"/shipments?msg={quote(msg)}", status_code=302)
+        return RedirectResponse(url="/finance", status_code=302)
 
     @app.post("/shipments/shipment/{shipment_id}/delete", name="home_shipment_delete")
     async def home_shipment_delete(request: Request, shipment_id: str):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/shipments?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        deleted_day = delete_delivery_shipment(oid, shipment_id)
-        msg = "shipment_deleted" if deleted_day else "shipment_not_found"
-        suffix = f"#day-{quote(deleted_day)}" if deleted_day else ""
-        return RedirectResponse(url=f"/shipments?msg={quote(msg)}{suffix}", status_code=302)
+        return RedirectResponse(url="/finance", status_code=302)
 
     @app.post("/shipments/shipment/{shipment_id}/confirm", name="home_shipment_confirm")
     async def home_shipment_confirm(request: Request, shipment_id: str):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/shipments?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        confirmed_day = confirm_delivery_shipment(oid, shipment_id)
-        msg = "shipment_confirmed" if confirmed_day else "shipment_not_found"
-        return RedirectResponse(url=f"/shipments?msg={quote(msg)}#shipment-{quote(str(shipment_id or '').strip())}", status_code=302)
+        return RedirectResponse(url="/finance", status_code=302)
 
     def _employee_user_id_by_name(workspace_owner_id: str, name: str) -> str:
         needle = str(name or "").strip().lower()

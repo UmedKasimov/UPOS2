@@ -43,15 +43,6 @@
           <small>Приход и списание</small>
         </a>
       {% endif %}
-      {% if not user.get('is_employee') or emp_perms.get('shipments') or ((emp_perms.get('shipments') is none) and (emp_perms.get('kassa') or emp_perms.get('reports'))) %}
-        <a class="general-report-card" href="{{ url_for('home_shipments') }}">
-          <span class="general-report-card-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false"><path d="M10 17h4V5H3v12h3" /><path d="M14 17h1a2 2 0 1 0 4 0h1v-5l-3-4h-3" /><circle cx="8" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></svg>
-          </span>
-          <span>Отгрузки</span>
-          <small>Журнал отгрузок</small>
-        </a>
-      {% endif %}
       {% if not user.get('is_employee') or emp_perms.get('hr') or ((emp_perms.get('hr') is none) and emp_perms.get('employees')) %}
         <a class="general-report-card" href="{{ url_for('home_hr') }}">
           <span class="general-report-card-icon" aria-hidden="true">
