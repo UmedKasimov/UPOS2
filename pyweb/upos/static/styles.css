@@ -26005,6 +26005,8 @@ table.upos-table-resizable-columns {
   touch-action: none;
 }
 
+/* Полоска-захват видна всегда — так понятно, что ширину колонки можно
+   менять; при наведении подсвечивается основным цветом. */
 .upos-table-column-resize-handle::after {
   position: absolute;
   top: 18%;
@@ -26012,15 +26014,16 @@ table.upos-table-resizable-columns {
   bottom: 18%;
   width: 2px;
   border-radius: 2px;
-  background: var(--primary);
+  background: var(--workbench-line, var(--border));
   content: "";
-  opacity: 0;
-  transition: opacity 120ms ease;
+  opacity: 0.6;
+  transition: opacity 120ms ease, background 120ms ease;
 }
 
 .upos-table-column-resize-handle:hover::after,
 .upos-table-column-resize-handle:focus-visible::after,
 .upos-table-column-resize-handle[data-resizing="1"]::after {
+  background: var(--primary);
   opacity: 1;
 }
 
