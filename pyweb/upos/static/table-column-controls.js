@@ -512,24 +512,21 @@
 
     root.append(button, menu);
     root._uposColumnMenu = menu;
+    root._uposColumnTable = table;
     menu._uposColumnRoot = root;
     menu._uposColumnTable = table;
     renderMenu(table, root);
     return root;
   }
 
-  /* Настройка столбцов живёт слева над таблицей, а не отдельной колонкой:
-     иначе в каждой строке остаётся пустая служебная ячейка. */
+  /* Настройка столбцов живёт в заголовке колонки действий, а не отдельной
+     колонкой: иначе в каждой строке остаётся пустая служебная ячейка. */
   function mountControl(table) {
-    const wrap = table.closest('.products-table-wrap, .org-ops-table-wrap, .reports-table-wrap, .clients-table-wrap')
-      || table.parentElement;
-    if (!wrap) return;
-    let host = wrap.previousElementSibling;
-    if (!host || !host.classList.contains('upos-table-column-control-host')) {
-      host = document.createElement('div');
-      host.className = 'upos-table-column-control-host';
-      wrap.parentElement?.insertBefore(host, wrap);
-    }
+    const header = headerRow(table);
+    const host = header?.querySelector(':scope > .products-actions-head, :scope > .org-hr-actions-col')
+      || header?.lastElementChild;
+    if (!host) return;
+    host.classList.add('upos-table-column-control-slot');
     host.append(createControl(table));
   }
 
@@ -563,7 +560,7 @@
     const toggle = event.target.closest('[data-upos-column-menu-toggle]');
     if (toggle) {
       const root = toggle.closest('.upos-table-column-control');
-      const table = toggle.closest('table');
+      const table = root?._uposColumnTable || toggle.closest('table');
       if (!root || !table) return;
       closeMenus(root);
       renderMenu(table, root);

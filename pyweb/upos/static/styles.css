@@ -29619,14 +29619,20 @@ html.dark .crm-task-calendar-event {
   border: 1px solid var(--border);
 }
 
-/* Панель настройки столбцов — слева над таблицей, отдельной колонки нет. */
-.upos-table-column-control-host {
-  display: flex;
-  justify-content: flex-start;
-  padding: 0 0 0.4rem;
+/* Настройка столбцов живёт в заголовке колонки «Действия» — отдельной
+   служебной колонки в строках больше нет. */
+.upos-table-column-control-slot {
+  text-align: center !important;
+  padding-right: 0.4rem !important;
 }
 
-.upos-table-column-control-host .upos-table-column-control {
+.upos-table-column-control-slot .upos-table-column-control {
   display: inline-grid;
   place-items: center;
+  vertical-align: middle;
+}
+
+.upos-table-column-control-slot .upos-table-column-btn {
+  width: 1.75rem;
+  height: 1.75rem;
 }
