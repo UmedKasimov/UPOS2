@@ -25915,8 +25915,13 @@ html.dark .org-settings-panel-surface {
   display: none !important;
 }
 
+/* Excel-поведение: ширина таблицы равна ровно сумме колонок. Тянешь одну
+   границу — меняется только эта колонка, соседние остаются на месте;
+   когда сумма больше экрана, появляется горизонтальная прокрутка. */
 table.upos-table-resizable-columns {
-  width: max(100%, var(--upos-table-column-total-width, 100%)) !important;
+  width: var(--upos-table-column-total-width, 100%) !important;
+  min-width: var(--upos-table-column-total-width, 100%) !important;
+  max-width: none !important;
   table-layout: fixed !important;
 }
 
@@ -27642,8 +27647,8 @@ html.dark .warehouse-adjustment-summary {
 }
 
 .dashboard-kpi--orders .dashboard-kpi-icon {
-  background: color-mix(in srgb, #64748b 15%, var(--card));
-  color: #475569;
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  color: var(--btn-edge, #1d4ed8);
 }
 
 .dashboard-kpi-icon svg {
@@ -27702,11 +27707,8 @@ html.dark .warehouse-adjustment-summary {
   background: color-mix(in srgb, #2563eb 6%, var(--card));
 }
 
-.dashboard-kpi-currencies--orders > span {
-  border-color: color-mix(in srgb, #64748b 28%, var(--border));
-  background: color-mix(in srgb, #64748b 7%, var(--card));
-}
-
+/* Брендбук: все KPI одного синего — различаются только подписью. */
+.dashboard-kpi-currencies--orders > span,
 .dashboard-kpi-currencies--average > span {
   border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
   background: color-mix(in srgb, var(--primary) 6%, var(--card));
@@ -27728,12 +27730,9 @@ html.dark .warehouse-adjustment-summary {
   white-space: nowrap;
 }
 
-.dashboard-kpi-currencies--orders b {
-  color: #9a6800;
-}
-
+.dashboard-kpi-currencies--orders b,
 .dashboard-kpi-currencies--average b {
-  color: var(--primary);
+  color: #1e40af;
 }
 
 .dashboard-content-grid {
@@ -29618,4 +29617,16 @@ html.dark .crm-task-calendar-event {
 .warehouse-purchase-status,
 .upos-table-column-btn {
   border: 1px solid var(--border);
+}
+
+/* Панель настройки столбцов — слева над таблицей, отдельной колонки нет. */
+.upos-table-column-control-host {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 0 0.4rem;
+}
+
+.upos-table-column-control-host .upos-table-column-control {
+  display: inline-grid;
+  place-items: center;
 }

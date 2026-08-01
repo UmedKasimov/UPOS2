@@ -205,6 +205,10 @@
 
   function captureBaseWidths(table) {
     if (table._uposBaseColumnWidths && Object.keys(table._uposBaseColumnWidths).length) return;
+    // Скрытую таблицу мерить нельзя: все колонки получат нулевую ширину и
+    // схлопнутся в минимум. Ждём, пока панель станет видимой.
+    if (!table.offsetParent && getComputedStyle(table).position !== 'fixed') return;
+    if (table.getBoundingClientRect().width < MIN_COLUMN_WIDTH) return;
     const widths = {};
     directCells(headerRow(table)).forEach((cell) => {
       const key = cell.getAttribute(CELL_KEY_ATTR);
@@ -484,10 +488,6 @@
   }
 
   function createControl(table) {
-    const th = document.createElement('th');
-    th.className = CONTROL_CELL;
-    th.scope = 'col';
-
     const root = document.createElement('div');
     root.className = 'upos-table-column-control';
 
@@ -514,9 +514,28 @@
     root._uposColumnMenu = menu;
     menu._uposColumnRoot = root;
     menu._uposColumnTable = table;
-    th.append(root);
     renderMenu(table, root);
-    return th;
+    return root;
+  }
+
+  /* Настройка столбцов живёт слева над таблицей, а не отдельной колонкой:
+     иначе в каждой строке остаётся пустая служебная ячейка. */
+  function mountControl(table) {
+    const wrap = table.closest('.products-table-wrap, .org-ops-table-wrap, .reports-table-wrap, .clients-table-wrap')
+      || table.parentElement;
+    if (!wrap) return;
+    let host = wrap.previousElementSibling;
+    if (!host || !host.classList.contains('upos-table-column-control-host')) {
+      host = document.createElement('div');
+      host.className = 'upos-table-column-control-host';
+      wrap.parentElement?.insertBefore(host, wrap);
+    }
+    host.append(createControl(table));
+  }
+
+  /* Старые служебные ячейки из ранее отрисованных таблиц убираем. */
+  function dropControlCells(table) {
+    table.querySelectorAll(`.${CONTROL_CELL}`).forEach((cell) => cell.remove());
   }
 
   function initTable(table) {
@@ -527,8 +546,8 @@
     table.classList.add('upos-table-with-column-controls', 'upos-table-resizable-columns');
     ensureColumnKeys(table);
     captureBaseWidths(table);
-    row.append(createControl(table));
-    ensureBodyControlCells(table);
+    dropControlCells(table);
+    mountControl(table);
     ensureColumnKeys(table);
     applyOrder(table);
     applyVisibility(table);
@@ -902,7 +921,7 @@
       });
     });
     tablesToRefresh.forEach((table) => {
-      ensureBodyControlCells(table);
+      dropControlCells(table);
       ensureColumnKeys(table);
       applyOrder(table);
       applyVisibility(table);
