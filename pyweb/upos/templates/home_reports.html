@@ -46,27 +46,8 @@
     </nav>
 
     <section class="general-report-launcher org-report-launcher" role="tablist" aria-label="Отчёты организации">
-      <button type="button" class="general-report-card" role="tab" data-org-report-card="courier-debts" aria-selected="false">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M16 17l2 2 4-5"/></svg>
-        </span>
-        <span>Долги доставщиков</span>
-        <small>Акт сверки</small>
-      </button>
-      <button type="button" class="general-report-card" role="tab" data-org-report-card="delivery-shipments" aria-selected="false">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M10 17h4V5H3v12h3"/><path d="M14 17h1a2 2 0 1 0 4 0h1v-5l-3-4h-3"/><circle cx="8" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-        </span>
-        <span>Отгрузки</span>
-        <small>Журнал отгрузок</small>
-      </button>
-      <button type="button" class="general-report-card" role="tab" data-org-report-card="courier-balance" aria-selected="false">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16V9"/><path d="M12 16V6"/><path d="M16 16v-4"/><path d="M7 20h10"/></svg>
-        </span>
-        <span>Баланс доставщиков</span>
-        <small>Дебет / кредит</small>
-      </button>
+      {# Отчёты по доставщикам (долги, отгрузки, баланс) убраны по просьбе
+         владельца — панели и JS остаются, карточек нет. #}
       <button type="button" class="general-report-card" role="tab" data-org-report-card="sales-overview" aria-selected="false">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-3 3 2 5-7"/><path d="M18 7h1v1"/></svg>
@@ -513,7 +494,7 @@
           <button type="button">Склад</button>
         </div>
         <div class="reports-table-wrap reports-stock-analysis-wrap">
-          <table class="reports-data-table reports-stock-analysis-table">
+          <table class="reports-data-table reports-stock-analysis-table" data-upos-column-controls>
             <thead>
               <tr>
                 <th>Товар</th>
