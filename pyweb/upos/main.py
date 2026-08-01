@@ -13020,6 +13020,21 @@ def create_app() -> FastAPI:
                 for key, value in sorted(route_map.items())
             ]
             client_balances.sort(key=lambda item: item["balance_value"], reverse=True)
+            # Кассовые дубли контрагентов несут один и тот же баланс по имени —
+            # в должниках оставляем одну строку на имя, телефон берём заполненный.
+            deduped_balances: dict[str, dict[str, Any]] = {}
+            for item in client_balances:
+                key = str(item.get("name") or "").strip().lower()
+                kept = deduped_balances.get(key)
+                if kept is None:
+                    deduped_balances[key] = item
+                elif not kept.get("phone") and item.get("phone"):
+                    kept["phone"] = item["phone"]
+            client_balances = list(deduped_balances.values())
+        client_balances_debt_total = sum(
+            (item["balance_value"] for item in client_balances),
+            Decimal("0"),
+        )
         all_clients_records = clients_records
         clients_total = len(all_clients_records)
         clients_debt_total = sum(
@@ -13112,6 +13127,7 @@ def create_app() -> FastAPI:
             clients_balance_summary=clients_balance_summary,
             client_routes=client_routes,
             client_balances=client_balances,
+            client_balances_debt_total=_client_balance_display(client_balances_debt_total),
             client_balances_total=client_balances_total,
             client_balances_page=client_balances_page,
             client_balances_total_pages=client_balances_total_pages,
