@@ -80,8 +80,7 @@
     dateTo: cardModal.querySelector("[data-hr-card-date-to]"),
     dateRange: cardModal.querySelector("[data-hr-card-date-range]"),
     period: cardModal.querySelector("[data-hr-card-period]"),
-    accruals: cardModal.querySelector("[data-hr-card-accruals]"),
-    payments: cardModal.querySelector("[data-hr-card-payments]"),
+    actRows: cardModal.querySelector("[data-hr-card-act-rows]"),
     balance: cardModal.querySelector("[data-hr-card-balance]"),
     balanceText: cardModal.querySelector("[data-hr-card-balance-text]"),
     state: cardModal.querySelector("[data-hr-card-state]"),
@@ -290,6 +289,58 @@
     return body;
   }
 
+  function clearActTable(emptyText) {
+    if (!card?.actRows) return;
+    card.actRows.replaceChildren();
+    if (!emptyText) return;
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 4;
+    td.className = "org-ops-empty";
+    td.textContent = emptyText;
+    tr.append(td);
+    card.actRows.append(tr);
+  }
+
+  function actSortValue(value) {
+    const raw = String(value || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+    const match = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+    if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+    return "";
+  }
+
+  function actAmountNumber(label) {
+    const match = String(label || "").match(/-?[\d\s]+(?:[.,]\d+)?/);
+    if (!match) return 0;
+    return Number(match[0].replace(/\s+/g, "").replace(",", ".")) || 0;
+  }
+
+  function appendActRow(dateLabel, operation, note, accrued, paid, tone) {
+    if (!card?.actRows) return;
+    const tr = document.createElement("tr");
+    if (tone) tr.className = "org-hr-act-row--" + tone;
+    const dateTd = document.createElement("td");
+    dateTd.textContent = dateLabel || "—";
+    const opTd = document.createElement("td");
+    const opTitle = document.createElement("strong");
+    opTitle.textContent = operation || "—";
+    opTd.append(opTitle);
+    if (note) {
+      const opNote = document.createElement("small");
+      opNote.textContent = note;
+      opTd.append(document.createElement("br"), opNote);
+    }
+    const accruedTd = document.createElement("td");
+    accruedTd.className = "num";
+    accruedTd.textContent = accrued || "";
+    const paidTd = document.createElement("td");
+    paidTd.className = "num";
+    paidTd.textContent = paid || "";
+    tr.append(dateTd, opTd, accruedTd, paidTd);
+    card.actRows.append(tr);
+  }
+
   function renderGroupedLedger(node, rows, emptyText, renderRow, fallbackDate) {
     if (!node) return;
     const cleanRows = (rows || []).filter(Boolean);
@@ -386,59 +437,64 @@
         sort_date: item.work_date || act.date_from || act.date,
       };
     });
-    renderGroupedLedger(
-      card.accruals,
-      baseRows.concat(adjustmentRows),
-      "Начислений за выбранный период пока нет.",
-      function (node, row) {
-        if (row.type === "base") {
-          const rowPeriod =
-            row.date_from && row.date_to ? periodLabel(row.date_from, row.date_to) : row.date_from || period;
-          appendLedgerRow(
-            node,
-            row.type_label || "Зарплата по табелю",
-            `${row.amount_label || "0"} UZS`,
-            rowPeriod,
-            `Оклад ${row.monthly_salary_label || employee.monthly_salary_label || "0"} UZS, пришёл ${row.present_days || 0}, не пришёл ${row.absent_days || 0}`,
-            "base"
-          );
-          return;
-        }
-        appendLedgerRow(
-          node,
-          row.type_label || "Начисление",
-          `${row.amount_label || "0"} UZS`,
-          row.work_date || "",
-          row.comment || "",
-          row.type === "penalty" ? "negative" : "positive"
-        );
-      },
-      act.date_from || act.date
-    );
-
-    const payments = (act.payments || []).map(function (row) {
-      return {
-        ...row,
+    // Начисления и выплаты — единая таблица акта сверки.
+    const actRows = [];
+    baseRows.forEach(function (row) {
+      actRows.push({
+        sort: actSortValue(row.date_from || act.date_from || act.date),
         order: 0,
-        sort_date: row.created_label || act.date_from || act.date,
-      };
+        date: row.date_from && row.date_to ? periodLabel(row.date_from, row.date_to) : row.date_from || period,
+        operation: row.type_label || "Зарплата по табелю",
+        note: `Оклад ${row.monthly_salary_label || employee.monthly_salary_label || "0"} UZS, пришёл ${row.present_days || 0}, не пришёл ${row.absent_days || 0}`,
+        accrued: `${row.amount_label || "0"} UZS`,
+        paid: "",
+        tone: "base",
+      });
     });
-    renderGroupedLedger(
-      card.payments,
-      payments,
-      "Выплат за выбранный период пока нет.",
-      function (node, row) {
-        appendLedgerRow(
-          node,
-          `#${row.number || "—"}`,
-          `${row.amount_label || "0"} ${row.currency || "UZS"}`,
-          row.created_label || "",
-          row.account || row.note || "",
-          "payment"
-        );
-      },
-      act.date_from || act.date
-    );
+    adjustmentRows.forEach(function (row) {
+      const negative = row.type === "penalty";
+      actRows.push({
+        sort: actSortValue(row.work_date || act.date_from || act.date),
+        order: 1,
+        date: row.work_date || "",
+        operation: row.type_label || (negative ? "Расход" : "Приход"),
+        note: row.comment || "",
+        accrued: `${negative ? "-" : "+"}${row.amount_label || "0"} UZS`,
+        paid: "",
+        tone: negative ? "negative" : "positive",
+      });
+    });
+    const paidTotals = new Map();
+    (act.payments || []).forEach(function (row) {
+      const currency = String(row.currency || "UZS").toUpperCase();
+      paidTotals.set(currency, (paidTotals.get(currency) || 0) + actAmountNumber(row.amount_label));
+      actRows.push({
+        sort: actSortValue(row.created_label || act.date_from || act.date),
+        order: 2,
+        date: row.created_label || "",
+        operation: `Выплата #${row.number || "—"}`,
+        note: row.account || row.note || "",
+        accrued: "",
+        paid: `${row.amount_label || "0"} ${row.currency || "UZS"}`,
+        tone: "payment",
+      });
+    });
+    clearActTable(actRows.length ? "" : "Операций за выбранный период пока нет.");
+    actRows
+      .sort(function (a, b) {
+        return String(b.sort || "").localeCompare(String(a.sort || "")) || a.order - b.order;
+      })
+      .forEach(function (row) {
+        appendActRow(row.date, row.operation, row.note, row.accrued, row.paid, row.tone);
+      });
+    if (actRows.length) {
+      const paidLabel = Array.from(paidTotals.entries())
+        .map(function ([currency, total]) {
+          return `${total.toLocaleString("ru-RU")} ${currency}`;
+        })
+        .join(", ");
+      appendActRow("", "Итого", "", `${act.salary_due_label || "0"} UZS`, paidLabel || "0 UZS", "total");
+    }
   }
 
   async function loadSalaryAct() {
@@ -462,8 +518,7 @@
       renderSalaryAct(data.act);
       setCardState("");
     } catch (error) {
-      clearLedger(card.accruals, "Не удалось загрузить начисления.");
-      clearLedger(card.payments, "Не удалось загрузить оплаты.");
+      clearActTable("Не удалось загрузить акт сверки.");
       setCardState("Не удалось загрузить акт сотрудника за выбранную дату.");
     }
   }
@@ -507,8 +562,7 @@
     initCardDatePicker();
     const bounds = monthBounds(pageSelectedDate());
     setCardRange(bounds.from, bounds.to, "month");
-    clearLedger(card.accruals, "Загружаем начисления...");
-    clearLedger(card.payments, "Загружаем оплаты...");
+    clearActTable("Загружаем акт сверки...");
     setBalance("due", row.dataset.salaryDueLabel || "0");
     loadSalaryAct();
   }

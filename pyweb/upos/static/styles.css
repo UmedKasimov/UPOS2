@@ -22600,10 +22600,41 @@ body:has(dialog[open]) {
 
 .org-hr-card-layout {
   display: grid;
-  grid-template-columns: minmax(17rem, 1.05fr) minmax(15rem, 1fr) minmax(15rem, 1fr);
+  grid-template-columns: minmax(17rem, 1.05fr) minmax(15rem, 2fr);
   gap: 0.75rem;
   align-items: stretch;
   min-width: 0;
+}
+
+/* Единая таблица акта сверки в карточке сотрудника. */
+.org-hr-card-act-wrap {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.org-hr-card-act-table th.num,
+.org-hr-card-act-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.org-hr-card-act-table td small {
+  color: var(--muted-foreground);
+}
+
+.org-hr-act-row--negative td.num {
+  color: var(--destructive, #dc2626);
+}
+
+.org-hr-act-row--payment td.num {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.org-hr-act-row--total td {
+  font-weight: 700;
+  background: color-mix(in srgb, var(--muted-foreground) 6%, var(--card));
 }
 
 .org-hr-card-profile,

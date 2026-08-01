@@ -833,16 +833,22 @@
                 <div><span>Штрафы</span><strong data-hr-card-penalty>0 UZS</strong></div>
               </div>
             </div>
-            <section class="org-hr-card-ledger">
-              <h3>Начисления</h3>
-              <div class="org-hr-card-ledger-list" data-hr-card-accruals>
-                <p class="org-ops-empty">Выберите дату, чтобы увидеть начисления.</p>
-              </div>
-            </section>
-            <section class="org-hr-card-ledger">
-              <h3>Оплаты</h3>
-              <div class="org-hr-card-ledger-list" data-hr-card-payments>
-                <p class="org-ops-empty">Выплат за выбранный месяц пока нет.</p>
+            <section class="org-hr-card-ledger org-hr-card-ledger--act">
+              <h3>Акт сверки</h3>
+              <div class="org-ops-table-wrap org-hr-card-act-wrap">
+                <table class="org-ops-table org-hr-card-act-table">
+                  <thead>
+                    <tr>
+                      <th>Дата</th>
+                      <th>Операция</th>
+                      <th class="num">Начислено</th>
+                      <th class="num">Выплачено</th>
+                    </tr>
+                  </thead>
+                  <tbody data-hr-card-act-rows>
+                    <tr><td colspan="4" class="org-ops-empty">Выберите дату, чтобы увидеть акт сверки.</td></tr>
+                  </tbody>
+                </table>
               </div>
             </section>
           </div>
@@ -2159,5 +2165,5 @@
   {{ super() }}
   <script src="{{ url_for('static', path='organizations-page.js') }}?v=2" defer></script>
   <script src="{{ url_for('static', path='hr-positions.js') }}?v=4" defer></script>
-  <script src="{{ url_for('static', path='hr-employees.js') }}?v=7" defer></script>
+  <script src="{{ url_for('static', path='hr-employees.js') }}?v=8" defer></script>
 {% endblock %}
