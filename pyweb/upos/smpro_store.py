@@ -729,10 +729,19 @@ def _ibox_product_data(
             }
         )
 
+    category_name = str(payload.get("product_category_name") or existing.get("category") or "")
+    # Услуга в IBOX — это type=2, но часть услуг там заведена обычным товаром
+    # в категории «УСЛУГИ»: распознаём и их, иначе они не попадают во вкладку
+    # «Услуги», фильтры прайса и бонусы за услуги.
+    is_service = (
+        str(payload.get("type") or "") == "2"
+        or "услуг" in category_name.strip().lower()
+        or str(existing.get("kind") or "") == "service"
+    )
     data = {
         **existing,
-        "kind": "service" if str(payload.get("type") or "") == "2" else "product",
-        "category": str(payload.get("product_category_name") or existing.get("category") or ""),
+        "kind": "service" if is_service else "product",
+        "category": category_name,
         "unit": (
             str(storage_unit.get("name") or storage_unit.get("short_name") or "")
             or str(existing.get("unit") or "Штука")
