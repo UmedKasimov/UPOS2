@@ -596,7 +596,8 @@
                   <td></td>
                   <td class="products-catalog-number">
                     {% for total in catalog_totals.quantities %}
-                      <span>{{ total.value }} {{ total.unit }}</span>
+                      {# «Штука» в итоге не пишем — это единица по умолчанию. #}
+                      <span>{{ total.value }}{% if total.unit and total.unit != 'Штука' %} {{ total.unit }}{% endif %}</span>
                     {% else %}
                       <span>0</span>
                     {% endfor %}

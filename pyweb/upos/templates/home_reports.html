@@ -102,6 +102,13 @@
         <span>Дебиторская задолженность</span>
         <small>Долги клиентов</small>
       </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="company-balance" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/><path d="M12 3v2"/></svg>
+        </span>
+        <span>Баланс компании</span>
+        <small>Деньги, склад, долги</small>
+      </button>
       <button type="button" class="general-report-card" role="tab" data-org-report-card="calls-conversion" aria-selected="false">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/><path d="M14 3h7v7"/><path d="m21 3-9 9"/></svg>
@@ -482,7 +489,6 @@
           <div>
             <p class="reports-section-kicker">Склад</p>
             <h2>Анализ остатков</h2>
-            <p>Остатки по товарам, средняя себестоимость и ожидаемая выручка.</p>
           </div>
           <div class="reports-stock-analysis-tools">
             <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
@@ -514,6 +520,7 @@
                 <th>На складе</th>
                 <th>Средняя себестоимость</th>
                 <th>Сумма себестоимости</th>
+                <th>Продажная цена</th>
                 <th>Ожидаемая выручка</th>
               </tr>
             </thead>
@@ -538,10 +545,23 @@
                   <td data-sort-value="{{ row.quantity_raw }}">{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
                   <td data-sort-value="{{ row.avg_cost_uzs }}"><span data-stock-money data-money-uzs="{{ row.avg_cost_uzs }}">{{ row.avg_cost }}</span></td>
                   <td data-sort-value="{{ row.cost_sum_uzs }}"><span data-stock-money data-money-uzs="{{ row.cost_sum_uzs }}">{{ row.cost_sum }}</span></td>
-                  <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}">{{ row.expected_revenue }}</span></td>
+                  <td data-sort-value="{{ row.sale_price_input or 0 }}" class="reports-stock-price-cell">
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      class="reports-stock-price-input"
+                      value="{{ row.sale_price_input }}"
+                      placeholder="0"
+                      data-stock-price-input
+                      data-product-id="{{ row.product_id }}"
+                      data-quantity="{{ row.quantity_raw }}"
+                      aria-label="Продажная цена: {{ row.product }}"
+                    />
+                  </td>
+                  <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}" data-stock-revenue-cell>{{ row.expected_revenue }}</span></td>
                 </tr>
               {% else %}
-                <tr><td colspan="5" class="reports-empty-cell">Остатков пока нет.</td></tr>
+                <tr><td colspan="6" class="reports-empty-cell">Остатков пока нет.</td></tr>
               {% endfor %}
             </tbody>
             <tfoot>
@@ -550,10 +570,64 @@
                 <td>{{ business_reports.stock_analysis.summary.quantity }}</td>
                 <td></td>
                 <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.cost_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.cost_total }}</span></td>
+                <td></td>
                 <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.revenue_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.revenue_total }}</span></td>
               </tr>
             </tfoot>
           </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-company-balance" data-org-report-panel="company-balance" hidden>
+        {% set company_balance = business_reports.company_balance or {} %}
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Баланс компании</p>
+            <h2>Активы и обязательства</h2>
+          </div>
+          <div class="reports-balance-total">
+            {% for row in company_balance.money_total %}
+              <span><b>{{ row.amount }} {{ row.currency }}</b> на счетах</span>
+            {% endfor %}
+          </div>
+        </header>
+        <div class="reports-sales-kpis">
+          {% for row in company_balance.money_total %}
+            <article><span>Деньги ({{ row.currency }})</span><strong>{{ row.amount }} {{ row.currency }}</strong></article>
+          {% endfor %}
+          <article><span>Склад по себестоимости</span><strong>{{ company_balance.stock_total or "0 UZS" }}</strong></article>
+          <article class="is-profit"><span>Нам должны клиенты</span><strong>{{ company_balance.receivable_total or "0 UZS" }}</strong><small>{{ company_balance.receivable_clients or 0 }} должников</small></article>
+          {% for row in company_balance.payables %}
+            <article class="is-debt"><span>Мы должны поставщикам ({{ row.currency }})</span><strong>{{ row.amount }}</strong></article>
+          {% else %}
+            <article class="is-debt"><span>Мы должны поставщикам</span><strong>0 UZS</strong></article>
+          {% endfor %}
+        </div>
+        <div class="reports-analysis-grid">
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Деньги по счетам</h3><p>Кассы, карты и банк</p></div></div>
+            <div class="reports-category-list">
+              {% for account in company_balance.accounts %}
+                <div class="reports-category-row">
+                  <div class="reports-category-main">
+                    <span>{{ account.label }}{% if account.note %} <small>{{ account.note }}</small>{% endif %}</span>
+                    <strong>{% for entry in account.entries %}{{ entry.amount_label }} {{ entry.currency }}{% if not loop.last %} · {% endif %}{% endfor %}</strong>
+                  </div>
+                </div>
+              {% else %}
+                <div class="reports-empty-state">Счета пока не заведены.</div>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Как читать баланс</h3><p>Что входит в цифры</p></div></div>
+            <div class="reports-category-list">
+              <div class="reports-category-row"><div class="reports-category-main"><span>Деньги</span><strong>остатки по счетам и кассам</strong></div></div>
+              <div class="reports-category-row"><div class="reports-category-main"><span>Склад</span><strong>остатки по себестоимости</strong></div></div>
+              <div class="reports-category-row"><div class="reports-category-main"><span>Дебиторка</span><strong>долги клиентов по продажам</strong></div></div>
+              <div class="reports-category-row"><div class="reports-category-main"><span>Кредиторка</span><strong>наши долги поставщикам</strong></div></div>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -729,6 +803,7 @@
     'delivery-shipments': 'Отгрузки',
     'sales-overview': 'Продажи',
     'profit': 'Прибыль',
+    'company-balance': 'Баланс компании',
     'stock-movement': 'Движение по складу',
     'stock-analysis': 'Анализ остатков',
     'receivables': 'Дебиторка',
@@ -822,17 +897,29 @@
     summary.textContent = history.length
       ? `${history.length} ${history.length === 1 ? 'документ прихода' : 'документов прихода'}`
       : 'Документы прихода не найдены';
-    list.innerHTML = history.length ? history.map((item) => `
-      <a class="reports-stock-history-row" href="${escapeHtml(item.url || '/warehouse#purchases')}">
-        <span class="reports-stock-history-date">${escapeHtml(item.date || '-')}</span>
-        <strong>${escapeHtml(item.number || '-')}</strong>
-        <span>${escapeHtml(item.supplier || 'Без поставщика')}</span>
-        <span>${escapeHtml(item.warehouse || 'Основной склад')}</span>
-        <span class="reports-stock-history-quantity">${escapeHtml(item.quantity || '0')} ${escapeHtml(item.unit || '')}</span>
-        <span class="reports-stock-history-price">${escapeHtml(item.price || '0 UZS')}</span>
-        <b>${escapeHtml(item.amount || '0 UZS')}</b>
-      </a>
-    `).join('') : '<div class="reports-stock-history-empty">Для этого товара пока нет сохранённых закупок.</div>';
+    list.innerHTML = history.length ? `
+      <table class="reports-data-table reports-stock-history-table">
+        <thead>
+          <tr><th>Дата</th><th>Документ</th><th>Поставщик</th><th>Склад</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>
+        </thead>
+        <tbody>
+          ${history.map((item) => `
+            <tr class="reports-stock-history-tr" data-history-url="${escapeHtml(item.url || '/warehouse#purchases')}">
+              <td>${escapeHtml(item.date || '-')}</td>
+              <td><strong>${escapeHtml(item.number || '-')}</strong></td>
+              <td>${escapeHtml(item.supplier || 'Без поставщика')}</td>
+              <td>${escapeHtml(item.warehouse || 'Основной склад')}</td>
+              <td class="num">${escapeHtml(item.quantity || '0')}${item.unit && item.unit !== 'Штука' ? ' ' + escapeHtml(item.unit) : ''}</td>
+              <td class="num">${escapeHtml(item.price || '0 UZS')}</td>
+              <td class="num"><b>${escapeHtml(item.amount || '0 UZS')}</b></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '<div class="reports-stock-history-empty">Для этого товара пока нет сохранённых закупок.</div>';
+    list.querySelectorAll('.reports-stock-history-tr').forEach((row) => {
+      row.addEventListener('click', () => { window.location.href = row.dataset.historyUrl; });
+    });
     drawer.hidden = false;
     backdrop.hidden = false;
     window.requestAnimationFrame(() => {
@@ -1714,6 +1801,38 @@
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeStockHistory();
+  });
+
+  // Продажная цена в «Анализе остатков»: сохранение в прайс-лист по умолчанию
+  // и мгновенный пересчёт ожидаемой выручки строки.
+  const stockPriceTypeId = {{ reports_default_price_type_id | default('1') | tojson }};
+  const stockCsrfToken = {{ csrf_token | tojson }};
+  document.addEventListener('change', async (event) => {
+    const input = event.target.closest('[data-stock-price-input]');
+    if (!input) return;
+    const price = String(input.value || '').replace(/\s+/g, '').replace(',', '.');
+    const body = new URLSearchParams();
+    body.set('csrf_token', stockCsrfToken);
+    body.set('price_type_id', stockPriceTypeId);
+    body.append('product_id', input.dataset.productId || '');
+    body.append('price_value', price);
+    body.append('price_currency', 'UZS');
+    input.classList.remove('is-saved', 'is-error');
+    try {
+      const response = await fetch('/products/price-types/prices', { method: 'POST', body, redirect: 'follow' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      input.classList.add('is-saved');
+      const qty = Number(input.dataset.quantity || 0);
+      const revenue = qty * (Number(price) || 0);
+      const cell = input.closest('tr')?.querySelector('[data-stock-revenue-cell]');
+      if (cell) {
+        cell.dataset.moneyUzs = String(revenue);
+        cell.textContent = revenue.toLocaleString('ru-RU') + ' UZS';
+      }
+      window.setTimeout(() => input.classList.remove('is-saved'), 1500);
+    } catch (error) {
+      input.classList.add('is-error');
+    }
   });
 
   restoreState();

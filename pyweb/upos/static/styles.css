@@ -29215,3 +29215,41 @@ html.dark .crm-task-calendar-event {
   color: #15803d;
   font-weight: 700;
 }
+
+/* Продажная цена и таблица истории в «Анализе остатков» */
+.reports-stock-price-input {
+  width: 8.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 8px;
+  font: inherit;
+  text-align: right;
+}
+
+.reports-stock-price-input.is-saved {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 2px rgb(22 163 74 / 0.18);
+}
+
+.reports-stock-price-input.is-error {
+  border-color: #dc2626;
+}
+
+.reports-stock-history-table th,
+.reports-stock-history-table td {
+  padding: 0.5rem 0.6rem;
+  white-space: nowrap;
+}
+
+.reports-stock-history-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.reports-stock-history-tr {
+  cursor: pointer;
+}
+
+.reports-stock-history-tr:hover td {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+}

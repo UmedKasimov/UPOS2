@@ -18407,8 +18407,9 @@ def create_app() -> FastAPI:
                             "product": item["name"],
                             "product_id": str(item["id"]),
                             "photo_url": item["photo_url"],
-                            "quantity": f"{_sales_money_label(qty)} {item['unit']}",
+                            "quantity": f"{_sales_money_label(qty)}{'' if item['unit'] == 'Штука' else ' ' + item['unit']}",
                             "quantity_raw": _decimal_plain_text(qty),
+                            "sale_price_input": _decimal_plain_text(sale_price) if sale_price else "",
                             "warehouse": stock_warehouses,
                             "avg_cost": _report_money(avg_cost, "UZS"),
                             "avg_cost_uzs": _decimal_plain_text(avg_cost),
@@ -18468,6 +18469,27 @@ def create_app() -> FastAPI:
                     "rows": receivable_rows[:50],
                 }
 
+                # ===== Баланс компании: деньги + склад + дебиторка − кредиторка =====
+                payables_by_currency: dict[str, Decimal] = {}
+                for purchase in purchase_rows:
+                    purchase_data = _json_object(purchase.data)
+                    debt = _sales_decimal(purchase.amount) - _sales_decimal(purchase_data.get("paid_amount"))
+                    if debt <= 0:
+                        continue
+                    ccy = str(purchase.currency or "UZS").upper()
+                    payables_by_currency[ccy] = payables_by_currency.get(ccy, Decimal("0")) + debt
+                business_reports["company_balance"] = {
+                    "money_total": report_data["balance_summary"],
+                    "accounts": report_data["balance_accounts"],
+                    "stock_total": _report_money(stock_analysis_cost_total, "UZS"),
+                    "receivable_total": _report_money(receivable_total, primary_currency),
+                    "receivable_clients": len(receivable_rows),
+                    "payables": [
+                        {"currency": ccy, "amount": _report_money(amount, ccy)}
+                        for ccy, amount in sorted(payables_by_currency.items())
+                    ],
+                }
+
                 settings_payload = _telephony_settings_payload(wid)
                 calls = settings_payload.get("telephony_calls") if isinstance(settings_payload.get("telephony_calls"), list) else []
                 period_calls = [call for call in calls if _report_in_period(str(call.get("started_at") or call.get("created_at") or "")[:10])]
@@ -18506,6 +18528,7 @@ def create_app() -> FastAPI:
             active="home_reports",
             pnl=pnl,
             balance_sheet=balance_sheet,
+            reports_default_price_type_id=_workspace_default_price_type_id(wid) or "1",
             reports=report_data,
             delivery_debts=delivery_debts,
             delivery_shipments=delivery_shipments,
