@@ -6052,6 +6052,37 @@ def create_app() -> FastAPI:
             raise ValueError("Не удалось прочитать изображение") from exc
         return output.getvalue(), "image/webp"
 
+    @app.get("/api/reports/stock-prices", name="reports_stock_prices_api")
+    def reports_stock_prices_api(request: Request, price_type: str = ""):
+        """Цены всех товаров по выбранному прайсу — для живого переключения
+        колонки «Продажная цена» в анализе остатков без перезагрузки."""
+        wid, redir = _product_workspace_owner(request)
+        if redir or not wid:
+            return JSONResponse({"error": "auth"}, status_code=401)
+        price_types = [
+            pt for pt in _workspace_price_types(wid)
+            if pt.get("is_active") and pt.get("is_for_sales")
+        ]
+        selected = _price_type_by_id(price_types, str(price_type or "").strip())
+        if not selected:
+            return JSONResponse({"error": "price_type_not_found"}, status_code=404)
+        usd_rate = _workspace_usd_uzs_rate(wid)
+        prices: dict[str, dict[str, str]] = {}
+        with session_scope() as session:
+            for row in session.execute(
+                select(Product).where(Product.workspace_owner_id == wid)
+            ).scalars():
+                item = _product_data(row)
+                price_text, price_ccy = _calculated_product_price(item, selected, price_types)
+                value = _sales_decimal(price_text)
+                price_uzs = _convert_product_currency(value, price_ccy or "UZS", "UZS", usd_rate)
+                prices[str(row.id)] = {
+                    "display": _report_money(value, price_ccy or "UZS") if value else "-",
+                    "raw": _decimal_plain_text(value) if value else "0",
+                    "uzs": _decimal_plain_text(price_uzs) if value else "0",
+                }
+        return {"price_type": str(selected.get("id") or ""), "prices": prices}
+
     @app.get("/products/{product_id}/photo", name="product_photo")
     def product_photo(request: Request, product_id: str):
         wid, redir = _product_workspace_owner(request)

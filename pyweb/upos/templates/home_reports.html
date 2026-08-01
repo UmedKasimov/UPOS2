@@ -545,7 +545,7 @@
                   <td data-sort-value="{{ row.avg_cost_uzs }}"><span data-stock-money data-money-uzs="{{ row.avg_cost_uzs }}">{{ row.avg_cost }}</span></td>
                   <td data-sort-value="{{ row.cost_sum_uzs }}"><span data-stock-money data-money-uzs="{{ row.cost_sum_uzs }}">{{ row.cost_sum }}</span></td>
                   {# Цена в отчёте только для чтения — правится в прайс-листах. #}
-                  <td data-sort-value="{{ row.sale_price_raw }}" class="reports-stock-price-cell">{{ row.sale_price_display }}</td>
+                  <td data-sort-value="{{ row.sale_price_raw }}" class="reports-stock-price-cell" data-stock-price-cell data-product-id="{{ row.product_id }}" data-quantity="{{ row.quantity_raw }}">{{ row.sale_price_display }}</td>
                   <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}" data-stock-revenue-cell>{{ row.expected_revenue }}</span></td>
                 </tr>
               {% else %}
@@ -1797,14 +1797,52 @@
     if (event.key === 'Escape') closeStockHistory();
   });
 
-  // Выбор прайс-листа для колонки «Продажная цена»: перезагрузка отчёта
-  // с параметром — цены и ожидаемая выручка пересчитываются на сервере.
-  document.addEventListener('change', (event) => {
+  // Выбор прайс-листа для колонки «Продажная цена»: цены и ожидаемая
+  // выручка обновляются на месте, без перезагрузки страницы.
+  document.addEventListener('change', async (event) => {
     const select = event.target.closest('[data-stock-price-type-select]');
     if (!select) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set('stock_price_type', select.value);
-    window.location.href = url.toString();
+    select.disabled = true;
+    try {
+      const response = await fetch(`/api/reports/stock-prices?price_type=${encodeURIComponent(select.value)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const payload = await response.json();
+      const prices = payload.prices || {};
+      let revenueTotal = 0;
+      document.querySelectorAll('[data-stock-price-cell]').forEach((cell) => {
+        const entry = prices[cell.dataset.productId] || null;
+        const qty = Number(cell.dataset.quantity || 0);
+        cell.textContent = entry ? entry.display : '-';
+        cell.setAttribute('data-sort-value', entry ? entry.raw : '0');
+        const revenue = qty * (entry ? Number(entry.uzs) || 0 : 0);
+        revenueTotal += revenue;
+        const revenueCell = cell.closest('tr')?.querySelector('[data-stock-revenue-cell]');
+        if (revenueCell) {
+          revenueCell.dataset.moneyUzs = String(revenue);
+          revenueCell.textContent = revenue.toLocaleString('ru-RU') + ' UZS';
+        }
+      });
+      const totalCell = document.querySelector('#report-stock-analysis tfoot [data-stock-money]:last-of-type');
+      const totals = document.querySelectorAll('#report-stock-analysis tfoot [data-stock-money]');
+      const revenueTotalCell = totals[totals.length - 1];
+      if (revenueTotalCell) {
+        revenueTotalCell.dataset.moneyUzs = String(revenueTotal);
+        revenueTotalCell.textContent = revenueTotal.toLocaleString('ru-RU') + ' UZS';
+      }
+      // Запоминаем выбор в адресе, чтобы обновление страницы его сохранило.
+      const url = new URL(window.location.href);
+      url.searchParams.set('stock_price_type', select.value);
+      window.history.replaceState(null, '', url.toString());
+    } catch (error) {
+      // При сбое честно перезагружаем страницу с выбранным прайсом.
+      const url = new URL(window.location.href);
+      url.searchParams.set('stock_price_type', select.value);
+      window.location.href = url.toString();
+    } finally {
+      select.disabled = false;
+    }
   });
 
   restoreState();
