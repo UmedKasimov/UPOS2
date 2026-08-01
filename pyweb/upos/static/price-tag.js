@@ -54,36 +54,41 @@
     const width = Math.max(20, Number(state.width) || 58);
     const height = Math.max(15, Number(state.height) || 40);
 
-    const parts = [];
-    if (on("logo")) {
-      parts.push('<div class="price-tag-logo"><span class="price-tag-logo-mark">u</span><span class="price-tag-logo-word">u<b>POS</b></span></div>');
-    }
-    if (on("name")) parts.push(`<div class="price-tag-name">${SAMPLE.name}</div>`);
+    // Раскладка как в YesPOS: название сверху, крупная цена по центру,
+    // снизу логотип слева и штрихкод справа.
+    const top = [];
+    if (on("name")) top.push(`<div class="price-tag-name">${SAMPLE.name}</div>`);
     if (on("old_price")) {
       const label = on("old_price_label") && state.old_price_label ? `${state.old_price_label} ` : "";
-      parts.push(`<div class="price-tag-old">${label}<s>${money(SAMPLE.old_price, state.format_price)}</s></div>`);
+      top.push(`<div class="price-tag-old">${label}<s>${money(SAMPLE.old_price, state.format_price)}</s></div>`);
     }
     if (on("price")) {
-      parts.push(
+      top.push(
         `<div class="price-tag-price"><b>${money(SAMPLE.price, state.format_price)}</b><span>${state.price_suffix || ""}</span></div>`,
       );
     }
     if (on("wholesale_price")) {
-      parts.push(`<div class="price-tag-line">Опт: ${money(SAMPLE.wholesale_price, state.format_price)}</div>`);
+      top.push(`<div class="price-tag-line">Опт: ${money(SAMPLE.wholesale_price, state.format_price)}</div>`);
     }
-    if (on("sku")) parts.push(`<div class="price-tag-line">${SAMPLE.sku}</div>`);
-    if (on("custom_text") && state.custom_text) parts.push(`<div class="price-tag-line">${state.custom_text}</div>`);
-    if (on("custom_text2") && state.custom_text2) parts.push(`<div class="price-tag-line">${state.custom_text2}</div>`);
-    if (on("custom_text3") && state.custom_text3) parts.push(`<div class="price-tag-line">${state.custom_text3}</div>`);
-    if (on("created_at")) parts.push(`<div class="price-tag-line">Создан: ${SAMPLE.created_at}</div>`);
-    if (on("printed_at")) parts.push(`<div class="price-tag-line">Напечатан: ${today()}</div>`);
-    if (on("barcode")) {
-      parts.push(`<div class="price-tag-barcode">${barcodeBars(SAMPLE.barcode)}</div><div class="price-tag-line">${SAMPLE.barcode}</div>`);
-    }
+    if (on("custom_text") && state.custom_text) top.push(`<div class="price-tag-line">${state.custom_text}</div>`);
+    if (on("custom_text2") && state.custom_text2) top.push(`<div class="price-tag-line">${state.custom_text2}</div>`);
+    if (on("custom_text3") && state.custom_text3) top.push(`<div class="price-tag-line">${state.custom_text3}</div>`);
+    if (on("created_at")) top.push(`<div class="price-tag-line">Создан: ${SAMPLE.created_at}</div>`);
+    if (on("printed_at")) top.push(`<div class="price-tag-line">Напечатан: ${today()}</div>`);
+
+    const left = on("logo")
+      ? '<div class="price-tag-logo"><span class="price-tag-logo-mark">u</span><span class="price-tag-logo-word">u<b>POS</b></span></div>'
+      : "";
+    const right = [];
+    if (on("sku")) right.push(`<div class="price-tag-sku">${SAMPLE.sku}</div>`);
+    if (on("barcode")) right.push(`<div class="price-tag-barcode">${barcodeBars(SAMPLE.barcode)}</div>`);
+    const bottom = left || right.length
+      ? `<div class="price-tag-bottom"><div>${left}</div><div class="price-tag-bottom-right">${right.join("")}</div></div>`
+      : "";
 
     preview.style.setProperty("--price-tag-width", `${width}mm`);
     preview.style.setProperty("--price-tag-height", `${height}mm`);
-    preview.innerHTML = `<div class="price-tag-card">${parts.join("")}</div>`;
+    preview.innerHTML = `<div class="price-tag-card"><div class="price-tag-body">${top.join("")}</div>${bottom}</div>`;
   }
 
   function setStatus(root, text) {

@@ -26030,9 +26030,8 @@ table.upos-table-resizable-columns {
 .price-tag-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4mm;
+  justify-content: space-between;
+  gap: 0.6mm;
   width: var(--price-tag-width);
   height: var(--price-tag-height);
   padding: 1.5mm;
@@ -26043,6 +26042,37 @@ table.upos-table-resizable-columns {
   text-align: center;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.price-tag-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4mm;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Низ этикетки: логотип слева, артикул и штрихкод справа. */
+.price-tag-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1mm;
+  flex: 0 0 auto;
+}
+
+.price-tag-bottom-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3mm;
+}
+
+.price-tag-sku {
+  font-size: 2mm;
+  font-weight: 600;
 }
 
 .price-tag-name {
