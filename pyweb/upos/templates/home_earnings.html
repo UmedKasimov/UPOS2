@@ -127,6 +127,24 @@
               </div>
             {% endfor %}
           </div>
+          {% if earnings_services %}
+            <h3 class="earnings-subtitle">Бонус за услуги</h3>
+            <p class="earnings-hint">Процент от суммы строки услуги в заказе — добавляется к базовой ставке установщика. Пустое поле — бонуса нет.</p>
+            <div class="earnings-rules-list">
+              {% for service in earnings_services %}
+                <div class="earnings-rule-row earnings-service-row">
+                  <span>{{ service.name }}</span>
+                  <span class="earnings-service-kind">Услуга</span>
+                  <input
+                    name="service_rate__{{ service.id }}"
+                    inputmode="decimal"
+                    value="{{ rules.by_service.get(service.id, '') }}"
+                    placeholder="% бонуса"
+                  />
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
           <button class="btn" type="submit">Сохранить ставки</button>
         </form>
       </section>

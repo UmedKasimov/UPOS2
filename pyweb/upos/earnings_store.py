@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from upos.db import session_scope
-from upos.db_models import EmployeeEarning, InstallationOrder, User
+from upos.db_models import EmployeeEarning, InstallationOrder, SaleDocument, User
 from upos.storage import load_workspace_settings, save_workspace_settings
 
 logger = logging.getLogger(__name__)
@@ -52,17 +52,41 @@ def _clean_rule(raw: Any) -> dict[str, Any]:
     return {"type": rate_type, "value": str(value)}
 
 
+def _clean_service_percent(raw: Any) -> str:
+    """Процент бонуса за услугу: 0..100, пусто — ставка не задана."""
+    try:
+        value = Decimal(str(raw or 0))
+    except Exception:
+        value = _ZERO
+    if value < 0:
+        value = _ZERO
+    if value > 100:
+        value = Decimal("100")
+    return str(value)
+
+
 def load_rules(workspace_owner_id: str) -> dict[str, Any]:
     raw = load_workspace_settings(workspace_owner_id).get(_SETTINGS_KEY)
     src = raw if isinstance(raw, dict) else {}
     by_user_raw = src.get("by_user") if isinstance(src.get("by_user"), dict) else {}
+    by_service_raw = src.get("by_service") if isinstance(src.get("by_service"), dict) else {}
     return {
         "default": _clean_rule(src.get("default")),
         "by_user": {str(key): _clean_rule(value) for key, value in by_user_raw.items() if str(key or "").strip()},
+        "by_service": {
+            str(key): _clean_service_percent(value)
+            for key, value in by_service_raw.items()
+            if str(key or "").strip() and _money(value) > 0
+        },
     }
 
 
-def save_rules(workspace_owner_id: str, default_rule: Any, by_user: dict[str, Any] | None = None) -> dict[str, Any]:
+def save_rules(
+    workspace_owner_id: str,
+    default_rule: Any,
+    by_user: dict[str, Any] | None = None,
+    by_service: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     rules = {
         "default": _clean_rule(default_rule),
         "by_user": {
@@ -70,11 +94,62 @@ def save_rules(workspace_owner_id: str, default_rule: Any, by_user: dict[str, An
             for key, value in (by_user or {}).items()
             if str(key or "").strip()
         },
+        "by_service": {
+            str(key): _clean_service_percent(value)
+            for key, value in (by_service or {}).items()
+            if str(key or "").strip() and _money(value) > 0
+        },
     }
     settings = load_workspace_settings(workspace_owner_id)
     settings[_SETTINGS_KEY] = rules
     save_workspace_settings(workspace_owner_id, settings)
     return rules
+
+
+def service_bonus_for_order(
+    session: Session,
+    order: InstallationOrder,
+    by_service: dict[str, str],
+) -> tuple[Decimal, list[dict[str, str]]]:
+    """Бонус за услуги в заказе: процент от суммы строки услуги.
+
+    Услуга «прикрепляется» ставкой в правилах — строки заказа сверяются по
+    product_id. Возвращает сумму бонуса и детализацию для записи начисления.
+    """
+    if not by_service or not order.sale_document_id:
+        return _ZERO, []
+    sale = session.get(SaleDocument, str(order.sale_document_id))
+    if sale is None or sale.workspace_owner_id != order.workspace_owner_id:
+        return _ZERO, []
+    data = sale.data if isinstance(sale.data, dict) else {}
+    total_bonus = _ZERO
+    details: list[dict[str, str]] = []
+    for line in data.get("lines") or []:
+        if not isinstance(line, dict):
+            continue
+        product_id = str(line.get("product_id") or "").strip()
+        percent_raw = by_service.get(product_id)
+        if not percent_raw:
+            continue
+        line_total = _money(line.get("total"))
+        if line_total <= 0:
+            line_total = _money(line.get("price")) * _money(line.get("quantity"))
+        if line_total <= 0:
+            continue
+        bonus = _money(line_total * _money(percent_raw) / Decimal("100"))
+        if bonus <= 0:
+            continue
+        total_bonus += bonus
+        details.append(
+            {
+                "product_id": product_id,
+                "product": str(line.get("product") or ""),
+                "line_total": str(line_total),
+                "percent": str(percent_raw),
+                "bonus": str(bonus),
+            }
+        )
+    return total_bonus, details
 
 
 def rule_for_user(workspace_owner_id: str, user_id: str) -> dict[str, Any]:
@@ -109,8 +184,13 @@ def accrue_for_installation(session: Session, order: InstallationOrder) -> Emplo
     if existing:
         return None
 
-    rule = rule_for_user(order.workspace_owner_id, installer_id)
-    amount = calculate_amount(rule, order.amount)
+    rules = load_rules(order.workspace_owner_id)
+    rule = rules["by_user"].get(installer_id, rules["default"])
+    base_amount = calculate_amount(rule, order.amount)
+    # Бонус за услуги: к прикреплённым услугам в заказе добавляется процент
+    # от суммы строки — поверх базовой ставки установщика.
+    service_bonus, service_details = service_bonus_for_order(session, order, rules["by_service"])
+    amount = base_amount + service_bonus
     if amount <= 0:
         return None
 
@@ -128,6 +208,9 @@ def accrue_for_installation(session: Session, order: InstallationOrder) -> Emplo
         data={
             "rate_type": rule.get("type"),
             "rate_value": rule.get("value"),
+            "base_amount": str(base_amount),
+            "service_bonus": str(service_bonus),
+            "service_details": service_details,
             "order_amount": str(_money(order.amount)),
             "order_number": str(order.number or ""),
         },

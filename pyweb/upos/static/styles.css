@@ -29143,3 +29143,14 @@ html.dark .crm-task-calendar-event {
   color: var(--muted-foreground);
   text-align: center;
 }
+
+/* Бонус за услуги в ставках заработка */
+.earnings-subtitle {
+  margin: 1.1rem 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.earnings-service-row .earnings-service-kind {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+}

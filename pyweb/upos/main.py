@@ -20792,9 +20792,25 @@ def create_app() -> FastAPI:
             ),
             rules=load_earning_rules(oid),
             rate_types=list(EARNING_RATE_TYPES),
+            earnings_services=[] if own_only else _earnings_service_options(oid),
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error"),
         )
+
+    def _earnings_service_options(workspace_owner_id: str) -> list[dict[str, str]]:
+        """Услуги воркспейса для настройки бонусов (kind=service)."""
+        options: list[dict[str, str]] = []
+        with session_scope() as session:
+            for row in session.execute(
+                select(Product)
+                .where(Product.workspace_owner_id == workspace_owner_id)
+                .order_by(Product.name.asc())
+            ).scalars():
+                data = _json_object(row.data)
+                if str(data.get("kind") or "product") != "service":
+                    continue
+                options.append({"id": row.id, "name": row.name})
+        return options
 
     @app.get("/earnings/act/{employee_id}", response_class=HTMLResponse, name="home_earnings_act")
     def home_earnings_act(request: Request, employee_id: str):
@@ -20889,21 +20905,26 @@ def create_app() -> FastAPI:
         if own_only:
             return RedirectResponse(url="/earnings?error=" + quote("Недостаточно прав"), status_code=302)
         by_user: dict[str, Any] = {}
+        by_service: dict[str, Any] = {}
         for key in form.keys():
-            if not key.startswith("rate_value__"):
-                continue
-            user_id = key[len("rate_value__"):]
-            raw_value = str(form.get(key) or "").strip()
-            if not raw_value:
-                continue
-            by_user[user_id] = {
-                "type": str(form.get(f"rate_type__{user_id}") or "percent"),
-                "value": raw_value,
-            }
+            if key.startswith("rate_value__"):
+                user_id = key[len("rate_value__"):]
+                raw_value = str(form.get(key) or "").strip()
+                if raw_value:
+                    by_user[user_id] = {
+                        "type": str(form.get(f"rate_type__{user_id}") or "percent"),
+                        "value": raw_value,
+                    }
+            elif key.startswith("service_rate__"):
+                product_id = key[len("service_rate__"):]
+                raw_value = str(form.get(key) or "").strip()
+                if raw_value:
+                    by_service[product_id] = raw_value
         save_earning_rules(
             oid,
             {"type": str(form.get("default_rate_type") or "percent"), "value": form.get("default_rate_value")},
             by_user,
+            by_service,
         )
         return RedirectResponse(url="/earnings?msg=" + quote("Ставки сохранены"), status_code=302)
 
