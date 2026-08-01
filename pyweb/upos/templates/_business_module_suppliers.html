@@ -1,4 +1,6 @@
-<div class="business-module-toolbar" data-workspace-view="suppliers purchases payables" hidden>
+{# Верхний тулбар на списке поставщиков дублировал заголовок панели —
+   показываем его только в закупках и кредиторке. #}
+<div class="business-module-toolbar" data-workspace-view="purchases payables" hidden>
   <div>
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
     <h2 id="business-module-title">{{ module.heading }}</h2>
@@ -99,7 +101,7 @@
             <th>Официальное название</th>
             <th>Баланс</th>
             <th>Последняя закупка</th>
-            <th>Telegram</th>
+            <th>Сегмент</th>
             <th>Дата создания</th>
             <th>Телефон</th>
             <th>Категория</th>
@@ -130,19 +132,30 @@
               </td>
               <td title="{{ supplier.official_name or '-' }}">{{ supplier.official_name or "-" }}</td>
               <td>
-                {% if supplier.balance_kind == "zero" %}
+                {# Балансы по каждой валюте отдельно: доллары не смешиваются с сумами.
+                   Красная пилюля — «Мы должны», зелёная — аванс поставщику. #}
+                {% set balance_lines = supplier.balance_lines | rejectattr("kind", "equalto", "zero") | list %}
+                {% if not balance_lines %}
                   <span class="client-balance-empty">-</span>
                 {% else %}
-                  {# Знак долга обратный клиентскому, поэтому показываем модуль:
-                     красная пилюля — «Мы должны», зелёная — аванс поставщику. #}
-                  <span
-                    class="client-balance-pill client-balance-pill--{{ supplier.balance_kind }}"
-                    title="{{ 'Мы должны' if supplier.balance_kind == 'debt' else 'Аванс поставщику' }}"
-                  >{{ supplier.balance_abs }} UZS</span>
+                  <div class="client-balance-total-lines">
+                    {% for line in balance_lines %}
+                      <span
+                        class="client-balance-pill client-balance-pill--{{ line.kind }}"
+                        title="{{ 'Мы должны' if line.kind == 'debt' else 'Аванс поставщику' }}"
+                      >{{ line.amount_abs }} {{ line.currency }}</span>
+                    {% endfor %}
+                  </div>
                 {% endif %}
               </td>
               <td title="{{ supplier.last_date or '-' }}">{{ supplier.last_date or "-" }}</td>
-              <td title="{{ supplier.telegram_phone or '-' }}">{{ supplier.telegram_phone or "-" }}</td>
+              <td title="{{ supplier.business_segment or '-' }}">
+                {% if supplier.business_segment %}
+                  <span class="client-segment-chip">{{ supplier.business_segment_icon }} {{ supplier.business_segment }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td title="{{ supplier.created_at or '-' }}">{{ supplier.created_at or "-" }}</td>
               <td title="{{ supplier.phone or '-' }}">{{ supplier.phone or "-" }}</td>
               <td title="{{ supplier.category or '-' }}">{{ supplier.category or "-" }}</td>
@@ -177,13 +190,13 @@
               <td colspan="4">Итого поставщики</td>
               <td>
                 <div class="client-balance-total-lines">
-                  {% if supplier_balance_summary.debt_count %}
-                    <span class="client-balance-pill client-balance-pill--debt" title="Мы должны">{{ supplier_balance_summary.debt_display }} UZS</span>
-                  {% endif %}
-                  {% if supplier_balance_summary.advance_count %}
-                    <span class="client-balance-pill client-balance-pill--advance" title="Авансы поставщикам">{{ supplier_balance_summary.advance_display }} UZS</span>
-                  {% endif %}
-                  {% if not supplier_balance_summary.debt_count and not supplier_balance_summary.advance_count %}
+                  {% for line in supplier_balance_summary.debt_lines %}
+                    <span class="client-balance-pill client-balance-pill--debt" title="Мы должны">{{ line.display }} {{ line.currency }}</span>
+                  {% endfor %}
+                  {% for line in supplier_balance_summary.advance_lines %}
+                    <span class="client-balance-pill client-balance-pill--advance" title="Авансы поставщикам">{{ line.display }} {{ line.currency }}</span>
+                  {% endfor %}
+                  {% if not supplier_balance_summary.debt_lines and not supplier_balance_summary.advance_lines %}
                     <span class="client-balance-empty">-</span>
                   {% endif %}
                 </div>
@@ -191,7 +204,13 @@
               <td colspan="6">
                 <div class="client-balance-net">
                   <span>Итоговый долг</span>
-                  <strong>{{ supplier_balance_summary.net_display }}{% if supplier_balance_summary.net_display != "-" %} UZS{% endif %}</strong>
+                  {% if supplier_balance_summary.net_lines %}
+                    {% for line in supplier_balance_summary.net_lines %}
+                      <strong>{{ line.display }} {{ line.currency }}</strong>
+                    {% endfor %}
+                  {% else %}
+                    <strong>-</strong>
+                  {% endif %}
                 </div>
               </td>
             </tr>

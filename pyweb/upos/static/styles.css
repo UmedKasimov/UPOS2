@@ -22606,6 +22606,19 @@ body:has(dialog[open]) {
   min-width: 0;
 }
 
+/* Чип сегмента с иконкой в таблицах клиентов и поставщиков. */
+.client-segment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.16rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Кнопки действий в строках клиентов и поставщиков — рядом, по центру. */
 .clients-table .products-row-actions {
   display: table-cell;

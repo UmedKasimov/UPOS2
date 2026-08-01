@@ -11246,6 +11246,7 @@ def create_app() -> FastAPI:
                     "amount_abs": _sales_money_label(abs(amount)),
                     "display": _client_balance_display(amount),
                     "kind": kind,
+                    "value": str(amount),
                 }
             )
         if not balance_lines:
@@ -11256,6 +11257,7 @@ def create_app() -> FastAPI:
                     "amount_abs": "0",
                     "display": "-",
                     "kind": "zero",
+                    "value": "0",
                 }
             )
         raw_programs = extra.get("programs")
@@ -13335,6 +13337,31 @@ def create_app() -> FastAPI:
             Decimal("0"),
         )
         clients_net_total = clients_debt_total - clients_advance_total
+        # Итоги по каждой валюте отдельно — доллары не смешиваются с сумами.
+        clients_debt_by_ccy: dict[str, Decimal] = {}
+        clients_advance_by_ccy: dict[str, Decimal] = {}
+        for item in all_clients_records:
+            for line in item.get("balance_lines") or []:
+                amount = _sales_decimal(line.get("value"))
+                if not amount:
+                    continue
+                ccy = str(line.get("currency") or "UZS").upper()
+                if amount > 0:
+                    clients_debt_by_ccy[ccy] = clients_debt_by_ccy.get(ccy, Decimal("0")) + amount
+                else:
+                    clients_advance_by_ccy[ccy] = clients_advance_by_ccy.get(ccy, Decimal("0")) + abs(amount)
+        clients_net_lines = []
+        for ccy in sorted(set(clients_debt_by_ccy) | set(clients_advance_by_ccy)):
+            net = clients_debt_by_ccy.get(ccy, Decimal("0")) - clients_advance_by_ccy.get(ccy, Decimal("0"))
+            if not net:
+                continue
+            clients_net_lines.append(
+                {
+                    "currency": ccy,
+                    "display": _client_balance_display(net),
+                    "kind": "debt" if net > 0 else "advance",
+                }
+            )
         clients_balance_summary = {
             "debt": _sales_money_label(clients_debt_total),
             "debt_display": _client_balance_display(clients_debt_total),
@@ -13342,6 +13369,17 @@ def create_app() -> FastAPI:
             "advance_display": _client_balance_display(-clients_advance_total),
             "net": _sales_money_label(clients_net_total),
             "net_display": _client_balance_display(clients_net_total),
+            "debt_lines": [
+                {"currency": ccy, "display": _client_balance_display(value)}
+                for ccy, value in sorted(clients_debt_by_ccy.items())
+                if value
+            ],
+            "advance_lines": [
+                {"currency": ccy, "display": _client_balance_display(-value)}
+                for ccy, value in sorted(clients_advance_by_ccy.items())
+                if value
+            ],
+            "net_lines": clients_net_lines,
             "debt_count": sum(1 for item in all_clients_records if item["balance_value"] > 0),
             "advance_count": sum(1 for item in all_clients_records if item["balance_value"] < 0),
         }
@@ -13854,6 +13892,8 @@ def create_app() -> FastAPI:
                     balance_by_name=balance_by_name,
                     last_date_by_id=last_date_by_id,
                     last_date_by_name=last_date_by_name,
+                    balance_currency_by_id=balance_currency_by_id,
+                    balance_currency_by_name=balance_currency_by_name,
                 )
                 hay = " ".join([item["name"], item["official_name"], item["phone"], item["category"]]).lower()
                 if q_clean and q_clean not in hay:
@@ -13900,23 +13940,44 @@ def create_app() -> FastAPI:
             "products": product_names,
             "warehouses": warehouse_names or ["Основной склад"],
         }
-        # Итоги для строки «Итого поставщики» — как clients_balance_summary,
-        # только знак обратный: положительный баланс закупок — должны мы.
-        supplier_debt_total = sum(
-            (item["balance_value"] for item in supplier_records if item["balance_value"] > 0),
-            Decimal("0"),
-        )
-        supplier_advance_total = sum(
-            (abs(item["balance_value"]) for item in supplier_records if item["balance_value"] < 0),
-            Decimal("0"),
-        )
-        supplier_net_total = supplier_debt_total - supplier_advance_total
+        # Итоги «Итого поставщики» считаем по каждой валюте отдельно:
+        # долларовые и сумовые долги не смешиваются в одну цифру.
+        supplier_debt_by_ccy: dict[str, Decimal] = {}
+        supplier_advance_by_ccy: dict[str, Decimal] = {}
+        for item in supplier_records:
+            for line in item.get("balance_lines") or []:
+                amount = _sales_decimal(line.get("value"))
+                if not amount:
+                    continue
+                ccy = str(line.get("currency") or "UZS").upper()
+                if amount > 0:
+                    supplier_debt_by_ccy[ccy] = supplier_debt_by_ccy.get(ccy, Decimal("0")) + amount
+                else:
+                    supplier_advance_by_ccy[ccy] = supplier_advance_by_ccy.get(ccy, Decimal("0")) + abs(amount)
+        supplier_net_lines = []
+        for ccy in sorted(set(supplier_debt_by_ccy) | set(supplier_advance_by_ccy)):
+            net = supplier_debt_by_ccy.get(ccy, Decimal("0")) - supplier_advance_by_ccy.get(ccy, Decimal("0"))
+            if not net:
+                continue
+            supplier_net_lines.append(
+                {
+                    "currency": ccy,
+                    "display": _sales_money_label(abs(net)),
+                    "kind": "debt" if net > 0 else "advance",
+                }
+            )
         supplier_balance_summary = {
-            # Модуль значений: у поставщиков минус клиентской конвенции не работает —
-            # красная пилюля и так значит «мы должны».
-            "debt_display": _sales_money_label(supplier_debt_total),
-            "advance_display": _sales_money_label(supplier_advance_total),
-            "net_display": _sales_money_label(abs(supplier_net_total)) if supplier_net_total else "-",
+            "debt_lines": [
+                {"currency": ccy, "display": _sales_money_label(value)}
+                for ccy, value in sorted(supplier_debt_by_ccy.items())
+                if value
+            ],
+            "advance_lines": [
+                {"currency": ccy, "display": _sales_money_label(value)}
+                for ccy, value in sorted(supplier_advance_by_ccy.items())
+                if value
+            ],
+            "net_lines": supplier_net_lines,
             "debt_count": sum(1 for item in supplier_records if item["balance_value"] > 0),
             "advance_count": sum(1 for item in supplier_records if item["balance_value"] < 0),
         }

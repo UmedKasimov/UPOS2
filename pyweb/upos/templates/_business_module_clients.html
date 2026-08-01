@@ -98,7 +98,7 @@
             <th>Официальное название</th>
             <th>Баланс</th>
             <th>Последняя отгрузка</th>
-            <th>Telegram</th>
+            <th>Сегмент</th>
             <th>Дата создания</th>
             <th>Телефон</th>
             <th>Категория</th>
@@ -136,7 +136,13 @@
                 {% endif %}
               </td>
               <td title="{{ client.last_date or '-' }}">{{ client.last_date or "-" }}</td>
-              <td title="{{ client.telegram_phone or '-' }}">{{ client.telegram_phone or "-" }}</td>
+              <td title="{{ client.business_segment or '-' }}">
+                {% if client.business_segment %}
+                  <span class="client-segment-chip">{{ client.business_segment_icon }} {{ client.business_segment }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td title="{{ client.created_at or '-' }}">{{ client.created_at or "-" }}</td>
               <td title="{{ client.phone or '-' }}">{{ client.phone or "-" }}</td>
               <td title="{{ client.category or '-' }}">{{ client.category or "-" }}</td>

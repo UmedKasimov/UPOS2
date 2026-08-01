@@ -712,7 +712,7 @@
     { key: "official_name", kind: "text" },
     { key: "balance", kind: "number" },
     { key: "last_date", kind: "date" },
-    { key: "telegram", kind: "text" },
+    { key: "segment", kind: "text" },
     { key: "created_at", kind: "date" },
     { key: "phone", kind: "text" },
     { key: "category", kind: "text" },
