@@ -29363,3 +29363,38 @@ html.dark .crm-task-calendar-event {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
+
+/* Кнопки истории — одной группой в общей рамке. */
+#products-catalog-table .product-history-actions,
+.reports-stock-analysis-table .product-history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 9px;
+  background: var(--card);
+}
+
+#products-catalog-table .product-history-actions .product-history-index,
+.reports-stock-analysis-table .product-history-actions .product-history-index {
+  padding: 0 0.15rem 0 0.4rem;
+}
+
+#products-catalog-table .product-history-actions .product-history-btn,
+.reports-stock-analysis-table .product-history-actions .product-history-btn {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+#products-catalog-table .product-history-actions .product-history-btn + .product-history-btn,
+.reports-stock-analysis-table .product-history-actions .product-history-btn + .product-history-btn {
+  border-left: 1px solid var(--workbench-line, var(--border));
+}
+
+#products-catalog-table .product-history-actions .product-history-btn:hover,
+.reports-stock-analysis-table .product-history-actions .product-history-btn:hover {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
