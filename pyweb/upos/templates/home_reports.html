@@ -502,7 +502,13 @@
                 <th>На складе</th>
                 <th>Средняя себестоимость</th>
                 <th>Сумма себестоимости</th>
-                <th>Продажная цена</th>
+                <th class="reports-stock-price-head" data-report-no-sort>
+                  <select class="reports-stock-price-select" data-stock-price-type-select aria-label="Прайс-лист для колонки цены">
+                    {% for pt in business_reports.stock_analysis.price_types %}
+                      <option value="{{ pt.id }}" {% if pt.id == business_reports.stock_analysis.selected_price_type_id %}selected{% endif %}>{{ pt.name }}</option>
+                    {% endfor %}
+                  </select>
+                </th>
                 <th>Ожидаемая выручка</th>
               </tr>
             </thead>
@@ -538,19 +544,8 @@
                   <td data-sort-value="{{ row.quantity_raw }}">{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
                   <td data-sort-value="{{ row.avg_cost_uzs }}"><span data-stock-money data-money-uzs="{{ row.avg_cost_uzs }}">{{ row.avg_cost }}</span></td>
                   <td data-sort-value="{{ row.cost_sum_uzs }}"><span data-stock-money data-money-uzs="{{ row.cost_sum_uzs }}">{{ row.cost_sum }}</span></td>
-                  <td data-sort-value="{{ row.sale_price_input or 0 }}" class="reports-stock-price-cell">
-                    <input
-                      type="text"
-                      inputmode="decimal"
-                      class="reports-stock-price-input"
-                      value="{{ row.sale_price_input }}"
-                      placeholder="0"
-                      data-stock-price-input
-                      data-product-id="{{ row.product_id }}"
-                      data-quantity="{{ row.quantity_raw }}"
-                      aria-label="Продажная цена: {{ row.product }}"
-                    />
-                  </td>
+                  {# Цена в отчёте только для чтения — правится в прайс-листах. #}
+                  <td data-sort-value="{{ row.sale_price_raw }}" class="reports-stock-price-cell">{{ row.sale_price_display }}</td>
                   <td data-sort-value="{{ row.expected_revenue_uzs }}"><span data-stock-money data-money-uzs="{{ row.expected_revenue_uzs }}" data-stock-revenue-cell>{{ row.expected_revenue }}</span></td>
                 </tr>
               {% else %}
@@ -1802,36 +1797,14 @@
     if (event.key === 'Escape') closeStockHistory();
   });
 
-  // Продажная цена в «Анализе остатков»: сохранение в прайс-лист по умолчанию
-  // и мгновенный пересчёт ожидаемой выручки строки.
-  const stockPriceTypeId = {{ reports_default_price_type_id | default('1') | tojson }};
-  const stockCsrfToken = {{ csrf_token | tojson }};
-  document.addEventListener('change', async (event) => {
-    const input = event.target.closest('[data-stock-price-input]');
-    if (!input) return;
-    const price = String(input.value || '').replace(/\s+/g, '').replace(',', '.');
-    const body = new URLSearchParams();
-    body.set('csrf_token', stockCsrfToken);
-    body.set('price_type_id', stockPriceTypeId);
-    body.append('product_id', input.dataset.productId || '');
-    body.append('price_value', price);
-    body.append('price_currency', 'UZS');
-    input.classList.remove('is-saved', 'is-error');
-    try {
-      const response = await fetch('/products/price-types/prices', { method: 'POST', body, redirect: 'follow' });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      input.classList.add('is-saved');
-      const qty = Number(input.dataset.quantity || 0);
-      const revenue = qty * (Number(price) || 0);
-      const cell = input.closest('tr')?.querySelector('[data-stock-revenue-cell]');
-      if (cell) {
-        cell.dataset.moneyUzs = String(revenue);
-        cell.textContent = revenue.toLocaleString('ru-RU') + ' UZS';
-      }
-      window.setTimeout(() => input.classList.remove('is-saved'), 1500);
-    } catch (error) {
-      input.classList.add('is-error');
-    }
+  // Выбор прайс-листа для колонки «Продажная цена»: перезагрузка отчёта
+  // с параметром — цены и ожидаемая выручка пересчитываются на сервере.
+  document.addEventListener('change', (event) => {
+    const select = event.target.closest('[data-stock-price-type-select]');
+    if (!select) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('stock_price_type', select.value);
+    window.location.href = url.toString();
   });
 
   restoreState();

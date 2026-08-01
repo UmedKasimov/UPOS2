@@ -18354,6 +18354,17 @@ def create_app() -> FastAPI:
                             "currency": row.get("currency") or "UZS",
                         }
                     )
+                # Прайс для колонки «Продажная цена» выбирается в шапке отчёта;
+                # по умолчанию — прайс-лист по умолчанию воркспейса.
+                stock_price_types = [
+                    pt for pt in _workspace_price_types(wid)
+                    if pt.get("is_active") and pt.get("is_for_sales")
+                ]
+                requested_stock_pt = str(request.query_params.get("stock_price_type") or "").strip()
+                stock_price_type = _price_type_by_id(
+                    stock_price_types,
+                    requested_stock_pt or _workspace_default_price_type_id(wid) or "1",
+                ) or (stock_price_types[0] if stock_price_types else {})
                 for product in products:
                     data = _json_object(product.data)
                     item = _product_data(product)
@@ -18391,11 +18402,19 @@ def create_app() -> FastAPI:
                             cost += price
                             cost_count += Decimal("1")
                     avg_cost = cost / cost_count if cost_count else _sales_decimal(data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price"))
-                    sale_price = _sales_decimal(item.get("sale_price"))
+                    if stock_price_type:
+                        stock_price_text, stock_price_ccy = _calculated_product_price(
+                            item, stock_price_type, stock_price_types
+                        )
+                        sale_price = _sales_decimal(stock_price_text)
+                        sale_price_currency = stock_price_ccy or "UZS"
+                    else:
+                        sale_price = _sales_decimal(item.get("sale_price"))
+                        sale_price_currency = str(item.get("sale_currency") or "UZS")
                     cost_sum = qty * avg_cost
                     revenue_sum = _convert_product_currency(
                         qty * sale_price,
-                        item.get("sale_currency") or "UZS",
+                        sale_price_currency,
                         "UZS",
                         report_rate,
                     )
@@ -18409,7 +18428,8 @@ def create_app() -> FastAPI:
                             "photo_url": item["photo_url"],
                             "quantity": f"{_sales_money_label(qty)}{'' if item['unit'] == 'Штука' else ' ' + item['unit']}",
                             "quantity_raw": _decimal_plain_text(qty),
-                            "sale_price_input": _decimal_plain_text(sale_price) if sale_price else "",
+                            "sale_price_display": _report_money(sale_price, sale_price_currency) if sale_price else "-",
+                            "sale_price_raw": _decimal_plain_text(sale_price) if sale_price else "0",
                             "warehouse": stock_warehouses,
                             "avg_cost": _report_money(avg_cost, "UZS"),
                             "avg_cost_uzs": _decimal_plain_text(avg_cost),
@@ -18442,6 +18462,11 @@ def create_app() -> FastAPI:
                     },
                     "rows": stock_analysis_rows[:200],
                     "history": purchase_history_by_product,
+                    "price_types": [
+                        {"id": str(pt.get("id") or ""), "name": str(pt.get("name") or "")}
+                        for pt in stock_price_types
+                    ],
+                    "selected_price_type_id": str((stock_price_type or {}).get("id") or ""),
                 }
 
                 today = datetime.now(timezone.utc).date()
