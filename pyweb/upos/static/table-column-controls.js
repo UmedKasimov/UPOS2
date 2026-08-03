@@ -281,6 +281,26 @@
     table.style.setProperty('--upos-table-column-total-width', `${Math.ceil(totalWidth)}px`);
   }
 
+  /* Единый футер таблицы: у панелей с серверной пагинацией он уже есть,
+     остальным добавляем такой же по виду счётчик строк. */
+  function ensureFooter(table) {
+    const wrap = table.closest('.products-table-wrap, .org-ops-table-wrap, .reports-table-wrap, .clients-table-wrap');
+    if (!wrap || wrap.parentElement?.querySelector(':scope > .products-catalog-footer')) return;
+    let footer = wrap.nextElementSibling;
+    if (!footer || !footer.classList.contains('upos-table-auto-footer')) {
+      footer = document.createElement('footer');
+      footer.className = 'products-catalog-footer upos-table-auto-footer';
+      footer.innerHTML = '<div class="products-catalog-footer-meta">'
+        + '<div class="products-panel-stats"><span data-upos-table-total></span></div></div>';
+      wrap.parentElement?.insertBefore(footer, wrap.nextSibling);
+    }
+    const rows = Array.from(table.tBodies?.[0]?.rows || []).filter(
+      (row) => !row.querySelector(':scope > .org-ops-empty, :scope > .reports-empty-cell') && row.cells.length > 1,
+    ).length;
+    const total = footer.querySelector('[data-upos-table-total]');
+    if (total) total.textContent = `Всего: ${rows}`;
+  }
+
   /* Панели с таблицами открываются вкладками: пока панель скрыта, замерить
      колонки нельзя. Досняем ширины, как только таблица становится видимой. */
   function watchVisibility(table) {
@@ -603,6 +623,7 @@
     enhanceHeaderInteractions(table);
     applyWidths(table);
     watchVisibility(table);
+    ensureFooter(table);
   }
 
   function initAll(root = document) {
@@ -978,6 +999,7 @@
       applyVisibility(table);
       enhanceHeaderInteractions(table);
       applyWidths(table);
+      ensureFooter(table);
     });
   });
 

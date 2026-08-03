@@ -869,9 +869,6 @@
                   <tr>
                     <th>Фото</th>
                     <th>Название</th>
-                    <th>Артикул</th>
-                    <th>Бренд</th>
-                    <th>Группа</th>
                     <th>Категория</th>
                     <th>
                       <div class="price-type-price-heading">
@@ -892,10 +889,7 @@
                     <tr>
                       <td>{% if product.photo_url %}<img class="product-thumb" src="{{ product.photo_url }}" alt="" />{% else %}<span class="product-thumb-frame">□</span>{% endif %}</td>
                       <td><a class="product-open-link" href="{{ url_for('products_get') }}?edit={{ product.id }}#product-form"><strong>{{ product.name }}</strong></a></td>
-                      <td>{{ product.sku or "-" }}<input type="hidden" name="product_id" value="{{ product.id }}" /></td>
-                      <td>{{ product.brand or "-" }}</td>
-                      <td>{{ product.group or "-" }}</td>
-                      <td>{{ product.category or "-" }}</td>
+                      <td>{{ product.category or "-" }}<input type="hidden" name="product_id" value="{{ product.id }}" /></td>
                       <td>
                         {% if selected_price.pricing_method == "manual" %}
                           <input class="price-type-price-input" name="price_value" value="{{ product.price_type_price }}" inputmode="decimal" />
@@ -931,7 +925,7 @@
                       </td>
                     </tr>
                   {% else %}
-                    <tr><td colspan="8">Товары не найдены.</td></tr>
+                    <tr><td colspan="5">Товары не найдены.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
