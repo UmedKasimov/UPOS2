@@ -196,18 +196,113 @@
     return root._priceTagSelected || "";
   }
 
+  const LABELS = {
+    name: "Название",
+    price: "Цена",
+    old_price: "Старая цена",
+    wholesale_price: "Оптовая цена",
+    sku: "Артикул",
+    created_at: "Дата создания",
+    custom_text: "Свой текст",
+    custom_text2: "Свой текст 2",
+    custom_text3: "Свой текст 3",
+    old_price_label: "Подпись старой цены",
+    printed_at: "Дата печати",
+    barcode: "Штрихкод",
+    logo: "Логотип",
+  };
+
+  /* Размер элемента меняется углами и кнопками «−/+»: у текста это размер
+     шрифта, у штрихкода и логотипа — масштаб блока. */
+  function currentSize(root, key) {
+    const style = (root._priceTagStyles || {})[key] || {};
+    if (style.size) return Number(style.size);
+    const node = root.querySelector(`[data-tag-element="${key}"]`);
+    return node ? Math.round(parseFloat(getComputedStyle(node).fontSize)) : 12;
+  }
+
+  function resizeSelected(root, delta) {
+    const key = selectedKey(root);
+    if (!key) return;
+    const next = Math.min(96, Math.max(6, currentSize(root, key) + delta));
+    root._priceTagStyles = root._priceTagStyles || {};
+    root._priceTagStyles[key] = { ...(root._priceTagStyles[key] || {}), size: String(next) };
+    render(root);
+  }
+
+  function nudgeSelected(root, dx, dy) {
+    const key = selectedKey(root);
+    if (!key) return;
+    const node = root.querySelector(`[data-tag-element="${key}"]`);
+    const card = root.querySelector(".price-tag-card");
+    if (!node || !card) return;
+    const spot = (root._priceTagPositions || {})[key] || {
+      x: Math.round(((node.getBoundingClientRect().left - card.getBoundingClientRect().left)
+        / card.getBoundingClientRect().width) * (Number(readState(root).width) || 58) * 10) / 10,
+      y: Math.round(((node.getBoundingClientRect().top - card.getBoundingClientRect().top)
+        / card.getBoundingClientRect().height) * (Number(readState(root).height) || 40) * 10) / 10,
+    };
+    root._priceTagPositions = root._priceTagPositions || {};
+    root._priceTagPositions[key] = {
+      x: Math.max(0, Math.round((spot.x + dx) * 10) / 10),
+      y: Math.max(0, Math.round((spot.y + dy) * 10) / 10),
+    };
+    applyPositions(root);
+  }
+
+  /* Маркеры на углах выделенного элемента: тянешь угол — меняется размер. */
+  function attachHandles(root) {
+    const key = selectedKey(root);
+    root.querySelectorAll(".price-tag-handle").forEach((handle) => handle.remove());
+    if (!key) return;
+    const node = root.querySelector(`[data-tag-element="${key}"]`);
+    if (!node) return;
+    ["nw", "ne", "sw", "se"].forEach((corner) => {
+      const handle = document.createElement("span");
+      handle.className = `price-tag-handle price-tag-handle--${corner}`;
+      handle.dataset.priceTagHandle = corner;
+      handle.setAttribute("aria-hidden", "true");
+      node.append(handle);
+    });
+    if (node._priceTagHandlesBound) return;
+    node._priceTagHandlesBound = true;
+    node.addEventListener("pointerdown", (event) => {
+      const handle = event.target.closest("[data-price-tag-handle]");
+      if (!handle) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const startY = event.clientY;
+      const startSize = currentSize(root, key);
+      const grows = handle.dataset.priceTagHandle.startsWith("s");
+      const move = (moveEvent) => {
+        const shift = (moveEvent.clientY - startY) * (grows ? 1 : -1);
+        const next = Math.min(96, Math.max(6, Math.round(startSize + shift / 3)));
+        root._priceTagStyles = root._priceTagStyles || {};
+        root._priceTagStyles[key] = { ...(root._priceTagStyles[key] || {}), size: String(next) };
+        render(root);
+      };
+      const stop = () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", stop);
+      };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", stop);
+    });
+  }
+
   function highlightSelected(root) {
     const key = selectedKey(root);
     root.querySelectorAll("[data-tag-element]").forEach((node) => {
       node.classList.toggle("is-selected", node.dataset.tagElement === key);
     });
+    attachHandles(root);
     const panel = root.querySelector("[data-price-tag-style-panel]");
     if (!panel) return;
     panel.hidden = !key;
     if (!key) return;
     const style = (root._priceTagStyles || {})[key] || {};
     const label = root.querySelector("[data-price-tag-style-name]");
-    if (label) label.textContent = root.querySelector(`[data-price-tag-field="${key}"]`)?.parentElement?.textContent.trim() || key;
+    if (label) label.textContent = LABELS[key] || key;
     panel.querySelector('[data-price-tag-style="size"]').value = style.size || "";
     panel.querySelector('[data-price-tag-style="weight"]').value = style.weight || "";
     panel.querySelector('[data-price-tag-style="align"]').value = style.align || "";
@@ -299,6 +394,18 @@
     root.addEventListener("change", rerender);
     root.querySelector("[data-price-tag-save]")?.addEventListener("click", () => save(root));
     root.querySelector("[data-price-tag-print]")?.addEventListener("click", () => print(root));
+    // Стрелки и «−/+» из панели выбранного элемента.
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-price-tag-nudge]");
+      if (!button) return;
+      const action = button.dataset.priceTagNudge;
+      if (action === "smaller") resizeSelected(root, -2);
+      else if (action === "larger") resizeSelected(root, 2);
+      else if (action === "left") nudgeSelected(root, -1, 0);
+      else if (action === "right") nudgeSelected(root, 1, 0);
+      else if (action === "up") nudgeSelected(root, 0, -1);
+      else if (action === "down") nudgeSelected(root, 0, 1);
+    });
     root.querySelector("[data-price-tag-reset-layout]")?.addEventListener("click", () => {
       root._priceTagPositions = {};
       root._priceTagStyles = {};
