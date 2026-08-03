@@ -26156,6 +26156,69 @@ table.upos-table-resizable-columns {
   font-size: var(--text-xs);
 }
 
+/* Подтверждение после продажи с печатью чека и ценников. */
+.sale-done-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: transparent;
+}
+
+.sale-done-dialog::backdrop {
+  background: rgb(15 23 42 / 38%);
+}
+
+.sale-done-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 1.6rem 1.4rem 1.3rem;
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.sale-done-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  color: var(--primary);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.sale-done-card h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.sale-done-sum {
+  margin: 0;
+  color: var(--primary);
+  font-size: var(--text-xl);
+  font-weight: 800;
+}
+
+.sale-done-meta {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.sale-done-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
 /* Элементы этикетки перетаскиваются мышкой и выделяются кликом. */
 .price-tag-card [data-tag-element] {
   cursor: move;

@@ -9791,6 +9791,8 @@ def create_app() -> FastAPI:
             flash_ok=request.query_params.get("msg"),
             flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
             sales_saved_id=request.query_params.get("saved_id") or "",
+            # Настройки ценника нужны попапу после продажи — печать этикеток.
+            sales_price_tag=(load_workspace_settings(wid) or {}).get("price_tag") or {},
             sales_prefill=sales_prefill,
             sales_embed=sales_embed,
             body_embed="sales-order" if sales_embed else "",
