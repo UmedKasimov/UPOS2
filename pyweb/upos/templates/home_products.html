@@ -607,12 +607,10 @@
                   {# Себестоимость остатка из итога убрана по просьбе владельца —
                      ячейка остаётся, чтобы колонки не съезжали. #}
                   <td class="products-price-list-cell products-purchase-price-cell"></td>
-                  <td class="products-price-list-cell products-price-list-name-cell">
-                    {% for total in catalog_totals.price_values %}<strong>{{ total.name }}</strong>{% endfor %}
-                  </td>
-                  <td class="products-price-list-cell products-price-value-cell">
-                    {% for total in catalog_totals.price_values %}<strong>{{ total.value }} {{ total.currency }}</strong>{% endfor %}
-                  </td>
+                  {# Сумма продажных цен из итога убрана по просьбе владельца —
+                     ячейки остаются пустыми, чтобы колонки не съезжали. #}
+                  <td class="products-price-list-cell products-price-list-name-cell"></td>
+                  <td class="products-price-list-cell products-price-value-cell"></td>
                   <td></td>
                   <td></td>
                   <td></td>
