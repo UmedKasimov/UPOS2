@@ -4134,6 +4134,55 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: none;
 }
 
+.client-create-form .client-data-table > .client-program-picker > span {
+  grid-row: auto;
+}
+
+.client-create-form .client-data-table > .client-program-picker > .client-program-dropdown.client-segment-dropdown {
+  border-bottom: 0;
+}
+
+.client-create-form .client-data-table > .client-program-picker > .client-program-dropdown.client-segment-dropdown > summary {
+  min-height: 3rem;
+}
+
+.client-program-dropdown .client-program-options.client-segment-options {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 15rem;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.client-program-dropdown .client-program-options.client-segment-options > label {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.client-program-dropdown .client-program-options.client-segment-options > label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: color-mix(in srgb, var(--primary) 11%, var(--card));
+  color: var(--foreground);
+}
+
+.client-program-custom-input {
+  width: 100%;
+  min-height: 2.35rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 4px;
+}
+
 .client-profile-menu {
   display: grid;
   gap: 0;
