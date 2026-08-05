@@ -13696,7 +13696,6 @@ def create_app() -> FastAPI:
         lon = _clean_client_coordinate(first.get("lon"), minimum=-180, maximum=180)
         return lat, lon
 
-    @app.post("/clients/save", name="clients_save")
     def _geocode_client_later(workspace_owner_id: str, counterparty_id: str, address: str) -> None:
         """Досчитывает координаты клиента после ответа, не задерживая запись."""
         lat, lon = _geocode_client_address(address)
@@ -13717,6 +13716,7 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[upos] background geocode failed for %s", counterparty_id)
 
+    @app.post("/clients/save", name="clients_save")
     async def clients_save(request: Request, background_tasks: BackgroundTasks):
         form = await request.form()
         wants_json = "application/json" in str(request.headers.get("accept") or "").lower() or str(form.get("response") or "").strip() == "json"
