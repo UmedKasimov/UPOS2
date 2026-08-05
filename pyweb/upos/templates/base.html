@@ -8,6 +8,9 @@
     <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v=4" type="image/svg+xml" />
     <link rel="icon" href="{{ url_for('static', path='favicon.png') }}?v=4" type="image/png" sizes="48x48" />
     <title>{% block title %}UPOS FINANCE{% endblock %}</title>
+    {# Ключ формы нужен запросам, которые уходят без формы: загрузка аватара,
+       сохранение настроек и прочие обращения из скриптов. #}
+    {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}" />{% endif %}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -593,7 +596,7 @@
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>
     <script src="{{ url_for('static', path='currency-select.js') }}?v=6"></script>
-    <script src="{{ url_for('static', path='avatar-upload.js') }}?v=2" defer></script>
+    <script src="{{ url_for('static', path='avatar-upload.js') }}?v=3" defer></script>
     {% if not user.get('is_employee') and user.get('role') == 'user' %}
     <script src="{{ url_for('static', path='device-sessions.js') }}?v=3" defer></script>
     {% endif %}

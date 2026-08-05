@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 import string
@@ -15,6 +16,8 @@ from sqlalchemy.orm import Session
 
 from upos.db import session_scope
 from upos.db_models import EmployeeAccountAccess, EmployeeOrganization, FinanceAccount, Organization, Role, User
+
+logger = logging.getLogger(__name__)
 from upos.storage import delete_workspace_settings
 from upos.treasury_store import delete_treasury
 from upos.user_cache import invalidate_username
@@ -860,7 +863,9 @@ def ensure_account_ids() -> None:
                 ),
             )
         except Exception:
-            pass
+            # Индекс не создаётся, если в базе уже есть повторяющиеся коды
+            # организаций. Раньше это проходило незамеченным.
+            logger.warning("[users] не удалось создать индекс по коду организации", exc_info=True)
 
 
 def _get_by_email(session: Session, email: str) -> User | None:

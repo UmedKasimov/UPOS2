@@ -239,6 +239,7 @@
                   data-shipment-journal-numbers="{{ day_row.numbers_label or '' }}"
                   data-shipment-journal-total-amount="{{ day_row.total_amount or 0 }}"
                   data-shipment-journal-debt-amount="{{ day_row.debt_amount or 0 }}"
+                  data-shipment-journal-has-debt="{{ '1' if day_row.has_debt else '0' }}"
                   data-shipment-journal-statuses="{{ (day_row.statuses or [])|join(',') }}"
                   data-shipment-journal-doc-status="{{ day_row.doc_status or 'new' }}"
                 >
@@ -264,7 +265,7 @@
                     {% endfor %}
                   </td>
                   <td>
-                    {% if (day_row.debt_amount or 0) <= 0 %}
+                    {% if not day_row.has_debt %}
                       <span class="org-shipments-status org-shipments-status--paid">Оплачено</span>
                     {% elif 'partial' in (day_row.statuses or []) %}
                       <span class="org-shipments-status org-shipments-status--partial">Частично</span>
@@ -1256,8 +1257,13 @@
             : parsedCurrencies;
           const total = Number(row.dataset.shipmentJournalTotalAmount || data.total_amount || 0) || parsedCurrencies.reduce((sum, item) => sum + item.total, 0);
           const debt = Number(row.dataset.shipmentJournalDebtAmount || data.debt_amount || 0) || parsedCurrencies.reduce((sum, item) => sum + item.debt, 0);
+          // Наличие долга берём отдельным признаком: суммы разных валют
+          // приведены к сумам только для сортировки, судить по ним нельзя.
+          const hasDebt = row.dataset.shipmentJournalHasDebt !== undefined
+            ? row.dataset.shipmentJournalHasDebt === '1'
+            : (typeof data.has_debt === 'boolean' ? data.has_debt : debt > 0);
           let statuses = String(row.dataset.shipmentJournalStatuses || (data.statuses || []).join(',')).split(',').filter(Boolean);
-          if (!statuses.length) statuses = debt > 0 ? ['open'] : ['paid'];
+          if (!statuses.length) statuses = hasDebt ? ['open'] : ['paid'];
           const docStatus = String(row.dataset.shipmentJournalDocStatus || data.doc_status || 'new');
           return {
             day: Number(row.children[0]?.textContent || data.day_index || 0),
@@ -1265,6 +1271,7 @@
             numbers: String(row.dataset.shipmentJournalNumbers || data.numbers_label || ''),
             total,
             debt,
+            hasDebt,
             statuses,
             docStatus,
             currencies,
@@ -1275,7 +1282,7 @@
           const badge = row.querySelector('.org-shipments-status');
           if (!badge) return;
           badge.classList.remove('org-shipments-status--open', 'org-shipments-status--partial', 'org-shipments-status--paid');
-          if (meta.debt <= 0) {
+          if (!meta.hasDebt) {
             badge.textContent = 'Оплачено';
             badge.classList.add('org-shipments-status--paid');
           } else if (meta.statuses.includes('partial')) {
@@ -1288,8 +1295,8 @@
         };
         const statusMatches = (meta) => {
           if (state.status === 'all') return true;
-          if (state.status === 'debt') return meta.debt > 0;
-          if (state.status === 'paid') return meta.debt <= 0;
+          if (state.status === 'debt') return meta.hasDebt;
+          if (state.status === 'paid') return !meta.hasDebt;
           return meta.statuses.includes(state.status);
         };
         const filteredRows = () => rows.filter((row) => {
@@ -1305,7 +1312,7 @@
           const [field, direction] = state.sort.split('-');
           const sign = direction === 'asc' ? 1 : -1;
           const statusRank = (meta) => {
-            if (meta.debt <= 0 || meta.statuses.includes('paid')) return 3;
+            if (!meta.hasDebt || meta.statuses.includes('paid')) return 3;
             if (meta.statuses.includes('partial')) return 2;
             return 1;
           };

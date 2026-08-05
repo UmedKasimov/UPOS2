@@ -35,11 +35,12 @@
     trigger.style.pointerEvents = 'none';
 
     try {
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || document.querySelector('input[name="csrf_token"]')?.value
+        || '';
       const res = await fetch('/api/user/avatar', {
         method: 'POST',
-        headers: {
-          // 'X-CSRF-Token': ... // If needed, but session cookies usually enough for same-site
-        },
+        headers: { 'X-CSRF-Token': csrf },
         body: formData
       });
       const body = await res.json();

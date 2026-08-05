@@ -13,7 +13,7 @@ import secrets
 import socket
 import time
 import uuid
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -398,7 +398,7 @@ def db_account_size_bytes(owner_id: str) -> int:
                 or 0,
             )
         except Exception:
-            pass
+            logger.warning("[upos] не удалось посчитать пользователей пространства %s", owner, exc_info=True)
         for table in WORKSPACE_SIZE_TABLES:
             try:
                 total += int(
@@ -1969,6 +1969,7 @@ def create_app() -> FastAPI:
             if isinstance(body, dict) and isinstance(body.get("client_meta"), dict):
                 client_meta = body["client_meta"]
         except Exception:
+            # Сигнал присутствия часто приходит без тела — это не ошибка.
             pass
         touch_auth_session(sid, uid, client_meta=client_meta or None)
         return {"ok": True}
@@ -4436,8 +4437,12 @@ def create_app() -> FastAPI:
                 continue
             try:
                 qty += Decimal(str(item.get("quantity") or "0"))
-            except Exception:
-                pass
+            except (InvalidOperation, ValueError, TypeError):
+                # Испорченное количество раньше просто пропадало из остатка,
+                # и склад показывал меньше без единого следа в журнале.
+                logger.warning(
+                    "[upos] некорректное количество в остатках: %r", item.get("quantity")
+                )
         if not purchase_history and stocks:
             purchase_history = [
                 {
@@ -17644,9 +17649,17 @@ def create_app() -> FastAPI:
         except Exception:
             payload = {}
         user = request.session.get("user") or {}
-        wid = str(payload.get("workspace_owner_id") or user.get("workspace_owner_id") or user.get("user_id") or "").strip()
+        session_wid = str(user.get("workspace_owner_id") or user.get("user_id") or "").strip()
+        wid = str(payload.get("workspace_owner_id") or session_wid or "").strip()
         if not valid_workspace_owner_id(wid):
             return JSONResponse({"ok": False, "error": "workspace_required"}, status_code=401)
+        # Раньше рабочее пространство брали прямо из тела запроса и проверяли
+        # только формат: зная идентификатор, звонок можно было подбросить в
+        # чужое пространство. Теперь нужен либо вход в это же пространство,
+        # либо тот же токен, что и у загрузки записей разговора.
+        if wid != session_wid and not _telephony_token_allowed(wid, _telephony_request_token(payload, request)):
+            logger.warning("[telephony] входящий звонок отклонён: нет доступа к пространству %s", wid)
+            return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
         raw_phone = str(payload.get("phone") or payload.get("from") or payload.get("caller") or "").strip()
         clean_phone = re.sub(r"\D+", "", raw_phone)
         client_name = str(payload.get("client") or "").strip()
@@ -19909,7 +19922,25 @@ def create_app() -> FastAPI:
             value = 0.0
         return f"{value:,.0f}".replace(",", " ")
 
-    def _shipment_daily_journal(shipments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _shipment_daily_journal(
+        shipments: list[dict[str, Any]],
+        usd_rate: Decimal | None = None,
+    ) -> list[dict[str, Any]]:
+        """Журнал отгрузок по дням.
+
+        Суммы по каждой валюте остаются раздельными — их и показывает таблица.
+        Общее число нужно только для сортировки и фильтра по долгу, поэтому
+        валюты приводятся к сумам по курсу рабочего пространства: раньше сюда
+        складывались доллары и сумы как есть, и сортировка по сумме врала.
+        """
+        rate = usd_rate if usd_rate and usd_rate > 0 else PRODUCT_USD_RATE
+
+        def to_uzs(value: Any, currency: str) -> float:
+            amount = _sales_decimal(value)
+            if str(currency or "UZS").upper() == "USD":
+                amount = amount * rate
+            return float(amount)
+
         grouped: dict[str, dict[str, Any]] = {}
         for row in shipments:
             day = str(row.get("shipment_date") or "").strip()
@@ -19950,10 +19981,13 @@ def create_app() -> FastAPI:
             total_amount = 0.0
             paid_amount = 0.0
             debt_amount = 0.0
+            has_debt = False
             for ccy, totals in sorted(bucket["currencies"].items()):
-                total_amount += float(totals["total"])
-                paid_amount += float(totals["paid"])
-                debt_amount += float(totals["debt"])
+                total_amount += to_uzs(totals["total"], ccy)
+                paid_amount += to_uzs(totals["paid"], ccy)
+                debt_amount += to_uzs(totals["debt"], ccy)
+                if float(totals["debt"]) > 0:
+                    has_debt = True
                 currencies.append(
                     {
                         "currency": ccy,
@@ -19984,6 +20018,9 @@ def create_app() -> FastAPI:
                     "total_amount": total_amount,
                     "paid_amount": paid_amount,
                     "debt_amount": debt_amount,
+                    "has_debt": has_debt,
+                    "mixed_currencies": len(currencies) > 1,
+                    "comparison_currency": "UZS",
                 }
             )
         return journal
@@ -20047,7 +20084,9 @@ def create_app() -> FastAPI:
             selected_organization=selected,
             selected_organization_id=selected_org_id,
             shipments=shipments_rows,
-            shipment_daily_journal=_shipment_daily_journal(shipments_rows),
+            shipment_daily_journal=_shipment_daily_journal(
+                shipments_rows, _workspace_usd_uzs_rate(selected_org_id)
+            ),
             shipment_totals=shipment_totals(selected_org_id),
             courier_debts=list_courier_debts(selected_org_id, include_zero=True),
             hr_employees=list_hr_employees(owner_id),
@@ -24200,15 +24239,30 @@ def create_app() -> FastAPI:
 
     @app.post("/api/user/avatar")
     async def upload_avatar(request: Request, file: UploadFile = File(...)):
+        # Проверка ключа формы: иначе чужая страница могла подменить аватар
+        # пользователю, который уже вошёл в программу.
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
         u = request.session.get("user")
         if not u:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         uid = u.get("user_id")
         if not uid:
             return JSONResponse({"error": "invalid_session"}, status_code=401)
+        content = await file.read()
+        if not content:
+            return JSONResponse({"error": "Файл пустой"}, status_code=400)
         try:
-            content = await file.read()
             img = Image.open(io.BytesIO(content))
+            img.load()
+        except Exception:
+            # Не картинка или повреждённый файл — это ошибка запроса, а не сбой
+            # программы: раньше здесь возвращалась пятисотка со следом ошибки.
+            return JSONResponse(
+                {"error": "Не удалось прочитать изображение. Загрузите файл JPG или PNG."},
+                status_code=400,
+            )
+        try:
             # Crop to square
             w, h = img.size
             sz = min(w, h)
@@ -24223,6 +24277,9 @@ def create_app() -> FastAPI:
             filename = f"{uid}_{uuid.uuid4().hex[:8]}.png"
             rel_path = f"avatars/{filename}"
             full_path = BASE_DIR / "static" / rel_path
+            # Папки для аватаров в репозитории нет, поэтому на свежем сервере
+            # сохранение падало с ошибкой «нет такого каталога».
+            full_path.parent.mkdir(parents=True, exist_ok=True)
             img.save(full_path, "PNG")
             # Update DB
             new_sess = save_user_avatar(uid, rel_path)
