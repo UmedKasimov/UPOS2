@@ -31598,3 +31598,50 @@ html.dark .crm-task-calendar-event {
   width: 1.75rem;
   height: 1.75rem;
 }
+
+/* ============================================================
+   Плавность: анимация смены страниц и отложенная отрисовка
+   ============================================================ */
+
+/* Переход между страницами вместо белой вспышки. Работает там, где
+   браузер это умеет; остальные просто не видят анимации. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+}
+
+/* Длинные таблицы и скрытые панели браузер размечает только когда они
+   попадают в зону видимости — прокрутка перестаёт «дёргаться». */
+.products-table-wrap,
+.org-ops-table-wrap,
+.reports-table-wrap,
+.clients-table-wrap,
+.clients-map-list {
+  contain: paint;
+}
+
+/* Только самая длинная таблица: у неё почти две тысячи строк, и разница
+   заметна. В коротких таблицах отложенная отрисовка строк ничего не даёт,
+   зато может дёргать ширины колонок. */
+.clients-map-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3.7rem;
+}
+
+/* Скрытые вкладки и панели не участвуют в раскладке до открытия. */
+.settings-panel[hidden],
+.reports-panel[hidden],
+[data-workspace-view][hidden] {
+  content-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
