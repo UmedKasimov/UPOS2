@@ -390,7 +390,7 @@
         </thead>
         <tbody>
           {% for client in map_clients %}
-            {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
+            {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id ~ '&focus=location' %}
             <tr
               data-client-overview-point
               data-client-id="{{ client.id }}"

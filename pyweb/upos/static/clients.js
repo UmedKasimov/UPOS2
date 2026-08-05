@@ -461,6 +461,13 @@
     };
   }
 
+  function focusClientLocationPanel() {
+    const panel = document.querySelector("#client-edit [data-client-location-panel]");
+    if (!panel || panel.closest("[hidden]")) return;
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    panel.querySelector("[data-client-location-search]")?.focus();
+  }
+
   function matchesOverviewFilters(point, filters, selectedIds) {
     if (selectedIds.size && !selectedIds.has(point.id)) return false;
     if (filters.q && !point.name.toLowerCase().includes(filters.q)) return false;
@@ -1394,11 +1401,7 @@
       setTimeout(() => {
         initializeMaps();
         refreshMaps();
-        if (quickLocationEdit) {
-          const panel = document.querySelector("#client-edit [data-client-location-panel]");
-          panel?.scrollIntoView({ behavior: "smooth", block: "start" });
-          panel?.querySelector("[data-client-location-search]")?.focus({ preventScroll: true });
-        }
+        if (quickLocationEdit) focusClientLocationPanel();
       }, 160);
     }
   });
@@ -1557,10 +1560,16 @@
     showClientSection();
     initializeMaps();
     setTimeout(refreshMaps, 250);
+    if (new URLSearchParams(window.location.search).get("focus") === "location") {
+      setTimeout(focusClientLocationPanel, 320);
+    }
   });
 
   window.addEventListener("hashchange", () => {
     showClientSection();
     setTimeout(refreshMaps, 160);
+    if (new URLSearchParams(window.location.search).get("focus") === "location") {
+      setTimeout(focusClientLocationPanel, 220);
+    }
   });
 })();
