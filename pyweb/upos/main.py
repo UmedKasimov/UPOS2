@@ -13216,37 +13216,58 @@ def create_app() -> FastAPI:
                     return current
                 return raw if raw > current else current
 
+            # Дату последнего контакта раньше искали перебором всех звонков,
+            # CRM-записей и подписчиков для каждого клиента: при тысяче с лишним
+            # клиентов это сотни тысяч проходов и разбор JSON внутри цикла.
+            # Собираем индексы один раз и дальше берём готовое значение.
+            contact_by_name: dict[str, str] = {}
+            contact_by_phone: dict[str, str] = {}
+            contact_by_counterparty: dict[str, str] = {}
+            contact_by_telegram: dict[str, str] = {}
+
+            def index_bump(store: dict[str, str], key: str, candidate: Any) -> None:
+                if not key:
+                    return
+                value = bump_date(store.get(key, ""), candidate)
+                if value:
+                    store[key] = value
+
+            for call in raw_calls:
+                if not isinstance(call, dict):
+                    continue
+                moment = call.get("started_at") or call.get("created_at")
+                index_bump(contact_by_name, str(call.get("client") or "").strip().lower(), moment)
+                call_phone = digits(call.get("phone"))
+                if call_phone:
+                    index_bump(contact_by_phone, call_phone[-9:], moment)
+
+            for crm_row in crm_rows_for_contact:
+                data = _json_object(crm_row.data)
+                moment = data.get("date") or data.get("due_date") or crm_row.updated_at.isoformat()
+                index_bump(contact_by_counterparty, str(crm_row.counterparty_id or ""), moment)
+                index_bump(contact_by_name, str(data.get("client") or "").strip().lower(), moment)
+
+            for subscriber in telegram_subscribers_for_contact:
+                moment = subscriber.requested_at.isoformat() if subscriber.requested_at else ""
+                index_bump(contact_by_telegram, str(subscriber.username or "").lstrip("@").lower(), moment)
+                sub_phone = digits(subscriber.phone)
+                if sub_phone:
+                    index_bump(contact_by_phone, sub_phone[-9:], moment)
+                index_bump(contact_by_name, str(subscriber.display_name or "").strip().lower(), moment)
+
             def client_last_contact(row: Counterparty, item: dict[str, Any]) -> str:
-                names = {
-                    str(item.get("name") or "").strip().lower(),
-                    str(item.get("official_name") or "").strip().lower(),
-                }
-                names.discard("")
                 best = str(item.get("last_date") or "")
+                for name in (item.get("name"), item.get("official_name")):
+                    key = str(name or "").strip().lower()
+                    if key:
+                        best = bump_date(best, contact_by_name.get(key))
                 phone_digits = digits(item.get("phone"))
+                if phone_digits:
+                    best = bump_date(best, contact_by_phone.get(phone_digits[-9:]))
+                best = bump_date(best, contact_by_counterparty.get(str(row.id or "")))
                 telegram_key = str(item.get("telegram") or "").lstrip("@").lower()
-                for call in raw_calls:
-                    if not isinstance(call, dict):
-                        continue
-                    call_client = str(call.get("client") or "").strip().lower()
-                    call_phone = digits(call.get("phone"))
-                    if call_client in names or (phone_digits and call_phone and call_phone.endswith(phone_digits[-9:])):
-                        best = bump_date(best, call.get("started_at") or call.get("created_at"))
-                for crm_row in crm_rows_for_contact:
-                    data = _json_object(crm_row.data)
-                    crm_client = str(data.get("client") or "").strip().lower()
-                    if crm_row.counterparty_id == row.id or crm_client in names:
-                        best = bump_date(best, data.get("date") or data.get("due_date") or crm_row.updated_at.isoformat())
-                for subscriber in telegram_subscribers_for_contact:
-                    username = str(subscriber.username or "").lstrip("@").lower()
-                    sub_phone = digits(subscriber.phone)
-                    display_name = str(subscriber.display_name or "").strip().lower()
-                    if (
-                        (telegram_key and username == telegram_key)
-                        or (phone_digits and sub_phone and sub_phone.endswith(phone_digits[-9:]))
-                        or (display_name and display_name in names)
-                    ):
-                        best = bump_date(best, subscriber.requested_at.isoformat() if subscriber.requested_at else "")
+                if telegram_key:
+                    best = bump_date(best, contact_by_telegram.get(telegram_key))
                 return best
 
             selected_client_id = client.strip()
