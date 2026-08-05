@@ -309,7 +309,7 @@
   <header class="products-panel-head">
     <div>
       <h2>Карта клиентов</h2>
-      <span>Клиенты с адресом или координатами</span>
+      <span>Все клиенты и состояние их локации</span>
     </div>
   </header>
   <div class="clients-map-filter" data-clients-map-filter>
@@ -390,6 +390,7 @@
         </thead>
         <tbody>
           {% for client in map_clients %}
+            {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
             <tr
               data-client-overview-point
               data-client-id="{{ client.id }}"
@@ -405,7 +406,25 @@
               data-segments="{{ client.business_segments | tojson | forceescape }}"
               data-status="{{ client.status }}"
             >
-              <td><strong>{{ client.name }}</strong></td>
+              <td>
+                <a
+                  class="clients-map-client-link"
+                  href="{{ client_tab_href }}#client-edit"
+                  data-workspace-trigger="client-edit-{{ client.id }}"
+                  data-workspace-tab-id="client-edit-{{ client.id }}"
+                  data-workspace-view-id="client_edit"
+                  data-workspace-tab-title="Редактировать {{ client.name }}"
+                  data-workspace-tab-hash="client-edit"
+                  data-workspace-tab-href="{{ client_tab_href }}"
+                  data-client-map-quick-edit
+                  title="Открыть локацию клиента {{ client.name }}"
+                >
+                  <strong>{{ client.name }}</strong>
+                  {% if not client.latitude and not client.longitude and not client.address %}
+                    <small>Добавить локацию</small>
+                  {% endif %}
+                </a>
+              </td>
               <td>
                 {% if client.business_segments %}
                   <div class="client-segment-chip-list">
@@ -420,8 +439,34 @@
               <td class="clients-map-location-cell">
                 {% if client.latitude and client.longitude %}
                   <span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>
+                {% elif client.address %}
+                  <a
+                    class="clients-map-location-quick-link"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-workspace-trigger="client-edit-{{ client.id }}"
+                    data-workspace-tab-id="client-edit-{{ client.id }}"
+                    data-workspace-view-id="client_edit"
+                    data-workspace-tab-title="Редактировать {{ client.name }}"
+                    data-workspace-tab-hash="client-edit"
+                    data-workspace-tab-href="{{ client_tab_href }}"
+                    data-client-map-quick-edit
+                    title="Уточнить координаты {{ client.name }}"
+                    aria-label="Уточнить координаты {{ client.name }}"
+                  ><span class="client-location-state client-location-state--no">×</span><small>Уточнить</small></a>
                 {% else %}
-                  <span class="client-location-state client-location-state--no" role="img" aria-label="Локация не указана" title="Локация не указана">×</span>
+                  <a
+                    class="clients-map-location-quick-link"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-workspace-trigger="client-edit-{{ client.id }}"
+                    data-workspace-tab-id="client-edit-{{ client.id }}"
+                    data-workspace-view-id="client_edit"
+                    data-workspace-tab-title="Редактировать {{ client.name }}"
+                    data-workspace-tab-hash="client-edit"
+                    data-workspace-tab-href="{{ client_tab_href }}"
+                    data-client-map-quick-edit
+                    title="Добавить локацию {{ client.name }}"
+                    aria-label="Добавить локацию {{ client.name }}"
+                  ><span class="client-location-state client-location-state--no">×</span><small>Добавить</small></a>
                 {% endif %}
               </td>
               <td title="{{ client.address or 'Адрес не указан' }}">{{ client.address or "Адрес не указан" }}</td>
@@ -434,9 +479,15 @@
           <tfoot>
             <tr>
               <td colspan="4">
-                Итого: {{ map_clients|length }}
-                · с координатами: {{ map_clients | selectattr("latitude") | selectattr("longitude") | list | length }}
-                · только адрес: {{ map_clients | rejectattr("latitude") | selectattr("address") | list | length }}
+                {% set map_clients_with_coords = map_clients | selectattr("latitude") | selectattr("longitude") | list %}
+                {% set map_clients_address_only = map_clients | rejectattr("latitude") | selectattr("address") | list %}
+                {% set map_clients_without_location = map_clients | rejectattr("latitude") | rejectattr("address") | list %}
+                <div class="clients-map-location-filters" aria-label="Фильтр по наличию локации">
+                  <button type="button" class="is-active" data-clients-map-location-filter="" aria-pressed="true">Итого: {{ map_clients|length }}</button>
+                  <button type="button" data-clients-map-location-filter="coords" aria-pressed="false">С координатами: {{ map_clients_with_coords|length }}</button>
+                  <button type="button" data-clients-map-location-filter="address" aria-pressed="false">Только адрес: {{ map_clients_address_only|length }}</button>
+                  <button type="button" data-clients-map-location-filter="missing" aria-pressed="false">Без локации: {{ map_clients_without_location|length }}</button>
+                </div>
               </td>
             </tr>
           </tfoot>
@@ -1138,7 +1189,7 @@
             </div>
           </details>
         </div>
-        <div class="client-location-panel wide">
+        <div class="client-location-panel wide" data-client-location-panel>
           <input type="hidden" name="address" value="{{ selected_client_card.address or '' }}" data-client-address />
           <input type="hidden" name="latitude" value="{{ selected_client_card.latitude or '' }}" data-client-latitude />
           <input type="hidden" name="longitude" value="{{ selected_client_card.longitude or '' }}" data-client-longitude />

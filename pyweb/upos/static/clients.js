@@ -457,6 +457,7 @@
         .filter(Boolean),
       category: section.querySelector("[data-clients-map-category]")?.value || "",
       status: section.querySelector("[data-clients-map-status]")?.value || "",
+      location: section.querySelector('[data-clients-map-location-filter][aria-pressed="true"]')?.dataset.clientsMapLocationFilter || "",
     };
   }
 
@@ -467,6 +468,9 @@
     if (filters.programs.length && !filters.programs.some((program) => point.programList.includes(program))) return false;
     if (filters.category && point.category !== filters.category) return false;
     if (filters.status && point.status !== filters.status) return false;
+    if (filters.location === "coords" && !point.hasCoords) return false;
+    if (filters.location === "address" && (point.hasCoords || !point.hasAddress)) return false;
+    if (filters.location === "missing" && (point.hasCoords || point.hasAddress)) return false;
     return true;
   }
 
@@ -510,6 +514,8 @@
           programList,
           segments,
           status: item.dataset.status || "",
+          hasCoords: Number.isFinite(lat) && Number.isFinite(lon),
+          hasAddress: Boolean(String(item.dataset.address || "").trim()),
           item,
         };
         const matched = matchesOverviewFilters(point, filters, selectedIds);
@@ -563,6 +569,10 @@
     });
     if (filters.programs.length) {
       labels.push(filters.programs.length <= 2 ? filters.programs.join(", ") : `Выбрано программ: ${filters.programs.length}`);
+    }
+    if (filters.location) {
+      const locationButton = section.querySelector(`[data-clients-map-location-filter="${filters.location}"]`);
+      labels.push(locationButton?.textContent?.trim() || filters.location);
     }
     const selectedCount = selectedMapIds().size;
     if (selectedCount) labels.push(`Выбрано вручную: ${selectedCount}`);
@@ -1379,10 +1389,16 @@
       locate(form);
       return;
     }
+    const quickLocationEdit = event.target.closest("[data-client-map-quick-edit]");
     if (event.target.closest("[data-workspace-tab], [data-workspace-card], [data-workspace-trigger]")) {
       setTimeout(() => {
         initializeMaps();
         refreshMaps();
+        if (quickLocationEdit) {
+          const panel = document.querySelector("#client-edit [data-client-location-panel]");
+          panel?.scrollIntoView({ behavior: "smooth", block: "start" });
+          panel?.querySelector("[data-client-location-search]")?.focus({ preventScroll: true });
+        }
       }, 160);
     }
   });
@@ -1470,6 +1486,19 @@
   });
 
   document.addEventListener("click", (event) => {
+    const locationFilter = event.target.closest("[data-clients-map-location-filter]");
+    if (locationFilter) {
+      event.preventDefault();
+      const section = locationFilter.closest("#clients-map");
+      if (!section) return;
+      section.querySelectorAll("[data-clients-map-location-filter]").forEach((button) => {
+        const active = button === locationFilter;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      section.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      return;
+    }
     const clear = event.target.closest("[data-clients-map-clear]");
     if (!clear) return;
     const section = clear.closest("#clients-map");
@@ -1481,6 +1510,11 @@
       checkbox.checked = false;
     });
     section.querySelectorAll("[data-clients-map-program-filter]").forEach(syncProgramDropdown);
+    section.querySelectorAll("[data-clients-map-location-filter]").forEach((button) => {
+      const active = !button.dataset.clientsMapLocationFilter;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
     document.querySelectorAll("[data-client-map-select]").forEach((checkbox) => {
       checkbox.checked = false;
     });

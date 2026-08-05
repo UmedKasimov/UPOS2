@@ -13467,13 +13467,9 @@ def create_app() -> FastAPI:
         clients_page_start = (clients_page - 1) * clients_page_size
         clients_page_end = clients_page_start + clients_page_size
         clients_records = all_clients_records[clients_page_start:clients_page_end]
-        # Карта не пагинируется: иначе клиент с меткой, попавший на вторую страницу
-        # таблицы, пропал бы с карты. Берём всех, кого вообще можно разместить.
-        clients_map_records = [
-            item
-            for item in all_clients_records
-            if (item["latitude"] and item["longitude"]) or item["address"]
-        ]
+        # Карта не пагинируется: в правой таблице нужны также клиенты без
+        # локации, чтобы координаты можно было быстро добавить из этого экрана.
+        clients_map_records = all_clients_records
 
         client_balances_total = len(client_balances)
         client_balances_total_pages = max(1, math.ceil(client_balances_total / clients_page_size))
