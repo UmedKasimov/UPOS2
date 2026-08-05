@@ -12532,12 +12532,7 @@ def create_app() -> FastAPI:
         operation_preset = str(op or "").strip()
         if operation_preset not in {"in", "out", "transfer"}:
             operation_preset = ""
-        q_clean = filters["q"].casefold().replace("ё", "е")
-        q_tokens = [
-            token
-            for token in re.split(r"\s+", q_clean)
-            if token and re.sub(r"[^\w]+", "", token)
-        ]
+        q_clean = filters["q"].lower()
         warehouse_records: list[dict[str, Any]] = []
         warehouse_stocks: list[dict[str, Any]] = []
         warehouse_operations: list[dict[str, Any]] = []
@@ -13169,7 +13164,12 @@ def create_app() -> FastAPI:
             "route": route.strip(),
             "status": status.strip() or "all",
         }
-        q_clean = filters["q"].lower()
+        q_clean = filters["q"].casefold().replace("ё", "е")
+        q_tokens = [
+            token
+            for token in re.split(r"\s+", q_clean)
+            if token and re.sub(r"[^\w]+", "", token)
+        ]
         clients_records: list[dict[str, Any]] = []
         client_routes: list[dict[str, Any]] = []
         client_balances: list[dict[str, Any]] = []
