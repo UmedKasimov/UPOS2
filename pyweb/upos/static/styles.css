@@ -5509,8 +5509,44 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .clients-map-table td:nth-child(4) {
   overflow: hidden;
+}
+
+.clients-map-address-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.clients-map-address-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.clients-map-address-edit {
+  display: inline-grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 1.9rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.clients-map-address-edit:hover,
+.clients-map-address-edit:focus-visible {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  outline: none;
 }
 
 @media (max-width: 1280px) {

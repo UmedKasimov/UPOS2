@@ -501,7 +501,24 @@
                   ><span class="client-location-state client-location-state--no">×</span><small>Добавить</small></a>
                 {% endif %}
               </td>
-              <td title="{{ client.address or 'Адрес не указан' }}">{{ client.address or "Адрес не указан" }}</td>
+              <td title="{{ client.address or 'Адрес не указан' }}">
+                <div class="clients-map-address-cell">
+                  <span class="clients-map-address-text">{{ client.address or "Адрес не указан" }}</span>
+                  <a
+                    class="clients-map-address-edit"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-workspace-trigger="client-edit-{{ client.id }}"
+                    data-workspace-tab-id="client-edit-{{ client.id }}"
+                    data-workspace-view-id="client_edit"
+                    data-workspace-tab-title="Редактировать {{ client.name }}"
+                    data-workspace-tab-hash="client-edit"
+                    data-workspace-tab-href="{{ client_tab_href }}"
+                    data-client-map-quick-edit
+                    title="Изменить местоположение {{ client.name }}"
+                    aria-label="Изменить местоположение {{ client.name }}"
+                  ><span aria-hidden="true">✎</span></a>
+                </div>
+              </td>
             </tr>
           {% else %}
             <tr><td colspan="4" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
