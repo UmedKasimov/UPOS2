@@ -132,14 +132,17 @@
       .replaceAll("'", "&#039;");
   }
 
-  function markerIcon(label = "Клиент", type = "", category = "") {
+  function markerIcon(label = "Клиент", type = "", category = "", options = {}) {
     const glyph = markerGlyph(type);
     const glyphMarkup = glyph
       ? `<span class="client-leaflet-marker-glyph" aria-hidden="true">${escapeHtml(glyph)}</span>`
       : "";
+    const dragHandle = options.draggable
+      ? '<span class="client-leaflet-marker-drag-handle" aria-hidden="true">↕</span>'
+      : "";
     return window.L.divIcon({
-      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}${glyphMarkup}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
-      className: "client-leaflet-marker-wrap",
+      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}${glyphMarkup}${dragHandle}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
+      className: `client-leaflet-marker-wrap${options.draggable ? " is-draggable" : ""}`,
       iconSize: [92, 54],
       iconAnchor: [16, 40],
       popupAnchor: [0, -40],
@@ -201,6 +204,13 @@
     return form.querySelector('input[name="industry"]')?.value || selected;
   }
 
+  function refreshEditableMarker(form) {
+    const api = form?.querySelector("[data-client-map]")?._clientMapApi;
+    if (!api?.marker) return;
+    api.marker.setIcon(markerIcon(formMarkerLabel(form), formMarkerType(form), "", { draggable: true }));
+    api.marker.dragging?.enable();
+  }
+
   function updateMap(form, lat, lon, options = {}) {
     const api = ensureMap(form);
     writeCoords(form, lat, lon);
@@ -210,14 +220,18 @@
     const point = [lat, lon];
     api.container.classList.remove("client-location-map--empty");
     if (!api.marker) {
-      api.marker = window.L.marker(point, { icon: markerIcon(formMarkerLabel(form), formMarkerType(form)), draggable: true }).addTo(api.map);
+      api.marker = window.L.marker(point, {
+        icon: markerIcon(formMarkerLabel(form), formMarkerType(form), "", { draggable: true }),
+        draggable: true,
+        title: "Перетащите маркер, чтобы изменить локацию",
+      }).addTo(api.map);
       api.marker.on("dragend", async () => {
         const next = api.marker.getLatLng();
         await selectPoint(form, Number(next.lat.toFixed(6)), Number(next.lng.toFixed(6)), { pan: false });
       });
     } else {
       api.marker.setLatLng(point);
-      api.marker.setIcon(markerIcon(formMarkerLabel(form), formMarkerType(form)));
+      refreshEditableMarker(form);
     }
     if (options.pan !== false) {
       api.map.setView(point, Math.max(api.map.getZoom(), PICK_ZOOM), { animate: true });
@@ -1081,10 +1095,7 @@
     }
     if (event.target.matches("[data-client-map-icon], [data-client-segment-select], input[name='industry'], input[name='name']")) {
       const form = event.target.closest("form");
-      const api = form?.querySelector("[data-client-map]")?._clientMapApi;
-      if (form && api?.marker) {
-        api.marker.setIcon(markerIcon(formMarkerLabel(form), formMarkerType(form)));
-      }
+      refreshEditableMarker(form);
     }
   });
 

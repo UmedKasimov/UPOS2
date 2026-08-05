@@ -4762,6 +4762,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border: 0;
 }
 
+.client-leaflet-marker-wrap.is-draggable {
+  cursor: grab;
+}
+
+.client-leaflet-marker-wrap.is-draggable:active {
+  cursor: grabbing;
+}
+
 .client-leaflet-marker {
   position: relative;
   width: 32px;
@@ -4782,6 +4790,31 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-size: 15px;
   line-height: 1;
   pointer-events: none;
+}
+
+.client-leaflet-marker-drag-handle {
+  position: absolute;
+  right: -9px;
+  bottom: 1px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  border-radius: 50%;
+  background: #fff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.24);
+}
+
+.client-leaflet-marker-wrap.is-draggable:hover .client-leaflet-marker-drag-handle {
+  transform: scale(1.1);
 }
 
 .client-leaflet-marker-label {
