@@ -5430,11 +5430,13 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   text-align: center;
 }
 
-.clients-map-select-column input,
-.clients-map-select-cell input {
+.org-ops-table.clients-map-table .clients-map-select-column input[type="checkbox"],
+.org-ops-table.clients-map-table .clients-map-select-cell input[type="checkbox"] {
   width: 1rem;
+  min-width: 1rem;
   height: 1rem;
-  margin: 0;
+  margin: 0 auto;
+  padding: 0;
   accent-color: var(--primary);
   cursor: pointer;
 }
