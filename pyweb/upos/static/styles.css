@@ -5385,6 +5385,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--primary) 7%, var(--card));
 }
 
+.clients-map-table tbody tr:has([data-clients-map-row-select]:checked) td {
+  background: color-mix(in srgb, var(--primary) 11%, var(--card));
+}
+
 .clients-map-table tbody td:has(.client-directory-segment-dropdown[open]),
 .clients-map-table tbody tr:has(.client-directory-segment-dropdown[open]) {
   position: relative;
@@ -5393,10 +5397,15 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .clients-map-table th:nth-child(1) {
-  width: 29%;
+  width: 2.75rem;
+  text-align: center;
 }
 
 .clients-map-table th:nth-child(2) {
+  width: 29%;
+}
+
+.clients-map-table th:nth-child(3) {
   width: 24%;
 }
 
@@ -5416,8 +5425,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   max-height: 15rem;
 }
 
-.clients-map-table th:nth-child(3) {
+.clients-map-table th:nth-child(4) {
   width: 5.75rem;
+  text-align: center;
+}
+
+.clients-map-select-column input,
+.clients-map-select-cell input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.clients-map-select-cell {
   text-align: center;
 }
 
@@ -5508,7 +5530,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   color: var(--primary);
 }
 
-.clients-map-table td:nth-child(4) {
+.clients-map-table td:nth-child(5) {
   overflow: hidden;
 }
 

@@ -501,7 +501,8 @@
     const layout = container.closest(".clients-map-layout") || document;
     const filters = overviewFilters(container);
     const selectedIds = selectedMapIds();
-    return [...layout.querySelectorAll("[data-client-overview-point]")]
+    const noSelection = new Set();
+    const points = [...layout.querySelectorAll("[data-client-overview-point]")]
       .map((item) => {
         const lat = Number.parseFloat(item.dataset.lat || "");
         const lon = Number.parseFloat(item.dataset.lon || "");
@@ -536,11 +537,29 @@
           editTabTitle: editLink?.dataset.workspaceTabTitle || `Редактировать ${item.dataset.name || "клиента"}`,
           item,
         };
-        const matched = matchesOverviewFilters(point, filters, selectedIds);
-        item.hidden = !matched;
+        const baseMatched = matchesOverviewFilters(point, filters, noSelection);
+        const matched = baseMatched && (!selectedIds.size || selectedIds.has(point.id));
+        item.hidden = !baseMatched;
         return matched ? point : null;
       })
       .filter(Boolean);
+    syncClientsMapSelectAll(layout.closest("#clients-map") || layout);
+    return points;
+  }
+
+  function visibleMapRowCheckboxes(section) {
+    return [...section.querySelectorAll("[data-clients-map-row-select]")]
+      .filter((checkbox) => !checkbox.closest("[data-client-overview-point]")?.hidden);
+  }
+
+  function syncClientsMapSelectAll(section) {
+    const selectAll = section?.querySelector("[data-clients-map-select-all]");
+    if (!selectAll) return;
+    const checkboxes = visibleMapRowCheckboxes(section);
+    const checked = checkboxes.filter((checkbox) => checkbox.checked).length;
+    selectAll.checked = Boolean(checkboxes.length) && checked === checkboxes.length;
+    selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
+    selectAll.disabled = checkboxes.length === 0;
   }
 
   function countOverviewValues(points, valuesForPoint, emptyLabel) {
@@ -1732,7 +1751,17 @@
     if (programDropdown && event.target.matches('input[name="programs"], [data-clients-map-program]')) {
       syncProgramDropdown(programDropdown);
     }
+    if (event.target.matches("[data-clients-map-select-all]")) {
+      const section = event.target.closest("#clients-map");
+      visibleMapRowCheckboxes(section).forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
+      });
+      syncClientsMapSelectAll(section);
+      section?.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      return;
+    }
     if (event.target.matches("[data-client-map-select]") || event.target.closest("[data-clients-map-filter]")) {
+      syncClientsMapSelectAll(event.target.closest("#clients-map"));
       document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
     }
     if (event.target.matches("[data-client-map-icon], [data-client-segment-select], [data-client-segment-option], input[name='industry'], input[name='name']")) {
@@ -1774,6 +1803,7 @@
     document.querySelectorAll("[data-client-map-select]").forEach((checkbox) => {
       checkbox.checked = false;
     });
+    syncClientsMapSelectAll(section);
     document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
   });
 

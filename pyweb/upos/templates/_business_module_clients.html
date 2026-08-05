@@ -403,6 +403,9 @@
       <table class="org-ops-table clients-map-table" data-upos-no-column-controls>
         <thead>
           <tr>
+            <th class="clients-map-select-column">
+              <input type="checkbox" data-clients-map-select-all aria-label="Выбрать всех видимых клиентов" />
+            </th>
             <th class="clients-map-client-column">
               <span>Клиент</span>
               <input type="search" placeholder="Поиск клиента" aria-label="Поиск клиента" data-clients-map-search />
@@ -430,6 +433,15 @@
               data-segments="{{ client.business_segments | tojson | forceescape }}"
               data-status="{{ client.status }}"
             >
+              <td class="clients-map-select-cell">
+                <input
+                  type="checkbox"
+                  value="{{ client.id }}"
+                  data-client-map-select
+                  data-clients-map-row-select
+                  aria-label="Выбрать {{ client.name }}"
+                />
+              </td>
               <td>
                 <a
                   class="clients-map-client-link"
@@ -531,13 +543,13 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="4" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
+            <tr><td colspan="5" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
         {% if map_clients %}
           <tfoot>
             <tr>
-              <td colspan="4">
+              <td colspan="5">
                 {% set map_clients_with_coords = map_clients | selectattr("latitude") | selectattr("longitude") | list %}
                 {% set map_clients_address_only = map_clients | rejectattr("latitude") | selectattr("address") | list %}
                 {% set map_clients_without_location = map_clients | rejectattr("latitude") | rejectattr("address") | list %}
