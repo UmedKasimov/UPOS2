@@ -14660,6 +14660,25 @@ def create_app() -> FastAPI:
             def digits(value: Any) -> str:
                 return "".join(ch for ch in str(value or "") if ch.isdigit())
 
+            # Подписчики Telegram раньше перебирались заново на каждую запись CRM.
+            # Раскладываем их один раз по трём ключам, запоминая позицию в списке:
+            # выбрать нужно того же подписчика, что и прежний перебор по порядку.
+            subscriber_index_by_username: dict[str, int] = {}
+            subscriber_index_by_phone: dict[str, int] = {}
+            subscriber_index_by_name: dict[str, int] = {}
+            subscriber_phones: list[tuple[str, int]] = []
+            for position, subscriber in enumerate(subscribers):
+                username_key = str(subscriber.username or "").lstrip("@").lower()
+                if username_key:
+                    subscriber_index_by_username.setdefault(username_key, position)
+                subscriber_phone = digits(subscriber.phone)
+                if subscriber_phone:
+                    subscriber_phones.append((subscriber_phone, position))
+                    subscriber_index_by_phone.setdefault(subscriber_phone[-9:], position)
+                display_key = str(subscriber.display_name or "").strip().lower()
+                if display_key:
+                    subscriber_index_by_name.setdefault(display_key, position)
+
             def chat_for_counterparty(counterparty: Counterparty | None) -> str:
                 if counterparty is None:
                     return ""
@@ -14667,14 +14686,34 @@ def create_app() -> FastAPI:
                 telegram = str(extra.get("telegram") or "").lstrip("@").lower()
                 phone_digits = digits(counterparty.phone)
                 name_key = str(counterparty.name or "").strip().lower()
-                for subscriber in subscribers:
-                    if telegram and str(subscriber.username or "").lstrip("@").lower() == telegram:
-                        return f"Telegram @{subscriber.username}" if subscriber.username else "Telegram"
-                    sub_phone = digits(subscriber.phone)
-                    if phone_digits and sub_phone and sub_phone.endswith(phone_digits[-9:]):
-                        return f"Telegram {subscriber.display_name or subscriber.phone}".strip()
-                    if name_key and str(subscriber.display_name or "").strip().lower() == name_key:
-                        return f"Telegram {subscriber.display_name}".strip()
+                candidates: list[int] = []
+                if telegram and telegram in subscriber_index_by_username:
+                    candidates.append(subscriber_index_by_username[telegram])
+                if phone_digits:
+                    if len(phone_digits) >= 9:
+                        by_phone = subscriber_index_by_phone.get(phone_digits[-9:])
+                        if by_phone is not None:
+                            candidates.append(by_phone)
+                    else:
+                        # Укороченный номер в карточке ищем по окончанию, как раньше.
+                        for subscriber_phone, position in subscriber_phones:
+                            if subscriber_phone.endswith(phone_digits):
+                                candidates.append(position)
+                                break
+                if name_key and name_key in subscriber_index_by_name:
+                    candidates.append(subscriber_index_by_name[name_key])
+                if not candidates:
+                    return str(extra.get("telegram") or "")
+                # Прежний код возвращал первого подошедшего подписчика по порядку
+                # списка, а внутри него проверял логин, затем телефон, затем имя.
+                subscriber = subscribers[min(candidates)]
+                if telegram and str(subscriber.username or "").lstrip("@").lower() == telegram:
+                    return f"Telegram @{subscriber.username}" if subscriber.username else "Telegram"
+                subscriber_phone = digits(subscriber.phone)
+                if phone_digits and subscriber_phone and subscriber_phone.endswith(phone_digits[-9:]):
+                    return f"Telegram {subscriber.display_name or subscriber.phone}".strip()
+                if name_key and str(subscriber.display_name or "").strip().lower() == name_key:
+                    return f"Telegram {subscriber.display_name}".strip()
                 return str(extra.get("telegram") or "")
 
             rows = list(
@@ -14693,7 +14732,15 @@ def create_app() -> FastAPI:
                 for row in rows
                 if row.item_type == "deal"
             ]
-            deal_options = [item for item in all_deal_options if next((row.status for row in rows if row.id == item["id"]), "") not in {"won", "lost", "done", "archived"}]
+            # Статус сделки раньше искали перебором всех записей CRM на каждую
+            # сделку. Берём его из готового словаря.
+            status_by_record_id = {row.id: row.status for row in rows}
+            closed_statuses = {"won", "lost", "done", "archived"}
+            deal_options = [
+                item
+                for item in all_deal_options
+                if status_by_record_id.get(item["id"], "") not in closed_statuses
+            ]
             deal_title_by_id = {item["id"]: item["title"] for item in all_deal_options}
             for row in rows:
                 item = _crm_record_data(row)
@@ -15393,6 +15440,51 @@ def create_app() -> FastAPI:
     ) -> list[dict[str, Any]]:
         call_rows = [dict(item) for item in calls if isinstance(item, dict)]
         contacts: list[dict[str, Any]] = []
+
+        # Раньше на каждый контакт заново перебирались все звонки и заново
+        # собирались одни и те же карточки вызовов. Теперь звонок готовится
+        # один раз, а совпадения берутся из индексов по телефону и по имени.
+        prepared_calls: list[dict[str, Any]] = []
+        calls_by_phone_tail: dict[str, list[int]] = {}
+        calls_by_phone_exact: dict[str, list[int]] = {}
+        calls_by_client: dict[str, list[int]] = {}
+        for index, call in enumerate(call_rows):
+            call_phone = str(call.get("phone") or "").strip()
+            prepared_calls.append(
+                {
+                    "id": str(call.get("id") or call.get("external_id") or ""),
+                    "phone": call_phone,
+                    "direction": str(call.get("direction") or "outgoing"),
+                    "direction_label": str(
+                        call.get("direction_label")
+                        or _telephony_direction_label(str(call.get("direction") or ""))
+                    ),
+                    "status": str(call.get("status") or ""),
+                    "status_label": str(
+                        call.get("status_label")
+                        or _telephony_status_label("call", str(call.get("status") or ""))
+                    ),
+                    "started_at": str(call.get("started_at") or call.get("created_at") or ""),
+                    "duration": str(call.get("duration") or ""),
+                    "responsible": str(call.get("responsible") or call.get("operator_name") or ""),
+                    "note": str(call.get("note") or call.get("comment") or ""),
+                    "recording_url": _telephony_recording_public_url(
+                        call.get("recording_url") or call.get("recording_path")
+                    ),
+                }
+            )
+            call_digits = _telephony_normalized_phone(call_phone)
+            if call_digits:
+                # Номера от девяти цифр сравниваются по последним девяти,
+                # более короткие — целиком: так же, как в _telephony_phone_matches.
+                if len(call_digits) >= 9:
+                    calls_by_phone_tail.setdefault(call_digits[-9:], []).append(index)
+                else:
+                    calls_by_phone_exact.setdefault(call_digits, []).append(index)
+            call_client = str(call.get("client") or "").strip()
+            if call_client:
+                calls_by_client.setdefault(call_client.casefold(), []).append(index)
+
         with session_scope() as session:
             rows = session.execute(
                 select(Counterparty)
@@ -15408,38 +15500,20 @@ def create_app() -> FastAPI:
                     continue
                 name = str(row.name or "Без имени").strip()
                 phone = str(row.phone or extra.get("phone") or "").strip()
-                matching_calls: list[dict[str, Any]] = []
-                for call in call_rows:
-                    call_phone = str(call.get("phone") or "").strip()
-                    call_client = str(call.get("client") or "").strip()
-                    if not (
-                        (phone and _telephony_phone_matches(phone, call_phone))
-                        or (name and call_client and name.casefold() == call_client.casefold())
-                    ):
-                        continue
-                    matching_calls.append(
-                        {
-                            "id": str(call.get("id") or call.get("external_id") or ""),
-                            "phone": call_phone or phone,
-                            "direction": str(call.get("direction") or "outgoing"),
-                            "direction_label": str(
-                                call.get("direction_label")
-                                or _telephony_direction_label(str(call.get("direction") or ""))
-                            ),
-                            "status": str(call.get("status") or ""),
-                            "status_label": str(
-                                call.get("status_label")
-                                or _telephony_status_label("call", str(call.get("status") or ""))
-                            ),
-                            "started_at": str(call.get("started_at") or call.get("created_at") or ""),
-                            "duration": str(call.get("duration") or ""),
-                            "responsible": str(call.get("responsible") or call.get("operator_name") or ""),
-                            "note": str(call.get("note") or call.get("comment") or ""),
-                            "recording_url": _telephony_recording_public_url(
-                                call.get("recording_url") or call.get("recording_path")
-                            ),
-                        }
-                    )
+                matched_indexes: set[int] = set()
+                phone_digits = _telephony_normalized_phone(phone)
+                if phone_digits:
+                    if len(phone_digits) >= 9:
+                        matched_indexes.update(calls_by_phone_tail.get(phone_digits[-9:], ()))
+                    else:
+                        matched_indexes.update(calls_by_phone_exact.get(phone_digits, ()))
+                if name:
+                    matched_indexes.update(calls_by_client.get(name.casefold(), ()))
+                matching_calls = [
+                    # Телефон контакта подставляется, когда в звонке его нет.
+                    {**prepared_calls[index], "phone": prepared_calls[index]["phone"] or phone}
+                    for index in sorted(matched_indexes)
+                ]
                 matching_calls.sort(key=lambda item: item["started_at"], reverse=True)
                 is_synced_contact = str(row.external_source or "").strip() == "upos-sip"
                 is_confirmed = bool(extra.get("telephony_confirmed"))
@@ -18709,6 +18783,9 @@ def create_app() -> FastAPI:
                         "purchase_price_value": _decimal_plain_text(cost) if cost else "",
                         "sale_price_value": product_item.get("sale_price") or "",
                     }
+                # Имя товара по идентификатору раньше искали перебором всего
+                # каталога на каждую операцию склада.
+                product_name_by_id = {product.id: product.name for product in products}
                 for op in operations:
                     data = _json_object(op.data)
                     op_date = _report_date(data, op.created_at)
@@ -18716,8 +18793,7 @@ def create_app() -> FastAPI:
                         continue
                     product_name = str(data.get("product") or data.get("product_name") or "")
                     if not product_name and op.product_id:
-                        matched = next((product.name for product in products if product.id == op.product_id), "")
-                        product_name = matched
+                        product_name = product_name_by_id.get(op.product_id, "")
                     product_name = product_name or "Без товара"
                     row = stock_movements.setdefault(
                         product_name,
