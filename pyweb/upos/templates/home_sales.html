@@ -55,6 +55,7 @@
     <nav class="general-module-tabs workbench-open-tabs sales-open-tabs" aria-label="Открытые вкладки продаж" data-workspace-open-tabs>
       <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Продажи</button>
     </nav>
+    {% include "_workspace_tabs_early.html" %}
 
     <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher{% if sales_default_tab %} hidden{% endif %}>
       <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">

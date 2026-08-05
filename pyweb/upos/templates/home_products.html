@@ -45,6 +45,7 @@
     <nav class="general-module-tabs workbench-open-tabs products-open-tabs" aria-label="Открытые вкладки товаров" data-workspace-open-tabs>
       <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Товары</button>
     </nav>
+    {% include "_workspace_tabs_early.html" %}
 
     <section class="general-report-launcher workbench-launcher products-launcher" aria-label="Разделы товаров" data-workspace-launcher>
       <a class="general-report-card {{ 'active' if product_filters.kind == 'product' else '' }}" href="{{ url_for('products_get') }}#catalog" data-workspace-card="catalog" data-workspace-tab-title="Каталог и остатки" data-workspace-tab-hash="catalog" data-workspace-tab-href="{{ url_for('products_get') }}" {% if product_filters.kind == 'product' %}aria-current="page"{% endif %}>

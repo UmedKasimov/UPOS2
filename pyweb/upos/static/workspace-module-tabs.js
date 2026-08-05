@@ -137,7 +137,14 @@
 
     function saveState() {
       try {
-        localStorage.setItem(storageKey, JSON.stringify({ openTabs, activeTab }));
+        // Подписи вкладок храним рядом с составом: ранний скрипт рисует панель
+        // из этого же ключа, до разбора остальной страницы.
+        const meta = {};
+        openTabs.forEach((tabId) => {
+          const item = tabMeta.get(tabId);
+          if (item) meta[tabId] = { title: item.title, hash: item.hash };
+        });
+        localStorage.setItem(storageKey, JSON.stringify({ openTabs, activeTab, meta }));
       } catch {}
     }
 
@@ -214,38 +221,67 @@
       });
     }
 
+    function buildTabNode(tabId) {
+      const holder = document.createElement("span");
+      holder.className = "general-module-tab general-module-tab--report";
+      holder.dataset.workspaceOpenTab = tabId;
+
+      const activateButton = document.createElement("button");
+      activateButton.type = "button";
+      activateButton.className = "general-module-tab-activate";
+      activateButton.dataset.workspaceActivateTab = tabId;
+
+      const closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.className = "general-module-tab-close";
+      closeButton.dataset.workspaceCloseTab = tabId;
+      closeButton.textContent = "×";
+
+      holder.append(activateButton, closeButton);
+      return holder;
+    }
+
     function renderTabs() {
-      tabsShell.querySelectorAll("[data-workspace-open-tab]").forEach((node) => node.remove());
       const homeActive = !activeTab;
       homeTab.classList.toggle("active", homeActive);
       homeTab.setAttribute("aria-current", homeActive ? "page" : "false");
 
+      // Узлы вкладок переиспользуются: раньше панель каждый раз собиралась
+      // заново, и вкладки заметно мигали на каждом переходе.
+      const existing = new Map();
+      tabsShell.querySelectorAll("[data-workspace-open-tab]").forEach((node) => {
+        const tabId = normalize(node.dataset.workspaceOpenTab);
+        if (tabId && !existing.has(tabId)) existing.set(tabId, node);
+        else node.remove();
+      });
+
+      let previous = homeTab;
       openTabs.forEach((tabId) => {
         const meta = tabMeta.get(tabId);
         if (!meta) return;
-        const holder = document.createElement("span");
-        holder.className = `general-module-tab general-module-tab--report${tabId === activeTab ? " active" : ""}`;
-        holder.dataset.workspaceOpenTab = tabId;
-        holder.dataset.workspaceHash = meta.hash;
+        let holder = existing.get(tabId);
+        if (holder) existing.delete(tabId);
+        else holder = buildTabNode(tabId);
+
+        holder.classList.toggle("active", tabId === activeTab);
+        if (holder.dataset.workspaceHash !== meta.hash) holder.dataset.workspaceHash = meta.hash;
         const syncUrl = tabUrl(tabId);
-        if (syncUrl) holder.dataset.workspaceSyncUrl = syncUrl.toString();
+        const syncValue = syncUrl ? syncUrl.toString() : "";
+        if (syncValue && holder.dataset.workspaceSyncUrl !== syncValue) {
+          holder.dataset.workspaceSyncUrl = syncValue;
+        }
+        const activateButton = holder.querySelector("[data-workspace-activate-tab]");
+        if (activateButton && activateButton.textContent !== meta.title) {
+          activateButton.textContent = meta.title;
+        }
+        const closeButton = holder.querySelector("[data-workspace-close-tab]");
+        closeButton?.setAttribute("aria-label", `Закрыть ${meta.title}`);
 
-        const activateButton = document.createElement("button");
-        activateButton.type = "button";
-        activateButton.className = "general-module-tab-activate";
-        activateButton.dataset.workspaceActivateTab = tabId;
-        activateButton.textContent = meta.title;
-
-        const closeButton = document.createElement("button");
-        closeButton.type = "button";
-        closeButton.className = "general-module-tab-close";
-        closeButton.dataset.workspaceCloseTab = tabId;
-        closeButton.setAttribute("aria-label", `Закрыть ${meta.title}`);
-        closeButton.textContent = "×";
-
-        holder.append(activateButton, closeButton);
-        tabsShell.append(holder);
+        if (previous.nextElementSibling !== holder) previous.after(holder);
+        previous = holder;
       });
+
+      existing.forEach((node) => node.remove());
     }
 
     function render() {

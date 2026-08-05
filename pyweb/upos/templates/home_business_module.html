@@ -87,6 +87,7 @@
     <nav class="general-module-tabs workbench-open-tabs business-module-tabs" aria-label="Открытые вкладки {{ module.title }}" data-workspace-open-tabs>
       <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">{{ module.title }}</button>
     </nav>
+    {% include "_workspace_tabs_early.html" %}
 
     <section class="general-report-launcher workbench-launcher business-module-launcher" aria-label="Разделы {{ module.title }}" data-workspace-launcher>
       {% for item in module.launcher %}

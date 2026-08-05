@@ -1,0 +1,51 @@
+{# Панель вкладок раньше дорисовывалась скриптом уже после загрузки страницы:
+   сначала было видно одну кнопку раздела, потом появлялись остальные — вкладки
+   заметно мигали на каждом переходе. Этот короткий скрипт выполняется прямо
+   здесь, пока страница ещё разбирается, и восстанавливает панель до первой
+   отрисовки. Полный контроллер позже переиспользует эти же узлы. #}
+<script>
+  (function () {
+    var shell = document.currentScript.previousElementSibling;
+    if (!shell || !shell.hasAttribute("data-workspace-open-tabs")) return;
+    var root = shell.closest("[data-workspace-tabs]");
+    var key = (root && root.dataset.workspaceKey || "").trim();
+    if (!key) return;
+    var state;
+    try {
+      state = JSON.parse(localStorage.getItem("upos." + key + ".openTabs") || "{}");
+    } catch (error) {
+      return;
+    }
+    var tabs = Array.isArray(state.openTabs) ? state.openTabs : [];
+    var meta = state.meta && typeof state.meta === "object" ? state.meta : {};
+    if (!tabs.length) return;
+    var home = shell.querySelector("[data-workspace-home-tab]");
+    var active = typeof state.activeTab === "string" ? state.activeTab : "";
+    if (active && home) {
+      home.classList.remove("active");
+      home.setAttribute("aria-current", "false");
+    }
+    tabs.forEach(function (tabId) {
+      var item = meta[tabId];
+      if (!item || !item.title) return;
+      var holder = document.createElement("span");
+      holder.className = "general-module-tab general-module-tab--report" + (tabId === active ? " active" : "");
+      holder.dataset.workspaceOpenTab = tabId;
+      holder.dataset.workspaceHash = item.hash || tabId;
+      var activate = document.createElement("button");
+      activate.type = "button";
+      activate.className = "general-module-tab-activate";
+      activate.dataset.workspaceActivateTab = tabId;
+      activate.textContent = item.title;
+      var close = document.createElement("button");
+      close.type = "button";
+      close.className = "general-module-tab-close";
+      close.dataset.workspaceCloseTab = tabId;
+      close.setAttribute("aria-label", "Закрыть " + item.title);
+      close.textContent = "×";
+      holder.appendChild(activate);
+      holder.appendChild(close);
+      shell.appendChild(holder);
+    });
+  })();
+</script>
