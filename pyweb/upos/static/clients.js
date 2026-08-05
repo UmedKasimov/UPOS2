@@ -503,7 +503,7 @@
           address: item.dataset.address || "",
           type: item.dataset.clientType || "",
           category: item.dataset.category || "",
-          icon: segments[0]?.icon || item.dataset.icon || "",
+          icon: segments[0]?.icon || "🏷️",
           programs: item.dataset.programs || "",
           programList,
           segments,
