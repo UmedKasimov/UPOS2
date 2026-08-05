@@ -1078,6 +1078,29 @@
     root.querySelectorAll("[data-client-segment-picker]").forEach(syncSegmentPicker);
   }
 
+  function renderClientPhotoPreview(source, url, objectUrl = false) {
+    const form = source?.closest("form");
+    const preview = form?.querySelector("[data-client-photo-preview]");
+    if (!preview) return;
+    const previousObjectUrl = preview.dataset.clientPhotoObjectUrl || "";
+    if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl);
+    delete preview.dataset.clientPhotoObjectUrl;
+    preview.replaceChildren();
+    if (!url) {
+      preview.append(document.createElement("span"));
+      return;
+    }
+    const image = document.createElement("img");
+    image.alt = "";
+    image.src = url;
+    image.addEventListener("error", () => {
+      if (image.parentElement !== preview) return;
+      preview.replaceChildren(document.createElement("span"));
+    }, { once: true });
+    preview.append(image);
+    if (objectUrl) preview.dataset.clientPhotoObjectUrl = url;
+  }
+
   document.addEventListener("click", (event) => {
     const documentMenuToggle = event.target.closest("[data-client-document-menu-toggle]");
     if (documentMenuToggle) {
@@ -1170,6 +1193,12 @@
   });
 
   document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-client-photo-url]")) {
+      window.clearTimeout(event.target._clientPhotoPreviewTimer);
+      event.target._clientPhotoPreviewTimer = window.setTimeout(() => {
+        renderClientPhotoPreview(event.target, String(event.target.value || "").trim());
+      }, 250);
+    }
     if (event.target.matches("[data-client-program-search]")) {
       filterProgramDropdown(event.target);
     }
@@ -1196,6 +1225,11 @@
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target.matches("[data-client-photo-file]")) {
+      const [file] = event.target.files || [];
+      const fallbackUrl = event.target.closest("form")?.querySelector("[data-client-photo-url]")?.value?.trim() || "";
+      renderClientPhotoPreview(event.target, file ? URL.createObjectURL(file) : fallbackUrl, Boolean(file));
+    }
     const segmentPicker = event.target.closest?.("[data-client-segment-picker]");
     if (segmentPicker && event.target.matches("[data-client-segment-option]")) {
       syncSegmentPicker(segmentPicker);

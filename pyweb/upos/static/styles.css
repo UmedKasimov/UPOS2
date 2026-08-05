@@ -3724,7 +3724,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-left: 1px solid color-mix(in srgb, var(--foreground) 16%, var(--border));
 }
 
-.client-edit-photo-row .client-photo-data-table > label {
+.client-edit-photo-row .client-photo-data-table > label,
+.client-edit-photo-row .client-photo-data-table > .client-photo-source-field {
   display: grid;
   grid-template-columns: 10rem minmax(0, 1fr);
   gap: 0;
@@ -3733,11 +3734,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-bottom: 1px solid var(--workbench-line, var(--border));
 }
 
-.client-edit-photo-row .client-photo-data-table > label:last-child {
+.client-edit-photo-row .client-photo-data-table > :last-child {
   border-bottom: 0;
 }
 
-.client-edit-photo-row .client-photo-data-table > label > span {
+.client-edit-photo-row .client-photo-data-table > label > span,
+.client-edit-photo-row .client-photo-data-table > .client-photo-source-field > span {
   display: flex;
   align-items: center;
   padding: 0.65rem 0.75rem;
@@ -3757,6 +3759,27 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   box-shadow: none;
 }
 
+.client-photo-source-controls {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(14rem, 1.2fr);
+  min-width: 0;
+  min-height: 4.25rem;
+}
+
+.client-photo-source-controls > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 4.25rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: none;
+}
+
+.client-photo-source-controls > input + input {
+  border-left: 1px solid var(--workbench-line, var(--border));
+}
+
 .client-create-form .client-data-table {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
@@ -3768,15 +3791,15 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.client-edit-shell .client-create-form {
+.client-photo-form {
   gap: 0;
 }
 
-.client-edit-shell .client-data-table {
+.client-photo-form .client-data-table {
   border-radius: 0 0 6px 6px;
 }
 
-.client-edit-shell .client-create-form > .product-form-actions {
+.client-photo-form > .product-form-actions {
   margin-top: 1rem;
 }
 
@@ -12539,10 +12562,20 @@ html.dark .kassa-status-select--confirmed {
   }
 
   .client-edit-photo-row .client-photo-data-table > label,
+  .client-edit-photo-row .client-photo-data-table > .client-photo-source-field,
   .client-create-form .client-data-table > label,
   .client-create-form .client-data-table > .client-program-picker,
   .client-create-form .client-data-table > .client-segment-picker {
     grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr);
+  }
+
+  .client-photo-source-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .client-photo-source-controls > input + input {
+    border-top: 1px solid var(--workbench-line, var(--border));
+    border-left: 0;
   }
 
   .client-create-form .client-data-table > label.wide,
