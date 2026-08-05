@@ -140,8 +140,11 @@
     const dragHandle = options.draggable
       ? '<span class="client-leaflet-marker-drag-handle" aria-hidden="true">↕</span>'
       : "";
+    const removeButton = options.removable
+      ? '<button type="button" class="client-leaflet-marker-remove" title="Убрать точку" aria-label="Убрать точку">×</button>'
+      : "";
     return window.L.divIcon({
-      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}${glyphMarkup}${dragHandle}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
+      html: `<div class="client-leaflet-marker">${markerSvg(type, category)}${glyphMarkup}${dragHandle}${removeButton}</div><div class="client-leaflet-marker-label">${escapeHtml(label)}</div>`,
       className: `client-leaflet-marker-wrap${options.draggable ? " is-draggable" : ""}`,
       iconSize: [92, 54],
       iconAnchor: [16, 40],
@@ -207,8 +210,55 @@
   function refreshEditableMarker(form) {
     const api = form?.querySelector("[data-client-map]")?._clientMapApi;
     if (!api?.marker) return;
-    api.marker.setIcon(markerIcon(formMarkerLabel(form), formMarkerType(form), "", { draggable: true }));
+    api.marker.setIcon(markerIcon(formMarkerLabel(form), formMarkerType(form), "", { draggable: true, removable: true }));
     api.marker.dragging?.enable();
+  }
+
+  function syncAddPointButton(api) {
+    if (!api?.addPointButton) return;
+    api.addPointButton.hidden = Boolean(api.marker);
+  }
+
+  function clearLocation(form) {
+    const api = form?.querySelector("[data-client-map]")?._clientMapApi;
+    writeCoords(form, "", "");
+    const addressInput = form?.querySelector("[data-client-address]");
+    const searchInput = form?.querySelector("[data-client-location-search]");
+    const link = form?.querySelector("[data-client-map-link]");
+    if (addressInput) addressInput.value = "";
+    if (searchInput) searchInput.value = "";
+    if (link) {
+      link.href = "#";
+      link.hidden = true;
+    }
+    if (api?.marker) {
+      api.map.removeLayer(api.marker);
+      api.marker = null;
+    }
+    api?.container.classList.add("client-location-map--empty");
+    api?.container.classList.remove("is-picking-point");
+    syncAddPointButton(api);
+    setStatus(form, "Локация не выбрана");
+  }
+
+  function ensureAddPointButton(form, api) {
+    if (!api || api.addPointButton) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "client-location-add-point";
+    button.title = "Добавить точку";
+    button.setAttribute("aria-label", "Добавить точку");
+    button.textContent = "+";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      api.container.classList.add("is-picking-point");
+      setStatus(form, "Нажмите на карту, чтобы добавить точку");
+      api.container.focus({ preventScroll: true });
+    });
+    api.container.append(button);
+    api.addPointButton = button;
+    syncAddPointButton(api);
   }
 
   function updateMap(form, lat, lon, options = {}) {
@@ -221,10 +271,16 @@
     api.container.classList.remove("client-location-map--empty");
     if (!api.marker) {
       api.marker = window.L.marker(point, {
-        icon: markerIcon(formMarkerLabel(form), formMarkerType(form), "", { draggable: true }),
+        icon: markerIcon(formMarkerLabel(form), formMarkerType(form), "", { draggable: true, removable: true }),
         draggable: true,
         title: "Перетащите маркер, чтобы изменить локацию",
       }).addTo(api.map);
+      api.marker.on("click", (event) => {
+        const removeButton = event.originalEvent?.target?.closest?.(".client-leaflet-marker-remove");
+        if (!removeButton) return;
+        window.L.DomEvent.stop(event.originalEvent);
+        clearLocation(form);
+      });
       api.marker.on("dragend", async () => {
         const next = api.marker.getLatLng();
         await selectPoint(form, Number(next.lat.toFixed(6)), Number(next.lng.toFixed(6)), { pan: false });
@@ -233,6 +289,8 @@
       api.marker.setLatLng(point);
       refreshEditableMarker(form);
     }
+    api.container.classList.remove("is-picking-point");
+    syncAddPointButton(api);
     if (options.pan !== false) {
       api.map.setView(point, Math.max(api.map.getZoom(), PICK_ZOOM), { animate: true });
     }
@@ -327,6 +385,7 @@
 
     const api = { container, map, marker: null };
     container._clientMapApi = api;
+    ensureAddPointButton(form, api);
     map.on("click", async (event) => {
       await selectPoint(form, Number(event.latlng.lat.toFixed(6)), Number(event.latlng.lng.toFixed(6)));
     });

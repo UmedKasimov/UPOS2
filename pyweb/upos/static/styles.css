@@ -4817,6 +4817,66 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   transform: scale(1.1);
 }
 
+.client-leaflet-marker-remove,
+.client-location-add-point {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 50%;
+  background: #fff;
+  color: #334155;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.2);
+}
+
+.client-leaflet-marker-remove {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.client-location-add-point[hidden] {
+  display: none;
+}
+
+.client-leaflet-marker-remove:hover {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.client-location-add-point {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 500;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: #2563eb;
+  font-size: 23px;
+  cursor: pointer;
+}
+
+.client-location-add-point:hover,
+.client-location-map.is-picking-point .client-location-add-point {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.client-location-map.is-picking-point {
+  cursor: crosshair;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.4);
+}
+
 .client-leaflet-marker-label {
   position: absolute;
   top: -8px;
@@ -27851,6 +27911,8 @@ html.dark .client-location-map .leaflet-control-zoom a,
 html.dark .client-location-map .leaflet-control-attribution,
 html.dark .client-location-map-hint,
 html.dark .client-leaflet-marker-label,
+html.dark .client-leaflet-marker-remove,
+html.dark .client-location-add-point,
 html.dark .clients-map-empty {
   border-color: var(--workbench-line);
   background: color-mix(in srgb, var(--workbench-surface), transparent 5%);
