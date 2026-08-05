@@ -5183,9 +5183,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   visibility: visible;
 }
 
+/* Карта во всю ширину, список клиентов — под ней: так на карте видно
+   больше точек, а в таблице помещаются все колонки без прокрутки. */
 .clients-map-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(34rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   padding: 1rem;
 }
@@ -5337,7 +5339,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .clients-map-list {
   display: grid;
   align-content: start;
-  max-height: 31rem;
+  max-height: 34rem;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: var(--workbench-radius-sm, 8px);
   background: var(--card);
@@ -5577,10 +5579,6 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 @media (max-width: 1280px) {
-  .clients-map-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .clients-map-list {
     max-height: 24rem;
   }
