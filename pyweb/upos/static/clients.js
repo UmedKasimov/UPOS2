@@ -1336,6 +1336,28 @@
       setStatus(form, `Локация выбрана: ${lat}, ${lon}`);
       return;
     }
+    const dialog = box.closest("[data-client-location-dialog]");
+    if (dialog) {
+      dialog.dataset.address = label;
+      setDirectoryLocationDialogPoint(dialog, lat, lon);
+      setSearchStatus("Адрес найден. Уточните точку и сохраните.");
+      return;
+    }
+    const overviewContainer = box.closest(".clients-map-frame")?.querySelector("[data-clients-overview-map]");
+    if (overviewContainer) {
+      const overviewApi = overviewContainer._clientsOverviewApi || ensureOverviewMap(overviewContainer);
+      if (!overviewApi?.map) {
+        setSearchStatus("Карта ещё не готова. Попробуйте ещё раз.");
+        return;
+      }
+      if (overviewApi.searchMarker) overviewApi.map.removeLayer(overviewApi.searchMarker);
+      overviewApi.searchMarker = window.L.marker([lat, lon]).addTo(overviewApi.map);
+      overviewApi.searchMarker.bindPopup(`<strong>${escapeHtml(label)}</strong>`).openPopup();
+      overviewApi.map.setView([lat, lon], PICK_ZOOM);
+      setSearchStatus("Место найдено на карте");
+      scheduleInvalidate(overviewApi);
+      return;
+    }
     const container = box.closest(".client-card-location-card")?.querySelector("[data-client-card-map]");
     const api = container ? ensureClientCardMap(container) : null;
     if (!api) {
@@ -1625,6 +1647,9 @@
       title: dialog?.querySelector("[data-client-location-dialog-title]"),
       status: dialog?.querySelector("[data-client-location-dialog-status]"),
       save: dialog?.querySelector("[data-client-location-dialog-save]"),
+      searchBox: dialog?.querySelector("[data-client-location-search-box]"),
+      searchInput: dialog?.querySelector("[data-client-location-search]"),
+      searchStatus: dialog?.querySelector("[data-client-location-search-status]"),
     };
   }
 
@@ -1711,6 +1736,9 @@
       elements.save.disabled = true;
       elements.save.textContent = "Сохранить точку";
     }
+    if (elements.searchInput) elements.searchInput.value = dialog.dataset.address;
+    if (elements.searchStatus) elements.searchStatus.textContent = "";
+    closeLocationSuggest(elements.searchBox);
     setDirectoryLocationDialogStatus(dialog, "Нажмите на карту, чтобы поставить точку.");
     if (!dialog.open) dialog.showModal();
     const api = ensureDirectoryLocationDialogMap(dialog);

@@ -23811,12 +23811,26 @@ body:has(dialog[open]) {
 
 .client-location-dialog-surface {
   display: grid;
-  grid-template-rows: auto minmax(18rem, 52vh) auto auto;
+  grid-template-rows: auto auto minmax(18rem, 52vh) auto auto;
   overflow: hidden;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: 8px;
   background: var(--card);
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+}
+
+.client-location-dialog-search,
+.clients-overview-location-search {
+  z-index: 600;
+  background: var(--card);
+}
+
+.client-location-dialog-search {
+  padding: 0.65rem 1rem;
+}
+
+.clients-overview-location-search {
+  border-bottom: 1px solid var(--workbench-line, var(--border));
 }
 
 .client-location-dialog-head,
@@ -23890,7 +23904,7 @@ body:has(dialog[open]) {
   }
 
   .client-location-dialog-surface {
-    grid-template-rows: auto minmax(16rem, 48vh) auto auto;
+    grid-template-rows: auto auto minmax(16rem, 48vh) auto auto;
   }
 }
 

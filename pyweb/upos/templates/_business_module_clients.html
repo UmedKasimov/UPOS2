@@ -331,6 +331,17 @@
       </div>
       <button type="button" class="client-location-dialog-close" data-client-location-dialog-close aria-label="Закрыть">×</button>
     </header>
+    <div class="client-location-search client-location-dialog-search" data-client-location-search-box>
+      <input
+        type="search"
+        placeholder="Найдите улицу, район или ориентир"
+        data-client-location-search
+        aria-label="Поиск адреса на карте"
+      />
+      <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+      <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+      <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Найденные адреса" hidden></ul>
+    </div>
     <div class="client-location-dialog-map" data-client-location-dialog-map aria-label="Выбор точки клиента на карте"></div>
     <div class="client-location-dialog-status" data-client-location-dialog-status role="status">Выберите точку на карте.</div>
     <footer class="client-location-dialog-actions">
@@ -398,6 +409,17 @@
   {% set map_clients = clients_map_records %}
   <div class="clients-map-layout">
     <div class="clients-map-frame">
+      <div class="client-location-search clients-overview-location-search" data-client-location-search-box>
+        <input
+          type="search"
+          placeholder="Найдите адрес или ориентир на карте"
+          data-client-location-search
+          aria-label="Поиск адреса на общей карте клиентов"
+        />
+        <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+        <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+        <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Найденные адреса" hidden></ul>
+      </div>
       {% set first_map_client = map_clients|selectattr('latitude')|first %}
       <div
         class="clients-overview-map{% if not first_map_client or not first_map_client.latitude or not first_map_client.longitude %} clients-overview-map--empty{% endif %}"
