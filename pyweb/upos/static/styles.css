@@ -23263,6 +23263,85 @@ body:has(dialog[open]) {
   overflow: hidden;
 }
 
+#clients-directory-table [data-client-column="segment"] {
+  width: 14rem;
+}
+
+#clients-directory-table tbody td[data-client-column="segment"]:has(.client-directory-segment-dropdown[open]) {
+  position: relative;
+  z-index: 80;
+  overflow: visible;
+}
+
+#clients-directory-table tbody tr:has(.client-directory-segment-dropdown[open]) {
+  position: relative;
+  z-index: 70;
+}
+
+.client-directory-segment-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.client-directory-segment-dropdown > summary {
+  min-height: 2rem;
+  padding: 0.2rem 1.45rem 0.2rem 0.25rem;
+  border-radius: 4px;
+  font-size: var(--text-xs);
+}
+
+.client-directory-segment-dropdown > summary:hover {
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+}
+
+.client-directory-segment-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.client-directory-segment-summary .client-segment-chip {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.client-directory-segment-empty {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.client-directory-segment-more {
+  flex: 0 0 auto;
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.client-directory-segment-menu {
+  right: auto;
+  min-width: 17rem;
+}
+
+.client-directory-segment-status {
+  min-height: 1rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.client-directory-segment-status[data-kind="success"] {
+  color: #15803d;
+}
+
+.client-directory-segment-status[data-kind="error"] {
+  color: #b91c1c;
+}
+
+.client-directory-segment-picker.is-saving > details > summary {
+  opacity: 0.68;
+}
+
 .client-location-state-cell {
   text-align: center;
 }

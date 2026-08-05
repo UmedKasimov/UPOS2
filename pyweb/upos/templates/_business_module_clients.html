@@ -169,16 +169,46 @@
                 {% endif %}
               </td>
               <td title="{{ client.last_date or '-' }}">{{ client.last_date or "-" }}</td>
-              <td title="{{ client.business_segment or '-' }}">
-                {% if client.business_segments %}
-                  <div class="client-segment-chip-list">
-                    {% for segment in client.business_segments %}
-                      <span class="client-segment-chip">{{ segment.icon }} {{ segment.name }}</span>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  -
-                {% endif %}
+              <td title="{{ client.business_segment or 'Выбрать сегмент' }}">
+                <div
+                  class="client-directory-segment-picker"
+                  data-client-directory-segment-picker
+                  data-client-id="{{ client.id }}"
+                  data-csrf="{{ csrf_token }}"
+                >
+                  <details class="client-segment-dropdown client-directory-segment-dropdown">
+                    <summary>
+                      <span class="client-directory-segment-summary" data-client-directory-segment-summary>
+                        {% if client.business_segments %}
+                          {% for segment in client.business_segments %}
+                            <span class="client-segment-chip">{{ segment.icon }} {{ segment.name }}</span>
+                          {% endfor %}
+                        {% else %}
+                          <span class="client-directory-segment-empty">Выбрать</span>
+                        {% endif %}
+                      </span>
+                    </summary>
+                    <div class="client-segment-menu client-directory-segment-menu">
+                      <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+                      <div class="client-segment-options">
+                        {% for segment in client_business_segments %}
+                          <label data-client-segment-option-row>
+                            <input
+                              type="checkbox"
+                              value="{{ segment.id }}"
+                              data-client-directory-segment-option
+                              data-segment-label="{{ segment.name }}"
+                              data-segment-icon="{{ segment.icon }}"
+                              {% if segment.id in client.business_segment_ids %}checked{% endif %}
+                            />
+                            <span>{{ segment.icon }} {{ segment.name }}</span>
+                          </label>
+                        {% endfor %}
+                      </div>
+                      <small class="client-directory-segment-status" data-client-directory-segment-status aria-live="polite"></small>
+                    </div>
+                  </details>
+                </div>
               </td>
               <td class="client-location-state-cell">
                 {% if client.latitude and client.longitude %}

@@ -1165,7 +1165,7 @@
   }
 
   function filterSegmentPicker(search) {
-    const picker = search?.closest("[data-client-segment-picker]");
+    const picker = search?.closest("[data-client-segment-picker], [data-client-directory-segment-picker]");
     if (!picker) return;
     const query = String(search.value || "").trim().toLocaleLowerCase("ru");
     picker.querySelectorAll("[data-client-segment-option-row]").forEach((row) => {
@@ -1175,6 +1175,110 @@
 
   function initializeSegmentPickers(root = document) {
     root.querySelectorAll("[data-client-segment-picker]").forEach(syncSegmentPicker);
+  }
+
+  function directorySegmentOptions(picker) {
+    return [...(picker?.querySelectorAll("[data-client-directory-segment-option]") || [])];
+  }
+
+  function syncDirectorySegmentPicker(picker) {
+    if (!picker) return;
+    const checked = directorySegmentOptions(picker).filter((input) => input.checked);
+    const summary = picker.querySelector("[data-client-directory-segment-summary]");
+    if (!summary) return;
+    summary.replaceChildren();
+    if (!checked.length) {
+      const empty = document.createElement("span");
+      empty.className = "client-directory-segment-empty";
+      empty.textContent = "Выбрать";
+      summary.append(empty);
+      summary.title = "Выбрать сегмент";
+      return;
+    }
+    checked.slice(0, 2).forEach((input) => {
+      const chip = document.createElement("span");
+      chip.className = "client-segment-chip";
+      chip.textContent = `${input.dataset.segmentIcon || ""} ${input.dataset.segmentLabel || input.value}`.trim();
+      summary.append(chip);
+    });
+    if (checked.length > 2) {
+      const more = document.createElement("span");
+      more.className = "client-directory-segment-more";
+      more.textContent = `+${checked.length - 2}`;
+      summary.append(more);
+    }
+    summary.title = checked.map((input) => input.dataset.segmentLabel || input.value).join(", ");
+  }
+
+  function setDirectorySegmentStatus(picker, text, kind = "") {
+    const status = picker?.querySelector("[data-client-directory-segment-status]");
+    if (!status) return;
+    status.textContent = text;
+    status.dataset.kind = kind;
+  }
+
+  async function saveDirectorySegments(picker) {
+    if (!picker || picker.dataset.segmentSaving === "1") {
+      if (picker) picker.dataset.segmentSaveQueued = "1";
+      return;
+    }
+    const clientId = String(picker.dataset.clientId || "").trim();
+    if (!clientId) return;
+    const selectedIds = directorySegmentOptions(picker)
+      .filter((input) => input.checked)
+      .map((input) => input.value);
+    picker.dataset.segmentSaving = "1";
+    picker.classList.add("is-saving");
+    setDirectorySegmentStatus(picker, "Сохраняю...");
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}/segments`, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken(picker),
+        },
+        body: JSON.stringify({ segment_ids: selectedIds }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "save_failed");
+      const savedIds = new Set((payload.segments || []).map((segment) => String(segment.id || "")));
+      directorySegmentOptions(picker).forEach((input) => {
+        input.checked = savedIds.has(input.value);
+      });
+      picker._savedSegmentIds = savedIds;
+      syncDirectorySegmentPicker(picker);
+      setDirectorySegmentStatus(picker, "Сохранено", "success");
+    } catch {
+      const savedIds = picker._savedSegmentIds || new Set();
+      directorySegmentOptions(picker).forEach((input) => {
+        input.checked = savedIds.has(input.value);
+      });
+      syncDirectorySegmentPicker(picker);
+      setDirectorySegmentStatus(picker, "Не удалось сохранить", "error");
+    } finally {
+      picker.dataset.segmentSaving = "0";
+      picker.classList.remove("is-saving");
+      if (picker.dataset.segmentSaveQueued === "1") {
+        picker.dataset.segmentSaveQueued = "0";
+        void saveDirectorySegments(picker);
+      }
+    }
+  }
+
+  function queueDirectorySegmentSave(picker) {
+    window.clearTimeout(picker?._segmentSaveTimer);
+    if (!picker) return;
+    picker._segmentSaveTimer = window.setTimeout(() => void saveDirectorySegments(picker), 220);
+  }
+
+  function initializeDirectorySegmentPickers(root = document) {
+    root.querySelectorAll("[data-client-directory-segment-picker]").forEach((picker) => {
+      picker._savedSegmentIds = new Set(
+        directorySegmentOptions(picker).filter((input) => input.checked).map((input) => input.value)
+      );
+      syncDirectorySegmentPicker(picker);
+    });
   }
 
   function renderClientPhotoPreview(source, url, objectUrl = false) {
@@ -1216,6 +1320,12 @@
 
     if (!event.target.closest("[data-client-document-menu]")) {
       closeClientDocumentMenus();
+    }
+
+    if (!event.target.closest("[data-client-directory-segment-picker]")) {
+      document.querySelectorAll("[data-client-directory-segment-picker] details[open]").forEach((details) => {
+        details.open = false;
+      });
     }
 
     const sectionLink = event.target.closest("[data-client-section-nav]");
@@ -1278,6 +1388,9 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeClientDocumentMenus();
+      document.querySelectorAll("[data-client-directory-segment-picker] details[open]").forEach((details) => {
+        details.open = false;
+      });
     }
     if (!event.target.matches?.("[data-client-location-search]")) return;
     const box = event.target.closest("[data-client-location-search-box]");
@@ -1332,6 +1445,12 @@
     const segmentPicker = event.target.closest?.("[data-client-segment-picker]");
     if (segmentPicker && event.target.matches("[data-client-segment-option]")) {
       syncSegmentPicker(segmentPicker);
+    }
+    const directorySegmentPicker = event.target.closest?.("[data-client-directory-segment-picker]");
+    if (directorySegmentPicker && event.target.matches("[data-client-directory-segment-option]")) {
+      syncDirectorySegmentPicker(directorySegmentPicker);
+      setDirectorySegmentStatus(directorySegmentPicker, "");
+      queueDirectorySegmentSave(directorySegmentPicker);
     }
     const programDropdown = event.target.closest?.("[data-client-program-dropdown]");
     if (programDropdown && event.target.matches('input[name="programs"]')) {
@@ -1392,6 +1511,7 @@
     initializeClientDirectoryTables();
     initializeProgramDropdowns();
     initializeSegmentPickers();
+    initializeDirectorySegmentPickers();
     showClientSection();
     initializeMaps();
     setTimeout(refreshMaps, 250);

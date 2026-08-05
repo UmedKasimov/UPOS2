@@ -13838,6 +13838,56 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.post("/api/clients/{counterparty_id}/segments", name="client_segments_save_api")
+    async def client_segments_save_api(request: Request, counterparty_id: str):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"ok": False, "error": "json"}, status_code=400)
+        raw_segment_ids = payload.get("segment_ids") if isinstance(payload, dict) else None
+        if not isinstance(raw_segment_ids, list):
+            return JSONResponse({"ok": False, "error": "segment_ids"}, status_code=400)
+
+        configured_segments = _workspace_business_segments(wid)
+        configured_by_id = {segment["id"]: segment for segment in configured_segments}
+        selected_segments: list[dict[str, str]] = []
+        selected_ids: set[str] = set()
+        for raw_segment_id in raw_segment_ids:
+            segment_id = str(raw_segment_id or "").strip()
+            segment = configured_by_id.get(segment_id)
+            if segment is None or segment_id in selected_ids:
+                continue
+            selected_segments.append(dict(segment))
+            selected_ids.add(segment_id)
+
+        with session_scope() as session:
+            row = session.get(Counterparty, counterparty_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            has_client, _has_supplier = _counterparty_role_flags(row.kind)
+            if not has_client:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            extra = _counterparty_extra(row)
+            selected_segment = selected_segments[0] if selected_segments else None
+            extra["business_segment_ids"] = [segment["id"] for segment in selected_segments]
+            extra["business_segments"] = selected_segments
+            extra["business_segment_id"] = selected_segment["id"] if selected_segment else ""
+            extra["business_segment"] = selected_segment["name"] if selected_segment else ""
+            extra["business_segment_icon"] = selected_segment["icon"] if selected_segment else ""
+            extra["industry"] = selected_segment["name"] if selected_segment else ""
+            extra["map_icon"] = selected_segment["icon"] if selected_segment else "default"
+            row.data = extra
+            flag_modified(row, "data")
+
+        return JSONResponse({"ok": True, "segments": selected_segments})
+
     @app.post("/clients/{counterparty_id}/delete", name="clients_delete")
     async def clients_delete(request: Request, counterparty_id: str):
         form = await request.form()
