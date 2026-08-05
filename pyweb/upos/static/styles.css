@@ -5260,6 +5260,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 .clients-overview-map {
+  position: relative;
   width: 100%;
   height: 31rem;
   min-height: 31rem;
@@ -5646,6 +5647,82 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-top: 3px solid var(--primary);
   border-radius: 6px;
   background: var(--card);
+}
+
+.clients-overview-map.is-picking-location {
+  cursor: crosshair;
+  outline: 3px solid color-mix(in srgb, var(--primary) 38%, transparent);
+  outline-offset: -3px;
+}
+
+.clients-map-point-picker {
+  position: absolute;
+  z-index: 1000;
+  top: 0.75rem;
+  left: 50%;
+  display: flex;
+  width: min(42rem, calc(100% - 6.5rem));
+  min-height: 3.4rem;
+  padding: 0.55rem 0.65rem 0.55rem 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card) 96%, transparent);
+  box-shadow: 0 0.75rem 1.8rem rgba(15, 23, 42, 0.18);
+  transform: translateX(-50%);
+}
+
+.clients-map-point-picker[hidden] {
+  display: none;
+}
+
+.clients-map-point-picker-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.clients-map-point-picker-copy strong,
+.clients-map-point-picker-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-map-point-picker-copy strong {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.clients-map-point-picker-copy span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.clients-map-point-picker-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.4rem;
+}
+
+.clients-map-point-picker-actions .btn {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.7rem;
+}
+
+@media (max-width: 720px) {
+  .clients-map-point-picker {
+    top: 3.25rem;
+    width: calc(100% - 1rem);
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .clients-map-point-picker-actions .btn {
+    flex: 1 1 0;
+  }
 }
 
 .clients-map-kpi--active { border-top-color: #16a34a; }

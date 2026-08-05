@@ -698,6 +698,151 @@
     scheduleInvalidate(api);
   }
 
+  function overviewPickerElements(api) {
+    const panel = api.container.querySelector("[data-clients-map-point-picker]");
+    return {
+      panel,
+      title: panel?.querySelector("[data-clients-map-point-picker-title]"),
+      status: panel?.querySelector("[data-clients-map-point-picker-status]"),
+      save: panel?.querySelector("[data-clients-map-point-picker-save]"),
+    };
+  }
+
+  function setOverviewPickerPoint(api, lat, lon, { focus = false } = {}) {
+    if (!api.picker || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    api.picker.lat = Number(lat.toFixed(6));
+    api.picker.lon = Number(lon.toFixed(6));
+    if (!api.picker.marker) {
+      api.picker.marker = window.L.marker([api.picker.lat, api.picker.lon], {
+        draggable: true,
+        icon: markerIcon(api.picker.name, api.picker.icon),
+        zIndexOffset: 2000,
+      }).addTo(api.pickerLayer);
+      api.picker.marker.on("dragend", () => {
+        const point = api.picker?.marker?.getLatLng();
+        if (point) setOverviewPickerPoint(api, point.lat, point.lng);
+      });
+    } else {
+      api.picker.marker.setLatLng([api.picker.lat, api.picker.lon]);
+    }
+    const elements = overviewPickerElements(api);
+    if (elements.status) {
+      elements.status.textContent = `Точка: ${api.picker.lat}, ${api.picker.lon}. Нажмите «Сохранить».`;
+    }
+    if (elements.save) elements.save.disabled = false;
+    if (focus) api.map.setView([api.picker.lat, api.picker.lon], PICK_ZOOM);
+  }
+
+  function stopOverviewLocationPicker(api) {
+    if (!api) return;
+    api.pickerLayer?.clearLayers();
+    api.picker = null;
+    api.container.classList.remove("is-picking-location");
+    const elements = overviewPickerElements(api);
+    if (elements.panel) elements.panel.hidden = true;
+    if (elements.save) {
+      elements.save.disabled = false;
+      elements.save.textContent = "Сохранить";
+    }
+  }
+
+  async function startOverviewLocationPicker(trigger) {
+    const section = trigger.closest("#clients-map");
+    const container = section?.querySelector("[data-clients-overview-map]");
+    const api = container?._clientsOverviewApi || ensureOverviewMap(container);
+    if (!api) return;
+    stopOverviewLocationPicker(api);
+    const row = trigger.closest("[data-client-overview-point]");
+    const lat = Number.parseFloat(row?.dataset.lat || "");
+    const lon = Number.parseFloat(row?.dataset.lon || "");
+    const client = {
+      id: trigger.dataset.clientId || row?.dataset.clientId || "",
+      name: trigger.dataset.clientName || row?.dataset.name || "Клиент",
+      address: trigger.dataset.clientAddress || row?.dataset.address || "",
+      icon: trigger.dataset.clientIcon || row?.dataset.icon || "",
+      saveUrl: trigger.dataset.saveUrl || `/api/clients/${encodeURIComponent(trigger.dataset.clientId || "")}/location`,
+      csrf: trigger.dataset.csrf || csrfToken(container),
+      row,
+      lat: Number.isFinite(lat) ? lat : null,
+      lon: Number.isFinite(lon) ? lon : null,
+      marker: null,
+    };
+    api.picker = client;
+    api.container.classList.remove("clients-overview-map--empty");
+    api.container.classList.add("is-picking-location");
+    const elements = overviewPickerElements(api);
+    if (elements.panel) elements.panel.hidden = false;
+    if (elements.title) elements.title.textContent = `Местоположение: ${client.name}`;
+    if (elements.status) elements.status.textContent = "Поставьте точку кликом по карте или перетащите маркер.";
+    const current = api.map.getCenter();
+    let startPoint = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+    if (!startPoint && client.address) {
+      try {
+        startPoint = await geocodeAddress(client.address);
+      } catch {}
+    }
+    if (!api.picker || api.picker.id !== client.id) return;
+    setOverviewPickerPoint(api, startPoint?.lat ?? current.lat, startPoint?.lon ?? current.lng, { focus: Boolean(startPoint) });
+    api.container.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  async function saveOverviewLocationPicker(api) {
+    const picker = api?.picker;
+    if (!picker || !Number.isFinite(picker.lat) || !Number.isFinite(picker.lon)) return;
+    const elements = overviewPickerElements(api);
+    if (elements.save) {
+      elements.save.disabled = true;
+      elements.save.textContent = "Сохраняем...";
+    }
+    if (elements.status) elements.status.textContent = "Определяем адрес и сохраняем точку...";
+    let address = picker.address || "";
+    try {
+      address = (await reverseAddress(picker.lat, picker.lon)) || address;
+    } catch {}
+    try {
+      const response = await fetch(picker.saveUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": picker.csrf || csrfToken(api.container),
+        },
+        body: JSON.stringify({
+          latitude: picker.lat,
+          longitude: picker.lon,
+          address,
+          map_icon: picker.icon || "",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "save_failed");
+      const savedAddress = String(payload.address || address || "Адрес не указан");
+      if (picker.row) {
+        picker.row.dataset.lat = String(payload.latitude || picker.lat);
+        picker.row.dataset.lon = String(payload.longitude || picker.lon);
+        picker.row.dataset.address = savedAddress === "Адрес не указан" ? "" : savedAddress;
+        const addressCell = picker.row.querySelector(".clients-map-address-text");
+        if (addressCell) addressCell.textContent = savedAddress;
+        const locationCell = picker.row.querySelector(".clients-map-location-cell");
+        if (locationCell) {
+          locationCell.innerHTML = '<span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>';
+        }
+      }
+      if (elements.status) elements.status.textContent = `Локация ${picker.name} сохранена.`;
+      if (elements.save) elements.save.textContent = "Сохранено";
+      window.setTimeout(() => {
+        stopOverviewLocationPicker(api);
+        void renderOverviewMap(api);
+      }, 700);
+    } catch {
+      if (elements.status) elements.status.textContent = "Не удалось сохранить точку. Попробуйте ещё раз.";
+      if (elements.save) {
+        elements.save.disabled = false;
+        elements.save.textContent = "Сохранить";
+      }
+    }
+  }
+
   function ensureOverviewMap(container) {
     if (!container || !window.L) return null;
     if (container._clientsOverviewApi) {
@@ -728,8 +873,20 @@
     }).addTo(map);
     window.L.control.attribution({ prefix: "" }).addTo(map);
 
-    const api = { container, map, layer: window.L.layerGroup().addTo(map) };
+    const api = {
+      container,
+      map,
+      layer: window.L.layerGroup().addTo(map),
+      pickerLayer: window.L.layerGroup().addTo(map),
+      picker: null,
+    };
     container._clientsOverviewApi = api;
+    const pickerPanel = container.querySelector("[data-clients-map-point-picker]");
+    if (pickerPanel) window.L.DomEvent.disableClickPropagation(pickerPanel);
+    map.on("click", (event) => {
+      if (!api.picker) return;
+      setOverviewPickerPoint(api, event.latlng.lat, event.latlng.lng);
+    });
     if (window.ResizeObserver) {
       api.resizeObserver = new ResizeObserver(() => scheduleInvalidate(api));
       api.resizeObserver.observe(container);
@@ -1401,6 +1558,25 @@
     preview.append(image);
     if (objectUrl) preview.dataset.clientPhotoObjectUrl = url;
   }
+
+  document.addEventListener("click", (event) => {
+    const quickLocationPick = event.target.closest?.("[data-client-map-location-pick]");
+    const pickerCancel = event.target.closest?.("[data-clients-map-point-picker-cancel]");
+    const pickerSave = event.target.closest?.("[data-clients-map-point-picker-save]");
+    if (!quickLocationPick && !pickerCancel && !pickerSave) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (quickLocationPick) {
+      void startOverviewLocationPicker(quickLocationPick);
+      return;
+    }
+    const container = (pickerCancel || pickerSave).closest("[data-clients-overview-map]");
+    if (pickerCancel) {
+      stopOverviewLocationPicker(container?._clientsOverviewApi);
+    } else {
+      void saveOverviewLocationPicker(container?._clientsOverviewApi);
+    }
+  }, true);
 
   document.addEventListener("click", (event) => {
     const documentMenuToggle = event.target.closest("[data-client-document-menu-toggle]");

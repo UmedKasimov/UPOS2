@@ -373,6 +373,16 @@
         {% endif %}
       >
         <div class="clients-map-empty">У клиентов пока нет сохраненной геолокации.</div>
+        <section class="clients-map-point-picker" data-clients-map-point-picker hidden aria-live="polite">
+          <div class="clients-map-point-picker-copy">
+            <strong data-clients-map-point-picker-title>Выберите местоположение</strong>
+            <span data-clients-map-point-picker-status>Поставьте точку на карте или перетащите маркер.</span>
+          </div>
+          <div class="clients-map-point-picker-actions">
+            <button type="button" class="btn btn-secondary" data-clients-map-point-picker-cancel>Отмена</button>
+            <button type="button" class="btn btn-primary" data-clients-map-point-picker-save>Сохранить</button>
+          </div>
+        </section>
       </div>
     </div>
     <div class="clients-map-list">
@@ -475,13 +485,13 @@
                   <a
                     class="clients-map-location-quick-link"
                     href="{{ client_tab_href }}#client-edit"
-                    data-workspace-trigger="client-edit-{{ client.id }}"
-                    data-workspace-tab-id="client-edit-{{ client.id }}"
-                    data-workspace-view-id="client_edit"
-                    data-workspace-tab-title="Редактировать {{ client.name }}"
-                    data-workspace-tab-hash="client-edit"
-                    data-workspace-tab-href="{{ client_tab_href }}"
-                    data-client-map-quick-edit
+                    data-client-map-location-pick
+                    data-client-id="{{ client.id }}"
+                    data-client-name="{{ client.name }}"
+                    data-client-address="{{ client.address or '' }}"
+                    data-client-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+                    data-save-url="{{ url_for('client_location_save_api', counterparty_id=client.id) }}"
+                    data-csrf="{{ csrf_token }}"
                     title="Уточнить координаты {{ client.name }}"
                     aria-label="Уточнить координаты {{ client.name }}"
                   ><span class="client-location-state client-location-state--no">×</span><small>Уточнить</small></a>
@@ -489,13 +499,13 @@
                   <a
                     class="clients-map-location-quick-link"
                     href="{{ client_tab_href }}#client-edit"
-                    data-workspace-trigger="client-edit-{{ client.id }}"
-                    data-workspace-tab-id="client-edit-{{ client.id }}"
-                    data-workspace-view-id="client_edit"
-                    data-workspace-tab-title="Редактировать {{ client.name }}"
-                    data-workspace-tab-hash="client-edit"
-                    data-workspace-tab-href="{{ client_tab_href }}"
-                    data-client-map-quick-edit
+                    data-client-map-location-pick
+                    data-client-id="{{ client.id }}"
+                    data-client-name="{{ client.name }}"
+                    data-client-address=""
+                    data-client-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+                    data-save-url="{{ url_for('client_location_save_api', counterparty_id=client.id) }}"
+                    data-csrf="{{ csrf_token }}"
                     title="Добавить локацию {{ client.name }}"
                     aria-label="Добавить локацию {{ client.name }}"
                   ><span class="client-location-state client-location-state--no">×</span><small>Добавить</small></a>
