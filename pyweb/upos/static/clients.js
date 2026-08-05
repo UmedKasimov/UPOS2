@@ -1209,13 +1209,34 @@
     return [...(picker?.querySelectorAll("[data-client-directory-segment-option]") || [])];
   }
 
-  function syncDirectorySegmentPicker(picker) {
-    if (!picker) return;
-    const checked = directorySegmentOptions(picker).filter((input) => input.checked);
-    const summary = picker.querySelector("[data-client-directory-segment-summary]");
+  function directorySegmentIds(picker) {
+    const options = directorySegmentOptions(picker);
+    if (options.length) {
+      return options.filter((input) => input.checked).map((input) => String(input.value || ""));
+    }
+    return parseOverviewList(picker?.dataset.selectedSegmentIds).map((value) => String(value || "")).filter(Boolean);
+  }
+
+  function hydrateDirectorySegmentPicker(picker) {
+    const target = picker?.querySelector("[data-client-map-segment-options]");
+    if (!target || target.dataset.hydrated === "1") return;
+    const template = document.querySelector("[data-client-map-segment-options-template]");
+    if (!template?.content) return;
+    const selectedIds = new Set(directorySegmentIds(picker));
+    target.append(template.content.cloneNode(true));
+    directorySegmentOptions(picker).forEach((input) => {
+      input.checked = selectedIds.has(String(input.value || ""));
+    });
+    target.dataset.hydrated = "1";
+    picker._savedSegmentIds = selectedIds;
+    syncDirectorySegmentPicker(picker);
+  }
+
+  function renderDirectorySegmentSummary(picker, segments) {
+    const summary = picker?.querySelector("[data-client-directory-segment-summary]");
     if (!summary) return;
     summary.replaceChildren();
-    if (!checked.length) {
+    if (!segments.length) {
       const empty = document.createElement("span");
       empty.className = "client-directory-segment-empty";
       empty.textContent = "Выбрать";
@@ -1223,19 +1244,53 @@
       summary.title = "Выбрать сегмент";
       return;
     }
-    checked.slice(0, 2).forEach((input) => {
+    segments.slice(0, 2).forEach((segment) => {
       const chip = document.createElement("span");
       chip.className = "client-segment-chip";
-      chip.textContent = `${input.dataset.segmentIcon || ""} ${input.dataset.segmentLabel || input.value}`.trim();
+      chip.textContent = `${segment.icon || ""} ${segment.name || segment.id || ""}`.trim();
       summary.append(chip);
     });
-    if (checked.length > 2) {
+    if (segments.length > 2) {
       const more = document.createElement("span");
       more.className = "client-directory-segment-more";
-      more.textContent = `+${checked.length - 2}`;
+      more.textContent = `+${segments.length - 2}`;
       summary.append(more);
     }
-    summary.title = checked.map((input) => input.dataset.segmentLabel || input.value).join(", ");
+    summary.title = segments.map((segment) => segment.name || segment.id || "").filter(Boolean).join(", ");
+  }
+
+  function syncDirectorySegmentPicker(picker) {
+    if (!picker) return;
+    const checked = directorySegmentOptions(picker).filter((input) => input.checked);
+    renderDirectorySegmentSummary(picker, checked.map((input) => ({
+      id: String(input.value || ""),
+      name: input.dataset.segmentLabel || input.value,
+      icon: input.dataset.segmentIcon || "",
+    })));
+  }
+
+  function applySavedClientSegments(clientId, segments) {
+    const normalized = (Array.isArray(segments) ? segments : []).map((segment) => ({
+      id: String(segment?.id || ""),
+      name: String(segment?.name || "").trim(),
+      icon: String(segment?.icon || "").trim(),
+    })).filter((segment) => segment.id);
+    const savedIds = new Set(normalized.map((segment) => segment.id));
+    document.querySelectorAll("[data-client-directory-segment-picker]").forEach((candidate) => {
+      if (String(candidate.dataset.clientId || "") !== clientId) return;
+      candidate.dataset.selectedSegmentIds = JSON.stringify([...savedIds]);
+      candidate._savedSegmentIds = new Set(savedIds);
+      directorySegmentOptions(candidate).forEach((input) => {
+        input.checked = savedIds.has(String(input.value || ""));
+      });
+      renderDirectorySegmentSummary(candidate, normalized);
+    });
+    document.querySelectorAll("[data-client-overview-point]").forEach((row) => {
+      if (String(row.dataset.clientId || "") !== clientId) return;
+      row.dataset.segments = JSON.stringify(normalized.map(({ name, icon }) => ({ name, icon })));
+      row.dataset.icon = normalized[0]?.icon || "";
+    });
+    document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
   }
 
   function setDirectorySegmentStatus(picker, text, kind = "") {
@@ -1274,8 +1329,7 @@
       directorySegmentOptions(picker).forEach((input) => {
         input.checked = savedIds.has(input.value);
       });
-      picker._savedSegmentIds = savedIds;
-      syncDirectorySegmentPicker(picker);
+      applySavedClientSegments(clientId, payload.segments || []);
       setDirectorySegmentStatus(picker, "Сохранено", "success");
     } catch {
       const savedIds = picker._savedSegmentIds || new Set();
@@ -1302,10 +1356,8 @@
 
   function initializeDirectorySegmentPickers(root = document) {
     root.querySelectorAll("[data-client-directory-segment-picker]").forEach((picker) => {
-      picker._savedSegmentIds = new Set(
-        directorySegmentOptions(picker).filter((input) => input.checked).map((input) => input.value)
-      );
-      syncDirectorySegmentPicker(picker);
+      picker._savedSegmentIds = new Set(directorySegmentIds(picker));
+      if (!picker.matches("[data-client-map-segment-picker]")) syncDirectorySegmentPicker(picker);
     });
   }
 
@@ -1571,6 +1623,11 @@
       setTimeout(focusClientLocationPanel, 320);
     }
   });
+
+  document.addEventListener("toggle", (event) => {
+    const details = event.target.closest?.("[data-client-map-segment-picker] details");
+    if (details?.open) hydrateDirectorySegmentPicker(details.closest("[data-client-map-segment-picker]"));
+  }, true);
 
   window.addEventListener("hashchange", () => {
     showClientSection();

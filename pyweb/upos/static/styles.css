@@ -5371,12 +5371,35 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--primary) 7%, var(--card));
 }
 
+.clients-map-table tbody td:has(.client-directory-segment-dropdown[open]),
+.clients-map-table tbody tr:has(.client-directory-segment-dropdown[open]) {
+  position: relative;
+  z-index: 80;
+  overflow: visible;
+}
+
 .clients-map-table th:nth-child(1) {
   width: 29%;
 }
 
 .clients-map-table th:nth-child(2) {
   width: 24%;
+}
+
+.clients-map-segment-picker {
+  width: 100%;
+}
+
+.client-directory-segment-menu.clients-map-segment-menu {
+  left: 0;
+  right: auto;
+  width: min(22rem, calc(100vw - 2rem));
+  min-width: 18rem;
+}
+
+.client-directory-segment-menu.clients-map-segment-menu .client-segment-options {
+  grid-template-columns: minmax(0, 1fr);
+  max-height: 15rem;
 }
 
 .clients-map-table th:nth-child(3) {

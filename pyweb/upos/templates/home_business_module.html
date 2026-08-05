@@ -14,12 +14,12 @@
   {% elif active == "clients" %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-    <script src="{{ url_for('static', path='clients.js') }}?v=35" defer></script>
+    <script src="{{ url_for('static', path='clients.js') }}?v=36" defer></script>
   {% elif active == "suppliers" %}
     {# Карточка поставщика переиспользует разметку клиентской, включая навигацию по
        разделам из clients.js. Leaflet не подключаем — карт здесь нет, а инициализация
        карт в скрипте сама отступает, если window.L отсутствует. #}
-    <script src="{{ url_for('static', path='clients.js') }}?v=35" defer></script>
+    <script src="{{ url_for('static', path='clients.js') }}?v=36" defer></script>
   {% endif %}
 {% endblock %}
 
