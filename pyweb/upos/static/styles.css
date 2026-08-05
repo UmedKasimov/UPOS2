@@ -23263,6 +23263,32 @@ body:has(dialog[open]) {
   overflow: hidden;
 }
 
+.client-location-state-cell {
+  text-align: center;
+}
+
+.client-location-state {
+  display: inline-grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.client-location-state--yes {
+  color: #15803d;
+  background: color-mix(in srgb, #22c55e 12%, var(--card));
+}
+
+.client-location-state--no {
+  color: #9ca3af;
+  background: color-mix(in srgb, #9ca3af 8%, var(--card));
+}
+
 /* Кнопки действий в строках клиентов и поставщиков — рядом, по центру. */
 .clients-table .products-row-actions {
   display: table-cell;

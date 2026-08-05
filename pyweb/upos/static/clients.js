@@ -890,6 +890,7 @@
     { key: "balance", kind: "number" },
     { key: "last_date", kind: "date" },
     { key: "segment", kind: "text" },
+    { key: "location", sortable: false },
     { key: "created_at", kind: "date" },
     { key: "phone", kind: "text" },
     { key: "category", kind: "text" },

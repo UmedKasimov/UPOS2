@@ -125,6 +125,7 @@
             <th>Баланс</th>
             <th>Последняя отгрузка</th>
             <th>Сегмент</th>
+            <th>Локация</th>
             <th>Дата создания</th>
             <th>Телефон</th>
             <th>Категория</th>
@@ -177,6 +178,13 @@
                   </div>
                 {% else %}
                   -
+                {% endif %}
+              </td>
+              <td class="client-location-state-cell">
+                {% if client.latitude and client.longitude %}
+                  <span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>
+                {% else %}
+                  <span class="client-location-state client-location-state--no" role="img" aria-label="Локация не указана" title="Локация не указана">×</span>
                 {% endif %}
               </td>
               <td title="{{ client.created_at or '-' }}">{{ client.created_at or "-" }}</td>
