@@ -57,6 +57,7 @@
       <form id="clients-filter-form" class="products-catalog-filter clients-filter-form" method="get" action="{{ url_for('clients_get') }}#clients">
         <input type="hidden" name="client_sort" value="{{ clients_sort_key }}" />
         <input type="hidden" name="client_sort_dir" value="{{ clients_sort_direction }}" />
+        <input type="hidden" name="page_size" value="{{ clients_page_size }}" data-clients-page-size-value />
         <label class="products-catalog-search">
           <span>Поиск</span>
           <input name="q" value="{{ client_filters.q }}" placeholder="Клиент, телефон, ИНН, код" />
@@ -113,6 +114,7 @@
         class="products-table products-catalog-table clients-table"
         data-upos-column-controls
         data-clients-directory-table
+        data-clients-search-query="{{ client_filters.q }}"
         data-clients-sort-key="{{ clients_sort_key }}"
         data-clients-sort-direction="{{ clients_sort_direction }}"
       >
@@ -308,7 +310,7 @@
         </div>
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
-          <select name="page_size" form="clients-filter-form" onchange="this.form.requestSubmit()">
+          <select form="clients-filter-form" data-clients-page-size onchange="this.form.querySelector('[data-clients-page-size-value]').value=this.value; this.form.requestSubmit()">
             {% for size in [100, 500, 1000] %}
               <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
             {% endfor %}
@@ -1434,7 +1436,7 @@
         </div>
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
-          <select name="page_size" form="clients-filter-form" onchange="this.form.requestSubmit()">
+          <select form="clients-filter-form" data-clients-page-size onchange="this.form.querySelector('[data-clients-page-size-value]').value=this.value; this.form.requestSubmit()">
             {% for size in [100, 500, 1000] %}
               <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
             {% endfor %}

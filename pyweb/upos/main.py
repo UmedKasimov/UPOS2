@@ -12532,7 +12532,12 @@ def create_app() -> FastAPI:
         operation_preset = str(op or "").strip()
         if operation_preset not in {"in", "out", "transfer"}:
             operation_preset = ""
-        q_clean = filters["q"].lower()
+        q_clean = filters["q"].casefold().replace("ё", "е")
+        q_tokens = [
+            token
+            for token in re.split(r"\s+", q_clean)
+            if token and re.sub(r"[^\w]+", "", token)
+        ]
         warehouse_records: list[dict[str, Any]] = []
         warehouse_stocks: list[dict[str, Any]] = []
         warehouse_operations: list[dict[str, Any]] = []
@@ -13281,7 +13286,7 @@ def create_app() -> FastAPI:
                     crm_status_by_id=crm_status_by_id,
                     crm_status_by_name=crm_status_by_name,
                 )
-                hay = " ".join(
+                search_fields = " ".join(
                     [
                         item["id"],
                         item["name"],
@@ -13289,16 +13294,16 @@ def create_app() -> FastAPI:
                         item["legal_name"],
                         item["phone"],
                         item["telegram_phone"],
-                        item["category"],
-                        item["territory"],
-                        item["route"],
                         item["inn"],
                         item["pinfl"],
-                        item["address"],
                         item["code"],
                     ]
-                ).lower()
-                if q_clean and q_clean not in hay:
+                ).casefold().replace("ё", "е")
+                compact_search_fields = re.sub(r"[^\w]+", "", search_fields)
+                if q_tokens and not all(
+                    token in search_fields or re.sub(r"[^\w]+", "", token) in compact_search_fields
+                    for token in q_tokens
+                ):
                     continue
                 if filters["territory"] and item["territory"] != filters["territory"]:
                     continue

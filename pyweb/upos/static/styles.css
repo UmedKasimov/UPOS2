@@ -23784,6 +23784,15 @@ body:has(dialog[open]) {
   background: color-mix(in srgb, #9ca3af 8%, var(--card));
 }
 
+.client-search-highlight {
+  padding: 0 0.08em;
+  border-radius: 2px;
+  background: #fde047;
+  color: #111827;
+  font: inherit;
+  font-weight: 800;
+}
+
 .client-location-dialog {
   width: min(48rem, calc(100vw - 1.5rem));
   max-width: none;

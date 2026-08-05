@@ -1193,6 +1193,47 @@
     root.querySelectorAll("[data-clients-directory-table]").forEach(initClientDirectoryTable);
   }
 
+  function highlightClientSearchMatches() {
+    const table = document.querySelector("[data-clients-directory-table]");
+    const query = String(table?.dataset.clientsSearchQuery || "").trim();
+    if (!table || !query || !table.tBodies[0]) return;
+    const terms = [...new Set(query.split(/\s+/).map((term) => term.trim()).filter(Boolean))]
+      .sort((left, right) => right.length - left.length);
+    if (!terms.length) return;
+    const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const matcher = new RegExp(`(${escaped.join("|")})`, "giu");
+    const walker = document.createTreeWalker(table.tBodies[0], NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const text = node.nodeValue || "";
+        const parent = node.parentElement;
+        if (!text.trim() || !parent || parent.closest("mark, input, select, option, button, script, style")) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        matcher.lastIndex = 0;
+        return matcher.test(text) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const matches = [];
+    while (walker.nextNode()) matches.push(walker.currentNode);
+    matches.forEach((node) => {
+      const text = node.nodeValue || "";
+      const fragment = document.createDocumentFragment();
+      let cursor = 0;
+      matcher.lastIndex = 0;
+      for (const match of text.matchAll(matcher)) {
+        const index = match.index || 0;
+        if (index > cursor) fragment.append(document.createTextNode(text.slice(cursor, index)));
+        const mark = document.createElement("mark");
+        mark.className = "client-search-highlight";
+        mark.textContent = match[0];
+        fragment.append(mark);
+        cursor = index + match[0].length;
+      }
+      if (cursor < text.length) fragment.append(document.createTextNode(text.slice(cursor)));
+      node.replaceWith(fragment);
+    });
+  }
+
   function locate(form) {
     ensureMap(form);
     if (!navigator.geolocation) {
@@ -2069,6 +2110,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     initializeClientDirectoryTables();
+    highlightClientSearchMatches();
     initializeProgramDropdowns();
     initializeSegmentPickers();
     initializeDirectorySegmentPickers();
