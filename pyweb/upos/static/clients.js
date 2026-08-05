@@ -492,6 +492,9 @@
         .filter(Boolean),
       category: section.querySelector("[data-clients-map-category]")?.value || "",
       status: section.querySelector("[data-clients-map-status]")?.value || "",
+      segments: [...section.querySelectorAll("[data-clients-map-segment]:checked")]
+        .map((input) => input.value)
+        .filter(Boolean),
       location: section.querySelector('[data-clients-map-location-filter][aria-pressed="true"]')?.dataset.clientsMapLocationFilter || "",
     };
   }
@@ -517,6 +520,10 @@
     if (filters.programs.length && !filters.programs.some((program) => point.programList.includes(program))) return false;
     if (filters.category && point.category !== filters.category) return false;
     if (filters.status && point.status !== filters.status) return false;
+    if (
+      filters.segments?.length
+      && !filters.segments.some((name) => point.segments.some((segment) => segment.name === name))
+    ) return false;
     if (filters.location === "coords" && !point.hasCoords) return false;
     if (filters.location === "address" && (point.hasCoords || !point.hasAddress)) return false;
     if (filters.location === "missing" && (point.hasCoords || point.hasAddress)) return false;
@@ -2264,7 +2271,7 @@
     section.querySelectorAll("[data-clients-map-search], [data-clients-map-filter] select").forEach((field) => {
       field.value = "";
     });
-    section.querySelectorAll("[data-clients-map-program]").forEach((checkbox) => {
+    section.querySelectorAll("[data-clients-map-program], [data-clients-map-segment]").forEach((checkbox) => {
       checkbox.checked = false;
     });
     section.querySelectorAll("[data-clients-map-program-filter]").forEach(syncProgramDropdown);
@@ -2334,6 +2341,182 @@
       details.closest("[data-client-map-segment-picker], [data-client-directory-segment-picker]"),
     );
   }, true);
+
+  // ── Попап настройки фильтра карты ───────────────────────────────────────
+  // Все фильтры собраны в одном окне, выбранный набор сохраняется как шаблон
+  // рабочего пространства и подставляется при следующем открытии.
+
+  function clientsMapSection() {
+    return document.querySelector("#clients-map");
+  }
+
+  function readClientsMapFilterState(section) {
+    if (!section) return null;
+    return {
+      type: section.querySelector("[data-clients-map-type]")?.value || "",
+      category: section.querySelector("[data-clients-map-category]")?.value || "",
+      status: section.querySelector("[data-clients-map-status]")?.value || "",
+      location: section.querySelector("[data-clients-map-location-select]")?.value || "",
+      programs: [...section.querySelectorAll("[data-clients-map-program]:checked")].map((input) => input.value),
+      segments: [...section.querySelectorAll("[data-clients-map-segment]:checked")].map((input) => input.value),
+    };
+  }
+
+  function applyClientsMapLocation(section, value) {
+    // Кнопки-счётчики под таблицей остаются источником истины для карты,
+    // поэтому выбор в попапе переводим в их состояние.
+    section.querySelectorAll("[data-clients-map-location-filter]").forEach((button) => {
+      const active = (button.dataset.clientsMapLocationFilter || "") === (value || "");
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  function applyClientsMapFilterState(section, state) {
+    if (!section || !state) return;
+    const setValue = (selector, value) => {
+      const field = section.querySelector(selector);
+      if (field) field.value = value || "";
+    };
+    setValue("[data-clients-map-type]", state.type);
+    setValue("[data-clients-map-category]", state.category);
+    setValue("[data-clients-map-status]", state.status);
+    setValue("[data-clients-map-location-select]", state.location);
+    const programs = new Set(Array.isArray(state.programs) ? state.programs : []);
+    section.querySelectorAll("[data-clients-map-program]").forEach((checkbox) => {
+      checkbox.checked = programs.has(checkbox.value);
+    });
+    const segments = new Set(Array.isArray(state.segments) ? state.segments : []);
+    section.querySelectorAll("[data-clients-map-segment]").forEach((checkbox) => {
+      checkbox.checked = segments.has(checkbox.value);
+    });
+    applyClientsMapLocation(section, state.location);
+  }
+
+  const CLIENTS_MAP_LOCATION_LABELS = {
+    coords: "с координатами",
+    address: "только адрес",
+    missing: "без локации",
+  };
+
+  function syncClientsMapFilterBar(section) {
+    if (!section) return;
+    const state = readClientsMapFilterState(section);
+    const parts = [];
+    if (state.type) parts.push(state.type === "company" ? "Компании" : "Физлица");
+    if (state.category) parts.push(state.category);
+    if (state.status) parts.push(state.status === "active" ? "Активные" : "Неактивные");
+    if (state.location) parts.push(CLIENTS_MAP_LOCATION_LABELS[state.location] || state.location);
+    if (state.programs.length) parts.push(`программы: ${state.programs.length}`);
+    if (state.segments.length) parts.push(`сегменты: ${state.segments.length}`);
+    const summary = section.querySelector("[data-clients-map-filter-summary]");
+    if (summary) summary.textContent = parts.length ? parts.join(" · ") : "Без фильтров";
+    const counter = section.querySelector("[data-clients-map-filter-count]");
+    if (counter) {
+      counter.textContent = String(parts.length);
+      counter.hidden = parts.length === 0;
+    }
+  }
+
+  function setClientsMapFilterStatus(section, message, tone = "") {
+    const status = section?.querySelector("[data-clients-map-filter-status]");
+    if (!status) return;
+    status.textContent = message || "";
+    status.dataset.tone = tone;
+  }
+
+  async function saveClientsMapFilter(section) {
+    const state = readClientsMapFilterState(section);
+    setClientsMapFilterStatus(section, "Сохраняю…");
+    try {
+      const response = await fetch("/api/settings/clients-map-filter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken(section) },
+        body: JSON.stringify({ filter: state }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.error) throw new Error(payload.error || "Не удалось сохранить");
+      section.dataset.clientsMapSavedFilter = JSON.stringify(payload.filter || state);
+      setClientsMapFilterStatus(section, "Шаблон сохранён", "ok");
+      return true;
+    } catch (error) {
+      setClientsMapFilterStatus(section, error.message || "Не удалось сохранить", "error");
+      return false;
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const section = event.target.closest?.("#clients-map");
+    if (!section) return;
+    const dialog = section.querySelector("[data-clients-map-filter-dialog]");
+
+    if (event.target.closest("[data-clients-map-filter-open]")) {
+      event.preventDefault();
+      if (dialog && !dialog.open) dialog.showModal();
+      syncClientsMapFilterBar(section);
+      setClientsMapFilterStatus(section, "");
+      return;
+    }
+
+    if (event.target.closest("[data-clients-map-filter-close]")) {
+      event.preventDefault();
+      dialog?.close();
+      return;
+    }
+
+    if (event.target.closest("[data-clients-map-clear]")) {
+      // Сброс меняет поля напрямую, без событий — строку сводки обновляем сами.
+      window.setTimeout(() => syncClientsMapFilterBar(section), 0);
+      return;
+    }
+
+    if (event.target.closest("[data-clients-map-filter-save]")) {
+      event.preventDefault();
+      saveClientsMapFilter(section).then((ok) => {
+        if (ok) window.setTimeout(() => dialog?.close(), 500);
+      });
+    }
+  });
+
+  document.addEventListener("change", (event) => {
+    const section = event.target.closest?.("#clients-map");
+    if (!section) return;
+    if (event.target.matches("[data-clients-map-location-select]")) {
+      applyClientsMapLocation(section, event.target.value);
+      document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+    }
+    if (event.target.closest("[data-clients-map-filter]")) syncClientsMapFilterBar(section);
+  });
+
+  document.addEventListener("click", (event) => {
+    // Клик по кнопке-счётчику под таблицей должен отражаться в попапе.
+    const button = event.target.closest?.("[data-clients-map-location-filter]");
+    if (!button) return;
+    const section = button.closest("#clients-map");
+    const select = section?.querySelector("[data-clients-map-location-select]");
+    if (select) select.value = button.dataset.clientsMapLocationFilter || "";
+    syncClientsMapFilterBar(section);
+  });
+
+  function restoreClientsMapFilter() {
+    const section = clientsMapSection();
+    if (!section || section.dataset.clientsMapFilterRestored === "1") return;
+    section.dataset.clientsMapFilterRestored = "1";
+    let saved = null;
+    try {
+      saved = JSON.parse(section.dataset.clientsMapSavedFilter || "null");
+    } catch (error) {
+      saved = null;
+    }
+    if (saved && typeof saved === "object") applyClientsMapFilterState(section, saved);
+    syncClientsMapFilterBar(section);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", restoreClientsMapFilter);
+  } else {
+    restoreClientsMapFilter();
+  }
 
   window.addEventListener("hashchange", () => {
     unpackClientsMapRows();

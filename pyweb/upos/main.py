@@ -13548,6 +13548,9 @@ def create_app() -> FastAPI:
             clients_sort_key=clients_sort_key,
             clients_sort_direction=clients_sort_direction,
             clients_map_records=clients_map_records,
+            clients_map_filter=_clean_clients_map_filter(
+                (load_workspace_settings(wid) or {}).get("clients_map_filter")
+            ),
             clients_total=clients_total,
             clients_page=clients_page,
             clients_page_size=clients_page_size,
@@ -23148,6 +23151,57 @@ def create_app() -> FastAPI:
             "old_price_label": clean_text(source.get("old_price_label"), 60) or "Старая цена",
             "fields": fields,
         }
+
+    CLIENTS_MAP_FILTER_TYPES = {"", "company", "individual"}
+    CLIENTS_MAP_FILTER_STATUSES = {"", "active", "inactive"}
+    CLIENTS_MAP_FILTER_LOCATIONS = {"", "coords", "address", "missing"}
+
+    def _clean_clients_map_filter(payload: Any) -> dict[str, Any]:
+        """Шаблон фильтра карты клиентов: только известные поля и значения."""
+        data = payload if isinstance(payload, dict) else {}
+
+        def text_value(key: str, allowed: set[str]) -> str:
+            value = str(data.get(key) or "").strip()
+            return value if value in allowed else ""
+
+        def list_value(key: str) -> list[str]:
+            raw = data.get(key)
+            if not isinstance(raw, list):
+                return []
+            seen: list[str] = []
+            for item in raw:
+                value = str(item or "").strip()
+                if value and value not in seen:
+                    seen.append(value)
+            return seen[:200]
+
+        return {
+            "type": text_value("type", CLIENTS_MAP_FILTER_TYPES),
+            "category": str(data.get("category") or "").strip()[:120],
+            "status": text_value("status", CLIENTS_MAP_FILTER_STATUSES),
+            "location": text_value("location", CLIENTS_MAP_FILTER_LOCATIONS),
+            "programs": list_value("programs"),
+            "segments": list_value("segments"),
+        }
+
+    @app.post("/api/settings/clients-map-filter")
+    async def api_settings_clients_map_filter(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _workspace_settings_owner_id(request, allow_general=True)
+        if err:
+            return err
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        template = _clean_clients_map_filter((body or {}).get("filter"))
+        data = load_workspace_settings(wid)
+        data["clients_map_filter"] = template
+        _save_workspace_settings_from_user(request, data)
+        return {"ok": True, "filter": template}
 
     @app.post("/api/settings/price-tag")
     async def api_settings_price_tag(request: Request):
