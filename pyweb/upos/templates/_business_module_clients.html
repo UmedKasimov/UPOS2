@@ -347,12 +347,18 @@
               data-category="{{ client.category or '' }}"
               data-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
               data-programs="{{ client.program or '' }}"
+              data-program-list="{{ client.programs | tojson | forceescape }}"
+              data-segments="{{ client.business_segments | tojson | forceescape }}"
               data-status="{{ client.status }}"
             >
               <td><strong>{{ client.name }}</strong></td>
               <td>
-                {% if client.business_segment %}
-                  <span class="client-segment-chip">{{ client.business_segment_icon }} {{ client.business_segment }}</span>
+                {% if client.business_segments %}
+                  <div class="client-segment-chip-list">
+                    {% for segment in client.business_segments %}
+                      <span class="client-segment-chip">{{ segment.icon }} {{ segment.name }}</span>
+                    {% endfor %}
+                  </div>
                 {% else %}
                   -
                 {% endif %}
@@ -387,6 +393,46 @@
       </table>
     </div>
   </div>
+  <section class="clients-map-insights" data-clients-map-insights aria-live="polite">
+    <header class="clients-map-insights-head">
+      <div>
+        <span>Сводка по текущему фильтру</span>
+        <strong data-clients-map-filter-label>Все клиенты на карте</strong>
+      </div>
+    </header>
+    <div class="clients-map-kpi-grid">
+      <article class="clients-map-kpi clients-map-kpi--total">
+        <span>Клиенты</span>
+        <strong data-clients-map-total>0</strong>
+        <small>попали в текущий фильтр</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--active">
+        <span>Активные</span>
+        <strong data-clients-map-active>0</strong>
+        <small data-clients-map-active-share>0% от выбранных</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--segments">
+        <span>Сегменты</span>
+        <strong data-clients-map-segment-total>0</strong>
+        <small>разных сегментов</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--programs">
+        <span>Программы</span>
+        <strong data-clients-map-program-total>0</strong>
+        <small>используют клиенты</small>
+      </article>
+    </div>
+    <div class="clients-map-breakdowns">
+      <section class="clients-map-breakdown">
+        <header><h3>Клиенты по сегментам</h3><span>Количество</span></header>
+        <div class="clients-map-breakdown-grid" data-clients-map-segment-breakdown></div>
+      </section>
+      <section class="clients-map-breakdown">
+        <header><h3>Клиенты по программам</h3><span>Количество</span></header>
+        <div class="clients-map-breakdown-grid" data-clients-map-program-breakdown></div>
+      </section>
+    </div>
+  </section>
 </section>
 
 <section id="client-create" class="products-list-panel client-create-shell" data-workspace-view="client_create" hidden>

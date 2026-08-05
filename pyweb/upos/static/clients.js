@@ -462,10 +462,19 @@
     if (selectedIds.size && !selectedIds.has(point.id)) return false;
     if (filters.q && !point.name.toLowerCase().includes(filters.q)) return false;
     if (filters.type && point.type !== filters.type) return false;
-    if (filters.program && !point.programs.split(",").map((item) => item.trim()).includes(filters.program)) return false;
+    if (filters.program && !point.programList.includes(filters.program)) return false;
     if (filters.category && point.category !== filters.category) return false;
     if (filters.status && point.status !== filters.status) return false;
     return true;
+  }
+
+  function parseOverviewList(value, fallback = []) {
+    try {
+      const parsed = JSON.parse(String(value || ""));
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
   }
 
   function readOverviewPoints(container) {
@@ -476,6 +485,16 @@
       .map((item) => {
         const lat = Number.parseFloat(item.dataset.lat || "");
         const lon = Number.parseFloat(item.dataset.lon || "");
+        const segments = parseOverviewList(item.dataset.segments)
+          .filter((segment) => segment && typeof segment === "object" && String(segment.name || "").trim())
+          .map((segment) => ({
+            name: String(segment.name || "").trim(),
+            icon: String(segment.icon || "🏷️").trim() || "🏷️",
+          }));
+        const programList = parseOverviewList(
+          item.dataset.programList,
+          String(item.dataset.programs || "").split(",").map((value) => value.trim()).filter(Boolean)
+        ).map((value) => String(value || "").trim()).filter(Boolean);
         const point = {
           id: item.dataset.clientId || "",
           lat,
@@ -484,8 +503,10 @@
           address: item.dataset.address || "",
           type: item.dataset.clientType || "",
           category: item.dataset.category || "",
-          icon: item.dataset.icon || "",
+          icon: segments[0]?.icon || item.dataset.icon || "",
           programs: item.dataset.programs || "",
+          programList,
+          segments,
           status: item.dataset.status || "",
           item,
         };
@@ -494,6 +515,81 @@
         return matched ? point : null;
       })
       .filter(Boolean);
+  }
+
+  function countOverviewValues(points, valuesForPoint, emptyLabel) {
+    const counts = new Map();
+    points.forEach((point) => {
+      const values = valuesForPoint(point);
+      if (!values.length) {
+        counts.set(emptyLabel, (counts.get(emptyLabel) || 0) + 1);
+        return;
+      }
+      new Set(values.filter(Boolean)).forEach((value) => {
+        counts.set(value, (counts.get(value) || 0) + 1);
+      });
+    });
+    return counts;
+  }
+
+  function renderOverviewBreakdown(container, counts) {
+    if (!container) return;
+    const entries = [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "ru"));
+    container.innerHTML = entries.length
+      ? entries.map(([label, count]) => `
+          <article class="clients-map-breakdown-item">
+            <span title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+            <strong>${count}</strong>
+          </article>
+        `).join("")
+      : '<p class="clients-map-breakdown-empty">Нет данных по выбранным клиентам</p>';
+  }
+
+  function overviewFilterLabel(container) {
+    const filters = overviewFilters(container);
+    const section = container.closest("#clients-map") || document;
+    const labels = [];
+    if (filters.q) labels.push(`Поиск: ${filters.q}`);
+    [
+      ["[data-clients-map-type]", filters.type],
+      ["[data-clients-map-program]", filters.program],
+      ["[data-clients-map-category]", filters.category],
+      ["[data-clients-map-status]", filters.status],
+    ].forEach(([selector, value]) => {
+      if (!value) return;
+      const select = section.querySelector(selector);
+      labels.push(select?.selectedOptions?.[0]?.textContent?.trim() || value);
+    });
+    const selectedCount = selectedMapIds().size;
+    if (selectedCount) labels.push(`Выбрано вручную: ${selectedCount}`);
+    return labels.length ? labels.join(" · ") : "Все клиенты на карте";
+  }
+
+  function renderOverviewInsights(container, points) {
+    const section = container.closest("#clients-map") || document;
+    const insights = section.querySelector("[data-clients-map-insights]");
+    if (!insights) return;
+    const active = points.filter((point) => point.status === "active").length;
+    const segmentCounts = countOverviewValues(
+      points,
+      (point) => point.segments.map((segment) => `${segment.icon} ${segment.name}`.trim()),
+      "Без сегмента"
+    );
+    const programCounts = countOverviewValues(points, (point) => point.programList, "Без программы");
+    const assignedSegments = [...segmentCounts.keys()].filter((label) => label !== "Без сегмента").length;
+    const assignedPrograms = [...programCounts.keys()].filter((label) => label !== "Без программы").length;
+    const setText = (selector, value) => {
+      const target = insights.querySelector(selector);
+      if (target) target.textContent = String(value);
+    };
+    setText("[data-clients-map-filter-label]", overviewFilterLabel(container));
+    setText("[data-clients-map-total]", points.length);
+    setText("[data-clients-map-active]", active);
+    setText("[data-clients-map-active-share]", `${points.length ? Math.round((active / points.length) * 100) : 0}% от выбранных`);
+    setText("[data-clients-map-segment-total]", assignedSegments);
+    setText("[data-clients-map-program-total]", assignedPrograms);
+    renderOverviewBreakdown(insights.querySelector("[data-clients-map-segment-breakdown]"), segmentCounts);
+    renderOverviewBreakdown(insights.querySelector("[data-clients-map-program-breakdown]"), programCounts);
   }
 
   async function overviewPointCoords(point) {
@@ -511,6 +607,7 @@
   async function renderOverviewMap(api) {
     const container = api.container;
     const points = readOverviewPoints(container);
+    renderOverviewInsights(container, points);
     const geocodable = points.filter((point) => (Number.isFinite(point.lat) && Number.isFinite(point.lon)) || point.address);
     const empty = container.querySelector(".clients-map-empty");
     if (empty) {
@@ -531,9 +628,10 @@
       const resolved = await overviewPointCoords(point);
       if (!resolved) continue;
       container.classList.remove("clients-overview-map--empty");
-      const marker = window.L.marker([resolved.lat, resolved.lon], { icon: markerIcon(resolved.name, resolved.icon, resolved.category) }).addTo(api.layer);
+      const marker = window.L.marker([resolved.lat, resolved.lon], { icon: markerIcon(resolved.name, resolved.icon) }).addTo(api.layer);
       marker.bindPopup(`
         <strong>${escapeHtml(resolved.name)}</strong>
+        ${resolved.segments.length ? `<span>${escapeHtml(resolved.segments.map((segment) => `${segment.icon} ${segment.name}`).join(", "))}</span>` : ""}
         ${resolved.category ? `<span>${escapeHtml(resolved.category)}</span>` : ""}
         ${resolved.address ? `<span>${escapeHtml(resolved.address)}</span>` : ""}
       `);
