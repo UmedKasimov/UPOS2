@@ -1234,6 +1234,133 @@
     });
   }
 
+  function directoryClientCheckboxes(root = document) {
+    return [...root.querySelectorAll("[data-client-directory-select]")];
+  }
+
+  function selectedDirectoryClientIds(root = document) {
+    return directoryClientCheckboxes(root)
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value)
+      .filter(Boolean);
+  }
+
+  function syncDirectoryClientSelection(root = document) {
+    const checkboxes = directoryClientCheckboxes(root);
+    const selected = checkboxes.filter((checkbox) => checkbox.checked);
+    const selectAll = root.querySelector("[data-client-directory-select-all]");
+    if (selectAll) {
+      selectAll.checked = Boolean(checkboxes.length) && selected.length === checkboxes.length;
+      selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+      selectAll.disabled = checkboxes.length === 0;
+    }
+    const count = selected.length;
+    const counter = root.querySelector("[data-client-bulk-selection-count]");
+    const counterValue = root.querySelector("[data-client-bulk-selection-value]");
+    const openButton = root.querySelector("[data-client-bulk-attach-open]");
+    if (counterValue) counterValue.textContent = String(count);
+    if (counter) counter.hidden = count === 0;
+    if (openButton) {
+      openButton.hidden = count === 0;
+      openButton.disabled = count === 0;
+    }
+  }
+
+  function setBulkAttachStatus(dialog, text, kind = "") {
+    const status = dialog?.querySelector("[data-client-bulk-attach-status]");
+    if (!status) return;
+    status.textContent = text;
+    status.dataset.kind = kind;
+  }
+
+  function resetBulkAttachDialog(dialog) {
+    if (!dialog) return;
+    dialog.querySelectorAll("[data-client-bulk-program], [data-client-bulk-segment]").forEach((input) => {
+      input.checked = false;
+    });
+    dialog.querySelectorAll("[data-client-program-search], [data-client-segment-search]").forEach((input) => {
+      input.value = "";
+    });
+    dialog.querySelectorAll("[data-client-program-option-row], [data-client-segment-option-row]").forEach((row) => {
+      row.hidden = false;
+    });
+    setBulkAttachStatus(dialog, "");
+  }
+
+  function openBulkAttachDialog() {
+    const dialog = document.querySelector("[data-client-bulk-attach-dialog]");
+    const clientIds = selectedDirectoryClientIds();
+    if (!dialog || !clientIds.length) return;
+    resetBulkAttachDialog(dialog);
+    dialog._clientIds = clientIds;
+    const count = dialog.querySelector("[data-client-bulk-dialog-count]");
+    if (count) count.textContent = String(clientIds.length);
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function closeBulkAttachDialog(dialog) {
+    if (!dialog?.open) return;
+    dialog.close();
+  }
+
+  async function saveBulkClientAttachments(dialog) {
+    const clientIds = Array.isArray(dialog?._clientIds) ? dialog._clientIds : [];
+    const programs = [...dialog.querySelectorAll("[data-client-bulk-program]:checked")]
+      .map((input) => input.value)
+      .filter(Boolean);
+    const segmentIds = [...dialog.querySelectorAll("[data-client-bulk-segment]:checked")]
+      .map((input) => input.value)
+      .filter(Boolean);
+    if (!clientIds.length) {
+      setBulkAttachStatus(dialog, "Сначала выберите клиентов.", "error");
+      return;
+    }
+    if (!programs.length && !segmentIds.length) {
+      setBulkAttachStatus(dialog, "Выберите хотя бы одну программу или сегмент.", "error");
+      return;
+    }
+    const save = dialog.querySelector("[data-client-bulk-attach-save]");
+    if (save) {
+      save.disabled = true;
+      save.textContent = "Прикрепляем...";
+    }
+    setBulkAttachStatus(dialog, "Сохраняем данные выбранных клиентов...");
+    try {
+      const response = await fetch(dialog.dataset.saveUrl || "/api/clients/bulk-attach", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": dialog.dataset.csrf || csrfToken(dialog),
+        },
+        body: JSON.stringify({ client_ids: clientIds, programs, segment_ids: segmentIds }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "save_failed");
+      setBulkAttachStatus(dialog, `Прикреплено клиентам: ${payload.updated || clientIds.length}`, "success");
+      if (save) save.textContent = "Готово";
+      window.setTimeout(() => window.location.reload(), 650);
+    } catch {
+      setBulkAttachStatus(dialog, "Не удалось прикрепить данные. Попробуйте ещё раз.", "error");
+      if (save) {
+        save.disabled = false;
+        save.textContent = "Прикрепить";
+      }
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const open = event.target.closest?.("[data-client-bulk-attach-open]");
+    const close = event.target.closest?.("[data-client-bulk-attach-close]");
+    const save = event.target.closest?.("[data-client-bulk-attach-save]");
+    if (!open && !close && !save) return;
+    event.preventDefault();
+    if (open) openBulkAttachDialog();
+    const dialog = (close || save)?.closest("[data-client-bulk-attach-dialog]");
+    if (close) closeBulkAttachDialog(dialog);
+    if (save) void saveBulkClientAttachments(dialog);
+  });
+
   function locate(form) {
     ensureMap(form);
     if (!navigator.geolocation) {
@@ -2033,6 +2160,16 @@
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target.matches("[data-client-directory-select-all]")) {
+      directoryClientCheckboxes().forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
+      });
+      syncDirectoryClientSelection();
+      return;
+    }
+    if (event.target.matches("[data-client-directory-select]")) {
+      syncDirectoryClientSelection();
+    }
     if (event.target.matches("[data-client-photo-file]")) {
       const [file] = event.target.files || [];
       const fallbackUrl = event.target.closest("form")?.querySelector("[data-client-photo-url]")?.value?.trim() || "";
@@ -2139,6 +2276,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     initializeClientDirectoryTables();
     highlightClientSearchMatches();
+    syncDirectoryClientSelection();
     initializeProgramDropdowns();
     initializeSegmentPickers();
     initializeDirectorySegmentPickers();

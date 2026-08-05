@@ -31,6 +31,10 @@
       </div>
 
       <div class="products-panel-top-actions">
+        <span class="client-bulk-selection-count" data-client-bulk-selection-count hidden>
+          Выбрано: <strong data-client-bulk-selection-value>0</strong>
+        </span>
+        <button type="button" class="btn btn-secondary" data-client-bulk-attach-open hidden>Прикрепление</button>
         <a
           class="btn btn-secondary"
           href="{{ url_for('clients_get') }}#clients-map"
@@ -120,7 +124,7 @@
       >
         <thead>
           <tr>
-            <th><input type="checkbox" aria-label="Выбрать всех клиентов" /></th>
+            <th><input type="checkbox" data-client-directory-select-all aria-label="Выбрать всех клиентов на странице" /></th>
             <th>ИД</th>
             <th>Название</th>
             <th>Официальное название</th>
@@ -138,7 +142,7 @@
           {% for client in clients_records %}
             {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
             <tr>
-              <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select aria-label="Выбрать {{ client.name }}" /></td>
+              <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select data-client-directory-select aria-label="Выбрать {{ client.name }}" /></td>
               <td><span class="client-id-badge">#{{ client.directory_number }}</span></td>
               <td>
                 <a
@@ -321,6 +325,64 @@
   </article>
 
 </div>
+
+<dialog
+  class="client-bulk-attach-dialog"
+  data-client-bulk-attach-dialog
+  data-save-url="{{ url_for('clients_bulk_attach_api') }}"
+  data-csrf="{{ csrf_token }}"
+  aria-labelledby="client-bulk-attach-title"
+>
+  <div class="client-bulk-attach-surface">
+    <header class="client-bulk-attach-head">
+      <div>
+        <h2 id="client-bulk-attach-title">Прикрепление</h2>
+        <p>Выбрано клиентов: <strong data-client-bulk-dialog-count>0</strong></p>
+      </div>
+      <button type="button" class="client-location-dialog-close" data-client-bulk-attach-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="client-bulk-attach-grid">
+      <section class="client-bulk-attach-section" data-client-program-dropdown>
+        <h3>Программы</h3>
+        <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+        <div class="client-bulk-attach-options">
+          {% for program in client_program_defaults %}
+            <label data-client-program-option-row><input type="checkbox" value="{{ program }}" data-client-bulk-program /><span>{{ program }}</span></label>
+          {% endfor %}
+          {% for program in client_options.programs %}
+            {% if program not in client_program_defaults %}
+              <label data-client-program-option-row><input type="checkbox" value="{{ program }}" data-client-bulk-program /><span>{{ program }}</span></label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+      <section class="client-bulk-attach-section" data-client-segment-picker>
+        <h3>Сегменты</h3>
+        <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+        <div class="client-bulk-attach-options">
+          {% for segment in client_business_segments %}
+            <label data-client-segment-option-row>
+              <input
+                type="checkbox"
+                value="{{ segment.id }}"
+                data-client-bulk-segment
+                data-client-segment-option
+                data-segment-label="{{ segment.name }}"
+                data-segment-icon="{{ segment.icon }}"
+              />
+              <span>{{ segment.icon }} {{ segment.name }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+    <div class="client-bulk-attach-status" data-client-bulk-attach-status role="status"></div>
+    <footer class="client-bulk-attach-actions">
+      <button type="button" class="btn btn-secondary" data-client-bulk-attach-close>Отмена</button>
+      <button type="button" class="btn" data-client-bulk-attach-save>Прикрепить</button>
+    </footer>
+  </div>
+</dialog>
 
 <dialog class="client-location-dialog" data-client-location-dialog aria-labelledby="client-location-dialog-title">
   <div class="client-location-dialog-surface">

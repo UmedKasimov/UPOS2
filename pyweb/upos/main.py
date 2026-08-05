@@ -13792,6 +13792,151 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=f"/clients?client={quote(client_id)}&msg=saved#client-card", status_code=302)
         return RedirectResponse(url="/clients?msg=saved#clients", status_code=302)
 
+    @app.post("/api/clients/bulk-attach", name="clients_bulk_attach_api")
+    async def clients_bulk_attach_api(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"ok": False, "error": "json"}, status_code=400)
+        if not isinstance(payload, dict):
+            return JSONResponse({"ok": False, "error": "json"}, status_code=400)
+
+        client_ids: list[str] = []
+        seen_client_ids: set[str] = set()
+        for raw_client_id in payload.get("client_ids") if isinstance(payload.get("client_ids"), list) else []:
+            client_id = str(raw_client_id or "").strip()
+            if client_id and client_id not in seen_client_ids:
+                client_ids.append(client_id)
+                seen_client_ids.add(client_id)
+            if len(client_ids) >= 1000:
+                break
+        if not client_ids:
+            return JSONResponse({"ok": False, "error": "client_ids"}, status_code=400)
+
+        programs: list[str] = []
+        seen_programs: set[str] = set()
+        for raw_program in payload.get("programs") if isinstance(payload.get("programs"), list) else []:
+            program = " ".join(str(raw_program or "").split())[:100]
+            program_key = program.casefold()
+            if program and program_key not in seen_programs:
+                programs.append(program)
+                seen_programs.add(program_key)
+            if len(programs) >= 100:
+                break
+
+        configured_segments = _workspace_business_segments(wid)
+        configured_by_id = {segment["id"]: segment for segment in configured_segments}
+        segments_to_attach: list[dict[str, str]] = []
+        seen_segment_ids: set[str] = set()
+        for raw_segment_id in payload.get("segment_ids") if isinstance(payload.get("segment_ids"), list) else []:
+            segment_id = str(raw_segment_id or "").strip()
+            segment = configured_by_id.get(segment_id)
+            if segment is None or segment_id in seen_segment_ids:
+                continue
+            segments_to_attach.append(dict(segment))
+            seen_segment_ids.add(segment_id)
+        if not programs and not segments_to_attach:
+            return JSONResponse({"ok": False, "error": "attachments"}, status_code=400)
+
+        updated = 0
+        with session_scope() as session:
+            rows = list(
+                session.execute(
+                    select(Counterparty).where(
+                        Counterparty.workspace_owner_id == wid,
+                        Counterparty.id.in_(client_ids),
+                        Counterparty.kind.in_(["client", "both"]),
+                    )
+                ).scalars()
+            )
+            for row in rows:
+                extra = _counterparty_extra(row)
+
+                current_programs: list[str] = []
+                raw_programs = extra.get("programs")
+                if isinstance(raw_programs, list):
+                    current_programs.extend(str(item or "").strip() for item in raw_programs)
+                elif isinstance(raw_programs, str):
+                    current_programs.extend(item.strip() for item in raw_programs.split(","))
+                legacy_program = str(extra.get("program") or "").strip()
+                if legacy_program:
+                    current_programs.extend(item.strip() for item in legacy_program.split(","))
+                merged_programs: list[str] = []
+                merged_program_keys: set[str] = set()
+                for program in [*current_programs, *programs]:
+                    program = " ".join(str(program or "").split())[:100]
+                    key = program.casefold()
+                    if program and key not in merged_program_keys:
+                        merged_programs.append(program)
+                        merged_program_keys.add(key)
+
+                merged_segments: list[dict[str, str]] = []
+                merged_segment_ids: set[str] = set()
+                raw_segments = extra.get("business_segments")
+                if isinstance(raw_segments, list):
+                    for raw_segment in raw_segments:
+                        if not isinstance(raw_segment, dict):
+                            continue
+                        segment_id = str(raw_segment.get("id") or "").strip()
+                        segment_name = str(raw_segment.get("name") or "").strip()
+                        if not segment_id or not segment_name or segment_id in merged_segment_ids:
+                            continue
+                        merged_segments.append(
+                            {
+                                "id": segment_id,
+                                "name": segment_name,
+                                "icon": str(raw_segment.get("icon") or "🏷️").strip() or "🏷️",
+                            }
+                        )
+                        merged_segment_ids.add(segment_id)
+                legacy_segment_id = str(extra.get("business_segment_id") or "").strip()
+                legacy_segment_name = str(extra.get("business_segment") or "").strip()
+                if legacy_segment_id and legacy_segment_name and legacy_segment_id not in merged_segment_ids:
+                    merged_segments.append(
+                        {
+                            "id": legacy_segment_id,
+                            "name": legacy_segment_name,
+                            "icon": str(extra.get("business_segment_icon") or extra.get("map_icon") or "🏷️").strip() or "🏷️",
+                        }
+                    )
+                    merged_segment_ids.add(legacy_segment_id)
+                for segment in segments_to_attach:
+                    if segment["id"] in merged_segment_ids:
+                        continue
+                    merged_segments.append(dict(segment))
+                    merged_segment_ids.add(segment["id"])
+
+                primary_segment = merged_segments[0] if merged_segments else None
+                extra["programs"] = merged_programs
+                extra["program"] = ", ".join(merged_programs)
+                extra["business_segment_ids"] = [segment["id"] for segment in merged_segments]
+                extra["business_segments"] = merged_segments
+                extra["business_segment_id"] = primary_segment["id"] if primary_segment else ""
+                extra["business_segment"] = primary_segment["name"] if primary_segment else ""
+                extra["business_segment_icon"] = primary_segment["icon"] if primary_segment else ""
+                if primary_segment:
+                    extra["industry"] = primary_segment["name"]
+                    extra["map_icon"] = primary_segment["icon"]
+                row.data = extra
+                flag_modified(row, "data")
+                updated += 1
+
+        return JSONResponse(
+            {
+                "ok": True,
+                "updated": updated,
+                "programs": programs,
+                "segments": segments_to_attach,
+            }
+        )
+
     @app.post("/api/clients/{counterparty_id}/location", name="client_location_save_api")
     async def client_location_save_api(request: Request, counterparty_id: str):
         tok = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
