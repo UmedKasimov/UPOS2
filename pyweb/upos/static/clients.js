@@ -1035,6 +1035,15 @@
     summary.title = checked.join(", ");
   }
 
+  function filterProgramDropdown(search) {
+    const dropdown = search?.closest("[data-client-program-dropdown]");
+    if (!dropdown) return;
+    const query = String(search.value || "").trim().toLocaleLowerCase("ru");
+    dropdown.querySelectorAll("[data-client-program-option-row]").forEach((row) => {
+      row.hidden = Boolean(query) && !String(row.textContent || "").toLocaleLowerCase("ru").includes(query);
+    });
+  }
+
   function initializeProgramDropdowns(root = document) {
     root.querySelectorAll("[data-client-program-dropdown]").forEach(syncProgramDropdown);
   }
@@ -1161,6 +1170,9 @@
   });
 
   document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-client-program-search]")) {
+      filterProgramDropdown(event.target);
+    }
     if (event.target.matches("[data-client-segment-search]")) {
       filterSegmentPicker(event.target);
     }

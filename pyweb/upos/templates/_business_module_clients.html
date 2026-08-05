@@ -408,15 +408,6 @@
       <label><span>ПИНФЛ</span><input name="pinfl" /></label>
       <label><span>Категория</span><input name="category" list="client-category-list" /></label>
       <label>
-        <span>Отрасль</span>
-        <select name="industry">
-          <option value="">Не выбрана</option>
-          {% for industry_name in ["Продуктовый", "Ресторан", "Кафе", "Одежда", "Аксессуар"] %}
-            <option value="{{ industry_name }}">{{ industry_name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
         <span>Иконка на карте</span>
         <select name="map_icon" data-client-map-icon>
           <option value="default">Обычная</option>
@@ -461,15 +452,18 @@
         <span>Программы клиента</span>
         <details class="client-program-dropdown" data-client-program-dropdown>
           <summary><span data-client-program-summary>Не выбраны</span></summary>
-          <div class="client-program-options">
-            {% for program in client_program_defaults %}
-              <label><input type="checkbox" name="programs" value="{{ program }}" /><span>{{ program }}</span></label>
-            {% endfor %}
-            {% for program in client_options.programs %}
-              {% if program not in client_program_defaults %}
-                <label><input type="checkbox" name="programs" value="{{ program }}" /><span>{{ program }}</span></label>
-              {% endif %}
-            {% endfor %}
+          <div class="client-program-menu">
+            <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+            <div class="client-program-options">
+              {% for program in client_program_defaults %}
+                <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" /><span>{{ program }}</span></label>
+              {% endfor %}
+              {% for program in client_options.programs %}
+                {% if program not in client_program_defaults %}
+                  <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" /><span>{{ program }}</span></label>
+                {% endif %}
+              {% endfor %}
+            </div>
           </div>
         </details>
         <input name="program_custom" list="client-program-list" placeholder="Другая программа" />
@@ -970,19 +964,6 @@
         <label><span>ПИНФЛ</span><input name="pinfl" value="{{ selected_client_card.pinfl or '' }}" /></label>
         <label><span>Категория</span><input name="category" list="client-category-list" value="{{ selected_client_card.category or '' }}" /></label>
         <label>
-          <span>Отрасль</span>
-          <select name="industry">
-            <option value="">Не выбрана</option>
-            {% set known_industries = ["Продуктовый", "Ресторан", "Кафе", "Одежда", "Аксессуар"] %}
-            {% for industry_name in known_industries %}
-              <option value="{{ industry_name }}" {% if selected_client_card.industry == industry_name %}selected{% endif %}>{{ industry_name }}</option>
-            {% endfor %}
-            {% if selected_client_card.industry and selected_client_card.industry not in known_industries %}
-              <option value="{{ selected_client_card.industry }}" selected>{{ selected_client_card.industry }}</option>
-            {% endif %}
-          </select>
-        </label>
-        <label>
           <span>Иконка на карте</span>
           <select name="map_icon" data-client-map-icon>
             <option value="default" {% if selected_client_card.map_icon == 'default' %}selected{% endif %}>Обычная</option>
@@ -1027,15 +1008,18 @@
           <span>Программы клиента</span>
           <details class="client-program-dropdown" data-client-program-dropdown>
             <summary><span data-client-program-summary>Не выбраны</span></summary>
-            <div class="client-program-options">
-              {% for program in client_program_defaults %}
-                <label><input type="checkbox" name="programs" value="{{ program }}" {% if program in selected_client_card.programs %}checked{% endif %} /><span>{{ program }}</span></label>
-              {% endfor %}
-              {% for program in client_options.programs %}
-                {% if program not in client_program_defaults %}
-                  <label><input type="checkbox" name="programs" value="{{ program }}" {% if program in selected_client_card.programs %}checked{% endif %} /><span>{{ program }}</span></label>
-                {% endif %}
-              {% endfor %}
+            <div class="client-program-menu">
+              <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+              <div class="client-program-options">
+                {% for program in client_program_defaults %}
+                  <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" {% if program in selected_client_card.programs %}checked{% endif %} /><span>{{ program }}</span></label>
+                {% endfor %}
+                {% for program in client_options.programs %}
+                  {% if program not in client_program_defaults %}
+                    <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" {% if program in selected_client_card.programs %}checked{% endif %} /><span>{{ program }}</span></label>
+                  {% endif %}
+                {% endfor %}
+              </div>
             </div>
           </details>
           <input name="program_custom" list="client-program-list" placeholder="Другая программа" />
