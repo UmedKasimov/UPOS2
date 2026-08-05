@@ -711,8 +711,18 @@ def create_app() -> FastAPI:
             logger.exception(
                 "[telegram] startup skipped due to error (check DB migrations / notification_prefs column)",
             )
+
+        from upos.smpro_scheduler import start_scheduler as start_ibox_scheduler
+        from upos.smpro_scheduler import stop_scheduler as stop_ibox_scheduler
+
+        try:
+            start_ibox_scheduler()
+        except Exception:
+            logger.exception("[ibox] не удалось запустить планировщик синхронизации")
+
         yield
         stop_scheduler()
+        stop_ibox_scheduler()
 
     app = FastAPI(title="UPOS FINANCE", version="0.3", lifespan=lifespan)
 

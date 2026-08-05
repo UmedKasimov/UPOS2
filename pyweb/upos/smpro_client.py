@@ -327,7 +327,14 @@ class SMProClient:
         *,
         full_history: bool,
         since: str = "",
+        context: dict[str, list[dict[str, Any]]] | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
+        """Забирает указанные модули.
+
+        Остатки перебираются по типам цен, а типы цен приходят в модуле
+        товаров. Когда модули запрашиваются по одному, ранее полученные типы
+        цен передаются через context.
+        """
         entities: dict[str, list[dict[str, Any]]] = {}
         for module in modules:
             for resource in RESOURCES.get(module, ()):
@@ -338,9 +345,10 @@ class SMProClient:
                 for filial_id in filial_ids:
                     variants: list[tuple[str, str]] = [("", "")]
                     if resource.key == "stock_selection":
+                        known_price_types = entities.get("price_types") or (context or {}).get("price_types") or []
                         remote_price_types = [
                             item
-                            for item in entities.get("price_types", [])
+                            for item in known_price_types
                             if not filial_id
                             or str(item.get("_ibox_filial_id") or "") == filial_id
                         ]

@@ -25,6 +25,7 @@ from upos.db_models import (
     SaleDocument,
     Warehouse,
 )
+from upos.integrations import integration_configured
 from upos.smpro_client import DEFAULT_MODULES, SMProClient, SMProError
 from upos.storage import load_workspace_settings, save_workspace_settings
 
@@ -1212,17 +1213,42 @@ def list_upos_branches(workspace_owner_id: str) -> list[dict[str, str]]:
         return [{"id": str(row.id), "name": str(row.name or "Филиал")} for row in rows]
 
 
+STALE_RUN_TIMEOUT = timedelta(minutes=5)
+
+
+def _parse_moment(value: Any) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
+def _run_last_sign_of_life(run: dict[str, Any]) -> datetime:
+    """Момент последнего шага запуска.
+
+    Отметка обновляется после каждого модуля, поэтому долгая, но живая
+    синхронизация больше не выглядит зависшей — раньше признаком служило
+    только время старта.
+    """
+    data = run.get("data")
+    heartbeat = _parse_moment((data or {}).get("heartbeat")) if isinstance(data, dict) else None
+    return heartbeat or _parse_moment(run.get("started_at")) or datetime.now(UTC)
+
+
+def is_run_stale(run: dict[str, Any] | None) -> bool:
+    if not run or run.get("status") != "running":
+        return False
+    return datetime.now(UTC) - _run_last_sign_of_life(run) > STALE_RUN_TIMEOUT
+
+
 def start_smpro_sync(workspace_owner_id: str) -> dict[str, Any]:
     current = last_smpro_status(workspace_owner_id)
     if current and current.get("status") == "running":
-        started_raw = str(current.get("started_at") or "")
-        try:
-            started_at = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
-            if started_at.tzinfo is None:
-                started_at = started_at.replace(tzinfo=UTC)
-        except ValueError:
-            started_at = datetime.now(UTC)
-        if datetime.now(UTC) - started_at <= timedelta(minutes=5):
+        if not is_run_stale(current):
             current["already_running"] = True
             return current
         _finish_run(
@@ -1248,8 +1274,117 @@ def start_smpro_sync(workspace_owner_id: str) -> dict[str, Any]:
     return status
 
 
+def _run_progress(run_id: str) -> dict[str, Any]:
+    """Что уже успел сделать этот запуск: нужно, чтобы продолжить после обрыва."""
+    with session_scope() as session:
+        run = session.get(IntegrationSyncRun, run_id)
+        data = run.data if run and isinstance(run.data, dict) else {}
+        return _json_copy(data) if isinstance(data, dict) else {}
+
+
+def _save_run_progress(run_id: str, progress: dict[str, Any], imported_count: int) -> None:
+    with session_scope() as session:
+        run = session.get(IntegrationSyncRun, run_id)
+        if not run:
+            return
+        progress["heartbeat"] = datetime.now(UTC).isoformat()
+        run.data = progress
+        run.imported_count = imported_count
+
+
+DEFAULT_SYNC_INTERVAL_MINUTES = 60
+MIN_SYNC_INTERVAL_MINUTES = 5
+
+
+def _sync_interval(config: dict[str, Any]) -> timedelta:
+    try:
+        minutes = int(config.get("sync_interval_minutes") or DEFAULT_SYNC_INTERVAL_MINUTES)
+    except (TypeError, ValueError):
+        minutes = DEFAULT_SYNC_INTERVAL_MINUTES
+    return timedelta(minutes=max(MIN_SYNC_INTERVAL_MINUTES, minutes))
+
+
+def _ibox_ready_to_sync(config: dict[str, Any]) -> bool:
+    """Те же условия, что проверяет кнопка ручного запуска."""
+    if not isinstance(config, dict) or not integration_configured(INTEGRATION, config):
+        return False
+    if not bool(config.get("sync_enabled", True)):
+        return False
+    if not str(config.get("upos_branch_id") or "").strip():
+        return False
+    has_filial = bool(str(config.get("filial_id") or config.get("terminal_id") or "").strip())
+    if not has_filial:
+        filial_ids = config.get("filial_ids")
+        has_filial = isinstance(filial_ids, list) and any(str(item or "").strip() for item in filial_ids)
+    if not has_filial:
+        return False
+    modules = config.get("sync_modules")
+    if isinstance(modules, dict) and not any(bool(modules.get(key)) for key in DEFAULT_MODULES):
+        return False
+    return True
+
+
+def claim_smpro_sync(workspace_owner_id: str) -> dict[str, Any] | None:
+    """Что планировщику делать с этим пространством.
+
+    Возвращает запуск, который нужно выполнить: либо прерванный, который надо
+    продолжить, либо новый по расписанию. None — делать нечего.
+    """
+    settings = load_workspace_settings(workspace_owner_id)
+    config = settings.get("integrations", {}).get(INTEGRATION, {})
+    if not _ibox_ready_to_sync(config):
+        return None
+    current = last_smpro_status(workspace_owner_id)
+    if current and current.get("status") == "running":
+        if not is_run_stale(current):
+            return None
+        # Прогресс прерванного прохода сохранён, поэтому продолжаем его,
+        # а не начинаем всё заново.
+        return {"id": str(current.get("id") or ""), "resumed": True}
+    last_sync = _parse_moment(config.get("last_sync_at"))
+    if last_sync and datetime.now(UTC) - last_sync < _sync_interval(config):
+        return None
+    status = start_smpro_sync(workspace_owner_id)
+    if status.get("already_running"):
+        return None
+    return {"id": str(status.get("id") or ""), "resumed": False}
+
+
+def list_ibox_workspaces() -> list[str]:
+    # Импорт внутри функции: перечисление пространств нужно только
+    # планировщику, а тесты хранилища подменяют модуль моделей.
+    from upos.db_models import WorkspaceSetting
+
+    with session_scope() as session:
+        rows = session.execute(select(WorkspaceSetting)).scalars().all()
+        out: list[str] = []
+        for row in rows:
+            data = row.data if isinstance(row.data, dict) else {}
+            config = (data.get("integrations") or {}).get(INTEGRATION)
+            if isinstance(config, dict) and _ibox_ready_to_sync(config):
+                out.append(str(row.workspace_owner_id))
+        return out
+
+
 def run_smpro_sync(workspace_owner_id: str, run_id: str) -> None:
-    imported = 0
+    """Переносит данные IBOX модуль за модулем.
+
+    Раньше всё выгружалось одним куском и сохранялось в самом конце: перезапуск
+    сервера посреди прохода терял весь результат, и следующий запуск начинал
+    заново. Теперь каждый модуль сохраняется сразу и отмечается в журнале, а
+    повторный вызов с тем же run_id продолжает с первого незавершённого.
+    """
+    progress = _run_progress(run_id)
+    completed = [str(item) for item in progress.get("completed_modules") or []]
+    summary: dict[str, int] = {
+        str(key): int(value or 0)
+        for key, value in (progress.get("entities") or {}).items()
+        if isinstance(progress.get("entities"), dict)
+    }
+    imported = int(progress.get("imported") or 0)
+    price_type_context = [
+        item for item in progress.get("price_types") or [] if isinstance(item, dict)
+    ]
     try:
         settings = load_workspace_settings(workspace_owner_id)
         config = settings.get("integrations", {}).get(INTEGRATION, {})
@@ -1259,17 +1394,44 @@ def run_smpro_sync(workspace_owner_id: str, run_id: str) -> None:
             for key in DEFAULT_MODULES
             if not isinstance(selected, dict) or bool(selected.get(key, True))
         ]
-        full_history = bool(config.get("full_history", True)) or not bool(config.get("initial_sync_completed"))
-        client = SMProClient(config)
-        entities = client.fetch_modules(
-            modules,
-            full_history=full_history,
-            since=str(config.get("last_sync_at") or ""),
+        full_history = bool(progress.get("full_history")) or (
+            bool(config.get("full_history", True)) or not bool(config.get("initial_sync_completed"))
         )
-        if not entities and client.warnings:
+        since = str(progress.get("since") or config.get("last_sync_at") or "")
+        client = SMProClient(config)
+        fetched_anything = bool(completed)
+
+        for module in modules:
+            if module in completed:
+                continue
+            entities = client.fetch_modules(
+                [module],
+                full_history=full_history,
+                since=since,
+                context={"price_types": price_type_context},
+            )
+            if entities:
+                fetched_anything = True
+                imported += _store_entities(workspace_owner_id, entities)
+                for key, value in entities.items():
+                    summary[key] = summary.get(key, 0) + len(value)
+                fetched_price_types = entities.get("price_types")
+                if fetched_price_types:
+                    price_type_context = [dict(item) for item in fetched_price_types]
+            completed.append(module)
+            progress = {
+                "entities": summary,
+                "full_history": full_history,
+                "since": since,
+                "completed_modules": completed,
+                "imported": imported,
+                "price_types": price_type_context,
+                "warnings": client.warnings,
+            }
+            _save_run_progress(run_id, progress, imported)
+
+        if not fetched_anything and client.warnings:
             raise SMProError(client.warnings[0]["error"])
-        imported = _store_entities(workspace_owner_id, entities)
-        summary = {key: len(value) for key, value in entities.items()}
         status = "partial" if client.warnings else "ok"
         _finish_run(
             run_id,
@@ -1278,6 +1440,7 @@ def run_smpro_sync(workspace_owner_id: str, run_id: str) -> None:
             data={
                 "entities": summary,
                 "full_history": full_history,
+                "completed_modules": completed,
                 "warnings": client.warnings,
             },
         )
