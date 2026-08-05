@@ -31869,3 +31869,20 @@ html.dark .crm-task-calendar-event {
 .clients-map-filter-status[data-tone="error"] {
   color: var(--destructive, var(--foreground));
 }
+
+/* Дата последней синхронизации в кнопке IBOX на боковой панели. */
+.sidebar-ibox-sync-last {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-ibox-sync-last[hidden] {
+  display: none;
+}

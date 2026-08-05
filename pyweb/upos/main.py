@@ -23856,7 +23856,13 @@ def create_app() -> FastAPI:
         if err:
             return err
         assert wid is not None
-        return {"ok": True, "status": last_smpro_status(wid)}
+        # Журнал хранит только последний запуск, а он может быть и неудачным,
+        # поэтому дату успешной синхронизации отдаём из настроек отдельно.
+        last_sync_at = str(
+            (load_workspace_settings(wid).get("integrations", {}).get("ibox", {}) or {}).get("last_sync_at")
+            or ""
+        )
+        return {"ok": True, "status": last_smpro_status(wid), "last_sync_at": last_sync_at}
 
     @app.post("/api/integrations/ibox/test")
     def api_ibox_test(request: Request, organization_id: str = Query(default="")):

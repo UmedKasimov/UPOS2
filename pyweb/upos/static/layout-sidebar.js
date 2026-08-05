@@ -81,8 +81,40 @@
     if (!button) return;
     var statusNode = button.querySelector("[data-sidebar-ibox-sync-status]");
     var liveNode = document.querySelector("[data-sidebar-ibox-sync-live]");
+    var lastSyncNode = button.querySelector("[data-sidebar-ibox-sync-last]");
     var pollTimer = 0;
     var resetTimer = 0;
+    var MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+    function formatSyncMoment(value) {
+      var raw = String(value || "").trim();
+      if (!raw) return "";
+      var moment = new Date(raw);
+      if (isNaN(moment.getTime())) return "";
+      var time =
+        String(moment.getHours()).padStart(2, "0") + ":" + String(moment.getMinutes()).padStart(2, "0");
+      var today = new Date();
+      var sameDay = function (a, b) {
+        return (
+          a.getFullYear() === b.getFullYear() &&
+          a.getMonth() === b.getMonth() &&
+          a.getDate() === b.getDate()
+        );
+      };
+      if (sameDay(moment, today)) return "сегодня в " + time;
+      var yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+      if (sameDay(moment, yesterday)) return "вчера в " + time;
+      var date = moment.getDate() + " " + MONTHS[moment.getMonth()];
+      if (moment.getFullYear() !== today.getFullYear()) date += " " + moment.getFullYear();
+      return date + ", " + time;
+    }
+
+    function showLastSync(value) {
+      if (!lastSyncNode) return;
+      var text = formatSyncMoment(value);
+      lastSyncNode.textContent = text ? "Обновлено " + text : "";
+      lastSyncNode.hidden = !text;
+    }
 
     function setState(state, message, detail) {
       button.dataset.state = state;
@@ -139,6 +171,7 @@
       })
         .then(readJsonResponse)
         .then(function (body) {
+          showLastSync(body.last_sync_at);
           if (applyStatus(body.status, announce)) {
             pollTimer = window.setTimeout(function () {
               pollStatus(true);
@@ -167,6 +200,8 @@
             pollTimer = window.setTimeout(function () {
               pollStatus(true);
             }, 1200);
+          } else {
+            pollStatus(false);
           }
         })
         .catch(function (error) {

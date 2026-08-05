@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=557" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=558" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -264,6 +264,7 @@
                   <span class="sidebar-ibox-sync-copy">
                     <strong>IBOX</strong>
                     <small data-sidebar-ibox-sync-status>Синхронизировать вручную</small>
+                    <small class="sidebar-ibox-sync-last" data-sidebar-ibox-sync-last hidden></small>
                   </span>
                   <span class="sidebar-ibox-sync-dot" aria-hidden="true"></span>
                 </button>
@@ -392,7 +393,7 @@
     </script>
     <script src="{{ url_for('static', path='theme.js') }}"></script>
     <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=5" defer></script>
-    <script src="{{ url_for('static', path='layout-sidebar.js') }}?v=2" defer></script>
+    <script src="{{ url_for('static', path='layout-sidebar.js') }}?v=3" defer></script>
     <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=11" defer></script>
     <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=7" defer></script>
     <script src="{{ url_for('static', path='table-column-controls.js') }}?v=15" defer></script>
