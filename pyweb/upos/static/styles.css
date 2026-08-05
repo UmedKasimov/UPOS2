@@ -5437,6 +5437,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   height: 1rem;
   margin: 0 auto;
   padding: 0;
+  position: relative;
+  z-index: 1;
   accent-color: var(--primary);
   cursor: pointer;
 }
