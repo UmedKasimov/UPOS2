@@ -1,0 +1,129 @@
+          {% for client in map_clients %}
+            {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id ~ '&focus=location' %}
+            <tr
+              data-client-overview-point
+              data-client-id="{{ client.id }}"
+              data-lat="{{ client.latitude }}"
+              data-lon="{{ client.longitude }}"
+              data-name="{{ client.name }}"
+              data-address="{{ client.address or '' }}"
+              data-client-type="{{ client.client_type }}"
+              data-category="{{ client.category or '' }}"
+              data-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+              data-programs="{{ client.program or '' }}"
+              data-program-list="{{ client.programs | tojson | forceescape }}"
+              data-segments="{{ client.business_segments | tojson | forceescape }}"
+              data-status="{{ client.status }}"
+            >
+              <td class="clients-map-select-cell">
+                <input
+                  type="checkbox"
+                  value="{{ client.id }}"
+                  data-client-map-select
+                  data-clients-map-row-select
+                  aria-label="Выбрать {{ client.name }}"
+                />
+              </td>
+              <td>
+                <a
+                  class="clients-map-client-link"
+                  href="{{ client_tab_href }}#client-edit"
+                  data-workspace-trigger="client-edit-{{ client.id }}"
+                  data-workspace-tab-id="client-edit-{{ client.id }}"
+                  data-workspace-view-id="client_edit"
+                  data-workspace-tab-title="Редактировать {{ client.name }}"
+                  data-workspace-tab-hash="client-edit"
+                  data-workspace-tab-href="{{ client_tab_href }}"
+                  data-client-map-quick-edit
+                  title="Открыть локацию клиента {{ client.name }}"
+                >
+                  <strong>{{ client.name }}</strong>
+                  {% if not client.latitude and not client.longitude and not client.address %}
+                    <small>Добавить локацию</small>
+                  {% endif %}
+                </a>
+              </td>
+              <td class="clients-map-segment-cell">
+                <div
+                  class="client-directory-segment-picker clients-map-segment-picker"
+                  data-client-directory-segment-picker
+                  data-client-map-segment-picker
+                  data-client-id="{{ client.id }}"
+                  data-selected-segment-ids="{{ client.business_segment_ids | tojson | forceescape }}"
+                  data-csrf="{{ csrf_token }}"
+                >
+                  <details class="client-segment-dropdown client-directory-segment-dropdown">
+                    <summary>
+                      <span class="client-directory-segment-summary" data-client-directory-segment-summary>
+                        {% if client.business_segments %}
+                          {% for segment in client.business_segments %}
+                            <span class="client-segment-chip">{{ segment.icon }} {{ segment.name }}</span>
+                          {% endfor %}
+                        {% else %}
+                          <span class="client-directory-segment-empty">Выбрать</span>
+                        {% endif %}
+                      </span>
+                    </summary>
+                    <div class="client-segment-menu client-directory-segment-menu clients-map-segment-menu">
+                      <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+                      <div class="client-segment-options" data-client-map-segment-options></div>
+                      <small class="client-directory-segment-status" data-client-directory-segment-status aria-live="polite"></small>
+                    </div>
+                  </details>
+                </div>
+              </td>
+              <td class="clients-map-location-cell">
+                {% if client.latitude and client.longitude %}
+                  <span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>
+                {% elif client.address %}
+                  <a
+                    class="clients-map-location-quick-link"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-client-map-location-pick
+                    data-client-id="{{ client.id }}"
+                    data-client-name="{{ client.name }}"
+                    data-client-address="{{ client.address or '' }}"
+                    data-client-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+                    data-save-url="{{ url_for('client_location_save_api', counterparty_id=client.id) }}"
+                    data-csrf="{{ csrf_token }}"
+                    title="Уточнить координаты {{ client.name }}"
+                    aria-label="Уточнить координаты {{ client.name }}"
+                  ><span class="client-location-state client-location-state--no">×</span><small>Уточнить</small></a>
+                {% else %}
+                  <a
+                    class="clients-map-location-quick-link"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-client-map-location-pick
+                    data-client-id="{{ client.id }}"
+                    data-client-name="{{ client.name }}"
+                    data-client-address=""
+                    data-client-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+                    data-save-url="{{ url_for('client_location_save_api', counterparty_id=client.id) }}"
+                    data-csrf="{{ csrf_token }}"
+                    title="Добавить локацию {{ client.name }}"
+                    aria-label="Добавить локацию {{ client.name }}"
+                  ><span class="client-location-state client-location-state--no">×</span><small>Добавить</small></a>
+                {% endif %}
+              </td>
+              <td title="{{ client.address or 'Адрес не указан' }}">
+                <div class="clients-map-address-cell">
+                  <span class="clients-map-address-text">{{ client.address or "Адрес не указан" }}</span>
+                  <a
+                    class="clients-map-address-edit"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-workspace-trigger="client-edit-{{ client.id }}"
+                    data-workspace-tab-id="client-edit-{{ client.id }}"
+                    data-workspace-view-id="client_edit"
+                    data-workspace-tab-title="Редактировать {{ client.name }}"
+                    data-workspace-tab-hash="client-edit"
+                    data-workspace-tab-href="{{ client_tab_href }}"
+                    data-client-map-quick-edit
+                    title="Изменить местоположение {{ client.name }}"
+                    aria-label="Изменить местоположение {{ client.name }}"
+                  ><span aria-hidden="true">✎</span></a>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
+          {% endfor %}

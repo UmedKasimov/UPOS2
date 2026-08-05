@@ -404,7 +404,23 @@
     return api;
   }
 
+  /* Строки таблицы карты лежат в <template> и раскрываются при первом
+     открытии вкладки: почти тысяча строк не должна размечаться, пока
+     панель скрыта — из-за этого страница клиентов открывалась секундами. */
+  function unpackClientsMapRows(root = document) {
+    root.querySelectorAll("[data-clients-map-rows]").forEach((template) => {
+      const body = template.closest("[data-clients-map-body]") || template.parentElement;
+      if (!body) return;
+      // Пока панель карты скрыта, строки не разворачиваем — в этом весь смысл.
+      const panel = template.closest("#clients-map") || body.closest("section, article");
+      if (panel && !panel.offsetParent) return;
+      body.append(template.content.cloneNode(true));
+      template.remove();
+    });
+  }
+
   function initializeMaps(root = document) {
+    unpackClientsMapRows(root);
     root.querySelectorAll("form").forEach((form) => {
       if (!form.querySelector("[data-client-map]")) return;
       ensureMap(form);
@@ -2301,6 +2317,7 @@
   }, true);
 
   window.addEventListener("hashchange", () => {
+    unpackClientsMapRows();
     showClientSection();
     setTimeout(refreshMaps, 160);
     if (new URLSearchParams(window.location.search).get("focus") === "location") {
