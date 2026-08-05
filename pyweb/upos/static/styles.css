@@ -9339,6 +9339,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .products-row-actions form {
   display: inline-flex;
   margin: 0;
+  vertical-align: middle;
   line-height: 1;
 }
 
