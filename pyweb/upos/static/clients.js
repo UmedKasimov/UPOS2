@@ -505,6 +505,7 @@
       .map((item) => {
         const lat = Number.parseFloat(item.dataset.lat || "");
         const lon = Number.parseFloat(item.dataset.lon || "");
+        const editLink = item.querySelector("[data-client-map-quick-edit]");
         const segments = parseOverviewList(item.dataset.segments)
           .filter((segment) => segment && typeof segment === "object" && String(segment.name || "").trim())
           .map((segment) => ({
@@ -530,6 +531,9 @@
           status: item.dataset.status || "",
           hasCoords: Number.isFinite(lat) && Number.isFinite(lon),
           hasAddress: Boolean(String(item.dataset.address || "").trim()),
+          editHref: editLink?.getAttribute("href") || `/clients?client=${encodeURIComponent(item.dataset.clientId || "")}&focus=location#client-edit`,
+          editTabId: editLink?.dataset.workspaceTabId || `client-edit-${item.dataset.clientId || ""}`,
+          editTabTitle: editLink?.dataset.workspaceTabTitle || `Редактировать ${item.dataset.name || "клиента"}`,
           item,
         };
         const matched = matchesOverviewFilters(point, filters, selectedIds);
@@ -662,7 +666,21 @@
         ${resolved.segments.length ? `<span>${escapeHtml(resolved.segments.map((segment) => `${segment.icon} ${segment.name}`).join(", "))}</span>` : ""}
         ${resolved.category ? `<span>${escapeHtml(resolved.category)}</span>` : ""}
         ${resolved.address ? `<span>${escapeHtml(resolved.address)}</span>` : ""}
+        <a
+          class="btn btn-primary clients-map-popup-edit"
+          href="${escapeHtml(resolved.editHref)}"
+          data-workspace-trigger="${escapeHtml(resolved.editTabId)}"
+          data-workspace-tab-id="${escapeHtml(resolved.editTabId)}"
+          data-workspace-view-id="client_edit"
+          data-workspace-tab-title="${escapeHtml(resolved.editTabTitle)}"
+          data-workspace-tab-hash="client-edit"
+          data-workspace-tab-href="${escapeHtml(resolved.editHref)}"
+        >Изменить местоположение</a>
       `);
+      marker.on("dblclick", (event) => {
+        if (event.originalEvent) window.L.DomEvent.stop(event.originalEvent);
+        marker.openPopup();
+      });
       bounds.push([resolved.lat, resolved.lon]);
     }
     bindLabelZoom(api);
