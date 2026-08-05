@@ -24036,44 +24036,6 @@ def create_app() -> FastAPI:
         https_only=cookie_https_only,
     )
 
-    # Отступы шаблонов дают больше половины веса страниц со списками: в строке
-    # карты клиентов 3 КБ из 5.3 КБ — только пробелы. Их разбирает браузер,
-    # поэтому схлопываем переносы строк ещё до сжатия. Содержимое script/style/
-    # pre/textarea не трогаем — там пробелы значимы.
-    _MINIFY_SKIP = re.compile(
-        r"(<(?:script|style|pre|textarea)\b[^>]*>.*?</(?:script|style|pre|textarea)>)",
-        re.IGNORECASE | re.DOTALL,
-    )
-    _MINIFY_GAPS = re.compile(r"\s*\n\s*")
-
-    def _collapse_html_whitespace(html: str) -> str:
-        parts = _MINIFY_SKIP.split(html)
-        for index in range(0, len(parts), 2):
-            parts[index] = _MINIFY_GAPS.sub(" ", parts[index])
-        return "".join(parts)
-
-    @app.middleware("http")
-    async def minify_html_responses(request: Request, call_next):
-        response = await call_next(request)
-        content_type = str(response.headers.get("content-type") or "")
-        if not content_type.startswith("text/html") or response.status_code >= 400:
-            return response
-        body = b""
-        async for chunk in response.body_iterator:
-            body += chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8")
-        try:
-            minified = _collapse_html_whitespace(body.decode("utf-8")).encode("utf-8")
-        except Exception:
-            minified = body
-        headers = dict(response.headers)
-        headers.pop("content-length", None)
-        return Response(
-            content=minified,
-            status_code=response.status_code,
-            headers=headers,
-            media_type=response.media_type,
-        )
-
     # Добавлен последним — оборачивает всё приложение снаружи: сжимает HTML/JS/CSS/JSON
     # (styles.css ~665 КБ → ~80 КБ). minimum_size — мелкие ответы не трогаем.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
