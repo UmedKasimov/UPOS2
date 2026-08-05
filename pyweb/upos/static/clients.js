@@ -198,6 +198,12 @@
   }
 
   function formMarkerType(form) {
+    const checkedSegment = form.querySelector("[data-client-segment-option]:checked");
+    if (checkedSegment) {
+      const icon = checkedSegment.dataset.segmentIcon || "";
+      const label = checkedSegment.dataset.segmentLabel || checkedSegment.value;
+      return `${icon} ${label}`.trim();
+    }
     const segment = form.querySelector("[data-client-segment-select]");
     if (segment?.value) {
       return segment.selectedOptions?.[0]?.textContent || segment.value;
@@ -1033,6 +1039,36 @@
     root.querySelectorAll("[data-client-program-dropdown]").forEach(syncProgramDropdown);
   }
 
+  function syncSegmentPicker(picker) {
+    if (!picker) return;
+    const checked = [...picker.querySelectorAll("[data-client-segment-option]:checked")];
+    const labels = checked.map((input) => input.dataset.segmentLabel || input.value).filter(Boolean);
+    const displayLabels = checked.map((input) => {
+      const icon = input.dataset.segmentIcon || "";
+      const label = input.dataset.segmentLabel || input.value;
+      return `${icon} ${label}`.trim();
+    });
+    const summary = picker.querySelector("[data-client-segment-summary]");
+    if (!summary) return;
+    summary.textContent = checked.length
+      ? (checked.length <= 2 ? displayLabels.join(", ") : `Выбрано: ${checked.length}`)
+      : "Не выбраны";
+    summary.title = labels.join(", ");
+  }
+
+  function filterSegmentPicker(search) {
+    const picker = search?.closest("[data-client-segment-picker]");
+    if (!picker) return;
+    const query = String(search.value || "").trim().toLocaleLowerCase("ru");
+    picker.querySelectorAll("[data-client-segment-option-row]").forEach((row) => {
+      row.hidden = Boolean(query) && !String(row.textContent || "").toLocaleLowerCase("ru").includes(query);
+    });
+  }
+
+  function initializeSegmentPickers(root = document) {
+    root.querySelectorAll("[data-client-segment-picker]").forEach(syncSegmentPicker);
+  }
+
   document.addEventListener("click", (event) => {
     const documentMenuToggle = event.target.closest("[data-client-document-menu-toggle]");
     if (documentMenuToggle) {
@@ -1125,6 +1161,9 @@
   });
 
   document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-client-segment-search]")) {
+      filterSegmentPicker(event.target);
+    }
     if (event.target.matches("[data-client-location-search]")) {
       const box = event.target.closest("[data-client-location-search-box]");
       // Подсказки тянем из внешнего сервиса, поэтому ждём паузы в наборе,
@@ -1145,6 +1184,10 @@
   });
 
   document.addEventListener("change", (event) => {
+    const segmentPicker = event.target.closest?.("[data-client-segment-picker]");
+    if (segmentPicker && event.target.matches("[data-client-segment-option]")) {
+      syncSegmentPicker(segmentPicker);
+    }
     const programDropdown = event.target.closest?.("[data-client-program-dropdown]");
     if (programDropdown && event.target.matches('input[name="programs"]')) {
       syncProgramDropdown(programDropdown);
@@ -1152,7 +1195,7 @@
     if (event.target.matches("[data-client-map-select]") || event.target.closest("[data-clients-map-filter]")) {
       document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
     }
-    if (event.target.matches("[data-client-map-icon], [data-client-segment-select], input[name='industry'], input[name='name']")) {
+    if (event.target.matches("[data-client-map-icon], [data-client-segment-select], [data-client-segment-option], input[name='industry'], input[name='name']")) {
       const form = event.target.closest("form");
       refreshEditableMarker(form);
     }
@@ -1203,6 +1246,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     initializeClientDirectoryTables();
     initializeProgramDropdowns();
+    initializeSegmentPickers();
     showClientSection();
     initializeMaps();
     setTimeout(refreshMaps, 250);

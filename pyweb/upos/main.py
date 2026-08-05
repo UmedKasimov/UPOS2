@@ -11283,6 +11283,37 @@ def create_app() -> FastAPI:
         map_icon = str(extra.get("map_icon") or "").strip()
         if not map_icon or map_icon == "default":
             map_icon = str(extra.get("industry") or "default").strip() or "default"
+        client_segments: list[dict[str, str]] = []
+        seen_segment_ids: set[str] = set()
+        raw_segments = extra.get("business_segments")
+        if isinstance(raw_segments, list):
+            for raw_segment in raw_segments:
+                if not isinstance(raw_segment, dict):
+                    continue
+                segment_id = str(raw_segment.get("id") or "").strip()
+                segment_name = str(raw_segment.get("name") or "").strip()
+                if not segment_id or not segment_name or segment_id in seen_segment_ids:
+                    continue
+                client_segments.append(
+                    {
+                        "id": segment_id,
+                        "name": segment_name,
+                        "icon": str(raw_segment.get("icon") or "🏷️").strip() or "🏷️",
+                    }
+                )
+                seen_segment_ids.add(segment_id)
+        legacy_segment_id = str(extra.get("business_segment_id") or "").strip()
+        legacy_segment_name = str(extra.get("business_segment") or "").strip()
+        if legacy_segment_id and legacy_segment_name and legacy_segment_id not in seen_segment_ids:
+            client_segments.insert(
+                0,
+                {
+                    "id": legacy_segment_id,
+                    "name": legacy_segment_name,
+                    "icon": str(extra.get("business_segment_icon") or map_icon or "🏷️").strip() or "🏷️",
+                },
+            )
+        client_segment_ids = [segment["id"] for segment in client_segments]
         return {
             "id": row.id,
             "name": row.name,
@@ -11306,6 +11337,8 @@ def create_app() -> FastAPI:
             "business_segment_icon": str(
                 extra.get("business_segment_icon") or map_icon or ""
             ),
+            "business_segment_ids": client_segment_ids,
+            "business_segments": client_segments,
             "program": ", ".join(programs),
             "programs": programs,
             "route": str(extra.get("route") or ""),
@@ -13605,10 +13638,18 @@ def create_app() -> FastAPI:
         pinfl = str(form.get("pinfl") or "").strip()
         email = str(form.get("email") or "").strip()
         business_segments = _workspace_business_segments(wid)
-        selected_segment = _business_segment_for_value(
-            form.get("business_segment_id"),
-            business_segments,
-        )
+        selected_segments: list[dict[str, str]] = []
+        selected_segment_ids: set[str] = set()
+        raw_segment_values = list(form.getlist("business_segment_ids"))
+        if not raw_segment_values:
+            raw_segment_values = [form.get("business_segment_id")]
+        for raw_segment_value in raw_segment_values:
+            segment = _business_segment_for_value(raw_segment_value, business_segments)
+            if segment is None or segment["id"] in selected_segment_ids:
+                continue
+            selected_segments.append(segment)
+            selected_segment_ids.add(segment["id"])
+        selected_segment = selected_segments[0] if selected_segments else None
         with session_scope() as session:
             duplicate = _counterparty_duplicate(
                 session,
@@ -13686,6 +13727,8 @@ def create_app() -> FastAPI:
                     "business_segment_id": selected_segment["id"] if selected_segment else "",
                     "business_segment": selected_segment["name"] if selected_segment else "",
                     "business_segment_icon": selected_segment["icon"] if selected_segment else "",
+                    "business_segment_ids": [segment["id"] for segment in selected_segments],
+                    "business_segments": [dict(segment) for segment in selected_segments],
                     "program": ", ".join(selected_programs),
                     "programs": selected_programs,
                     "route": str(form.get("route") or "").strip(),
@@ -13736,6 +13779,8 @@ def create_app() -> FastAPI:
                         or extra.get("map_icon")
                         or ""
                     ),
+                    "business_segment_ids": list(extra.get("business_segment_ids") or []),
+                    "business_segments": list(extra.get("business_segments") or []),
                     "balance_kind": "zero",
                     "balance_note": "Баланс: 0",
                     "balance": "0",

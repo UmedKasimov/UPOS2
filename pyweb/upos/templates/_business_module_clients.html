@@ -169,8 +169,12 @@
               </td>
               <td title="{{ client.last_date or '-' }}">{{ client.last_date or "-" }}</td>
               <td title="{{ client.business_segment or '-' }}">
-                {% if client.business_segment %}
-                  <span class="client-segment-chip">{{ client.business_segment_icon }} {{ client.business_segment }}</span>
+                {% if client.business_segments %}
+                  <div class="client-segment-chip-list">
+                    {% for segment in client.business_segments %}
+                      <span class="client-segment-chip">{{ segment.icon }} {{ segment.name }}</span>
+                    {% endfor %}
+                  </div>
                 {% else %}
                   -
                 {% endif %}
@@ -436,15 +440,23 @@
           <option value="paused">Пауза</option>
         </select>
       </label>
-      <label>
-        <span>Сегмент</span>
-        <select name="business_segment_id" data-client-segment-select>
-          <option value="">Не выбран</option>
-          {% for segment in client_business_segments %}
-            <option value="{{ segment.id }}">{{ segment.icon }} {{ segment.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
+      <div class="client-segment-picker" data-client-segment-picker>
+        <span>Сегменты</span>
+        <details class="client-segment-dropdown">
+          <summary><span data-client-segment-summary>Не выбраны</span></summary>
+          <div class="client-segment-menu">
+            <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+            <div class="client-segment-options">
+              {% for segment in client_business_segments %}
+                <label data-client-segment-option-row>
+                  <input type="checkbox" name="business_segment_ids" value="{{ segment.id }}" data-client-segment-option data-segment-label="{{ segment.name }}" data-segment-icon="{{ segment.icon }}" />
+                  <span>{{ segment.icon }} {{ segment.name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      </div>
       <div class="client-program-picker">
         <span>Программы клиента</span>
         <details class="client-program-dropdown" data-client-program-dropdown>
@@ -994,15 +1006,23 @@
             <option value="paused" {% if selected_client_card.crm_status == 'paused' %}selected{% endif %}>Пауза</option>
           </select>
         </label>
-        <label>
-          <span>Сегмент</span>
-          <select name="business_segment_id" data-client-segment-select>
-            <option value="">Не выбран</option>
-            {% for segment in client_business_segments %}
-              <option value="{{ segment.id }}" {% if selected_client_card.business_segment_id == segment.id %}selected{% endif %}>{{ segment.icon }} {{ segment.name }}</option>
-            {% endfor %}
-          </select>
-        </label>
+        <div class="client-segment-picker" data-client-segment-picker>
+          <span>Сегменты</span>
+          <details class="client-segment-dropdown">
+            <summary><span data-client-segment-summary>Не выбраны</span></summary>
+            <div class="client-segment-menu">
+              <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+              <div class="client-segment-options">
+                {% for segment in client_business_segments %}
+                  <label data-client-segment-option-row>
+                    <input type="checkbox" name="business_segment_ids" value="{{ segment.id }}" data-client-segment-option data-segment-label="{{ segment.name }}" data-segment-icon="{{ segment.icon }}" {% if segment.id in selected_client_card.business_segment_ids %}checked{% endif %} />
+                    <span>{{ segment.icon }} {{ segment.name }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </details>
+        </div>
         <div class="client-program-picker">
           <span>Программы клиента</span>
           <details class="client-program-dropdown" data-client-program-dropdown>
