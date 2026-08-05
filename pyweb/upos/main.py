@@ -272,6 +272,11 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+# Отступы шаблонов давали больше половины веса страниц со списками
+# (в строке карты клиентов 3 КБ из 5.3 КБ — только пробелы). Обрезаем их:
+# меньше байт на сборку страницы и меньше разметки на разбор в браузере.
+templates.env.trim_blocks = True
+templates.env.lstrip_blocks = True
 # В проде (Railway) шаблоны не меняются на диске — отключаем auto_reload,
 # чтобы Jinja не делала os.stat() по всей цепочке шаблонов на каждый рендер.
 _templates_dev_reload = not os.environ.get("RAILWAY_ENVIRONMENT")
@@ -13614,7 +13619,27 @@ def create_app() -> FastAPI:
         return lat, lon
 
     @app.post("/clients/save", name="clients_save")
-    async def clients_save(request: Request):
+    def _geocode_client_later(workspace_owner_id: str, counterparty_id: str, address: str) -> None:
+        """Досчитывает координаты клиента после ответа, не задерживая запись."""
+        lat, lon = _geocode_client_address(address)
+        if not lat or not lon:
+            return
+        try:
+            with session_scope() as session:
+                row = session.get(Counterparty, counterparty_id)
+                if row is None or row.workspace_owner_id != workspace_owner_id:
+                    return
+                extra = _counterparty_extra(row)
+                if extra.get("latitude") and extra.get("longitude"):
+                    return
+                extra["latitude"] = lat
+                extra["longitude"] = lon
+                row.data = extra
+                flag_modified(row, "data")
+        except Exception:
+            logger.exception("[upos] background geocode failed for %s", counterparty_id)
+
+    async def clients_save(request: Request, background_tasks: BackgroundTasks):
         form = await request.form()
         wants_json = "application/json" in str(request.headers.get("accept") or "").lower() or str(form.get("response") or "").strip() == "json"
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
@@ -13700,10 +13725,9 @@ def create_app() -> FastAPI:
             address = str(form.get("address") or "").strip()
             latitude = _clean_client_coordinate(form.get("latitude"), minimum=-90, maximum=90)
             longitude = _clean_client_coordinate(form.get("longitude"), minimum=-180, maximum=180)
-            if address and (not latitude or not longitude):
-                geocoded_latitude, geocoded_longitude = _geocode_client_address(address)
-                latitude = latitude or geocoded_latitude
-                longitude = longitude or geocoded_longitude
+            # Геокодинг ходит во внешний сервис с таймаутом 5 секунд и держал
+            # сохранение. Координаты досчитываем фоном уже после ответа.
+            needs_geocode = bool(address and (not latitude or not longitude))
             saved_row = _ensure_counterparty(
                 session,
                 wid,
@@ -13765,6 +13789,8 @@ def create_app() -> FastAPI:
                 _crm_workspace_stages(wid),
             )
             client_id = saved_row.id
+            if needs_geocode and client_id:
+                background_tasks.add_task(_geocode_client_later, wid, client_id, address)
             if wants_json:
                 extra = _counterparty_extra(saved_row)
                 client = {
@@ -24009,6 +24035,44 @@ def create_app() -> FastAPI:
         same_site="lax",
         https_only=cookie_https_only,
     )
+
+    # Отступы шаблонов дают больше половины веса страниц со списками: в строке
+    # карты клиентов 3 КБ из 5.3 КБ — только пробелы. Их разбирает браузер,
+    # поэтому схлопываем переносы строк ещё до сжатия. Содержимое script/style/
+    # pre/textarea не трогаем — там пробелы значимы.
+    _MINIFY_SKIP = re.compile(
+        r"(<(?:script|style|pre|textarea)\b[^>]*>.*?</(?:script|style|pre|textarea)>)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _MINIFY_GAPS = re.compile(r"\s*\n\s*")
+
+    def _collapse_html_whitespace(html: str) -> str:
+        parts = _MINIFY_SKIP.split(html)
+        for index in range(0, len(parts), 2):
+            parts[index] = _MINIFY_GAPS.sub(" ", parts[index])
+        return "".join(parts)
+
+    @app.middleware("http")
+    async def minify_html_responses(request: Request, call_next):
+        response = await call_next(request)
+        content_type = str(response.headers.get("content-type") or "")
+        if not content_type.startswith("text/html") or response.status_code >= 400:
+            return response
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8")
+        try:
+            minified = _collapse_html_whitespace(body.decode("utf-8")).encode("utf-8")
+        except Exception:
+            minified = body
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        return Response(
+            content=minified,
+            status_code=response.status_code,
+            headers=headers,
+            media_type=response.media_type,
+        )
 
     # Добавлен последним — оборачивает всё приложение снаружи: сжимает HTML/JS/CSS/JSON
     # (styles.css ~665 КБ → ~80 КБ). minimum_size — мелкие ответы не трогаем.
