@@ -13224,6 +13224,9 @@ def create_app() -> FastAPI:
             contact_by_phone: dict[str, str] = {}
             contact_by_counterparty: dict[str, str] = {}
             contact_by_telegram: dict[str, str] = {}
+            # Телефоны короче девяти цифр в индекс по последним девяти не попадают,
+            # поэтому для таких клиентов оставляем точный поиск по суффиксу.
+            contact_phones_raw: list[tuple[str, str]] = []
 
             def index_bump(store: dict[str, str], key: str, candidate: Any) -> None:
                 if not key:
@@ -13240,6 +13243,7 @@ def create_app() -> FastAPI:
                 call_phone = digits(call.get("phone"))
                 if call_phone:
                     index_bump(contact_by_phone, call_phone[-9:], moment)
+                    contact_phones_raw.append((call_phone, str(moment or "")))
 
             for crm_row in crm_rows_for_contact:
                 data = _json_object(crm_row.data)
@@ -13253,6 +13257,7 @@ def create_app() -> FastAPI:
                 sub_phone = digits(subscriber.phone)
                 if sub_phone:
                     index_bump(contact_by_phone, sub_phone[-9:], moment)
+                    contact_phones_raw.append((sub_phone, moment))
                 index_bump(contact_by_name, str(subscriber.display_name or "").strip().lower(), moment)
 
             def client_last_contact(row: Counterparty, item: dict[str, Any]) -> str:
@@ -13262,8 +13267,12 @@ def create_app() -> FastAPI:
                     if key:
                         best = bump_date(best, contact_by_name.get(key))
                 phone_digits = digits(item.get("phone"))
-                if phone_digits:
+                if len(phone_digits) >= 9:
                     best = bump_date(best, contact_by_phone.get(phone_digits[-9:]))
+                elif phone_digits:
+                    for candidate_phone, candidate_moment in contact_phones_raw:
+                        if candidate_phone.endswith(phone_digits):
+                            best = bump_date(best, candidate_moment)
                 best = bump_date(best, contact_by_counterparty.get(str(row.id or "")))
                 telegram_key = str(item.get("telegram") or "").lstrip("@").lower()
                 if telegram_key:
