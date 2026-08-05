@@ -23924,6 +23924,10 @@ body:has(dialog[open]) {
   background: color-mix(in srgb, var(--brand-box, #2563eb) 7%, var(--card));
 }
 
+.client-bulk-attach-options label[hidden] {
+  display: none;
+}
+
 .client-bulk-attach-status {
   min-height: 2.35rem;
   padding: 0.65rem 1rem;
