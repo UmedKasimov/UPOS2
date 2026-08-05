@@ -10852,7 +10852,33 @@ def create_app() -> FastAPI:
             )
         return tabs
 
-    def _purchase_document_data(row: PurchaseDocument) -> dict[str, Any]:
+    def _purchase_line_product_meta(session, workspace_owner_id: str) -> dict[str, dict[str, dict[str, str]]]:
+        """Фото и вид позиции (товар или услуга) для строк закупки.
+
+        Собирается один раз на запрос: карточка закупки показывает снимок
+        товара, а услуги отмечаются отдельно.
+        """
+        by_id: dict[str, dict[str, str]] = {}
+        by_name: dict[str, dict[str, str]] = {}
+        rows = session.execute(
+            select(Product).where(Product.workspace_owner_id == workspace_owner_id)
+        ).scalars()
+        for product_row in rows:
+            data = _json_object(product_row.data)
+            entry = {
+                "photo_url": str(data.get("photo_url") or ""),
+                "kind": "service" if str(data.get("kind") or "product") == "service" else "product",
+            }
+            by_id[str(product_row.id)] = entry
+            name_key = str(product_row.name or "").strip().lower()
+            if name_key:
+                by_name.setdefault(name_key, entry)
+        return {"by_id": by_id, "by_name": by_name}
+
+    def _purchase_document_data(
+        row: PurchaseDocument,
+        product_meta: dict[str, dict[str, dict[str, str]]] | None = None,
+    ) -> dict[str, Any]:
         data = _json_object(row.data)
         paid_amount = _sales_decimal(data.get("paid_amount"))
         amount_value = _sales_decimal(row.amount)
@@ -10873,10 +10899,17 @@ def create_app() -> FastAPI:
         for line in raw_lines:
             if not isinstance(line, dict):
                 continue
+            product_id = str(line.get("product_id") or "")
+            product_name = str(line.get("product") or "")
+            meta = (product_meta or {}).get("by_id", {}).get(product_id) or (product_meta or {}).get(
+                "by_name", {}
+            ).get(product_name.strip().lower()) or {}
             safe_lines.append(
                 {
-                    "product_id": str(line.get("product_id") or ""),
-                    "product": str(line.get("product") or ""),
+                    "product_id": product_id,
+                    "product": product_name,
+                    "photo_url": str(meta.get("photo_url") or ""),
+                    "kind": str(meta.get("kind") or "product"),
                     "quantity": _purchase_quantity_label(line.get("quantity")),
                     "price": _decimal_plain_text(_sales_decimal(line.get("price"))),
                     "extra_expense": _decimal_plain_text(_sales_decimal(line.get("extra_expense"))),
@@ -12131,13 +12164,14 @@ def create_app() -> FastAPI:
                 created_at.isoformat() if created_at else "",
             )
 
+        card_product_meta = _purchase_line_product_meta(session, workspace_owner_id)
         for purchase_row in purchase_rows:
             data = _json_object(purchase_row.data)
             counterparty_id = str(data.get("counterparty_id") or purchase_row.counterparty_id or "").strip()
             supplier_name = str(data.get("supplier") or "").strip().lower()
             if counterparty_id != supplier_id and supplier_name not in names:
                 continue
-            item = _purchase_document_data(purchase_row)
+            item = _purchase_document_data(purchase_row, card_product_meta)
             purchases.append(item)
             total_amount += _sales_decimal(purchase_row.amount)
             total_paid += _sales_decimal(data.get("paid_amount"))
@@ -12155,7 +12189,7 @@ def create_app() -> FastAPI:
             key=purchase_sort_key,
         ):
             data = _json_object(purchase_row.data)
-            item = _purchase_document_data(purchase_row)
+            item = _purchase_document_data(purchase_row, card_product_meta)
             amount = _sales_decimal(purchase_row.amount)
             paid_amount = _sales_decimal(data.get("paid_amount"))
             currency = str(item.get("currency") or purchase_row.currency or reconciliation_currency or "UZS").strip().upper() or "UZS"
@@ -12648,8 +12682,9 @@ def create_app() -> FastAPI:
                 if filters["op_type"] != "all" and item["operation_type"] != filters["op_type"]:
                     continue
                 warehouse_operations.append(item)
+            purchase_product_meta = _purchase_line_product_meta(session, wid)
             for row in purchase_rows:
-                item = _purchase_document_data(row)
+                item = _purchase_document_data(row, purchase_product_meta)
                 if str(row.id) == str(edit_purchase or ""):
                     warehouse_purchase_edit = item
                 line_products = " ".join(
@@ -14258,8 +14293,9 @@ def create_app() -> FastAPI:
                     .order_by(PurchaseDocument.updated_at.desc())
                 ).scalars()
             )
+            purchase_product_meta = _purchase_line_product_meta(session, wid)
             for row in purchase_rows:
-                item = _purchase_document_data(row)
+                item = _purchase_document_data(row, purchase_product_meta)
                 hay = " ".join([item["number"], item["supplier"], item["warehouse"], item["status_label"], item["note"]]).lower()
                 if q_clean and q_clean not in hay:
                     continue

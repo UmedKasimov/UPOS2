@@ -2068,15 +2068,59 @@
       linesRoot.append(row);
       return;
     }
+    const appendProductCell = (row, line, isService) => {
+      const cell = document.createElement("td");
+      cell.className = "purchase-line-product";
+      // Раскладка живёт внутри ячейки: display:flex на самой td выключает её
+      // из расчёта ширин таблицы, и колонка «Товар» схлопывается.
+      const box = document.createElement("span");
+      box.className = "purchase-line-box";
+
+      const media = document.createElement("span");
+      media.className = "purchase-line-photo";
+      const photoUrl = String(line.photo_url || "").trim();
+      if (photoUrl) {
+        const image = document.createElement("img");
+        image.src = photoUrl;
+        image.alt = "";
+        image.loading = "lazy";
+        image.decoding = "async";
+        // Битая ссылка не должна оставлять рамку с крестиком.
+        image.addEventListener("error", () => {
+          media.dataset.fallback = isService ? "service" : "product";
+          image.remove();
+        });
+        media.append(image);
+      } else {
+        media.dataset.fallback = isService ? "service" : "product";
+      }
+
+      const copy = document.createElement("span");
+      copy.className = "purchase-line-name";
+      copy.textContent = String(line.product || "Товар");
+      box.append(media, copy);
+      if (isService) {
+        const badge = document.createElement("span");
+        badge.className = "purchase-line-service-badge";
+        badge.textContent = "Услуга";
+        box.append(badge);
+      }
+      cell.append(box);
+      row.append(cell);
+      return cell;
+    };
+
     lines.forEach((line, index) => {
       const row = document.createElement("tr");
+      if (String(line.kind || "product") === "service") row.classList.add("is-service");
       const qty = quantityText(line.quantity);
       const price = line.price ? moneyWithCurrency(line.price, currency) : "-";
       const costPrice = line.cost_price ? moneyWithCurrency(line.cost_price, currency) : price;
       const salePrice = line.sale_price ? moneyWithCurrency(line.sale_price, purchase.price_type_currency || currency) : "-";
       const total = line.total ? moneyWithCurrency(line.total, currency) : "-";
+      const isService = String(line.kind || "product") === "service";
       appendCell(row, index + 1);
-      appendCell(row, line.product || "Товар");
+      appendProductCell(row, line, isService);
       appendCell(row, qty);
       appendCell(row, price);
       appendCell(row, costPrice);

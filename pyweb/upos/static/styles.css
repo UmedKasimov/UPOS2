@@ -31886,3 +31886,75 @@ html.dark .crm-task-calendar-event {
 .sidebar-ibox-sync-last[hidden] {
   display: none;
 }
+
+/* ── Позиции в карточке закупки: снимок и отметка услуги ────────────────── */
+/* Ячейка остаётся обычной ячейкой таблицы: display:flex на td выключает её
+   из расчёта ширин, и колонка «Товар» схлопывается. Раскладка — внутри. */
+.warehouse-purchase-detail-table td.purchase-line-product {
+  white-space: normal;
+}
+
+.purchase-line-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.purchase-line-photo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.purchase-line-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Позиция без снимка: нейтральная заглушка вместо пустой рамки. */
+.purchase-line-photo[data-fallback]::before {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.purchase-line-photo[data-fallback="product"]::before {
+  content: "📦";
+}
+
+.purchase-line-photo[data-fallback="service"]::before {
+  content: "🛠";
+}
+
+.purchase-line-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+/* Услуги отличаются от товаров оттенком того же синего: складского запаса
+   за ними не стоит, и в списке это должно быть видно сразу. */
+.warehouse-purchase-detail-table tr.is-service > td {
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+}
+
+.purchase-line-service-badge {
+  flex: none;
+  align-self: center;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
