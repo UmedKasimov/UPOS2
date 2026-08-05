@@ -1578,6 +1578,238 @@
     if (objectUrl) preview.dataset.clientPhotoObjectUrl = url;
   }
 
+  function directoryLocationDialogElements(dialog) {
+    return {
+      map: dialog?.querySelector("[data-client-location-dialog-map]"),
+      title: dialog?.querySelector("[data-client-location-dialog-title]"),
+      status: dialog?.querySelector("[data-client-location-dialog-status]"),
+      save: dialog?.querySelector("[data-client-location-dialog-save]"),
+    };
+  }
+
+  function setDirectoryLocationDialogStatus(dialog, text, isError = false) {
+    const status = directoryLocationDialogElements(dialog).status;
+    if (!status) return;
+    status.textContent = text;
+    status.classList.toggle("is-error", isError);
+  }
+
+  function setDirectoryLocationDialogPoint(dialog, lat, lon, { focus = true } = {}) {
+    const elements = directoryLocationDialogElements(dialog);
+    const api = elements.map?._clientLocationDialogApi;
+    if (!api || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const nextLat = Number(lat.toFixed(6));
+    const nextLon = Number(lon.toFixed(6));
+    dialog.dataset.lat = String(nextLat);
+    dialog.dataset.lon = String(nextLon);
+    if (!api.marker) {
+      api.marker = window.L.marker([nextLat, nextLon], {
+        draggable: true,
+        icon: markerIcon(dialog.dataset.clientName || "Клиент", dialog.dataset.clientIcon || "", "", { draggable: true }),
+        zIndexOffset: 2000,
+      }).addTo(api.map);
+      api.marker.on("dragend", () => {
+        const point = api.marker?.getLatLng();
+        if (point) setDirectoryLocationDialogPoint(dialog, point.lat, point.lng, { focus: false });
+      });
+    } else {
+      api.marker.setLatLng([nextLat, nextLon]);
+      api.marker.setIcon(markerIcon(dialog.dataset.clientName || "Клиент", dialog.dataset.clientIcon || "", "", { draggable: true }));
+    }
+    if (focus) api.map.setView([nextLat, nextLon], PICK_ZOOM);
+    if (elements.save) elements.save.disabled = false;
+    setDirectoryLocationDialogStatus(dialog, `Точка: ${nextLat}, ${nextLon}`);
+  }
+
+  function ensureDirectoryLocationDialogMap(dialog) {
+    const container = directoryLocationDialogElements(dialog).map;
+    if (!container || !window.L) return null;
+    if (container._clientLocationDialogApi) {
+      scheduleInvalidate(container._clientLocationDialogApi);
+      return container._clientLocationDialogApi;
+    }
+    const map = window.L.map(container, {
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      zoomControl: true,
+      attributionControl: false,
+    });
+    window.L.tileLayer(TILE_URL, {
+      attribution: TILE_ATTRIBUTION,
+      maxZoom: 19,
+    }).addTo(map);
+    window.L.control.attribution({ prefix: "" }).addTo(map);
+    const api = { container, map, marker: null };
+    container._clientLocationDialogApi = api;
+    map.on("click", (event) => {
+      setDirectoryLocationDialogPoint(dialog, event.latlng.lat, event.latlng.lng);
+    });
+    if (window.ResizeObserver) {
+      api.resizeObserver = new ResizeObserver(() => scheduleInvalidate(api));
+      api.resizeObserver.observe(container);
+    }
+    scheduleInvalidate(api);
+    return api;
+  }
+
+  async function openDirectoryLocationDialog(trigger) {
+    const dialog = document.querySelector("[data-client-location-dialog]");
+    if (!dialog) return;
+    const elements = directoryLocationDialogElements(dialog);
+    dialog._locationTrigger = trigger;
+    dialog.dataset.clientId = trigger.dataset.clientId || "";
+    dialog.dataset.clientName = trigger.dataset.clientName || "Клиент";
+    dialog.dataset.clientIcon = trigger.dataset.clientIcon || "";
+    dialog.dataset.saveUrl = trigger.dataset.saveUrl || `/api/clients/${encodeURIComponent(dialog.dataset.clientId)}/location`;
+    dialog.dataset.csrf = trigger.dataset.csrf || csrfToken(trigger);
+    dialog.dataset.address = trigger.dataset.clientAddress || "";
+    dialog.dataset.lat = "";
+    dialog.dataset.lon = "";
+    if (elements.title) elements.title.textContent = `Локация: ${dialog.dataset.clientName}`;
+    if (elements.save) {
+      elements.save.disabled = true;
+      elements.save.textContent = "Сохранить точку";
+    }
+    setDirectoryLocationDialogStatus(dialog, "Нажмите на карту, чтобы поставить точку.");
+    if (!dialog.open) dialog.showModal();
+    const api = ensureDirectoryLocationDialogMap(dialog);
+    if (!api) {
+      setDirectoryLocationDialogStatus(dialog, "Карта не загрузилась. Обновите страницу и попробуйте ещё раз.", true);
+      return;
+    }
+    if (api.marker) {
+      api.map.removeLayer(api.marker);
+      api.marker = null;
+    }
+    api.map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    scheduleInvalidate(api);
+    const lat = Number.parseFloat(trigger.dataset.clientLat || "");
+    const lon = Number.parseFloat(trigger.dataset.clientLon || "");
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      setDirectoryLocationDialogPoint(dialog, lat, lon);
+      return;
+    }
+    if (!dialog.dataset.address) return;
+    setDirectoryLocationDialogStatus(dialog, "Ищем адрес клиента на карте...");
+    const clientId = dialog.dataset.clientId;
+    let point = null;
+    try {
+      point = await geocodeAddress(dialog.dataset.address);
+    } catch {}
+    if (!dialog.open || dialog.dataset.clientId !== clientId) return;
+    if (point) {
+      setDirectoryLocationDialogPoint(dialog, point.lat, point.lon);
+      setDirectoryLocationDialogStatus(dialog, "Адрес найден. Уточните точку и сохраните.");
+    } else {
+      setDirectoryLocationDialogStatus(dialog, "Адрес не найден. Поставьте точку вручную.");
+    }
+  }
+
+  function closeDirectoryLocationDialog(dialog) {
+    if (!dialog?.open) return;
+    dialog.close();
+    dialog._locationTrigger = null;
+  }
+
+  function updateSavedDirectoryLocation(dialog, payload, address) {
+    const trigger = dialog._locationTrigger;
+    const clientId = dialog.dataset.clientId || "";
+    const latitude = String(payload.latitude || dialog.dataset.lat || "");
+    const longitude = String(payload.longitude || dialog.dataset.lon || "");
+    if (trigger) {
+      trigger.dataset.clientLat = latitude;
+      trigger.dataset.clientLon = longitude;
+      trigger.dataset.clientAddress = address;
+      trigger.innerHTML = '<span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>';
+    }
+    document.querySelectorAll("[data-client-overview-point]").forEach((row) => {
+      if (String(row.dataset.clientId || "") !== clientId) return;
+      row.dataset.lat = latitude;
+      row.dataset.lon = longitude;
+      row.dataset.address = address;
+      const addressCell = row.querySelector(".clients-map-address-text");
+      if (addressCell) addressCell.textContent = address || "Адрес не указан";
+      const locationCell = row.querySelector(".clients-map-location-cell");
+      if (locationCell) {
+        locationCell.innerHTML = '<span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>';
+      }
+    });
+  }
+
+  async function saveDirectoryLocationDialog(dialog) {
+    const elements = directoryLocationDialogElements(dialog);
+    const latitude = Number.parseFloat(dialog.dataset.lat || "");
+    const longitude = Number.parseFloat(dialog.dataset.lon || "");
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setDirectoryLocationDialogStatus(dialog, "Сначала выберите точку на карте.", true);
+      return;
+    }
+    if (elements.save) {
+      elements.save.disabled = true;
+      elements.save.textContent = "Сохраняем...";
+    }
+    setDirectoryLocationDialogStatus(dialog, "Определяем адрес и сохраняем точку...");
+    let address = dialog.dataset.address || "";
+    try {
+      address = (await reverseAddress(latitude, longitude)) || address;
+    } catch {}
+    try {
+      const response = await fetch(dialog.dataset.saveUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": dialog.dataset.csrf || csrfToken(dialog),
+        },
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          address,
+          map_icon: dialog.dataset.clientIcon || "",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "save_failed");
+      const savedAddress = String(payload.address || address || "");
+      updateSavedDirectoryLocation(dialog, payload, savedAddress);
+      setDirectoryLocationDialogStatus(dialog, "Точка сохранена.");
+      if (elements.save) elements.save.textContent = "Сохранено";
+      document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      window.setTimeout(() => closeDirectoryLocationDialog(dialog), 550);
+    } catch {
+      setDirectoryLocationDialogStatus(dialog, "Не удалось сохранить точку. Попробуйте ещё раз.", true);
+      if (elements.save) {
+        elements.save.disabled = false;
+        elements.save.textContent = "Сохранить точку";
+      }
+    }
+  }
+
+  document.addEventListener("dblclick", (event) => {
+    const trigger = event.target.closest?.("[data-client-location-dialog-trigger]");
+    if (!trigger) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void openDirectoryLocationDialog(trigger);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const trigger = event.target.closest?.("[data-client-location-dialog-trigger]");
+    if (!trigger || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    void openDirectoryLocationDialog(trigger);
+  });
+
+  document.addEventListener("click", (event) => {
+    const close = event.target.closest?.("[data-client-location-dialog-close]");
+    const save = event.target.closest?.("[data-client-location-dialog-save]");
+    const dialog = (close || save)?.closest("[data-client-location-dialog]");
+    if (!dialog) return;
+    event.preventDefault();
+    if (close) closeDirectoryLocationDialog(dialog);
+    if (save) void saveDirectoryLocationDialog(dialog);
+  });
+
   document.addEventListener("click", (event) => {
     const quickLocationPick = event.target.closest?.("[data-client-map-location-pick]");
     const pickerCancel = event.target.closest?.("[data-clients-map-point-picker-cancel]");

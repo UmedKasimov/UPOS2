@@ -23751,6 +23751,17 @@ body:has(dialog[open]) {
   text-align: center;
 }
 
+.client-location-state-cell--interactive {
+  cursor: pointer;
+  outline: none;
+}
+
+.client-location-state-cell--interactive:hover,
+.client-location-state-cell--interactive:focus-visible {
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
 .client-location-state {
   display: inline-grid;
   width: 1.45rem;
@@ -23771,6 +23782,107 @@ body:has(dialog[open]) {
 .client-location-state--no {
   color: #9ca3af;
   background: color-mix(in srgb, #9ca3af 8%, var(--card));
+}
+
+.client-location-dialog {
+  width: min(48rem, calc(100vw - 1.5rem));
+  max-width: none;
+  max-height: calc(100vh - 1.5rem);
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  overflow: visible;
+}
+
+.client-location-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.client-location-dialog-surface {
+  display: grid;
+  grid-template-rows: auto minmax(18rem, 52vh) auto auto;
+  overflow: hidden;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+}
+
+.client-location-dialog-head,
+.client-location-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.client-location-dialog-head {
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.client-location-dialog-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.client-location-dialog-head p {
+  margin: 0.18rem 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.client-location-dialog-close {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 50%;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.client-location-dialog-map {
+  width: 100%;
+  min-height: 18rem;
+  background: var(--muted);
+}
+
+.client-location-dialog-status {
+  min-height: 2.25rem;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.client-location-dialog-status.is-error {
+  color: #dc2626;
+}
+
+.client-location-dialog-actions {
+  justify-content: flex-end;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+@media (max-width: 640px) {
+  .client-location-dialog {
+    width: calc(100vw - 1rem);
+    max-height: calc(100vh - 1rem);
+  }
+
+  .client-location-dialog-surface {
+    grid-template-rows: auto minmax(16rem, 48vh) auto auto;
+  }
 }
 
 /* Кнопки действий в строках клиентов и поставщиков — рядом, по центру. */

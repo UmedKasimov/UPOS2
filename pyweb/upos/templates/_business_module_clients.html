@@ -210,7 +210,22 @@
                   </details>
                 </div>
               </td>
-              <td class="client-location-state-cell">
+              <td
+                class="client-location-state-cell client-location-state-cell--interactive"
+                role="button"
+                tabindex="0"
+                data-client-location-dialog-trigger
+                data-client-id="{{ client.id }}"
+                data-client-name="{{ client.name }}"
+                data-client-lat="{{ client.latitude or '' }}"
+                data-client-lon="{{ client.longitude or '' }}"
+                data-client-address="{{ client.address or '' }}"
+                data-client-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+                data-save-url="{{ url_for('client_location_save_api', counterparty_id=client.id) }}"
+                data-csrf="{{ csrf_token }}"
+                aria-label="Изменить локацию клиента {{ client.name }}"
+                title="Дважды нажмите, чтобы изменить локацию"
+              >
                 {% if client.latitude and client.longitude %}
                   <span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>
                 {% else %}
@@ -304,6 +319,24 @@
   </article>
 
 </div>
+
+<dialog class="client-location-dialog" data-client-location-dialog aria-labelledby="client-location-dialog-title">
+  <div class="client-location-dialog-surface">
+    <header class="client-location-dialog-head">
+      <div>
+        <h2 id="client-location-dialog-title" data-client-location-dialog-title>Локация клиента</h2>
+        <p>Нажмите на карту или перетащите маркер в нужную точку.</p>
+      </div>
+      <button type="button" class="client-location-dialog-close" data-client-location-dialog-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="client-location-dialog-map" data-client-location-dialog-map aria-label="Выбор точки клиента на карте"></div>
+    <div class="client-location-dialog-status" data-client-location-dialog-status role="status">Выберите точку на карте.</div>
+    <footer class="client-location-dialog-actions">
+      <button type="button" class="btn btn-secondary" data-client-location-dialog-close>Отмена</button>
+      <button type="button" class="btn" data-client-location-dialog-save disabled>Сохранить точку</button>
+    </footer>
+  </div>
+</dialog>
 
 <section id="clients-map" class="products-list-panel clients-map-shell" data-workspace-view="clients_map" hidden>
   <header class="products-panel-head">
