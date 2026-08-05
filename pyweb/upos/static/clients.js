@@ -413,10 +413,29 @@
       if (!body) return;
       // Пока панель карты скрыта, строки не разворачиваем — в этом весь смысл.
       const panel = template.closest("#clients-map") || body.closest("section, article");
-      if (panel && !panel.offsetParent) return;
+      if (panel && !panel.offsetParent) {
+        watchClientsMapPanel(panel);
+        return;
+      }
       body.append(template.content.cloneNode(true));
       template.remove();
+      initializeDirectorySegmentPickers(body);
+      syncDirectoryClientSelection();
     });
+  }
+
+  /* Панель карты открывается по-разному: вкладкой, хешем, кнопкой «Показать
+     на карте». Ждём её появления наблюдателем, чтобы не гадать с событиями. */
+  function watchClientsMapPanel(panel) {
+    if (!panel || panel._clientsMapWatched || typeof ResizeObserver !== "function") return;
+    panel._clientsMapWatched = true;
+    const observer = new ResizeObserver(() => {
+      if (!panel.offsetParent) return;
+      observer.disconnect();
+      panel._clientsMapWatched = false;
+      unpackClientsMapRows(panel);
+    });
+    observer.observe(panel);
   }
 
   function initializeMaps(root = document) {
