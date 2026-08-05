@@ -461,11 +461,18 @@
     };
   }
 
-  function focusClientLocationPanel() {
+  function focusClientLocationPanel(attempt = 0) {
     const panel = document.querySelector("#client-edit [data-client-location-panel]");
-    if (!panel || panel.closest("[hidden]")) return;
-    panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    panel.querySelector("[data-client-location-search]")?.focus();
+    if (!panel || panel.closest("[hidden]")) {
+      if (attempt < 6) window.setTimeout(() => focusClientLocationPanel(attempt + 1), 120);
+      return;
+    }
+    panel.scrollIntoView({ block: "start" });
+    const search = panel.querySelector("[data-client-location-search]");
+    search?.focus();
+    if (search && document.activeElement !== search && attempt < 6) {
+      window.setTimeout(() => focusClientLocationPanel(attempt + 1), 120);
+    }
   }
 
   function matchesOverviewFilters(point, filters, selectedIds) {
