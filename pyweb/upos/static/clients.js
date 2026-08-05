@@ -2289,8 +2289,15 @@
   });
 
   document.addEventListener("toggle", (event) => {
-    const details = event.target.closest?.("[data-client-map-segment-picker] details");
-    if (details?.open) hydrateDirectorySegmentPicker(details.closest("[data-client-map-segment-picker]"));
+    // Список сегментов подставляется при открытии — и в карте, и в таблице
+    // клиентов: держать его копию в каждой строке слишком дорого.
+    const details = event.target.closest?.(
+      "[data-client-map-segment-picker] details, [data-client-directory-segment-picker] details",
+    );
+    if (!details?.open) return;
+    hydrateDirectorySegmentPicker(
+      details.closest("[data-client-map-segment-picker], [data-client-directory-segment-picker]"),
+    );
   }, true);
 
   window.addEventListener("hashchange", () => {
