@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=553" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=554" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -25,6 +25,9 @@
     {% if user %}data-user-id="{{ user.user_id | default(user.id) | e }}" data-user-name="{{ (user.name or user.username or '') | e }}"{% endif %}
     {% if user and not user.get('is_employee') and user.get('role') == 'user' %}data-device-heartbeat="1"{% endif %}
   >
+    <div class="page-veil" data-page-veil aria-hidden="true">
+      <div class="page-veil-body"><div class="page-veil-spinner"></div></div>
+    </div>
     <div class="layout">
       <div
         class="sidebar-backdrop"
@@ -597,6 +600,7 @@
     <script src="{{ url_for('static', path='workspace-switcher.js') }}?v=3" defer></script>
     {% endif %}
     {% endif %}
+    <script src="{{ url_for('static', path='page-transition.js') }}?v=1" defer></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>
