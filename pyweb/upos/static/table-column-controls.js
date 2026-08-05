@@ -394,8 +394,27 @@
       const order = raw.map(String).filter((key, index, items) => (
         available.has(key) && items.indexOf(key) === index
       ));
-      fallback.forEach((key) => {
-        if (!order.includes(key)) order.push(key);
+      fallback.forEach((key, fallbackIndex) => {
+        if (order.includes(key)) return;
+
+        const previousKey = fallback
+          .slice(0, fallbackIndex)
+          .reverse()
+          .find((candidate) => order.includes(candidate));
+        if (previousKey) {
+          order.splice(order.indexOf(previousKey) + 1, 0, key);
+          return;
+        }
+
+        const nextKey = fallback
+          .slice(fallbackIndex + 1)
+          .find((candidate) => order.includes(candidate));
+        if (nextKey) {
+          order.splice(order.indexOf(nextKey), 0, key);
+          return;
+        }
+
+        order.push(key);
       });
       return order;
     } catch {
