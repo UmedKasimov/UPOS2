@@ -394,12 +394,11 @@
   </header>
   <form method="post" action="{{ url_for('clients_save') }}" class="product-form client-create-form">
     {% include "_csrf_field.html" %}
-    <div class="product-form-grid">
+    <div class="product-form-grid client-data-table">
       <label class="wide"><span>Название клиента*</span><input name="name" required /></label>
       <label><span>Официальное название</span><input name="official_name" /></label>
       <label><span>Тип клиента</span><select name="client_type"><option value="company">Компания</option><option value="individual">Физическое лицо</option></select></label>
       <label><span>Телефон</span><input name="phone" data-uz-phone placeholder="+998 90 123 45 67" /></label>
-      <label><span>Email</span><input name="email" type="email" /></label>
       <label><span>Telegram номер</span><input name="telegram_phone" data-uz-phone placeholder="+998 90 123 45 67" /></label>
       <label><span>ИНН</span><input name="tax_id" /></label>
       <label><span>ПИНФЛ</span><input name="pinfl" /></label>
@@ -948,12 +947,12 @@
           <label class="wide"><span>Выбрать фото из ПК</span><input name="photo_file" type="file" accept="image/*" /></label>
         </div>
       </div>
-      <div class="product-form-grid">
+      <div class="product-form-grid client-data-table">
+        <input type="hidden" name="email" value="{{ selected_client_card.email or '' }}" />
         <label class="wide"><span>Название клиента*</span><input name="name" value="{{ selected_client_card.name }}" required /></label>
         <label><span>Официальное название</span><input name="official_name" value="{{ selected_client_card.official_name or '' }}" /></label>
         <label><span>Тип клиента</span><select name="client_type"><option value="company" {% if selected_client_card.client_type == 'company' %}selected{% endif %}>Компания</option><option value="individual" {% if selected_client_card.client_type == 'individual' %}selected{% endif %}>Физическое лицо</option></select></label>
         <label><span>Телефон</span><input name="phone" data-uz-phone placeholder="+998 90 123 45 67" value="{{ selected_client_card.phone or '' }}" /></label>
-        <label><span>Email</span><input name="email" type="email" value="{{ selected_client_card.email or '' }}" /></label>
         <label><span>Telegram номер</span><input name="telegram_phone" data-uz-phone placeholder="+998 90 123 45 67" value="{{ selected_client_card.telegram_phone or '' }}" /></label>
         <label><span>ИНН</span><input name="tax_id" value="{{ selected_client_card.inn or '' }}" /></label>
         <label><span>ПИНФЛ</span><input name="pinfl" value="{{ selected_client_card.pinfl or '' }}" /></label>

@@ -723,49 +723,6 @@
     return [...(row?.children || [])].filter((cell) => !cell.classList.contains("upos-table-column-control-cell"));
   }
 
-  function clientColumnOrderKey(table) {
-    return `upos.clientsColumnOrder:${location.pathname}:${table.id || "directory"}`;
-  }
-
-  function readClientColumnOrder(table) {
-    const fallback = CLIENT_DIRECTORY_COLUMNS.map((column) => column.key);
-    try {
-      const saved = JSON.parse(localStorage.getItem(clientColumnOrderKey(table)) || "[]");
-      if (!Array.isArray(saved) || saved.length !== fallback.length) return fallback;
-      const known = new Set(fallback);
-      if (saved.some((key) => !known.has(key)) || new Set(saved).size !== fallback.length) return fallback;
-      return saved;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function saveClientColumnOrder(table, order) {
-    try {
-      localStorage.setItem(clientColumnOrderKey(table), JSON.stringify(order));
-    } catch {
-      /* localStorage may be unavailable. */
-    }
-  }
-
-  function clientColumnRows(table) {
-    return [
-      ...Array.from(table.tHead?.rows || []),
-      ...Array.from(table.tBodies || []).flatMap((body) => Array.from(body.rows || [])),
-    ].filter((row) => clientDirectoryCells(row).length === CLIENT_DIRECTORY_COLUMNS.length);
-  }
-
-  function applyClientColumnOrder(table, order) {
-    clientColumnRows(table).forEach((row) => {
-      const cells = new Map(clientDirectoryCells(row).map((cell) => [cell.dataset.clientColumn, cell]));
-      const control = row.querySelector(":scope > .upos-table-column-control-cell");
-      order.forEach((key) => {
-        const cell = cells.get(key);
-        if (cell) row.insertBefore(cell, control || null);
-      });
-    });
-  }
-
   function updateClientSortButtons(table, activeKey, direction) {
     table.querySelectorAll("[data-clients-sort]").forEach((button) => {
       const active = button.dataset.clientsSort === activeKey;
@@ -788,19 +745,6 @@
     window.location.assign(url.toString());
   }
 
-  function moveClientColumn(table, sourceKey, targetKey, after = false) {
-    if (!sourceKey || !targetKey || sourceKey === targetKey) return;
-    const order = clientDirectoryCells(table.tHead?.rows?.[0]).map((cell) => cell.dataset.clientColumn);
-    const sourceIndex = order.indexOf(sourceKey);
-    if (sourceIndex < 0) return;
-    order.splice(sourceIndex, 1);
-    const targetIndex = order.indexOf(targetKey);
-    if (targetIndex < 0) return;
-    order.splice(targetIndex + (after ? 1 : 0), 0, sourceKey);
-    applyClientColumnOrder(table, order);
-    saveClientColumnOrder(table, order);
-  }
-
   function initClientDirectoryTable(table) {
     if (!table || table.dataset.clientsDirectoryReady === "1") return;
     const header = table.tHead?.rows?.[0];
@@ -813,11 +757,6 @@
       cell.dataset.clientColumn = definition.key;
       cell.dataset.columnKey = definition.key;
       cell.scope = "col";
-      if (definition.movable !== false) {
-        cell.draggable = true;
-        cell.classList.add("clients-table-movable-column");
-        cell.title = "Перетащить столбец";
-      }
       if (definition.sortable === false) return;
       const label = cell.textContent.trim();
       const button = document.createElement("button");
@@ -828,16 +767,6 @@
       button.addEventListener("click", () => {
         if (Date.now() - Number(table.dataset.clientsDraggedAt || 0) < 300) return;
         sortClientDirectory(table, definition.key);
-      });
-      button.addEventListener("keydown", (event) => {
-        if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-        const cells = clientDirectoryCells(header);
-        const currentIndex = cells.indexOf(cell);
-        const target = cells[currentIndex + (event.key === "ArrowLeft" ? -1 : 1)];
-        if (!target || !target.classList.contains("clients-table-movable-column")) return;
-        event.preventDefault();
-        moveClientColumn(table, definition.key, target.dataset.clientColumn, event.key === "ArrowRight");
-        button.focus();
       });
       cell.replaceChildren(button);
     });
@@ -852,44 +781,12 @@
       });
     });
 
-    applyClientColumnOrder(table, readClientColumnOrder(table));
     updateClientSortButtons(
       table,
       table.dataset.clientsSortKey || "",
       table.dataset.clientsSortDirection === "asc" ? "asc" : "desc"
     );
 
-    header.addEventListener("dragstart", (event) => {
-      const cell = event.target.closest("th.clients-table-movable-column");
-      if (!cell) return;
-      table.dataset.clientsDraggingColumn = cell.dataset.clientColumn;
-      cell.classList.add("is-client-column-dragging");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", cell.dataset.clientColumn);
-    });
-    header.addEventListener("dragover", (event) => {
-      const cell = event.target.closest("th.clients-table-movable-column");
-      if (!cell || !table.dataset.clientsDraggingColumn) return;
-      event.preventDefault();
-      header.querySelectorAll(".is-client-column-drop-target").forEach((item) => item.classList.remove("is-client-column-drop-target"));
-      cell.classList.add("is-client-column-drop-target");
-      event.dataTransfer.dropEffect = "move";
-    });
-    header.addEventListener("drop", (event) => {
-      const cell = event.target.closest("th.clients-table-movable-column");
-      const sourceKey = table.dataset.clientsDraggingColumn;
-      if (!cell || !sourceKey) return;
-      event.preventDefault();
-      const rect = cell.getBoundingClientRect();
-      moveClientColumn(table, sourceKey, cell.dataset.clientColumn, event.clientX > rect.left + rect.width / 2);
-      table.dataset.clientsDraggedAt = String(Date.now());
-    });
-    header.addEventListener("dragend", () => {
-      delete table.dataset.clientsDraggingColumn;
-      header.querySelectorAll(".is-client-column-dragging, .is-client-column-drop-target").forEach((cell) => {
-        cell.classList.remove("is-client-column-dragging", "is-client-column-drop-target");
-      });
-    });
   }
 
   function initializeClientDirectoryTables(root = document) {
