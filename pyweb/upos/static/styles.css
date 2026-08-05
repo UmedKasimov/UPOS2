@@ -3701,25 +3701,89 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .client-edit-photo-row {
   display: grid;
   grid-template-columns: 10rem minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-  padding: 1rem 1rem 0;
+  gap: 0;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--foreground) 16%, var(--border));
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--card);
+}
+
+.client-edit-photo-row .client-profile-photo--edit {
+  width: auto;
+  height: auto;
+  min-height: 8.5rem;
+  margin: 0.7rem;
+  border-radius: 4px;
+}
+
+.client-edit-photo-row .client-photo-data-table {
+  grid-template-columns: 1fr;
+  gap: 0;
+  border-left: 1px solid color-mix(in srgb, var(--foreground) 16%, var(--border));
+}
+
+.client-edit-photo-row .client-photo-data-table > label {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: 0;
+  min-height: 4.25rem;
+  padding: 0;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.client-edit-photo-row .client-photo-data-table > label:last-child {
+  border-bottom: 0;
+}
+
+.client-edit-photo-row .client-photo-data-table > label > span {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-right: 1px solid var(--workbench-line, var(--border));
+  background: color-mix(in srgb, var(--muted) 68%, var(--card));
+  color: var(--foreground);
+  font-weight: 800;
+}
+
+.client-edit-photo-row .client-photo-data-table > label > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 4.25rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: none;
 }
 
 .client-create-form .client-data-table {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  border: 1px solid var(--workbench-line, var(--border));
+  border: 1px solid color-mix(in srgb, var(--foreground) 16%, var(--border));
   border-bottom: 0;
   border-radius: 6px;
   background: var(--card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.client-edit-shell .client-create-form {
+  gap: 0;
+}
+
+.client-edit-shell .client-data-table {
+  border-radius: 0 0 6px 6px;
+}
+
+.client-edit-shell .client-create-form > .product-form-actions {
+  margin-top: 1rem;
 }
 
 .client-create-form .client-data-table > label,
 .client-create-form .client-data-table > .client-program-picker {
   display: grid;
-  grid-template-columns: minmax(8rem, 34%) minmax(0, 1fr);
+  grid-template-columns: 10rem minmax(0, 1fr);
   gap: 0;
   min-width: 0;
   min-height: 3rem;
@@ -3741,10 +3805,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   min-width: 0;
   padding: 0.55rem 0.7rem;
   border-right: 1px solid var(--workbench-line, var(--border));
-  background: color-mix(in srgb, var(--muted) 54%, var(--card));
+  background: color-mix(in srgb, var(--muted) 68%, var(--card));
   color: var(--foreground);
   font-size: var(--text-xs);
-  font-weight: 750;
+  font-weight: 800;
 }
 
 .client-create-form .client-data-table > label > input,
@@ -3756,6 +3820,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-radius: 0;
   background: var(--card);
   box-shadow: none;
+}
+
+.client-create-form .client-data-table > label > input:hover,
+.client-create-form .client-data-table > label > select:hover,
+.client-edit-photo-row .client-photo-data-table > label > input:hover {
+  background: color-mix(in srgb, var(--primary) 3%, var(--card));
 }
 
 .client-create-form .client-data-table > label > input:focus,
@@ -12320,6 +12390,25 @@ html.dark .kassa-status-select--confirmed {
 
   .client-create-form .client-data-table {
     grid-template-columns: 1fr;
+  }
+
+  .client-edit-photo-row {
+    grid-template-columns: 1fr;
+  }
+
+  .client-edit-photo-row .client-profile-photo--edit {
+    min-height: 7rem;
+  }
+
+  .client-edit-photo-row .client-photo-data-table {
+    border-top: 1px solid var(--workbench-line, var(--border));
+    border-left: 0;
+  }
+
+  .client-edit-photo-row .client-photo-data-table > label,
+  .client-create-form .client-data-table > label,
+  .client-create-form .client-data-table > .client-program-picker {
+    grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr);
   }
 
   .client-create-form .client-data-table > label.wide,
