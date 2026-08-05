@@ -313,7 +313,6 @@
     </div>
   </header>
   <div class="clients-map-filter" data-clients-map-filter>
-    <label><span>Поиск</span><input type="search" placeholder="Имя клиента" data-clients-map-search /></label>
     <label>
       <span>Тип клиента</span>
       <select data-clients-map-type>
@@ -365,11 +364,13 @@
       <table class="org-ops-table clients-map-table" data-upos-no-column-controls>
         <thead>
           <tr>
-            <th>Клиент</th>
+            <th class="clients-map-client-column">
+              <span>Клиент</span>
+              <input type="search" placeholder="Поиск клиента" aria-label="Поиск клиента" data-clients-map-search />
+            </th>
             <th>Сегмент</th>
+            <th class="clients-map-location-column">Локация</th>
             <th>Адрес</th>
-            <th>Карта</th>
-            <th class="num">№</th>
           </tr>
         </thead>
         <tbody>
@@ -401,26 +402,23 @@
                   -
                 {% endif %}
               </td>
-              <td>{{ client.address or "Адрес не указан" }}</td>
-              <td>
+              <td class="clients-map-location-cell">
                 {% if client.latitude and client.longitude %}
-                  <a href="https://www.openstreetmap.org/?mlat={{ client.latitude }}&mlon={{ client.longitude }}#map=17/{{ client.latitude }}/{{ client.longitude }}" target="_blank" rel="noreferrer">Открыть</a>
-                {% elif client.address %}
-                  <small>По адресу</small>
+                  <span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>
                 {% else %}
-                  <small>Нет данных</small>
+                  <span class="client-location-state client-location-state--no" role="img" aria-label="Локация не указана" title="Локация не указана">×</span>
                 {% endif %}
               </td>
-              <td class="num">{{ loop.index }}</td>
+              <td title="{{ client.address or 'Адрес не указан' }}">{{ client.address or "Адрес не указан" }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
+            <tr><td colspan="4" class="org-ops-empty">Клиенты пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
         {% if map_clients %}
           <tfoot>
             <tr>
-              <td colspan="5">
+              <td colspan="4">
                 Итого: {{ map_clients|length }}
                 · с координатами: {{ map_clients | selectattr("latitude") | selectattr("longitude") | list | length }}
                 · только адрес: {{ map_clients | rejectattr("latitude") | selectattr("address") | list | length }}

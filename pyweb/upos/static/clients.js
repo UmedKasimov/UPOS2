@@ -1424,7 +1424,7 @@
       window.clearTimeout(locationSuggestTimer);
       locationSuggestTimer = window.setTimeout(() => void suggestClientLocation(box), 350);
     }
-    if (event.target.closest("[data-clients-map-filter]")) {
+    if (event.target.matches("[data-clients-map-search]") || event.target.closest("[data-clients-map-filter]")) {
       document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
     }
     if (event.target.matches("input[name='industry'], input[name='name']")) {
@@ -1468,9 +1468,9 @@
   document.addEventListener("click", (event) => {
     const clear = event.target.closest("[data-clients-map-clear]");
     if (!clear) return;
-    const root = clear.closest("[data-clients-map-filter]");
-    if (!root) return;
-    root.querySelectorAll("input, select").forEach((field) => {
+    const section = clear.closest("#clients-map");
+    if (!section) return;
+    section.querySelectorAll("[data-clients-map-search], [data-clients-map-filter] select").forEach((field) => {
       field.value = "";
     });
     document.querySelectorAll("[data-client-map-select]").forEach((checkbox) => {
