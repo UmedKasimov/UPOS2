@@ -107,6 +107,31 @@ INTEGRATION_PROVIDERS: tuple[IntegrationProvider, ...] = (
         test_connection=True,
     ),
     IntegrationProvider(
+        key="instagram",
+        label="Instagram Direct и заявки",
+        logo_path="integrations/instagram.svg",
+        badge_path="integrations/instagram-mark.svg",
+        default={
+            # Секрет приложения Meta — им подписан каждый веб-хук.
+            "app_secret": "",
+            # Токен страницы: им отправляются ответы и дочитываются заявки.
+            "page_access_token": "",
+            # Профессиональный аккаунт Instagram: он же приходит в веб-хуке.
+            "ig_user_id": "",
+            "page_id": "",
+            "account_name": "",
+            # Слово, которым Meta проверяет адрес веб-хука при подключении.
+            "verify_token": "",
+            "auto_create_client": True,
+            "auto_create_lead": True,
+            "last_event_at": "",
+        },
+        required_fields=("app_secret", "page_access_token", "ig_user_id"),
+        active_fields=("ig_user_id", "account_name", "last_event_at"),
+        logo_class="integr-card-logo--wide",
+        test_connection=True,
+    ),
+    IntegrationProvider(
         key="clopos",
         label="Clopos",
         logo_path="integrations/clopos.svg",

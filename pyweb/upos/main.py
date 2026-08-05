@@ -26,7 +26,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, Form, Query, Request, UploadFile, File
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -139,6 +139,26 @@ from upos.greenwhite_store import (
     test_greenwhite_connection,
 )
 from upos.smpro_client import DEFAULT_MODULES, SMProError
+from upos.instagram_client import (
+    InstagramError,
+    fetch_lead,
+    fetch_profile,
+    parse_lead_fields,
+    parse_webhook,
+    send_message as instagram_send_message,
+    signature_valid,
+)
+from upos.messenger_store import (
+    add_message as messenger_add_message,
+    find_workspace_by_instagram,
+    list_leads as messenger_list_leads,
+    list_messages as messenger_list_messages,
+    list_threads as messenger_list_threads,
+    mark_thread_read as messenger_mark_thread_read,
+    save_lead as messenger_save_lead,
+    thread_by_id as messenger_thread_by_id,
+    upsert_thread as messenger_upsert_thread,
+)
 from upos.smpro_store import (
     ibox_sales_document_lines,
     last_smpro_status,
@@ -1339,6 +1359,9 @@ def create_app() -> FastAPI:
             or path == "/api/telephony/recordings/upload"
             or path == "/api/telephony/config"
             or path == "/api/telephony/softphone/login"
+            # Веб-хук Instagram вызывает Meta, а не человек: вход тут
+            # невозможен. Подлинность события проверяется подписью.
+            or path == "/webhooks/instagram"
         ):
             return await call_next(request)
         user = request.session.get("user")
@@ -23924,6 +23947,262 @@ def create_app() -> FastAPI:
             "branches": list_upos_branches(wid),
             "status": last_smpro_status(wid),
         }
+
+    # ── Instagram: переписка и заявки из рекламы ───────────────────────────
+    INSTAGRAM_CHANNEL = "instagram"
+
+    def _instagram_config(workspace_owner_id: str) -> dict[str, Any]:
+        """Доступы к Instagram.
+
+        Аккаунт и токен страницы уже сохраняет кнопка «Подключить Instagram»
+        в настройках — они лежат в social_links. Блок интеграции добавляет
+        только то, чего там нет: секрет приложения и правила разбора заявок.
+        """
+        settings_payload = load_workspace_settings(workspace_owner_id)
+        block = settings_payload.get("integrations", {}).get(INSTAGRAM_CHANNEL)
+        block = dict(block) if isinstance(block, dict) else {}
+        social = settings_payload.get("social_links")
+        social = social if isinstance(social, dict) else {}
+
+        def prefer(*values: Any) -> str:
+            for value in values:
+                text = str(value or "").strip()
+                if text:
+                    return text
+            return ""
+
+        app_secret_env = str(
+            get_settings().meta_app_secret
+            or os.getenv("META_APP_SECRET")
+            or os.getenv("FACEBOOK_APP_SECRET")
+            or ""
+        ).strip()
+        block["ig_user_id"] = prefer(block.get("ig_user_id"), social.get("instagram_business_id"))
+        block["page_id"] = prefer(block.get("page_id"), social.get("facebook_page_id"))
+        block["page_access_token"] = prefer(
+            block.get("page_access_token"),
+            social.get("instagram_access_token"),
+            social.get("facebook_access_token"),
+        )
+        block["account_name"] = prefer(block.get("account_name"), social.get("instagram_login"))
+        block["app_secret"] = prefer(block.get("app_secret"), app_secret_env)
+        block["verify_token"] = prefer(
+            block.get("verify_token"),
+            os.getenv("META_WEBHOOK_VERIFY_TOKEN"),
+        )
+        return block
+
+    def _instagram_touch(workspace_owner_id: str) -> None:
+        """Отмечает время последнего события — видно, живёт ли подключение."""
+        try:
+            data = load_workspace_settings(workspace_owner_id)
+            block = data.setdefault("integrations", {}).setdefault(INSTAGRAM_CHANNEL, {})
+            block["last_event_at"] = datetime.now(timezone.utc).isoformat()
+            save_workspace_settings(workspace_owner_id, data)
+        except Exception:
+            logger.warning("[instagram] не удалось отметить время события", exc_info=True)
+
+    @app.get("/webhooks/instagram")
+    def instagram_webhook_verify(request: Request):
+        """Подтверждение адреса веб-хука при подключении в кабинете Meta."""
+        params = request.query_params
+        mode = str(params.get("hub.mode") or "").strip()
+        token = str(params.get("hub.verify_token") or "").strip()
+        challenge = str(params.get("hub.challenge") or "").strip()
+        if mode != "subscribe" or not token:
+            return JSONResponse({"error": "bad_request"}, status_code=400)
+        if find_workspace_by_instagram(verify_token=token) is None:
+            logger.warning("[instagram] проверочное слово не совпало ни с одним пространством")
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        return PlainTextResponse(challenge)
+
+    def _instagram_store_message(workspace_owner_id: str, config: dict[str, Any], item: dict[str, Any]) -> None:
+        contact_id = str(item.get("contact_id") or "").strip()
+        if not contact_id:
+            return
+        profile: dict[str, str] = {}
+        if item.get("direction") == "in":
+            profile = fetch_profile(
+                token=str(config.get("page_access_token") or ""),
+                igsid=contact_id,
+            )
+        thread = messenger_upsert_thread(
+            workspace_owner_id,
+            external_id=contact_id,
+            title=profile.get("name") or profile.get("username") or "",
+            username=profile.get("username") or "",
+            avatar_url=profile.get("avatar_url") or "",
+            link_client=bool(config.get("auto_create_client", True)),
+        )
+        messenger_add_message(
+            workspace_owner_id,
+            thread_id=str(thread.get("id") or ""),
+            external_id=str(item.get("external_id") or ""),
+            direction=str(item.get("direction") or "in"),
+            author=profile.get("name") or profile.get("username") or "",
+            text_body=str(item.get("text") or ""),
+            payload={"attachments": item.get("attachments") or []},
+            sent_at=item.get("timestamp"),
+        )
+
+    def _instagram_store_lead(workspace_owner_id: str, config: dict[str, Any], item: dict[str, Any]) -> None:
+        token = str(config.get("page_access_token") or "")
+        try:
+            payload = fetch_lead(token=token, leadgen_id=str(item.get("leadgen_id") or ""))
+        except InstagramError as exc:
+            # Данные заявки дочитываются отдельным запросом. Если он не прошёл,
+            # сохраняем то, что было в самом событии — контакт не теряем.
+            logger.warning("[instagram] не удалось получить заявку %s: %s", item.get("leadgen_id"), exc)
+            payload = {"id": item.get("leadgen_id"), "form_id": item.get("form_id"), "ad_id": item.get("ad_id")}
+        lead = parse_lead_fields(payload)
+        if not lead.get("external_id"):
+            lead["external_id"] = str(item.get("leadgen_id") or "")
+        if not lead.get("created_time"):
+            lead["created_time"] = item.get("created_time")
+        messenger_save_lead(
+            workspace_owner_id,
+            lead,
+            create_client=bool(config.get("auto_create_client", True)),
+            create_crm_record=bool(config.get("auto_create_lead", True)),
+        )
+
+    @app.post("/webhooks/instagram")
+    async def instagram_webhook_receive(request: Request):
+        raw_body = await request.body()
+        try:
+            body = json.loads(raw_body.decode("utf-8") or "{}")
+        except (UnicodeDecodeError, ValueError):
+            return JSONResponse({"error": "bad_json"}, status_code=400)
+        if not isinstance(body, dict):
+            return JSONResponse({"error": "bad_json"}, status_code=400)
+
+        parsed = parse_webhook(body)
+        events = parsed["messages"] + parsed["leads"]
+        if not events:
+            return {"ok": True, "handled": 0}
+
+        account_id = str(events[0].get("account_id") or "").strip()
+        found = find_workspace_by_instagram(account_id=account_id)
+        if found is None:
+            logger.warning("[instagram] событие для неизвестного аккаунта %s", account_id)
+            # Meta повторяет доставку, пока не получит успех: отвечаем успехом,
+            # иначе очередь будет расти из-за чужих или отключённых аккаунтов.
+            return {"ok": True, "handled": 0}
+        workspace_owner_id, config = found
+
+        if not signature_valid(
+            str(config.get("app_secret") or ""),
+            raw_body,
+            request.headers.get("X-Hub-Signature-256") or "",
+        ):
+            logger.warning("[instagram] подпись события не совпала, аккаунт %s", account_id)
+            return JSONResponse({"error": "signature"}, status_code=403)
+
+        handled = 0
+        for item in parsed["messages"]:
+            try:
+                _instagram_store_message(workspace_owner_id, config, item)
+                handled += 1
+            except Exception:
+                logger.exception("[instagram] сообщение не сохранено")
+        for item in parsed["leads"]:
+            try:
+                _instagram_store_lead(workspace_owner_id, config, item)
+                handled += 1
+            except Exception:
+                logger.exception("[instagram] заявка не сохранена")
+        if handled:
+            _instagram_touch(workspace_owner_id)
+        return {"ok": True, "handled": handled}
+
+    @app.get("/api/messengers/instagram/threads")
+    def api_instagram_threads(request: Request):
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        return {
+            "ok": True,
+            "threads": messenger_list_threads(wid),
+            "leads": messenger_list_leads(wid),
+            "configured": bool(str(_instagram_config(wid).get("page_access_token") or "").strip()),
+        }
+
+    @app.get("/api/messengers/instagram/threads/{thread_id}")
+    def api_instagram_thread_messages(request: Request, thread_id: str):
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        thread = messenger_thread_by_id(wid, thread_id)
+        if thread is None:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        messenger_mark_thread_read(wid, thread_id)
+        return {"ok": True, "thread": thread, "messages": messenger_list_messages(wid, thread_id)}
+
+    @app.post("/api/messengers/instagram/send")
+    async def api_instagram_send(request: Request):
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        thread_id = str((body or {}).get("thread_id") or "").strip()
+        text_body = str((body or {}).get("text") or "").strip()
+        if not thread_id or not text_body:
+            return JSONResponse({"error": "Укажите переписку и текст сообщения"}, status_code=400)
+        thread = messenger_thread_by_id(wid, thread_id)
+        if thread is None:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        config = _instagram_config(wid)
+        try:
+            result = instagram_send_message(
+                token=str(config.get("page_access_token") or ""),
+                ig_user_id=str(config.get("ig_user_id") or ""),
+                recipient_id=str(thread.get("external_id") or ""),
+                text=text_body,
+            )
+        except InstagramError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        user = request.session.get("user") or {}
+        messenger_add_message(
+            wid,
+            thread_id=thread_id,
+            external_id=str(result.get("message_id") or ""),
+            direction="out",
+            author=str(user.get("name") or user.get("username") or "UPOS"),
+            text_body=text_body,
+        )
+        return {"ok": True, "messages": messenger_list_messages(wid, thread_id)}
+
+    @app.post("/api/integrations/instagram/test")
+    def api_instagram_test(request: Request):
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _integration_target_workspace(request, "")
+        if err:
+            return err
+        assert wid is not None
+        config = _instagram_config(wid)
+        account = str(config.get("ig_user_id") or "").strip()
+        if not account:
+            return JSONResponse({"error": "Укажите аккаунт Instagram"}, status_code=400)
+        profile = fetch_profile(token=str(config.get("page_access_token") or ""), igsid=account)
+        if not profile:
+            return JSONResponse(
+                {"error": "Instagram не ответил на запрос. Проверьте токен страницы и аккаунт."},
+                status_code=400,
+            )
+        data = load_workspace_settings(wid)
+        block = data.setdefault("integrations", {}).setdefault(INSTAGRAM_CHANNEL, {})
+        block["account_name"] = profile.get("username") or profile.get("name") or ""
+        save_workspace_settings(wid, data)
+        return {"ok": True, "profile": profile}
 
     @app.get("/api/integrations/ibox/status")
     def api_ibox_status(request: Request, organization_id: str = Query(default="")):

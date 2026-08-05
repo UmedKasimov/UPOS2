@@ -1310,3 +1310,131 @@ class InstallationPushSubscription(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MessengerThread(Base):
+    """Переписка с одним человеком в мессенджере.
+
+    Канал вынесен в колонку: сейчас это Instagram, но та же таблица подойдёт
+    и другим каналам, где переписка приходит через веб-хук.
+    """
+
+    __tablename__ = "messenger_threads"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "channel",
+            "external_id",
+            name="uq_messenger_thread_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="instagram", server_default=text("'instagram'"))
+    # Идентификатор собеседника в мессенджере: для Instagram это IGSID.
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    username: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    avatar_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default=text("'active'"))
+    last_message_text: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    unread_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class MessengerMessage(Base):
+    """Одно сообщение переписки: и входящее, и наш ответ."""
+
+    __tablename__ = "messenger_messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "channel",
+            "external_id",
+            name="uq_messenger_message_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    thread_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("messenger_threads.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="instagram", server_default=text("'instagram'"))
+    # Идентификатор сообщения на стороне мессенджера: защищает от повторов,
+    # веб-хук может прислать одно событие несколько раз.
+    external_id: Mapped[str] = mapped_column(String(190), nullable=False, default="", server_default=text("''"))
+    direction: Mapped[str] = mapped_column(String(8), nullable=False, default="in", server_default=text("'in'"))
+    author: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    text_body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class MessengerLead(Base):
+    """Заявка из рекламы: имя, телефон и остальные поля формы."""
+
+    __tablename__ = "messenger_leads"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "channel",
+            "external_id",
+            name="uq_messenger_lead_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="instagram", server_default=text("'instagram'"))
+    external_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    form_id: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    form_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    ad_id: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    campaign_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    phone: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    email: Mapped[str] = mapped_column(String(190), nullable=False, default="", server_default=text("''"))
+    fields: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    crm_record_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("crm_records.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
