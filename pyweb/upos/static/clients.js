@@ -452,7 +452,9 @@
     return {
       q: (section.querySelector("[data-clients-map-search]")?.value || "").trim().toLowerCase(),
       type: section.querySelector("[data-clients-map-type]")?.value || "",
-      program: section.querySelector("[data-clients-map-program]")?.value || "",
+      programs: [...section.querySelectorAll("[data-clients-map-program]:checked")]
+        .map((input) => input.value)
+        .filter(Boolean),
       category: section.querySelector("[data-clients-map-category]")?.value || "",
       status: section.querySelector("[data-clients-map-status]")?.value || "",
     };
@@ -462,7 +464,7 @@
     if (selectedIds.size && !selectedIds.has(point.id)) return false;
     if (filters.q && !point.name.toLowerCase().includes(filters.q)) return false;
     if (filters.type && point.type !== filters.type) return false;
-    if (filters.program && !point.programList.includes(filters.program)) return false;
+    if (filters.programs.length && !filters.programs.some((program) => point.programList.includes(program))) return false;
     if (filters.category && point.category !== filters.category) return false;
     if (filters.status && point.status !== filters.status) return false;
     return true;
@@ -552,7 +554,6 @@
     if (filters.q) labels.push(`Поиск: ${filters.q}`);
     [
       ["[data-clients-map-type]", filters.type],
-      ["[data-clients-map-program]", filters.program],
       ["[data-clients-map-category]", filters.category],
       ["[data-clients-map-status]", filters.status],
     ].forEach(([selector, value]) => {
@@ -560,6 +561,9 @@
       const select = section.querySelector(selector);
       labels.push(select?.selectedOptions?.[0]?.textContent?.trim() || value);
     });
+    if (filters.programs.length) {
+      labels.push(filters.programs.length <= 2 ? filters.programs.join(", ") : `Выбрано программ: ${filters.programs.length}`);
+    }
     const selectedCount = selectedMapIds().size;
     if (selectedCount) labels.push(`Выбрано вручную: ${selectedCount}`);
     return labels.length ? labels.join(" · ") : "Все клиенты на карте";
@@ -1123,14 +1127,14 @@
 
   function syncProgramDropdown(dropdown) {
     if (!dropdown) return;
-    const checked = [...dropdown.querySelectorAll('input[name="programs"]:checked')]
+    const checked = [...dropdown.querySelectorAll('input[name="programs"]:checked, [data-clients-map-program]:checked')]
       .map((input) => input.value)
       .filter(Boolean);
     const summary = dropdown.querySelector("[data-client-program-summary]");
     if (!summary) return;
     summary.textContent = checked.length
       ? (checked.length <= 2 ? checked.join(", ") : `Выбрано: ${checked.length}`)
-      : "Не выбраны";
+      : (dropdown.dataset.emptyLabel || "Не выбраны");
     summary.title = checked.join(", ");
   }
 
@@ -1453,7 +1457,7 @@
       queueDirectorySegmentSave(directorySegmentPicker);
     }
     const programDropdown = event.target.closest?.("[data-client-program-dropdown]");
-    if (programDropdown && event.target.matches('input[name="programs"]')) {
+    if (programDropdown && event.target.matches('input[name="programs"], [data-clients-map-program]')) {
       syncProgramDropdown(programDropdown);
     }
     if (event.target.matches("[data-client-map-select]") || event.target.closest("[data-clients-map-filter]")) {
@@ -1473,6 +1477,10 @@
     section.querySelectorAll("[data-clients-map-search], [data-clients-map-filter] select").forEach((field) => {
       field.value = "";
     });
+    section.querySelectorAll("[data-clients-map-program]").forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+    section.querySelectorAll("[data-clients-map-program-filter]").forEach(syncProgramDropdown);
     document.querySelectorAll("[data-client-map-select]").forEach((checkbox) => {
       checkbox.checked = false;
     });

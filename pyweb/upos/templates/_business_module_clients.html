@@ -321,13 +321,28 @@
         <option value="individual">Физическое лицо</option>
       </select>
     </label>
-    <label>
+    <div class="clients-map-filter-field clients-map-program-filter">
       <span>Программа</span>
-      <select data-clients-map-program>
-        <option value="">Все программы</option>
-        {% for item in client_options.programs %}<option value="{{ item }}">{{ item }}</option>{% endfor %}
-      </select>
-    </label>
+      <details
+        class="client-program-dropdown clients-map-program-dropdown"
+        data-client-program-dropdown
+        data-clients-map-program-filter
+        data-empty-label="Все программы"
+      >
+        <summary><span data-client-program-summary>Все программы</span></summary>
+        <div class="client-program-menu clients-map-program-menu">
+          <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+          <div class="client-program-options">
+            {% for item in client_options.programs %}
+              <label data-client-program-option-row>
+                <input type="checkbox" value="{{ item }}" data-clients-map-program />
+                <span>{{ item }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+    </div>
     <label>
       <span>Категория</span>
       <select data-clients-map-category>
