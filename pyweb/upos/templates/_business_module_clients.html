@@ -55,6 +55,8 @@
       </div>
 
       <form id="clients-filter-form" class="products-catalog-filter clients-filter-form" method="get" action="{{ url_for('clients_get') }}#clients">
+        <input type="hidden" name="client_sort" value="{{ clients_sort_key }}" />
+        <input type="hidden" name="client_sort_dir" value="{{ clients_sort_direction }}" />
         <label class="products-catalog-search">
           <span>Поиск</span>
           <input name="q" value="{{ client_filters.q }}" placeholder="Клиент, телефон, ИНН, код" />
@@ -106,7 +108,14 @@
     </header>
 
     <div class="products-table-wrap clients-table-wrap">
-      <table id="clients-directory-table" class="products-table products-catalog-table clients-table" data-upos-column-controls data-clients-directory-table>
+      <table
+        id="clients-directory-table"
+        class="products-table products-catalog-table clients-table"
+        data-upos-column-controls
+        data-clients-directory-table
+        data-clients-sort-key="{{ clients_sort_key }}"
+        data-clients-sort-direction="{{ clients_sort_direction }}"
+      >
         <thead>
           <tr>
             <th><input type="checkbox" aria-label="Выбрать всех клиентов" /></th>
@@ -127,7 +136,7 @@
             {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
             <tr>
               <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select aria-label="Выбрать {{ client.name }}" /></td>
-              <td><span class="client-id-badge">#{{ clients_page_from + loop.index0 }}</span></td>
+              <td><span class="client-id-badge">#{{ client.directory_number }}</span></td>
               <td>
                 <a
                   class="client-open-link product-cell-main product-cell-meta"

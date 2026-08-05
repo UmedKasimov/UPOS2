@@ -13108,6 +13108,8 @@ def create_app() -> FastAPI:
         program: str = "",
         route: str = "",
         status: str = "all",
+        client_sort: str = "",
+        client_sort_dir: str = "desc",
         page_size: str = "100",
         page: str = "1",
         balance_page: str = "1",
@@ -13329,6 +13331,38 @@ def create_app() -> FastAPI:
             Decimal("0"),
         )
         all_clients_records = clients_records
+        for directory_number, item in enumerate(all_clients_records, start=1):
+            item["directory_number"] = directory_number
+
+        client_sort_keys = {
+            "id": ("directory_number", "number"),
+            "name": ("name", "text"),
+            "official_name": ("official_name", "text"),
+            "balance": ("balance_value", "number"),
+            "last_date": ("last_date", "date"),
+            "segment": ("business_segment", "text"),
+            "created_at": ("created_at", "date"),
+            "phone": ("phone", "text"),
+            "category": ("category", "text"),
+        }
+        clients_sort_key = client_sort if client_sort in client_sort_keys else ""
+        clients_sort_direction = "asc" if client_sort_dir == "asc" else "desc"
+        if clients_sort_key:
+            value_key, value_kind = client_sort_keys[clients_sort_key]
+
+            def clients_sort_value(item: dict[str, Any]) -> Any:
+                value = item.get(value_key)
+                if value_kind == "number":
+                    return _sales_decimal(value)
+                return str(value or "").strip().casefold()
+
+            populated_clients = [item for item in all_clients_records if str(item.get(value_key) or "").strip()]
+            empty_clients = [item for item in all_clients_records if not str(item.get(value_key) or "").strip()]
+            populated_clients.sort(
+                key=clients_sort_value,
+                reverse=clients_sort_direction == "desc",
+            )
+            all_clients_records = populated_clients + empty_clients
         clients_total = len(all_clients_records)
         clients_debt_total = sum(
             (item["balance_value"] for item in all_clients_records if item["balance_value"] > 0),
@@ -13442,6 +13476,8 @@ def create_app() -> FastAPI:
             client_options=client_options,
             client_business_segments=business_segments,
             clients_records=clients_records,
+            clients_sort_key=clients_sort_key,
+            clients_sort_direction=clients_sort_direction,
             clients_map_records=clients_map_records,
             clients_total=clients_total,
             clients_page=clients_page,

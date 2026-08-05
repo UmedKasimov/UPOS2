@@ -766,25 +766,6 @@
     });
   }
 
-  function clientNumericValue(cell, key) {
-    const raw = (cell?.textContent || "").replace(/\u00a0/g, " ").replace(/[^0-9,.-]/g, "").replace(",", ".");
-    const value = Number.parseFloat(raw) || 0;
-    if (key === "balance" && cell?.querySelector(".client-balance-pill--debt")) return -Math.abs(value);
-    if (key === "balance" && cell?.querySelector(".client-balance-pill--advance")) return Math.abs(value);
-    return value;
-  }
-
-  function clientSortValue(row, key, kind) {
-    const cell = row.querySelector(`[data-client-column="${key}"]`);
-    if (kind === "number") return clientNumericValue(cell, key);
-    const text = (cell?.textContent || "").replace(/\s+/g, " ").trim();
-    if (kind === "date") {
-      const timestamp = Date.parse(text);
-      return Number.isFinite(timestamp) ? timestamp : 0;
-    }
-    return text.toLocaleLowerCase("ru");
-  }
-
   function updateClientSortButtons(table, activeKey, direction) {
     table.querySelectorAll("[data-clients-sort]").forEach((button) => {
       const active = button.dataset.clientsSort === activeKey;
@@ -795,28 +776,16 @@
     });
   }
 
-  function sortClientDirectory(table, key, kind) {
-    const tbody = table.tBodies[0];
-    if (!tbody) return;
+  function sortClientDirectory(table, key) {
     const currentKey = table.dataset.clientsSortKey;
     const currentDirection = table.dataset.clientsSortDirection;
     const direction = currentKey === key && currentDirection === "desc" ? "asc" : "desc";
-    const rows = [...tbody.rows].filter((row) => clientDirectoryCells(row).length === CLIENT_DIRECTORY_COLUMNS.length);
-    rows.forEach((row, index) => {
-      if (!row.dataset.clientsOriginalIndex) row.dataset.clientsOriginalIndex = String(index);
-    });
-    rows.sort((left, right) => {
-      const a = clientSortValue(left, key, kind);
-      const b = clientSortValue(right, key, kind);
-      const result = kind === "text"
-        ? String(a).localeCompare(String(b), "ru", { numeric: true, sensitivity: "base" })
-        : a - b;
-      return (result || Number(left.dataset.clientsOriginalIndex) - Number(right.dataset.clientsOriginalIndex)) * (direction === "asc" ? 1 : -1);
-    });
-    rows.forEach((row) => tbody.append(row));
-    table.dataset.clientsSortKey = key;
-    table.dataset.clientsSortDirection = direction;
-    updateClientSortButtons(table, key, direction);
+    const url = new URL(window.location.href);
+    url.searchParams.set("client_sort", key);
+    url.searchParams.set("client_sort_dir", direction);
+    url.searchParams.delete("page");
+    url.hash = "clients";
+    window.location.assign(url.toString());
   }
 
   function moveClientColumn(table, sourceKey, targetKey, after = false) {
@@ -858,7 +827,7 @@
       button.innerHTML = `<span>${label}</span><span class="org-shipments-sort-arrow" aria-hidden="true">↕</span>`;
       button.addEventListener("click", () => {
         if (Date.now() - Number(table.dataset.clientsDraggedAt || 0) < 300) return;
-        sortClientDirectory(table, definition.key, definition.kind);
+        sortClientDirectory(table, definition.key);
       });
       button.addEventListener("keydown", (event) => {
         if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
@@ -884,6 +853,11 @@
     });
 
     applyClientColumnOrder(table, readClientColumnOrder(table));
+    updateClientSortButtons(
+      table,
+      table.dataset.clientsSortKey || "",
+      table.dataset.clientsSortDirection === "asc" ? "asc" : "desc"
+    );
 
     header.addEventListener("dragstart", (event) => {
       const cell = event.target.closest("th.clients-table-movable-column");
