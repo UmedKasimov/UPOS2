@@ -9332,10 +9332,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   padding-inline: 0.45rem !important;
   vertical-align: middle;
   white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.24rem;
+  display: table-cell;
+  text-align: center;
 }
 
 .products-row-actions form {
