@@ -23426,7 +23426,51 @@ body:has(dialog[open]) {
 
 .client-directory-segment-menu {
   right: auto;
-  min-width: 17rem;
+  width: min(30rem, calc(100vw - 2rem));
+  min-width: 30rem;
+  padding: 0.55rem;
+}
+
+.client-directory-segment-menu .client-segment-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  max-height: 18rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 4px;
+  background: var(--card);
+}
+
+.client-directory-segment-menu .client-segment-options > label {
+  min-height: 2.15rem;
+  margin-right: -1px;
+  margin-bottom: -1px;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-right: 1px solid var(--workbench-line, var(--border));
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  border-radius: 0;
+}
+
+.client-directory-segment-menu .client-segment-options > label:has(input:checked) {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.client-directory-segment-menu .client-segment-options > label > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .client-directory-segment-menu {
+    width: min(22rem, calc(100vw - 1rem));
+    min-width: 0;
+  }
+
+  .client-directory-segment-menu .client-segment-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .client-directory-segment-status {
