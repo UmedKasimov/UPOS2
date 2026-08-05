@@ -663,6 +663,9 @@
     const insights = section.querySelector("[data-clients-map-insights]");
     if (!insights) return;
     const active = points.filter((point) => point.status === "active").length;
+    // Без локации — ни координат, ни адреса: тот же признак, что и у счётчика
+    // под таблицей клиентов.
+    const withoutLocation = points.filter((point) => !point.hasCoords && !point.hasAddress).length;
     const segmentCounts = countOverviewValues(
       points,
       (point) => point.segments.map((segment) => `${segment.icon} ${segment.name}`.trim()),
@@ -679,6 +682,11 @@
     setText("[data-clients-map-total]", points.length);
     setText("[data-clients-map-active]", active);
     setText("[data-clients-map-active-share]", `${points.length ? Math.round((active / points.length) * 100) : 0}% от выбранных`);
+    setText("[data-clients-map-no-location]", withoutLocation);
+    setText(
+      "[data-clients-map-no-location-share]",
+      `${points.length ? Math.round((withoutLocation / points.length) * 100) : 0}% от выбранных`
+    );
     setText("[data-clients-map-segment-total]", assignedSegments);
     setText("[data-clients-map-program-total]", assignedPrograms);
     renderOverviewBreakdown(insights.querySelector("[data-clients-map-segment-breakdown]"), segmentCounts);

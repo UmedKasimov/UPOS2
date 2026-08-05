@@ -5751,6 +5751,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 /* Брендбук: одна синяя линия сверху у всех карточек, без светофора. */
 .clients-map-kpi--active,
+.clients-map-kpi--no-location,
 .clients-map-kpi--segments,
 .clients-map-kpi--programs { border-top-color: var(--primary); }
 
