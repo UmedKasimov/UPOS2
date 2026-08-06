@@ -673,6 +673,20 @@
             </div>
           </section>
 
+          <details class="product-form-section product-form-section--details" open>
+            <summary>
+              <span>Фото</span>
+              <small>Изображение для каталога</small>
+            </summary>
+            <div class="product-form-grid product-photo-grid">
+              {# type="text": после загрузки фото сюда попадает внутренний путь
+                 /products/<id>/photo, а type="url" требует абсолютный адрес и
+                 браузер блокировал сабмит с ошибкой «Введите URL». #}
+              <label class="wide"><span>Фото URL</span><input name="photo_url" type="text" inputmode="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
+              <label class="wide"><span>Выбрать из ПК</span><input name="photo_file" type="file" accept="image/*" /></label>
+            </div>
+          </details>
+
           <section class="product-form-section product-form-section--primary" data-service-extra {% if current.kind != 'service' %}hidden{% endif %}>
             <div class="product-form-section-head">
               <h3>Услуга: цена и бонус</h3>
@@ -739,19 +753,6 @@
             <input type="hidden" name="variation_values" value="{{ variation.values_text or '' }}" />
           {% endfor %}
 
-          <details class="product-form-section product-form-section--details">
-            <summary>
-              <span>Фото</span>
-              <small>Изображение для каталога</small>
-            </summary>
-            <div class="product-form-grid product-photo-grid">
-              {# type="text": после загрузки фото сюда попадает внутренний путь
-                 /products/<id>/photo, а type="url" требует абсолютный адрес и
-                 браузер блокировал сабмит с ошибкой «Введите URL». #}
-              <label class="wide"><span>Фото URL</span><input name="photo_url" type="text" inputmode="url" value="{{ current.photo_url or '' }}" placeholder="https://..." /></label>
-              <label class="wide"><span>Выбрать из ПК</span><input name="photo_file" type="file" accept="image/*" /></label>
-            </div>
-          </details>
           <input type="hidden" name="purchase_history_json" value="{{ current.purchase_history_json or '' }}" />
           <input type="hidden" name="batch_tracking" value="{{ '1' if current.batch_tracking else '0' }}" />
           <input type="hidden" name="packages" value="{{ current.packages or '' }}" />
