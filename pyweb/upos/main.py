@@ -9461,6 +9461,18 @@ def create_app() -> FastAPI:
             sales_crm_index = _sales_crm_index(crm_rows_for_sales, crm_stages)
 
             journal_archived_count = 0
+            journal_installment_count = 0
+
+            def payment_tab_url(payment_value: str) -> str:
+                pairs = [
+                    (key, value)
+                    for key, value in request.query_params.multi_items()
+                    if key not in {"doc_type", "journal_page", "view", "payment_status"}
+                ]
+                pairs.append(("view", "journal"))
+                pairs.append(("payment_status", payment_value))
+                query = urlencode(pairs, doseq=True)
+                return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
 
             def archive_tab_url() -> str:
                 pairs = [
@@ -9530,6 +9542,10 @@ def create_app() -> FastAPI:
                 journal_doc_type_counts["all"] += 1
                 if item["status"] == "archived":
                     journal_archived_count += 1
+                # Рассрочка — документ, который гасится частями: оплата есть,
+                # но долг ещё не закрыт.
+                if item["payment_status"] == "partial":
+                    journal_installment_count += 1
                 if item["doc_type"] in journal_doc_type_counts:
                     journal_doc_type_counts[item["doc_type"]] += 1
                 if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
@@ -9577,6 +9593,16 @@ def create_app() -> FastAPI:
                     "href": document_tab_url("return"),
                     "active": "return" in selected_doc_types,
                     "current": selected_doc_types == ["return"],
+                },
+                {
+                    "value": "partial",
+                    "label": "Рассрочки",
+                    "logo": "РС",
+                    "brand": "installment",
+                    "count": journal_installment_count,
+                    "href": payment_tab_url("partial"),
+                    "active": "partial" in (selected_payment_statuses or []),
+                    "current": (selected_payment_statuses or []) == ["partial"],
                 },
                 {
                     "value": "archived",
