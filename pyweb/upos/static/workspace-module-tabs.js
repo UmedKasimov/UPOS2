@@ -380,6 +380,24 @@
         openTab(normalize(activateButton.dataset.workspaceActivateTab), { navigate: true });
       });
 
+      // Фильтры, сортировка и размер страницы отправляют обычную форму с
+      // жёстким якорем вида «#clients». После перезагрузки открывался не тот
+      // раздел: сначала мелькала домашняя кнопка, потом возвращалась вкладка.
+      // Подставляем в адрес формы якорь текущей вкладки — страница
+      // возвращается ровно туда, где нажали.
+      root.addEventListener("submit", (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if ((form.getAttribute("method") || "get").toLowerCase() !== "get") return;
+        if (!activeTab) return;
+        const meta = tabMeta.get(activeTab);
+        if (!meta || !meta.hash) return;
+        try {
+          const url = new URL(form.getAttribute("action") || window.location.href, window.location.href);
+          form.setAttribute("action", `${url.pathname}${url.search}#${meta.hash}`);
+        } catch {}
+      }, true);
+
       window.addEventListener("hashchange", () => {
         const nextTab = tabFromLocation();
         const hasHash = Boolean(normalize(window.location.hash).replace(/^#/, ""));
