@@ -10278,6 +10278,39 @@ def create_app() -> FastAPI:
                 }
             )
             deal_data["activity_log"] = events
+            # Задача из продажи тоже становится записью CRM — её видно во
+            # вкладке «Задачи» и она попадает в просрочку.
+            task_data = {
+                "item_type": "task",
+                "client": client_name,
+                "counterparty_id": counterparty_id,
+                "responsible": assignee or responsible or actor,
+                "date": str(sale_data.get("date") or ""),
+                "due_date": due_date,
+                "due_time": due_time,
+                "priority": priority,
+                "next_step": task_text,
+                "note": participants,
+                "checklist": checklist,
+                "related_deal_id": deal_row.id,
+                "reminder_at": reminder_at,
+            }
+            _crm_apply_stage(task_data, stages, deal_data.get("stage_id") or deal_data.get("stage"))
+            _crm_append_activity(task_data, "Задача создана из продажи", actor, task_text)
+            session.add(
+                CrmRecord(
+                    id=str(uuid.uuid4()),
+                    workspace_owner_id=wid,
+                    item_type="task",
+                    title=task_text[:200],
+                    counterparty_id=counterparty_id or None,
+                    status="new",
+                    due_date=due_date,
+                    amount=Decimal("0"),
+                    currency=sale_row.currency or "UZS",
+                    data=task_data,
+                )
+            )
             if assignee:
                 assignee_id = _employee_user_id_by_name(wid, assignee)
                 if assignee_id:
@@ -18516,7 +18549,11 @@ def create_app() -> FastAPI:
             )
             if contact_match and contact_match[1] == "phone":
                 counterparty = contact_match[0]
-                data["client"] = counterparty.name
+                # Имя клиента, введённое человеком, не перетираем: совпадение
+                # идёт по последним 9 цифрам, и общий номер офиса подставлял
+                # чужого контрагента.
+                if not data.get("client"):
+                    data["client"] = counterparty.name
                 counterparty_id = counterparty.id
             elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
@@ -18574,7 +18611,11 @@ def create_app() -> FastAPI:
             )
             if contact_match and contact_match[1] == "phone":
                 counterparty = contact_match[0]
-                data["client"] = counterparty.name
+                # Имя клиента, введённое человеком, не перетираем: совпадение
+                # идёт по последним 9 цифрам, и общий номер офиса подставлял
+                # чужого контрагента.
+                if not data.get("client"):
+                    data["client"] = counterparty.name
                 counterparty_id = counterparty.id
             elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
@@ -18875,6 +18916,41 @@ def create_app() -> FastAPI:
             row.data = data
             flag_modified(row, "data")
             record_title = str(row.title or data.get("client") or "")
+            # Задача из карточки становится настоящей записью: иначе она жила
+            # только в ленте — не попадала во вкладку «Задачи» и никогда не
+            # становилась просроченной.
+            if kind == "task":
+                task_data = {
+                    "item_type": "task",
+                    "client": str(data.get("client") or ""),
+                    "counterparty_id": str(row.counterparty_id or data.get("counterparty_id") or ""),
+                    "responsible": assignee or actor,
+                    "date": datetime.now(timezone.utc).date().isoformat(),
+                    "due_date": due_date,
+                    "due_time": due_time,
+                    "priority": priority,
+                    "next_step": text,
+                    "note": participants,
+                    "checklist": checklist,
+                    "related_deal_id": row.id if row.item_type == "deal" else str(data.get("related_deal_id") or ""),
+                    "reminder_at": reminder_at,
+                }
+                _crm_apply_stage(task_data, _crm_workspace_stages(wid), data.get("stage_id") or data.get("stage"))
+                _crm_append_activity(task_data, "Задача создана из карточки", actor, text)
+                session.add(
+                    CrmRecord(
+                        id=str(uuid.uuid4()),
+                        workspace_owner_id=wid,
+                        item_type="task",
+                        title=text[:200],
+                        counterparty_id=row.counterparty_id,
+                        status="done" if completed else "new",
+                        due_date=due_date,
+                        amount=Decimal("0"),
+                        currency=row.currency or "UZS",
+                        data=task_data,
+                    )
+                )
         # Ответственный в карточке задаётся именем, а не идентификатором, поэтому
         # ищем сотрудника по совпадению имени/логина.
         if kind == "task" and assignee:
