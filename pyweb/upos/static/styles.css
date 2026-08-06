@@ -31975,11 +31975,20 @@ html.dark .crm-task-calendar-event {
   flex-wrap: wrap;
 }
 
-.clients-map-head-actions {
+/* Правило «каждый div шапки — сетка» превращало кнопки в столбик,
+   поэтому селектор здесь с родителем — он сильнее. */
+.clients-map-insights-head > .clients-map-head-actions {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.clients-map-head-actions .clients-map-filter-summary {
+  margin-right: 0.4rem;
+  font-weight: 500;
+  text-transform: none;
 }
 
 .clients-map-ownership {
