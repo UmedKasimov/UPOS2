@@ -96,7 +96,9 @@
 
     <section class="general-report-launcher workbench-launcher business-module-launcher" aria-label="Разделы {{ module.title }}" data-workspace-launcher>
       {% for item in module.launcher %}
-        <a class="general-report-card" href="#{{ item.id }}" data-workspace-card="{{ item.id }}" data-workspace-view-id="{{ item.view_id|default(item.id) }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}">
+        {# Карточка с href ведёт в другой модуль обычной ссылкой; остальные
+           открывают вкладку внутри текущего. #}
+        <a class="general-report-card" {% if item.href %}href="{{ item.href }}"{% else %}href="#{{ item.id }}" data-workspace-card="{{ item.id }}" data-workspace-view-id="{{ item.view_id|default(item.id) }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}"{% endif %}>
           <span class="general-report-card-icon" aria-hidden="true">
             {% if item.icon == "warehouse" %}
               <svg viewBox="0 0 24 24" focusable="false"><path d="M3 21V8l9-5 9 5v13" /><path d="M13 13h4v8H7v-8h4" /><path d="M7 8h10" /></svg>

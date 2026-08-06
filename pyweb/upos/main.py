@@ -3223,6 +3223,7 @@ def create_app() -> FastAPI:
                     {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
                     {"id": "warehouses", "title": "Склады", "subtitle": "Создание и настройки", "icon": "warehouse"},
                     {"id": "adjustments", "title": "Корректировки", "subtitle": "Приход и списание", "icon": "adjustment"},
+                    {"id": "suppliers", "title": "Поставщики", "subtitle": "База контрагентов", "icon": "suppliers", "href": "/suppliers"},
                 ],
                 "filters": ["Поиск", "Склад", "Товар", "Дата", "Тип операции"],
                 "columns": ["Документ", "Дата", "Склад", "Товар", "Количество", "Статус"],
