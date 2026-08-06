@@ -205,7 +205,9 @@ def _client_payload(row: dict[str, Any]) -> dict[str, Any]:
         "address": address,
         "latitude": row["latitude"],
         "longitude": row["longitude"],
-        "category": row["category"],
+        # Рубрика — это сфера деятельности, а не используемая программа.
+        # В поле категории её писать нельзя: оттуда она попадает в список
+        # программ клиента и он ошибочно считается работающим с нами.
         "client_type": "company",
         "industry": row["category"],
         "email": row["email"],

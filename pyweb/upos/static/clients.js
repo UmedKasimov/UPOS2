@@ -496,6 +496,7 @@
         .map((input) => input.value)
         .filter(Boolean),
       location: section.querySelector('[data-clients-map-location-filter][aria-pressed="true"]')?.dataset.clientsMapLocationFilter || "",
+      ownership: section.querySelector('[data-clients-map-ownership][aria-pressed="true"]')?.dataset.clientsMapOwnership || "",
     };
   }
 
@@ -527,6 +528,10 @@
     if (filters.location === "coords" && !point.hasCoords) return false;
     if (filters.location === "address" && (point.hasCoords || !point.hasAddress)) return false;
     if (filters.location === "missing" && (point.hasCoords || point.hasAddress)) return false;
+    // Наш клиент — тот, за кем закреплена хотя бы одна программа: он с нами
+    // работает. Остальные — те, кого ещё предстоит привлечь.
+    if (filters.ownership === "ours" && !point.isOurs) return false;
+    if (filters.ownership === "others" && point.isOurs) return false;
     return true;
   }
 
@@ -572,6 +577,7 @@
           programList,
           segments,
           status: item.dataset.status || "",
+          isOurs: item.dataset.ours === "1",
           hasCoords: Number.isFinite(lat) && Number.isFinite(lon),
           hasAddress: Boolean(String(item.dataset.address || "").trim()),
           editHref: editLink?.getAttribute("href") || `/clients?client=${encodeURIComponent(item.dataset.clientId || "")}&focus=location#client-edit`,
@@ -2417,6 +2423,9 @@
     if (state.location) parts.push(CLIENTS_MAP_LOCATION_LABELS[state.location] || state.location);
     if (state.programs.length) parts.push(`программы: ${state.programs.length}`);
     if (state.segments.length) parts.push(`сегменты: ${state.segments.length}`);
+    const ownership = section.querySelector('[data-clients-map-ownership][aria-pressed="true"]')?.dataset.clientsMapOwnership || "";
+    if (ownership === "ours") parts.push("наши клиенты");
+    if (ownership === "others") parts.push("не наши");
     const summary = section.querySelector("[data-clients-map-filter-summary]");
     if (summary) summary.textContent = parts.length ? parts.join(" · ") : "Без фильтров";
     const counter = section.querySelector("[data-clients-map-filter-count]");
@@ -2493,7 +2502,10 @@
       applyClientsMapLocation(section, event.target.value);
       document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
     }
-    if (event.target.closest("[data-clients-map-filter]")) syncClientsMapFilterBar(section);
+    if (event.target.closest("[data-clients-map-filter]")) {
+      syncClientsMapFilterBar(section);
+      syncMapShowAll(section);
+    }
   });
 
   document.addEventListener("click", (event) => {
@@ -2504,6 +2516,52 @@
     const select = section?.querySelector("[data-clients-map-location-select]");
     if (select) select.value = button.dataset.clientsMapLocationFilter || "";
     syncClientsMapFilterBar(section);
+  });
+
+  function syncMapShowAll(section) {
+    const button = section?.querySelector("[data-clients-map-show-all]");
+    if (!button) return;
+    const state = readClientsMapFilterState(section);
+    const ownership = section.querySelector('[data-clients-map-ownership][aria-pressed="true"]')?.dataset.clientsMapOwnership || "";
+    const anything = Boolean(
+      state.type || state.category || state.status || state.location
+      || state.programs.length || state.segments.length || ownership
+    );
+    button.hidden = !anything;
+  }
+
+  document.addEventListener("click", (event) => {
+    const ownershipButton = event.target.closest?.("[data-clients-map-ownership]");
+    if (ownershipButton) {
+      event.preventDefault();
+      const section = ownershipButton.closest("#clients-map");
+      if (!section) return;
+      section.querySelectorAll("[data-clients-map-ownership]").forEach((item) => {
+        item.setAttribute("aria-pressed", item === ownershipButton ? "true" : "false");
+      });
+      syncClientsMapFilterBar(section);
+      syncMapShowAll(section);
+      document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      return;
+    }
+
+    const showAll = event.target.closest?.("[data-clients-map-show-all]");
+    if (!showAll) return;
+    event.preventDefault();
+    const section = showAll.closest("#clients-map");
+    if (!section) return;
+    // Одной кнопкой снимаем все условия: человек видит всю базу на карте.
+    applyClientsMapFilterState(section, {
+      type: "", category: "", status: "", location: "", programs: [], segments: [],
+    });
+    section.querySelectorAll("[data-clients-map-ownership]").forEach((item) => {
+      item.setAttribute("aria-pressed", item.dataset.clientsMapOwnership ? "false" : "true");
+    });
+    const search = section.querySelector("[data-clients-map-search]");
+    if (search) search.value = "";
+    syncClientsMapFilterBar(section);
+    syncMapShowAll(section);
+    document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
   });
 
   function restoreClientsMapFilter() {
@@ -2518,6 +2576,7 @@
     }
     if (saved && typeof saved === "object") applyClientsMapFilterState(section, saved);
     syncClientsMapFilterBar(section);
+    syncMapShowAll(section);
   }
 
   if (document.readyState === "loading") {

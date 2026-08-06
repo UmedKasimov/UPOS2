@@ -11428,6 +11428,9 @@ def create_app() -> FastAPI:
             programs = [item.strip() for item in raw_programs.split(",") if item.strip()]
         else:
             programs = []
+        # Признак «наш клиент» — только закреплённые программы, без подстановок
+        # из категории: иначе заведение из справочника выглядит работающим с нами.
+        has_own_program = bool(programs)
         legacy_program = str(extra.get("program") or extra.get("software") or extra.get("category") or "").strip()
         if legacy_program and legacy_program not in programs:
             programs.append(legacy_program)
@@ -11500,6 +11503,7 @@ def create_app() -> FastAPI:
             "business_segments": client_segments,
             "program": ", ".join(programs),
             "programs": programs,
+            "is_ours": has_own_program,
             "route": str(extra.get("route") or ""),
             "status": str(extra.get("status") or "active"),
             "crm_status": crm_status,

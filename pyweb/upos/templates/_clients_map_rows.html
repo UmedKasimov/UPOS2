@@ -12,6 +12,7 @@
               data-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
               data-programs="{{ client.program or '' }}"
               data-program-list="{{ client.programs | tojson | forceescape }}"
+              data-ours="{{ '1' if client.is_ours else '0' }}"
               data-segments="{{ client.business_segments | tojson | forceescape }}"
               data-status="{{ client.status }}"
             >
