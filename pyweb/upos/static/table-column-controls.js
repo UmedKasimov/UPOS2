@@ -8,17 +8,26 @@
   const ORDER_STORAGE_SUFFIX = ':order';
   const WIDTH_STORAGE_SUFFIX = ':widths';
   const MIN_COLUMN_WIDTH = 48;
-  // Столбец с галочкой всегда узкий: тянуть там нечего, а из общего
-  // распределения ширин он раздувался до размера обычной колонки.
-  const FIXED_WIDTH_CELLS = '.products-check-col, .clients-map-select-column, .kassa-col-select';
-  const FIXED_CELL_WIDTH = 44;
+  // Столбцы с постоянной шириной: тянуть там нечего, а из общего
+  // распределения ширин они раздувались до размера обычной колонки.
+  const FIXED_WIDTH_COLUMNS = [
+    { selector: '.products-check-col, .clients-map-select-column, .kassa-col-select', width: 44 },
+    { selector: '.clients-col-id', width: 96 },
+    { selector: '.clients-col-own', width: 116 },
+  ];
 
-  function isFixedWidthCell(cell) {
-    if (!cell || !cell.matches) return false;
-    if (cell.matches(FIXED_WIDTH_CELLS)) return true;
+  function fixedCellWidth(cell) {
+    if (!cell || !cell.matches) return 0;
+    for (const item of FIXED_WIDTH_COLUMNS) {
+      if (cell.matches(item.selector)) return item.width;
+    }
     // Узнаём и по содержимому: внутри только галочка и больше ничего.
     const checkbox = cell.querySelector(':scope > input[type="checkbox"]');
-    return Boolean(checkbox && !cell.textContent.trim());
+    return checkbox && !cell.textContent.trim() ? 44 : 0;
+  }
+
+  function isFixedWidthCell(cell) {
+    return fixedCellWidth(cell) > 0;
   }
   const MAX_COLUMN_WIDTH = 720;
   let draggedColumn = null;
@@ -275,12 +284,10 @@
       const sample = tableRows(table)
         .map((row) => directCells(row).find((item) => item.getAttribute(CELL_KEY_ATTR) === column.key))
         .find(Boolean);
-      const fixed = isFixedWidthCell(sample);
-      const value = fixed ? FIXED_CELL_WIDTH : Number(widths[column.key]);
+      const fixed = fixedCellWidth(sample);
+      const value = fixed || Number(widths[column.key]);
       if (!Number.isFinite(value)) return;
-      const width = fixed
-        ? FIXED_CELL_WIDTH
-        : Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+      const width = fixed || Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
       tableRows(table).forEach((row) => {
         const cell = directCells(row).find((item) => item.getAttribute(CELL_KEY_ATTR) === column.key);
         if (!cell) return;

@@ -144,7 +144,8 @@
         <thead>
           <tr>
             <th class="products-check-col"><input type="checkbox" data-client-directory-select-all aria-label="Выбрать всех клиентов на странице" /></th>
-            <th>ИД</th>
+            <th class="clients-col-id">ИД</th>
+            <th class="clients-col-own">Клиент</th>
             <th>Название</th>
             <th>Официальное название</th>
             <th>Баланс</th>
@@ -162,8 +163,8 @@
             {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
             <tr>
               <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select data-client-directory-select aria-label="Выбрать {{ client.name }}" /></td>
-              <td>
-                <span class="client-id-badge">#{{ client.directory_number }}</span>
+              <td class="clients-col-id"><span class="client-id-badge">#{{ client.directory_number }}</span></td>
+              <td class="clients-col-own">
                 {% if client.is_ours %}
                   <span class="client-own-tag client-own-tag--ours">Клиент</span>
                 {% else %}
@@ -286,7 +287,7 @@
            и авансов не нужны, для этого есть раздел должников. #}
         <tfoot>
           <tr class="clients-total-row">
-            <td colspan="13">Итого клиенты</td>
+            <td colspan="14">Итого клиенты</td>
           </tr>
         </tfoot>
       </table>
