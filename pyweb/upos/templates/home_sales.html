@@ -59,6 +59,17 @@
     </nav>
     {% include "_workspace_tabs_early.html" %}
 
+    {# Невидимый реестр вкладок. Карточки разделов убраны, но контроллер
+       вкладок берёт из них названия и адреса: без реестра он не знал ни
+       одной вкладки, «journal» не открывался — и раздел оказывался пустым. #}
+    <div hidden aria-hidden="true">
+      <span data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form"></span>
+      <span data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal"></span>
+      <span data-workspace-card="order" data-workspace-tab-title="Заказы" data-workspace-tab-hash="order" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=order"></span>
+      <span data-workspace-card="return" data-workspace-tab-title="Возвраты" data-workspace-tab-hash="return" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=return"></span>
+      <span data-workspace-card="debt" data-workspace-tab-title="Долги" data-workspace-tab-hash="debt" data-workspace-tab-href="{{ url_for('sales_get') }}?status=debt"></span>
+    </div>
+
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
     {% macro render_sales_journal_filter() %}
