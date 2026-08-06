@@ -8,10 +8,9 @@
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid', 'converted', 'already_converted'] %}
 {% set sales_journal_requested = request.query_params.get('view') == 'journal' %}
-{# При обычном заходе в раздел показываем кнопки разделов, а не сразу
-   журнал: раньше последнее значение по умолчанию всегда было 'journal',
-   и карточки не появлялись никогда. #}
-{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))))) %}
+{# Карточки разделов убраны: раздел открывается сразу журналом, а
+   переходы между разделами идут вкладками сверху. #}
+{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else 'journal'))))) %}
 {% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
 {% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
 {% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
@@ -60,60 +59,6 @@
     </nav>
     {% include "_workspace_tabs_early.html" %}
 
-    <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher{% if sales_default_tab %} hidden{% endif %}>
-      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M5 5h14v14H5z" />
-            <path d="M8 9h8M8 13h5" />
-            <path d="M17 17h3M18.5 15.5v3" />
-          </svg>
-        </span>
-        <span>{{ sales_form_title }}</span>
-        <small>Счёт, заказ или реализация</small>
-      </a>
-      <a class="general-report-card" href="#sales-journal" data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M5 4h14v16H5z" />
-            <path d="M8 8h8M8 12h8M8 16h5" />
-            <path d="M3 8h2M3 12h2M3 16h2" />
-          </svg>
-        </span>
-        <span>Журнал</span>
-        <small>Продажи по документам</small>
-      </a>
-      <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=order#order" data-workspace-card="order" data-workspace-tab-title="Заказы" data-workspace-tab-hash="order" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=order">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
-            <path d="M9 8h6M9 12h6" />
-          </svg>
-        </span>
-        <span>Заказы</span>
-        <small>Резерв и ожидание оплаты</small>
-      </a>
-      <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=return#return" data-workspace-card="return" data-workspace-tab-title="Возвраты" data-workspace-tab-hash="return" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=return">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M9 14 4 9l5-5" />
-            <path d="M4 9h10a6 6 0 1 1 0 12H8" />
-          </svg>
-        </span>
-        <span>Возвраты</span>
-        <small>Возврат товара клиентом</small>
-      </a>
-      <a class="general-report-card" href="{{ url_for('sales_get') }}?status=debt#debt" data-workspace-card="debt" data-workspace-tab-title="Долги" data-workspace-tab-hash="debt" data-workspace-tab-href="{{ url_for('sales_get') }}?status=debt">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M12 3v18" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </span>
-        <span>Долги</span>
-        <small>Неполная оплата и остаток</small>
-      </a>
-    </section>
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
     {% macro render_sales_journal_filter() %}
@@ -409,21 +354,6 @@
             {{ render_sales_journal_filter() }}
           {% endif %}
         </header>
-        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Типы документов журнала">
-          <span class="sales-document-tabs-title">Разделы журнала</span>
-          {% for tab in sales_options.document_tabs %}
-            <a
-              class="messenger-channel-tab sales-document-tab{% if tab.active %} active{% endif %}"
-              href="{{ tab.href }}"
-              data-channel-brand="{{ tab.brand }}"
-              {% if tab.current %}aria-current="page"{% endif %}
-            >
-              <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
-              <span class="messenger-channel-label">{{ tab.label }}</span>
-              <b>{{ tab.count }}</b>
-            </a>
-          {% endfor %}
-        </nav>
         <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
           <table class="products-table products-catalog-table sales-table sales-journal-table" id="sales-journal-table" data-upos-column-controls>
             <thead>
