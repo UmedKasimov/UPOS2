@@ -16,7 +16,6 @@
     { path: '/reports', keys: ['upos.homeReports.openTabs'] },
     { path: '/shipments', keys: ['upos.shipments.openTabs'] },
     { path: '/hr', keys: ['upos.hr.openTabs'] },
-    { path: '/adjustments', keys: ['upos.adjustments.openTabs'] },
   ];
 
   function resetActiveTab(key) {

@@ -1007,8 +1007,6 @@ def create_app() -> FastAPI:
             return "/kassa"
         if _has_permission(user, "reports"):
             return "/reports"
-        if _has_permission(user, "adjustments"):
-            return "/adjustments"
         if _has_permission(user, "shipments"):
             return "/shipments"
         if _has_permission(user, "employees"):
@@ -1031,8 +1029,6 @@ def create_app() -> FastAPI:
             return ("kassa",)
         if path == "/reports" or path.startswith("/reports/"):
             return ("reports",)
-        if path == "/adjustments" or path.startswith("/adjustments/"):
-            return ("adjustments",)
         if path == "/shipments" or path.startswith("/shipments/"):
             return ("shipments",)
         if path == "/employees" or path.startswith("/employees/"):
@@ -1047,7 +1043,8 @@ def create_app() -> FastAPI:
             # Список зарплат остался ради кассы: расход «зарплата».
             return ("kassa",)
         if path.startswith("/api/adjustments"):
-            return ("adjustments",)
+            # История корректировок остатка нужна детали счёта.
+            return ("schet",)
         if path.startswith("/api/categories"):
             return ("settings", "dictionary")
         if path == "/api/settings/preferences":
@@ -1090,8 +1087,6 @@ def create_app() -> FastAPI:
             return ("schet", "edit")
         if clean == "/api/treasury":
             return ("schet", "balance")
-        if clean.startswith("/api/adjustments"):
-            return ("adjustments", "save")
         if clean in {"/shipments/create", "/organizations/shipments/create"}:
             return ("shipments", "create")
         if "/shipments/day/" in clean and clean.endswith("/update"):
@@ -19592,304 +19587,24 @@ def create_app() -> FastAPI:
             reports_usd_rate=_decimal_plain_text(reports_usd_rate),
         )
 
-    @app.get("/adjustments", response_class=HTMLResponse, name="home_adjustments")
-    def home_adjustments(request: Request):
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        _sync_program_employees_to_hr(oid)
-        raw = json.dumps(_adjustments_payload(oid), ensure_ascii=False).replace("</", "<\\/")
-        return tpl(
-            request,
-            "home_adjustments.html",
-            variant="user",
-            active="home_adjustments",
-            inside_organization=True,
-            selected_organization_id=oid,
-            adjustments_bootstrap_json=raw,
-        )
-
-
     def _adjustments_path(workspace_owner_id: str) -> Path:
         workspace_dir = Path(ensure_client_workspace(workspace_owner_id))
         return workspace_dir / "adjustments_log.json"
 
-    def _load_adjustments_log(workspace_owner_id: str) -> list[dict[str, Any]]:
-        path = _adjustments_path(workspace_owner_id)
-        if not path.exists():
-            return []
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-        return data if isinstance(data, list) else []
-
-    def _save_adjustments_log(workspace_owner_id: str, rows: list[dict[str, Any]]) -> None:
-        path = _adjustments_path(workspace_owner_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(rows[-500:], ensure_ascii=False, indent=2), encoding="utf-8")
-
-    def _adjustment_money(raw: Any) -> Decimal:
-        text_value = str(raw or "0").replace(" ", "").replace("\u202f", "").replace(",", ".")
-        try:
-            return Decimal(text_value)
-        except Exception:
-            return Decimal("0")
-
-    def _adjustment_amount_label(raw: Any) -> str:
-        amount = _adjustment_money(raw).quantize(Decimal("0.01"))
-        if amount == amount.to_integral_value():
-            return f"{int(amount):,}".replace(",", " ")
-        return f"{amount:,.2f}".replace(",", " ").replace(".", ",").rstrip("0").rstrip(",")
-
-    def _append_adjustment_log(
-        workspace_owner_id: str,
-        *,
-        section: str,
-        target_id: str,
-        target_name: str,
-        currency: str,
-        old_amount: Any,
-        new_amount: Any,
-        note: str,
-        actor: dict[str, Any] | None,
-    ) -> dict[str, Any]:
-        old_dec = _adjustment_money(old_amount)
-        new_dec = _adjustment_money(new_amount)
-        row = {
-            "id": str(uuid.uuid4()),
-            "section": str(section or "").strip(),
-            "target_id": str(target_id or "").strip(),
-            "target_name": str(target_name or "").strip() or "—",
-            "currency": str(currency or "UZS").strip().upper() or "UZS",
-            "old_amount": float(old_dec),
-            "new_amount": float(new_dec),
-            "delta": float(new_dec - old_dec),
-            "old_amount_label": _adjustment_amount_label(old_dec),
-            "new_amount_label": _adjustment_amount_label(new_dec),
-            "delta_label": _adjustment_amount_label(new_dec - old_dec),
-            "note": str(note or "").strip(),
-            "actor_name": str((actor or {}).get("name") or (actor or {}).get("username") or "").strip(),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        rows = _load_adjustments_log(workspace_owner_id)
-        rows.append(row)
-        _save_adjustments_log(workspace_owner_id, rows)
-        return row
-
-    def _adjustments_payload(workspace_owner_id: str) -> dict[str, Any]:
-        treasury = load_treasury(workspace_owner_id)
-        accounts: list[dict[str, Any]] = []
-        for pocket in treasury.get("pockets") or []:
-            if not isinstance(pocket, dict):
-                continue
-            for entry in pocket.get("entries") or []:
-                if not isinstance(entry, dict):
-                    continue
-                currency = str(entry.get("currency") or "UZS").strip().upper() or "UZS"
-                amount = _adjustment_money(entry.get("amount"))
-                accounts.append(
-                    {
-                        "id": str(pocket.get("id") or ""),
-                        "name": str(pocket.get("label") or pocket.get("name") or "Счёт"),
-                        "currency": currency,
-                        "amount": float(amount),
-                        "amount_label": _adjustment_amount_label(amount),
-                    }
-                )
-
-        employees = _hr_employees_with_adjustments(workspace_owner_id, datetime.now().strftime("%Y-%m-%d"))
-        employee_rows = [
-            {
-                "id": str(emp.get("id") or ""),
-                "name": str(emp.get("full_name") or ""),
-                "amount": float(_adjustment_money(emp.get("salary_due"))),
-                "amount_label": _adjustment_amount_label(emp.get("salary_due")),
-            }
-            for emp in employees
-            if str(emp.get("status") or "active") == "active"
-        ]
-
-        latest_manual: dict[tuple[str, str, str], Decimal] = {}
-        for row in _load_adjustments_log(workspace_owner_id):
-            section = str(row.get("section") or "")
-            if section not in {"couriers", "suppliers"}:
-                continue
-            key = (
-                section,
-                str(row.get("target_id") or row.get("target_name") or ""),
-                str(row.get("currency") or "UZS").upper(),
-            )
-            latest_manual[key] = _adjustment_money(row.get("new_amount"))
-
-        try:
-            recompute_delivery_debts(workspace_owner_id)
-        except Exception:
-            logger.exception("[upos] recompute_delivery_debts failed before adjustments payload")
-        courier_rows = []
-        for row in list_courier_debts(workspace_owner_id, include_zero=True):
-            name = str(row.get("courier_name") or "Без имени")
-            currency = str(row.get("currency") or "UZS").upper()
-            amount = latest_manual.get(("couriers", name, currency), _adjustment_money(row.get("debt") or row.get("debt_amount") or 0))
-            courier_rows.append(
-                {
-                    "id": name,
-                    "name": name,
-                    "currency": currency,
-                    "amount": float(amount),
-                    "amount_label": _adjustment_amount_label(amount),
-                }
-            )
-
-        supplier_totals: dict[tuple[str, str], Decimal] = {}
-        for tx in list_transactions(workspace_owner_id, limit=5000):
-            supplier = str(tx.get("supplier") or "").strip()
-            if not supplier:
-                continue
-            currency = str(tx.get("currency") or "UZS").strip().upper() or "UZS"
-            amount = _adjustment_money(tx.get("amount"))
-            sign = Decimal("1") if str(tx.get("type") or "") == "expense" else Decimal("-1")
-            supplier_totals[(supplier, currency)] = supplier_totals.get((supplier, currency), Decimal("0")) + amount * sign
-        supplier_rows = [
-            {
-                "id": f"{name}|{currency}",
-                "name": name,
-                "currency": currency,
-                "amount": float(latest_manual.get(("suppliers", f"{name}|{currency}", currency), amount)),
-                "amount_label": _adjustment_amount_label(latest_manual.get(("suppliers", f"{name}|{currency}", currency), amount)),
-            }
-            for (name, currency), amount in sorted(supplier_totals.items())
-        ]
-
-        history = list(reversed(_load_adjustments_log(workspace_owner_id)[-100:]))
-        return {
-            "ok": True,
-            "accounts": accounts,
-            "employees": employee_rows,
-            "couriers": courier_rows,
-            "suppliers": supplier_rows,
-            "history": history,
-        }
-
     @app.get("/api/adjustments")
     def api_adjustments_get(request: Request):
+        """Раздел «Корректировки» удалён; деталь счёта по-прежнему читает
+        историю корректировок остатка из журнала."""
         oid, err = _treasury_workspace_owner(request)
         if err:
             return err
         assert oid is not None
-        return _adjustments_payload(oid)
-
-    @app.post("/api/adjustments/account")
-    async def api_adjustments_account_save(request: Request):
-        tok = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
-        if not csrf_matches_session(request, tok):
-            return JSONResponse({"error": "csrf"}, status_code=403)
-        oid, err = _treasury_workspace_owner(request)
-        if err:
-            return err
-        assert oid is not None
-        body = await request.json()
-        account_id = str(body.get("account_id") or "").strip()
-        currency = str(body.get("currency") or "UZS").strip().upper() or "UZS"
-        new_amount = _adjustment_money(body.get("amount"))
-        note = str(body.get("note") or "").strip()
-        treasury = load_treasury(oid)
-        target_name = ""
-        old_amount = Decimal("0")
-        found = False
-        for pocket in treasury.get("pockets") or []:
-            if str(pocket.get("id") or "") != account_id:
-                continue
-            target_name = str(pocket.get("label") or pocket.get("name") or "Счёт")
-            entries = pocket.setdefault("entries", [])
-            entry = next((item for item in entries if str(item.get("currency") or "").upper() == currency), None)
-            if entry is None:
-                entry = {"id": str(uuid.uuid4()), "currency": currency, "amount": 0}
-                entries.append(entry)
-            old_amount = _adjustment_money(entry.get("amount"))
-            entry["amount"] = float(new_amount)
-            found = True
-            break
-        if not found:
-            return JSONResponse({"error": "account_not_found"}, status_code=404)
-        save_treasury(oid, treasury)
-        _append_adjustment_log(
-            oid,
-            section="accounts",
-            target_id=account_id,
-            target_name=target_name,
-            currency=currency,
-            old_amount=old_amount,
-            new_amount=new_amount,
-            note=note,
-            actor=request.session.get("user") or {},
-        )
-        return _adjustments_payload(oid)
-
-    @app.post("/api/adjustments/manual")
-    async def api_adjustments_manual_save(request: Request):
-        tok = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
-        if not csrf_matches_session(request, tok):
-            return JSONResponse({"error": "csrf"}, status_code=403)
-        oid, err = _treasury_workspace_owner(request)
-        if err:
-            return err
-        assert oid is not None
-        body = await request.json()
-        section = str(body.get("section") or "").strip()
-        if section not in {"couriers", "suppliers"}:
-            return JSONResponse({"error": "invalid_section"}, status_code=400)
-        _append_adjustment_log(
-            oid,
-            section=section,
-            target_id=str(body.get("target_id") or body.get("target_name") or ""),
-            target_name=str(body.get("target_name") or body.get("target_id") or ""),
-            currency=str(body.get("currency") or "UZS").strip().upper() or "UZS",
-            old_amount=body.get("old_amount") or 0,
-            new_amount=body.get("amount") or 0,
-            note=str(body.get("note") or "").strip(),
-            actor=request.session.get("user") or {},
-        )
-        return _adjustments_payload(oid)
-
-    @app.post("/api/adjustments/salary")
-    async def api_adjustments_salary_save(request: Request):
-        tok = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
-        if not csrf_matches_session(request, tok):
-            return JSONResponse({"error": "csrf"}, status_code=403)
-        oid, err = _treasury_workspace_owner(request)
-        if err:
-            return err
-        assert oid is not None
-        body = await request.json()
-        employee_id = str(body.get("employee_id") or "").strip()
-        amount = _adjustment_money(body.get("amount"))
-        note = str(body.get("note") or "Корректировка зарплаты").strip()
-        work_date = str(body.get("work_date") or datetime.now().strftime("%Y-%m-%d"))[:10]
-        old_amount = Decimal("0")
-        target_name = employee_id
-        for emp in _hr_employees_with_adjustments(oid, work_date):
-            if str(emp.get("id") or "") == employee_id:
-                old_amount = _adjustment_money(emp.get("salary_due"))
-                target_name = str(emp.get("full_name") or employee_id)
-                break
-        delta = amount - old_amount
-        adj_type = "bonus" if delta >= 0 else "penalty"
-        _save_hr_salary_adjustment(oid, employee_id, work_date, adj_type, str(abs(delta)), note)
-        _append_adjustment_log(
-            oid,
-            section="employees",
-            target_id=employee_id,
-            target_name=target_name,
-            currency="UZS",
-            old_amount=old_amount,
-            new_amount=amount,
-            note=note,
-            actor=request.session.get("user") or {},
-        )
-        return _adjustments_payload(oid)
-
+        try:
+            raw = json.loads(_adjustments_path(oid).read_text(encoding="utf-8"))
+        except Exception:
+            raw = []
+        rows = raw if isinstance(raw, list) else []
+        return {"history": list(reversed(rows[-100:]))}
 
     def _workspace_owner_or_redirect(request: Request):
         """Только владелец учётки бизнеса (не сотрудник и не админ)."""
@@ -20747,10 +20462,6 @@ def create_app() -> FastAPI:
             return []
         return raw if isinstance(raw, list) else []
 
-    def _save_hr_salary_adjustments(workspace_owner_id: str, rows: list[dict[str, Any]]) -> None:
-        path = _hr_salary_adjustments_path(workspace_owner_id)
-        path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
-
     def _month_prefix_from_date(raw: str) -> str:
         value = str(raw or "")[:10]
         return value[:7] if len(value) >= 7 else datetime.now().strftime("%Y-%m")
@@ -21035,41 +20746,6 @@ def create_app() -> FastAPI:
                 }
             )
         return {"ok": True, "date": selected_date, "employees": payload}
-
-    def _save_hr_salary_adjustment(
-        workspace_owner_id: str,
-        work_date: str,
-        employee_id: str,
-        adjustment_type: str,
-        amount: str,
-        comment: str,
-    ) -> None:
-        clean_date = str(work_date or "").strip()[:10] or datetime.now().strftime("%Y-%m-%d")
-        clean_employee_id = str(employee_id or "").strip()
-        clean_type = str(adjustment_type or "").strip()
-        if clean_type not in {"bonus", "penalty"}:
-            raise ValueError("salary_adjustment_type_required")
-        clean_amount = _hr_money(amount)
-        if clean_amount <= 0:
-            raise ValueError("salary_adjustment_amount_required")
-        employees = list_hr_employees(workspace_owner_id, clean_date)
-        employee = next((emp for emp in employees if str(emp.get("id") or "") == clean_employee_id), None)
-        if employee is None:
-            raise ValueError("salary_adjustment_employee_required")
-        rows = _load_hr_salary_adjustments(workspace_owner_id)
-        rows.append(
-            {
-                "id": uuid.uuid4().hex,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "work_date": clean_date,
-                "employee_id": clean_employee_id,
-                "employee_name": employee.get("full_name"),
-                "type": clean_type,
-                "amount": _hr_amount_out(clean_amount),
-                "comment": str(comment or "").strip()[:500],
-            }
-        )
-        _save_hr_salary_adjustments(workspace_owner_id, rows)
 
     def _current_org_html_owner(request: Request):
         u = request.session.get("user") or {}

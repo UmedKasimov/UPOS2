@@ -34,15 +34,6 @@
           <small>Приходы, расходы, переводы</small>
         </a>
       {% endif %}
-      {% if not user.get('is_employee') or emp_perms.get('adjustments') %}
-        <a class="general-report-card" href="{{ url_for('home_adjustments') }}">
-          <span class="general-report-card-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v18" /><path d="M5 8h14" /><path d="M7 16h10" /><path d="m8 5-3 3 3 3" /><path d="m16 13 3 3-3 3" /></svg>
-          </span>
-          <span>Корректировки</span>
-          <small>Приход и списание</small>
-        </a>
-      {% endif %}
       {% if not user.get('is_employee') or emp_perms.get('earnings') %}
         <a class="general-report-card" href="{{ url_for('home_earnings') }}">
           <span class="general-report-card-icon" aria-hidden="true">
