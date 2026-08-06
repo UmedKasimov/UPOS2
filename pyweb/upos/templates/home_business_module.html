@@ -90,7 +90,8 @@
     {% endif %}
 
     <nav class="general-module-tabs workbench-open-tabs business-module-tabs" aria-label="Открытые вкладки {{ module.title }}" data-workspace-open-tabs>
-      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">{{ module.title }}</button>
+      {# У поставщиков раздел один — домашняя кнопка дублировала вкладку. #}
+      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page" {% if active == "suppliers" %}hidden style="display: none"{% endif %}>{{ module.title }}</button>
     </nav>
     {% include "_workspace_tabs_early.html" %}
 
