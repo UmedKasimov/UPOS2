@@ -11880,7 +11880,9 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-document-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Вкладок стало шесть — Рассрочки и Архивы добавились, а сетка была на
+     четыре: новые падали на вторую строку. Колонки считаются сами. */
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   align-items: stretch;
   gap: 0;
   min-height: 0;
