@@ -716,6 +716,21 @@
               <button class="btn btn-secondary btn-sm sales-detail-return-btn" type="button" data-sales-detail-return hidden>
                 Сделать возврат
               </button>
+              {# Прибыль программы считается только по архивным документам,
+                 поэтому архивация вынесена отдельной кнопкой. #}
+              <form
+                method="post"
+                action=""
+                data-sales-detail-archive-form
+                data-action-template="{{ url_for('sales_status_update', sale_id='__sale_id__') }}"
+                hidden
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="status" value="archived" />
+                <button class="btn btn-primary btn-sm" type="submit" data-sales-detail-archive>
+                  Отправить в архив
+                </button>
+              </form>
               <button class="warehouse-purchases-icon" type="button" title="Печать" aria-label="Печать" data-sales-detail-print>
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
               </button>
@@ -1093,6 +1108,7 @@
                 </label>
                 <input type="hidden" name="price_type_name" data-sales-price-type-name />
                 <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
+                <button type="button" class="btn btn-secondary btn-sm sales-add-installment-btn" data-sales-installment-add>+ Рассрочка</button>
               </div>
             </div>
             <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
@@ -1238,6 +1254,62 @@
             </div>
           </section>
 
+          {# Рассрочка: срок и условия хранятся в документе, суммы считаются
+             от итога позиций. #}
+          <input type="hidden" name="installment_enabled" value="0" data-sales-installment-enabled />
+          <input type="hidden" name="installment_months" value="" data-sales-installment-months-field />
+          <input type="hidden" name="installment_initial" value="" data-sales-installment-initial-field />
+          <input type="hidden" name="installment_markup_percent" value="" data-sales-installment-markup-field />
+          <section class="product-form-section sales-installment-section" data-sales-installment-section hidden>
+            <div class="sales-section-head">
+              <h3>Рассрочка</h3>
+              <div class="sales-section-actions">
+                <button type="button" class="sales-installment-remove" data-sales-installment-remove aria-label="Убрать рассрочку" title="Убрать рассрочку">×</button>
+              </div>
+            </div>
+            <div class="sales-installment-body" data-sales-installment-body>
+              <div class="sales-installment-controls">
+                <label class="sales-installment-period">
+                  <span>Период</span>
+                  <span class="sales-installment-period-field">
+                    <input type="text" inputmode="numeric" value="1" data-sales-installment-months placeholder="1" />
+                    <b>мес.</b>
+                  </span>
+                </label>
+                <button type="button" class="btn btn-secondary" data-sales-installment-open>Условия рассрочки</button>
+              </div>
+              <div class="sales-installment-summary" data-sales-installment-summary>
+                <div class="sales-installment-summary-row sales-installment-summary-row--total">
+                  <span>Итого</span>
+                  <strong data-sales-installment-total>0 UZS</strong>
+                </div>
+                <div class="sales-installment-summary-details" data-sales-installment-details>
+                  <div class="sales-installment-summary-row">
+                    <span>Начальная сумма</span>
+                    <strong data-sales-installment-initial>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row">
+                    <span>Осталось</span>
+                    <strong data-sales-installment-rest>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row">
+                    <span>Прибыль</span>
+                    <strong data-sales-installment-profit>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row sales-installment-summary-row--rest">
+                    <span>Итого остаток</span>
+                    <strong data-sales-installment-rest-total>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row sales-installment-summary-row--month">
+                    <span>Платёж в месяц</span>
+                    <strong data-sales-installment-month>0 UZS</strong>
+                  </div>
+                </div>
+                <button type="button" class="sales-installment-details-toggle" data-sales-installment-details-toggle>Скрыть детали</button>
+              </div>
+            </div>
+          </section>
+
           <div class="sales-payment-breakdown" data-sales-payment-breakdown hidden>
             <button type="button" class="sales-payment-breakdown-clear" data-sales-payment-clear aria-label="Убрать оплату" title="Убрать оплату">×</button>
             <div class="sales-payment-breakdown-row sales-payment-breakdown-row--total">
@@ -1324,6 +1396,60 @@
               </div>
             </footer>
           </section>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-installment-dialog" data-sales-installment-dialog>
+          <div class="settings-profile-modal-surface sales-installment-dialog-surface">
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Условия рассрочки</h2>
+                <p class="settings-profile-modal-sub">Первый взнос и наценка за рассрочку.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-installment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-installment-dialog-grid">
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Итого</span>
+                  <input class="settings-profile-input" data-sales-installment-dialog-total readonly />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Начальная сумма</span>
+                  <input class="settings-profile-input" inputmode="decimal" data-sales-installment-dialog-initial placeholder="0" />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Осталось</span>
+                  <input class="settings-profile-input" data-sales-installment-dialog-rest readonly />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Прибыль, %</span>
+                  <input class="settings-profile-input" inputmode="decimal" data-sales-installment-dialog-markup placeholder="0" />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Период, мес.</span>
+                  <input class="settings-profile-input" inputmode="numeric" data-sales-installment-dialog-months placeholder="1" />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Платёж в месяц</span>
+                  <input class="settings-profile-input" data-sales-installment-dialog-month readonly />
+                </label>
+              </div>
+              <div class="sales-payment-summary-card">
+                <div class="sales-payment-summary-row">
+                  <span>Итого остаток</span>
+                  <strong data-sales-installment-dialog-rest-total>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row sales-payment-summary-row--total">
+                  <span>Итого к оплате</span>
+                  <strong data-sales-installment-dialog-grand>0 UZS</strong>
+                </div>
+              </div>
+            </div>
+            <div class="settings-profile-modal-actions">
+              <button type="button" class="btn btn-secondary" data-sales-installment-close>Закрыть</button>
+              <button type="button" class="btn" data-sales-installment-save>Сохранить</button>
+            </div>
+          </div>
         </dialog>
 
         <dialog class="settings-profile-modal sales-payment-dialog" data-sales-payment-dialog>
@@ -1710,9 +1836,9 @@
 {% block scripts %}
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=30" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=31" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=62" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=63" defer></script>
   {% if sales_embed %}
     <script>
       (() => {

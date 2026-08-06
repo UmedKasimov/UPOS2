@@ -7529,6 +7529,28 @@ def create_app() -> FastAPI:
                             "amount": str(payment_amount.normalize() if payment_amount else "0"),
                         }
                     )
+        # Рассрочка: срок, первый взнос и наценка. Суммы пересчитываем на
+        # сервере, чтобы в документе лежал итог, а не только ввод формы.
+        installment_on = str(form.get("installment_enabled") or "").strip() in {"1", "true", "on", "yes"}
+        installment: dict[str, Any] = {}
+        if installment_on:
+            months = max(1, int(_sales_decimal(form.get("installment_months")) or 1))
+            initial = min(max(_sales_decimal(form.get("installment_initial")), Decimal("0")), total)
+            markup = max(_sales_decimal(form.get("installment_markup_percent")), Decimal("0"))
+            rest = total - initial
+            profit = (rest * markup / Decimal("100")).quantize(Decimal("0.01"))
+            rest_total = rest + profit
+            installment = {
+                "enabled": True,
+                "months": months,
+                "initial": _decimal_plain_text(initial),
+                "markup_percent": _decimal_plain_text(markup),
+                "rest": _decimal_plain_text(rest),
+                "profit": _decimal_plain_text(profit),
+                "rest_total": _decimal_plain_text(rest_total),
+                "total": _decimal_plain_text(initial + rest_total),
+                "monthly": _decimal_plain_text((rest_total / months).quantize(Decimal("0.01"))),
+            }
         payment_type = str(form.get("payment_type") or "").strip()
         if not payment_type and payment_lines:
             payment_type = ", ".join(
@@ -7553,6 +7575,7 @@ def create_app() -> FastAPI:
             "note": str(form.get("note") or "").strip(),
             "crm_record_id": str(form.get("crm_record_id") or "").strip(),
             "source_sale_id": str(form.get("source_sale_id") or "").strip(),
+            "installment": installment,
             "installer_user_id": str(form.get("installer_user_id") or "").strip(),
             "installation_scheduled_at": str(form.get("installation_scheduled_at") or "").strip(),
             "installation_template_id": str(form.get("installation_template_id") or "").strip(),

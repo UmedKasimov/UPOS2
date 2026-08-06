@@ -1061,6 +1061,10 @@
       paymentType: root.querySelector("[data-sales-payment-type]")?.value || "",
       paymentLines: root.querySelector("[data-sales-payment-lines]")?.value || "",
       note: root.querySelector('textarea[name="note"]')?.value || "",
+      installmentEnabled: root.querySelector("[data-sales-installment-enabled]")?.value || "0",
+      installmentMonths: root.querySelector("[data-sales-installment-months-field]")?.value || "",
+      installmentInitial: root.querySelector("[data-sales-installment-initial-field]")?.value || "",
+      installmentMarkup: root.querySelector("[data-sales-installment-markup-field]")?.value || "",
       manualOriginalTotal: root.dataset.salesManualOriginalTotal || "",
       products: Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).map(lineDraft).filter(hasDraftLine),
       services: serviceRows(root).map(lineDraft).filter(hasDraftLine)
@@ -1171,6 +1175,10 @@
     setDraftField(root, "[data-sales-payment-type]", draft.paymentType);
     setDraftField(root, "[data-sales-payment-lines]", draft.paymentLines);
     setDraftField(root, 'textarea[name="note"]', draft.note);
+    setDraftField(root, "[data-sales-installment-enabled]", draft.installmentEnabled);
+    setDraftField(root, "[data-sales-installment-months-field]", draft.installmentMonths);
+    setDraftField(root, "[data-sales-installment-initial-field]", draft.installmentInitial);
+    setDraftField(root, "[data-sales-installment-markup-field]", draft.installmentMarkup);
     if (draft.manualOriginalTotal) root.dataset.salesManualOriginalTotal = draft.manualOriginalTotal;
     else delete root.dataset.salesManualOriginalTotal;
     var clientCombo = root.querySelector('[data-sales-combobox="client"]');
@@ -1328,7 +1336,198 @@
     if (output) output.textContent = formatMoney(total, selectedCurrency(root)) + " " + selectedCurrency(root);
     updateDiscountBadge(root, total);
     updatePaymentBreakdown(root);
+    updateInstallmentSummary(root);
     scheduleSalesDraft(root);
+  }
+
+  /* ── Рассрочка ───────────────────────────────────────────────────────────
+     Итого — сумма позиций. Клиент вносит начальную сумму, на остаток
+     начисляется процент, и результат делится на срок. */
+  function installmentState(root) {
+    var enabled = root.querySelector("[data-sales-installment-enabled]");
+    return {
+      on: String(enabled?.value || "0") === "1",
+      months: Math.max(1, Math.round(numberValue(root.querySelector("[data-sales-installment-months-field]")?.value) || 1)),
+      initial: Math.max(0, numberValue(root.querySelector("[data-sales-installment-initial-field]")?.value)),
+      markup: Math.max(0, numberValue(root.querySelector("[data-sales-installment-markup-field]")?.value)),
+    };
+  }
+
+  function installmentNumbers(root) {
+    var state = installmentState(root);
+    var currency = selectedCurrency(root);
+    var total = roundCurrency(rowsTotal(root, false), currency);
+    var initial = Math.min(state.initial, total);
+    var rest = Math.max(total - initial, 0);
+    var profit = roundCurrency((rest * state.markup) / 100, currency);
+    var restTotal = roundCurrency(rest + profit, currency);
+    return {
+      currency: currency,
+      months: state.months,
+      total: total,
+      initial: initial,
+      rest: rest,
+      profit: profit,
+      restTotal: restTotal,
+      grand: roundCurrency(initial + restTotal, currency),
+      monthly: roundCurrency(restTotal / state.months, currency),
+    };
+  }
+
+  function setMoneyText(root, selector, value, currency) {
+    var node = root.querySelector(selector);
+    if (node) node.textContent = formatMoney(value, currency) + " " + currency;
+  }
+
+  function updateInstallmentSummary(root) {
+    var section = root.querySelector("[data-sales-installment-section]");
+    if (!section) return;
+    var state = installmentState(root);
+    section.hidden = !state.on;
+    var addButton = root.querySelector("[data-sales-installment-add]");
+    if (addButton) addButton.hidden = state.on;
+    if (!state.on) return;
+    var numbers = installmentNumbers(root);
+    var monthsInput = root.querySelector("[data-sales-installment-months]");
+    if (monthsInput && document.activeElement !== monthsInput) monthsInput.value = String(numbers.months);
+    setMoneyText(root, "[data-sales-installment-total]", numbers.total, numbers.currency);
+    setMoneyText(root, "[data-sales-installment-initial]", numbers.initial, numbers.currency);
+    setMoneyText(root, "[data-sales-installment-rest]", numbers.rest, numbers.currency);
+    setMoneyText(root, "[data-sales-installment-profit]", numbers.profit, numbers.currency);
+    setMoneyText(root, "[data-sales-installment-rest-total]", numbers.restTotal, numbers.currency);
+    setMoneyText(root, "[data-sales-installment-month]", numbers.monthly, numbers.currency);
+  }
+
+  function fillInstallmentDialog(root) {
+    var dialog = document.querySelector("[data-sales-installment-dialog]");
+    if (!dialog) return;
+    var state = installmentState(root);
+    var numbers = installmentNumbers(root);
+    var setValue = function (selector, value) {
+      var node = dialog.querySelector(selector);
+      if (node) node.value = value;
+    };
+    setValue("[data-sales-installment-dialog-total]", formatMoney(numbers.total, numbers.currency) + " " + numbers.currency);
+    setValue("[data-sales-installment-dialog-initial]", state.initial ? formatMoney(state.initial, numbers.currency) : "");
+    setValue("[data-sales-installment-dialog-rest]", formatMoney(numbers.rest, numbers.currency) + " " + numbers.currency);
+    setValue("[data-sales-installment-dialog-markup]", state.markup ? String(state.markup) : "");
+    setValue("[data-sales-installment-dialog-months]", String(numbers.months));
+    setValue("[data-sales-installment-dialog-month]", formatMoney(numbers.monthly, numbers.currency) + " " + numbers.currency);
+    var restTotal = dialog.querySelector("[data-sales-installment-dialog-rest-total]");
+    if (restTotal) restTotal.textContent = formatMoney(numbers.restTotal, numbers.currency) + " " + numbers.currency;
+    var grand = dialog.querySelector("[data-sales-installment-dialog-grand]");
+    if (grand) grand.textContent = formatMoney(numbers.grand, numbers.currency) + " " + numbers.currency;
+  }
+
+  function recalcInstallmentDialog(root) {
+    var dialog = document.querySelector("[data-sales-installment-dialog]");
+    if (!dialog) return;
+    var currency = selectedCurrency(root);
+    var total = roundCurrency(rowsTotal(root, false), currency);
+    var initial = Math.min(Math.max(numberValue(dialog.querySelector("[data-sales-installment-dialog-initial]")?.value), 0), total);
+    var markup = Math.max(numberValue(dialog.querySelector("[data-sales-installment-dialog-markup]")?.value), 0);
+    var months = Math.max(1, Math.round(numberValue(dialog.querySelector("[data-sales-installment-dialog-months]")?.value) || 1));
+    var rest = Math.max(total - initial, 0);
+    var restTotal = roundCurrency(rest + (rest * markup) / 100, currency);
+    var set = function (selector, value) {
+      var node = dialog.querySelector(selector);
+      if (node) node.value = formatMoney(value, currency) + " " + currency;
+    };
+    set("[data-sales-installment-dialog-rest]", rest);
+    set("[data-sales-installment-dialog-month]", roundCurrency(restTotal / months, currency));
+    var restNode = dialog.querySelector("[data-sales-installment-dialog-rest-total]");
+    if (restNode) restNode.textContent = formatMoney(restTotal, currency) + " " + currency;
+    var grandNode = dialog.querySelector("[data-sales-installment-dialog-grand]");
+    if (grandNode) grandNode.textContent = formatMoney(roundCurrency(initial + restTotal, currency), currency) + " " + currency;
+  }
+
+  function openInstallmentDialog(root) {
+    var dialog = document.querySelector("[data-sales-installment-dialog]");
+    if (!dialog) return;
+    fillInstallmentDialog(root);
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }
+
+  function closeInstallmentDialog() {
+    var dialog = document.querySelector("[data-sales-installment-dialog]");
+    if (!dialog) return;
+    if (dialog.open && typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+
+  function wireInstallment(root) {
+    if (root.dataset.salesInstallmentReady === "1") return;
+    root.dataset.salesInstallmentReady = "1";
+    var enabledField = root.querySelector("[data-sales-installment-enabled]");
+    var monthsField = root.querySelector("[data-sales-installment-months-field]");
+    var initialField = root.querySelector("[data-sales-installment-initial-field]");
+    var markupField = root.querySelector("[data-sales-installment-markup-field]");
+    var dialog = document.querySelector("[data-sales-installment-dialog]");
+
+    root.querySelector("[data-sales-installment-add]")?.addEventListener("click", function () {
+      if (enabledField) enabledField.value = "1";
+      if (monthsField && !monthsField.value) monthsField.value = "1";
+      updateInstallmentSummary(root);
+      openInstallmentDialog(root);
+      scheduleSalesDraft(root);
+    });
+    root.querySelector("[data-sales-installment-remove]")?.addEventListener("click", function () {
+      if (enabledField) enabledField.value = "0";
+      if (monthsField) monthsField.value = "";
+      if (initialField) initialField.value = "";
+      if (markupField) markupField.value = "";
+      updateInstallmentSummary(root);
+      scheduleSalesDraft(root);
+    });
+    root.querySelector("[data-sales-installment-open]")?.addEventListener("click", function () {
+      openInstallmentDialog(root);
+    });
+    root.querySelector("[data-sales-installment-months]")?.addEventListener("input", function (event) {
+      if (monthsField) monthsField.value = String(Math.max(1, Math.round(numberValue(event.target.value) || 1)));
+      updateInstallmentSummary(root);
+      scheduleSalesDraft(root);
+    });
+    root.querySelector("[data-sales-installment-details-toggle]")?.addEventListener("click", function (event) {
+      var details = root.querySelector("[data-sales-installment-details]");
+      if (!details) return;
+      details.hidden = !details.hidden;
+      event.target.textContent = details.hidden ? "Показать детали" : "Скрыть детали";
+    });
+
+    if (dialog) {
+      dialog.querySelectorAll("[data-sales-installment-close]").forEach(function (button) {
+        button.addEventListener("click", closeInstallmentDialog);
+      });
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) closeInstallmentDialog();
+      });
+      ["[data-sales-installment-dialog-initial]", "[data-sales-installment-dialog-markup]", "[data-sales-installment-dialog-months]"].forEach(function (selector) {
+        dialog.querySelector(selector)?.addEventListener("input", function () {
+          recalcInstallmentDialog(root);
+        });
+      });
+      dialog.querySelector("[data-sales-installment-save]")?.addEventListener("click", function () {
+        var initial = Math.max(numberValue(dialog.querySelector("[data-sales-installment-dialog-initial]")?.value), 0);
+        var markup = Math.max(numberValue(dialog.querySelector("[data-sales-installment-dialog-markup]")?.value), 0);
+        var months = Math.max(1, Math.round(numberValue(dialog.querySelector("[data-sales-installment-dialog-months]")?.value) || 1));
+        if (enabledField) enabledField.value = "1";
+        if (initialField) initialField.value = String(initial);
+        if (markupField) markupField.value = String(markup);
+        if (monthsField) monthsField.value = String(months);
+        closeInstallmentDialog();
+        updateInstallmentSummary(root);
+        scheduleSalesDraft(root);
+      });
+    }
+    updateInstallmentSummary(root);
   }
 
   function renderAdjustedPrice(input, originalPrice) {
@@ -2953,6 +3152,7 @@
     }
     syncInstallationSection(root);
     wireInstallationCalendar(root);
+    wireInstallment(root);
     hydratePaymentRows(root, parsePaymentLines(root));
     updatePaymentBreakdown(root);
     root.addEventListener("input", function () {

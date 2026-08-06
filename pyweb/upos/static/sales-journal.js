@@ -507,6 +507,23 @@
     form.action = template.replace("__sale_id__", encodeURIComponent(String(sale.id || "")));
   }
 
+  /* Архив — финальный шаг документа: только после него продажа попадает в
+     прибыль. Возвраты и уже архивные документы кнопку не показывают. */
+  function updateArchiveButton(panel, sale) {
+    var form = panel.querySelector("[data-sales-detail-archive-form]");
+    if (!form) return;
+    var status = textValue(sale.status).toLowerCase();
+    var docType = textValue(sale.doc_type).toLowerCase();
+    var canArchive = docType !== "return" && status !== "archived";
+    form.hidden = !canArchive;
+    if (!canArchive) {
+      form.removeAttribute("action");
+      return;
+    }
+    var template = form.dataset.actionTemplate || "";
+    form.action = template.replace("__sale_id__", encodeURIComponent(String(sale.id || "")));
+  }
+
   function setDetailMenu(panel, open) {
     if (!panel) return;
     var menu = panel.querySelector("[data-sales-detail-menu]");
@@ -769,6 +786,7 @@
     updatePaymentButton(panel, sale);
     updateReturnButton(panel, sale);
     updateConvertButton(panel, sale);
+    updateArchiveButton(panel, sale);
     renderLines(panel, sale);
     renderCompletedTasks(panel, sale);
   }
