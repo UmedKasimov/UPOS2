@@ -12,6 +12,7 @@
   // распределения ширин они раздувались до размера обычной колонки.
   const FIXED_WIDTH_COLUMNS = [
     { selector: '.products-check-col, .clients-map-select-column, .kassa-col-select', width: 44 },
+    { selector: '.products-photo-col', width: 72 },
     { selector: '.clients-col-id', width: 96 },
     { selector: '.clients-col-own', width: 116 },
   ];

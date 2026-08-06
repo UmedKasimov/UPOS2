@@ -2476,12 +2476,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   z-index: 4;
 }
 
-/* Закреплённый блок «не меняется»: без перетаскивания и изменения ширины.
-   Кнопка перетаскивания заодно закрывала галочку «Выбрать все». */
+/* Закреплённый блок и фото «не меняются»: без перетаскивания и изменения
+   ширины. Кнопка перетаскивания заодно закрывала галочку «Выбрать все». */
 #products-catalog-table .products-history-col .upos-table-header-drag-handle,
 #products-catalog-table .products-history-col .upos-table-column-resize-handle,
 #products-catalog-table .products-check-col .upos-table-header-drag-handle,
-#products-catalog-table .products-check-col .upos-table-column-resize-handle {
+#products-catalog-table .products-check-col .upos-table-column-resize-handle,
+#products-catalog-table .products-photo-col .upos-table-header-drag-handle,
+#products-catalog-table .products-photo-col .upos-table-column-resize-handle {
   display: none !important;
 }
 
