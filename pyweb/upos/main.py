@@ -131,6 +131,7 @@ from upos.transactions_store import (
     get_pnl_data,
 )
 from PIL import Image
+from upos.clients_import import import_clients, read_clients_file
 from upos.clopos_client import CloposError, test_clopos_connection
 from upos.greenwhite_client import GreenWhiteError
 from upos.greenwhite_store import (
@@ -13819,6 +13820,51 @@ def create_app() -> FastAPI:
                 flag_modified(row, "data")
         except Exception:
             logger.exception("[upos] background geocode failed for %s", counterparty_id)
+
+    @app.post("/clients/import", name="clients_import")
+    async def clients_import(
+        request: Request,
+        csrf_token: str = Form(default=""),
+        excel_file: UploadFile = File(...),
+    ):
+        """Загрузка клиентов из файла Excel вместе с адресами и координатами."""
+        if not csrf_matches_session(request, csrf_token):
+            return RedirectResponse(url="/clients?err=csrf#clients", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        try:
+            content = await excel_file.read()
+        except Exception:
+            content = b""
+        if not content:
+            return RedirectResponse(
+                url="/clients?error=" + quote("Файл пустой") + "#clients", status_code=302
+            )
+        try:
+            rows, notes = read_clients_file(content)
+        except Exception as exc:
+            logger.exception("[clients] не удалось разобрать файл клиентов")
+            message = str(exc).strip() or "Не удалось прочитать файл"
+            return RedirectResponse(
+                url="/clients?error=" + quote(message) + "#clients", status_code=302
+            )
+        if not rows:
+            reason = "; ".join(notes) or "В файле нет клиентов"
+            return RedirectResponse(
+                url="/clients?error=" + quote(reason) + "#clients", status_code=302
+            )
+        result = import_clients(wid, rows)
+        summary = (
+            f"Загружено клиентов: {result['created']}, "
+            f"дополнено: {result['updated']}, без изменений: {result['skipped']}"
+        )
+        if notes:
+            summary += ". " + "; ".join(notes)
+        return RedirectResponse(
+            url="/clients?msg=" + quote(summary) + "#clients", status_code=302
+        )
 
     @app.post("/clients/save", name="clients_save")
     async def clients_save(request: Request, background_tasks: BackgroundTasks):
