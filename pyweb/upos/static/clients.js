@@ -412,8 +412,11 @@
       const body = template.closest("[data-clients-map-body]") || template.parentElement;
       if (!body) return;
       // Пока панель карты скрыта, строки не разворачиваем — в этом весь смысл.
+      // Скрытой считаем только по-настоящему свёрнутую панель: offsetParent
+      // бывает пустым и у видимой панели, и тогда список оставался пустым.
       const panel = template.closest("#clients-map") || body.closest("section, article");
-      if (panel && !panel.offsetParent) {
+      const panelHidden = panel && (panel.hidden || panel.closest("[hidden]") || !panel.getClientRects().length);
+      if (panelHidden) {
         watchClientsMapPanel(panel);
         return;
       }
@@ -421,21 +424,36 @@
       template.remove();
       initializeDirectorySegmentPickers(body);
       syncDirectoryClientSelection();
+      // Строки появились позже футера — пересчитываем счётчики и страницы,
+      // иначе список показывал «Всего: 0» при видимых клиентах.
+      const section = body.closest("#clients-map");
+      if (section) {
+        paginateClientsMapRows(
+          section,
+          [...section.querySelectorAll("[data-client-overview-point]")].filter((row) => !row.hidden)
+        );
+      }
     });
   }
 
   /* Панель карты открывается по-разному: вкладкой, хешем, кнопкой «Показать
      на карте». Ждём её появления наблюдателем, чтобы не гадать с событиями. */
   function watchClientsMapPanel(panel) {
-    if (!panel || panel._clientsMapWatched || typeof ResizeObserver !== "function") return;
+    if (!panel || panel._clientsMapWatched) return;
     panel._clientsMapWatched = true;
-    const observer = new ResizeObserver(() => {
-      if (!panel.offsetParent) return;
-      observer.disconnect();
+    const wake = () => {
+      if (panel.hidden || !panel.getClientRects().length) return;
       panel._clientsMapWatched = false;
+      resizeObserver?.disconnect();
+      attrObserver?.disconnect();
       unpackClientsMapRows(panel);
-    });
-    observer.observe(panel);
+    };
+    // Панель открывают снятием атрибута hidden — на это ResizeObserver
+    // реагировал не всегда, и список оставался пустым до перерисовки карты.
+    const attrObserver = typeof MutationObserver === "function" ? new MutationObserver(wake) : null;
+    attrObserver?.observe(panel, { attributes: true, attributeFilter: ["hidden", "style", "class"] });
+    const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(wake) : null;
+    resizeObserver?.observe(panel);
   }
 
   function initializeMaps(root = document) {
@@ -546,6 +564,10 @@
 
   function readOverviewPoints(container) {
     const layout = container.closest(".clients-map-layout") || document;
+    // Строки списка лежат в <template> и раньше разворачивались только по
+    // наблюдателю за размером панели: если он не срабатывал, список
+    // оставался пустым и фильтры «ничего не меняли».
+    unpackClientsMapRows(layout);
     const filters = overviewFilters(container);
     const selectedIds = selectedMapIds();
     const noSelection = new Set();
@@ -623,6 +645,16 @@
       shownNode.textContent = total
         ? `Показано: ${Math.min(start + 1, total)}-${Math.min(end, total)}`
         : "Показано: 0";
+    }
+    const resetNode = footer.querySelector("[data-clients-map-filter-reset]");
+    if (resetNode) {
+      const state = readClientsMapFilterState(section);
+      const ownership = section.querySelector('[data-clients-map-ownership][aria-pressed="true"]')?.dataset.clientsMapOwnership || "";
+      const search = String(section.querySelector("[data-clients-map-search]")?.value || "").trim();
+      resetNode.hidden = !(
+        state.type || state.category || state.status || state.location
+        || state.programs.length || state.segments.length || ownership || search
+      );
     }
     const pagesNode = footer.querySelector("[data-clients-map-pages]");
     if (!pagesNode) return;
@@ -2361,6 +2393,32 @@
   });
 
   document.addEventListener("click", (event) => {
+    const filterReset = event.target.closest("[data-clients-map-filter-reset]");
+    if (filterReset) {
+      event.preventDefault();
+      const section = filterReset.closest("#clients-map");
+      if (!section) return;
+      applyClientsMapFilterState(section, {
+        type: "", category: "", status: "", location: "", programs: [], segments: [],
+      });
+      section.querySelectorAll("[data-clients-map-ownership]").forEach((item) => {
+        const active = !item.dataset.clientsMapOwnership;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      section.querySelectorAll("[data-clients-map-location-filter]").forEach((item) => {
+        const active = !item.dataset.clientsMapLocationFilter;
+        item.classList.toggle("is-active", active);
+        item.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      const search = section.querySelector("[data-clients-map-search]");
+      if (search) search.value = "";
+      section.dataset.clientsMapPage = "1";
+      syncClientsMapFilterBar(section);
+      syncMapShowAll(section);
+      section.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      return;
+    }
     const mapPageButton = event.target.closest("[data-clients-map-page]");
     if (mapPageButton) {
       event.preventDefault();
@@ -2683,6 +2741,11 @@
     if (saved && typeof saved === "object") applyClientsMapFilterState(section, saved);
     syncClientsMapFilterBar(section);
     syncMapShowAll(section);
+    // Счётчики футера считались только после отрисовки карты: до этого список
+    // показывал «Всего: 0» при видимых строках.
+    unpackClientsMapRows(section);
+    const rows = [...section.querySelectorAll("[data-client-overview-point]")].filter((row) => !row.hidden);
+    paginateClientsMapRows(section, rows);
   }
 
   if (document.readyState === "loading") {

@@ -678,6 +678,11 @@
             <div class="products-panel-stats" aria-label="Информация по списку клиентов">
               <span data-clients-map-total>Всего: {{ map_clients|length }}</span>
               <span data-clients-map-shown>Показано: {{ map_clients|length }}</span>
+              {# Сохранённый шаблон фильтра применялся молча: человек видел
+                 часть базы и не понимал, почему клиентов мало. #}
+              <button type="button" class="clients-map-filter-reset" data-clients-map-filter-reset hidden>
+                Фильтр активен · показать всех
+              </button>
             </div>
             <label class="products-page-size products-page-size--footer">
               <span>Показать</span>
