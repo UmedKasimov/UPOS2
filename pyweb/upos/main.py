@@ -13307,6 +13307,7 @@ def create_app() -> FastAPI:
         route: str = "",
         status: str = "all",
         ownership: str = "",
+        archive: str = "",
         client_sort: str = "",
         client_sort_dir: str = "desc",
         page_size: str = "100",
@@ -13473,6 +13474,8 @@ def create_app() -> FastAPI:
                 ).scalars()
             )
             route_map: dict[str, dict[str, Any]] = {}
+            archive_mode = archive.strip() == "1"
+            clients_archived_total = 0
             for row in rows:
                 item = _counterparty_view_data(
                     row,
@@ -13485,10 +13488,18 @@ def create_app() -> FastAPI:
                     crm_status_by_id=crm_status_by_id,
                     crm_status_by_name=crm_status_by_name,
                 )
+                # Удалённые клиенты живут в архиве: в списке и на карте их
+                # нет, пока не открыт сам архив.
+                is_archived = bool(str((_counterparty_extra(row) or {}).get("archived_at") or "").strip())
+                if is_archived:
+                    clients_archived_total += 1
+                if archive_mode != is_archived:
+                    continue
                 # Карта показывает всю базу: фильтры списка на неё не влияют,
                 # иначе после поиска или отбора по программе на карте
                 # оставалась горстка клиентов.
-                map_source_records.append(item)
+                if not archive_mode:
+                    map_source_records.append(item)
                 search_fields = " ".join(
                     [
                         item["id"],
@@ -13750,6 +13761,8 @@ def create_app() -> FastAPI:
             clients_sort_direction=clients_sort_direction,
             clients_map_records=clients_map_records,
             client_ownership=filters["ownership"],
+            clients_archive_mode=archive_mode,
+            clients_archived_total=clients_archived_total,
             clients_map_filter=_clean_clients_map_filter(
                 (load_workspace_settings(wid) or {}).get("clients_map_filter")
             ),
@@ -14395,8 +14408,37 @@ def create_app() -> FastAPI:
             row = session.get(Counterparty, counterparty_id)
             if row and row.workspace_owner_id == wid:
                 if not _drop_counterparty_role(row, "client"):
-                    session.delete(row)
-        return RedirectResponse(url="/clients?msg=deleted#clients", status_code=302)
+                    # Клиент не стирается, а уходит в архив: оттуда его можно
+                    # восстановить кнопкой, вся история остаётся на месте.
+                    extra = _counterparty_extra(row)
+                    extra["archived_at"] = datetime.now(timezone.utc).isoformat()
+                    row.data = extra
+                    flag_modified(row, "data")
+        return RedirectResponse(
+            url="/clients?msg=" + quote("Клиент перемещён в архив") + "#clients",
+            status_code=302,
+        )
+
+    @app.post("/clients/{counterparty_id}/restore", name="clients_restore")
+    async def clients_restore(request: Request, counterparty_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/clients?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        with session_scope() as session:
+            row = session.get(Counterparty, counterparty_id)
+            if row and row.workspace_owner_id == wid:
+                extra = _counterparty_extra(row)
+                extra.pop("archived_at", None)
+                row.data = extra
+                flag_modified(row, "data")
+        return RedirectResponse(
+            url="/clients?archive=1&msg=" + quote("Клиент восстановлен") + "#clients",
+            status_code=302,
+        )
 
     @app.get("/api/clients/duplicates")
     def api_clients_duplicates(request: Request):

@@ -26,7 +26,7 @@
   <article class="products-list-panel clients-list-panel" data-workspace-view="clients" hidden>
     <header class="products-panel-head clients-panel-head">
       <div class="products-panel-titleline">
-        <h2>Клиенты</h2>
+        <h2>{{ 'Архив клиентов' if clients_archive_mode else 'Клиенты' }}</h2>
         <span>Всего: {{ clients_total }}</span>
       </div>
 
@@ -45,6 +45,11 @@
         <button type="button" class="btn btn-secondary" data-clients-locations-fill>
           <span>Определить локации</span>
         </button>
+        {% if clients_archive_mode %}
+          <a class="btn btn-secondary" href="{{ url_for('clients_get') }}#clients">← К клиентам</a>
+        {% else %}
+          <a class="btn btn-secondary" href="{{ url_for('clients_get') }}?archive=1#clients">Архив{% if clients_archived_total %} ({{ clients_archived_total }}){% endif %}</a>
+        {% endif %}
         <span class="clients-locations-status" data-clients-locations-status role="status"></span>
         <a
           class="btn btn-secondary"
@@ -73,6 +78,7 @@
         <input type="hidden" name="client_sort" value="{{ clients_sort_key }}" />
         <input type="hidden" name="client_sort_dir" value="{{ clients_sort_direction }}" />
         <input type="hidden" name="page_size" value="{{ clients_page_size }}" data-clients-page-size-value />
+        {% if clients_archive_mode %}<input type="hidden" name="archive" value="1" />{% endif %}
         <label class="products-catalog-search">
           <span>Поиск</span>
           <input name="q" value="{{ client_filters.q }}" placeholder="Клиент, телефон, ИНН, код" />
@@ -272,10 +278,17 @@
                     title="Редактировать {{ client.name }}"
                     aria-label="Редактировать {{ client.name }}"
                   >✎</a>
-                  <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}">
-                    {% include "_csrf_field.html" %}
-                    <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить {{ client.name }}" aria-label="Удалить {{ client.name }}">🗑</button>
-                  </form>
+                  {% if clients_archive_mode %}
+                    <form method="post" action="{{ url_for('clients_restore', counterparty_id=client.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <button class="btn btn-secondary clients-restore-btn" type="submit" title="Восстановить {{ client.name }}">Восстановить</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}" onsubmit="return confirm('Переместить клиента «{{ client.name }}» в архив? Его можно будет восстановить.')">
+                      {% include "_csrf_field.html" %}
+                      <button class="products-action-icon products-action-icon--delete" type="submit" title="В архив: {{ client.name }}" aria-label="В архив: {{ client.name }}">🗑</button>
+                    </form>
+                  {% endif %}
                 </div>
               </td>
             </tr>
