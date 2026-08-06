@@ -131,6 +131,12 @@ from upos.transactions_store import (
     get_pnl_data,
 )
 from PIL import Image
+from upos.clients_geocode import (
+    clients_without_location,
+    is_running as clients_geocode_running,
+    read_progress as clients_geocode_progress,
+    run_geocode as clients_run_geocode,
+)
 from upos.clients_import import import_clients, read_clients_file
 from upos.clopos_client import CloposError, test_clopos_connection
 from upos.greenwhite_client import GreenWhiteError
@@ -13820,6 +13826,44 @@ def create_app() -> FastAPI:
                 flag_modified(row, "data")
         except Exception:
             logger.exception("[upos] background geocode failed for %s", counterparty_id)
+
+    @app.get("/api/clients/locations/status")
+    def api_clients_locations_status(request: Request):
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        progress = clients_geocode_progress(wid)
+        return {
+            "ok": True,
+            "running": clients_geocode_running(wid),
+            "pending": len(clients_without_location(wid)),
+            "progress": progress,
+        }
+
+    @app.post("/api/clients/locations/fill")
+    def api_clients_locations_fill(request: Request, background_tasks: BackgroundTasks):
+        """Запускает определение координат по адресам клиентов."""
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        if clients_geocode_running(wid):
+            return JSONResponse(
+                {"error": "Определение локаций уже идёт"}, status_code=409
+            )
+        pending = clients_without_location(wid)
+        if not pending:
+            return {"ok": True, "pending": 0, "message": "У всех клиентов с адресом уже есть локация"}
+        background_tasks.add_task(clients_run_geocode, wid)
+        return {
+            "ok": True,
+            "pending": len(pending),
+            # Nominatim разрешает один адрес в секунду — сразу говорим, сколько ждать.
+            "estimated_minutes": max(1, round(len(pending) * 1.1 / 60)),
+        }
 
     @app.post("/clients/import", name="clients_import")
     async def clients_import(

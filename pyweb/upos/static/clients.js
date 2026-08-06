@@ -2526,6 +2526,100 @@
     restoreClientsMapFilter();
   }
 
+  // ── Определение локаций по адресам ──────────────────────────────────────
+  // Адреса разбирает OpenStreetMap, у него не больше одного обращения в
+  // секунду. Проход идёт в фоне, поэтому показываем, сколько сделано.
+
+  let locationsPollTimer = 0;
+
+  function setLocationsStatus(section, text) {
+    const node = section?.querySelector("[data-clients-locations-status]");
+    if (node) node.textContent = text || "";
+  }
+
+  function describeLocationsProgress(payload) {
+    const progress = payload?.progress || {};
+    if (payload?.running) {
+      const done = Number(progress.done || 0);
+      const total = Number(progress.total || 0);
+      const found = Number(progress.found || 0);
+      const left = Math.max(0, total - done);
+      const minutes = Math.max(1, Math.round((left * 1.1) / 60));
+      return `Определяю локации: ${done} из ${total}, найдено ${found}. Осталось около ${minutes} мин.`;
+    }
+    if (progress.status === "error") {
+      return `Определение локаций прервано: ${progress.error || "неизвестная причина"}`;
+    }
+    const pending = Number(payload?.pending || 0);
+    if (progress.status === "ok" && Number(progress.total || 0)) {
+      return `Готово: найдено ${Number(progress.found || 0)} из ${Number(progress.total || 0)}.`
+        + (pending ? ` Без локации осталось ${pending} — у них адрес не распознан.` : "");
+    }
+    if (!pending) return "У всех клиентов с адресом есть локация.";
+    return `Без локации: ${pending} клиентов с адресом.`;
+  }
+
+  async function pollLocationsStatus(section, { keep = false } = {}) {
+    try {
+      const payload = await fetch("/api/clients/locations/status", {
+        headers: { Accept: "application/json" },
+      }).then((response) => response.json());
+      setLocationsStatus(section, describeLocationsProgress(payload));
+      window.clearTimeout(locationsPollTimer);
+      if (payload?.running) {
+        locationsPollTimer = window.setTimeout(() => pollLocationsStatus(section, { keep: true }), 5000);
+      } else if (keep) {
+        // Проход закончился — обновляем карту, чтобы точки появились.
+        document.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      }
+    } catch (error) {
+      setLocationsStatus(section, "Не удалось узнать ход работы");
+    }
+  }
+
+  document.addEventListener("click", async (event) => {
+    const trigger = event.target.closest?.("[data-clients-locations-fill]");
+    if (!trigger) return;
+    event.preventDefault();
+    const section = trigger.closest("#clients-map") || document;
+    trigger.disabled = true;
+    setLocationsStatus(section, "Запускаю…");
+    try {
+      const response = await fetch("/api/clients/locations/fill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken(section) },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.error) {
+        setLocationsStatus(section, payload.error || "Не удалось запустить");
+      } else if (!payload.pending) {
+        setLocationsStatus(section, payload.message || "Определять нечего");
+      } else {
+        setLocationsStatus(
+          section,
+          `Запущено для ${payload.pending} клиентов. Займёт около ${payload.estimated_minutes} мин.`
+        );
+        pollLocationsStatus(section, { keep: true });
+      }
+    } catch (error) {
+      setLocationsStatus(section, "Не удалось запустить");
+    } finally {
+      trigger.disabled = false;
+    }
+  });
+
+  function initClientsLocations() {
+    const section = document.querySelector("#clients-map");
+    if (!section || !section.querySelector("[data-clients-locations-fill]")) return;
+    pollLocationsStatus(section);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initClientsLocations);
+  } else {
+    initClientsLocations();
+  }
+
   window.addEventListener("hashchange", () => {
     unpackClientsMapRows();
     showClientSection();
