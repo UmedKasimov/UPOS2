@@ -2434,19 +2434,27 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   width: 7.2rem !important;
   min-width: 7.2rem !important;
   max-width: 7.2rem !important;
-  /* Зазор-«воздух» между стенкой и таблицей — правая граница цветом подложки. */
-  border-right: 6px solid var(--background, #eef2f8) !important;
+  border-right: 0 !important;
   background: color-mix(in srgb, var(--muted-foreground) 8%, var(--card));
 }
 
-/* Чекбокс не закрепляем: sticky с ручным left наезжал на стенку и оставлял
-   пустой «родной» слот колонки. Стенке — тень-разделитель. */
-#products-catalog-table .products-history-col {
+/* Галочки объединены со стенкой в один закреплённый блок: без зазора,
+   встык за стенкой, тень-разделитель на правом краю блока. */
+#products-catalog-table .products-check-col {
+  position: sticky;
+  left: 7.2rem;
+  z-index: 3;
+  background: var(--card);
   box-shadow: 6px 0 8px -6px rgb(15 23 42 / 0.14);
 }
 
-#products-catalog-table thead .products-history-col {
+#products-catalog-table thead .products-history-col,
+#products-catalog-table thead .products-check-col {
   z-index: 5;
+}
+
+#products-catalog-table thead .products-check-col {
+  background: color-mix(in srgb, var(--muted) 34%, var(--card));
 }
 
 #products-catalog-table thead .products-history-col {
@@ -2468,9 +2476,12 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   z-index: 4;
 }
 
-/* Стенка «не меняется»: без перетаскивания и изменения ширины. */
+/* Закреплённый блок «не меняется»: без перетаскивания и изменения ширины.
+   Кнопка перетаскивания заодно закрывала галочку «Выбрать все». */
 #products-catalog-table .products-history-col .upos-table-header-drag-handle,
-#products-catalog-table .products-history-col .upos-table-column-resize-handle {
+#products-catalog-table .products-history-col .upos-table-column-resize-handle,
+#products-catalog-table .products-check-col .upos-table-header-drag-handle,
+#products-catalog-table .products-check-col .upos-table-column-resize-handle {
   display: none !important;
 }
 
