@@ -403,6 +403,21 @@
             {{ render_sales_journal_filter() }}
           {% endif %}
         </header>
+        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Типы документов журнала">
+          <span class="sales-document-tabs-title">Разделы журнала</span>
+          {% for tab in sales_options.document_tabs %}
+            <a
+              class="messenger-channel-tab sales-document-tab{% if tab.active %} active{% endif %}"
+              href="{{ tab.href }}"
+              data-channel-brand="{{ tab.brand }}"
+              {% if tab.current %}aria-current="page"{% endif %}
+            >
+              <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
+              <span class="messenger-channel-label">{{ tab.label }}</span>
+              <b>{{ tab.count }}</b>
+            </a>
+          {% endfor %}
+        </nav>
         <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
           <table class="products-table products-catalog-table sales-table sales-journal-table" id="sales-journal-table" data-upos-column-controls>
             <thead>

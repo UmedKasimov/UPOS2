@@ -9460,6 +9460,19 @@ def create_app() -> FastAPI:
             )
             sales_crm_index = _sales_crm_index(crm_rows_for_sales, crm_stages)
 
+            journal_archived_count = 0
+
+            def archive_tab_url() -> str:
+                pairs = [
+                    (key, value)
+                    for key, value in request.query_params.multi_items()
+                    if key not in {"doc_type", "journal_page", "view", "status"}
+                ]
+                pairs.append(("view", "journal"))
+                pairs.append(("status", "archived"))
+                query = urlencode(pairs, doseq=True)
+                return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
+
             def document_tab_url(tab_doc_type: str = "") -> str:
                 pairs = [
                     (key, value)
@@ -9515,6 +9528,8 @@ def create_app() -> FastAPI:
                 # Считаем до отбора по типу документа: вкладка «Заказы» должна
                 # показывать своё число даже когда открыта вкладка «Продажи».
                 journal_doc_type_counts["all"] += 1
+                if item["status"] == "archived":
+                    journal_archived_count += 1
                 if item["doc_type"] in journal_doc_type_counts:
                     journal_doc_type_counts[item["doc_type"]] += 1
                 if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
@@ -9562,6 +9577,16 @@ def create_app() -> FastAPI:
                     "href": document_tab_url("return"),
                     "active": "return" in selected_doc_types,
                     "current": selected_doc_types == ["return"],
+                },
+                {
+                    "value": "archived",
+                    "label": "Архивы",
+                    "logo": "АР",
+                    "brand": "archive",
+                    "count": journal_archived_count,
+                    "href": archive_tab_url(),
+                    "active": "archived" in (selected_statuses or []),
+                    "current": (selected_statuses or []) == ["archived"],
                 },
             ]
             sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)
