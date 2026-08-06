@@ -9463,39 +9463,31 @@ def create_app() -> FastAPI:
             journal_archived_count = 0
             journal_installment_count = 0
 
-            def payment_tab_url(payment_value: str) -> str:
+            # Разделы журнала взаимоисключающие: каждая вкладка сбрасывает
+            # условия остальных, иначе фильтры накапливались — «Рассрочки»
+            # вместе с «Архивом» давали пустой журнал с нулями во всех
+            # счётчиках.
+            _JOURNAL_TAB_RESET = {"doc_type", "status", "payment_status", "journal_page", "view"}
+
+            def _journal_tab_url(extra: list[tuple[str, str]]) -> str:
                 pairs = [
                     (key, value)
                     for key, value in request.query_params.multi_items()
-                    if key not in {"doc_type", "journal_page", "view", "payment_status"}
+                    if key not in _JOURNAL_TAB_RESET
                 ]
                 pairs.append(("view", "journal"))
-                pairs.append(("payment_status", payment_value))
+                pairs.extend(extra)
                 query = urlencode(pairs, doseq=True)
                 return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
+
+            def payment_tab_url(payment_value: str) -> str:
+                return _journal_tab_url([("payment_status", payment_value)])
 
             def archive_tab_url() -> str:
-                pairs = [
-                    (key, value)
-                    for key, value in request.query_params.multi_items()
-                    if key not in {"doc_type", "journal_page", "view", "status"}
-                ]
-                pairs.append(("view", "journal"))
-                pairs.append(("status", "archived"))
-                query = urlencode(pairs, doseq=True)
-                return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
+                return _journal_tab_url([("status", "archived")])
 
             def document_tab_url(tab_doc_type: str = "") -> str:
-                pairs = [
-                    (key, value)
-                    for key, value in request.query_params.multi_items()
-                    if key not in {"doc_type", "journal_page", "view"}
-                ]
-                pairs.append(("view", "journal"))
-                if tab_doc_type:
-                    pairs.append(("doc_type", tab_doc_type))
-                query = urlencode(pairs, doseq=True)
-                return f"{request.url.path}{f'?{query}' if query else ''}#sales-journal"
+                return _journal_tab_url([("doc_type", tab_doc_type)] if tab_doc_type else [])
 
             for row in rows:
                 item = _sales_document_data(row)
