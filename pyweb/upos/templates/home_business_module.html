@@ -96,6 +96,11 @@
 
     <section class="general-report-launcher workbench-launcher business-module-launcher" aria-label="Разделы {{ module.title }}" data-workspace-launcher>
       {% for item in module.launcher %}
+        {% if item.hidden %}
+          {# Невидимый реестр: карточки убраны с лончера, но контроллер
+             вкладок собирает meta только из data-workspace-card. #}
+          <span hidden data-workspace-card="{{ item.id }}" data-workspace-view-id="{{ item.view_id|default(item.id) }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}"></span>
+        {% else %}
         {# Карточка с href ведёт в другой модуль обычной ссылкой; остальные
            открывают вкладку внутри текущего. #}
         <a class="general-report-card" {% if item.href %}href="{{ item.href }}"{% else %}href="#{{ item.id }}" data-workspace-card="{{ item.id }}" data-workspace-view-id="{{ item.view_id|default(item.id) }}" data-workspace-tab-title="{{ item.title }}" data-workspace-tab-hash="{{ item.id }}"{% endif %}>
@@ -141,6 +146,7 @@
           <span>{{ item.title }}</span>
           <small>{{ item.subtitle }}</small>
         </a>
+        {% endif %}
       {% endfor %}
     </section>
 

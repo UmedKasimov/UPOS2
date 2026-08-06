@@ -3270,8 +3270,10 @@ def create_app() -> FastAPI:
                 "action": "+ Поставщик",
                 "launcher": [
                     {"id": "suppliers", "title": "Поставщики", "subtitle": "База контрагентов", "icon": "suppliers"},
-                    {"id": "purchases", "title": "Закупки", "subtitle": "Документы прихода", "icon": "purchase"},
-                    {"id": "payables", "title": "Кредиторка", "subtitle": "Балансы и оплаты", "icon": "balance"},
+                    # Карточки убраны с лончера, но остаются реестром вкладок:
+                    # без них контроллер не смог бы открыть сохранённые вкладки.
+                    {"id": "purchases", "title": "Закупки", "subtitle": "Документы прихода", "icon": "purchase", "hidden": True},
+                    {"id": "payables", "title": "Кредиторка", "subtitle": "Балансы и оплаты", "icon": "balance", "hidden": True},
                 ],
                 "filters": ["Поиск", "Статус", "Категория"],
                 "columns": ["Название", "Баланс", "Создал", "Дата создания", "Категория"],
