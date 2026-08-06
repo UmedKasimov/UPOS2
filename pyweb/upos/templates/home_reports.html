@@ -340,24 +340,20 @@
             </label>
           </form>
           <div class="reports-balance-total">
-            <span><b>{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
-            <select
-              class="reports-currency-select"
-              aria-label="Валюта отчёта"
-              onchange="const u = new URL(location.href); u.searchParams.set('currency', this.value); u.hash = 'report-profit'; location.assign(u.toString());"
-            >
-              <option value="USD" {% if report_currency == 'USD' %}selected{% endif %}>USD</option>
-              <option value="UZS" {% if report_currency == 'UZS' %}selected{% endif %}>UZS</option>
-            </select>
+            <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта" data-profit-currency-switch data-initial-currency="{{ report_currency }}">
+              <button type="button" data-profit-currency="UZS" {% if report_currency == 'UZS' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>UZS</button>
+              <button type="button" data-profit-currency="USD" {% if report_currency == 'USD' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>USD</button>
+            </div>
+            <span><b data-profit-money data-money-uzs="{{ profit_summary.net_uzs or 0 }}">{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
           </div>
         </header>
         <div class="reports-sales-kpis">
-          <article><span>Выручка</span><strong>{{ profit_summary.revenue or "0 UZS" }}</strong></article>
-          <article><span>Себестоимость</span><strong>{{ profit_summary.cost or "0 UZS" }}</strong></article>
-          <article class="is-profit"><span>Валовая прибыль</span><strong>{{ profit_summary.gross or "0 UZS" }}</strong></article>
-          <article><span>Прочие доходы</span><strong>{{ profit_summary.other_income or "0 UZS" }}</strong></article>
-          <article class="is-return"><span>Расходы</span><strong>{{ profit_summary.expenses or "0 UZS" }}</strong></article>
-          <article class="{{ 'is-debt' if profit_summary.net_negative else 'is-profit' }}"><span>Чистая прибыль</span><strong>{{ profit_summary.net or "0 UZS" }}</strong></article>
+          <article><span>Выручка</span><strong data-profit-money data-money-uzs="{{ profit_summary.revenue_uzs or 0 }}">{{ profit_summary.revenue or "0 UZS" }}</strong></article>
+          <article><span>Себестоимость</span><strong data-profit-money data-money-uzs="{{ profit_summary.cost_uzs or 0 }}">{{ profit_summary.cost or "0 UZS" }}</strong></article>
+          <article class="is-profit"><span>Валовая прибыль</span><strong data-profit-money data-money-uzs="{{ profit_summary.gross_uzs or 0 }}">{{ profit_summary.gross or "0 UZS" }}</strong></article>
+          <article><span>Прочие доходы</span><strong data-profit-money data-money-uzs="{{ profit_summary.other_income_uzs or 0 }}">{{ profit_summary.other_income or "0 UZS" }}</strong></article>
+          <article class="is-return"><span>Расходы</span><strong data-profit-money data-money-uzs="{{ profit_summary.expenses_uzs or 0 }}">{{ profit_summary.expenses or "0 UZS" }}</strong></article>
+          <article class="{{ 'is-debt' if profit_summary.net_negative else 'is-profit' }}"><span>Чистая прибыль</span><strong data-profit-money data-money-uzs="{{ profit_summary.net_uzs or 0 }}">{{ profit_summary.net or "0 UZS" }}</strong></article>
         </div>
         <div class="reports-analysis-grid">
           <article class="reports-flow">
@@ -365,7 +361,7 @@
             <div class="reports-category-list">
               {% for row in profit.expenses %}
                 <div class="reports-category-row">
-                  <div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong>{{ row.amount }}</strong></div>
+                  <div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong data-profit-money data-money-uzs="{{ row.amount_uzs or 0 }}">{{ row.amount }}</strong></div>
                   <div class="reports-category-meta"><div class="reports-bar-track"><span style="width: {{ row.bar_width }}%"></span></div></div>
                 </div>
               {% else %}
@@ -858,6 +854,21 @@
   function money(value, currency) {
     const amount = Number(value || 0);
     return `${numberFormatter.format(amount)} ${currency || 'UZS'}`;
+  }
+
+  let profitCurrency = document.querySelector('[data-profit-currency-switch]')?.getAttribute('data-initial-currency') === 'UZS' ? 'UZS' : 'USD';
+
+  function renderProfitCurrency() {
+    document.querySelectorAll('[data-profit-money]').forEach((node) => {
+      const amountUzs = Number(node.getAttribute('data-money-uzs') || 0);
+      const amount = profitCurrency === 'USD' ? amountUzs / stockUsdRate : amountUzs;
+      node.textContent = `${numberFormatter.format(amount)} ${profitCurrency}`;
+    });
+    document.querySelectorAll('[data-profit-currency]').forEach((button) => {
+      const active = button.getAttribute('data-profit-currency') === profitCurrency;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
   }
 
   function renderStockCurrency() {
@@ -1714,6 +1725,12 @@
     if (currencyButton) {
       stockCurrency = currencyButton.getAttribute('data-stock-currency') === 'USD' ? 'USD' : 'UZS';
       renderStockCurrency();
+      return;
+    }
+    const profitCurrencyButton = event.target.closest('[data-profit-currency]');
+    if (profitCurrencyButton) {
+      profitCurrency = profitCurrencyButton.getAttribute('data-profit-currency') === 'USD' ? 'USD' : 'UZS';
+      renderProfitCurrency();
       return;
     }
     const sortButton = event.target.closest('[data-report-sort-column]');

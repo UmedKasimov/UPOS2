@@ -19124,15 +19124,33 @@ def create_app() -> FastAPI:
                 # документам и здесь противоречила бы собственным KPI отчёта.
                 gross_profit_total = net_sales_total - cost_total
                 net_profit_total = gross_profit_total + other_income_primary - expenses_primary
+                def profit_to_uzs(value: Decimal) -> str:
+                    """Сумма в сумах — от неё страница мгновенно пересчитывает
+                    доллары тем же переключателем, что и анализ остатков."""
+                    return _decimal_plain_text(
+                        _convert_product_currency(value, primary_currency, "UZS", report_rate)
+                    )
+
+                for profit_row in profit_expense_rows:
+                    profit_row["amount_uzs"] = profit_to_uzs(profit_row.get("amount_primary") or Decimal("0"))
+                for profit_row in profit_other_income_rows:
+                    profit_row["amount_uzs"] = profit_to_uzs(profit_row.get("amount_primary") or Decimal("0"))
+
                 business_reports["profit"] = {
                     "summary": {
                         "period": report_data["period_label"],
                         "revenue": _report_money(net_sales_total, primary_currency),
+                        "revenue_uzs": profit_to_uzs(net_sales_total),
                         "cost": _report_money(cost_total, primary_currency),
+                        "cost_uzs": profit_to_uzs(cost_total),
                         "gross": _report_money(gross_profit_total, primary_currency),
+                        "gross_uzs": profit_to_uzs(gross_profit_total),
                         "other_income": _report_money(other_income_primary, primary_currency),
+                        "other_income_uzs": profit_to_uzs(other_income_primary),
                         "expenses": _report_money(expenses_primary, primary_currency),
+                        "expenses_uzs": profit_to_uzs(expenses_primary),
                         "net": _report_money(net_profit_total, primary_currency),
+                        "net_uzs": profit_to_uzs(net_profit_total),
                         "net_negative": net_profit_total < 0,
                         "expense_count": len(profit_expense_rows),
                     },
