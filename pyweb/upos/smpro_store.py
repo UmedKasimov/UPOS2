@@ -216,6 +216,47 @@ def _sync_ibox_price_types(
     save_workspace_settings(workspace_owner_id, settings)
 
 
+# Поля, по которым запись узнаётся, даже если своего номера у неё нет.
+# Меняться они не должны: суммы, статусы и остатки сюда не входят.
+IDENTITY_KEYS = (
+    "_ibox_filial_id",
+    "filial_id",
+    "date",
+    "created_at",
+    "document_date",
+    "name",
+    "title",
+    "product_id",
+    "price_type_id",
+    "warehouse_id",
+    "cashbox_id",
+    "user_id",
+    "client_id",
+    "counterparty_id",
+)
+
+
+def _identity_key(item: dict[str, Any], entity_type: str) -> str:
+    """Устойчивый ключ для записи без собственного номера.
+
+    Раньше в таких случаях брался хеш всего содержимого: iBox менял любое
+    поле — статус, сумму, пересчитанный остаток — и та же самая запись
+    приходила как новая, создавая дубликат. Теперь ключ считается только по
+    полям, которые запись опознают и сами по себе не меняются.
+    """
+    parts: list[str] = []
+    for key in IDENTITY_KEYS:
+        value = _walk(item, key)
+        if value in (None, "") or isinstance(value, (dict, list)):
+            continue
+        parts.append(f"{key}={str(value).strip()}")
+    if parts:
+        digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+        return f"{entity_type}:key:{digest}"[:180]
+    # Опознать нечем — остаётся прежнее поведение как последняя мера.
+    return f"{entity_type}:{_payload_hash(item)}"[:180]
+
+
 def _external_id(item: dict[str, Any], entity_type: str) -> str:
     value = _walk(
         item,
@@ -232,7 +273,7 @@ def _external_id(item: dict[str, Any], entity_type: str) -> str:
     )
     if value not in (None, "") and not isinstance(value, (dict, list)):
         return str(value).strip()[:180]
-    return f"{entity_type}:{_payload_hash(item)}"[:180]
+    return _identity_key(item, entity_type)
 
 
 def _money(item: dict[str, Any]) -> Decimal:
@@ -1473,6 +1514,51 @@ def _finish_run(
         run.data = data or {}
 
 
+def _migrate_legacy_external_id(
+    session,
+    workspace_owner_id: str,
+    entity_type: str,
+    payload: dict[str, Any],
+    new_external_id: str,
+) -> None:
+    """Переводит уже перенесённую запись на устойчивый ключ.
+
+    Записи без собственного номера раньше опознавались по хешу всего
+    содержимого. Смена правила сама по себе создала бы дубликат: старая
+    строка осталась бы под прежним ключом, а рядом появилась бы новая.
+    Поэтому строку со старым ключом переименовываем, а не заводим вторую.
+    """
+    if ":key:" not in new_external_id:
+        return
+    legacy_id = f"{entity_type}:{_payload_hash(payload)}"[:180]
+    if legacy_id == new_external_id:
+        return
+    row = session.execute(
+        select(ExternalRecord).where(
+            ExternalRecord.workspace_owner_id == workspace_owner_id,
+            ExternalRecord.integration == INTEGRATION,
+            ExternalRecord.entity_type == entity_type,
+            ExternalRecord.external_id == legacy_id,
+        )
+    ).scalars().first()
+    if row is None:
+        return
+    already = session.execute(
+        select(ExternalRecord.id).where(
+            ExternalRecord.workspace_owner_id == workspace_owner_id,
+            ExternalRecord.integration == INTEGRATION,
+            ExternalRecord.entity_type == entity_type,
+            ExternalRecord.external_id == new_external_id,
+        )
+    ).first()
+    if already is not None:
+        # Новый ключ уже занят — старую строку убираем, чтобы не осталось двух.
+        session.delete(row)
+        return
+    row.external_id = new_external_id
+    session.flush()
+
+
 def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, Any]]]) -> int:
     total = 0
     settings = load_workspace_settings(workspace_owner_id)
@@ -1502,6 +1588,7 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
                 payload = _json_copy(raw_item)
                 ext_id = _external_id(payload, entity_type)
                 digest = _payload_hash(payload)
+                _migrate_legacy_external_id(session, workspace_owner_id, entity_type, payload, ext_id)
                 stmt = insert(ExternalRecord).values(
                     id=str(uuid.uuid4()),
                     workspace_owner_id=workspace_owner_id,
