@@ -454,10 +454,6 @@
                   <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Переводы</span><span class="tg-rule-chevron">⌄</span></button>
                   <div class="tg-rule-body" hidden></div>
                 </div>
-                <div class="tg-rule" data-tg-route-key="hr_attendance">
-                  <button type="button" class="tg-rule-head" data-tg-route-toggle><span>Табель</span><span class="tg-rule-chevron">⌄</span></button>
-                  <div class="tg-rule-body" hidden></div>
-                </div>
               </div>
               <div class="tg-rules-panel" data-tg-rules-panel="reports" hidden>
                 <div class="tg-report-note">
@@ -592,6 +588,6 @@
   <script src="{{ url_for('static', path='settings-page.js') }}?v=26" defer></script>
   {% if settings_default_tab | default('general') == 'telegram' %}
     <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=114" />
-    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=22" defer></script>
+    <script src="{{ url_for('static', path='telegram-settings.js') }}?v=23" defer></script>
   {% endif %}
 {% endblock %}

@@ -174,7 +174,7 @@
                 <span class="nav-label">Продажи</span>
               </a>
               {% endif %}
-              {% set home_nav_active = active in ['home_finance', 'home_account', 'home_kassa', 'home_adjustments', 'home_hr'] %}
+              {% set home_nav_active = active in ['home_finance', 'home_account', 'home_kassa', 'home_adjustments'] %}
               {% if emp_can or emp_perms.get('finance') %}
               <a href="{{ url_for('home_finance') }}" class="nav-link {{ 'active' if home_nav_active else '' }}">
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>

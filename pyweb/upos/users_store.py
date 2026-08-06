@@ -54,7 +54,6 @@ ROLE_PERMISSION_KEYS = (
     "reports",
     "adjustments",
     "shipments",
-    "hr",
     "employees",
     "settings",
     "dictionary",
@@ -94,7 +93,6 @@ ROLE_PERMISSION_LABELS = {
     "reports": "Отчёты",
     "adjustments": "Корректировки",
     "shipments": "Отгрузки",
-    "hr": "HR",
     "employees": "Сотрудники",
     "settings": "Настройки",
     "dictionary": "Справочники",
@@ -197,17 +195,6 @@ ROLE_BUTTON_PERMISSION_LABELS = {
         "templates": "Шаблоны",
         "open": "Открыть документ",
     },
-    "hr": {
-        "create": "Добавить сотрудника",
-        "edit": "Редактировать сотрудника",
-        "dismiss": "Уволить",
-        "restore": "Восстановить",
-        "delete": "Удалить",
-        "attendance": "Табель",
-        "attendance_report": "Отчёт табеля",
-        "salary_act": "Акт зарплаты",
-        "salary_adjustment": "Корректировка зарплаты",
-    },
     "employees": {
         "create": "Добавить сотрудника",
         "edit": "Редактировать сотрудника",
@@ -260,7 +247,6 @@ DEFAULT_EMPLOYEE_ROLES = (
             "reports": False,
             "adjustments": False,
             "shipments": False,
-            "hr": True,
             "employees": True,
             "settings": True,
             "dictionary": True,
@@ -285,7 +271,6 @@ DEFAULT_EMPLOYEE_ROLES = (
             "reports": True,
             "adjustments": True,
             "shipments": True,
-            "hr": False,
             "employees": False,
             "settings": False,
             "dictionary": True,
@@ -310,7 +295,6 @@ DEFAULT_EMPLOYEE_ROLES = (
             "reports": False,
             "adjustments": False,
             "shipments": True,
-            "hr": False,
             "employees": False,
             "settings": False,
             "dictionary": False,
@@ -335,7 +319,6 @@ DEFAULT_EMPLOYEE_ROLES = (
             "reports": False,
             "adjustments": False,
             "shipments": False,
-            "hr": False,
             "employees": False,
             "settings": False,
             "dictionary": False,
@@ -384,8 +367,6 @@ def normalize_role_permissions(raw: dict[str, Any] | None) -> dict[str, Any]:
     }
     if "shipments" not in src:
         out["shipments"] = bool(src.get("kassa") or src.get("reports"))
-    if "hr" not in src:
-        out["hr"] = bool(src.get("employees"))
     raw_button_access = src.get("button_access")
     button_access_src = raw_button_access if isinstance(raw_button_access, dict) else {}
     button_access: dict[str, dict[str, bool]] = {}

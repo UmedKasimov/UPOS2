@@ -245,19 +245,13 @@ from upos.shipments_store import (
     delete_delivery_shipment,
     delete_delivery_shipment_document,
     delete_position,
-    delete_hr_employee_permanently,
-    dismiss_hr_employee,
     list_courier_debts,
     list_delivery_shipments,
     list_hr_employees,
     list_positions,
     recompute_delivery_debts,
-    restore_hr_employee,
-    set_hr_attendance,
-    set_hr_attendance_day,
     shipment_totals,
     update_delivery_shipment_document,
-    update_hr_employee,
     update_position,
 )
 from upos.users_store import (
@@ -649,8 +643,6 @@ def safe_internal_path(raw: str | None, default: str = "/") -> str:
         return p
     if path_only == "/shipments" or path_only.startswith("/shipments/"):
         return p
-    if path_only == "/hr" or path_only.startswith("/hr/"):
-        return p
     if path_only == "/admin" or path_only.startswith("/admin/"):
         return p
     if path_only == "/installer":
@@ -676,7 +668,6 @@ def _admin_post_login_path(target: str) -> str:
         or path_only == "/kassa"
         or path_only == "/reports"
         or path_only == "/shipments"
-        or path_only == "/hr"
         or path_only == "/organizations"
         or path_only == "/settings"
         or path_only.startswith("/organizations/")
@@ -832,8 +823,6 @@ def create_app() -> FastAPI:
                 out[key] = True
         if "shipments" not in src:
             out["shipments"] = bool(src.get("kassa") or src.get("reports"))
-        if "hr" not in src:
-            out["hr"] = bool(src.get("employees"))
         return out
 
     # Тяжёлые части прав (кнопки, категории) больше не хранятся в cookie-сессии
@@ -1022,8 +1011,6 @@ def create_app() -> FastAPI:
             return "/adjustments"
         if _has_permission(user, "shipments"):
             return "/shipments"
-        if _has_permission(user, "hr"):
-            return "/hr"
         if _has_permission(user, "employees"):
             return "/settings?tab=employees"
         if _has_permission(user, "dictionary"):
@@ -1048,8 +1035,6 @@ def create_app() -> FastAPI:
             return ("adjustments",)
         if path == "/shipments" or path.startswith("/shipments/"):
             return ("shipments",)
-        if path == "/hr" or path.startswith("/hr/"):
-            return ("hr",)
         if path == "/employees" or path.startswith("/employees/"):
             return ("employees",)
         if path == "/earnings" or path.startswith("/earnings/") or path.startswith("/api/earnings"):
@@ -1059,7 +1044,8 @@ def create_app() -> FastAPI:
         if path.startswith("/api/employees"):
             return ("employees",)
         if path.startswith("/api/hr"):
-            return ("hr",)
+            # Список зарплат остался ради кассы: расход «зарплата».
+            return ("kassa",)
         if path.startswith("/api/adjustments"):
             return ("adjustments",)
         if path.startswith("/api/categories"):
@@ -1118,24 +1104,6 @@ def create_app() -> FastAPI:
             return ("shipments", "confirm")
         if "/shipments/shipment/" in clean and clean.endswith("/delete"):
             return ("shipments", "delete")
-        if "/hr/employees/create" in clean:
-            return ("hr", "create")
-        if "/hr/employees/update" in clean:
-            return ("hr", "edit")
-        if "/hr/employees/" in clean and clean.endswith("/dismiss"):
-            return ("hr", "dismiss")
-        if "/hr/employees/" in clean and clean.endswith("/restore"):
-            return ("hr", "restore")
-        if "/hr/employees/" in clean and clean.endswith("/delete"):
-            return ("hr", "delete")
-        if clean.endswith("/hr/attendance/report"):
-            return ("hr", "attendance_report")
-        if clean.endswith("/hr/attendance"):
-            return ("hr", "attendance")
-        if clean.endswith("/hr/salary-act/save"):
-            return ("hr", "salary_act")
-        if clean.endswith("/hr/salary-adjustment/save"):
-            return ("hr", "salary_adjustment")
         if clean == "/employees/create":
             return ("employees", "create")
         if clean == "/employees/update":
@@ -19630,6 +19598,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert oid is not None
+        _sync_program_employees_to_hr(oid)
         raw = json.dumps(_adjustments_payload(oid), ensure_ascii=False).replace("</", "<\\/")
         return tpl(
             request,
@@ -20739,288 +20708,6 @@ def create_app() -> FastAPI:
         url = _shipment_return_url("/organizations/shipments", str(org["id"]), msg=msg)
         return RedirectResponse(url=f"{url}#shipment-{quote(str(shipment_id or '').strip())}", status_code=302)
 
-    @app.get("/organizations/hr", response_class=HTMLResponse, name="organizations_hr_get")
-    def organizations_hr_get(request: Request):
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        u = _refresh_org_session(request, org_scope="general")
-        active_org_id = _employee_active_org_id(owner_id, u)
-        selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d"))[:10]
-        return tpl(
-            request,
-            "home_organizations_hr.html",
-            variant="user",
-            active="organizations_hr",
-            employees=_hr_employees_with_adjustments(active_org_id, selected_date),
-            positions=list_positions(active_org_id),
-            selected_organization_id=active_org_id,
-            selected_date=selected_date,
-            flash_ok=request.query_params.get("msg"),
-            flash_err=request.query_params.get("error"),
-        )
-
-    @app.get("/organizations/hr/salary-act/{employee_id}", response_class=HTMLResponse, name="organizations_hr_salary_act_detail")
-    def organizations_hr_salary_act_detail(request: Request, employee_id: str):
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        u = _refresh_org_session(request, org_scope="general")
-        active_org_id = _employee_active_org_id(owner_id, u)
-        selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d"))[:10]
-        try:
-            act = _salary_employee_act_payload(active_org_id, selected_date, employee_id)
-        except ValueError as exc:
-            raise StarletteHTTPException(status_code=404, detail=str(exc)) from exc
-        return tpl(
-            request,
-            "home_hr_salary_act_detail.html",
-            variant="user",
-            active="organizations_hr",
-            inside_organization=False,
-            selected_organization_id=active_org_id,
-            selected_date=selected_date,
-            act=act,
-        )
-
-    async def _save_hr_photo(owner_id: str, photo: UploadFile | None) -> str:
-        if photo is None or not str(photo.filename or "").strip():
-            return ""
-        content = await photo.read()
-        if not content:
-            return ""
-        img = Image.open(io.BytesIO(content))
-        w, h = img.size
-        sz = min(w, h)
-        img = img.crop(((w - sz) // 2, (h - sz) // 2, (w + sz) // 2, (h + sz) // 2))
-        img = img.resize((500, 500), Image.Resampling.LANCZOS)
-        rel_dir = "hr-photos"
-        out_dir = BASE_DIR / "static" / rel_dir
-        out_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{owner_id}_{uuid.uuid4().hex[:10]}.png"
-        rel_path = f"{rel_dir}/{filename}"
-        img.save(BASE_DIR / "static" / rel_path, "PNG")
-        return rel_path
-
-    @app.post("/organizations/hr/employees/create", name="organizations_hr_employee_create")
-    async def organizations_hr_employee_create(
-        request: Request,
-        csrf_token: str = Form(default=""),
-        first_name: str = Form(default=""),
-        last_name: str = Form(default=""),
-        position_id: str = Form(default=""),
-        position: str = Form(default=""),
-        passport_series: str = Form(default=""),
-        passport_number: str = Form(default=""),
-        monthly_salary: str = Form(default="0"),
-        is_courier: str = Form(default=""),
-        hired_at: str = Form(default=""),
-        photo: UploadFile | None = File(default=None),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        try:
-            photo_path = await _save_hr_photo(active_org_id, photo)
-            create_hr_employee(
-                active_org_id,
-                {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "position_id": position_id,
-                    "position": position,
-                    "passport_series": passport_series,
-                    "passport_number": passport_number,
-                    "monthly_salary": monthly_salary,
-                    "is_courier": is_courier,
-                    "hired_at": hired_at,
-                    "photo_path": photo_path,
-                },
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/organizations/hr?error={quote(str(exc) or 'hr')}", status_code=302)
-        except Exception as exc:
-            logger.exception("[upos] HR employee create failed")
-            return RedirectResponse(url=f"/organizations/hr?error={quote(type(exc).__name__)}", status_code=302)
-        return RedirectResponse(url="/organizations/hr?msg=employee_created", status_code=302)
-
-    @app.post("/organizations/hr/employees/update", name="organizations_hr_employee_update")
-    async def organizations_hr_employee_update(
-        request: Request,
-        csrf_token: str = Form(default=""),
-        employee_id: str = Form(default=""),
-        first_name: str = Form(default=""),
-        last_name: str = Form(default=""),
-        position_id: str = Form(default=""),
-        position: str = Form(default=""),
-        passport_series: str = Form(default=""),
-        passport_number: str = Form(default=""),
-        monthly_salary: str = Form(default="0"),
-        is_courier: str = Form(default=""),
-        hired_at: str = Form(default=""),
-        photo: UploadFile | None = File(default=None),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        try:
-            photo_path = await _save_hr_photo(active_org_id, photo)
-            updated = update_hr_employee(
-                active_org_id,
-                employee_id,
-                {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "position_id": position_id,
-                    "position": position,
-                    "passport_series": passport_series,
-                    "passport_number": passport_number,
-                    "monthly_salary": monthly_salary,
-                    "is_courier": is_courier,
-                    "hired_at": hired_at,
-                    "photo_path": photo_path,
-                },
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/organizations/hr?error={quote(str(exc) or 'hr')}", status_code=302)
-        except Exception as exc:
-            logger.exception("[upos] HR employee update failed")
-            return RedirectResponse(url=f"/organizations/hr?error={quote(type(exc).__name__)}", status_code=302)
-        return RedirectResponse(
-            url=f"/organizations/hr?msg={'employee_updated' if updated else 'not_found'}",
-            status_code=302,
-        )
-
-    @app.post("/organizations/hr/employees/{employee_id}/dismiss", name="organizations_hr_employee_dismiss")
-    def organizations_hr_employee_dismiss(
-        request: Request,
-        employee_id: str,
-        csrf_token: str = Form(default=""),
-        dismissed_at: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        ok = dismiss_hr_employee(active_org_id, employee_id, dismissed_at)
-        return RedirectResponse(url=f"/organizations/hr?msg={'employee_dismissed' if ok else 'not_found'}", status_code=302)
-
-    @app.post("/organizations/hr/employees/{employee_id}/restore", name="organizations_hr_employee_restore")
-    def organizations_hr_employee_restore(
-        request: Request,
-        employee_id: str,
-        csrf_token: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf#staff", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        ok = restore_hr_employee(active_org_id, employee_id)
-        return RedirectResponse(url=f"/organizations/hr?msg={'employee_restored' if ok else 'not_found'}#staff", status_code=302)
-
-    @app.post("/organizations/hr/employees/{employee_id}/delete", name="organizations_hr_employee_delete")
-    def organizations_hr_employee_delete(
-        request: Request,
-        employee_id: str,
-        csrf_token: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf#staff", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        ok = delete_hr_employee_permanently(active_org_id, employee_id)
-        if ok:
-            _purge_hr_salary_records(active_org_id, employee_id)
-        return RedirectResponse(url=f"/organizations/hr?msg={'employee_deleted' if ok else 'not_found'}#staff", status_code=302)
-
-    @app.post("/organizations/hr/attendance", name="organizations_hr_attendance")
-    def organizations_hr_attendance(
-        request: Request,
-        csrf_token: str = Form(default=""),
-        employee_id: str = Form(default=""),
-        work_date: str = Form(default=""),
-        status: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        try:
-            ok = set_hr_attendance(active_org_id, employee_id, work_date, status)
-        except ValueError as exc:
-            return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&error={quote(str(exc))}", status_code=302)
-        return RedirectResponse(
-            url=f"/organizations/hr?date={quote(work_date)}&msg={'attendance_saved' if ok else 'not_found'}",
-            status_code=302,
-        )
-
-    def _hr_attendance_records_from_form(form) -> list[dict[str, Any]]:
-        records: list[dict[str, Any]] = []
-        for employee_id in form.getlist("employee_id"):
-            eid = str(employee_id or "").strip()
-            if not eid:
-                continue
-            records.append(
-                {
-                    "employee_id": eid,
-                    "status": str(form.get(f"status_{eid}") or "absent").strip(),
-                    "note": str(form.get(f"note_{eid}") or "").strip(),
-                }
-            )
-        return records
-
-    @app.post("/organizations/hr/attendance/report", name="organizations_hr_attendance_report")
-    async def organizations_hr_attendance_report(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        work_date = str(form.get("work_date") or "").strip()
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf#calendar", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        try:
-            report = set_hr_attendance_day(active_org_id, work_date, _hr_attendance_records_from_form(form))
-        except ValueError as exc:
-            return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&error={quote(str(exc))}#calendar", status_code=302)
-        telegram_status = "attendance_report_saved"
-        try:
-            from upos.telegram_notifier import send_hr_attendance_report
-
-            tg = send_hr_attendance_report(active_org_id, report)
-            if tg.get("ok"):
-                telegram_status = "attendance_report_sent"
-            elif tg.get("error"):
-                telegram_status = f"telegram_{tg.get('error')}"
-        except Exception:
-            logger.exception("[upos] HR attendance Telegram report failed")
-            telegram_status = "telegram_failed"
-        return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&msg={quote(telegram_status)}#calendar", status_code=302)
-
     def _hr_money(raw: Any) -> Decimal:
         text_raw = str(raw or "0").strip()
         text_raw = text_raw.replace("\u00a0", "").replace("\u202f", "").replace(" ", "").replace("'", "")
@@ -21064,49 +20751,6 @@ def create_app() -> FastAPI:
         path = _hr_salary_adjustments_path(workspace_owner_id)
         path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def _purge_hr_salary_records(workspace_owner_id: str, employee_id: str) -> None:
-        clean_employee_id = str(employee_id or "").strip()
-        if not clean_employee_id:
-            return
-        rows = _load_hr_salary_adjustments(workspace_owner_id)
-        filtered_rows = [row for row in rows if str(row.get("employee_id") or "").strip() != clean_employee_id]
-        if len(filtered_rows) != len(rows):
-            _save_hr_salary_adjustments(workspace_owner_id, filtered_rows)
-
-        workspace_dir = CLIENT_WORKSPACES_DIR / workspace_owner_id
-        path = workspace_dir / "hr_salary_acts.json"
-        if not path.exists():
-            return
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return
-        if not isinstance(raw, list):
-            return
-        changed = False
-        cleaned_acts: list[dict[str, Any]] = []
-        for act in raw:
-            if not isinstance(act, dict):
-                cleaned_acts.append(act)
-                continue
-            employees = act.get("employees")
-            if not isinstance(employees, list):
-                cleaned_acts.append(act)
-                continue
-            kept = [
-                emp
-                for emp in employees
-                if not isinstance(emp, dict) or str(emp.get("id") or "").strip() != clean_employee_id
-            ]
-            if len(kept) != len(employees):
-                changed = True
-            if kept:
-                cleaned_acts.append({**act, "employees": kept})
-            else:
-                changed = True
-        if changed:
-            path.write_text(json.dumps(cleaned_acts, ensure_ascii=False, indent=2), encoding="utf-8")
-
     def _month_prefix_from_date(raw: str) -> str:
         value = str(raw or "")[:10]
         return value[:7] if len(value) >= 7 else datetime.now().strftime("%Y-%m")
@@ -21133,38 +20777,6 @@ def create_app() -> FastAPI:
             "Декабрь",
         ]
         return f"{names[dt.month]} {dt.year}"
-
-    def _salary_period_month_ranges(date_from: str, date_to: str) -> list[dict[str, str]]:
-        start = _salary_clean_date(date_from) or _salary_month_labels(date_from)[0]
-        end = _salary_clean_date(date_to) or start
-        if end < start:
-            start, end = end, start
-        try:
-            cursor = datetime.strptime(start, "%Y-%m-%d").replace(day=1)
-            last = datetime.strptime(end, "%Y-%m-%d").replace(day=1)
-        except ValueError:
-            return []
-        rows: list[dict[str, str]] = []
-        while cursor <= last:
-            first = f"{cursor.year:04d}-{cursor.month:02d}-01"
-            last_day = calendar.monthrange(cursor.year, cursor.month)[1]
-            month_end = f"{cursor.year:04d}-{cursor.month:02d}-{last_day:02d}"
-            rows.append(
-                {
-                    "month_key": f"{cursor.year:04d}-{cursor.month:02d}",
-                    "month_label": _salary_month_label(first),
-                    "date_from": max(start, first),
-                    "date_to": min(end, month_end),
-                    "month_date": first,
-                }
-            )
-            next_month = cursor.month + 1
-            next_year = cursor.year
-            if next_month > 12:
-                next_month = 1
-                next_year += 1
-            cursor = cursor.replace(year=next_year, month=next_month, day=1)
-        return rows
 
     def _apply_hr_salary_adjustments(
         workspace_owner_id: str,
@@ -21287,57 +20899,6 @@ def create_app() -> FastAPI:
             emp["salary_due_label"] = _hr_amount_label(base_due)
         return employees
 
-    def _salary_employee_base_month_rows(
-        workspace_owner_id: str,
-        employee_id: str,
-        date_from: str,
-        date_to: str,
-    ) -> list[dict[str, Any]]:
-        clean_employee_id = str(employee_id or "").strip()
-        rows: list[dict[str, Any]] = []
-        for month in _salary_period_month_ranges(date_from, date_to):
-            month_date = month.get("month_date") or month.get("date_from") or date_from
-            employees = list_hr_employees(workspace_owner_id, month_date)
-            employee = next((emp for emp in employees if str(emp.get("id") or "") == clean_employee_id), None)
-            if employee is None:
-                continue
-            month_from = str(month.get("date_from") or date_from)
-            month_to = str(month.get("date_to") or date_to)
-            attendance = {
-                str(day): status
-                for day, status in (employee.get("attendance") or {}).items()
-                if month_from <= str(day) <= month_to
-            }
-            present_days = sum(1 for status in attendance.values() if status == "present")
-            absent_days = sum(1 for status in attendance.values() if status == "absent")
-            salary = _hr_money(employee.get("monthly_salary"))
-            base_due = Decimal("0.00")
-            try:
-                dt = datetime.strptime(month_date, "%Y-%m-%d")
-                days_in_month = calendar.monthrange(dt.year, dt.month)[1]
-            except ValueError:
-                days_in_month = 0
-            if days_in_month > 0 and present_days > 0:
-                base_due = (salary / Decimal(days_in_month) * Decimal(present_days)).quantize(Decimal("0.01"))
-            if not present_days and not absent_days and base_due <= 0:
-                continue
-            rows.append(
-                {
-                    "type": "base",
-                    "type_label": "Зарплата по табелю",
-                    "amount": _hr_amount_out(base_due),
-                    "amount_label": _hr_amount_label(base_due),
-                    "date_from": month_from,
-                    "date_to": month_to,
-                    "month_key": str(month.get("month_key") or month_from[:7]),
-                    "month_label": str(month.get("month_label") or _salary_month_label(month_from)),
-                    "present_days": present_days,
-                    "absent_days": absent_days,
-                    "monthly_salary_label": _hr_amount_label(salary),
-                }
-            )
-        return rows
-
     def _salary_employee_payments(
         workspace_owner_id: str,
         selected_date: str,
@@ -21427,100 +20988,6 @@ def create_app() -> FastAPI:
             category_filter = or_(category_filter, Transaction.category_id.in_(salary_category_ids))
         return category_filter
 
-    def _salary_employee_payment_rows(
-        workspace_owner_id: str,
-        selected_date: str,
-        employee_id: str,
-        date_from: Any = None,
-        date_to: Any = None,
-    ) -> list[dict[str, Any]]:
-        settings = load_workspace_settings(workspace_owner_id)
-        tz_name = normalize_workspace_timezone(str(settings.get("timezone") or ""))
-        date_from, date_to = _salary_period_labels(selected_date, date_from, date_to)
-        start_utc, end_utc, *_ = period_local_bounds_utc(
-            tz_name,
-            preset="custom",
-            date_from=date_from,
-            date_to=date_to,
-        )
-        employee_expr = Transaction.data.op("->>")("hr_employee_id")
-        category_filter = _salary_category_filter(workspace_owner_id)
-        with session_scope() as session:
-            stmt = select(Transaction).where(
-                Transaction.workspace_owner_id == workspace_owner_id,
-                Transaction.type == "expense",
-                Transaction.status == "confirmed",
-                category_filter,
-                employee_expr == str(employee_id or "").strip(),
-            )
-            if start_utc is not None:
-                stmt = stmt.where(Transaction.created_at >= start_utc)
-            if end_utc is not None:
-                stmt = stmt.where(Transaction.created_at < end_utc)
-            rows = session.execute(stmt.order_by(Transaction.created_at.desc())).scalars().all()
-        account_names = _hr_account_name_map(workspace_owner_id)
-        out: list[dict[str, Any]] = []
-        for tx in rows:
-            account_id = str(tx.from_account_id or tx.from_pocket_id or "").strip()
-            created = tx.created_at
-            if created and created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
-            local_created = created.astimezone(ZoneInfo(tz_name)) if created else None
-            created_label = local_created.strftime("%d.%m.%Y %H:%M") if local_created else ""
-            created_date = local_created.strftime("%Y-%m-%d") if local_created else str(selected_date or "")[:10]
-            out.append(
-                {
-                    "number": tx.number,
-                    "created_label": created_label,
-                    "month_key": created_date[:7],
-                    "month_label": _salary_month_label(created_date),
-                    "amount": _hr_amount_out(tx.amount),
-                    "amount_label": _hr_amount_label(tx.amount),
-                    "currency": str(tx.currency or "UZS").upper(),
-                    "account": account_names.get(account_id, account_id[:8] if account_id else "—"),
-                    "note": tx.note or "",
-                }
-            )
-        return out
-
-    def _salary_employee_act_payload(
-        workspace_owner_id: str,
-        selected_date: str,
-        employee_id: str,
-        date_from: Any = None,
-        date_to: Any = None,
-    ) -> dict[str, Any]:
-        clean_employee_id = str(employee_id or "").strip()
-        period_from, period_to = _salary_period_labels(selected_date, date_from, date_to)
-        employees = _hr_employees_with_adjustments(workspace_owner_id, selected_date, period_from, period_to)
-        employee = next((emp for emp in employees if str(emp.get("id") or "") == clean_employee_id), None)
-        if employee is None:
-            raise ValueError("employee_not_found")
-        payments_by_currency = _salary_employee_payments(workspace_owner_id, selected_date, period_from, period_to).get(clean_employee_id, {})
-        payment_rows = _salary_employee_payment_rows(workspace_owner_id, selected_date, clean_employee_id, period_from, period_to)
-        salary_base_months = _salary_employee_base_month_rows(workspace_owner_id, clean_employee_id, period_from, period_to)
-        salary_due = _hr_money(employee.get("salary_due"))
-        paid_uzs = Decimal(str(payments_by_currency.get("UZS", 0))).quantize(Decimal("0.01"))
-        balance_uzs = salary_due - paid_uzs
-        return {
-            "employee": employee,
-            "date": str(selected_date or "")[:10],
-            "date_from": period_from,
-            "date_to": period_to,
-            "months": _salary_period_month_ranges(period_from, period_to),
-            "salary_base_months": salary_base_months,
-            "payments": payment_rows,
-            "payments_by_currency": [
-                {"currency": ccy, "amount_label": _hr_amount_label(amount)}
-                for ccy, amount in sorted(payments_by_currency.items())
-            ],
-            "paid_uzs_label": _hr_amount_label(paid_uzs),
-            "balance_uzs": _hr_amount_out(balance_uzs),
-            "balance_uzs_label": _hr_amount_label(abs(balance_uzs)),
-            "balance_state": "overpaid" if balance_uzs < 0 else "due" if balance_uzs > 0 else "closed",
-            "salary_due_label": _hr_amount_label(salary_due),
-        }
-
     def _hr_api_workspace_owner(request: Request) -> tuple[str | None, JSONResponse | None]:
         u = request.session.get("user") or {}
         if u.get("org_scope") != "general":
@@ -21542,6 +21009,7 @@ def create_app() -> FastAPI:
             return err
         assert oid is not None
         selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d")).strip()[:10]
+        _sync_program_employees_to_hr(oid)
         employees = _hr_employees_with_adjustments(oid, selected_date)
         payments = _salary_employee_payments(oid, selected_date)
         payload: list[dict[str, Any]] = []
@@ -21567,21 +21035,6 @@ def create_app() -> FastAPI:
                 }
             )
         return {"ok": True, "date": selected_date, "employees": payload}
-
-    @app.get("/api/hr/salary-act/{employee_id}")
-    def api_hr_salary_act(request: Request, employee_id: str):
-        oid, err = _hr_api_workspace_owner(request)
-        if err:
-            return err
-        assert oid is not None
-        selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d")).strip()[:10]
-        date_from = request.query_params.get("date_from")
-        date_to = request.query_params.get("date_to")
-        try:
-            act = _salary_employee_act_payload(oid, selected_date, employee_id, date_from, date_to)
-        except ValueError as exc:
-            return JSONResponse({"ok": False, "error": str(exc)}, status_code=404)
-        return {"ok": True, "date": selected_date, "act": act}
 
     def _save_hr_salary_adjustment(
         workspace_owner_id: str,
@@ -21617,93 +21070,6 @@ def create_app() -> FastAPI:
             }
         )
         _save_hr_salary_adjustments(workspace_owner_id, rows)
-
-    def _save_hr_salary_act(workspace_owner_id: str, work_date: str, employee_ids: list[str]) -> int:
-        clean_ids = [str(item or "").strip() for item in employee_ids if str(item or "").strip()]
-        if not clean_ids:
-            raise ValueError("salary_act_employees_required")
-        employees = _hr_employees_with_adjustments(workspace_owner_id, work_date)
-        selected = [emp for emp in employees if str(emp.get("id") or "") in clean_ids]
-        if not selected:
-            raise ValueError("salary_act_employees_required")
-        workspace_dir = CLIENT_WORKSPACES_DIR / workspace_owner_id
-        workspace_dir.mkdir(parents=True, exist_ok=True)
-        path = workspace_dir / "hr_salary_acts.json"
-        acts: list[dict[str, Any]] = []
-        if path.exists():
-            try:
-                raw = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(raw, list):
-                    acts = raw
-            except Exception:
-                acts = []
-        act = {
-            "id": uuid.uuid4().hex,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "work_date": str(work_date or "")[:10],
-            "employees": [
-                {
-                    "id": emp.get("id"),
-                    "name": emp.get("full_name"),
-                    "position": emp.get("position"),
-                    "monthly_salary": emp.get("monthly_salary"),
-                    "present_days": emp.get("present_days"),
-                    "absent_days": emp.get("absent_days"),
-                    "salary_base_due": emp.get("salary_base_due"),
-                    "salary_bonus": emp.get("salary_bonus"),
-                    "salary_penalty": emp.get("salary_penalty"),
-                    "salary_adjustments": emp.get("salary_adjustments") or [],
-                    "salary_due": emp.get("salary_due"),
-                }
-                for emp in selected
-            ],
-        }
-        acts.append(act)
-        path.write_text(json.dumps(acts, ensure_ascii=False, indent=2), encoding="utf-8")
-        return len(selected)
-
-    @app.post("/organizations/hr/salary-act/save", name="organizations_hr_salary_act_save")
-    async def organizations_hr_salary_act_save(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        work_date = str(form.get("work_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf#salary", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        try:
-            _save_hr_salary_act(active_org_id, work_date, list(form.getlist("employee_id")))
-        except ValueError as exc:
-            return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&error={quote(str(exc))}#salary", status_code=302)
-        return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&msg=salary_act_saved#salary", status_code=302)
-
-    @app.post("/organizations/hr/salary-adjustment/save", name="organizations_hr_salary_adjustment_save")
-    async def organizations_hr_salary_adjustment_save(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        work_date = str(form.get("work_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/organizations/hr?err=csrf#staff", status_code=302)
-        owner_id, redir = _director_owner_or_redirect(request)
-        if redir:
-            return redir
-        assert owner_id is not None
-        active_org_id = _employee_active_org_id(owner_id, request.session.get("user") or {})
-        try:
-            _save_hr_salary_adjustment(
-                active_org_id,
-                work_date,
-                str(form.get("employee_id") or ""),
-                str(form.get("adjustment_type") or ""),
-                str(form.get("amount") or ""),
-                str(form.get("comment") or ""),
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&error={quote(str(exc))}#staff", status_code=302)
-        return RedirectResponse(url=f"/organizations/hr?date={quote(work_date)}&msg=salary_adjustment_saved#staff", status_code=302)
 
     def _current_org_html_owner(request: Request):
         u = request.session.get("user") or {}
@@ -21970,7 +21336,7 @@ def create_app() -> FastAPI:
         return RedirectResponse(url="/earnings?msg=" + quote("Ставки сохранены"), status_code=302)
 
     def _sync_program_employees_to_hr(workspace_owner_id: str) -> None:
-        """Сотрудники, заведённые в программе, автоматически появляются в HR.
+        """Сотрудники программы автоматически появляются в зарплатных списках.
 
         Совпадение ищем по набору слов имени, чтобы «Иванов Иван» и
         «Иван Иванов» не задваивались.
@@ -21999,283 +21365,6 @@ def create_app() -> FastAPI:
                 existing.add(key)
         except Exception:
             logger.exception("[upos] sync program employees to HR failed")
-
-    @app.get("/hr", response_class=HTMLResponse, name="home_hr")
-    def home_hr(request: Request):
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        _sync_program_employees_to_hr(oid)
-        selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d"))[:10]
-        return tpl(
-            request,
-            "home_organizations_hr.html",
-            variant="user",
-            active="home_hr",
-            inside_organization=True,
-            employees=_hr_employees_with_adjustments(oid, selected_date),
-            positions=list_positions(oid),
-            selected_organization_id=oid,
-            selected_date=selected_date,
-            flash_ok=request.query_params.get("msg"),
-            flash_err=request.query_params.get("error"),
-        )
-
-    @app.get("/hr/salary-act/{employee_id}", response_class=HTMLResponse, name="home_hr_salary_act_detail")
-    def home_hr_salary_act_detail(request: Request, employee_id: str):
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        selected_date = str(request.query_params.get("date") or datetime.now().strftime("%Y-%m-%d"))[:10]
-        try:
-            act = _salary_employee_act_payload(oid, selected_date, employee_id)
-        except ValueError as exc:
-            raise StarletteHTTPException(status_code=404, detail=str(exc)) from exc
-        return tpl(
-            request,
-            "home_hr_salary_act_detail.html",
-            variant="user",
-            active="home_hr",
-            inside_organization=True,
-            selected_organization_id=oid,
-            selected_date=selected_date,
-            act=act,
-        )
-
-    @app.post("/hr/employees/create", name="home_hr_employee_create")
-    async def home_hr_employee_create(
-        request: Request,
-        csrf_token: str = Form(default=""),
-        first_name: str = Form(default=""),
-        last_name: str = Form(default=""),
-        position_id: str = Form(default=""),
-        position: str = Form(default=""),
-        passport_series: str = Form(default=""),
-        passport_number: str = Form(default=""),
-        monthly_salary: str = Form(default="0"),
-        is_courier: str = Form(default=""),
-        hired_at: str = Form(default=""),
-        photo: UploadFile | None = File(default=None),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        try:
-            photo_path = await _save_hr_photo(oid, photo)
-            create_hr_employee(
-                oid,
-                {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "position_id": position_id,
-                    "position": position,
-                    "passport_series": passport_series,
-                    "passport_number": passport_number,
-                    "monthly_salary": monthly_salary,
-                    "is_courier": is_courier,
-                    "hired_at": hired_at,
-                    "photo_path": photo_path,
-                },
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/hr?error={quote(str(exc) or 'hr')}", status_code=302)
-        except Exception as exc:
-            logger.exception("[upos] organization HR employee create failed")
-            return RedirectResponse(url=f"/hr?error={quote(type(exc).__name__)}", status_code=302)
-        return RedirectResponse(url="/hr?msg=employee_created", status_code=302)
-
-    @app.post("/hr/employees/update", name="home_hr_employee_update")
-    async def home_hr_employee_update(
-        request: Request,
-        csrf_token: str = Form(default=""),
-        employee_id: str = Form(default=""),
-        first_name: str = Form(default=""),
-        last_name: str = Form(default=""),
-        position_id: str = Form(default=""),
-        position: str = Form(default=""),
-        passport_series: str = Form(default=""),
-        passport_number: str = Form(default=""),
-        monthly_salary: str = Form(default="0"),
-        is_courier: str = Form(default=""),
-        hired_at: str = Form(default=""),
-        photo: UploadFile | None = File(default=None),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        try:
-            photo_path = await _save_hr_photo(oid, photo)
-            updated = update_hr_employee(
-                oid,
-                employee_id,
-                {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "position_id": position_id,
-                    "position": position,
-                    "passport_series": passport_series,
-                    "passport_number": passport_number,
-                    "monthly_salary": monthly_salary,
-                    "is_courier": is_courier,
-                    "hired_at": hired_at,
-                    "photo_path": photo_path,
-                },
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/hr?error={quote(str(exc) or 'hr')}", status_code=302)
-        except Exception as exc:
-            logger.exception("[upos] organization HR employee update failed")
-            return RedirectResponse(url=f"/hr?error={quote(type(exc).__name__)}", status_code=302)
-        return RedirectResponse(url=f"/hr?msg={'employee_updated' if updated else 'not_found'}", status_code=302)
-
-    @app.post("/hr/employees/{employee_id}/dismiss", name="home_hr_employee_dismiss")
-    def home_hr_employee_dismiss(
-        request: Request,
-        employee_id: str,
-        csrf_token: str = Form(default=""),
-        dismissed_at: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        ok = dismiss_hr_employee(oid, employee_id, dismissed_at)
-        return RedirectResponse(url=f"/hr?msg={'employee_dismissed' if ok else 'not_found'}", status_code=302)
-
-    @app.post("/hr/employees/{employee_id}/restore", name="home_hr_employee_restore")
-    def home_hr_employee_restore(
-        request: Request,
-        employee_id: str,
-        csrf_token: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf#staff", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        ok = restore_hr_employee(oid, employee_id)
-        return RedirectResponse(url=f"/hr?msg={'employee_restored' if ok else 'not_found'}#staff", status_code=302)
-
-    @app.post("/hr/employees/{employee_id}/delete", name="home_hr_employee_delete")
-    def home_hr_employee_delete(
-        request: Request,
-        employee_id: str,
-        csrf_token: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf#staff", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        ok = delete_hr_employee_permanently(oid, employee_id)
-        if ok:
-            _purge_hr_salary_records(oid, employee_id)
-        return RedirectResponse(url=f"/hr?msg={'employee_deleted' if ok else 'not_found'}#staff", status_code=302)
-
-    @app.post("/hr/attendance", name="home_hr_attendance")
-    def home_hr_attendance(
-        request: Request,
-        csrf_token: str = Form(default=""),
-        employee_id: str = Form(default=""),
-        work_date: str = Form(default=""),
-        status: str = Form(default=""),
-    ):
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        try:
-            ok = set_hr_attendance(oid, employee_id, work_date, status)
-        except ValueError as exc:
-            return RedirectResponse(url=f"/hr?date={quote(work_date)}&error={quote(str(exc))}", status_code=302)
-        return RedirectResponse(
-            url=f"/hr?date={quote(work_date)}&msg={'attendance_saved' if ok else 'not_found'}",
-            status_code=302,
-        )
-
-    @app.post("/hr/attendance/report", name="home_hr_attendance_report")
-    async def home_hr_attendance_report(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        work_date = str(form.get("work_date") or "").strip()
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf#calendar", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        try:
-            report = set_hr_attendance_day(oid, work_date, _hr_attendance_records_from_form(form))
-        except ValueError as exc:
-            return RedirectResponse(url=f"/hr?date={quote(work_date)}&error={quote(str(exc))}#calendar", status_code=302)
-        telegram_status = "attendance_report_saved"
-        try:
-            from upos.telegram_notifier import send_hr_attendance_report
-
-            tg = send_hr_attendance_report(oid, report)
-            if tg.get("ok"):
-                telegram_status = "attendance_report_sent"
-            elif tg.get("error"):
-                telegram_status = f"telegram_{tg.get('error')}"
-        except Exception:
-            logger.exception("[upos] HR attendance Telegram report failed")
-            telegram_status = "telegram_failed"
-        return RedirectResponse(url=f"/hr?date={quote(work_date)}&msg={quote(telegram_status)}#calendar", status_code=302)
-
-    @app.post("/hr/salary-act/save", name="home_hr_salary_act_save")
-    async def home_hr_salary_act_save(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        work_date = str(form.get("work_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf#salary", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        try:
-            _save_hr_salary_act(oid, work_date, list(form.getlist("employee_id")))
-        except ValueError as exc:
-            return RedirectResponse(url=f"/hr?date={quote(work_date)}&error={quote(str(exc))}#salary", status_code=302)
-        return RedirectResponse(url=f"/hr?date={quote(work_date)}&msg=salary_act_saved#salary", status_code=302)
-
-    @app.post("/hr/salary-adjustment/save", name="home_hr_salary_adjustment_save")
-    async def home_hr_salary_adjustment_save(request: Request):
-        form = await request.form()
-        csrf_token = str(form.get("csrf_token") or "")
-        work_date = str(form.get("work_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
-        if not csrf_matches_session(request, csrf_token):
-            return RedirectResponse(url="/hr?err=csrf#staff", status_code=302)
-        oid, redir = _current_org_html_owner(request)
-        if redir:
-            return redir
-        assert oid is not None
-        try:
-            _save_hr_salary_adjustment(
-                oid,
-                work_date,
-                str(form.get("employee_id") or ""),
-                str(form.get("adjustment_type") or ""),
-                str(form.get("amount") or ""),
-                str(form.get("comment") or ""),
-            )
-        except ValueError as exc:
-            return RedirectResponse(url=f"/hr?date={quote(work_date)}&error={quote(str(exc))}#staff", status_code=302)
-        return RedirectResponse(url=f"/hr?date={quote(work_date)}&msg=salary_adjustment_saved#staff", status_code=302)
 
     @app.get("/organizations/settings", response_class=HTMLResponse, name="organizations_settings_get")
     def organizations_settings_get(request: Request):

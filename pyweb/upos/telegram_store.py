@@ -45,7 +45,6 @@ DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
         "limits": True,
         "transaction_deleted": True,
         "transfer": True,
-        "hr_attendance": True,
         "daily": True,
         "weekly": False,
         "monthly": False,
@@ -66,7 +65,6 @@ DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
         "limits": "",
         "transaction_deleted": "",
         "transfer": "",
-        "hr_attendance": "",
         "daily": "",
         "weekly": "",
         "monthly": "",
@@ -95,16 +93,6 @@ DEFAULT_NOTIFICATION_PREFS: dict[str, Any] = {
         "limits": "{text}",
         "transaction_deleted": "{text}",
         "transfer": "{text}",
-        "hr_attendance": (
-            "🧾 <b>ДНЕВНОЙ ТАБЕЛЬ</b>\n"
-            "Организация: {organization}\n"
-            "Дата: {date}\n\n"
-            "{text}\n\n"
-            "<b>Кто пришёл</b>\n"
-            "{present_list}\n\n"
-            "<b>Кто не пришёл и причина</b>\n"
-            "{absent_list}"
-        ),
         "daily": (
             "🧾 <b>КАССОВЫЙ ОТЧЁТ</b>\n"
             "Организация: {organization}\n"

@@ -68,8 +68,6 @@ def _report_key_for_kind(kind: str) -> str | None:
         return None
     if k in ("transaction", "transaction_deleted") or k.startswith("tx"):
         return "transactions"
-    if k == "hr_attendance":
-        return "hr_attendance"
     if k == "daily":
         return "daily"
     if k == "weekly":
@@ -451,57 +449,6 @@ def notify_transaction_deleted(workspace_owner_id: str, tx: dict[str, Any]) -> d
         template_context=_transaction_template_context(tx),
         dedupe_key=dedupe,
         dedupe_window_seconds=300,
-    )
-
-
-def send_hr_attendance_report(workspace_owner_id: str, report: dict[str, Any]) -> dict[str, Any]:
-    day = str(report.get("work_date") or "")
-    total = int(report.get("total") or 0)
-    present_count = int(report.get("present_count") or 0)
-    absent_count = int(report.get("absent_count") or 0)
-    lines = [
-        f"HR перекличка за {day}",
-        f"Всего сотрудников: {total}",
-        f"Пришли: {present_count}",
-        f"Не пришли: {absent_count}",
-        "",
-        "Пришли:",
-    ]
-    present = report.get("present") if isinstance(report.get("present"), list) else []
-    absent = report.get("absent") if isinstance(report.get("absent"), list) else []
-    present_list = "\n".join(
-        f"• {str(item.get('name') or 'Без имени')}" for item in present
-    ) or "• нет"
-    absent_list = "\n".join(
-        f"• {str(item.get('name') or 'Без имени')}: {str(item.get('reason') or 'Причина не указана')}"
-        for item in absent
-    ) or "• нет"
-    if present:
-        lines.extend(f"- {str(item.get('name') or 'Без имени')}" for item in present)
-    else:
-        lines.append("- нет")
-    lines.extend(["", "Не пришли:"])
-    if absent:
-        for item in absent:
-            reason = str(item.get("reason") or "Причина не указана")
-            lines.append(f"- {str(item.get('name') or 'Без имени')}: {reason}")
-    else:
-        lines.append("- нет")
-    dedupe = f"hr_attendance:{workspace_owner_id}:{day}:{present_count}:{absent_count}"
-    return _broadcast(
-        workspace_owner_id,
-        "\n".join(lines),
-        kind="hr_attendance",
-        template_context={
-            "date": day,
-            "total": total,
-            "present": present_count,
-            "absent": absent_count,
-            "present_list": present_list,
-            "absent_list": absent_list,
-        },
-        dedupe_key=dedupe,
-        dedupe_window_seconds=30,
     )
 
 
