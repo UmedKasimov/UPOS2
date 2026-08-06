@@ -5657,7 +5657,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .clients-map-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Карточек стало пять — «Без локации» добавилась, а сетка осталась на
+     четыре: «Программы» уезжали на вторую строку в одиночестве. */
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 0.75rem;
 }
 
