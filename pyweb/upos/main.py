@@ -18714,6 +18714,12 @@ def create_app() -> FastAPI:
         else:
             primary_currency = sorted(balance_totals)[0] if balance_totals else display_currency
 
+        # Валюта показа выбирается на странице: доллары или сумы. Раньше
+        # чистая прибыль выводилась сразу в обеих — просили переключатель.
+        requested_report_currency = str(request.query_params.get("currency") or "").strip().upper()
+        if requested_report_currency in ("USD", "UZS"):
+            primary_currency = requested_report_currency
+
         all_pnl_currencies = sorted(pnl_currencies)
         if primary_currency in all_pnl_currencies:
             all_pnl_currencies.remove(primary_currency)
@@ -19127,21 +19133,6 @@ def create_app() -> FastAPI:
                         "other_income": _report_money(other_income_primary, primary_currency),
                         "expenses": _report_money(expenses_primary, primary_currency),
                         "net": _report_money(net_profit_total, primary_currency),
-                        # Та же чистая прибыль во второй валюте: доллары и сумы
-                        # видно одновременно, без переключений.
-                        "net_secondary": (
-                            _report_money(
-                                _convert_product_currency(
-                                    net_profit_total,
-                                    primary_currency,
-                                    "UZS" if primary_currency == "USD" else "USD",
-                                    report_rate,
-                                ),
-                                "UZS" if primary_currency == "USD" else "USD",
-                            )
-                            if primary_currency in ("USD", "UZS") and report_rate > 0
-                            else ""
-                        ),
                         "net_negative": net_profit_total < 0,
                         "expense_count": len(profit_expense_rows),
                     },
@@ -19517,6 +19508,7 @@ def create_app() -> FastAPI:
             delivery_shipment_totals=delivery_shipment_totals,
             courier_debt_limits=courier_debt_limits,
             business_reports=business_reports,
+            report_currency=primary_currency,
             reports_usd_rate=_decimal_plain_text(reports_usd_rate),
         )
 

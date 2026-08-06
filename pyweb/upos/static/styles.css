@@ -32055,3 +32055,16 @@ html.dark .client-own-tag--ours {
 html.dark .client-own-tag--other {
   color: #fbbf24;
 }
+
+/* Переключатель валюты в шапке отчёта о прибыли. */
+.reports-currency-select {
+  margin-left: 0.6rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}

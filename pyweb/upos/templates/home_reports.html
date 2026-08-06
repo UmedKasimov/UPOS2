@@ -340,7 +340,15 @@
             </label>
           </form>
           <div class="reports-balance-total">
-            <span><b>{{ profit_summary.net or "0 UZS" }}</b>{% if profit_summary.net_secondary %} · <b>{{ profit_summary.net_secondary }}</b>{% endif %} чистая прибыль</span>
+            <span><b>{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
+            <select
+              class="reports-currency-select"
+              aria-label="Валюта отчёта"
+              onchange="const u = new URL(location.href); u.searchParams.set('currency', this.value); u.hash = 'report-profit'; location.assign(u.toString());"
+            >
+              <option value="USD" {% if report_currency == 'USD' %}selected{% endif %}>USD</option>
+              <option value="UZS" {% if report_currency == 'UZS' %}selected{% endif %}>UZS</option>
+            </select>
           </div>
         </header>
         <div class="reports-sales-kpis">
