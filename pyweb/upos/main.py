@@ -13600,6 +13600,7 @@ def create_app() -> FastAPI:
             "created_at": ("created_at", "date"),
             "phone": ("phone", "text"),
             "category": ("category", "text"),
+            "own": ("is_ours", "bool"),
         }
         clients_sort_key = client_sort if client_sort in client_sort_keys else ""
         clients_sort_direction = "asc" if client_sort_dir == "asc" else "desc"
@@ -13630,12 +13631,17 @@ def create_app() -> FastAPI:
                 должен опережать тех, у кого долг есть.
                 """
                 value = clients_raw_value(item)
+                if value_kind == "bool":
+                    # «Не клиент» — тоже значение: обе группы сортируются.
+                    return True
                 if value_kind == "number":
                     return _sales_decimal(value) != 0
                 return bool(str(value or "").strip())
 
             def clients_sort_value(item: dict[str, Any]) -> Any:
                 value = clients_raw_value(item)
+                if value_kind == "bool":
+                    return 1 if value else 0
                 if value_kind == "number":
                     return _sales_decimal(value)
                 return str(value or "").strip().casefold()

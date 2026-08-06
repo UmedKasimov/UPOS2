@@ -1163,6 +1163,7 @@
   const CLIENT_DIRECTORY_COLUMNS = [
     { key: "select", sortable: false, movable: false },
     { key: "id", kind: "number" },
+    { key: "own", kind: "text" },
     { key: "name", kind: "text" },
     { key: "official_name", kind: "text" },
     { key: "balance", kind: "number" },
