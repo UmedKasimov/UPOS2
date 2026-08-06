@@ -9553,6 +9553,8 @@ def create_app() -> FastAPI:
                 sales.append(item)
 
             # Строим после цикла: счётчики наполняются там же.
+            # Порядок разделов задан заказчиком: Все, Заказы, Продажи,
+            # Рассрочки, Возвраты, Архив.
             document_tabs = [
                 {
                     "value": "",
@@ -9565,16 +9567,6 @@ def create_app() -> FastAPI:
                     "current": not selected_doc_types,
                 },
                 {
-                    "value": "sale",
-                    "label": "Продажи",
-                    "logo": "ПР",
-                    "brand": "sale",
-                    "count": journal_doc_type_counts["sale"],
-                    "href": document_tab_url("sale"),
-                    "active": "sale" in selected_doc_types,
-                    "current": selected_doc_types == ["sale"],
-                },
-                {
                     "value": "order",
                     "label": "Заказы",
                     "logo": "ЗК",
@@ -9585,14 +9577,14 @@ def create_app() -> FastAPI:
                     "current": selected_doc_types == ["order"],
                 },
                 {
-                    "value": "return",
-                    "label": "Возвраты",
-                    "logo": "ВЗ",
-                    "brand": "return",
-                    "count": journal_doc_type_counts["return"],
-                    "href": document_tab_url("return"),
-                    "active": "return" in selected_doc_types,
-                    "current": selected_doc_types == ["return"],
+                    "value": "sale",
+                    "label": "Продажи",
+                    "logo": "ПР",
+                    "brand": "sale",
+                    "count": journal_doc_type_counts["sale"],
+                    "href": document_tab_url("sale"),
+                    "active": "sale" in selected_doc_types,
+                    "current": selected_doc_types == ["sale"],
                 },
                 {
                     "value": "partial",
@@ -9605,8 +9597,18 @@ def create_app() -> FastAPI:
                     "current": (selected_payment_statuses or []) == ["partial"],
                 },
                 {
+                    "value": "return",
+                    "label": "Возвраты",
+                    "logo": "ВЗ",
+                    "brand": "return",
+                    "count": journal_doc_type_counts["return"],
+                    "href": document_tab_url("return"),
+                    "active": "return" in selected_doc_types,
+                    "current": selected_doc_types == ["return"],
+                },
+                {
                     "value": "archived",
-                    "label": "Архивы",
+                    "label": "Архив",
                     "logo": "АР",
                     "brand": "archive",
                     "count": journal_archived_count,
