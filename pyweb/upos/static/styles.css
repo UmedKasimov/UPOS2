@@ -31692,16 +31692,14 @@ html.dark .crm-task-calendar-event {
   contain: none;
 }
 
-.clients-map-page-sizes {
-  margin-top: 0.45rem;
+.clients-map-list-footer {
+  margin-top: 0.6rem;
 }
 
-.clients-map-page-size-label {
-  align-self: center;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  text-transform: uppercase;
+/* Кнопки страниц — тот же вид, что ссылки пагинации журнала. */
+button.products-page-link {
+  cursor: pointer;
+  font: inherit;
 }
 
 /* Только самая длинная таблица: у неё почти две тысячи строк, и разница

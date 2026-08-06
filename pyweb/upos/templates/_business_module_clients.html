@@ -665,21 +665,34 @@
                   <button type="button" data-clients-map-location-filter="address" aria-pressed="false">Только адрес: {{ map_clients_address_only|length }}</button>
                   <button type="button" data-clients-map-location-filter="missing" aria-pressed="false">Без локации: {{ map_clients_without_location|length }}</button>
                 </div>
-                {# Сколько строк списка показывать; карту лимит не трогает. #}
-                <div class="clients-map-location-filters clients-map-page-sizes" aria-label="Сколько строк показывать">
-                  <span class="clients-map-page-size-label">Показывать:</span>
-                  <button type="button" data-clients-map-page-size="50" aria-pressed="false">50</button>
-                  <button type="button" data-clients-map-page-size="100" aria-pressed="false">100</button>
-                  <button type="button" data-clients-map-page-size="500" aria-pressed="false">500</button>
-                  <button type="button" data-clients-map-page-size="1000" aria-pressed="false">1000</button>
-                  <button type="button" data-clients-map-page-size="2000" aria-pressed="false">2000</button>
-                  <button type="button" class="is-active" data-clients-map-page-size="" aria-pressed="true">Макс</button>
-                </div>
               </td>
             </tr>
           </tfoot>
         {% endif %}
       </table>
+      {% if map_clients %}
+        {# Футер как в журнале продаж: страницы, счётчики и размер показа. #}
+        <footer class="products-catalog-footer clients-map-list-footer" data-clients-map-footer>
+          <nav class="products-pagination" aria-label="Страницы списка клиентов" data-clients-map-pages></nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Информация по списку клиентов">
+              <span data-clients-map-total>Всего: {{ map_clients|length }}</span>
+              <span data-clients-map-shown>Показано: {{ map_clients|length }}</span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select data-clients-map-page-size-select aria-label="Количество клиентов на странице">
+                <option value="50">50 шт</option>
+                <option value="100">100 шт</option>
+                <option value="500">500 шт</option>
+                <option value="1000">1000 шт</option>
+                <option value="2000">2000 шт</option>
+                <option value="" selected>Макс</option>
+              </select>
+            </label>
+          </div>
+        </footer>
+      {% endif %}
     </div>
   </div>
 </section>

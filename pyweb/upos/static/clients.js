@@ -549,11 +549,9 @@
     const filters = overviewFilters(container);
     const selectedIds = selectedMapIds();
     const noSelection = new Set();
-    // Лимит касается только строк списка: карта показывает все совпадения.
-    const limitButton = (container.closest("#clients-map") || layout)
-      .querySelector('[data-clients-map-page-size][aria-pressed="true"]');
-    const rowLimit = Number.parseInt(limitButton?.dataset.clientsMapPageSize || "", 10) || Infinity;
-    let shownRows = 0;
+    // Пагинация касается только строк списка: карта показывает все совпадения.
+    const mapSection = container.closest("#clients-map") || layout;
+    const matchedRows = [];
     const points = [...layout.querySelectorAll("[data-client-overview-point]")]
       .map((item) => {
         const lat = Number.parseFloat(item.dataset.lat || "");
@@ -592,14 +590,60 @@
         };
         const baseMatched = matchesOverviewFilters(point, filters, noSelection);
         const matched = baseMatched && (!selectedIds.size || selectedIds.has(point.id));
-        const rowVisible = baseMatched && shownRows < rowLimit;
-        if (baseMatched) shownRows += 1;
-        item.hidden = !rowVisible;
+        item.hidden = !baseMatched;
+        if (baseMatched) matchedRows.push(item);
         return matched ? point : null;
       })
       .filter(Boolean);
+    paginateClientsMapRows(mapSection, matchedRows);
     syncClientsMapSelectAll(layout.closest("#clients-map") || layout);
     return points;
+  }
+
+  /* Футер списка карты — как в журнале продаж: страницы, «Всего»,
+     «Показано» и размер показа. Карту пагинация не трогает. */
+  function paginateClientsMapRows(section, rows) {
+    const footer = section?.querySelector?.("[data-clients-map-footer]");
+    if (!footer) return;
+    const pageSize = Number.parseInt(footer.querySelector("[data-clients-map-page-size-select]")?.value || "", 10) || Infinity;
+    const total = rows.length;
+    const totalPages = Number.isFinite(pageSize) ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+    let page = Number.parseInt(section.dataset.clientsMapPage || "1", 10) || 1;
+    page = Math.min(Math.max(page, 1), totalPages);
+    section.dataset.clientsMapPage = String(page);
+    const start = Number.isFinite(pageSize) ? (page - 1) * pageSize : 0;
+    const end = Number.isFinite(pageSize) ? start + pageSize : total;
+    rows.forEach((row, index) => {
+      if (index < start || index >= end) row.hidden = true;
+    });
+    const totalNode = footer.querySelector("[data-clients-map-total]");
+    if (totalNode) totalNode.textContent = `Всего: ${total}`;
+    const shownNode = footer.querySelector("[data-clients-map-shown]");
+    if (shownNode) {
+      shownNode.textContent = total
+        ? `Показано: ${Math.min(start + 1, total)}-${Math.min(end, total)}`
+        : "Показано: 0";
+    }
+    const pagesNode = footer.querySelector("[data-clients-map-pages]");
+    if (!pagesNode) return;
+    const pageButton = (label, target, options = {}) =>
+      `<button type="button" class="products-page-link${options.active ? " active" : ""}${options.disabled ? " disabled" : ""}"` +
+      ` data-clients-map-page="${target}"${options.disabled ? " disabled" : ""}` +
+      `${options.aria ? ` aria-label="${options.aria}"` : ""}${options.active ? ' aria-current="page"' : ""}>${label}</button>`;
+    const parts = [];
+    parts.push(pageButton("‹", Math.max(1, page - 1), { disabled: page <= 1, aria: "Предыдущая страница" }));
+    const windowStart = Math.max(1, page - 2);
+    const windowEnd = Math.min(totalPages, page + 2);
+    if (windowStart > 1) parts.push(pageButton("1", 1, { active: page === 1 }));
+    if (windowStart > 2) parts.push('<span class="products-page-count">…</span>');
+    for (let index = windowStart; index <= windowEnd; index += 1) {
+      parts.push(pageButton(String(index), index, { active: index === page }));
+    }
+    if (windowEnd < totalPages - 1) parts.push('<span class="products-page-count">…</span>');
+    if (windowEnd < totalPages) parts.push(pageButton(String(totalPages), totalPages, { active: page === totalPages }));
+    parts.push(pageButton("›", Math.min(totalPages, page + 1), { disabled: page >= totalPages, aria: "Следующая страница" }));
+    parts.push(`<span class="products-page-count">Стр. ${page} из ${totalPages}</span>`);
+    pagesNode.innerHTML = parts.join("");
   }
 
   function visibleMapRowCheckboxes(section) {
@@ -2307,17 +2351,23 @@
     }
   });
 
+  document.addEventListener("change", (event) => {
+    const pageSizeSelect = event.target.closest("[data-clients-map-page-size-select]");
+    if (!pageSizeSelect) return;
+    const section = pageSizeSelect.closest("#clients-map");
+    if (!section) return;
+    section.dataset.clientsMapPage = "1";
+    section.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+  });
+
   document.addEventListener("click", (event) => {
-    const pageSizeButton = event.target.closest("[data-clients-map-page-size]");
-    if (pageSizeButton) {
+    const mapPageButton = event.target.closest("[data-clients-map-page]");
+    if (mapPageButton) {
       event.preventDefault();
-      const section = pageSizeButton.closest("#clients-map");
+      if (mapPageButton.disabled) return;
+      const section = mapPageButton.closest("#clients-map");
       if (!section) return;
-      section.querySelectorAll("[data-clients-map-page-size]").forEach((button) => {
-        const active = button === pageSizeButton;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", active ? "true" : "false");
-      });
+      section.dataset.clientsMapPage = mapPageButton.dataset.clientsMapPage || "1";
       section.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
       return;
     }
