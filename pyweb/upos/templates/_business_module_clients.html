@@ -282,34 +282,11 @@
             <tr><td colspan="11">Клиенты пока не добавлены.</td></tr>
           {% endfor %}
         </tbody>
+        {# Итоги по балансу из подвала убраны: в списке клиентов суммы долгов
+           и авансов не нужны, для этого есть раздел должников. #}
         <tfoot>
           <tr class="clients-total-row">
-            <td colspan="4">Итого клиенты</td>
-            <td>
-              <div class="client-balance-total-lines">
-                {% for line in clients_balance_summary.debt_lines %}
-                  <span class="client-balance-pill client-balance-pill--debt">{{ line.display }} {{ line.currency }}</span>
-                {% endfor %}
-                {% for line in clients_balance_summary.advance_lines %}
-                  <span class="client-balance-pill client-balance-pill--advance">{{ line.display }} {{ line.currency }}</span>
-                {% endfor %}
-                {% if not clients_balance_summary.debt_lines and not clients_balance_summary.advance_lines %}
-                  <span class="client-balance-empty">-</span>
-                {% endif %}
-              </div>
-            </td>
-            <td colspan="6">
-              <div class="client-balance-net">
-                <span>Итоговый баланс</span>
-                {% if clients_balance_summary.net_lines %}
-                  {% for line in clients_balance_summary.net_lines %}
-                    <strong>{{ line.display }} {{ line.currency }}</strong>
-                  {% endfor %}
-                {% else %}
-                  <strong>-</strong>
-                {% endif %}
-              </div>
-            </td>
+            <td colspan="13">Итого клиенты</td>
           </tr>
         </tfoot>
       </table>
