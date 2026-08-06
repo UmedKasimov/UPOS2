@@ -143,7 +143,7 @@
       >
         <thead>
           <tr>
-            <th><input type="checkbox" data-client-directory-select-all aria-label="Выбрать всех клиентов на странице" /></th>
+            <th class="products-check-col"><input type="checkbox" data-client-directory-select-all aria-label="Выбрать всех клиентов на странице" /></th>
             <th>ИД</th>
             <th>Название</th>
             <th>Официальное название</th>
@@ -162,7 +162,14 @@
             {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
             <tr>
               <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select data-client-directory-select aria-label="Выбрать {{ client.name }}" /></td>
-              <td><span class="client-id-badge">#{{ client.directory_number }}</span></td>
+              <td>
+                <span class="client-id-badge">#{{ client.directory_number }}</span>
+                {% if client.is_ours %}
+                  <span class="client-own-tag client-own-tag--ours">Клиент</span>
+                {% else %}
+                  <span class="client-own-tag client-own-tag--other">Не клиент</span>
+                {% endif %}
+              </td>
               <td>
                 <a
                   class="client-open-link product-cell-main product-cell-meta"

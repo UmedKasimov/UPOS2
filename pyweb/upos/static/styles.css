@@ -32008,3 +32008,39 @@ html.dark .crm-task-calendar-event {
   background: var(--primary);
   color: #fff;
 }
+
+/* ── Отметка «работает с нами» в списке клиентов ────────────────────────────
+   Здесь цвет несёт смысл и назван заказчиком прямо: зелёный — наш клиент,
+   жёлтый — ещё нет. Это оговорённое исключение из правила одного синего. */
+.client-own-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.client-own-tag--ours {
+  background: color-mix(in srgb, #16a34a 14%, transparent);
+  border-color: color-mix(in srgb, #16a34a 40%, transparent);
+  color: #15803d;
+}
+
+.client-own-tag--other {
+  background: color-mix(in srgb, #d97706 16%, transparent);
+  border-color: color-mix(in srgb, #d97706 42%, transparent);
+  color: #b45309;
+}
+
+html.dark .client-own-tag--ours {
+  color: #4ade80;
+}
+
+html.dark .client-own-tag--other {
+  color: #fbbf24;
+}

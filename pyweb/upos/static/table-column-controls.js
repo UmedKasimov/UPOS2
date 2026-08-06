@@ -8,6 +8,18 @@
   const ORDER_STORAGE_SUFFIX = ':order';
   const WIDTH_STORAGE_SUFFIX = ':widths';
   const MIN_COLUMN_WIDTH = 48;
+  // Столбец с галочкой всегда узкий: тянуть там нечего, а из общего
+  // распределения ширин он раздувался до размера обычной колонки.
+  const FIXED_WIDTH_CELLS = '.products-check-col, .clients-map-select-column, .kassa-col-select';
+  const FIXED_CELL_WIDTH = 44;
+
+  function isFixedWidthCell(cell) {
+    if (!cell || !cell.matches) return false;
+    if (cell.matches(FIXED_WIDTH_CELLS)) return true;
+    // Узнаём и по содержимому: внутри только галочка и больше ничего.
+    const checkbox = cell.querySelector(':scope > input[type="checkbox"]');
+    return Boolean(checkbox && !cell.textContent.trim());
+  }
   const MAX_COLUMN_WIDTH = 720;
   let draggedColumn = null;
   let draggedHeaderColumn = null;
@@ -222,6 +234,8 @@
     if (table.getBoundingClientRect().width < MIN_COLUMN_WIDTH) return;
     const widths = {};
     directCells(headerRow(table)).forEach((cell) => {
+      // Узкий столбец с галочкой в общее распределение ширин не входит.
+      if (isFixedWidthCell(cell)) return;
       const key = cell.getAttribute(CELL_KEY_ATTR);
       const width = cell.getBoundingClientRect().width;
       if (key && Number.isFinite(width) && width > 0) {
@@ -258,9 +272,15 @@
     let sized = 0;
 
     columns(table).forEach((column) => {
-      const value = Number(widths[column.key]);
+      const sample = tableRows(table)
+        .map((row) => directCells(row).find((item) => item.getAttribute(CELL_KEY_ATTR) === column.key))
+        .find(Boolean);
+      const fixed = isFixedWidthCell(sample);
+      const value = fixed ? FIXED_CELL_WIDTH : Number(widths[column.key]);
       if (!Number.isFinite(value)) return;
-      const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+      const width = fixed
+        ? FIXED_CELL_WIDTH
+        : Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
       tableRows(table).forEach((row) => {
         const cell = directCells(row).find((item) => item.getAttribute(CELL_KEY_ATTR) === column.key);
         if (!cell) return;
@@ -344,7 +364,7 @@
         cell.append(moveHandle);
       }
 
-      if (!cell.querySelector(':scope > [data-upos-column-resize-handle]')) {
+      if (!isFixedWidthCell(cell) && !cell.querySelector(':scope > [data-upos-column-resize-handle]')) {
         const resizeHandle = document.createElement('span');
         resizeHandle.className = 'upos-table-column-resize-handle';
         resizeHandle.dataset.uposColumnResizeHandle = '1';
