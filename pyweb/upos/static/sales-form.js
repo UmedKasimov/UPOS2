@@ -141,6 +141,10 @@
 
   function stockLabel(product, warehouse) {
     var total = stockTotal(product, warehouse);
+    // Ноль по складу строки часто значит лишь, что стоки товара привязаны
+    // к складу с другим названием (например, из iBox) — тогда показываем
+    // суммарный остаток по всем складам.
+    if (!total) total = stockTotal(product, "");
     var unit = product.unit || "шт";
     return formatQty(total) + " " + unit;
   }
