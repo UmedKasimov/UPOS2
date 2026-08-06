@@ -423,7 +423,11 @@
             <thead>
               <tr>
                 <th data-column-label="№">№</th>
-                <th data-column-label="ID">ID</th>
+                <th data-column-label="ID" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>ID</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="Дата" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
                     <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -481,7 +485,7 @@
               {% for sale in sales %}
                 <tr class="sales-table-row--{{ sale.doc_type }}{% if sales_saved_id and sales_saved_id == sale.id %} sales-table-row--saved{% endif %}" data-sales-journal-row>
                   <td class="sales-journal-row-index">{{ sales_journal_pagination.row_offset + loop.index }}</td>
-                  <td class="sales-journal-id-cell" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0">
+                  <td class="sales-journal-id-cell" data-sort-value="{{ sale.number }}" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0">
                     <strong>{{ sale.number }}</strong>
                     <small>{{ sale.manager or "Без ответственного" }}</small>
                     {% if sale.document_age_label %}
