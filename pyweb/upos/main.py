@@ -13339,6 +13339,7 @@ def create_app() -> FastAPI:
             if token and re.sub(r"[^\w]+", "", token)
         ]
         clients_records: list[dict[str, Any]] = []
+        map_source_records: list[dict[str, Any]] = []
         client_routes: list[dict[str, Any]] = []
         client_balances: list[dict[str, Any]] = []
         selected_client_card: dict[str, Any] | None = None
@@ -13484,6 +13485,10 @@ def create_app() -> FastAPI:
                     crm_status_by_id=crm_status_by_id,
                     crm_status_by_name=crm_status_by_name,
                 )
+                # Карта показывает всю базу: фильтры списка на неё не влияют,
+                # иначе после поиска или отбора по программе на карте
+                # оставалась горстка клиентов.
+                map_source_records.append(item)
                 search_fields = " ".join(
                     [
                         item["id"],
@@ -13703,9 +13708,9 @@ def create_app() -> FastAPI:
         clients_page_start = (clients_page - 1) * clients_page_size
         clients_page_end = clients_page_start + clients_page_size
         clients_records = all_clients_records[clients_page_start:clients_page_end]
-        # Карта не пагинируется: в правой таблице нужны также клиенты без
-        # локации, чтобы координаты можно было быстро добавить из этого экрана.
-        clients_map_records = all_clients_records
+        # Карта не пагинируется и не зависит от фильтров списка: в правой
+        # таблице нужны все клиенты, включая тех, у кого координат ещё нет.
+        clients_map_records = map_source_records
 
         client_balances_total = len(client_balances)
         client_balances_total_pages = max(1, math.ceil(client_balances_total / clients_page_size))
