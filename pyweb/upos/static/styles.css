@@ -32075,3 +32075,14 @@ html.dark .client-own-tag--other {
   background: color-mix(in srgb, #dc2626 9%, transparent);
   box-shadow: inset 3px 0 0 color-mix(in srgb, #dc2626 45%, transparent);
 }
+
+/* ── Рамки в таблицах отчётов ───────────────────────────────────────────────
+   Полная сетка, как в карточке закупки: строки и колонки читаются сразу. */
+.reports-data-table th,
+.reports-data-table td {
+  border: 1px solid color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 54%, var(--border));
+}
+
+.reports-data-table tfoot td {
+  border-top-width: 2px;
+}
