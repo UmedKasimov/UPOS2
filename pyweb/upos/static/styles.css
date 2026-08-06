@@ -12578,6 +12578,13 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   max-width: 100%;
 }
 
+/* Журнал выше каталога на полосу «Разделы журнала», поэтому базовая
+   высота области данных выталкивала страницу за экран и появлялся
+   правый скролл. Здесь область ниже ровно на эту полосу. */
+#sales-journal .products-table-wrap--catalog {
+  height: clamp(22rem, calc(100vh - 27rem), 72rem);
+}
+
 .sales-journal-table {
   width: 100%;
   min-width: 86rem;
