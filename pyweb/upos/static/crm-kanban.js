@@ -708,8 +708,10 @@
 
     document.querySelectorAll(".crm-kanban-card").forEach((card) => {
       card.querySelectorAll("a.crm-kanban-client").forEach((link) => {
+        // Ссылка на клиента выглядела кликабельной, но переход был отменён.
+        // Оставляем переход и не даём карточке открыться поверх него.
         link.addEventListener("click", (event) => {
-          event.preventDefault();
+          event.stopPropagation();
         });
       });
       card.addEventListener("dblclick", (event) => {

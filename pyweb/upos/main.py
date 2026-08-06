@@ -4296,6 +4296,10 @@ def create_app() -> FastAPI:
         by_id: dict[str, str] = {}
         by_name: dict[str, str] = {}
         for row in rows:
+            # Статус клиента показываем по сделкам: задачи и заметки этап
+            # клиента не определяют.
+            if row.item_type != "deal":
+                continue
             data = _json_object(row.data)
             stage = _crm_stage_for_value(data.get("stage_id"), stages, data.get("stage"))
             status = _client_crm_status_from_stage(stage)
@@ -4312,6 +4316,10 @@ def create_app() -> FastAPI:
         row: CrmRecord,
         stages: list[dict[str, str]],
     ) -> None:
+        # Статус клиента ведут только сделки: заметка или задача на дефолтном
+        # этапе разжаловала «нашего клиента» обратно в новый лид.
+        if row.item_type != "deal":
+            return
         data = _json_object(row.data)
         stage = _crm_stage_for_value(data.get("stage_id"), stages, data.get("stage"))
         crm_status = _client_crm_status_from_stage(stage)
@@ -15407,10 +15415,26 @@ def create_app() -> FastAPI:
                                 "detail_href": f"/sales?q={quote(str(document.get('number') or ''))}&doc_type={quote(str(document.get('doc_type') or 'sale'))}#sales-journal",
                             }
                         )
+                # В сумму сделки идут только её собственные заказы. Раньше
+                # брались все заказы клиента, и у клиента с несколькими
+                # сделками одна сумма считалась в воронке по нескольку раз.
+                linked_document_ids = {
+                    str(record_data.get("related_sale_id") or "").strip(),
+                    *(
+                        str(document_id).strip()
+                        for document_id in (
+                            record_data.get("sales_document_ids")
+                            if isinstance(record_data.get("sales_document_ids"), list)
+                            else []
+                        )
+                    ),
+                }
+                linked_document_ids.discard("")
                 related_orders = [
                     document
                     for document in related_documents
                     if str(document.get("doc_type") or "") == "order"
+                    and str(document.get("id") or "") in linked_document_ids
                 ]
                 order_total_value = sum(
                     [
@@ -15425,7 +15449,7 @@ def create_app() -> FastAPI:
                     Decimal("0"),
                 )
                 latest_order = related_orders[0] if related_orders else None
-                item["order_count"] = len(related_documents)
+                item["order_count"] = len(related_orders)
                 item["order_number"] = str(latest_order.get("number") or "") if latest_order else ""
                 item["order_amount"] = _sales_money_label(order_total_value) if related_orders else ""
                 item["order_currency"] = "UZS" if related_orders else item["currency"]
@@ -15483,18 +15507,9 @@ def create_app() -> FastAPI:
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
                 item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
                 item["edit_payload"] = _crm_record_edit_payload(item)
-                if item["item_type"] == "task" and item["status"] != "archived":
-                    crm_task_records.append(item)
-                    crm_task_summary["total_count"] += 1
-                    if item["status"] == "done":
-                        crm_task_summary["completed_count"] += 1
-                    else:
-                        crm_task_summary["open_count"] += 1
-                        if item["action_state"]["id"] == "overdue":
-                            crm_task_summary["overdue_count"] += 1
-                        elif item["action_state"]["id"] == "today":
-                            crm_task_summary["today_count"] += 1
-                    continue
+                # Фильтры применяем до разветвления по типу записи: раньше
+                # задачи отбирались раньше фильтров и поиск с ответственным на
+                # них не действовали.
                 hay = " ".join(
                     [
                         item["title"],
@@ -15515,8 +15530,6 @@ def create_app() -> FastAPI:
                     continue
                 if filters["responsible"] and item["responsible"] != filters["responsible"]:
                     continue
-                if filters["status"] != "all" and item["status"] != filters["status"]:
-                    continue
                 if filters["priority"] != "all" and item["priority"] != filters["priority"]:
                     continue
                 if item["item_type"] == "history":
@@ -15525,8 +15538,26 @@ def create_app() -> FastAPI:
                         continue
                     if filters["date_to"] and history_date and history_date > filters["date_to"]:
                         continue
+                # Архив собираем до фильтра по статусу: иначе выбор статуса на
+                # «Сделках» опустошал вкладку «Архив» без видимой причины.
                 if item["status"] == "archived":
                     crm_archive_records.append(item)
+                    continue
+                if item["item_type"] == "task":
+                    if filters["status"] != "all" and item["status"] != filters["status"]:
+                        continue
+                    crm_task_records.append(item)
+                    crm_task_summary["total_count"] += 1
+                    if item["status"] == "done":
+                        crm_task_summary["completed_count"] += 1
+                    else:
+                        crm_task_summary["open_count"] += 1
+                        if item["action_state"]["id"] == "overdue":
+                            crm_task_summary["overdue_count"] += 1
+                        elif item["action_state"]["id"] == "today":
+                            crm_task_summary["today_count"] += 1
+                    continue
+                if filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
                 crm_records.append(item)
                 if item["item_type"] == "history":

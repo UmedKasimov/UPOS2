@@ -625,7 +625,9 @@
           <label><span>Привязка чата</span><input name="chat_ref" placeholder="@username, ссылка или chat id" /></label>
           <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
           <label><span>Срок</span><input name="due_date" type="date" value="{{ today }}" /></label>
-          <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option></select></label>
+          {# Без «Архива» в списке правка архивной записи молча возвращала её
+             в работу: select не находил своего значения и слал «Новый». #}
+          <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option><option value="archived">Архив</option></select></label>
           <label><span>Вероятность</span><input name="probability" inputmode="numeric" placeholder="0-100" /></label>
           <label class="wide" data-crm-deal-create-field><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" placeholder="0" /></label>
           <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
