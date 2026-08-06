@@ -659,7 +659,6 @@
           <section class="product-form-hero">
             <div class="product-kind-toggle product-kind-toggle--compact">
               <label><input type="radio" name="kind" value="product" {% if (current.kind or product_filters.kind) != 'service' %}checked{% endif %} /> Простой товар</label>
-              <label><input type="radio" name="kind" value="collection" {% if current.kind == 'collection' %}checked{% endif %} /> Товар коллекции</label>
               <label><input type="radio" name="kind" value="service" {% if (current.kind or product_filters.kind) == 'service' %}checked{% endif %} /> Услуга</label>
             </div>
 

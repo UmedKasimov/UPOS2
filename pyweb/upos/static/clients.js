@@ -1190,6 +1190,18 @@
     });
   }
 
+  function markClientDirectoryRows(table) {
+    Array.from(table.tBodies || []).forEach((tbody) => {
+      Array.from(tbody.rows || []).forEach((row) => {
+        const cells = clientDirectoryCells(row);
+        if (cells.length !== CLIENT_DIRECTORY_COLUMNS.length) return;
+        cells.forEach((cell, index) => {
+          cell.dataset.clientColumn = CLIENT_DIRECTORY_COLUMNS[index].key;
+        });
+      });
+    });
+  }
+
   function sortClientDirectory(table, key) {
     const currentKey = table.dataset.clientsSortKey;
     const currentDirection = table.dataset.clientsSortDirection;
@@ -1199,7 +1211,38 @@
     url.searchParams.set("client_sort_dir", direction);
     url.searchParams.delete("page");
     url.hash = "clients";
-    window.location.assign(url.toString());
+    // Сортировка без перезагрузки: сервер отдаёт готовый порядок всей базы,
+    // а мы меняем только строки и пагинацию — вкладки не мигают.
+    table.dataset.clientsSortKey = key;
+    table.dataset.clientsSortDirection = direction;
+    updateClientSortButtons(table, key, direction);
+    table.setAttribute("aria-busy", "true");
+    fetch(url.toString(), { headers: { Accept: "text/html" }, credentials: "same-origin" })
+      .then((response) => {
+        if (!response.ok) throw new Error("sort");
+        return response.text();
+      })
+      .then((html) => {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const fresh = doc.querySelector("[data-clients-directory-table]");
+        const freshBody = fresh?.tBodies?.[0];
+        const currentBody = table.tBodies[0];
+        if (!freshBody || !currentBody) throw new Error("sort");
+        currentBody.replaceWith(freshBody);
+        markClientDirectoryRows(table);
+        const wrap = table.closest(".products-table-wrap");
+        const footer = wrap?.parentElement?.querySelector(":scope > footer.products-catalog-footer");
+        const freshFooter = fresh.closest(".products-table-wrap")?.parentElement?.querySelector(":scope > footer.products-catalog-footer");
+        if (footer && freshFooter) footer.replaceWith(freshFooter);
+        history.replaceState(null, "", url.toString());
+        highlightClientSearchMatches();
+      })
+      .catch(() => {
+        window.location.assign(url.toString());
+      })
+      .finally(() => {
+        table.removeAttribute("aria-busy");
+      });
   }
 
   function initClientDirectoryTable(table) {
@@ -1228,15 +1271,7 @@
       cell.replaceChildren(button);
     });
 
-    Array.from(table.tBodies || []).forEach((tbody) => {
-      Array.from(tbody.rows || []).forEach((row) => {
-        const cells = clientDirectoryCells(row);
-        if (cells.length !== CLIENT_DIRECTORY_COLUMNS.length) return;
-        cells.forEach((cell, index) => {
-          cell.dataset.clientColumn = CLIENT_DIRECTORY_COLUMNS[index].key;
-        });
-      });
-    });
+    markClientDirectoryRows(table);
 
     updateClientSortButtons(
       table,
