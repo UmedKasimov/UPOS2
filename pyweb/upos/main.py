@@ -18849,9 +18849,22 @@ def create_app() -> FastAPI:
 
                 product_by_id = {str(product.id): product for product in products}
                 product_by_name = {str(product.name or "").strip().casefold(): product for product in products if product.name}
+                # В продажах из IBOX в строке лежит идентификатор IBOX, а не
+                # внутренний номер карточки: без этой карты товар не находился
+                # и себестоимость всего документа выходила нулевой.
+                product_by_external: dict[str, Product] = {}
+                for product in products:
+                    product_data = _json_object(product.data)
+                    for external_key in (product.external_id, product_data.get("ibox_product_id")):
+                        external_key = str(external_key or "").strip()
+                        if external_key:
+                            product_by_external.setdefault(external_key, product)
 
                 def report_product_unit_cost(line: dict[str, Any]) -> Decimal:
-                    product = product_by_id.get(str(line.get("product_id") or ""))
+                    line_product_id = str(line.get("product_id") or "").strip()
+                    product = product_by_id.get(line_product_id)
+                    if product is None and line_product_id:
+                        product = product_by_external.get(line_product_id)
                     if product is None:
                         product = product_by_name.get(str(line.get("product") or "").strip().casefold())
                     if product is None or not _product_uses_stock(product):
@@ -18864,11 +18877,17 @@ def create_app() -> FastAPI:
                     ]
                     if stock_prices:
                         return sum(stock_prices, Decimal("0")) / Decimal(len(stock_prices))
-                    return _sales_decimal(
+                    unit_cost = _sales_decimal(
                         product_data.get("purchase_price")
                         or product_data.get("cost")
                         or product_data.get("last_purchase_price")
                     )
+                    # Закупочная цена из IBOX может быть в долларах — приводим
+                    # к сумам, дальше документ считается как обычно.
+                    purchase_currency = str(product_data.get("purchase_currency") or "UZS").upper()
+                    if purchase_currency == "USD" and report_rate > 0:
+                        unit_cost = unit_cost * report_rate
+                    return unit_cost
 
                 report_rate = _workspace_usd_uzs_rate(wid)
                 reports_usd_rate = report_rate
