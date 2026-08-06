@@ -2,7 +2,7 @@
 {% block title %}{{ _('kassa.title_page') }}{% endblock %}
 {% block extra_head %}
   <meta name="csrf-token" content="{{ csrf_token }}" />
-  <link rel="stylesheet" href="{{ url_for('static', path='kassa-page.css') }}?v=160" />
+  <link rel="stylesheet" href="{{ url_for('static', path='kassa-page.css') }}?v=161" />
 {% endblock %}
 {% block page_header %}
   <div class="kassa-header-line">
@@ -230,6 +230,27 @@
       </label>
     </div>
     </section>
+
+    <dialog class="kassa-tx-dialog" id="kassa-tx-dialog" aria-label="Карточка операции">
+      <div class="kassa-tx-card">
+        <header class="kassa-tx-head">
+          <div>
+            <span class="kassa-tx-kicker" data-kassa-tx-kicker>Операция</span>
+            <strong class="kassa-tx-title" data-kassa-tx-title>—</strong>
+          </div>
+          <button type="button" class="btn btn-secondary" data-kassa-tx-close aria-label="Закрыть">✕</button>
+        </header>
+        <div class="kassa-tx-amount-row">
+          <span class="kassa-tx-amount" data-kassa-tx-amount>—</span>
+          <span class="kassa-tx-type" data-kassa-tx-type>—</span>
+        </div>
+        <dl class="kassa-tx-facts" data-kassa-tx-facts></dl>
+        <section class="kassa-tx-source" data-kassa-tx-source hidden>
+          <h3>Откуда эти деньги</h3>
+          <div class="kassa-tx-source-body" data-kassa-tx-source-body></div>
+        </section>
+      </div>
+    </dialog>
 
     <section class="kassa-overview-grid" aria-label="Сводка кассы">
       <article class="kassa-overview-card">
@@ -579,5 +600,5 @@
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
-  <script src="{{ url_for('static', path='kassa-page.js') }}?v=73" defer></script>
+  <script src="{{ url_for('static', path='kassa-page.js') }}?v=74" defer></script>
 {% endblock %}

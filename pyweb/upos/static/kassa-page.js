@@ -3459,6 +3459,9 @@
   function txCellHtml(tx, key) {
     const text = txColumnText(tx, key) || '—';
     switch (key) {
+      case 'number':
+        // По номеру открывается карточка: видно, откуда деньги и сколько.
+        return `<td data-col="number"><button type="button" class="kassa-tx-open" data-kassa-tx-open="${escapeHtml(String(tx.id || ''))}">${escapeHtml(text)}</button></td>`;
       case 'amount':
         return `<td class="kassa-col-amount" data-col="amount">${escapeHtml(text)}</td>`;
       case 'type':
@@ -3711,6 +3714,146 @@
     }).join('');
     return `<tr class="kassa-table-summary-row kassa-table-summary-row--balance" data-summary-row="true">${cells}</tr>`;
   }
+
+  // ── Карточка операции ───────────────────────────────────────────────────
+  // По номеру в журнале открывается окно: откуда пришли деньги или на что
+  // ушли, на какую сумму и по какому документу.
+
+  const TX_SOURCE_TITLES = {
+    sales: 'Продажа',
+    ibox: 'Документ IBOX',
+    shipment: 'Отгрузка',
+    purchase: 'Закупка',
+    salary: 'Зарплата',
+  };
+
+  function txSourceInfo(tx) {
+    const data = (tx && typeof tx.data === 'object' && tx.data) ? tx.data : {};
+    const source = String(data.source || '').trim();
+
+    if (source === 'sales') {
+      const number = String(data.sales_number || '').trim();
+      const docType = String(data.sales_doc_type || 'sale').trim();
+      const kind = docType === 'return' ? 'Возврат продажи' : (docType === 'order' ? 'Заказ' : 'Продажа');
+      return {
+        title: number ? `${kind} № ${number}` : kind,
+        rows: [
+          ['Документ', number ? `${kind} № ${number}` : kind],
+          ['Сумма документа', String(data.sales_amount || '') || '—'],
+          ['Способ оплаты', String(data.payment_type || '') || '—'],
+          ['Касса', String(data.payment_account || '') || '—'],
+          ['Оформил', String(data.manager || '') || '—'],
+        ],
+        href: number ? `/sales?q=${encodeURIComponent(number)}&doc_type=${encodeURIComponent(docType)}#sales-journal` : '',
+        hrefLabel: 'Открыть документ продажи',
+      };
+    }
+
+    if (source === 'ibox') {
+      const entity = String(data.ibox_entity_type || '').trim();
+      const kinds = {
+        payments_received: 'Приход из IBOX',
+        payments_made: 'Расход из IBOX',
+        salary: 'Зарплата из IBOX',
+      };
+      const kind = kinds[entity] || 'Документ IBOX';
+      const number = String(data.ibox_number || '').trim();
+      return {
+        title: number ? `${kind} № ${number}` : kind,
+        rows: [
+          ['Документ', number ? `${kind} № ${number}` : kind],
+          ['Раздел IBOX', entity || '—'],
+          ['Касса', String(data.payment_account || '') || '—'],
+        ],
+        href: '',
+        hrefLabel: '',
+      };
+    }
+
+    if (source) {
+      return {
+        title: TX_SOURCE_TITLES[source] || source,
+        rows: [['Источник', TX_SOURCE_TITLES[source] || source]],
+        href: '',
+        hrefLabel: '',
+      };
+    }
+    return null;
+  }
+
+  function openTxCard(txId) {
+    const dialog = document.getElementById('kassa-tx-dialog');
+    if (!dialog) return;
+    const tx = (transactions || []).find((item) => String(item.id) === String(txId));
+    if (!tx) return;
+
+    const setText = (selector, value) => {
+      const node = dialog.querySelector(selector);
+      if (node) node.textContent = value;
+    };
+    setText('[data-kassa-tx-kicker]', formatDate(tx.created_at) || 'Операция');
+    setText('[data-kassa-tx-title]', `Операция № ${tx.number || '—'}`);
+    setText('[data-kassa-tx-amount]', formatTransferAmountSummary(tx) || '—');
+    const typeNode = dialog.querySelector('[data-kassa-tx-type]');
+    if (typeNode) {
+      typeNode.innerHTML = getTypeLabel(tx.type, tx);
+      typeNode.dataset.type = String(tx.type || '');
+    }
+
+    const facts = [
+      ['Дата', formatDate(tx.created_at)],
+      ['Категория', tx.category || ''],
+      ['Клиент', tx.client || ''],
+      ['Сотрудник', txEmployeeText(tx)],
+      ['Из кошелька', getPocketName(tx.from_pocket_id)],
+      ['В кошелёк', getPocketName(tx.to_pocket_id)],
+      ['Поставщик', tx.supplier || ''],
+      ['Филиал', tx.branch || ''],
+      ['Примечание', tx.note || ''],
+    ].filter(([, value]) => String(value || '').trim());
+
+    const factsNode = dialog.querySelector('[data-kassa-tx-facts]');
+    if (factsNode) {
+      factsNode.innerHTML = facts
+        .map(([label, value]) => `<div class="kassa-tx-fact"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`)
+        .join('');
+    }
+
+    const info = txSourceInfo(tx);
+    const sourceSection = dialog.querySelector('[data-kassa-tx-source]');
+    const sourceBody = dialog.querySelector('[data-kassa-tx-source-body]');
+    if (sourceSection && sourceBody) {
+      if (info) {
+        const rows = info.rows
+          .filter(([, value]) => String(value || '').trim() && String(value) !== '—')
+          .map(([label, value]) => `<div class="kassa-tx-fact"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`)
+          .join('');
+        const link = info.href
+          ? `<a class="btn btn-secondary kassa-tx-source-link" href="${escapeHtml(info.href)}">${escapeHtml(info.hrefLabel || 'Открыть документ')}</a>`
+          : '';
+        sourceBody.innerHTML = `<dl class="kassa-tx-facts">${rows}</dl>${link}`;
+        sourceSection.hidden = false;
+      } else {
+        sourceBody.innerHTML = '<p class="kassa-tx-manual">Операция заведена вручную в кассе — документа за ней нет.</p>';
+        sourceSection.hidden = false;
+      }
+    }
+
+    if (!dialog.open) dialog.showModal();
+  }
+
+  document.addEventListener('click', (event) => {
+    const opener = event.target.closest?.('[data-kassa-tx-open]');
+    if (opener) {
+      event.preventDefault();
+      openTxCard(opener.dataset.kassaTxOpen);
+      return;
+    }
+    if (event.target.closest?.('[data-kassa-tx-close]')) {
+      event.preventDefault();
+      document.getElementById('kassa-tx-dialog')?.close();
+    }
+  });
 
   function renderTable() {
     if (!els.tableBody) return;
