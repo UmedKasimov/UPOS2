@@ -12591,6 +12591,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   height: clamp(22rem, calc(100vh - 29.5rem), 72rem);
 }
 
+/* Каталог товаров: полоса «Разделы каталога» тоже добавила высоты. */
+.products-list-panel[data-workspace-view~="catalog"] .products-table-wrap--catalog {
+  height: clamp(22rem, calc(100vh - 24.5rem), 72rem);
+}
+
 .warehouse-purchases-board .sales-document-tabs {
   --sales-tabs-count: 3;
 }
