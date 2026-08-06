@@ -9389,6 +9389,21 @@ def create_app() -> FastAPI:
         installer_options = list_installers(wid)
         installation_templates = list_installation_templates(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
+        # Агент и ответственный по задаче выбираются из сотрудников — тот же
+        # список имён, что подсказывает CRM.
+        sales_agent_options = sorted(
+            {
+                name
+                for name in (
+                    [str((request.session.get("user") or {}).get("name") or "").strip()]
+                    + [
+                        str(emp.get("name") or emp.get("username") or "").strip()
+                        for emp in list_employees_safe(wid)
+                    ]
+                )
+                if name
+            }
+        )
         with session_scope() as session:
             requested_crm_id = str(crm_record_id or "").strip()
             if requested_crm_id:
@@ -9911,6 +9926,7 @@ def create_app() -> FastAPI:
                 "crm_stage_filters": crm_stage_filter_options,
                 "business_segments": business_segments,
                 "crm_stages": crm_stages,
+                "responsibles": sales_agent_options,
                 "installers": installer_options,
                 "installation_templates": installation_templates,
                 "installation_priorities": [
@@ -10067,6 +10083,140 @@ def create_app() -> FastAPI:
         settings["client_business_segments"] = segments
         save_workspace_settings(wid, settings)
         return JSONResponse({"ok": True, "segment": segment})
+
+    def _sales_apply_crm_agent_and_task(
+        session,
+        request: Request,
+        background_tasks: BackgroundTasks,
+        wid: str,
+        sale_row: SaleDocument,
+        sale_data: dict[str, Any],
+        form: Any,
+    ) -> None:
+        """Агент и задача из формы продажи уходят в связанную карточку CRM
+        той же структурой, что и в самом CRM. Сделку находит по документу,
+        контрагенту или клиенту; без сделки — создаёт на первом этапе."""
+        responsible = re.sub(r"\s+", " ", str(form.get("crm_responsible") or "")).strip()[:120]
+        task_text = re.sub(r"\s+", " ", str(form.get("crm_task_text") or "")).strip()[:500]
+        if not responsible and not task_text:
+            return
+        stages = _crm_workspace_stages(wid)
+        crm_rows = list(
+            session.execute(
+                select(CrmRecord)
+                .where(CrmRecord.workspace_owner_id == wid)
+                .order_by(CrmRecord.updated_at.desc())
+            ).scalars()
+        )
+        crm_index = _sales_crm_index(crm_rows, stages)
+        records_by_id = crm_index["records_by_id"]
+        client_name = str(sale_data.get("client") or "").strip()
+        counterparty_id = str(sale_row.counterparty_id or sale_data.get("counterparty_id") or "").strip()
+        direct_record = records_by_id.get(str(sale_data.get("crm_record_id") or "").strip())
+        deal_row = direct_record if direct_record and direct_record.item_type == "deal" else None
+        if direct_record and direct_record.item_type == "task":
+            direct_data = _json_object(direct_record.data)
+            related_deal = records_by_id.get(str(direct_data.get("related_deal_id") or "").strip())
+            if related_deal and related_deal.item_type == "deal":
+                deal_row = related_deal
+        if deal_row is None and counterparty_id:
+            deal_row = crm_index["deals_by_counterparty"].get(counterparty_id)
+        if deal_row is None and client_name:
+            deal_row = crm_index["deals_by_client"].get(client_name.casefold())
+        actor = _crm_actor_name(request)
+        doc_label = _sales_doc_type_label(str(sale_data.get("doc_type") or "sale"))
+        if deal_row is None:
+            deal_data: dict[str, Any] = {
+                "item_type": "deal",
+                "client": client_name,
+                "responsible": responsible or str(sale_data.get("manager") or actor).strip(),
+                "date": str(sale_data.get("date") or ""),
+                "due_date": "",
+                "lead_source": "Продажи",
+                "contact_type": "",
+                "chat_ref": "",
+                "service_type": "",
+                "priority": "normal",
+                "next_step": "",
+                "probability": "",
+                "note": f"Создано из документа {sale_row.number}",
+                "lost_reason": "",
+                "tags": [doc_label],
+                "sales_document_ids": [sale_row.id],
+            }
+            if stages:
+                _crm_apply_stage(deal_data, stages, stages[0]["id"])
+            _crm_append_activity(deal_data, "Сделка создана из продажи", actor, f"{doc_label} {sale_row.number}")
+            deal_row = CrmRecord(
+                id=str(uuid.uuid4()),
+                workspace_owner_id=wid,
+                item_type="deal",
+                title=f"{doc_label} {sale_row.number}",
+                counterparty_id=counterparty_id or None,
+                status="in_progress",
+                due_date="",
+                amount=sale_row.amount,
+                currency=sale_row.currency,
+                data=deal_data,
+            )
+            session.add(deal_row)
+        else:
+            deal_data = _json_object(deal_row.data).copy()
+        if responsible:
+            previous_responsible = str(deal_data.get("responsible") or "").strip()
+            deal_data["responsible"] = responsible
+            if previous_responsible != responsible:
+                _crm_append_activity(deal_data, "Ответственный назначен из продажи", actor, responsible)
+        if task_text:
+            due_date = str(form.get("crm_task_due_date") or "").strip()[:10]
+            due_time = str(form.get("crm_task_due_time") or "").strip()[:5]
+            assignee = re.sub(r"\s+", " ", str(form.get("crm_task_assignee") or "")).strip()[:120] or responsible
+            participants = re.sub(r"\s+", " ", str(form.get("crm_task_participants") or "")).strip()[:240]
+            reminder_at = str(form.get("crm_task_reminder_at") or "").strip()[:16]
+            priority = str(form.get("crm_task_priority") or "normal").strip().lower()
+            if priority not in {"low", "normal", "high", "urgent"}:
+                priority = "normal"
+            checklist = [
+                re.sub(r"\s+", " ", item).strip()[:160]
+                for item in str(form.get("crm_task_checklist") or "").splitlines()
+                if re.sub(r"\s+", " ", item).strip()
+            ][:12]
+            raw_events = deal_data.get("activity_log") if isinstance(deal_data.get("activity_log"), list) else []
+            events = [item for item in raw_events if isinstance(item, dict)][-99:]
+            events.append(
+                {
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "action": "Задача",
+                    "actor": actor,
+                    "detail": task_text,
+                    "kind": "task",
+                    "due_date": due_date,
+                    "due_time": due_time,
+                    "assignee": assignee,
+                    "participants": participants,
+                    "reminder_at": reminder_at,
+                    "priority": priority,
+                    "checklist": checklist,
+                    "completed": False,
+                }
+            )
+            deal_data["activity_log"] = events
+            if assignee:
+                assignee_id = _employee_user_id_by_name(wid, assignee)
+                if assignee_id:
+                    when = " · ".join(part for part in (due_date, due_time) if part)
+                    background_tasks.add_task(
+                        push_notify_users,
+                        wid,
+                        [assignee_id],
+                        title="Новая задача",
+                        body=f"{task_text}{f' ({when})' if when else ''} · {deal_row.title or client_name}".strip(" ·"),
+                        url="/crm",
+                        tag=f"crm-task-{deal_row.id}",
+                    )
+        deal_row.data = deal_data
+        flag_modified(deal_row, "data")
+        sale_data["crm_record_id"] = deal_row.id
 
     @app.post("/sales/save", name="sales_save")
     async def sales_save(request: Request, background_tasks: BackgroundTasks):
@@ -10321,6 +10471,9 @@ def create_app() -> FastAPI:
                 )
                 linked_crm_row.data = crm_data
                 flag_modified(linked_crm_row, "data")
+            _sales_apply_crm_agent_and_task(session, request, background_tasks, wid, row, data, form)
+            row.data = data
+            flag_modified(row, "data")
         try:
             _sync_sales_cash_transactions(
                 wid,
