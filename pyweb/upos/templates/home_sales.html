@@ -28,6 +28,7 @@
     class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root sales-workspace products-workspace workspace-module-root workspace-module-root--sales{% if sales_embed %} sales-workspace--embed{% endif %}"
     data-workspace-tabs
     data-workspace-key="sales"
+    data-workspace-home-tab-id="journal"
     data-workspace-default-tab="{{ sales_default_tab }}"
     data-workspace-force-tab="{{ '' if sales_embed else ('journal' if flash_ok in sales_saved_messages else '') }}"
     data-workspace-close-tabs-on-load="{{ '' if sales_embed else ('new' if flash_ok in ['saved', 'order_saved', 'return_saved', 'updated'] else '') }}"

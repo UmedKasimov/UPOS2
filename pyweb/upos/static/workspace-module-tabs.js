@@ -304,6 +304,13 @@
     }
 
     function goHome(options = {}) {
+      // У раздела без домашнего экрана кнопка раздела открывает главную
+      // вкладку: в продажах карточек больше нет, и «домой» вело в пустоту.
+      const homeTabId = normalize(root.dataset.workspaceHomeTabId);
+      if (homeTabId && tabMeta.has(homeTabId)) {
+        openTab(homeTabId, options);
+        return;
+      }
       activeTab = "";
       saveState();
       const url = homeUrl();
