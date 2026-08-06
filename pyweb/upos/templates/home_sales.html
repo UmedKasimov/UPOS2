@@ -82,16 +82,10 @@
         <span>Журнал</span>
         <small>Продажи по документам</small>
       </a>
-      <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=order#order" data-workspace-card="order" data-workspace-tab-title="Заказы" data-workspace-tab-hash="order" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=order">
-        <span class="general-report-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
-            <path d="M9 8h6M9 12h6" />
-          </svg>
-        </span>
-        <span>Заказы</span>
-        <small>Резерв и ожидание оплаты</small>
-      </a>
+      {# Карточка «Заказы» убрана, но вкладка живёт: контроллер берёт из
+         этой записи название и адрес — без неё прямая ссылка на заказы
+         открывала бы пустой экран. #}
+      <span hidden aria-hidden="true" data-workspace-card="order" data-workspace-tab-title="Заказы" data-workspace-tab-hash="order" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=order"></span>
       <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=return#return" data-workspace-card="return" data-workspace-tab-title="Возвраты" data-workspace-tab-hash="return" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=return">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
