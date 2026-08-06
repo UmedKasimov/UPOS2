@@ -10218,6 +10218,28 @@ def create_app() -> FastAPI:
         flag_modified(deal_row, "data")
         sale_data["crm_record_id"] = deal_row.id
 
+    @app.post("/sales/{sale_id}/crm-task", name="sales_crm_task_add")
+    async def sales_crm_task_add(request: Request, sale_id: str, background_tasks: BackgroundTasks):
+        """Задача из детали документа: уходит в связанную сделку CRM, при
+        необходимости создавая её — та же логика, что у формы продажи."""
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir or not wid:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        if not re.sub(r"\s+", " ", str(form.get("crm_task_text") or "")).strip():
+            return JSONResponse({"ok": False, "error": "empty"}, status_code=400)
+        with session_scope() as session:
+            row = session.get(SaleDocument, sale_id)
+            if not row or row.workspace_owner_id != wid:
+                return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+            data = _json_object(row.data).copy()
+            _sales_apply_crm_agent_and_task(session, request, background_tasks, wid, row, data, form)
+            row.data = data
+            flag_modified(row, "data")
+        return JSONResponse({"ok": True})
+
     @app.post("/sales/save", name="sales_save")
     async def sales_save(request: Request, background_tasks: BackgroundTasks):
         form = await request.form()

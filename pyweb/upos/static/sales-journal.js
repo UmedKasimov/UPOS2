@@ -1062,10 +1062,56 @@
     });
   }
 
+  function bindDetailTaskForm(scope) {
+    var panel = scope.querySelector("[data-sales-journal-detail]");
+    var form = panel ? panel.querySelector("[data-sales-detail-task-form]") : null;
+    if (!form || form.dataset.salesDetailTaskReady === "1") return;
+    form.dataset.salesDetailTaskReady = "1";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var saleId = panel.dataset.saleId || "";
+      if (!saleId) return;
+      var status = form.querySelector("[data-sales-detail-task-status]");
+      var submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      if (status) {
+        status.hidden = false;
+        status.textContent = "Сохраняю...";
+      }
+      fetch("/sales/" + encodeURIComponent(saleId) + "/crm-task", {
+        method: "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json" },
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (body) {
+            if (!response.ok || !body.ok) throw new Error(body.error === "csrf" ? "Обновите страницу и повторите" : "Не удалось добавить задачу");
+            return body;
+          });
+        })
+        .then(function () {
+          if (status) status.textContent = "Задача добавлена в CRM";
+          form.querySelectorAll('input[name="crm_task_text"], input[name="crm_task_due_date"], input[name="crm_task_due_time"], input[name="crm_task_assignee"]').forEach(function (input) {
+            input.value = "";
+          });
+        })
+        .catch(function (error) {
+          if (status) {
+            status.hidden = false;
+            status.textContent = error.message || "Не удалось добавить задачу";
+          }
+        })
+        .finally(function () {
+          if (submit) submit.disabled = false;
+        });
+    });
+  }
+
   function init(root) {
     var scope = root || document;
     bindSalesJournalFilter(scope);
     bindSalesJournalSort(scope);
+    bindDetailTaskForm(scope);
     highlightSalesJournalMatches(scope);
     initStatusSelects(scope);
     scope.querySelectorAll("[data-sales-journal-open]").forEach(function (trigger) {

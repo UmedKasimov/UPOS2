@@ -821,6 +821,21 @@
             </div>
           </section>
           <section class="warehouse-purchase-detail-pane sales-document-tasks-pane" data-sales-detail-pane="tasks" hidden>
+            {# Форма — как задача в карточке CRM; уходит в связанную сделку документа. #}
+            <form class="crm-card-detail-activity-form crm-card-detail-task-form sales-document-task-form" data-sales-detail-task-form>
+              {% include "_csrf_field.html" %}
+              <div class="crm-task-form-main">
+                <input name="crm_task_text" maxlength="500" placeholder="Название задачи" required />
+              </div>
+              <div class="crm-task-form-grid">
+                <label><span>Дата</span><input name="crm_task_due_date" type="date" /></label>
+                <label><span>Время</span><input name="crm_task_due_time" type="time" /></label>
+                <label><span>Ответственный</span><input name="crm_task_assignee" list="sales-crm-responsible-list" placeholder="Сотрудник" /></label>
+                <label><span>Приоритет</span><select name="crm_task_priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
+              </div>
+              <div class="sales-document-task-form-status" data-sales-detail-task-status hidden></div>
+              <button class="btn" type="submit">Добавить задачу</button>
+            </form>
             <div class="sales-document-completed-tasks" data-sales-detail-tasks></div>
           </section>
           <footer class="warehouse-purchase-detail-footer">
@@ -1695,7 +1710,7 @@
 {% block scripts %}
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=29" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=30" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=62" defer></script>
   {% if sales_embed %}
