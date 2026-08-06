@@ -1390,6 +1390,10 @@
     var numbers = installmentNumbers(root);
     var monthsInput = root.querySelector("[data-sales-installment-months]");
     if (monthsInput && document.activeElement !== monthsInput) monthsInput.value = String(numbers.months);
+    // Расчёт показываем, когда условия заданы: пустая сводка с нулями
+    // человеку ничего не говорила.
+    var summary = root.querySelector("[data-sales-installment-summary]");
+    if (summary) summary.hidden = !(state.initial || state.markup || state.months > 1);
     setMoneyText(root, "[data-sales-installment-total]", numbers.total, numbers.currency);
     setMoneyText(root, "[data-sales-installment-initial]", numbers.initial, numbers.currency);
     setMoneyText(root, "[data-sales-installment-rest]", numbers.rest, numbers.currency);
@@ -1473,10 +1477,12 @@
     var dialog = document.querySelector("[data-sales-installment-dialog]");
 
     root.querySelector("[data-sales-installment-add]")?.addEventListener("click", function () {
-      // Рассрочка включается только после «Сохранить» в условиях: иначе
-      // сводка с нулями висела в форме у обычной продажи.
+      // Нажатие открывает блок рассрочки: срок и кнопка «Условия рассрочки».
+      // Расчёт появляется, когда условия заданы.
+      if (enabledField) enabledField.value = "1";
       if (monthsField && !monthsField.value) monthsField.value = "1";
-      openInstallmentDialog(root);
+      updateInstallmentSummary(root);
+      scheduleSalesDraft(root);
     });
     root.querySelector("[data-sales-installment-remove]")?.addEventListener("click", function () {
       if (enabledField) enabledField.value = "0";

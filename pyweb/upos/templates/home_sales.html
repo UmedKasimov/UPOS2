@@ -1278,7 +1278,7 @@
                 </label>
                 <button type="button" class="btn btn-secondary" data-sales-installment-open>Условия рассрочки</button>
               </div>
-              <div class="sales-installment-summary" data-sales-installment-summary>
+              <div class="sales-installment-summary" data-sales-installment-summary hidden>
                 <div class="sales-installment-summary-row sales-installment-summary-row--total">
                   <span>Итого</span>
                   <strong data-sales-installment-total>0 UZS</strong>
@@ -1838,7 +1838,7 @@
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=31" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=64" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=65" defer></script>
   {% if sales_embed %}
     <script>
       (() => {
