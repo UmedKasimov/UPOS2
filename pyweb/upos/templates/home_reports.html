@@ -62,6 +62,13 @@
         <span>Прибыль</span>
         <small>Доходы и все расходы</small>
       </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="sales-cost" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 4h18v16H3z"></path><path d="M3 9h18"></path><path d="M9 9v11"></path><path d="M15 9v11"></path></svg>
+        </span>
+        <span>Продажи и себестоимость</span>
+        <small>Каждый документ: сумма и прибыль</small>
+      </button>
       <button type="button" class="general-report-card" role="tab" data-org-report-card="stock-movement" aria-selected="false">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 13h10"/><path d="m8 17-3-3 3-3"/><path d="m16 11 3 3-3 3"/></svg>
@@ -388,6 +395,71 @@
             <div class="reports-category-row"><div class="reports-category-main"><span><small>Оплаты поставщикам за товар не входят в расходы — закуп уже учтён в себестоимости.</small></span></div></div>
           </div>
         </article>
+      </section>
+
+      <section class="reports-panel" id="report-sales-cost" data-org-report-panel="sales-cost" hidden>
+        {% set sc_summary = (business_reports.profit or {}).summary or {} %}
+        {% set sc_rows = (business_reports.profit or {}).sales_rows or [] %}
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Прибыль</p>
+            <h2>Продажи и себестоимость</h2>
+            <p>{{ sc_summary.period }} · документов: {{ sc_rows | length }}</p>
+          </div>
+          <div class="reports-stock-analysis-tools">
+            <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
+              <button type="button" data-profit-currency="UZS" {% if report_currency == 'UZS' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>UZS</button>
+              <button type="button" data-profit-currency="USD" {% if report_currency == 'USD' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>USD</button>
+            </div>
+            <div class="reports-balance-total">
+              <span><b data-profit-money data-money-uzs="{{ sc_summary.cost_uzs or 0 }}">{{ sc_summary.cost or "0 UZS" }}</b> себестоимость</span>
+              <span><b data-profit-money data-money-uzs="{{ sc_summary.gross_uzs or 0 }}">{{ sc_summary.gross or "0 UZS" }}</b> прибыль</span>
+            </div>
+          </div>
+        </header>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>№</th>
+                <th>Тип</th>
+                <th>Клиент</th>
+                <th>Продажа</th>
+                <th>Себестоимость</th>
+                <th>Прибыль</th>
+                <th>Маржа</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in sc_rows %}
+                <tr>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.number or "-" }}</td>
+                  <td>{{ row.kind }}</td>
+                  <td>{{ row.client }}</td>
+                  <td><span data-profit-money data-money-uzs="{{ row.amount_uzs }}">{{ row.amount }}</span></td>
+                  <td><span data-profit-money data-money-uzs="{{ row.cost_uzs }}">{{ row.cost }}</span></td>
+                  <td{% if row.profit_negative %} class="is-negative"{% endif %}><span data-profit-money data-money-uzs="{{ row.profit_uzs }}">{{ row.profit }}</span></td>
+                  <td>{{ row.margin }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="8" class="reports-empty-state">Продаж за период нет.</td></tr>
+              {% endfor %}
+            </tbody>
+            {% if sc_rows %}
+              <tfoot>
+                <tr>
+                  <td colspan="4"><strong>Итого</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_summary.revenue_uzs or 0 }}">{{ sc_summary.revenue or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_summary.cost_uzs or 0 }}">{{ sc_summary.cost or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_summary.gross_uzs or 0 }}">{{ sc_summary.gross or "0 UZS" }}</strong></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
       </section>
 
       <section class="reports-panel" id="report-stock-movement" data-org-report-panel="stock-movement" hidden>
@@ -798,6 +870,7 @@
     'delivery-shipments': 'Отгрузки',
     'sales-overview': 'Продажи',
     'profit': 'Прибыль',
+    'sales-cost': 'Продажи и себестоимость',
     'company-balance': 'Баланс компании',
     'stock-movement': 'Движение по складу',
     'stock-analysis': 'Анализ остатков',

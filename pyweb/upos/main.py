@@ -18907,6 +18907,7 @@ def create_app() -> FastAPI:
                     )
 
                 sale_docs: list[SaleDocument] = []
+                profit_sales_rows: list[dict[str, Any]] = []
                 sales_report_rows: list[dict[str, Any]] = []
                 top_clients: dict[str, Decimal] = {}
                 top_products: dict[str, Decimal] = {}
@@ -18959,12 +18960,28 @@ def create_app() -> FastAPI:
                             # в работе выручка была, себестоимость нулевая, и вся
                             # сумма показывалась чистой прибылью.
                             cost_total += document_cost
+                            profit_sales_rows.append({
+                                "date": doc_date,
+                                "number": str(row.number or ""),
+                                "client": client,
+                                "kind": "Продажа",
+                                "amount_value": amount_primary,
+                                "cost_value": document_cost,
+                            })
                         if records_profit:
                             profit_total += amount_primary - document_cost
                     elif doc_type == "return":
                         return_count += 1
                         returns_total += amount_primary
                         cost_total -= document_cost
+                        profit_sales_rows.append({
+                            "date": doc_date,
+                            "number": str(row.number or ""),
+                            "client": client,
+                            "kind": "Возврат",
+                            "amount_value": -amount_primary,
+                            "cost_value": -document_cost,
+                        })
                         profit_total -= amount_primary - document_cost
                         top_clients[client] = top_clients.get(client, Decimal("0")) - amount_primary
                         day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) - amount_primary
@@ -18975,6 +18992,14 @@ def create_app() -> FastAPI:
                             paid_total += report_to_primary(paid_amount, currency)
                             debt_total += report_to_primary(debt_amount, currency)
                             cost_total += document_cost
+                            profit_sales_rows.append({
+                                "date": doc_date,
+                                "number": str(row.number or ""),
+                                "client": client,
+                                "kind": "Заказ",
+                                "amount_value": amount_primary,
+                                "cost_value": document_cost,
+                            })
                         if records_profit:
                             profit_total += amount_primary - document_cost
                             top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
@@ -19136,6 +19161,24 @@ def create_app() -> FastAPI:
                 for profit_row in profit_other_income_rows:
                     profit_row["amount_uzs"] = profit_to_uzs(profit_row.get("amount_primary") or Decimal("0"))
 
+                profit_sales_rows.sort(key=lambda item: str(item.get("date") or ""), reverse=True)
+                for sales_row in profit_sales_rows:
+                    row_amount = sales_row.pop("amount_value")
+                    row_cost = sales_row.pop("cost_value")
+                    row_profit = row_amount - row_cost
+                    sales_row["amount"] = _report_money(row_amount, primary_currency)
+                    sales_row["amount_uzs"] = profit_to_uzs(row_amount)
+                    sales_row["cost"] = _report_money(row_cost, primary_currency)
+                    sales_row["cost_uzs"] = profit_to_uzs(row_cost)
+                    sales_row["profit"] = _report_money(row_profit, primary_currency)
+                    sales_row["profit_uzs"] = profit_to_uzs(row_profit)
+                    sales_row["profit_negative"] = row_profit < 0
+                    sales_row["margin"] = (
+                        f"{(row_profit / row_amount * Decimal('100')).quantize(Decimal('0.1'))}%"
+                        if row_amount > 0
+                        else "-"
+                    )
+
                 business_reports["profit"] = {
                     "summary": {
                         "period": report_data["period_label"],
@@ -19156,6 +19199,7 @@ def create_app() -> FastAPI:
                     },
                     "expenses": profit_expense_rows[:100],
                     "other_income": profit_other_income_rows[:50],
+                    "sales_rows": profit_sales_rows[:300],
                 }
 
                 stock_movements: dict[str, dict[str, Any]] = {}
