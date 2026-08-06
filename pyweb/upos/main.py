@@ -13306,6 +13306,7 @@ def create_app() -> FastAPI:
         program: str = "",
         route: str = "",
         status: str = "all",
+        ownership: str = "",
         client_sort: str = "",
         client_sort_dir: str = "desc",
         page_size: str = "100",
@@ -13328,6 +13329,8 @@ def create_app() -> FastAPI:
             "program": program.strip(),
             "route": route.strip(),
             "status": status.strip() or "all",
+            # Наш клиент — тот, за кем закреплена программа: он с нами работает.
+            "ownership": ownership.strip() if ownership.strip() in ("ours", "others") else "",
         }
         q_clean = filters["q"].casefold().replace("ё", "е")
         q_tokens = [
@@ -13510,6 +13513,10 @@ def create_app() -> FastAPI:
                     continue
                 if filters["status"] != "all" and item["status"] != filters["status"]:
                     continue
+                if filters["ownership"] == "ours" and not item.get("is_ours"):
+                    continue
+                if filters["ownership"] == "others" and item.get("is_ours"):
+                    continue
                 clients_records.append(item)
                 item["last_contact"] = client_last_contact(row, item)
                 route_key = item["route"] or "Без маршрута"
@@ -13583,14 +13590,43 @@ def create_app() -> FastAPI:
         if clients_sort_key:
             value_key, value_kind = client_sort_keys[clients_sort_key]
 
+            def clients_raw_value(item: dict[str, Any]) -> Any:
+                """То же значение, что человек видит в столбце.
+
+                Столбец сегмента показывает список сегментов, а старое
+                одиночное поле почти у всех пустое: сортировка по нему
+                выглядела так, будто стрелка ничего не делает.
+                """
+                if value_key == "business_segment":
+                    segments = item.get("business_segments")
+                    if isinstance(segments, list):
+                        for segment in segments:
+                            name = str((segment or {}).get("name") or "").strip()
+                            if name:
+                                return name
+                    return str(item.get("business_segment") or "").strip()
+                return item.get(value_key)
+
+            def clients_has_value(item: dict[str, Any]) -> bool:
+                """Есть ли что показывать в этом столбце.
+
+                У чисел ноль — это отсутствие данных: клиент без долга не
+                должен опережать тех, у кого долг есть.
+                """
+                value = clients_raw_value(item)
+                if value_kind == "number":
+                    return _sales_decimal(value) != 0
+                return bool(str(value or "").strip())
+
             def clients_sort_value(item: dict[str, Any]) -> Any:
-                value = item.get(value_key)
+                value = clients_raw_value(item)
                 if value_kind == "number":
                     return _sales_decimal(value)
                 return str(value or "").strip().casefold()
 
-            populated_clients = [item for item in all_clients_records if str(item.get(value_key) or "").strip()]
-            empty_clients = [item for item in all_clients_records if not str(item.get(value_key) or "").strip()]
+            # Строки с данными всегда наверху — в обе стороны стрелки.
+            populated_clients = [item for item in all_clients_records if clients_has_value(item)]
+            empty_clients = [item for item in all_clients_records if not clients_has_value(item)]
             populated_clients.sort(
                 key=clients_sort_value,
                 reverse=clients_sort_direction == "desc",
@@ -13708,6 +13744,7 @@ def create_app() -> FastAPI:
             clients_sort_key=clients_sort_key,
             clients_sort_direction=clients_sort_direction,
             clients_map_records=clients_map_records,
+            client_ownership=filters["ownership"],
             clients_map_filter=_clean_clients_map_filter(
                 (load_workspace_settings(wid) or {}).get("clients_map_filter")
             ),

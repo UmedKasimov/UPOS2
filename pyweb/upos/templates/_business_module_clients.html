@@ -94,6 +94,14 @@
           <input name="route" list="client-route-list" value="{{ client_filters.route }}" placeholder="Маршрут" />
         </label>
         <label>
+          <span>Клиенты</span>
+          <select name="ownership">
+            <option value="" {% if not client_ownership %}selected{% endif %}>Все</option>
+            <option value="ours" {% if client_ownership == 'ours' %}selected{% endif %}>Наши клиенты</option>
+            <option value="others" {% if client_ownership == 'others' %}selected{% endif %}>Не наши</option>
+          </select>
+        </label>
+        <label>
           <span>Статус</span>
           <select name="status">
             <option value="all" {% if client_filters.status == 'all' %}selected{% endif %}>Все</option>
