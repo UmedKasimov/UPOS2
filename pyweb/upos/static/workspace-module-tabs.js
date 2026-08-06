@@ -196,10 +196,9 @@
       if (!window.history?.replaceState || !url) return;
       const next = `${url.pathname}${url.search}${url.hash}`;
       window.history.replaceState(null, "", next);
-      if (url.hash) {
-        const target = document.getElementById(url.hash.slice(1));
-        target?.scrollIntoView({ block: "start" });
-      }
+      // Раньше страница прокручивалась к якорю вкладки и уезжала вниз: шапка
+      // раздела оставалась выше экрана. Вкладку открываем с самого верха.
+      window.scrollTo({ top: 0 });
     }
 
     function renderViews() {
