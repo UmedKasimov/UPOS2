@@ -2533,7 +2533,8 @@
   let locationsPollTimer = 0;
 
   function setLocationsStatus(section, text) {
-    const node = section?.querySelector("[data-clients-locations-status]");
+    const node = section?.querySelector("[data-clients-locations-status]")
+      || document.querySelector("[data-clients-locations-status]");
     if (node) node.textContent = text || "";
   }
 
@@ -2582,6 +2583,7 @@
     if (!trigger) return;
     event.preventDefault();
     const section = trigger.closest("#clients-map") || document;
+    // Кнопка живёт в шапке списка клиентов, а не только на вкладке карты.
     trigger.disabled = true;
     setLocationsStatus(section, "Запускаю…");
     try {
@@ -2609,9 +2611,8 @@
   });
 
   function initClientsLocations() {
-    const section = document.querySelector("#clients-map");
-    if (!section || !section.querySelector("[data-clients-locations-fill]")) return;
-    pollLocationsStatus(section);
+    if (!document.querySelector("[data-clients-locations-fill]")) return;
+    pollLocationsStatus(document);
   }
 
   if (document.readyState === "loading") {
