@@ -264,11 +264,32 @@
     if (locked) closePanel(combo);
   }
 
+  function comboValueExists(combo, value) {
+    var type = combo.getAttribute("data-sales-combobox") || "";
+    var name = normalize(value);
+    if (!name) return false;
+    var options = readOptions();
+    if (type === "client") {
+      return (options.client_rows || []).some(function (row) {
+        return normalize(row.name) === name;
+      });
+    }
+    if (type === "product" || type === "service") {
+      return (options.product_rows || []).some(function (row) {
+        return productKind(row) === type && normalize(row.name) === name;
+      });
+    }
+    return false;
+  }
+
   function commitCombo(combo, value) {
     var input = combo.querySelector("[data-sales-combo-input]");
     if (!input) return;
     input.value = value || "";
-    setLocked(combo, !!input.value && /^(client|product|service)$/.test(combo.getAttribute("data-sales-combobox") || ""));
+    // Блокируем поле только под настоящую запись справочника: черновик с
+    // недописанным названием оставлял readonly-поле, из которого список
+    // товаров уже не открывался.
+    setLocked(combo, comboValueExists(combo, input.value));
     scheduleSalesDraft(combo.closest(".sales-form"));
   }
 
