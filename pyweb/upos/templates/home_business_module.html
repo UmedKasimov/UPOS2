@@ -154,6 +154,12 @@
     <div class="workspace-module-stack" data-workspace-view="{{ module_stack_views }}" hidden>
       {% if active == "warehouse" %}
         {% include "_business_module_warehouse.html" %}
+        {# База поставщиков открывается вкладкой склада, рядом с закупками и
+           перемещениями: собственные закупки поставщика при этом скрыты —
+           имя панели «purchases» здесь занято закупками склада. #}
+        {% with suppliers_embedded = true %}
+          {% include "_business_module_suppliers.html" %}
+        {% endwith %}
       {% elif active == "clients" %}
         {% include "_business_module_clients.html" %}
       {% elif active == "suppliers" %}

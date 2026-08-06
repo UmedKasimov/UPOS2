@@ -1,5 +1,6 @@
 {# Верхний тулбар на списке поставщиков дублировал заголовок панели —
    показываем его только в закупках и кредиторке. #}
+{% if not suppliers_embedded %}
 <div class="business-module-toolbar" data-workspace-view="purchases payables" hidden>
   <div>
     <p class="settings-ios-footnote">{{ module.subtitle }}</p>
@@ -16,6 +17,8 @@
   <a class="btn btn-secondary" href="{{ url_for('suppliers_get') }}">Очистить</a>
 </form>
 
+{% endif %}
+
 <datalist id="supplier-category-list">
   {% for item in supplier_options.categories %}<option value="{{ item }}">{% endfor %}
 </datalist>
@@ -29,7 +32,7 @@
   {% for item in supplier_options.warehouses %}<option value="{{ item }}">{% endfor %}
 </datalist>
 
-<div class="products-layout" data-workspace-view="suppliers purchases" hidden>
+<div class="products-layout" data-workspace-view="suppliers{% if not suppliers_embedded %} purchases{% endif %}" hidden>
   <article class="products-list-panel suppliers-list-panel" data-workspace-view="suppliers" hidden>
     <header class="products-panel-head suppliers-panel-head">
       <div class="products-panel-titleline">
@@ -228,6 +231,7 @@
   </article>
 
 
+  {% if not suppliers_embedded %}
   <article class="products-list-panel" data-workspace-view="purchases" hidden>
     <header class="products-panel-head">
       <div>
@@ -322,6 +326,7 @@
       </div>
     </form>
   </aside>
+  {% endif %}
 </div>
 
 <section id="supplier-create" class="products-list-panel client-create-shell" data-workspace-view="supplier_create" hidden>
@@ -603,6 +608,7 @@
   </section>
 {% endif %}
 
+{% if not suppliers_embedded %}
 <section class="products-dictionaries" data-workspace-view="payables" hidden>
   <article data-workspace-view="payables" hidden>
     <h2>Кредиторка</h2>
@@ -636,3 +642,4 @@
     </div>
   </article>
 </section>
+{% endif %}

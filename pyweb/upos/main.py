@@ -3237,7 +3237,7 @@ def create_app() -> FastAPI:
                     {"id": "transfers", "title": "Перемещения", "subtitle": "Между складами", "icon": "transfer"},
                     {"id": "warehouses", "title": "Склады", "subtitle": "Создание и настройки", "icon": "warehouse"},
                     {"id": "adjustments", "title": "Корректировки", "subtitle": "Приход и списание", "icon": "adjustment"},
-                    {"id": "suppliers", "title": "Поставщики", "subtitle": "База контрагентов", "icon": "suppliers", "href": "/suppliers"},
+                    {"id": "suppliers", "title": "Поставщики", "subtitle": "База контрагентов", "icon": "suppliers"},
                 ],
                 "filters": ["Поиск", "Склад", "Товар", "Дата", "Тип операции"],
                 "columns": ["Документ", "Дата", "Склад", "Товар", "Количество", "Статус"],
@@ -13255,6 +13255,9 @@ def create_app() -> FastAPI:
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
+            # База поставщиков живёт вкладкой склада, поэтому её данные
+            # отдаются вместе со складом.
+            **_suppliers_module_context(wid, supplier=str(request.query_params.get("supplier") or "")),
         )
 
     @app.post("/warehouse/save", name="warehouse_save")
@@ -14756,21 +14759,16 @@ def create_app() -> FastAPI:
             flag_modified(row, "data")
         return RedirectResponse(url="/clients?msg=saved#routes", status_code=302)
 
-    @app.get("/suppliers", response_class=HTMLResponse, name="suppliers_get")
-    def suppliers_get(
-        request: Request,
+    def _suppliers_module_context(
+        wid: str,
+        *,
         q: str = "",
         status: str = "all",
         category: str = "",
         supplier: str = "",
-    ):
-        module_redirect = _employee_module_redirect(request, "suppliers")
-        if module_redirect is not None:
-            return module_redirect
-        wid, redir = _product_workspace_owner(request)
-        if redir:
-            return redir
-        assert wid is not None
+    ) -> dict[str, Any]:
+        """Данные базы поставщиков: используются и своим разделом, и вкладкой
+        «Поставщики» внутри склада."""
         filters = {
             "q": q.strip(),
             "status": status.strip() or "all",
@@ -14912,22 +14910,42 @@ def create_app() -> FastAPI:
             "debt_count": sum(1 for item in supplier_records if item["balance_value"] > 0),
             "advance_count": sum(1 for item in supplier_records if item["balance_value"] < 0),
         }
+        return {
+            "supplier_filters": filters,
+            "supplier_options": supplier_options,
+            "supplier_records": supplier_records,
+            "supplier_balance_summary": supplier_balance_summary,
+            "supplier_purchases": supplier_purchases,
+            "supplier_payables": supplier_payables,
+            "selected_supplier_card": selected_supplier_card,
+        }
+
+    @app.get("/suppliers", response_class=HTMLResponse, name="suppliers_get")
+    def suppliers_get(
+        request: Request,
+        q: str = "",
+        status: str = "all",
+        category: str = "",
+        supplier: str = "",
+    ):
+        module_redirect = _employee_module_redirect(request, "suppliers")
+        if module_redirect is not None:
+            return module_redirect
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        context = _suppliers_module_context(wid, q=q, status=status, category=category, supplier=supplier)
         return tpl(
             request,
             "home_business_module.html",
             variant="user",
             active="suppliers",
             module=_business_module_context("suppliers"),
-            supplier_filters=filters,
-            supplier_options=supplier_options,
-            supplier_records=supplier_records,
-            supplier_balance_summary=supplier_balance_summary,
-            supplier_purchases=supplier_purchases,
-            supplier_payables=supplier_payables,
-            selected_supplier_card=selected_supplier_card,
             today=datetime.now(timezone.utc).date().isoformat(),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
+            **context,
         )
 
     @app.post("/warehouse/suppliers/quick-save", name="warehouse_supplier_quick_save")
