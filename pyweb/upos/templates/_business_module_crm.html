@@ -244,7 +244,9 @@
       <section
         class="crm-kanban-column"
         data-crm-stage-id="{{ column.id }}"
-        data-crm-stage-outcome="{% if column.id == 'lost' or 'потер' in column.title|lower %}lost{% elif column.id == 'won' or 'успеш' in column.title|lower %}won{% endif %}"
+        {# Исход считает сервер: раньше шаблон знал только «потер»/«успеш», и
+           этап «Отказ» молча откатывал карточку без причины потери. #}
+        data-crm-stage-outcome="{{ column.outcome or '' }}"
       >
         <header>
           <div>
@@ -628,6 +630,9 @@
           <label class="wide" data-crm-deal-create-field><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" placeholder="0" /></label>
           <label><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
           <label class="wide" data-crm-next-step-field><span>Следующий шаг*</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
+          {# Уже сохранённая причина: без этого поля правка проигранной сделки
+             затирала причину и упиралась в ошибку «Укажите причину потери». #}
+          <input type="hidden" name="lost_reason" value="" />
           <div class="wide crm-lost-reason-field" data-crm-lost-reason-field hidden>
             <fieldset class="crm-lost-reason-options">
               <legend>Причина потери*</legend>

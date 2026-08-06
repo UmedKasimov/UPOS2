@@ -17,10 +17,17 @@
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
       },
       body: body.toString(),
-    }).then((response) => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
-    });
+    }).then((response) =>
+      response
+        .json()
+        .catch(() => ({}))
+        .then((body) => {
+          // Причину отказа показываем пользователю, поэтому код ошибки
+          // сервера доносим до вызывающего кода как есть.
+          if (!response.ok || body.ok === false) throw new Error(body.error || `HTTP ${response.status}`);
+          return body;
+        })
+    );
   }
 
   function postArchive(root, recordId) {
@@ -709,6 +716,20 @@
         event.preventDefault();
         openDetails(card);
       });
+      // На телефоне и планшете двойного клика нет, с клавиатуры карточка тоже
+      // была недостижима — открываем и одиночным кликом, и Enter.
+      card.addEventListener("click", (event) => {
+        if (event.detail > 1) return;
+        if (event.target.closest("a, button, input, select, textarea")) return;
+        openDetails(card);
+      });
+      if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "0");
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (event.target !== card) return;
+        event.preventDefault();
+        openDetails(card);
+      });
     });
     dialog.querySelectorAll("[data-crm-card-detail-close]").forEach((button) => {
       button.addEventListener("click", closeDetails);
@@ -1131,10 +1152,16 @@
         const card = dragged || root.querySelector(`[data-crm-record-id="${CSS.escape(recordId)}"]`);
         const stageId = column.dataset.crmStageId || "";
         if (!card || !recordId || !stageId) return;
+        // Пока прошлый перенос не сохранён, новый игнорируем: два запроса
+        // подряд приходили вразнобой и на сервере оставался не тот этап.
+        if (card.dataset.crmStageSaving === "1") return;
         const lostReasons = column.dataset.crmStageOutcome === "lost" ? await requestLostReason() : [];
         if (column.dataset.crmStageOutcome === "lost" && !lostReasons.length) return;
         const previousColumn = card.closest(".crm-kanban-column");
+        const previousDropzone = card.parentElement;
+        const previousSibling = card.nextElementSibling;
         const previousRect = card.getBoundingClientRect();
+        card.dataset.crmStageSaving = "1";
         moveCardToTop(dropzone, card);
         card.classList.remove("is-dragging");
         column.classList.add("is-committing");
@@ -1142,14 +1169,34 @@
         updateColumnState(column);
         animateCardMove(card, previousRect);
         postStage(root, recordId, stageId, lostReasons)
-          .then(() => {
+          .then((result) => {
+            if (result && result.ok === false) throw new Error(result.error || "stage_failed");
             column.classList.add("is-saved");
             window.setTimeout(() => column.classList.remove("is-saved"), 900);
           })
-          .catch(() => {
-            window.location.reload();
+          .catch((error) => {
+            // Сервер не принял этап — возвращаем карточку на место, чтобы
+            // экран не расходился с базой.
+            if (previousDropzone) {
+              if (previousSibling && previousSibling.parentElement === previousDropzone) {
+                previousDropzone.insertBefore(card, previousSibling);
+              } else {
+                previousDropzone.append(card);
+              }
+            }
+            if (previousColumn) updateColumnState(previousColumn);
+            updateColumnState(column);
+            const reason = String(error?.message || "");
+            window.alert(
+              reason === "forbidden"
+                ? "Нет прав на изменение этапа."
+                : reason === "lost_reason_required"
+                ? "Укажите причину потери."
+                : "Не удалось сохранить этап. Попробуйте ещё раз."
+            );
           })
           .finally(() => {
+            delete card.dataset.crmStageSaving;
             column.classList.remove("is-committing");
           });
       });

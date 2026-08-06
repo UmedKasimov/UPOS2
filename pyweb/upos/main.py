@@ -950,6 +950,20 @@ def create_app() -> FastAPI:
         ("settings", "/settings"),
     )
 
+    def _employee_module_denied(request: Request, key: str, *, json_error: bool = False):
+        """Ответ, если у сотрудника нет права на модуль. None — доступ есть.
+
+        Раньше право проверялось только на GET-странице: сотрудник без модуля
+        мог править и удалять записи прямым POST."""
+        user = request.session.get("user") or {}
+        if not user.get("is_employee"):
+            return None
+        if _employee_permissions(user).get(key):
+            return None
+        if json_error:
+            return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+        return RedirectResponse(url="/?error=" + quote("Недостаточно прав"), status_code=302)
+
     def _employee_module_redirect(request: Request, key: str) -> Response | None:
         """Редирект, если у сотрудника нет права на модуль. None — доступ есть."""
         user = request.session.get("user") or {}
@@ -4081,8 +4095,13 @@ def create_app() -> FastAPI:
         base = "-".join(part for part in base.split("-") if part)
         return (base or fallback)[:80]
 
-    def _crm_clean_stages(raw: Any) -> list[dict[str, str]]:
+    def _crm_clean_stages(raw: Any, previous: list[dict[str, str]] | None = None) -> list[dict[str, str]]:
         source = raw if isinstance(raw, list) else []
+        # Настройки присылают только названия этапов. Без сопоставления со
+        # старым списком id генерировался заново из названия, переставал
+        # совпадать с записями — и вся воронка схлопывалась в первую колонку.
+        previous_stages = previous or []
+        previous_by_title = {str(item.get("title") or "").strip().lower(): item for item in previous_stages}
         stages: list[dict[str, str]] = []
         seen: set[str] = set()
         for index, item in enumerate(source, start=1):
@@ -4096,6 +4115,17 @@ def create_app() -> FastAPI:
                 hint = ""
             if not title:
                 continue
+            if not stage_id:
+                # Тот же этап узнаём по названию, а переименованный — по месту
+                # в списке: id сохраняется, записи остаются в своих колонках.
+                match = previous_by_title.get(title.lower())
+                if match is None and index <= len(previous_stages):
+                    candidate = previous_stages[index - 1]
+                    if str(candidate.get("id") or "") not in seen:
+                        match = candidate
+                if match is not None:
+                    stage_id = str(match.get("id") or "")
+                    hint = hint or str(match.get("hint") or "")
             stage_id = _crm_stage_slug(stage_id or title, f"stage-{index}")
             if stage_id in seen:
                 stage_id = f"{stage_id}-{index}"
@@ -4114,15 +4144,18 @@ def create_app() -> FastAPI:
             lookup[str(stage["title"]).lower()] = stage
         return lookup
 
-    def _crm_stage_for_value(value: Any, stages: list[dict[str, str]]) -> dict[str, str]:
+    def _crm_stage_for_value(value: Any, stages: list[dict[str, str]], *args: Any) -> dict[str, str]:
+        """Этап ищем по id, а если он устарел — по названию: у записей,
+        сохранённых до смены id, название колонки остаётся верным."""
         lookup = _crm_stage_lookup(stages)
-        raw = str(value or "").strip().lower()
-        if raw in lookup:
-            return lookup[raw]
+        for candidate in (value, *args):
+            raw = str(candidate or "").strip().lower()
+            if raw and raw in lookup:
+                return lookup[raw]
         return stages[0] if stages else dict(CRM_DEFAULT_STAGES[0])
 
     def _crm_apply_stage(data: dict[str, Any], stages: list[dict[str, str]], raw_stage: Any = "") -> dict[str, str]:
-        stage = _crm_stage_for_value(raw_stage or data.get("stage_id") or data.get("stage"), stages)
+        stage = _crm_stage_for_value(raw_stage, stages, data.get("stage_id"), data.get("stage"))
         data["stage_id"] = stage["id"]
         data["stage"] = stage["title"]
         return stage
@@ -4210,19 +4243,31 @@ def create_app() -> FastAPI:
         raw_id = str((stage or {}).get("id") or "").strip().lower()
         raw_title = str((stage or {}).get("title") or "").strip().lower()
         combined = f"{raw_id} {raw_title}"
+        # Потерю проверяем раньше победы: «Закрыто без сделки» и «Закрыт отказ»
+        # иначе считались выигранными и делали клиента нашим.
+        if raw_id == "lost" or "потер" in combined or "отказ" in combined or "провал" in combined:
+            return "lost"
         if raw_id in {"leads", "lead", "new_lead"} or "лид" in combined:
             return "new_lead"
         if raw_id == "qualification" or "квалиф" in combined:
             return "qualification"
         if raw_id == "negotiation" or "перег" in combined:
             return "negotiation"
-        if raw_id == "invoice" or "сч" in combined:
+        # «сч» ловило «Просчёт» и «Расчёт» — сверяемся с целым словом.
+        if raw_id == "invoice" or "счёт" in combined or "счет" in combined or "оплат" in combined:
             return "invoice"
-        if raw_id == "won" or "усп" in combined or "закрыт" in combined:
+        if raw_id == "won" or "усп" in combined or "закрыт" in combined or "выигр" in combined:
             return "our_client"
-        if raw_id == "lost" or "потер" in combined or "отказ" in combined:
-            return "lost"
         return "new_lead"
+
+    def _crm_stage_outcome(stage: dict[str, str] | None) -> str:
+        """Исход этапа для интерфейса: won / lost / пусто."""
+        status = _client_crm_status_from_stage(stage)
+        if status == "our_client":
+            return "won"
+        if status == "lost":
+            return "lost"
+        return ""
 
     def _crm_stage_for_client_status(status: str, stages: list[dict[str, str]]) -> dict[str, str]:
         status = status if status in CLIENT_CRM_STATUS_LABELS else "new_lead"
@@ -4252,7 +4297,7 @@ def create_app() -> FastAPI:
         by_name: dict[str, str] = {}
         for row in rows:
             data = _json_object(row.data)
-            stage = _crm_stage_for_value(data.get("stage_id") or data.get("stage"), stages)
+            stage = _crm_stage_for_value(data.get("stage_id"), stages, data.get("stage"))
             status = _client_crm_status_from_stage(stage)
             if row.counterparty_id and row.counterparty_id not in by_id:
                 by_id[row.counterparty_id] = status
@@ -4268,7 +4313,7 @@ def create_app() -> FastAPI:
         stages: list[dict[str, str]],
     ) -> None:
         data = _json_object(row.data)
-        stage = _crm_stage_for_value(data.get("stage_id") or data.get("stage"), stages)
+        stage = _crm_stage_for_value(data.get("stage_id"), stages, data.get("stage"))
         crm_status = _client_crm_status_from_stage(stage)
         counterparty = session.get(Counterparty, row.counterparty_id) if row.counterparty_id else None
         if counterparty is None and data.get("client"):
@@ -4397,7 +4442,7 @@ def create_app() -> FastAPI:
         item_type = str(data.get("item_type") or "task")
         if item_type == "history":
             return ""
-        stage = _crm_stage_for_value(data.get("stage_id") or data.get("stage"), stages)
+        stage = _crm_stage_for_value(data.get("stage_id"), stages, data.get("stage"))
         is_lost = status == "lost" or _client_crm_status_from_stage(stage) == "lost"
         if is_lost and not str(data.get("lost_reason") or "").strip():
             return "Укажите причину потери сделки"
@@ -7042,8 +7087,9 @@ def create_app() -> FastAPI:
         status_data = _json_object(status_record.data)
         if status_record.item_type == "deal":
             stage = _crm_stage_for_value(
-                status_data.get("stage_id") or status_data.get("stage"),
+                status_data.get("stage_id"),
                 index["stages"],
+                status_data.get("stage"),
             )
             return {"crm_status": stage["id"], "crm_status_label": stage["title"]}
         crm_status = str(status_record.status or "new")
@@ -15134,7 +15180,16 @@ def create_app() -> FastAPI:
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_activity_settings = _crm_activity_settings(crm_workspace_settings)
-        crm_stage_map = {stage["id"]: {**stage, "records": [], "total_value": Decimal("0"), "total": "0"} for stage in crm_stages}
+        crm_stage_map = {
+            stage["id"]: {
+                **stage,
+                "records": [],
+                "total_value": Decimal("0"),
+                "total": "0",
+                "outcome": _crm_stage_outcome(stage),
+            }
+            for stage in crm_stages
+        }
         messenger_threads_by_client: dict[str, list[dict[str, Any]]] = {}
         for thread in _messenger_threads_from_sources(wid):
             client_key = str(thread.get("client") or "").strip().casefold()
@@ -15271,7 +15326,7 @@ def create_app() -> FastAPI:
             deal_title_by_id = {item["id"]: item["title"] for item in all_deal_options}
             for row in rows:
                 item = _crm_record_data(row)
-                stage = _crm_stage_for_value(item["stage_id"] or item["stage"], crm_stages)
+                stage = _crm_stage_for_value(item["stage_id"], crm_stages, item["stage"])
                 item["stage_id"] = stage["id"]
                 item["stage"] = stage["title"]
                 item["related_deal_title"] = deal_title_by_id.get(item["related_deal_id"], "")
@@ -18361,6 +18416,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        denied = _employee_module_denied(request, "crm")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -18414,6 +18472,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        denied = _employee_module_denied(request, "crm")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -18450,6 +18511,26 @@ def create_app() -> FastAPI:
             old_stage = str(old_data.get("stage") or "")
             old_log = old_data.get("activity_log") if isinstance(old_data.get("activity_log"), list) else []
             data["activity_log"] = list(old_log)
+            # Форма карточки не знает про служебные поля, а payload собирается
+            # с нуля: без переноса терялись связь с продажами и признак архива.
+            for carry_key in (
+                "related_sale_id",
+                "related_sale_number",
+                "related_sale_type",
+                "sales_document_ids",
+                "archived_status",
+                "archived_at",
+                "counterparty_id",
+            ):
+                if carry_key in old_data and not data.get(carry_key):
+                    data[carry_key] = old_data[carry_key]
+            if counterparty_id:
+                data["counterparty_id"] = counterparty_id
+            # Клиент был, а в форме поле скрыто — не затираем привязку.
+            if not data.get("client") and old_data.get("client"):
+                data["client"] = old_data["client"]
+            if counterparty_id is None:
+                counterparty_id = row.counterparty_id
             change_bits = []
             if row.title != title:
                 change_bits.append("название")
@@ -18475,6 +18556,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        denied = _employee_module_denied(request, "crm")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -18516,12 +18600,17 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/crm?err=csrf#deals", status_code=302)
+        denied = _employee_module_denied(request, "settings")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
         assert wid is not None
         raw_lines = str(form.get("stages") or "").splitlines()
-        stages = _crm_clean_stages(raw_lines)
+        # Старые этапы нужны, чтобы сохранить их id: иначе переименование
+        # колонки уносит все её сделки в первый этап.
+        stages = _crm_clean_stages(raw_lines, _crm_workspace_stages(wid))
         data = load_workspace_settings(wid)
         data["crm_pipeline_stages"] = stages
         save_workspace_settings(wid, data)
@@ -18532,6 +18621,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        denied = _employee_module_denied(request, "crm", json_error=True)
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
@@ -18558,9 +18650,13 @@ def create_app() -> FastAPI:
                 _crm_append_activity(data, "Причина потери", _crm_actor_name(request), lost_reason)
             row.data = data
             flag_modified(row, "data")
-            if stage["id"] == "won":
+            # Исход берём из смысла этапа, а не из литерального id: после
+            # переименования колонок сравнение с "won"/"lost" переставало
+            # срабатывать и сделки навсегда оставались «в работе».
+            stage_outcome = _crm_stage_outcome(stage)
+            if stage_outcome == "won":
                 row.status = "won"
-            elif stage["id"] == "lost":
+            elif stage_outcome == "lost":
                 row.status = "lost"
             elif row.status in {"new", "won", "lost"}:
                 row.status = "in_progress"
@@ -18572,6 +18668,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        denied = _employee_module_denied(request, "crm", json_error=True)
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
@@ -18594,6 +18693,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/crm?err=csrf#deals", status_code=302)
+        denied = _employee_module_denied(request, "crm")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -18616,6 +18718,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        denied = _employee_module_denied(request, "crm", json_error=True)
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
@@ -18642,6 +18747,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        denied = _employee_module_denied(request, "crm", json_error=True)
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
@@ -18717,6 +18825,9 @@ def create_app() -> FastAPI:
         form = await request.form()
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/crm?err=csrf", status_code=302)
+        denied = _employee_module_denied(request, "crm")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -22127,7 +22238,10 @@ def create_app() -> FastAPI:
             red_hours = 48
         data["crm_activity"] = {"yellow_hours": yellow_hours, "red_hours": red_hours}
         raw_lines = str(form.get("crm_pipeline_stages") or "").splitlines()
-        data["crm_pipeline_stages"] = _crm_clean_stages(raw_lines)
+        data["crm_pipeline_stages"] = _crm_clean_stages(
+            raw_lines,
+            _crm_clean_stages(data.get("crm_pipeline_stages")),
+        )
         save_workspace_settings(wid, data)
         return_to = str(form.get("return_to") or "").strip()
         if not (return_to.startswith("/settings") or return_to.startswith("/organizations/settings")):
