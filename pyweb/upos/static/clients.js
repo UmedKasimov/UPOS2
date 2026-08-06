@@ -549,6 +549,11 @@
     const filters = overviewFilters(container);
     const selectedIds = selectedMapIds();
     const noSelection = new Set();
+    // Лимит касается только строк списка: карта показывает все совпадения.
+    const limitButton = (container.closest("#clients-map") || layout)
+      .querySelector('[data-clients-map-page-size][aria-pressed="true"]');
+    const rowLimit = Number.parseInt(limitButton?.dataset.clientsMapPageSize || "", 10) || Infinity;
+    let shownRows = 0;
     const points = [...layout.querySelectorAll("[data-client-overview-point]")]
       .map((item) => {
         const lat = Number.parseFloat(item.dataset.lat || "");
@@ -587,7 +592,9 @@
         };
         const baseMatched = matchesOverviewFilters(point, filters, noSelection);
         const matched = baseMatched && (!selectedIds.size || selectedIds.has(point.id));
-        item.hidden = !baseMatched;
+        const rowVisible = baseMatched && shownRows < rowLimit;
+        if (baseMatched) shownRows += 1;
+        item.hidden = !rowVisible;
         return matched ? point : null;
       })
       .filter(Boolean);
@@ -2301,6 +2308,19 @@
   });
 
   document.addEventListener("click", (event) => {
+    const pageSizeButton = event.target.closest("[data-clients-map-page-size]");
+    if (pageSizeButton) {
+      event.preventDefault();
+      const section = pageSizeButton.closest("#clients-map");
+      if (!section) return;
+      section.querySelectorAll("[data-clients-map-page-size]").forEach((button) => {
+        const active = button === pageSizeButton;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      section.querySelectorAll("[data-clients-overview-map]").forEach((container) => ensureOverviewMap(container));
+      return;
+    }
     const locationFilter = event.target.closest("[data-clients-map-location-filter]");
     if (locationFilter) {
       event.preventDefault();

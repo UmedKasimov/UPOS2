@@ -31692,6 +31692,18 @@ html.dark .crm-task-calendar-event {
   contain: none;
 }
 
+.clients-map-page-sizes {
+  margin-top: 0.45rem;
+}
+
+.clients-map-page-size-label {
+  align-self: center;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 /* Только самая длинная таблица: у неё почти две тысячи строк, и разница
    заметна. В коротких таблицах отложенная отрисовка строк ничего не даёт,
    зато может дёргать ширины колонок. */

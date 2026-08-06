@@ -665,6 +665,16 @@
                   <button type="button" data-clients-map-location-filter="address" aria-pressed="false">Только адрес: {{ map_clients_address_only|length }}</button>
                   <button type="button" data-clients-map-location-filter="missing" aria-pressed="false">Без локации: {{ map_clients_without_location|length }}</button>
                 </div>
+                {# Сколько строк списка показывать; карту лимит не трогает. #}
+                <div class="clients-map-location-filters clients-map-page-sizes" aria-label="Сколько строк показывать">
+                  <span class="clients-map-page-size-label">Показывать:</span>
+                  <button type="button" data-clients-map-page-size="50" aria-pressed="false">50</button>
+                  <button type="button" data-clients-map-page-size="100" aria-pressed="false">100</button>
+                  <button type="button" data-clients-map-page-size="500" aria-pressed="false">500</button>
+                  <button type="button" data-clients-map-page-size="1000" aria-pressed="false">1000</button>
+                  <button type="button" data-clients-map-page-size="2000" aria-pressed="false">2000</button>
+                  <button type="button" class="is-active" data-clients-map-page-size="" aria-pressed="true">Макс</button>
+                </div>
               </td>
             </tr>
           </tfoot>
