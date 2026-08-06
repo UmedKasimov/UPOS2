@@ -67,6 +67,15 @@
           <small>Сверка и выплаты</small>
         </a>
       {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('earnings') %}
+        <a class="general-report-card" href="{{ url_for('home_earnings') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+          </span>
+          <span>Заработок</span>
+          <small>Ставки и бонусы</small>
+        </a>
+      {% endif %}
     </section>
   </div>
 {% endblock %}

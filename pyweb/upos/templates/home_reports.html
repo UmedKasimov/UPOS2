@@ -340,7 +340,7 @@
             </label>
           </form>
           <div class="reports-balance-total">
-            <span><b>{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
+            <span><b>{{ profit_summary.net or "0 UZS" }}</b>{% if profit_summary.net_secondary %} · <b>{{ profit_summary.net_secondary }}</b>{% endif %} чистая прибыль</span>
           </div>
         </header>
         <div class="reports-sales-kpis">

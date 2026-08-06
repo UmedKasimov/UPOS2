@@ -19102,6 +19102,21 @@ def create_app() -> FastAPI:
                         "other_income": _report_money(other_income_primary, primary_currency),
                         "expenses": _report_money(expenses_primary, primary_currency),
                         "net": _report_money(net_profit_total, primary_currency),
+                        # Та же чистая прибыль во второй валюте: доллары и сумы
+                        # видно одновременно, без переключений.
+                        "net_secondary": (
+                            _report_money(
+                                _convert_product_currency(
+                                    net_profit_total,
+                                    primary_currency,
+                                    "UZS" if primary_currency == "USD" else "USD",
+                                    report_rate,
+                                ),
+                                "UZS" if primary_currency == "USD" else "USD",
+                            )
+                            if primary_currency in ("USD", "UZS") and report_rate > 0
+                            else ""
+                        ),
                         "net_negative": net_profit_total < 0,
                         "expense_count": len(profit_expense_rows),
                     },
