@@ -1775,3 +1775,116 @@ def _upsert_expense(session, common: dict[str, Any], payload: dict[str, Any]) ->
         values,
         {key: values[key] for key in ("number", "amount", "currency", "data", "created_at")},
     )
+
+def ibox_cash_operations(workspace_owner_id: str, limit: int = 500) -> list[dict[str, Any]]:
+    """Оплаты и расходы IBOX в виде готовых кассовых операций.
+
+    Синхронизация раскладывала их только по документам и остаткам касс, а в
+    журнал кассы они не попадали — приход и расход из IBOX там не появлялись.
+    Здесь они приводятся к виду, из которого журнал строит свои записи.
+    """
+    cap = max(1, min(int(limit or 500), 2000))
+    operations: list[dict[str, Any]] = []
+
+    with session_scope() as session:
+        payments = session.execute(
+            select(PaymentDocument)
+            .where(
+                PaymentDocument.workspace_owner_id == workspace_owner_id,
+                PaymentDocument.external_source == INTEGRATION,
+            )
+            .order_by(PaymentDocument.created_at.desc())
+            .limit(cap)
+        ).scalars().all()
+        expenses = session.execute(
+            select(ExpenseDocument)
+            .where(
+                ExpenseDocument.workspace_owner_id == workspace_owner_id,
+                ExpenseDocument.external_source == INTEGRATION,
+            )
+            .order_by(ExpenseDocument.created_at.desc())
+            .limit(cap)
+        ).scalars().all()
+
+        account_rows = session.execute(
+            select(FinanceAccount.id)
+            .where(FinanceAccount.workspace_owner_id == workspace_owner_id)
+            .order_by(FinanceAccount.created_at.asc())
+        ).all()
+        known_accounts = {str(value) for (value,) in account_rows}
+        # Журнал кассы не принимает операцию без кошелька. Если касса из IBOX
+        # ещё не заведена, ставим первый счёт пространства — операция попадёт
+        # в журнал, а привязку можно поправить вручную.
+        fallback_account = str(account_rows[0][0]) if account_rows else ""
+        counterparty_names: dict[str, str] = {}
+        ids = [row.counterparty_id for row in payments if row.counterparty_id]
+        ids += [row.counterparty_id for row in expenses if getattr(row, "counterparty_id", None)]
+        ids = [item for item in ids if item]
+        if ids:
+            for row in session.execute(
+                select(Counterparty).where(Counterparty.id.in_(ids))
+            ).scalars():
+                counterparty_names[row.id] = row.name
+
+    def entity_type_of(external_id: Any) -> str:
+        raw = str(external_id or "")
+        return raw.split(":", 1)[0] if ":" in raw else raw
+
+    def account_for(entity_type: str, payload: dict[str, Any]) -> tuple[str, str]:
+        """Касса IBOX, через которую прошли деньги.
+
+        Счёт подставляется, только если он уже заведён: касса из IBOX может
+        появиться позже, и операция не должна из-за этого потеряться.
+        """
+        movements = _ibox_cashbox_movements(entity_type, payload)
+        for movement in movements:
+            cashbox_id = str(movement.get("cashbox_id") or "").strip()
+            if not cashbox_id:
+                continue
+            filial_id = str(movement.get("filial_id") or "default")
+            account_id = _ibox_account_id(workspace_owner_id, filial_id, cashbox_id)
+            name = str(movement.get("cashbox_name") or "")
+            if account_id in known_accounts:
+                return account_id, name
+            return fallback_account, name
+        return fallback_account, ""
+
+    def append(row: Any, direction: str, default_category: str) -> None:
+        payload = row.data if isinstance(row.data, dict) else {}
+        entity_type = entity_type_of(row.external_id)
+        account_id, account_name = account_for(entity_type, payload)
+        client = counterparty_names.get(getattr(row, "counterparty_id", "") or "", "")
+        if not client:
+            client = _text(payload, "client_name", "counterparty_name", "supplier_name")
+        note_parts = [
+            "Приход IBOX" if direction == "income" else "Расход IBOX",
+            str(row.number or "").strip(),
+        ]
+        operations.append(
+            {
+                "document_id": str(row.id),
+                "external_id": str(row.external_id or ""),
+                "entity_type": entity_type,
+                "direction": direction,
+                "amount": _decimal_value(row.amount),
+                "currency": str(row.currency or "UZS").strip().upper() or "UZS",
+                "number": str(row.number or ""),
+                "client": client,
+                "category": "Зарплата" if entity_type == "salary" else default_category,
+                "account_id": account_id,
+                "account_name": account_name,
+                "created_at": row.created_at,
+                "note": " ".join(part for part in note_parts if part),
+            }
+        )
+
+    for row in payments:
+        if str(row.direction or "in") == "in":
+            append(row, "income", "Оплата от клиента")
+        else:
+            append(row, "expense", "Оплата поставщику")
+    for row in expenses:
+        append(row, "expense", "Оплата поставщику")
+
+    return operations
+

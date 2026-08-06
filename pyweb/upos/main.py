@@ -160,6 +160,7 @@ from upos.messenger_store import (
     upsert_thread as messenger_upsert_thread,
 )
 from upos.smpro_store import (
+    ibox_cash_operations,
     ibox_sales_document_lines,
     last_smpro_status,
     list_upos_branches,
@@ -2739,6 +2740,10 @@ def create_app() -> FastAPI:
             _ensure_sales_cash_transactions(oid)
         except Exception:
             logger.exception("[sales] failed to ensure sales cash transactions for %s", oid)
+        try:
+            _ensure_ibox_cash_transactions(oid)
+        except Exception:
+            logger.exception("[ibox] не удалось перенести приход и расход в кассу для %s", oid)
         try:
             limit = int(request.query_params.get("limit") or 500)
         except (TypeError, ValueError):
@@ -7815,6 +7820,77 @@ def create_app() -> FastAPI:
         if count:
             return count
         return 1 if _sales_decimal(data.get("paid_amount")) > 0 else 0
+
+    # Приход и расход из IBOX раньше оставались только документами и остатками
+    # касс: в журнале кассы их не было. Проверяем не чаще раза в минуту.
+    _ibox_cash_ensure_ts: dict[str, float] = {}
+    _IBOX_CASH_ENSURE_TTL = 60.0
+
+    def _ensure_ibox_cash_transactions(workspace_owner_id: str) -> None:
+        now = time.monotonic()
+        last = _ibox_cash_ensure_ts.get(workspace_owner_id, 0.0)
+        if now - last < _IBOX_CASH_ENSURE_TTL:
+            return
+        _ibox_cash_ensure_ts[workspace_owner_id] = now
+
+        operations = ibox_cash_operations(workspace_owner_id)
+        if not operations:
+            return
+
+        with session_scope() as session:
+            known = {
+                str(value or "")
+                for (value,) in session.execute(
+                    select(Transaction.data.op("->>")("ibox_document_id")).where(
+                        Transaction.workspace_owner_id == workspace_owner_id,
+                        Transaction.data.op("->>")("source") == "ibox",
+                    )
+                ).all()
+                if str(value or "").strip()
+            }
+
+        for item in operations:
+            document_id = str(item.get("document_id") or "")
+            if not document_id or document_id in known:
+                continue
+            amount = _sales_decimal(item.get("amount"))
+            if amount <= 0:
+                continue
+            account_id = str(item.get("account_id") or "")
+            tx_type = "income" if item.get("direction") == "income" else "expense"
+            tx_data: dict[str, Any] = {
+                "amount": amount,
+                "currency": str(item.get("currency") or "UZS"),
+                "type": tx_type,
+                "status": "confirmed",
+                "is_confirmed": True,
+                "category": str(item.get("category") or ""),
+                "client": str(item.get("client") or ""),
+                "created_at": item.get("created_at"),
+                "note": str(item.get("note") or ""),
+                "data": {
+                    "source": "ibox",
+                    "ibox_document_id": document_id,
+                    "ibox_external_id": str(item.get("external_id") or ""),
+                    "ibox_entity_type": str(item.get("entity_type") or ""),
+                    "ibox_number": str(item.get("number") or ""),
+                    "payment_account_id": account_id,
+                    "payment_account": str(item.get("account_name") or ""),
+                },
+            }
+            # Без заведённого счёта кошелёк не указываем: касса примет операцию
+            # и покажет её, а привязку можно проставить потом.
+            if account_id:
+                if tx_type == "expense":
+                    tx_data["from_pocket_id"] = account_id
+                    tx_data["from_account_id"] = account_id
+                else:
+                    tx_data["to_pocket_id"] = account_id
+                    tx_data["to_account_id"] = account_id
+            try:
+                create_transaction(workspace_owner_id, tx_data)
+            except Exception:
+                logger.exception("[ibox] операция %s не попала в кассу", document_id)
 
     # Троттлинг страховочной синхронизации на GET /api/transactions: сканировать
     # продажи не чаще раза в 30 с на workspace — при сохранении/оплате продажи
