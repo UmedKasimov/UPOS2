@@ -32068,3 +32068,10 @@ html.dark .client-own-tag--other {
   font-size: var(--text-xs);
   font-weight: 600;
 }
+
+/* Продажа без себестоимости: лёгкая красная заливка показывает, что у
+   товара не заполнена закупочная цена и прибыль по строке завышена. */
+.reports-data-table td.reports-cost-missing {
+  background: color-mix(in srgb, #dc2626 9%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, #dc2626 45%, transparent);
+}

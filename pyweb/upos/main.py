@@ -19173,6 +19173,11 @@ def create_app() -> FastAPI:
                     sales_row["profit"] = _report_money(row_profit, primary_currency)
                     sales_row["profit_uzs"] = profit_to_uzs(row_profit)
                     sales_row["profit_negative"] = row_profit < 0
+                    # Себестоимости нет или она мизерная против суммы продажи —
+                    # это дыра в данных товара, ячейка подсвечивается красным.
+                    sales_row["cost_missing"] = bool(
+                        row_amount > 0 and row_cost < row_amount * Decimal("0.001")
+                    )
                     sales_row["margin"] = (
                         f"{(row_profit / row_amount * Decimal('100')).quantize(Decimal('0.1'))}%"
                         if row_amount > 0

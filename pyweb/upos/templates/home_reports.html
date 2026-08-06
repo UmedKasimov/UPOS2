@@ -439,7 +439,7 @@
                   <td>{{ row.kind }}</td>
                   <td>{{ row.client }}</td>
                   <td><span data-profit-money data-money-uzs="{{ row.amount_uzs }}">{{ row.amount }}</span></td>
-                  <td><span data-profit-money data-money-uzs="{{ row.cost_uzs }}">{{ row.cost }}</span></td>
+                  <td{% if row.cost_missing %} class="reports-cost-missing" title="У товара нет себестоимости"{% endif %}><span data-profit-money data-money-uzs="{{ row.cost_uzs }}">{{ row.cost }}</span></td>
                   <td{% if row.profit_negative %} class="is-negative"{% endif %}><span data-profit-money data-money-uzs="{{ row.profit_uzs }}">{{ row.profit }}</span></td>
                   <td>{{ row.margin }}</td>
                 </tr>
