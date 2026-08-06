@@ -1473,11 +1473,10 @@
     var dialog = document.querySelector("[data-sales-installment-dialog]");
 
     root.querySelector("[data-sales-installment-add]")?.addEventListener("click", function () {
-      if (enabledField) enabledField.value = "1";
+      // Рассрочка включается только после «Сохранить» в условиях: иначе
+      // сводка с нулями висела в форме у обычной продажи.
       if (monthsField && !monthsField.value) monthsField.value = "1";
-      updateInstallmentSummary(root);
       openInstallmentDialog(root);
-      scheduleSalesDraft(root);
     });
     root.querySelector("[data-sales-installment-remove]")?.addEventListener("click", function () {
       if (enabledField) enabledField.value = "0";

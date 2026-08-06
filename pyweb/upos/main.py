@@ -3771,7 +3771,7 @@ def create_app() -> FastAPI:
                 if current <= 0:
                     continue
                 take = current if current <= remaining else remaining
-                stock["quantity"] = str((current - take).normalize() if current - take else "0")
+                stock["quantity"] = (_decimal_plain_text(current - take) or "0")
                 remaining -= take
                 if remaining <= 0:
                     break
@@ -3787,7 +3787,7 @@ def create_app() -> FastAPI:
                     stocks.append(target)
                 current = _sales_decimal(target.get("quantity"))
                 target["warehouse"] = clean_name
-                target["quantity"] = str((current - remaining).normalize() if current - remaining else "0")
+                target["quantity"] = (_decimal_plain_text(current - remaining) or "0")
                 if price:
                     target["price"] = str(price)
                 if op_date:
@@ -3804,7 +3804,7 @@ def create_app() -> FastAPI:
                 stocks.append(target)
             current = _sales_decimal(target.get("quantity"))
             target["warehouse"] = clean_name
-            target["quantity"] = str((current + delta).normalize() if current + delta else "0")
+            target["quantity"] = (_decimal_plain_text(current + delta) or "0")
             if price:
                 target["price"] = str(price)
             if op_date:
@@ -3953,7 +3953,7 @@ def create_app() -> FastAPI:
                     "Товар",
                 )
                 raise ValueError(
-                    f"Нельзя вернуть {requested.normalize()} {product_name}: доступно к возврату {available.normalize()}"
+                    f"Нельзя вернуть {_decimal_plain_text(requested)} {product_name}: доступно к возврату {_decimal_plain_text(available)}"
                 )
         data["source_sale_number"] = source_row.number
 
@@ -3977,7 +3977,7 @@ def create_app() -> FastAPI:
             {
                 "price_type_id": price_type_id,
                 "name": price_type_name,
-                "price": str(price_value.normalize() if price_value else ""),
+                "price": _decimal_plain_text(price_value),
                 "currency": str(currency or price_type.get("convert_to_currency") or "UZS").strip().upper() or "UZS",
             }
         )
@@ -4531,7 +4531,7 @@ def create_app() -> FastAPI:
             "purchase_history": purchase_history,
             "purchase_history_json": json.dumps(purchase_history, ensure_ascii=False, indent=2) if purchase_history else "",
             "variations": variations,
-            "quantity": str(qty.normalize() if qty else 0),
+            "quantity": (_decimal_plain_text(qty) or "0"),
             "sale_price": sale_price,
             "sale_currency": sale_currency,
             "updated_at": row.updated_at.isoformat() if row.updated_at else "",
@@ -7491,9 +7491,9 @@ def create_app() -> FastAPI:
                 {
                     "product": product,
                     "warehouse": warehouse,
-                    "quantity": str(quantity.normalize() if quantity else ""),
-                    "price": str(price.normalize() if price else ""),
-                    "total": str(line_total.normalize() if line_total else "0"),
+                    "quantity": _decimal_plain_text(quantity),
+                    "price": _decimal_plain_text(price),
+                    "total": (_decimal_plain_text(line_total) or "0"),
                 }
             )
         if not lines:
@@ -7526,7 +7526,7 @@ def create_app() -> FastAPI:
                             "account": str(payment.get("account") or "").strip(),
                             "type": str(payment.get("type") or "").strip(),
                             "currency": payment_currency[:8],
-                            "amount": str(payment_amount.normalize() if payment_amount else "0"),
+                            "amount": (_decimal_plain_text(payment_amount) or "0"),
                         }
                     )
         # Рассрочка: срок, первый взнос и наценка. Суммы пересчитываем на
@@ -7568,7 +7568,7 @@ def create_app() -> FastAPI:
             "inventory_applied": doc_type == "return",
             "price_type_id": str(form.get("price_type_id") or "").strip(),
             "price_type": str(form.get("price_type_name") or "").strip(),
-            "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
+            "paid_amount": (_decimal_plain_text(paid_amount) or "0"),
             "payment_type": payment_type,
             "payment_lines": payment_lines,
             "manager": str(form.get("manager") or "").strip(),
@@ -11161,7 +11161,7 @@ def create_app() -> FastAPI:
         quantity = _sales_decimal(value)
         if quantity == quantity.to_integral_value():
             return str(int(quantity))
-        return _decimal_plain_text(quantity.normalize())
+        return _decimal_plain_text(quantity)
 
     def _purchase_elapsed_days_label(value: Any) -> str:
         raw_date = str(value or "").strip()[:10]
@@ -11387,10 +11387,10 @@ def create_app() -> FastAPI:
             lines.append(
                 {
                     "product": product,
-                    "quantity": str(quantity.normalize() if quantity else ""),
-                    "price": str(price.normalize() if price else ""),
-                    "sale_price": str(sale_price.normalize() if sale_price else ""),
-                    "total": str(line_total.normalize() if line_total else "0"),
+                    "quantity": _decimal_plain_text(quantity),
+                    "price": _decimal_plain_text(price),
+                    "sale_price": _decimal_plain_text(sale_price),
+                    "total": (_decimal_plain_text(line_total) or "0"),
                 }
             )
         expense_names = list(form.getlist("extra_expense_name"))
@@ -11481,7 +11481,7 @@ def create_app() -> FastAPI:
                             "account": str(payment.get("account") or "").strip(),
                             "type": str(payment.get("type") or "").strip(),
                             "currency": payment_currency[:8],
-                            "amount": str(payment_amount.normalize() if payment_amount else "0"),
+                            "amount": (_decimal_plain_text(payment_amount) or "0"),
                         }
                     )
         payment_status = "paid" if paid_amount and paid_amount >= amount else "partial" if paid_amount else "unpaid"
@@ -11497,7 +11497,7 @@ def create_app() -> FastAPI:
             "status": "ordered",
             "workflow_status": "ordered",
             "payment_status": payment_status,
-            "paid_amount": str(paid_amount.normalize() if paid_amount else "0"),
+            "paid_amount": (_decimal_plain_text(paid_amount) or "0"),
             "payment_type": payment_type,
             "payment_lines": payment_lines,
             "price_type_id": str(form.get("purchase_price_type_id") or "").strip(),
@@ -11822,10 +11822,10 @@ def create_app() -> FastAPI:
             "from_warehouse": str(form.get("from_warehouse") or "").strip() or "Основной склад",
             "to_warehouse": str(form.get("to_warehouse") or "").strip() or "Основной склад",
             "product": str(form.get("product") or "").strip(),
-            "price": str(price.normalize() if price else ""),
+            "price": _decimal_plain_text(price),
             "responsible": str(form.get("responsible") or "").strip(),
             "note": str(form.get("note") or "").strip(),
-            "quantity": str(quantity.normalize() if quantity else "0"),
+            "quantity": (_decimal_plain_text(quantity) or "0"),
         }
         return data, amount
 
@@ -11857,9 +11857,9 @@ def create_app() -> FastAPI:
             lines.append(
                 {
                     "product": product,
-                    "quantity": str(quantity.normalize()),
-                    "price": str(price.normalize() if price else "0"),
-                    "total": str(line_total.normalize() if line_total else "0"),
+                    "quantity": _decimal_plain_text(quantity),
+                    "price": (_decimal_plain_text(price) or "0"),
+                    "total": (_decimal_plain_text(line_total) or "0"),
                 }
             )
         if not lines:
@@ -11887,7 +11887,7 @@ def create_app() -> FastAPI:
             "from_warehouse": str(data.get("from_warehouse") or ""),
             "to_warehouse": str(data.get("to_warehouse") or ""),
             "product": str(data.get("product") or ""),
-            "quantity": str(quantity.normalize() if quantity else "0"),
+            "quantity": (_decimal_plain_text(quantity) or "0"),
             "amount": _sales_money_label(row.amount),
             "currency": row.currency,
             "responsible": str(data.get("responsible") or ""),
@@ -11954,7 +11954,7 @@ def create_app() -> FastAPI:
         probability = _crm_probability_value(data.get("probability"))
         tags = [str(item or "").strip() for item in data.get("tags", []) if str(item or "").strip()] if isinstance(data.get("tags"), list) else []
         amount_value = _sales_decimal(row.amount)
-        amount_input = str(amount_value.normalize()) if amount_value else ""
+        amount_input = _decimal_plain_text(amount_value) if amount_value else ""
         activity_log = [item for item in data.get("activity_log", []) if isinstance(item, dict)] if isinstance(data.get("activity_log"), list) else []
         if not activity_log:
             created_at = row.created_at.isoformat() if row.created_at else ""
@@ -13017,7 +13017,7 @@ def create_app() -> FastAPI:
                     stock_row = {
                         "product": item["name"],
                         "warehouse": str(stock.get("warehouse") or "Основной склад"),
-                        "quantity": str(quantity_value.normalize() if quantity_value else "0"),
+                        "quantity": (_decimal_plain_text(quantity_value) or "0"),
                         "quantity_value": quantity_value,
                         "unit": item["unit"],
                         "category": item["category"],
@@ -13323,8 +13323,8 @@ def create_app() -> FastAPI:
                             "product_id": product_row.id,
                             "product": product_row.name,
                             "warehouse": warehouse_row.name,
-                            "stock_before": str(current_stock.normalize() if current_stock else "0"),
-                            "stock_after": str((current_stock + Decimal(delta_sign) * quantity).normalize()),
+                            "stock_before": (_decimal_plain_text(current_stock) or "0"),
+                            "stock_after": _decimal_plain_text(current_stock + Decimal(delta_sign) * quantity) or "0",
                         }
                     )
                     prepared_lines.append(prepared_line)
@@ -13356,7 +13356,7 @@ def create_app() -> FastAPI:
                         **line,
                         "warehouse_id": warehouse_row.id,
                         "operation_batch_id": operation_batch_id,
-                        "signed_quantity": str((Decimal(delta_sign) * quantity).normalize()),
+                        "signed_quantity": _decimal_plain_text(Decimal(delta_sign) * quantity) or "0",
                     }
                     session.add(
                         WarehouseOperation(
