@@ -13900,6 +13900,10 @@ def create_app() -> FastAPI:
                 url="/clients?error=" + quote(reason) + "#clients", status_code=302
             )
         result = import_clients(wid, rows)
+        logger.info(
+            "[clients] загрузка из файла: пространство=%s строк=%s заведено=%s дополнено=%s пропущено=%s",
+            wid, result["total"], result["created"], result["updated"], result["skipped"],
+        )
         summary = (
             f"Загружено клиентов: {result['created']}, "
             f"дополнено: {result['updated']}, без изменений: {result['skipped']}"

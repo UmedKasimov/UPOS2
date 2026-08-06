@@ -79,6 +79,11 @@
       <div class="flash ok settings-ios-flash">Телефон отвязан от SIP-линии.</div>
     {% elif flash_ok == "deleted" %}
       <div class="flash ok settings-ios-flash">Запись удалена.</div>
+    {% elif flash_ok %}
+      {# Итог загрузки и прочие ответы приходят готовым текстом: раньше
+         показывались только три заранее известных сообщения, а остальные
+         терялись — человек нажимал кнопку и не видел ничего. #}
+      <div class="flash ok settings-ios-flash">{{ flash_ok }}</div>
     {% endif %}
     {% if flash_err %}
       <div class="flash err settings-ios-flash">{{ flash_err }}</div>
