@@ -18881,8 +18881,12 @@ def create_app() -> FastAPI:
                             debt_total += report_to_primary(debt_amount, currency)
                             top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
                             day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
-                        if records_profit:
+                            # Себестоимость идёт вместе с выручкой. Раньше она
+                            # считалась только у архивных документов: у продажи
+                            # в работе выручка была, себестоимость нулевая, и вся
+                            # сумма показывалась чистой прибылью.
                             cost_total += document_cost
+                        if records_profit:
                             profit_total += amount_primary - document_cost
                     elif doc_type == "return":
                         return_count += 1
@@ -18897,8 +18901,8 @@ def create_app() -> FastAPI:
                         if records_debt:
                             paid_total += report_to_primary(paid_amount, currency)
                             debt_total += report_to_primary(debt_amount, currency)
-                        if records_profit:
                             cost_total += document_cost
+                        if records_profit:
                             profit_total += amount_primary - document_cost
                             top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
                             day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
