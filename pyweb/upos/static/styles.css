@@ -32265,93 +32265,144 @@ html.dark .client-own-tag--other {
 .workspace-module-root .product-form-panel,
 .workspace-module-root #client-create,
 .workspace-module-root #client-edit,
-.workspace-module-root #client-card {
+.workspace-module-root #client-card,
+.workspace-module-root #supplier-create,
+.workspace-module-root #supplier-edit {
   width: 100%;
   max-width: 72rem;
   margin-inline: auto;
 }
 
-/* Форма товара повторяет таблицу карточки клиента: подпись слева
-   на сером поле, значение справа, всё в единой сетке с рамками. */
-.product-form--clean .product-form-grid {
+/* ЕДИНЫЙ ДИЗАЙН КАРТОЧЕК СОЗДАНИЯ
+   Товар, клиент, поставщик и прочие карточки собраны в одну таблицу:
+   подпись слева на светлом поле, значение справа, одинаковые высоты
+   строк и общая рамка. Раньше каждая форма выглядела по-своему. */
+.product-form--clean .product-form-grid,
+.client-create-form .product-form-grid,
+.client-create-form .client-data-table {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
-  overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--foreground) 16%, var(--border));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, var(--border));
   border-bottom: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--card);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.05);
 }
 
-.product-form--clean .product-form-grid > label {
+.client-photo-form .client-data-table {
+  border-radius: 0 0 10px 10px;
+}
+
+.product-form--clean .product-form-grid > label,
+.client-create-form .product-form-grid > label,
+.client-create-form .client-data-table > label,
+.client-create-form .client-data-table > .client-program-picker,
+.client-create-form .client-data-table > .client-segment-picker {
   display: grid;
-  grid-template-columns: 10rem minmax(0, 1fr);
+  grid-template-columns: 11rem minmax(0, 1fr);
   gap: 0;
   min-width: 0;
-  min-height: 3rem;
+  min-height: 2.9rem;
   padding: 0;
   border-right: 1px solid var(--workbench-line, var(--border));
   border-bottom: 1px solid var(--workbench-line, var(--border));
   background: var(--card);
 }
 
-.product-form--clean .product-form-grid > label.wide {
+.product-form--clean .product-form-grid > label.wide,
+.client-create-form .product-form-grid > label.wide,
+.client-create-form .client-data-table > label.wide,
+.client-create-form .client-data-table > .wide {
   grid-column: 1 / -1;
 }
 
-.product-form--clean .product-form-grid > label > span {
+.product-form--clean .product-form-grid > label > span,
+.client-create-form .product-form-grid > label > span,
+.client-create-form .client-data-table > label > span,
+.client-create-form .client-data-table > .client-program-picker > span,
+.client-create-form .client-data-table > .client-segment-picker > span {
   display: flex;
   align-items: center;
   min-width: 0;
-  padding: 0.55rem 0.7rem;
+  padding: 0.55rem 0.75rem;
   border-right: 1px solid var(--workbench-line, var(--border));
-  background: color-mix(in srgb, var(--muted) 68%, var(--card));
-  color: var(--foreground);
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+  color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
 .product-form--clean .product-form-grid > label > input,
-.product-form--clean .product-form-grid > label > select {
+.product-form--clean .product-form-grid > label > select,
+.client-create-form .product-form-grid > label > input,
+.client-create-form .product-form-grid > label > select,
+.client-create-form .client-data-table > label > input,
+.client-create-form .client-data-table > label > select {
   width: 100%;
   min-width: 0;
   /* Общий лимит в 28rem оставлял поле обрезанным посреди строки. */
   max-width: none;
-  min-height: 3rem;
+  min-height: 2.9rem;
+  padding-inline: 0.75rem;
   border: 0;
   border-radius: 0;
   background: var(--card);
   box-shadow: none;
+  color: var(--foreground);
+  transition: background-color 0.12s ease;
 }
 
 .product-form--clean .product-form-grid > label > input:hover,
-.product-form--clean .product-form-grid > label > select:hover {
+.product-form--clean .product-form-grid > label > select:hover,
+.client-create-form .product-form-grid > label > input:hover,
+.client-create-form .product-form-grid > label > select:hover,
+.client-create-form .client-data-table > label > input:hover,
+.client-create-form .client-data-table > label > select:hover {
   background: color-mix(in srgb, var(--primary) 3%, var(--card));
 }
 
 .product-form--clean .product-form-grid > label > input:focus,
-.product-form--clean .product-form-grid > label > select:focus {
+.product-form--clean .product-form-grid > label > select:focus,
+.client-create-form .product-form-grid > label > input:focus,
+.client-create-form .product-form-grid > label > select:focus,
+.client-create-form .client-data-table > label > input:focus,
+.client-create-form .client-data-table > label > select:focus {
   position: relative;
   z-index: 1;
+  outline: none;
   box-shadow: inset 0 0 0 2px var(--primary);
 }
 
-.product-form--clean .product-form-grid > label > input[type="file"] {
-  padding: 0.6rem 0.7rem;
+.product-form--clean .product-form-grid > label > input[type="file"],
+.client-create-form .product-form-grid > label > input[type="file"] {
+  padding-block: 0.6rem;
+}
+
+/* Заголовки блоков внутри карточки: одинаковый вид у «Фото»,
+   «Услуга: цена и бонус» и «Штрихкод». */
+.product-form--clean .product-form-section-head h3,
+.product-form--clean .product-form-section > summary > span,
+.product-form--clean .product-form-section--details > summary > span {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 /* Штрихкод — та же рамка, чтобы блок не выпадал из общей таблицы. */
 .product-form--clean .product-line-grid--barcode {
   gap: 0;
-  border: 1px solid color-mix(in srgb, var(--foreground) 16%, var(--border));
-  border-radius: 6px;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, var(--border));
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.05);
 }
 
 .product-form--clean .product-line-grid--barcode > input,
 .product-form--clean .product-line-grid--barcode > select {
-  min-height: 3rem;
+  min-height: 2.9rem;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -32359,4 +32410,46 @@ html.dark .client-own-tag--other {
 
 .product-form--clean .product-line-grid--barcode > select {
   border-left: 1px solid var(--workbench-line, var(--border));
+}
+
+/* Кнопки карточки: одинаковый ряд слева во всех формах. */
+.product-form--clean .product-form-actions,
+.client-create-form .product-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  margin-top: 1rem;
+}
+
+/* На телефоне подпись шириной 11rem не оставляла места полю, поэтому
+   карточка разворачивается в один столбец с подписью над значением. */
+@media (max-width: 860px) {
+  .product-form--clean .product-form-grid,
+  .client-create-form .product-form-grid,
+  .client-create-form .client-data-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .product-form--clean .product-form-grid > label,
+  .client-create-form .product-form-grid > label,
+  .client-create-form .client-data-table > label,
+  .client-create-form .client-data-table > .client-program-picker,
+  .client-create-form .client-data-table > .client-segment-picker {
+    grid-template-columns: minmax(0, 1fr);
+    border-right: 0;
+  }
+
+  .product-form--clean .product-form-grid > label > span,
+  .client-create-form .product-form-grid > label > span,
+  .client-create-form .client-data-table > label > span,
+  .client-create-form .client-data-table > .client-program-picker > span,
+  .client-create-form .client-data-table > .client-segment-picker > span {
+    border-right: 0;
+    border-bottom: 1px solid var(--workbench-line, var(--border));
+    padding-block: 0.4rem;
+  }
+
+  .client-create-form .client-data-table > .client-program-picker > span {
+    grid-row: auto;
+  }
 }
