@@ -137,14 +137,18 @@
   }
 
   function updateColumnState(column) {
-    const cards = Array.from(column.querySelectorAll(".crm-kanban-card"));
+    // При активном поиске шапка считает только найденные карточки: раньше
+    // число и сумма оставались полными и противоречили экрану.
+    const query = String(document.querySelector('.crm-kanban-filters input[name="q"]')?.value || "").trim();
+    const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !query || !card.hidden);
     const count = column.querySelector("header strong");
     if (count) count.textContent = String(cards.length);
     const total = column.querySelector(".crm-kanban-column-total");
     if (total) {
+      // Сумма всегда в UZS: значения карточек конвертированы сервером,
+      // подпись валютой первой карточки давала «1 000 000 USD» из сумов.
       const amount = cards.reduce((sum, card) => sum + parseCardAmount(card), 0);
-      const currency = cards.find((card) => card.dataset.crmAmountCurrency)?.dataset.crmAmountCurrency || "UZS";
-      total.textContent = formatColumnMoney(amount, currency);
+      total.textContent = formatColumnMoney(amount, "UZS");
     }
     const empty = column.querySelector(".crm-kanban-empty");
     if (empty) empty.hidden = cards.length > 0;
@@ -805,6 +809,48 @@
           completed: form.querySelector('[name="completed"]')?.checked ? "1" : "",
         };
         if (!root || !recordId || !payload.text || form.classList.contains("is-saving")) return;
+        // Сообщение в чате уходит клиенту в Instagram, если у карточки есть
+        // привязанная переписка Direct: раньше кнопка «Отправить» только
+        // писала в историю, и клиент ничего не получал.
+        if (kind === "chat") {
+          const activeThread = dialog.querySelector('[data-crm-thread-chat]:not([hidden])');
+          const threadKey = String(activeThread?.dataset.crmThreadChat || "");
+          const instagramId = threadKey.indexOf("instagram-thread-") === 0
+            ? threadKey.slice("instagram-thread-".length)
+            : "";
+          if (instagramId) {
+            form.classList.add("is-saving");
+            fetch("/api/messengers/instagram/send", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": root.dataset.crmCsrf || "",
+              },
+              body: JSON.stringify({ thread_id: instagramId, text: payload.text }),
+            })
+              .then((response) =>
+                response.json().catch(() => ({})).then((body) => {
+                  if (!response.ok || body.ok === false) throw new Error(body.error || "Не удалось отправить сообщение");
+                  return body;
+                })
+              )
+              .then(() => postActivity(root, recordId, payload))
+              .then((result) => {
+                const eventData = result?.event || payload;
+                if (chatFeed) {
+                  chatFeed.querySelector(".crm-card-detail-empty")?.remove();
+                  chatFeed.insertAdjacentHTML("afterbegin", renderActivityEvent(eventData, "chat"));
+                }
+                form.reset();
+              })
+              .catch((error) => {
+                window.alert(error.message || "Не удалось отправить сообщение");
+              })
+              .finally(() => form.classList.remove("is-saving"));
+            return;
+          }
+        }
         form.classList.add("is-saving");
         postActivity(root, recordId, payload)
           .then((result) => {
