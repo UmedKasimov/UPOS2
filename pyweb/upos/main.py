@@ -17490,7 +17490,13 @@ def create_app() -> FastAPI:
                     "telegram_url": _telegram_chat_url(thread.get("username"), thread.get("chat_id")),
                     "messages": [
                         {
-                            "author": message["sender_name"] or "Клиент" if message["direction"] == "in" else "Вы",
+                            # В исходящих отправитель — сотрудник, который вёл
+                            # переписку. Показываем его имя, а не общее «Вы».
+                            "author": (
+                                (message["sender_name"] or "Клиент")
+                                if message["direction"] == "in"
+                                else (message["sender_name"] or "Вы")
+                            ),
                             "text": message["text"],
                             "kind": "in" if message["direction"] == "in" else "out",
                             "created_at": message["sent_at"],
@@ -17500,6 +17506,8 @@ def create_app() -> FastAPI:
                                 if message["has_attachment"]
                                 else ""
                             ),
+                            # Заказ, который ушёл клиенту этим сообщением.
+                            "sale_document": message.get("sale_document") or {},
                         }
                         for message in business_thread_messages(workspace_owner_id, thread["chat_id"])
                     ],
@@ -24397,7 +24405,7 @@ def create_app() -> FastAPI:
         content = build_invoice_pdf(payload)
         caption = f"{payload['title']} № {payload['number']}".strip()
         try:
-            tg_send_document(
+            sent = tg_send_document(
                 token,
                 chat_id,
                 filename=f"invoice-{payload.get('number') or 'document'}.pdf",
@@ -24407,6 +24415,33 @@ def create_app() -> FastAPI:
             )
         except TelegramApiError as exc:
             return JSONResponse({"error": str(exc)}, status_code=400)
+
+        # Отправленный документ остаётся в переписке карточкой заказа: иначе
+        # непонятно, что и когда уже ушло клиенту.
+        if connection_id or _telegram_business_chat(wid, chat_id):
+            from upos.telegram_business_store import save_message as business_save_message
+
+            actor = request.session.get("user") or {}
+            business_save_message(
+                wid,
+                {
+                    "message_id": int((sent or {}).get("message_id") or 0),
+                    "chat": {"id": chat_id},
+                    "from": {"first_name": str(actor.get("name") or actor.get("username") or "Вы")},
+                    "caption": caption,
+                    "document": (sent or {}).get("document") or {},
+                    "date": int((sent or {}).get("date") or 0),
+                },
+                connection_id=connection_id,
+                direction="out",
+                extra={
+                    "sale_document_id": payload["document_id"],
+                    "sale_number": payload["number"],
+                    "sale_title": payload["title"],
+                    "sale_amount": payload["amount"],
+                    "sale_currency": payload["currency"],
+                },
+            )
         return {"ok": True, "caption": caption}
 
     @app.get("/api/messengers/threads/{thread_id}/client")

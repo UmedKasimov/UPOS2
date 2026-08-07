@@ -62,7 +62,9 @@
   </nav>
 </form>
 
-<section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox hidden>
+{# Имя текущего сотрудника подписывает только что отправленное сообщение —
+   до ответа сервера подписи взять больше неоткуда. #}
+<section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox data-messenger-author="{{ (user.name if user else '') or (user.username if user else '') or 'Вы' }}" hidden>
   {% set active_channel_accounts = (messenger_channel_accounts|default({})).get(active_channel_profile.data.value, []) %}
   {% if active_channel_accounts %}
     {# Вместо общих фраз про канал — к каким аккаунтам привязаны чаты. #}

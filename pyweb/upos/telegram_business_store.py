@@ -74,6 +74,21 @@ def _attachment_payload(message: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def sale_document(payload: Any) -> dict[str, Any]:
+    """Заказ или продажа, отправленные клиенту этим сообщением."""
+    data = payload if isinstance(payload, dict) else {}
+    document_id = _clean(data.get("sale_document_id"))
+    if not document_id:
+        return {}
+    return {
+        "id": document_id,
+        "number": _clean(data.get("sale_number")),
+        "title": _clean(data.get("sale_title")) or "Документ",
+        "amount": _clean(data.get("sale_amount")),
+        "currency": _clean(data.get("sale_currency")) or "UZS",
+    }
+
+
 def attachment_label(payload: Any) -> str:
     """Как показать вложение в списке диалогов и в переписке."""
     data = payload if isinstance(payload, dict) else {}
@@ -236,9 +251,14 @@ def save_message(
     *,
     connection_id: str = "",
     direction: str = "in",
+    extra: dict[str, Any] | None = None,
 ) -> bool:
     """Кладёт сообщение личной переписки в базу. Повторный апдейт с тем же
-    message_id игнорируется — Telegram может прислать его несколько раз."""
+    message_id игнорируется — Telegram может прислать его несколько раз.
+
+    `extra` дописывается в payload: так отправленная накладная запоминает,
+    какой это документ, и переписка показывает карточку заказа.
+    """
     chat = message.get("chat") if isinstance(message.get("chat"), dict) else {}
     chat_id = int(chat.get("id") or 0)
     if not chat_id:
@@ -248,6 +268,8 @@ def save_message(
     sent_at = datetime.fromtimestamp(int(message.get("date") or 0) or 0, tz=timezone.utc) if message.get("date") else datetime.now(timezone.utc)
     text_body = _clean(message.get("text") or message.get("caption"))
     payload = _attachment_payload(message)
+    if extra:
+        payload = {**payload, **{key: value for key, value in extra.items() if value not in (None, "")}}
 
     with session_scope() as session:
         if message_id:
@@ -363,6 +385,7 @@ def thread_messages(workspace_owner_id: str, chat_id: int, limit: int = 200) -> 
                 "sent_at": row.sent_at.isoformat() if row.sent_at else "",
                 "has_attachment": bool(row.payload),
                 "attachment_label": attachment_label(row.payload),
+                "sale_document": sale_document(row.payload),
             }
             for row in rows
         ]

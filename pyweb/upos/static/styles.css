@@ -3219,6 +3219,45 @@ a.messenger-message-attachment:focus-visible {
   background: color-mix(in srgb, var(--primary), transparent 84%);
 }
 
+/* Заказ, отправленный клиенту: карточка прямо в переписке. */
+.messenger-message-sale {
+  display: grid;
+  gap: 0.2rem;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 62%);
+  border-radius: var(--workbench-radius-sm, 8px);
+  /* Исходящий пузырь сам голубой — карточку делаем светлой, иначе сливались. */
+  background: var(--card);
+}
+
+.messenger-message-sale-head {
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.messenger-message-sale-sum {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.messenger-message-sale-link {
+  justify-self: start;
+  margin-top: 0.15rem;
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.messenger-message-sale-link:hover,
+.messenger-message-sale-link:focus-visible {
+  text-decoration: underline;
+}
+
 .messenger-thread-message--out {
   align-self: flex-end;
   background: color-mix(in srgb, var(--primary), white 84%);
@@ -28098,7 +28137,9 @@ body.upos-table-column-resizing * {
 
 .upos-table-column-menu {
   position: fixed;
-  z-index: 80;
+  /* Меню уезжает в body, поэтому обязано перекрывать модалки — карточка
+     клиента (z-index 90) прятала его, и шестерёнка выглядела нерабочей. */
+  z-index: 200;
   display: grid;
   gap: 0.3rem;
   padding: 0.65rem;
