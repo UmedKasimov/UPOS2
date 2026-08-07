@@ -6990,6 +6990,8 @@ def create_app() -> FastAPI:
             "debt_recognized": _sales_status_records_debt(status, doc_type),
             "profit_recognized": _sales_status_records_profit(status, doc_type),
             "manager": str(data.get("manager") or ""),
+            # Ответственный агент, назначенный через CRM-блок формы продажи.
+            "crm_responsible": str(data.get("crm_responsible") or ""),
             "note": str(data.get("note") or ""),
             "price_type_id": str(data.get("price_type_id") or ""),
             "price_type": str(data.get("price_type") or ""),
@@ -10240,6 +10242,9 @@ def create_app() -> FastAPI:
         else:
             deal_data = _json_object(deal_row.data).copy()
         if responsible:
+            # Агент остаётся и в самом документе: деталь показывает его как
+            # ответственного, не заглядывая в CRM.
+            sale_data["crm_responsible"] = responsible
             previous_responsible = str(deal_data.get("responsible") or "").strip()
             deal_data["responsible"] = responsible
             if previous_responsible != responsible:

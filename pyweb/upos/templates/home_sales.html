@@ -756,6 +756,10 @@
               <strong data-sales-detail-warehouse></strong>
             </div>
             <div>
+              <span>Ответственный</span>
+              <strong data-sales-detail-manager></strong>
+            </div>
+            <div>
               <span>Статус</span>
               <strong data-sales-detail-status></strong>
             </div>
@@ -1836,7 +1840,7 @@
 {% block scripts %}
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=31" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=32" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=65" defer></script>
   {% if sales_embed %}

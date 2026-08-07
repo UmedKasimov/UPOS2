@@ -763,6 +763,12 @@
     setText(panel, "[data-sales-detail-date]", dateText || sale.status_label || "Новый");
     setText(panel, "[data-sales-detail-client]", sale.client || "Клиент не указан");
     setText(panel, "[data-sales-detail-warehouse]", sale.warehouse || "Склад не указан");
+    // Ответственный: агент из CRM, если назначен, иначе автор документа.
+    setText(
+      panel,
+      "[data-sales-detail-manager]",
+      textValue(sale.crm_responsible) || textValue(sale.manager) || "Не назначен"
+    );
     setText(panel, "[data-sales-detail-status]", sale.status_label || "Новый");
     var crmStatus = panel.querySelector("[data-sales-detail-crm-status]");
     if (crmStatus) {
