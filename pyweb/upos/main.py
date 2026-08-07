@@ -19505,18 +19505,22 @@ def create_app() -> FastAPI:
                         product_name = str(line.get("product") or "Без товара").strip() or "Без товара"
                         if doc_type == "return" or inventory_applied:
                             top_products[product_name] = top_products.get(product_name, Decimal("0")) + sign * _sales_decimal(line.get("quantity"))
-                    if doc_type in {"sale", "order"} and debt_amount > 0:
+                    # Долг клиента признаём по тем же правилам, что и в журнале:
+                    # раньше в дебиторку попадали документы, у которых в таблице
+                    # долг показан прочерком, а разные валюты складывались в одну
+                    # цифру.
+                    if doc_type in {"sale", "order"} and records_debt and debt_amount > 0:
                         rec = receivables.setdefault(
                             client,
                             {
                                 "client": client,
                                 "debt": Decimal("0"),
-                                "currency": currency,
+                                "currency": primary_currency,
                                 "last_payment": str(data.get("paid_at") or data.get("payment_date") or ""),
                                 "last_sale_date": doc_date,
                             },
                         )
-                        rec["debt"] += debt_amount
+                        rec["debt"] += report_to_primary(debt_amount, currency)
                         rec["last_sale_date"] = max(str(rec.get("last_sale_date") or ""), doc_date)
                     view = _sales_document_data(row)
                     sales_report_rows.append(
@@ -19880,16 +19884,27 @@ def create_app() -> FastAPI:
                             for stock in negative_stocks
                         )
                         stock_warehouses = f"{stock_warehouses}. Отрицательный остаток: {negative_details}"
-                    cost = Decimal("0")
-                    cost_count = Decimal("0")
+                    # Себестоимость остатка — сумма «количество × цена» по
+                    # каждому складу. Раньше бралась средняя цена складов и
+                    # умножалась на весь остаток: товар, лежащий по разным
+                    # ценам, оценивался в разы дороже.
+                    fallback_cost = _sales_decimal(
+                        data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price")
+                    )
+                    stock_cost_sum = Decimal("0")
+                    priced_qty = Decimal("0")
                     for stock in stocks:
                         if not isinstance(stock, dict):
                             continue
                         price = _sales_decimal(stock.get("price"))
-                        if price:
-                            cost += price
-                            cost_count += Decimal("1")
-                    avg_cost = cost / cost_count if cost_count else _sales_decimal(data.get("purchase_price") or data.get("cost") or data.get("last_purchase_price"))
+                        if not price:
+                            continue
+                        stock_qty = _sales_decimal(stock.get("quantity"))
+                        stock_cost_sum += stock_qty * price
+                        priced_qty += stock_qty
+                    # Остаток без своей цены оцениваем закупочной ценой товара.
+                    stock_cost_sum += (qty - priced_qty) * fallback_cost
+                    avg_cost = (stock_cost_sum / qty) if qty else fallback_cost
                     if stock_price_type:
                         stock_price_text, stock_price_ccy = _calculated_product_price(
                             item, stock_price_type, stock_price_types
@@ -19899,7 +19914,7 @@ def create_app() -> FastAPI:
                     else:
                         sale_price = _sales_decimal(item.get("sale_price"))
                         sale_price_currency = str(item.get("sale_currency") or "UZS")
-                    cost_sum = qty * avg_cost
+                    cost_sum = stock_cost_sum
                     revenue_sum = _convert_product_currency(
                         qty * sale_price,
                         sale_price_currency,
