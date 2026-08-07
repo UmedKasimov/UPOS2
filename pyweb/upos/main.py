@@ -17142,6 +17142,22 @@ def create_app() -> FastAPI:
                 return "recent", "Недавно был(а)"
         return "offline", "Не в сети"
 
+    def _messenger_time_label(value: Any) -> str:
+        """Отметка времени диалога, как в мессенджерах: сегодня — часы,
+        вчера — «вчера», раньше — дата."""
+        moment = value if isinstance(value, datetime) else _parse_iso_datetime(value)
+        if not isinstance(moment, datetime):
+            return ""
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        today = datetime.now(timezone.utc).date()
+        day = moment.date()
+        if day == today:
+            return moment.strftime("%H:%M")
+        if (today - day).days == 1:
+            return "вчера"
+        return moment.strftime("%d.%m.%Y")
+
     def _messenger_threads_from_sources(workspace_owner_id: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         with session_scope() as session:
@@ -17431,6 +17447,10 @@ def create_app() -> FastAPI:
             )
 
         rows.sort(key=lambda item: item.get("updated_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        # Отметка времени последнего сообщения — она же показывается в списке
+        # диалогов справа, как в самом мессенджере.
+        for item in rows:
+            item["time_label"] = _messenger_time_label(item.get("updated_at"))
         return rows
 
     def _messenger_filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[dict[str, Any]]:

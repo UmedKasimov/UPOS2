@@ -121,6 +121,9 @@
               <small>{{ row.topic or row.last_message or row.channel }}</small>
             </span>
             <span class="messenger-dialog-side">
+              {% if row.time_label %}
+                <time class="messenger-dialog-time">{{ row.time_label }}</time>
+              {% endif %}
               <em>{{ row.status_label }}</em>
               {% if row_message_count %}
                 <b>{{ row_message_count }}</b>

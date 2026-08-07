@@ -3157,6 +3157,14 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.34rem;
 }
 
+/* Время последнего сообщения — как в мессенджере, над статусом. */
+.messenger-dialog-time {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .messenger-dialog-chat-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
