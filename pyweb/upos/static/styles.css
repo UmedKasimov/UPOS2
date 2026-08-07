@@ -32453,3 +32453,29 @@ html.dark .client-own-tag--other {
     grid-row: auto;
   }
 }
+
+/* Товар: фото и название сверху одной карточкой, ниже — остальные поля.
+   Блоки стыкуются без зазора, как в карточке клиента. */
+.product-form--clean .client-edit-photo-row {
+  border-radius: 10px 10px 0 0;
+}
+
+.product-form--clean .client-edit-photo-row + .product-form-grid--identity {
+  border-radius: 0 0 10px 10px;
+}
+
+/* Фото-строка и таблица полей — единая карточка без разрыва. */
+.product-form--clean .product-form-hero {
+  gap: 0.85rem;
+}
+
+.product-form--clean .client-edit-photo-row + .product-form-grid--identity {
+  margin-top: -0.85rem;
+}
+
+.product-form--clean .client-edit-photo-row .client-photo-data-table {
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--foreground) 14%, var(--border));
+  border-radius: 0;
+  box-shadow: none;
+}
