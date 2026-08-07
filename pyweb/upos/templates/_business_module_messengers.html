@@ -63,19 +63,6 @@
 </form>
 
 <section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox hidden>
-  {% set active_channel_count = messenger_channel_message_counts.get(active_channel_profile.data.value, 0) %}
-  <section class="messenger-channel-overview" data-channel-brand="{{ active_channel_profile.data.brand }}">
-    <div class="messenger-channel-overview-mark" aria-hidden="true">{{ active_channel_profile.data.logo }}</div>
-    <div class="messenger-channel-overview-copy">
-      <p>{{ active_channel_profile.data.status }}</p>
-      <h2>{{ active_channel_profile.data.title }}</h2>
-      <span>{{ active_channel_profile.data.subtitle }}</span>
-    </div>
-    <div class="messenger-channel-overview-stats">
-      <strong>{{ active_channel_count }}</strong>
-      <span>сообщений</span>
-    </div>
-  </section>
   <div class="messenger-inbox-shell">
     <aside class="messenger-dialog-list-panel" aria-label="Диалоги">
       <div class="messenger-dialog-list-head">
@@ -88,7 +75,7 @@
           <input type="search" placeholder="Поиск диалога" data-messenger-dialog-search />
         </label>
       </div>
-      <div class="messenger-dialog-list" data-messenger-thread-list>
+      <div class="messenger-dialog-list" data-messenger-thread-list data-sync-scroll-key="messenger-dialogs">
         {% for row in messenger_threads %}
           {% set row_message_count = row.messages|length %}
           <button

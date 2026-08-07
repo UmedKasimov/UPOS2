@@ -1,4 +1,68 @@
 (() => {
+  const STATE_KEY = 'upos.moduleSync.state';
+
+  function locationKey(url) {
+    const clean = new URL(url.toString());
+    clean.searchParams.delete('t');
+    clean.searchParams.delete('fresh');
+    return `${clean.pathname}${clean.search}`;
+  }
+
+  function scrollPanels() {
+    const seen = [];
+    document.querySelectorAll('[data-sync-scroll-key]').forEach((node) => {
+      seen.push({ key: node.dataset.syncScrollKey, top: node.scrollTop });
+    });
+    return seen;
+  }
+
+  function rememberState(url) {
+    try {
+      const payload = {
+        key: locationKey(url),
+        hash: (url.hash || window.location.hash || '').replace(/^#/, ''),
+        y: window.scrollY || document.documentElement.scrollTop || 0,
+        panels: scrollPanels(),
+        at: Date.now(),
+      };
+      window.sessionStorage.setItem(STATE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      /* storage may be unavailable */
+    }
+  }
+
+  function applyScroll(state) {
+    if (state.y) window.scrollTo(0, state.y);
+    (state.panels || []).forEach((panel) => {
+      if (!panel || !panel.key || !panel.top) return;
+      const node = document.querySelector(`[data-sync-scroll-key="${panel.key}"]`);
+      if (node) node.scrollTop = panel.top;
+    });
+  }
+
+  function restoreState() {
+    let state = null;
+    try {
+      const raw = window.sessionStorage.getItem(STATE_KEY);
+      if (!raw) return;
+      state = JSON.parse(raw);
+      window.sessionStorage.removeItem(STATE_KEY);
+    } catch (err) {
+      return;
+    }
+    if (!state || state.key !== locationKey(new URL(window.location.href))) return;
+    if (!state.at || Date.now() - state.at > 30000) return;
+    if (!state.y && !(state.panels || []).some((panel) => panel && panel.top)) return;
+    requestAnimationFrame(() => applyScroll(state));
+    window.setTimeout(() => applyScroll(state), 260);
+    window.setTimeout(() => applyScroll(state), 700);
+  }
+
+  function goSync(url) {
+    rememberState(url);
+    window.location.assign(url.toString());
+  }
+
   function tabHash(button) {
     const tab = button.closest('.general-module-tab--report');
     if (!tab) return '';
@@ -24,8 +88,15 @@
     const workspaceUrl = button.closest('.general-module-tab--report')?.dataset.workspaceSyncUrl;
     if (workspaceUrl) {
       const target = new URL(workspaceUrl, window.location.href);
+      if (!target.hash) target.hash = tabHash(button);
+      if (target.pathname === window.location.pathname) {
+        new URL(window.location.href).searchParams.forEach((value, name) => {
+          if (name === 't' || name === 'fresh') return;
+          if (!target.searchParams.has(name)) target.searchParams.append(name, value);
+        });
+      }
       target.searchParams.set('t', String(Date.now()));
-      window.location.assign(target.toString());
+      goSync(target);
       return;
     }
 
@@ -34,12 +105,12 @@
     const settingsTab = button.closest('.general-module-tab--report')?.dataset.orgSettingsOpenTab;
     if (settingsTab) {
       url.searchParams.set('tab', settingsTab);
-      window.location.assign(url.toString());
+      goSync(url);
       return;
     }
     const hash = tabHash(button);
     if (hash) url.hash = hash;
-    window.location.assign(url.toString());
+    goSync(url);
   }
 
   function syncStaticTab(icon) {
@@ -50,7 +121,7 @@
     if (href) {
       const target = new URL(href, window.location.href);
       target.searchParams.set('t', String(Date.now()));
-      window.location.assign(target.toString());
+      goSync(target);
       return;
     }
     const settingsTab = tab.getAttribute('data-settings-tab');
@@ -64,7 +135,7 @@
       url.hash = '';
     }
     url.searchParams.set('t', String(Date.now()));
-    window.location.assign(url.toString());
+    goSync(url);
   }
 
   function createButton() {
@@ -144,9 +215,14 @@
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount, { once: true });
-  } else {
+  function boot() {
     mount();
+    restoreState();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
   }
 })();
