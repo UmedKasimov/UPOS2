@@ -17224,6 +17224,91 @@ def create_app() -> FastAPI:
             if not unread:
                 item["is_new"] = False
 
+    def _messenger_channel_accounts(workspace_owner_id: str) -> dict[str, list[dict[str, str]]]:
+        """К каким аккаунтам привязаны чаты канала.
+
+        Раньше над списком висели общие фразы про канал; сотруднику нужнее
+        знать, какой именно бот и какой бизнес-аккаунт принимают сообщения.
+        """
+        from upos.telegram_store import get_bot_config
+
+        accounts: dict[str, list[dict[str, str]]] = {}
+
+        bot_config = get_bot_config(workspace_owner_id) or {}
+        bot_username = str(bot_config.get("bot_username") or "").strip()
+        bot_name = str(bot_config.get("bot_first_name") or "").strip()
+        telegram_rows = [
+            {
+                "label": "Бот",
+                "value": ("@" + bot_username) if bot_username else (bot_name or "не подключён"),
+                "state": "on" if bot_config else "off",
+            }
+        ]
+        business = telegram_business_connection(workspace_owner_id) or {}
+        business_username = str(business.get("username") or "").strip()
+        business_name = str(business.get("display_name") or "").strip()
+        telegram_rows.append(
+            {
+                "label": "Telegram Business",
+                "value": (
+                    ("@" + business_username)
+                    if business_username
+                    else (business_name or "не подключён")
+                ),
+                "state": "on" if business else "off",
+            }
+        )
+        accounts["Telegram"] = telegram_rows
+
+        social_data = load_workspace_settings(workspace_owner_id).get("social_links")
+        social = social_data if isinstance(social_data, dict) else {}
+
+        def _social(*keys: str) -> str:
+            for key in keys:
+                value = str(social.get(key) or "").strip()
+                if value:
+                    return value
+            return ""
+
+        instagram_login = _social("instagram_login", "instagram_business_id", "instagram_url")
+        accounts["Instagram"] = [
+            {
+                "label": "Аккаунт",
+                "value": (
+                    instagram_login
+                    if instagram_login.startswith("@") or not instagram_login or "/" in instagram_login
+                    else "@" + instagram_login
+                )
+                or "не подключён",
+                "state": "on" if instagram_login else "off",
+            }
+        ]
+        whatsapp_phone = _social("whatsapp_phone", "whatsapp_business_id")
+        accounts["WhatsApp"] = [
+            {
+                "label": "Номер",
+                "value": whatsapp_phone or "не подключён",
+                "state": "on" if whatsapp_phone else "off",
+            }
+        ]
+        facebook_page = _social("facebook_page_id", "facebook_url")
+        accounts["Facebook"] = [
+            {
+                "label": "Страница",
+                "value": facebook_page or "не подключена",
+                "state": "on" if facebook_page else "off",
+            }
+        ]
+        site_widget = _social("website_url", "site_chat_widget_id")
+        accounts["Сайт"] = [
+            {
+                "label": "Виджет",
+                "value": site_widget or "не подключён",
+                "state": "on" if site_widget else "off",
+            }
+        ]
+        return accounts
+
     def _messenger_threads_from_sources(workspace_owner_id: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         with session_scope() as session:
@@ -18528,6 +18613,7 @@ def create_app() -> FastAPI:
                 "clients": _messenger_client_options(wid),
             },
             messenger_channel_message_counts=channel_message_counts,
+            messenger_channel_accounts=_messenger_channel_accounts(wid),
             messenger_threads=threads,
             messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,

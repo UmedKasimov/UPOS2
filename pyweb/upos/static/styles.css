@@ -1071,6 +1071,47 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: none;
 }
 
+.messenger-channel-accounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+
+.messenger-channel-account {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.messenger-channel-account small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.messenger-channel-account strong {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.messenger-channel-account--on strong {
+  color: var(--primary);
+}
+
+.messenger-channel-account--off {
+  border-style: dashed;
+}
+
+.messenger-channel-account--off strong {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
 .messenger-channel-tab b {
   margin-left: 0.5rem;
 }

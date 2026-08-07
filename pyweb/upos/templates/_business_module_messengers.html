@@ -63,6 +63,18 @@
 </form>
 
 <section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox hidden>
+  {% set active_channel_accounts = (messenger_channel_accounts|default({})).get(active_channel_profile.data.value, []) %}
+  {% if active_channel_accounts %}
+    {# Вместо общих фраз про канал — к каким аккаунтам привязаны чаты. #}
+    <div class="messenger-channel-accounts" data-channel-brand="{{ active_channel_profile.data.brand }}">
+      {% for account in active_channel_accounts %}
+        <span class="messenger-channel-account messenger-channel-account--{{ account.state }}">
+          <small>{{ account.label }}</small>
+          <strong>{{ account.value }}</strong>
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
   <div class="messenger-inbox-shell">
     <aside class="messenger-dialog-list-panel" aria-label="Диалоги">
       <div class="messenger-dialog-list-head">
