@@ -276,6 +276,15 @@ def register_telegram_routes(
             return err
         assert oid is not None
         summary = status_summary(oid)
+        # Подсказка сохранённого токена: поле в настройках раньше оставалось
+        # пустым, и было не понять, сохранён токен или стёрся.
+        saved_token = get_bot_config_with_token(oid)[1] or ""
+        if saved_token:
+            visible_tail = saved_token[-4:]
+            bot_id_part = saved_token.split(":", 1)[0]
+            summary["token_hint"] = f"{bot_id_part}:••••{visible_tail}"
+        else:
+            summary["token_hint"] = ""
         if request.query_params.get("webhook") == "1":
             token = get_bot_config_with_token(oid)[1]
             if token:

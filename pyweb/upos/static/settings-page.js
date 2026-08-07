@@ -810,6 +810,22 @@
     function renderStatus(payload) {
       var cfg = payload.config || {};
       var connected = !!payload.connected;
+      // Сохранённый токен показываем подсказкой: поле очищалось после
+      // подключения, и казалось, что токен не сохранился.
+      if (tokenInput) {
+        var hint = String(payload.token_hint || "");
+        if (connected && hint) {
+          tokenInput.type = "text";
+          tokenInput.value = hint;
+          tokenInput.dataset.tokenSaved = "1";
+          tokenInput.setAttribute("title", "Токен сохранён. Чтобы заменить — введите новый.");
+        } else {
+          tokenInput.type = "password";
+          if (tokenInput.dataset.tokenSaved === "1") tokenInput.value = "";
+          delete tokenInput.dataset.tokenSaved;
+          tokenInput.removeAttribute("title");
+        }
+      }
       if (botEl) {
         botEl.textContent = connected
           ? (cfg.bot_username ? "@" + cfg.bot_username : cfg.bot_first_name || "Telegram подключен")
@@ -845,6 +861,11 @@
     if (connectBtn) {
       connectBtn.addEventListener("click", function () {
         var token = tokenInput ? (tokenInput.value || "").trim() : "";
+        // Подсказку сохранённого токена за новый токен не принимаем.
+        if (tokenInput && tokenInput.dataset.tokenSaved === "1" && token.indexOf("•") >= 0) {
+          setStatus("Токен уже сохранён. Введите новый, чтобы заменить, или нажмите «Отвязать».", "warn");
+          return;
+        }
         if (!token) {
           if (tokenInput) tokenInput.focus();
           setStatus("Укажите токен Telegram.", "warn");
@@ -853,7 +874,6 @@
         setBusy(connectBtn, true, "Подключаем...");
         call("POST", "/api/telegram/verify", { token: token })
           .then(function () {
-            if (tokenInput) tokenInput.value = "";
             return loadStatus();
           })
           .then(function () {
@@ -884,15 +904,24 @@
 
     if (disconnectBtn) {
       disconnectBtn.addEventListener("click", function () {
-        if (!confirm("Отключить Telegram от программы?")) return;
-        setBusy(disconnectBtn, true, "Отключаем...");
+        if (!confirm("Отвязать Telegram? Токен будет удалён, уведомления и чаты перестанут работать.")) return;
+        setBusy(disconnectBtn, true, "Отвязываем...");
         call("DELETE", "/api/telegram/disconnect")
-          .then(loadStatus)
+          .then(function () {
+            if (tokenInput) {
+              delete tokenInput.dataset.tokenSaved;
+              tokenInput.value = "";
+              tokenInput.type = "password";
+            }
+          })
           .catch(function (err) {
-            setStatus(err.message || "Не удалось отключить Telegram", "err");
+            setStatus(err.message || "Не удалось отвязать Telegram", "err");
           })
           .finally(function () {
+            // Сначала снимаем «занято», потом читаем статус: иначе кнопка
+            // оставалась активной после отвязки.
             setBusy(disconnectBtn, false);
+            loadStatus();
           });
       });
     }
