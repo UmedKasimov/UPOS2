@@ -17114,6 +17114,14 @@ def create_app() -> FastAPI:
                 return client
         return None
 
+    def _telegram_chat_url(username: Any = "", chat_id: Any = "") -> str:
+        """Ссылка, открывающая этот же диалог в приложении Telegram."""
+        clean_username = str(username or "").lstrip("@").strip()
+        if clean_username:
+            return f"https://t.me/{clean_username}"
+        digits = re.sub(r"\D+", "", str(chat_id or ""))
+        return f"tg://user?id={digits}" if digits else ""
+
     def _messenger_payload_dict(value: Any) -> dict[str, Any]:
         return value if isinstance(value, dict) else {}
 
@@ -17334,10 +17342,45 @@ def create_app() -> FastAPI:
                 .order_by(TelegramChat.last_seen_at.desc())
             ).scalars().all()
 
+        # Личная переписка Telegram Business и карточка подписчика бота — это
+        # один и тот же человек. Приметы переписок собираем заранее: иначе он
+        # попадал в список дважды — настоящим диалогом и пустой заявкой, и та
+        # заявка выглядела как обнулившийся чат.
+        business_threads = list_business_threads(workspace_owner_id)
+
+        def _phone_tail(value: Any) -> str:
+            digits = re.sub(r"\D+", "", str(value or ""))
+            return digits[-9:] if len(digits) >= 9 else ""
+
+        business_chat_ids = {
+            str(item.get("chat_id") or "").strip()
+            for item in business_threads
+            if str(item.get("chat_id") or "").strip()
+        }
+        business_usernames = {
+            str(item.get("username") or "").lstrip("@").strip().lower()
+            for item in business_threads
+            if str(item.get("username") or "").lstrip("@").strip()
+        }
+        business_phones = {tail for tail in (_phone_tail(item.get("phone")) for item in business_threads) if tail}
+
+        def _covered_by_business(chat_id: Any = "", username: str = "", phone: str = "") -> bool:
+            if str(chat_id or "").strip() and str(chat_id).strip() in business_chat_ids:
+                return True
+            clean_username = str(username or "").lstrip("@").strip().lower()
+            if clean_username and clean_username in business_usernames:
+                return True
+            tail = _phone_tail(phone)
+            return bool(tail and tail in business_phones)
+
         seen_chat_ids: set[str] = set()
         for sub in subscribers:
             title = str(sub.display_name or sub.username or sub.phone or sub.telegram_user_id or "Telegram").strip()
             username = str(sub.username or "").strip()
+            if _covered_by_business(sub.chat_id, username, str(sub.phone or "")):
+                # Диалог уже есть в личной переписке — карточку заявки прячем.
+                seen_chat_ids.add(str(sub.chat_id))
+                continue
             client = _messenger_match_client(
                 clients,
                 phone=str(sub.phone or ""),
@@ -17379,7 +17422,7 @@ def create_app() -> FastAPI:
             seen_chat_ids.add(str(sub.chat_id))
 
         for chat in chats:
-            if str(chat.chat_id) in seen_chat_ids:
+            if str(chat.chat_id) in seen_chat_ids or _covered_by_business(chat.chat_id):
                 continue
             status_value = "active" if chat.is_enabled else "waiting"
             presence, presence_label = _messenger_presence(chat.last_seen_at, status_value)
@@ -17412,7 +17455,7 @@ def create_app() -> FastAPI:
 
         # Личные переписки из Telegram для бизнеса — это настоящие диалоги с
         # текстами, поэтому они идут выше карточек подписчиков.
-        for thread in list_business_threads(workspace_owner_id):
+        for thread in business_threads:
             waiting = bool(thread.get("waiting"))
             status_value = "waiting" if waiting else "active"
             presence, presence_label = _messenger_presence(
@@ -17442,12 +17485,21 @@ def create_app() -> FastAPI:
                     "is_new": waiting,
                     "counterparty_id": thread.get("counterparty_id") or "",
                     "updated_at": _parse_iso_datetime(thread.get("last_at")),
+                    # Файл в UPOS не хранится, поэтому вложение показываем
+                    # подписанной ссылкой прямо в диалог Telegram.
+                    "telegram_url": _telegram_chat_url(thread.get("username"), thread.get("chat_id")),
                     "messages": [
                         {
                             "author": message["sender_name"] or "Клиент" if message["direction"] == "in" else "Вы",
-                            "text": message["text"] or ("Вложение" if message["has_attachment"] else ""),
+                            "text": message["text"],
                             "kind": "in" if message["direction"] == "in" else "out",
                             "created_at": message["sent_at"],
+                            "attachment_label": message.get("attachment_label") or "",
+                            "attachment_url": (
+                                _telegram_chat_url(thread.get("username"), thread.get("chat_id"))
+                                if message["has_attachment"]
+                                else ""
+                            ),
                         }
                         for message in business_thread_messages(workspace_owner_id, thread["chat_id"])
                     ],
@@ -24250,6 +24302,18 @@ def create_app() -> FastAPI:
                 "debt": _decimal_plain_text(max(Decimal("0"), amount - paid)),
                 "note": str(data.get("note") or ""),
             }
+
+    @app.get("/api/sales/{document_id}/document")
+    def api_sales_document(request: Request, document_id: str):
+        """Документ продажи в JSON — для просмотра заказа без ухода со страницы."""
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        payload = _messenger_invoice_payload(wid, str(document_id or "").strip())
+        if payload is None:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        return {"ok": True, "document": payload}
 
     @app.get("/api/sales/{document_id}/invoice.pdf")
     def api_sales_invoice_pdf(request: Request, document_id: str):

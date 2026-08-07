@@ -36,6 +36,58 @@ def _display_name(user: dict[str, Any]) -> str:
     return name or str(user.get("username") or "") or "Клиент"
 
 
+# Виды вложений и как их называть в переписке. Раньше в базу писался голый
+# флаг True, и любой файл показывался безымянным словом «Вложение».
+_ATTACHMENT_KINDS: tuple[tuple[str, str], ...] = (
+    ("photo", "Фото"),
+    ("document", "Документ"),
+    ("video", "Видео"),
+    ("video_note", "Видеосообщение"),
+    ("voice", "Голосовое сообщение"),
+    ("audio", "Аудио"),
+    ("animation", "GIF"),
+    ("sticker", "Стикер"),
+    ("location", "Геопозиция"),
+    ("contact", "Контакт"),
+)
+
+
+def _attachment_payload(message: dict[str, Any]) -> dict[str, Any]:
+    """Описание вложения: вид, подпись и file_id для будущей выгрузки."""
+    for key, label in _ATTACHMENT_KINDS:
+        raw = message.get(key)
+        if not raw:
+            continue
+        # У фото Telegram присылает список размеров — берём самый крупный.
+        item = raw[-1] if isinstance(raw, list) and raw else raw
+        item = item if isinstance(item, dict) else {}
+        file_name = _clean(item.get("file_name"), 255)
+        return {
+            key: True,
+            "kind": key,
+            "label": f"{label}: {file_name}" if file_name else label,
+            "file_id": _clean(item.get("file_id"), 255),
+            "file_name": file_name,
+            "file_size": int(item.get("file_size") or 0),
+            "mime_type": _clean(item.get("mime_type"), 120),
+        }
+    return {}
+
+
+def attachment_label(payload: Any) -> str:
+    """Как показать вложение в списке диалогов и в переписке."""
+    data = payload if isinstance(payload, dict) else {}
+    if not data:
+        return ""
+    label = _clean(data.get("label"))
+    if label:
+        return label
+    for key, fallback in _ATTACHMENT_KINDS:
+        if data.get(key):
+            return fallback
+    return "Вложение"
+
+
 def save_connection(workspace_owner_id: str, connection: dict[str, Any]) -> str:
     """Сохраняет (или обновляет) подключение бота к личному аккаунту."""
     connection_id = _clean(connection.get("id"), 120)
@@ -195,21 +247,31 @@ def save_message(
     message_id = int(message.get("message_id") or 0)
     sent_at = datetime.fromtimestamp(int(message.get("date") or 0) or 0, tz=timezone.utc) if message.get("date") else datetime.now(timezone.utc)
     text_body = _clean(message.get("text") or message.get("caption"))
-    payload: dict[str, Any] = {}
-    for key in ("photo", "document", "voice", "video", "audio", "location", "contact"):
-        if message.get(key):
-            payload[key] = True
+    payload = _attachment_payload(message)
 
     with session_scope() as session:
-        exists = session.execute(
-            select(TelegramBusinessMessage.id).where(
-                TelegramBusinessMessage.workspace_owner_id == workspace_owner_id,
-                TelegramBusinessMessage.chat_id == chat_id,
-                TelegramBusinessMessage.message_id == message_id,
-            ).limit(1)
-        ).scalar_one_or_none()
-        if exists:
-            return False
+        if message_id:
+            exists = session.execute(
+                select(TelegramBusinessMessage.id).where(
+                    TelegramBusinessMessage.workspace_owner_id == workspace_owner_id,
+                    TelegramBusinessMessage.chat_id == chat_id,
+                    TelegramBusinessMessage.message_id == message_id,
+                ).limit(1)
+            ).scalar_one_or_none()
+            if exists:
+                return False
+        else:
+            # Без message_id уникальный ключ (чат, 0) занимает первое же
+            # сообщение, и все следующие ответы молча пропадали. Даём такой
+            # записи собственный отрицательный номер — с настоящими,
+            # положительными, он не столкнётся.
+            lowest = session.execute(
+                select(func.min(TelegramBusinessMessage.message_id)).where(
+                    TelegramBusinessMessage.workspace_owner_id == workspace_owner_id,
+                    TelegramBusinessMessage.chat_id == chat_id,
+                )
+            ).scalar()
+            message_id = min(0, int(lowest or 0)) - 1
         phone = _clean((message.get("contact") or {}).get("phone_number") if isinstance(message.get("contact"), dict) else "", 40)
         username = _clean(sender.get("username") or chat.get("username"), 80)
         counterparty_id = _match_counterparty(session, workspace_owner_id, phone, username)
@@ -228,6 +290,9 @@ def save_message(
                 text_body=text_body,
                 payload=payload,
                 counterparty_id=counterparty_id,
+                # Раньше время сообщения вычислялось и терялось: в базу шла
+                # отметка вставки, из-за чего порядок переписки плыл.
+                sent_at=sent_at,
             )
         )
     return True
@@ -255,7 +320,7 @@ def list_threads(workspace_owner_id: str, limit: int = 60) -> list[dict[str, Any
                 "username": row.sender_username,
                 "phone": row.sender_phone,
                 "counterparty_id": row.counterparty_id or "",
-                "last_text": row.text_body,
+                "last_text": row.text_body or attachment_label(row.payload),
                 "last_at": row.sent_at.isoformat() if row.sent_at else "",
                 "last_direction": row.direction,
                 "messages": 0,
@@ -297,6 +362,7 @@ def thread_messages(workspace_owner_id: str, chat_id: int, limit: int = 200) -> 
                 "sender_name": row.sender_name,
                 "sent_at": row.sent_at.isoformat() if row.sent_at else "",
                 "has_attachment": bool(row.payload),
+                "attachment_label": attachment_label(row.payload),
             }
             for row in rows
         ]

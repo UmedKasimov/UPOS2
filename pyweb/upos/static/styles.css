@@ -3186,6 +3186,39 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   object-fit: cover;
 }
 
+/* Вложение: файл лежит в Telegram, поэтому показываем подписанную ссылку,
+   открывающую переписку в приложении. */
+.messenger-message-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  /* Пузырь сообщения — grid, поэтому прижимаем плашку по инлайновой оси. */
+  align-self: flex-start;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 65%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary), transparent 92%);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.messenger-message-attachment::before {
+  content: "📎";
+  font-size: 0.85em;
+}
+
+a.messenger-message-attachment:hover,
+a.messenger-message-attachment:focus-visible {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary), transparent 84%);
+}
+
 .messenger-thread-message--out {
   align-self: flex-end;
   background: color-mix(in srgb, var(--primary), white 84%);
@@ -32661,6 +32694,36 @@ html.dark .client-own-tag--other {
   height: auto;
   max-height: min(28rem, 46vh);
   overflow: auto;
+}
+
+/* Вкладки карточки: журнал и открытые документы. Выглядят как вкладки
+   рабочей области, чтобы оператор не искал новый способ переключения. */
+.messenger-client-doc-views {
+  margin: 1.1rem 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.messenger-client-doc-views .general-module-tab {
+  cursor: pointer;
+}
+
+.messenger-client-doc-views + .messenger-client-journal,
+.messenger-client-doc-views ~ .messenger-client-doc-view {
+  margin-top: 0.4rem;
+}
+
+.messenger-client-doc-view {
+  container-type: inline-size;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 7px);
+  overflow: hidden;
+}
+
+.messenger-client-doc-facts {
+  margin: 0;
+  padding: 0.7rem 1rem;
 }
 
 /* Статус здесь только показываем: у карточки нет формы смены статуса,
