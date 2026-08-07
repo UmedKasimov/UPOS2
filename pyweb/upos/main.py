@@ -17346,6 +17346,8 @@ def create_app() -> FastAPI:
             rows.append(
                 {
                     "id": f"telegram-sub-{sub.id}",
+                    # Ответ такому контакту уходит через бота.
+                    "source": "telegram_bot",
                     "channel": "Telegram",
                     "contact": client.name if client else title,
                     "client": client.name if client else "",
@@ -17378,6 +17380,7 @@ def create_app() -> FastAPI:
             rows.append(
                 {
                     "id": f"telegram-chat-{chat.id}",
+                    "source": "telegram_bot",
                     "channel": "Telegram",
                     "contact": str(chat.title or chat.chat_id or "Telegram"),
                     "client": "",
@@ -23981,6 +23984,62 @@ def create_app() -> FastAPI:
         if handled:
             _instagram_touch(workspace_owner_id)
         return {"ok": True, "handled": handled}
+
+    @app.post("/api/messengers/telegram/send")
+    async def api_messenger_telegram_send(request: Request):
+        """Ответ клиенту через бота: подписчику или в чат, где бот состоит.
+
+        Личные переписки Telegram Business уходят другой ручкой — там ответ
+        отправляется от имени владельца, а не от бота.
+        """
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        thread_id = str((body or {}).get("thread_id") or "").strip()
+        text_body = str((body or {}).get("text") or "").strip()[:4000]
+        if not thread_id or not text_body:
+            return JSONResponse({"error": "Укажите переписку и текст сообщения"}, status_code=400)
+
+        from upos.telegram_client import TelegramApiError, send_message as tg_send_message
+        from upos.telegram_store import get_bot_config_with_token, get_chat_by_row_id
+
+        cfg, token = get_bot_config_with_token(wid)
+        if not cfg or not token:
+            return JSONResponse({"error": "Бот не подключён к организации"}, status_code=400)
+
+        chat_id = 0
+        if thread_id.startswith("telegram-chat-"):
+            chat = get_chat_by_row_id(wid, thread_id[len("telegram-chat-") :])
+            if not chat:
+                return JSONResponse({"error": "Чат не найден"}, status_code=404)
+            private = str(chat.get("chat_type") or "").strip().lower() == "private"
+            if not private and not chat.get("bot_is_admin"):
+                return JSONResponse({"error": "Бот не админ в этом чате"}, status_code=400)
+            chat_id = int(chat.get("chat_id") or 0)
+        elif thread_id.startswith("telegram-sub-"):
+            subscriber_id = thread_id[len("telegram-sub-") :]
+            with session_scope() as session:
+                row = session.get(TelegramSubscriber, subscriber_id)
+                if row is None or row.workspace_owner_id != wid:
+                    return JSONResponse({"error": "Контакт не найден"}, status_code=404)
+                chat_id = int(row.chat_id or 0)
+        else:
+            return JSONResponse({"error": "Этот канал не поддерживает отправку"}, status_code=400)
+
+        if not chat_id:
+            return JSONResponse({"error": "У переписки нет чата Telegram"}, status_code=400)
+        try:
+            tg_send_message(token, chat_id, text_body, parse_mode="")
+        except TelegramApiError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        return {"ok": True}
 
     @app.post("/api/messengers/threads/read")
     async def api_messenger_thread_read(request: Request):

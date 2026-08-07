@@ -502,16 +502,18 @@
         var value = String(text.value || "").trim();
         if (!current || !value) return;
 
-        // Личные переписки Telegram и Instagram Direct уходят клиенту
-        // по-настоящему; остальные каналы пока показывают ответ локально.
+        // Telegram Business, чаты бота и Instagram Direct уходят клиенту
+        // по-настоящему. Каналы без интеграции честно об этом сообщают:
+        // раньше ответ появлялся в окне, но никуда не отправлялся.
         var isTelegram = current.source === "telegram_business" && current.chat_id;
         var isInstagram = current.source === "instagram" && current.thread_id;
-        if (!isTelegram && !isInstagram) {
-          current.messages = threadMessages(current).slice();
-          current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
-          text.value = "";
-          rememberThread(current);
-          renderMessages(root, current);
+        var isTelegramBot = current.source === "telegram_bot" && current.id;
+        if (!isTelegram && !isInstagram && !isTelegramBot) {
+          window.alert(
+            "Канал «" +
+              (current.channel || "") +
+              "» ещё не подключён к отправке сообщений. Подключите его в разделе Настройки → Соцсети."
+          );
           return;
         }
 
@@ -519,9 +521,15 @@
         var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrf = csrfInput ? csrfInput.value : csrfMeta ? csrfMeta.content : "";
         send.disabled = true;
-        var sendUrl = isInstagram ? "/api/messengers/instagram/send" : "/api/telegram/business/send";
+        var sendUrl = isInstagram
+          ? "/api/messengers/instagram/send"
+          : isTelegramBot
+          ? "/api/messengers/telegram/send"
+          : "/api/telegram/business/send";
         var sendBody = isInstagram
           ? { thread_id: current.thread_id, text: value }
+          : isTelegramBot
+          ? { thread_id: current.id, text: value }
           : { chat_id: current.chat_id, text: value };
         fetch(sendUrl, {
           method: "POST",
