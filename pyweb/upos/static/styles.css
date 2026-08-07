@@ -7127,6 +7127,13 @@ a.messenger-message-attachment:focus-visible {
   box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
 }
 
+/* Заказ из переписки открывается во весь экран: оператор работает с
+   позициями и оплатами, и обрезка до 96rem оставляла пустые поля вокруг. */
+.crm-order-dialog[data-messenger-order-dialog] {
+  max-width: none;
+  max-height: none;
+}
+
 .crm-order-dialog::backdrop {
   background: rgb(15 23 42 / 58%);
   backdrop-filter: blur(4px);
@@ -7211,6 +7218,11 @@ body[data-embed="sales-order"] .sales-workspace--embed > .workspace-module-stack
 body[data-embed="sales-order"] .sales-workspace--embed #sales-form {
   display: block !important;
   margin: 0;
+  /* На странице форма держит узкую колонку в 72rem, чтобы поля не читались
+     пустыми полосами. В модальном окне эта же колонка оставляла широкую
+     пустую полосу справа — здесь форма занимает всю ширину окна. */
+  width: 100%;
+  max-width: none;
 }
 
 body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-panel-head {
