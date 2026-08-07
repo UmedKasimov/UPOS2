@@ -70,6 +70,26 @@ def save_connection(workspace_owner_id: str, connection: dict[str, Any]) -> str:
     return connection_id
 
 
+def mark_can_reply(workspace_owner_id: str, connection_id: str) -> None:
+    """Ответ ушёл — значит владелец разрешил боту отвечать.
+
+    Telegram присылает обновление прав отдельным событием, и до него наш
+    флаг говорит «нельзя», хотя право уже выдано.
+    """
+    clean_id = _clean(connection_id, 120)
+    if not clean_id:
+        return
+    with session_scope() as session:
+        row = session.execute(
+            select(TelegramBusinessConnection).where(
+                TelegramBusinessConnection.connection_id == clean_id,
+                TelegramBusinessConnection.workspace_owner_id == workspace_owner_id,
+            )
+        ).scalar_one_or_none()
+        if row is not None:
+            row.can_reply = True
+
+
 def active_connection(workspace_owner_id: str) -> dict[str, Any] | None:
     with session_scope() as session:
         row = session.execute(

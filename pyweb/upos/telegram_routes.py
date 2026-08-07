@@ -33,6 +33,7 @@ from upos.telegram_notifier import send_test_report
 from upos.telegram_scheduler import ensure_scheduler_running, reschedule_workspace
 from upos.telegram_business_store import (
     active_connection as business_active_connection,
+    mark_can_reply as business_mark_can_reply,
     save_message as business_save_message,
     thread_messages as business_thread_messages,
 )
@@ -536,8 +537,9 @@ def register_telegram_routes(
         connection = business_active_connection(oid)
         if not connection:
             return JSONResponse({"error": "business_not_connected"}, status_code=400)
-        if not connection.get("can_reply"):
-            return JSONResponse({"error": "business_reply_denied"}, status_code=400)
+        # Право отвечать не проверяем сами: наш флаг обновляется только
+        # уведомлением от Telegram и отстаёт от настроек, которые владелец
+        # поменял минуту назад. Пусть решает сам Telegram.
         try:
             sent = tg_send_message(
                 token,
@@ -548,6 +550,9 @@ def register_telegram_routes(
             )
         except TelegramApiError as exc:
             return JSONResponse({"error": str(exc)}, status_code=400)
+        if not connection.get("can_reply"):
+            # Отправка прошла — значит право есть, запоминаем это.
+            business_mark_can_reply(oid, str(connection.get("connection_id") or ""))
         # Telegram не присылает business_message на наш же ответ, поэтому
         # записываем его в переписку сами.
         business_save_message(

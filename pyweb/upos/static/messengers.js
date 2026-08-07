@@ -374,6 +374,12 @@
     if (raw.indexOf("Не указан получатель") === 0) {
       return "У этой переписки нет получателя Instagram — обновите список диалогов.";
     }
+    if (raw.indexOf("BUSINESS_CONNECTION_INVALID") >= 0) {
+      return "Подключение Telegram Business устарело. В Мессенджеры → Телеграм нажмите «Переподключить».";
+    }
+    if (raw.indexOf("business connection") >= 0 || raw.indexOf("BUSINESS") >= 0) {
+      return "Telegram отклонил ответ за владельца: проверьте в Telegram → Telegram для бизнеса → Чат-боты, что бот выбран и ему разрешено отвечать. Ответ Telegram: " + raw;
+    }
     return raw || "Не удалось отправить сообщение";
   }
 
