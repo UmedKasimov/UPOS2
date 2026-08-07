@@ -70,6 +70,26 @@ def save_connection(workspace_owner_id: str, connection: dict[str, Any]) -> str:
     return connection_id
 
 
+def has_business_chat(workspace_owner_id: str, chat_id: int) -> bool:
+    """Есть ли у владельца личная переписка с этим чатом.
+
+    Если есть — отвечать и слать файлы правильнее от имени владельца:
+    клиент писал человеку, а не боту.
+    """
+    if not chat_id:
+        return False
+    with session_scope() as session:
+        found = session.execute(
+            select(TelegramBusinessMessage.id)
+            .where(
+                TelegramBusinessMessage.workspace_owner_id == workspace_owner_id,
+                TelegramBusinessMessage.chat_id == int(chat_id),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+    return found is not None
+
+
 def mark_can_reply(workspace_owner_id: str, connection_id: str) -> None:
     """Ответ ушёл — значит владелец разрешил боту отвечать.
 

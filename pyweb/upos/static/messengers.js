@@ -308,6 +308,48 @@
     list.insertBefore(button, searchEmpty || null);
   }
 
+  function updateThreadListItem(root, thread) {
+    /* Обновляет строку списка на месте: пересборка убила бы выделение
+       выбранного диалога и позицию прокрутки. */
+    var item = root.querySelector(
+      '[data-messenger-thread-id="' + String(thread.id).replace(/"/g, '\\"') + '"]'
+    );
+    if (!item) return;
+    var name = item.querySelector(".messenger-dialog-name-line strong");
+    if (name) name.textContent = thread.contact || "Диалог";
+    var preview = item.querySelector(".messenger-dialog-main small");
+    if (preview) preview.textContent = thread.topic || thread.last_message || thread.channel || "";
+    var timeNode = item.querySelector(".messenger-dialog-time");
+    if (timeNode && thread.time_label) timeNode.textContent = thread.time_label;
+    var statusNode = item.querySelector(".messenger-dialog-side em");
+    if (statusNode) statusNode.textContent = thread.status_label || thread.presence_label || "";
+
+    var badge = item.querySelector("[data-messenger-unread]");
+    var unread = Number(thread.unread || 0);
+    var selected = String(root.dataset.selectedThreadId || "") === String(thread.id);
+    if (badge) {
+      var show = unread > 0 && !selected;
+      badge.hidden = !show;
+      badge.textContent = show ? String(unread) : "";
+    }
+
+    var dot = item.querySelector(".messenger-presence-dot");
+    var online = classToken(thread.presence, "offline") === "online";
+    if (online && !dot) {
+      var wrap = item.querySelector(".messenger-dialog-avatar-wrap");
+      if (wrap) {
+        var mark = document.createElement("i");
+        mark.className = "messenger-presence-dot messenger-presence-dot--online";
+        mark.setAttribute("aria-hidden", "true");
+        wrap.appendChild(mark);
+      }
+    } else if (!online && dot) {
+      dot.remove();
+    }
+    item.setAttribute("data-messenger-presence", thread.presence || "offline");
+    item.setAttribute("data-messenger-search", threadSearchText(thread));
+  }
+
   function updateThreadHeader(root, thread) {
     var title = root.querySelector("[data-messenger-thread-title]");
     var meta = root.querySelector("[data-messenger-thread-meta]");
@@ -729,12 +771,18 @@
       return byId[String(root.dataset.selectedThreadId || "")];
     }
 
-    root.querySelectorAll("[data-messenger-thread-id]").forEach(function (item) {
-      item.addEventListener("click", function () {
+    // Делегирование, а не обработчик на каждой строке: список обновляется
+    // сам, и новые диалоги должны открываться без перезагрузки страницы.
+    var listNode = root.querySelector("[data-messenger-thread-list]");
+    if (listNode) {
+      listNode.addEventListener("click", function (event) {
+        var item = event.target.closest("[data-messenger-thread-id]");
+        if (!item || !listNode.contains(item)) return;
+        if (event.target.closest("[data-messenger-avatar-open]")) return;
         selectThread(root, byId[String(item.getAttribute("data-messenger-thread-id"))]);
         renderTemplatePicker();
       });
-    });
+    }
 
     root.addEventListener("click", function (event) {
       var avatarTarget = event.target.closest("[data-messenger-avatar-open]");
@@ -956,6 +1004,68 @@
         }
       });
     }
+
+    // Окно переписки обновляется само: новые сообщения приходят от клиента
+    // в любой момент, а сотрудник не должен обновлять страницу руками.
+    var refreshing = false;
+    function refreshThreads() {
+      if (refreshing || document.hidden) return;
+      refreshing = true;
+      window
+        .fetch("/api/messengers/threads?channel=" + encodeURIComponent(activeChannel || ""), {
+          credentials: "same-origin",
+        })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; });
+        })
+        .then(function (payload) {
+          if (!payload || !Array.isArray(payload.threads)) return;
+          var selectedId = String(root.dataset.selectedThreadId || "");
+          payload.threads.forEach(function (raw) {
+            var incoming = normalizeThread(raw);
+            var id = String(incoming.id || "");
+            if (!id) return;
+            var existing = byId[id];
+            if (!existing) {
+              byId[id] = incoming;
+              ensureThreadListItem(root, incoming);
+              updateThreadListItem(root, incoming);
+              rememberThread(incoming);
+              return;
+            }
+            var before = threadMessages(existing).length;
+            var fresh = threadMessages(incoming);
+            existing.messages = fresh;
+            existing.contact = incoming.contact || existing.contact;
+            existing.last_message = incoming.last_message;
+            existing.topic = incoming.topic || existing.topic;
+            existing.status = incoming.status;
+            existing.status_label = incoming.status_label;
+            existing.presence = incoming.presence;
+            existing.presence_label = incoming.presence_label;
+            existing.time_label = incoming.time_label;
+            existing.unread = incoming.unread;
+            existing.client = incoming.client || existing.client;
+            updateThreadListItem(root, existing);
+            rememberThread(existing);
+            if (id === selectedId && fresh.length !== before) {
+              renderMessages(root, existing);
+              updateThreadHeader(root, existing);
+            }
+          });
+        })
+        .catch(function () {
+          /* сеть моргнула — попробуем на следующем круге */
+        })
+        .then(function () {
+          refreshing = false;
+        });
+    }
+
+    window.setInterval(refreshThreads, 12000);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) refreshThreads();
+    });
   }
 
   function initChannelTabs() {

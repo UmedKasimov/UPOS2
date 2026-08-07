@@ -212,6 +212,7 @@ from upos.earnings_store import (
 )
 from upos.telegram_business_store import (
     active_connection as telegram_business_connection,
+    has_business_chat as _telegram_business_chat,
     list_threads as list_business_threads,
     thread_messages as business_thread_messages,
 )
@@ -24293,6 +24294,11 @@ def create_app() -> FastAPI:
             )
         if not chat_id:
             return JSONResponse({"error": "У переписки нет чата Telegram"}, status_code=400)
+        if not connection_id and _telegram_business_chat(wid, chat_id):
+            # Клиент переписывается с владельцем лично — накладная должна
+            # прийти от него же, а не от бота.
+            connection = telegram_business_connection(wid) or {}
+            connection_id = str(connection.get("connection_id") or "")
         cfg, token = get_bot_config_with_token(wid)
         if not cfg or not token:
             return JSONResponse({"error": "not_connected"}, status_code=400)
@@ -24410,11 +24416,38 @@ def create_app() -> FastAPI:
 
         if not chat_id:
             return JSONResponse({"error": "У переписки нет чата Telegram"}, status_code=400)
+        # Если это личная переписка владельца, отвечаем от его имени —
+        # клиент писал человеку, и ответ от бота выглядит подменой.
+        connection_id = ""
+        if _telegram_business_chat(wid, chat_id):
+            connection = telegram_business_connection(wid) or {}
+            connection_id = str(connection.get("connection_id") or "")
         try:
-            tg_send_message(token, chat_id, text_body, parse_mode="")
+            tg_send_message(
+                token,
+                chat_id,
+                text_body,
+                parse_mode="",
+                business_connection_id=connection_id,
+            )
         except TelegramApiError as exc:
             return JSONResponse({"error": str(exc)}, status_code=400)
-        return {"ok": True}
+        return {"ok": True, "as_owner": bool(connection_id)}
+
+    @app.get("/api/messengers/threads")
+    def api_messenger_threads(request: Request, channel: str = ""):
+        """Свежий список диалогов — окно переписки обновляет себя само."""
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        rows = _messenger_threads_from_sources(wid)
+        wanted = _messenger_channel_key(str(channel or ""))
+        if wanted:
+            rows = [row for row in rows if _messenger_channel_key(str(row.get("channel") or "")) == wanted]
+        # updated_at — datetime, в JSON он не сериализуется сам.
+        payload = json.loads(json.dumps(rows, ensure_ascii=False, default=str))
+        return {"ok": True, "threads": payload}
 
     @app.post("/api/messengers/threads/read")
     async def api_messenger_thread_read(request: Request):
