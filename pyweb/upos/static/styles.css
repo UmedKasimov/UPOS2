@@ -32767,6 +32767,22 @@ html.dark .client-own-tag--other {
   padding: 0.7rem 1rem;
 }
 
+.messenger-client-doc-subtitle {
+  margin: 0;
+  padding: 0.6rem 1rem 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Итог по оплатам — строка таблицы, но читается как подвал. */
+.messenger-client-doc-total td {
+  background: color-mix(in srgb, var(--primary), transparent 94%);
+  font-weight: 800;
+}
+
 /* Статус здесь только показываем: у карточки нет формы смены статуса,
    поэтому убираем место под стрелку селекта. */
 .messenger-client-status {

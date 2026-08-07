@@ -24294,6 +24294,37 @@ def create_app() -> FastAPI:
                         ),
                     }
                 )
+            # Оплаты по документу: чем и когда закрывали сумму.
+            currency_code = str(row.currency or data.get("currency") or "UZS").upper()
+            payments = []
+            for payment in data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []:
+                if not isinstance(payment, dict):
+                    continue
+                payment_amount = _sales_decimal(payment.get("amount"))
+                if payment_amount <= 0:
+                    continue
+                payments.append(
+                    {
+                        "account": str(payment.get("account") or payment.get("type") or "Оплата"),
+                        "type": str(payment.get("type") or ""),
+                        "date": str(payment.get("date") or ""),
+                        "amount": _decimal_plain_text(payment_amount),
+                        "currency": str(payment.get("currency") or currency_code).upper(),
+                    }
+                )
+            if not payments and paid > 0:
+                # У старых документов разбивки нет — показываем одной строкой,
+                # иначе оплаченный документ выглядит как неоплаченный.
+                payments.append(
+                    {
+                        "account": str(data.get("payment_type") or "Оплата"),
+                        "type": str(data.get("payment_type") or ""),
+                        "date": "",
+                        "amount": _decimal_plain_text(paid),
+                        "currency": currency_code,
+                    }
+                )
+
             return {
                 "document_id": str(row.id),
                 "title": {"sale": "Накладная", "return": "Возврат", "order": "Заказ"}.get(doc_type, "Документ"),
@@ -24303,8 +24334,9 @@ def create_app() -> FastAPI:
                 "client": str(data.get("client") or ""),
                 "phone": str(data.get("client_phone") or data.get("phone") or ""),
                 "status": _sales_status_label(_sales_workflow_status(data)),
-                "currency": str(row.currency or data.get("currency") or "UZS").upper(),
+                "currency": currency_code,
                 "lines": lines,
+                "payments": payments,
                 "amount": _decimal_plain_text(amount),
                 "paid": _decimal_plain_text(paid),
                 "debt": _decimal_plain_text(max(Decimal("0"), amount - paid)),
