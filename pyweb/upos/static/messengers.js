@@ -485,19 +485,50 @@
       '<button type="submit" class="btn">' + (client ? "Сохранить" : "Создать клиента") + "</button>" +
       "</form>";
 
+    var groups = [
+      { key: "all", label: "Все" },
+      { key: "sale", label: "Продажи" },
+      { key: "order", label: "Заказы" },
+      { key: "return", label: "Возвраты" },
+      { key: "installment", label: "Рассрочки" },
+    ];
+    var tabs =
+      '<nav class="messenger-client-groups" data-messenger-client-groups>' +
+      groups
+        .map(function (group) {
+          var count =
+            group.key === "all"
+              ? docs.length
+              : docs.filter(function (doc) {
+                  return String(doc.group || doc.kind) === group.key;
+                }).length;
+          return (
+            '<button type="button" class="messenger-client-group' +
+            (group.key === "all" ? " active" : "") +
+            '" data-client-group="' + group.key + '">' +
+            escapeHtml(group.label) + " <b>" + count + "</b></button>"
+          );
+        })
+        .join("") +
+      "</nav>";
+
     var history = docs.length
-      ? '<table class="messenger-client-docs"><thead><tr><th>Дата</th><th>№</th><th>Тип</th><th>Статус</th><th>Сумма</th><th>Долг</th></tr></thead><tbody>' +
+      ? tabs +
+        '<table class="messenger-client-docs"><thead><tr><th>Дата</th><th>№</th><th>Тип</th><th>Статус</th><th>Сумма</th><th>Долг</th><th></th></tr></thead><tbody>' +
         docs
           .map(function (doc) {
             return (
-              '<tr data-doc-url="' + escapeHtml(doc.url || "") + '">' +
-              "<td>" + escapeHtml(doc.date || "") + "</td>" +
-              "<td>" + escapeHtml(doc.number || "") + "</td>" +
-              "<td>" + escapeHtml(doc.kind || "") + "</td>" +
+              '<tr data-doc-group="' + escapeHtml(String(doc.group || "sale")) + '">' +
+              '<td data-doc-url="' + escapeHtml(doc.url || "") + '">' + escapeHtml(doc.date || "") + "</td>" +
+              '<td data-doc-url="' + escapeHtml(doc.url || "") + '">' + escapeHtml(doc.number || "") + "</td>" +
+              "<td>" + escapeHtml(doc.kind || "") + (String(doc.group) === "installment" ? " · рассрочка" : "") + "</td>" +
               "<td>" + escapeHtml(doc.status || "") + "</td>" +
               "<td>" + moneyText(doc.amount, doc.currency) + "</td>" +
               "<td>" + moneyText(doc.debt, doc.currency) + "</td>" +
-              "</tr>"
+              '<td class="messenger-client-docs-actions">' +
+              '<a class="messenger-client-doc-link" href="/api/sales/' + escapeHtml(doc.id || "") + '/invoice.pdf" target="_blank" rel="noopener">PDF</a>' +
+              '<button type="button" class="messenger-client-doc-send" data-send-invoice="' + escapeHtml(doc.id || "") + '">Отправить</button>' +
+              "</td></tr>"
             );
           })
           .join("") +
@@ -506,12 +537,67 @@
 
     box.innerHTML =
       '<div class="messenger-client-head">' + head + "</div>" + form +
-      '<h4 class="messenger-client-subtitle">Заказы и история</h4>' + history;
+      '<h4 class="messenger-client-subtitle">Заказы и история</h4>' + history +
+      '<p class="messenger-client-note" data-messenger-invoice-status hidden></p>';
 
-    box.querySelectorAll("[data-doc-url]").forEach(function (rowNode) {
-      rowNode.addEventListener("click", function () {
-        var url = rowNode.getAttribute("data-doc-url");
+    box.querySelectorAll("[data-doc-url]").forEach(function (cell) {
+      cell.addEventListener("click", function () {
+        var url = cell.getAttribute("data-doc-url");
         if (url) window.location.assign(url);
+      });
+    });
+
+    box.querySelectorAll("[data-client-group]").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var key = tab.getAttribute("data-client-group");
+        box.querySelectorAll("[data-client-group]").forEach(function (node) {
+          node.classList.toggle("active", node === tab);
+        });
+        box.querySelectorAll("[data-doc-group]").forEach(function (rowNode) {
+          rowNode.hidden = key !== "all" && rowNode.getAttribute("data-doc-group") !== key;
+        });
+      });
+    });
+
+    box.querySelectorAll("[data-send-invoice]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var status = box.querySelector("[data-messenger-invoice-status]");
+        var docId = button.getAttribute("data-send-invoice");
+        if (!docId) return;
+        button.disabled = true;
+        if (status) {
+          status.hidden = false;
+          status.className = "messenger-client-note";
+          status.textContent = "Отправляем накладную…";
+        }
+        window
+          .fetch("/api/messengers/threads/" + encodeURIComponent(card.thread_id) + "/invoice", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+            body: JSON.stringify({ document_id: docId }),
+          })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+              if (!response.ok || !body.ok) throw new Error(body.error || "Не удалось отправить накладную");
+              return body;
+            });
+          })
+          .then(function (body) {
+            if (status) {
+              status.className = "messenger-client-note messenger-client-note--ok";
+              status.textContent = "Накладная отправлена клиенту: " + (body.caption || "");
+            }
+          })
+          .catch(function (error) {
+            if (status) {
+              status.className = "messenger-client-note messenger-client-note--error";
+              status.textContent = sendErrorText(error.message);
+            }
+          })
+          .then(function () {
+            button.disabled = false;
+          });
       });
     });
 
@@ -670,6 +756,14 @@
     if (chatTop) {
       chatTop.addEventListener("dblclick", function (event) {
         if (event.target.closest("button, a")) return;
+        var thread = currentThread();
+        if (thread) openClientDialog(root, thread);
+      });
+    }
+
+    var clientOpen = root.querySelector("[data-messenger-client-open]");
+    if (clientOpen) {
+      clientOpen.addEventListener("click", function () {
         var thread = currentThread();
         if (thread) openClientDialog(root, thread);
       });

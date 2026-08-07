@@ -207,6 +207,48 @@ def send_message(
     return last
 
 
+def send_document(
+    token: str,
+    chat_id: int,
+    *,
+    filename: str,
+    content: bytes,
+    caption: str = "",
+    business_connection_id: str = "",
+) -> dict[str, Any]:
+    """Отправляет файл — например накладную в PDF.
+
+    Файл уходит формой multipart, поэтому обычный `_api_call` с JSON тут
+    не подходит.
+    """
+    clean_token = (token or "").strip()
+    if not clean_token:
+        raise TelegramApiError("Telegram token is empty")
+    url = TELEGRAM_API.format(token=clean_token, method="sendDocument")
+    data: dict[str, Any] = {"chat_id": str(int(chat_id))}
+    if caption:
+        data["caption"] = caption[:1024]
+    if business_connection_id:
+        data["business_connection_id"] = str(business_connection_id)
+    files = {"document": (filename, content, "application/pdf")}
+    try:
+        resp = _http_client().post(url, data=data, files=files, timeout=30.0)
+    except httpx.HTTPError as exc:
+        raise TelegramApiError(f"Telegram network error: {exc}") from exc
+    try:
+        payload = resp.json()
+    except Exception as exc:
+        raise TelegramApiError(f"Invalid Telegram response ({resp.status_code})") from exc
+    if not payload.get("ok"):
+        raise TelegramApiError(
+            str(payload.get("description") or "Telegram API error"),
+            status_code=resp.status_code,
+            payload=payload,
+        )
+    result = payload.get("result")
+    return result if isinstance(result, dict) else {}
+
+
 def get_chat_member(token: str, chat_id: int, user_id: int) -> dict[str, Any]:
     result = _api_call(
         token,

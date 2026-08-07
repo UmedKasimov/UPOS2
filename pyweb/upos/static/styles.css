@@ -32638,3 +32638,82 @@ html.dark .client-own-tag--other {
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+
+/* Разделы документов клиента и отправка накладной из переписки. */
+.messenger-dialog-chat-tools {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.messenger-client-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.messenger-client-group {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.messenger-client-group b {
+  margin-left: 0.25rem;
+  color: var(--foreground);
+}
+
+.messenger-client-group.active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  color: var(--primary);
+}
+
+.messenger-client-docs-actions {
+  display: flex;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.messenger-client-doc-link,
+.messenger-client-doc-send {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.messenger-client-doc-send:hover,
+.messenger-client-doc-link:hover {
+  border-color: var(--primary);
+}
+
+.messenger-client-note {
+  margin: 0.7rem 0 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary);
+  font-size: var(--text-sm);
+}
+
+.messenger-client-note--ok {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #15803d;
+}
+
+.messenger-client-note--error {
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  color: #b91c1c;
+}

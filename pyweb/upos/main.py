@@ -24151,11 +24151,18 @@ def create_app() -> FastAPI:
                 amount_total += amount if doc_type != "return" else -amount
                 debt_total += debt
                 if len(documents) < 20:
+                    installment = data.get("installment")
+                    has_installment = bool(
+                        isinstance(installment, dict) and _sales_decimal(installment.get("months")) > 1
+                    )
                     documents.append(
                         {
+                            "id": str(sale.id),
                             "number": str(sale.number or ""),
                             "date": _messenger_document_date(data, sale.created_at),
                             "kind": {"sale": "Продажа", "return": "Возврат", "order": "Заказ"}.get(doc_type, doc_type),
+                            # Рассрочка — это та же продажа, но её ищут отдельно.
+                            "group": "installment" if has_installment else doc_type,
                             "status": _sales_status_label(status),
                             "amount": _decimal_plain_text(amount),
                             "currency": str(sale.currency or data.get("currency") or "UZS").upper(),
@@ -24170,6 +24177,140 @@ def create_app() -> FastAPI:
                 "debt": _decimal_plain_text(debt_total),
             }
         return payload
+
+    def _messenger_invoice_payload(workspace_owner_id: str, document_id: str) -> dict[str, Any] | None:
+        """Данные накладной по документу продажи."""
+        from upos.telegram_store import workspace_display_name
+
+        with session_scope() as session:
+            row = session.get(SaleDocument, document_id)
+            if row is None or row.workspace_owner_id != workspace_owner_id:
+                return None
+            data = _json_object(row.data)
+            doc_type = str(data.get("doc_type") or "sale")
+            amount = _sales_decimal(row.amount)
+            paid = min(amount, _sales_decimal(data.get("paid_amount")))
+            lines = []
+            for line in data.get("lines") if isinstance(data.get("lines"), list) else []:
+                if not isinstance(line, dict):
+                    continue
+                quantity = _sales_decimal(line.get("quantity"))
+                price = _sales_decimal(line.get("price"))
+                lines.append(
+                    {
+                        "product": str(line.get("product") or line.get("name") or ""),
+                        "quantity": _decimal_plain_text(quantity),
+                        "price": _decimal_plain_text(price),
+                        "total": _decimal_plain_text(
+                            _sales_decimal(line.get("total")) or quantity * price
+                        ),
+                    }
+                )
+            return {
+                "document_id": str(row.id),
+                "title": {"sale": "Накладная", "return": "Возврат", "order": "Заказ"}.get(doc_type, "Документ"),
+                "number": str(row.number or ""),
+                "organization": workspace_display_name(workspace_owner_id),
+                "date": _messenger_document_date(data, row.created_at),
+                "client": str(data.get("client") or ""),
+                "phone": str(data.get("client_phone") or data.get("phone") or ""),
+                "status": _sales_status_label(_sales_workflow_status(data)),
+                "currency": str(row.currency or data.get("currency") or "UZS").upper(),
+                "lines": lines,
+                "amount": _decimal_plain_text(amount),
+                "paid": _decimal_plain_text(paid),
+                "debt": _decimal_plain_text(max(Decimal("0"), amount - paid)),
+                "note": str(data.get("note") or ""),
+            }
+
+    @app.get("/api/sales/{document_id}/invoice.pdf")
+    def api_sales_invoice_pdf(request: Request, document_id: str):
+        """Скачать накладную — та же форма, что уходит клиенту."""
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        payload = _messenger_invoice_payload(wid, str(document_id or "").strip())
+        if payload is None:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        from upos.invoice_pdf import build_invoice_pdf
+
+        content = build_invoice_pdf(payload)
+        name = f"invoice-{payload.get('number') or payload['document_id'][:8]}.pdf"
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{name}"'},
+        )
+
+    @app.post("/api/messengers/threads/{thread_id}/invoice")
+    async def api_messenger_send_invoice(request: Request, thread_id: str):
+        """Отправляет накладную PDF прямо в переписку с клиентом."""
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        document_id = str((body or {}).get("document_id") or "").strip()
+        if not document_id:
+            return JSONResponse({"error": "Укажите документ"}, status_code=400)
+        payload = _messenger_invoice_payload(wid, document_id)
+        if payload is None:
+            return JSONResponse({"error": "Документ не найден"}, status_code=404)
+
+        thread_key = str(thread_id or "").strip()
+        from upos.invoice_pdf import build_invoice_pdf
+        from upos.telegram_client import TelegramApiError, send_document as tg_send_document
+        from upos.telegram_store import get_bot_config_with_token, get_chat_by_row_id
+
+        chat_id = 0
+        connection_id = ""
+        if thread_key.startswith("tg-business-"):
+            chat_id = int(thread_key[len("tg-business-") :] or 0)
+            connection = telegram_business_connection(wid) or {}
+            connection_id = str(connection.get("connection_id") or "")
+            if not connection_id:
+                return JSONResponse({"error": "business_not_connected"}, status_code=400)
+        elif thread_key.startswith("telegram-chat-"):
+            chat = get_chat_by_row_id(wid, thread_key[len("telegram-chat-") :])
+            if not chat:
+                return JSONResponse({"error": "Чат не найден"}, status_code=404)
+            chat_id = int(chat.get("chat_id") or 0)
+        elif thread_key.startswith("telegram-sub-"):
+            with session_scope() as session:
+                row = session.get(TelegramSubscriber, thread_key[len("telegram-sub-") :])
+                if row is None or row.workspace_owner_id != wid:
+                    return JSONResponse({"error": "Контакт не найден"}, status_code=404)
+                chat_id = int(row.chat_id or 0)
+        else:
+            return JSONResponse(
+                {"error": "Накладную можно отправить только в Telegram"}, status_code=400
+            )
+        if not chat_id:
+            return JSONResponse({"error": "У переписки нет чата Telegram"}, status_code=400)
+        cfg, token = get_bot_config_with_token(wid)
+        if not cfg or not token:
+            return JSONResponse({"error": "not_connected"}, status_code=400)
+
+        content = build_invoice_pdf(payload)
+        caption = f"{payload['title']} № {payload['number']}".strip()
+        try:
+            tg_send_document(
+                token,
+                chat_id,
+                filename=f"invoice-{payload.get('number') or 'document'}.pdf",
+                content=content,
+                caption=caption,
+                business_connection_id=connection_id,
+            )
+        except TelegramApiError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        return {"ok": True, "caption": caption}
 
     @app.get("/api/messengers/threads/{thread_id}/client")
     def api_messenger_thread_client(request: Request, thread_id: str):
