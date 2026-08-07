@@ -171,7 +171,10 @@ def add_message(
             workspace_owner_id=workspace_owner_id,
             thread_id=thread_id,
             channel=channel,
-            external_id=external_id,
+            # Идентификатор канала уникален в пределах воркспейса, поэтому
+            # сообщениям без него выдаём свой: иначе второе такое сообщение
+            # не сохранится вовсе.
+            external_id=external_id or f"local:{uuid.uuid4()}",
             direction="out" if direction == "out" else "in",
             author=str(author or "")[:255],
             text_body=str(text_body or ""),

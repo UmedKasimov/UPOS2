@@ -18582,12 +18582,13 @@ def create_app() -> FastAPI:
         responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
         data = _messenger_settings_payload(wid)
         all_threads = _messenger_threads_from_sources(wid)
-        channel_message_counts: dict[str, int] = {}
+        # На вкладке канала — непрочитанные, как и в списке диалогов: общее
+        # число сообщений висело бы там вечно.
+        channel_unread_counts: dict[str, int] = {}
         for item in all_threads:
             key = _messenger_channel_key(str(item.get("channel") or ""))
-            message_count = len(item.get("messages") or [])
             if key:
-                channel_message_counts[key] = channel_message_counts.get(key, 0) + message_count
+                channel_unread_counts[key] = channel_unread_counts.get(key, 0) + int(item.get("unread") or 0)
         threads = _messenger_filter_rows(all_threads, filters)
         campaigns = _messenger_filter_rows(
             [dict(row, status_label=_messenger_status_label(str(row.get("status") or ""))) for row in data.get("messenger_campaigns") or []],
@@ -18612,7 +18613,7 @@ def create_app() -> FastAPI:
                 "responsibles": responsible_options,
                 "clients": _messenger_client_options(wid),
             },
-            messenger_channel_message_counts=channel_message_counts,
+            messenger_channel_unread_counts=channel_unread_counts,
             messenger_channel_accounts=_messenger_channel_accounts(wid),
             messenger_threads=threads,
             messenger_threads_json=threads_json,

@@ -332,12 +332,27 @@
     return meta ? meta.getAttribute("content") || "" : "";
   }
 
+  function dropChannelUnread(count) {
+    /* Цифра на вкладке канала — сумма непрочитанных его диалогов. */
+    if (!count) return;
+    var tab = document.querySelector(".messenger-channel-tab.active");
+    var badge = tab ? tab.querySelector("b") : null;
+    if (!badge) return;
+    var left = (parseInt(badge.textContent, 10) || 0) - count;
+    if (left > 0) {
+      badge.textContent = String(left);
+    } else {
+      badge.remove();
+    }
+  }
+
   function clearUnread(root, thread) {
     /* Счётчик гасим сразу, не дожидаясь ответа сервера: диалог уже открыт. */
     var item = root.querySelector('[data-messenger-thread-id="' + String(thread.id).replace(/"/g, '\\"') + '"]');
     if (item) {
       var badge = item.querySelector("[data-messenger-unread]");
       if (badge) {
+        if (!badge.hidden) dropChannelUnread(parseInt(badge.textContent, 10) || 0);
         badge.textContent = "";
         badge.hidden = true;
       }

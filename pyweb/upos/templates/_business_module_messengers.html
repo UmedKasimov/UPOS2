@@ -11,7 +11,7 @@
 <script type="application/json" data-messenger-template-json>{{ messenger_templates_json|default('[]')|safe }}</script>
 
 {% set active_messenger_channel = messenger_filters.channel or 'Telegram' %}
-{% set messenger_channel_message_counts = messenger_channel_message_counts|default({}) %}
+{% set messenger_channel_unread_counts = messenger_channel_unread_counts|default({}) %}
 {% set messenger_auto_reply = messenger_auto_reply|default({}) %}
 {% set messenger_campaigns = messenger_campaigns|default([]) %}
 {% set messenger_templates = messenger_templates|default([]) %}
@@ -44,7 +44,7 @@
   <nav class="messenger-channel-tabs" aria-label="Каналы диалогов">
     {% for tab in messenger_channel_tabs %}
       {% set is_active_channel = active_messenger_channel|lower == tab.value|lower %}
-      {% set tab_message_count = messenger_channel_message_counts.get(tab.value, 0) %}
+      {% set tab_unread_count = messenger_channel_unread_counts.get(tab.value, 0) %}
       <button
         type="button"
         class="messenger-channel-tab{% if is_active_channel %} active{% endif %}"
@@ -54,8 +54,8 @@
       >
         <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
         <span class="messenger-channel-label">{{ tab.label }}</span>
-        {% if tab_message_count %}
-          <b>{{ tab_message_count }}</b>
+        {% if tab_unread_count %}
+          <b>{{ tab_unread_count }}</b>
         {% endif %}
       </button>
     {% endfor %}
