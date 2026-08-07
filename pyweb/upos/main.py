@@ -17317,6 +17317,58 @@ def create_app() -> FastAPI:
             },
         ]
 
+        # Настоящие переписки Instagram Direct: каждая своим диалогом, с
+        # историей сообщений. Раньше канал показывался одной заглушкой, и
+        # отвечать клиенту было не из чего.
+        instagram_threads = messenger_list_threads(workspace_owner_id)
+        instagram_client_names = {
+            str(row.get("id") or ""): str(row.get("client") or "")
+            for row in instagram_threads
+        }
+        for thread in instagram_threads:
+            thread_id = str(thread.get("id") or "")
+            if not thread_id:
+                continue
+            history = messenger_list_messages(workspace_owner_id, thread_id)
+            title = str(thread.get("title") or thread.get("username") or "Instagram Direct")
+            last_at = str(thread.get("last_message_at") or "")
+            status_value = "active" if str(thread.get("status") or "open") != "closed" else "done"
+            presence, presence_label = _messenger_presence(_parse_iso_datetime(last_at), status_value)
+            rows.append(
+                {
+                    "id": f"instagram-thread-{thread_id}",
+                    "source": "instagram",
+                    "thread_id": thread_id,
+                    "channel": "Instagram",
+                    "contact": instagram_client_names.get(thread_id) or title,
+                    "client": instagram_client_names.get(thread_id, ""),
+                    "username": str(thread.get("username") or ""),
+                    "phone": "",
+                    "topic": ("@" + str(thread.get("username"))) if thread.get("username") else "Instagram Direct",
+                    "last_message": str(thread.get("last_message_text") or ""),
+                    "responsible": "",
+                    "status": status_value,
+                    "status_label": _messenger_status_label(status_value),
+                    "presence": presence,
+                    "presence_label": presence_label,
+                    "avatar_url": str(thread.get("avatar_url") or ""),
+                    "avatar_ttl_days": 5,
+                    "is_new": bool(thread.get("unread_count")),
+                    # Сортировка списка сравнивает даты, поэтому строку ISO
+                    # разбираем здесь же.
+                    "updated_at": _parse_iso_datetime(last_at),
+                    "messages": [
+                        {
+                            "author": str(message.get("author") or title),
+                            "text": str(message.get("text") or ""),
+                            "kind": "out" if str(message.get("direction") or "") == "out" else "in",
+                            "created_at": str(message.get("sent_at") or ""),
+                        }
+                        for message in history
+                    ],
+                }
+            )
+
         for spec in social_thread_specs:
             channel = str(spec["channel"])
             channel_slug = {

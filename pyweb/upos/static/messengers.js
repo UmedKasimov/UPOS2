@@ -401,9 +401,11 @@
         var value = String(text.value || "").trim();
         if (!current || !value) return;
 
-        // Личные переписки Telegram уходят клиенту по-настоящему; остальные
-        // каналы пока только показывают ответ локально.
-        if (current.source !== "telegram_business" || !current.chat_id) {
+        // Личные переписки Telegram и Instagram Direct уходят клиенту
+        // по-настоящему; остальные каналы пока показывают ответ локально.
+        var isTelegram = current.source === "telegram_business" && current.chat_id;
+        var isInstagram = current.source === "instagram" && current.thread_id;
+        if (!isTelegram && !isInstagram) {
           current.messages = threadMessages(current).slice();
           current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
           text.value = "";
@@ -416,14 +418,18 @@
         var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrf = csrfInput ? csrfInput.value : csrfMeta ? csrfMeta.content : "";
         send.disabled = true;
-        fetch("/api/telegram/business/send", {
+        var sendUrl = isInstagram ? "/api/messengers/instagram/send" : "/api/telegram/business/send";
+        var sendBody = isInstagram
+          ? { thread_id: current.thread_id, text: value }
+          : { chat_id: current.chat_id, text: value };
+        fetch(sendUrl, {
           method: "POST",
           credentials: "same-origin",
           headers: {
             "Content-Type": "application/json",
             "X-CSRF-Token": csrf,
           },
-          body: JSON.stringify({ chat_id: current.chat_id, text: value }),
+          body: JSON.stringify(sendBody),
         })
           .then(function (response) {
             return response.json().catch(function () { return {}; }).then(function (payload) {
@@ -431,9 +437,22 @@
               return payload;
             });
           })
-          .then(function () {
-            current.messages = threadMessages(current).slice();
-            current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
+          .then(function (payload) {
+            // Instagram возвращает ленту целиком — берём её, чтобы порядок и
+            // отметки совпадали с сохранённой перепиской.
+            if (isInstagram && Array.isArray(payload && payload.messages)) {
+              current.messages = payload.messages.map(function (message) {
+                return {
+                  author: String(message.author || current.contact || "Instagram"),
+                  text: String(message.text || ""),
+                  kind: String(message.direction || "") === "out" ? "out" : "in",
+                  created_at: String(message.sent_at || ""),
+                };
+              });
+            } else {
+              current.messages = threadMessages(current).slice();
+              current.messages.push({ author: "Вы", text: value, kind: "out", created_at: new Date().toISOString() });
+            }
             text.value = "";
             rememberThread(current);
             renderMessages(root, current);
