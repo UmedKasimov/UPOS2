@@ -400,6 +400,7 @@
       <section class="reports-panel" id="report-sales-cost" data-org-report-panel="sales-cost" hidden>
         {% set sc_summary = (business_reports.profit or {}).summary or {} %}
         {% set sc_rows = (business_reports.profit or {}).sales_rows or [] %}
+        {% set sc_stages = (business_reports.profit or {}).stages or {'all': {}, 'shipment': {}, 'archive': {}} %}
         <header class="reports-panel-head">
           <div>
             <p class="reports-section-kicker">Прибыль</p>
@@ -412,11 +413,38 @@
               <button type="button" data-profit-currency="USD" {% if report_currency == 'USD' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>USD</button>
             </div>
             <div class="reports-balance-total">
-              <span><b data-profit-money data-money-uzs="{{ sc_summary.cost_uzs or 0 }}">{{ sc_summary.cost or "0 UZS" }}</b> себестоимость</span>
-              <span><b data-profit-money data-money-uzs="{{ sc_summary.gross_uzs or 0 }}">{{ sc_summary.gross or "0 UZS" }}</b> прибыль</span>
+              <span><b data-profit-money data-money-uzs="{{ sc_stages.all.cost_uzs or 0 }}" data-sales-cost-total>{{ sc_stages.all.cost or "0 UZS" }}</b> себестоимость</span>
+              <span><b data-profit-money data-money-uzs="{{ sc_stages.all.profit_uzs or 0 }}" data-sales-cost-profit>{{ sc_stages.all.profit or "0 UZS" }}</b> <span data-sales-cost-profit-label>прибыль</span></span>
             </div>
           </div>
         </header>
+        {# Отгрузки дают ожидаемую прибыль, архив — реальную: разделы
+           переключают и таблицу, и суммы наверху. #}
+        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы прибыли" data-sales-cost-stages>
+          <span class="sales-document-tabs-title">Разделы прибыли</span>
+          {% for stage in [
+            {'key': 'all', 'label': 'Все', 'logo': 'ВС', 'note': 'прибыль'},
+            {'key': 'shipment', 'label': 'Отгрузки', 'logo': 'ОТ', 'note': 'ожидаемая прибыль'},
+            {'key': 'archive', 'label': 'Архив', 'logo': 'АР', 'note': 'реальная прибыль'},
+          ] %}
+            {% set stage_data = sc_stages[stage.key] %}
+            <button
+              type="button"
+              class="messenger-channel-tab sales-document-tab{% if stage.key == 'all' %} active{% endif %}"
+              data-channel-brand="{{ stage.key }}"
+              data-sales-cost-stage="{{ stage.key }}"
+              data-stage-cost="{{ stage_data.cost_uzs or 0 }}"
+              data-stage-profit="{{ stage_data.profit_uzs or 0 }}"
+              data-stage-revenue="{{ stage_data.revenue_uzs or 0 }}"
+              data-stage-note="{{ stage.note }}"
+              aria-pressed="{{ 'true' if stage.key == 'all' else 'false' }}"
+            >
+              <span class="messenger-channel-logo" aria-hidden="true">{{ stage.logo }}</span>
+              <span class="messenger-channel-label">{{ stage.label }}</span>
+              <b>{{ stage_data.count or 0 }}</b>
+            </button>
+          {% endfor %}
+        </nav>
         <div class="reports-table-wrap">
           <table class="reports-data-table">
             <thead>
@@ -429,11 +457,12 @@
                 <th>Себестоимость</th>
                 <th>Прибыль</th>
                 <th>Маржа</th>
+                <th>Прибыль учтена</th>
               </tr>
             </thead>
             <tbody>
               {% for row in sc_rows %}
-                <tr>
+                <tr data-sales-cost-row="{{ row.stage or 'shipment' }}">
                   <td>{{ row.date }}</td>
                   <td>{{ row.number or "-" }}</td>
                   <td>{{ row.kind }}</td>
@@ -442,18 +471,27 @@
                   <td{% if row.cost_missing %} class="reports-cost-missing" title="У товара нет себестоимости"{% endif %}><span data-profit-money data-money-uzs="{{ row.cost_uzs }}">{{ row.cost }}</span></td>
                   <td{% if row.profit_negative %} class="is-negative"{% endif %}><span data-profit-money data-money-uzs="{{ row.profit_uzs }}">{{ row.profit }}</span></td>
                   <td>{{ row.margin }}</td>
+                  <td>
+                    {% if (row.stage or 'shipment') == 'archive' %}
+                      <span class="reports-stage-flag reports-stage-flag--real">Реальная</span>
+                    {% else %}
+                      <span class="reports-stage-flag reports-stage-flag--expected">Ожидаемая</span>
+                    {% endif %}
+                  </td>
                 </tr>
               {% else %}
-                <tr><td colspan="8" class="reports-empty-state">Продаж за период нет.</td></tr>
+                <tr><td colspan="9" class="reports-empty-state">Продаж за период нет.</td></tr>
               {% endfor %}
+              <tr hidden data-sales-cost-empty><td colspan="9" class="reports-empty-state">В этом разделе документов нет.</td></tr>
             </tbody>
             {% if sc_rows %}
               <tfoot>
                 <tr>
                   <td colspan="4"><strong>Итого</strong></td>
-                  <td><strong data-profit-money data-money-uzs="{{ sc_summary.revenue_uzs or 0 }}">{{ sc_summary.revenue or "0 UZS" }}</strong></td>
-                  <td><strong data-profit-money data-money-uzs="{{ sc_summary.cost_uzs or 0 }}">{{ sc_summary.cost or "0 UZS" }}</strong></td>
-                  <td><strong data-profit-money data-money-uzs="{{ sc_summary.gross_uzs or 0 }}">{{ sc_summary.gross or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.revenue_uzs or 0 }}" data-sales-cost-foot-revenue>{{ sc_stages.all.revenue or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.cost_uzs or 0 }}" data-sales-cost-foot-cost>{{ sc_stages.all.cost or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.profit_uzs or 0 }}" data-sales-cost-foot-profit>{{ sc_stages.all.profit or "0 UZS" }}</strong></td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -943,6 +981,54 @@
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
   }
+
+  // Разделы прибыли: «Отгрузки» показывают ожидаемую прибыль, «Архив» —
+  // реальную, потому что программа признаёт прибыль только после архива.
+  function applySalesCostStage(stage) {
+    const tabs = document.querySelector('[data-sales-cost-stages]');
+    if (!tabs) return;
+    const button = tabs.querySelector(`[data-sales-cost-stage="${stage}"]`) || tabs.querySelector('[data-sales-cost-stage]');
+    if (!button) return;
+    const active = button.getAttribute('data-sales-cost-stage');
+    tabs.querySelectorAll('[data-sales-cost-stage]').forEach((node) => {
+      const on = node === button;
+      node.classList.toggle('active', on);
+      node.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+
+    let visible = 0;
+    document.querySelectorAll('[data-sales-cost-row]').forEach((row) => {
+      const show = active === 'all' || row.getAttribute('data-sales-cost-row') === active;
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+    const emptyRow = document.querySelector('[data-sales-cost-empty]');
+    if (emptyRow) emptyRow.hidden = visible > 0;
+
+    const cost = button.getAttribute('data-stage-cost') || '0';
+    const profit = button.getAttribute('data-stage-profit') || '0';
+    const revenue = button.getAttribute('data-stage-revenue') || '0';
+    const pairs = [
+      ['[data-sales-cost-total]', cost],
+      ['[data-sales-cost-profit]', profit],
+      ['[data-sales-cost-foot-revenue]', revenue],
+      ['[data-sales-cost-foot-cost]', cost],
+      ['[data-sales-cost-foot-profit]', profit],
+    ];
+    pairs.forEach(([selector, value]) => {
+      const node = document.querySelector(selector);
+      if (node) node.setAttribute('data-money-uzs', value);
+    });
+    const label = document.querySelector('[data-sales-cost-profit-label]');
+    if (label) label.textContent = button.getAttribute('data-stage-note') || 'прибыль';
+    renderProfitCurrency();
+  }
+
+  document.querySelector('[data-sales-cost-stages]')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-sales-cost-stage]');
+    if (!button) return;
+    applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
+  });
 
   function renderStockCurrency() {
     document.querySelectorAll('[data-stock-money]').forEach((node) => {

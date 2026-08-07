@@ -151,6 +151,31 @@ INTEGRATION_PROVIDERS: tuple[IntegrationProvider, ...] = (
         logo_class="integr-card-logo--wide",
         test_connection=True,
     ),
+    IntegrationProvider(
+        key="replypilot",
+        label="ReplyPilot — AI-агент в мессенджерах",
+        logo_path="integrations/replypilot.svg",
+        badge_path="integrations/replypilot-mark.svg",
+        default={
+            # Ключ, которым ReplyPilot представляется нашему API. Его
+            # выдаёт эта программа, а не внешний сервис: кнопка «Создать
+            # ключ» в карточке интеграции пишет сюда случайное значение,
+            # и ровно его ждёт replypilot_api.find_workspace_by_api_key.
+            "api_key": "",
+            # Прайс, по которому агент называет цены клиенту. Пусто —
+            # берётся первый активный прайс для продаж.
+            "price_type_id": "",
+            # Отдавать ли агенту историю покупок и долг клиента.
+            "share_client_history": True,
+            # Заводить ли заявку в CRM по итогу разговора с агентом.
+            "create_leads": True,
+            "last_request_at": "",
+        },
+        required_fields=("api_key",),
+        active_fields=("api_key", "last_request_at"),
+        logo_class="integr-card-logo--wide",
+        test_connection=False,
+    ),
 )
 
 INTEGRATION_PROVIDER_BY_KEY = {provider.key: provider for provider in INTEGRATION_PROVIDERS}

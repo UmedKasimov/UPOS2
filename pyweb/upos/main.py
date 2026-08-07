@@ -1347,6 +1347,11 @@ def create_app() -> FastAPI:
             # Веб-хук Instagram вызывает Meta, а не человек: вход тут
             # невозможен. Подлинность события проверяется подписью.
             or path == "/webhooks/instagram"
+            # AI-агент ReplyPilot — тоже программа без cookie-сессии.
+            # Вместо входа он предъявляет ключ рабочего пространства,
+            # который проверяет сам обработчик (upos/replypilot_api.py):
+            # пропустить сюда без ключа нельзя, 401 вернёт он.
+            or path.startswith("/api/replypilot/")
         ):
             return await call_next(request)
         user = request.session.get("user")
@@ -19644,6 +19649,9 @@ def create_app() -> FastAPI:
                                 "number": str(row.number or ""),
                                 "client": client,
                                 "kind": "Продажа",
+                                # Прибыль программы считается только по архиву;
+                                # у остальных отгрузок она пока ожидаемая.
+                                "stage": "archive" if records_profit else "shipment",
                                 "amount_value": amount_primary,
                                 "cost_value": document_cost,
                             })
@@ -19658,6 +19666,7 @@ def create_app() -> FastAPI:
                             "number": str(row.number or ""),
                             "client": client,
                             "kind": "Возврат",
+                            "stage": "archive",
                             "amount_value": -amount_primary,
                             "cost_value": -document_cost,
                         })
@@ -19676,6 +19685,7 @@ def create_app() -> FastAPI:
                                 "number": str(row.number or ""),
                                 "client": client,
                                 "kind": "Заказ",
+                                "stage": "archive" if records_profit else "shipment",
                                 "amount_value": amount_primary,
                                 "cost_value": document_cost,
                             })
@@ -19845,10 +19855,21 @@ def create_app() -> FastAPI:
                     profit_row["amount_uzs"] = profit_to_uzs(profit_row.get("amount_primary") or Decimal("0"))
 
                 profit_sales_rows.sort(key=lambda item: str(item.get("date") or ""), reverse=True)
+                # Отгрузки дают ожидаемую прибыль, архив — реальную: считаем
+                # обе суммы отдельно, чтобы разделы отчёта не спорили друг с другом.
+                stage_totals = {
+                    "archive": {"revenue": Decimal("0"), "cost": Decimal("0"), "count": 0},
+                    "shipment": {"revenue": Decimal("0"), "cost": Decimal("0"), "count": 0},
+                }
                 for sales_row in profit_sales_rows:
                     row_amount = sales_row.pop("amount_value")
                     row_cost = sales_row.pop("cost_value")
                     row_profit = row_amount - row_cost
+                    stage_bucket = stage_totals.get(str(sales_row.get("stage") or "shipment"))
+                    if stage_bucket is not None:
+                        stage_bucket["revenue"] += row_amount
+                        stage_bucket["cost"] += row_cost
+                        stage_bucket["count"] += 1
                     sales_row["amount"] = _report_money(row_amount, primary_currency)
                     sales_row["amount_uzs"] = profit_to_uzs(row_amount)
                     sales_row["cost"] = _report_money(row_cost, primary_currency)
@@ -19867,7 +19888,41 @@ def create_app() -> FastAPI:
                         else "-"
                     )
 
+                archive_totals = stage_totals["archive"]
+                shipment_totals_row = stage_totals["shipment"]
+                archive_profit = archive_totals["revenue"] - archive_totals["cost"]
+                shipment_profit = shipment_totals_row["revenue"] - shipment_totals_row["cost"]
+
                 business_reports["profit"] = {
+                    "stages": {
+                        "all": {
+                            "count": archive_totals["count"] + shipment_totals_row["count"],
+                            "revenue_uzs": profit_to_uzs(archive_totals["revenue"] + shipment_totals_row["revenue"]),
+                            "cost_uzs": profit_to_uzs(archive_totals["cost"] + shipment_totals_row["cost"]),
+                            "profit_uzs": profit_to_uzs(archive_profit + shipment_profit),
+                            "revenue": _report_money(archive_totals["revenue"] + shipment_totals_row["revenue"], primary_currency),
+                            "cost": _report_money(archive_totals["cost"] + shipment_totals_row["cost"], primary_currency),
+                            "profit": _report_money(archive_profit + shipment_profit, primary_currency),
+                        },
+                        "shipment": {
+                            "count": shipment_totals_row["count"],
+                            "revenue_uzs": profit_to_uzs(shipment_totals_row["revenue"]),
+                            "cost_uzs": profit_to_uzs(shipment_totals_row["cost"]),
+                            "profit_uzs": profit_to_uzs(shipment_profit),
+                            "revenue": _report_money(shipment_totals_row["revenue"], primary_currency),
+                            "cost": _report_money(shipment_totals_row["cost"], primary_currency),
+                            "profit": _report_money(shipment_profit, primary_currency),
+                        },
+                        "archive": {
+                            "count": archive_totals["count"],
+                            "revenue_uzs": profit_to_uzs(archive_totals["revenue"]),
+                            "cost_uzs": profit_to_uzs(archive_totals["cost"]),
+                            "profit_uzs": profit_to_uzs(archive_profit),
+                            "revenue": _report_money(archive_totals["revenue"], primary_currency),
+                            "cost": _report_money(archive_totals["cost"], primary_currency),
+                            "profit": _report_money(archive_profit, primary_currency),
+                        },
+                    },
                     "summary": {
                         "period": report_data["period_label"],
                         "revenue": _report_money(net_sales_total, primary_currency),
@@ -22479,6 +22534,22 @@ def create_app() -> FastAPI:
         treasury_workspace_owner=_treasury_workspace_owner,
         is_director=_is_director,
         can_manage_telegram=_can_manage_telegram,
+    )
+
+    from upos.replypilot_api import register_replypilot_api
+
+    # Расчёт цены и свод долгов передаются функциями, а не переписываются
+    # в модуле агента: цена в мессенджере обязана совпадать с ценой на
+    # экране продавца, а две копии одной формулы рано или поздно разойдутся.
+    register_replypilot_api(
+        app,
+        product_data=_product_data,
+        calculated_product_price=_calculated_product_price,
+        workspace_price_types=_workspace_price_types,
+        workspace_usd_rate=_workspace_usd_uzs_rate,
+        sales_rollup_all=_sales_rollup_all,
+        json_object=_json_object,
+        sales_decimal=_sales_decimal,
     )
 
     @app.post("/settings", name="settings_post")
