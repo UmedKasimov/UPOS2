@@ -490,6 +490,191 @@
     return amount.toLocaleString("ru-RU") + " " + (currency || "UZS");
   }
 
+  // Разделы карточки клиента повторяют журнал продаж: тот же порядок, те же
+  // значки и та же логика отбора — «Рассрочки» смотрят на состояние оплаты,
+  // «Архив» на статус, остальные вкладки на тип документа.
+  var CLIENT_DOC_TABS = [
+    { key: "", label: "Все", logo: "ВС", brand: "all" },
+    { key: "order", label: "Заказы", logo: "ЗК", brand: "order" },
+    { key: "sale", label: "Продажи", logo: "ПР", brand: "sale" },
+    { key: "partial", label: "Рассрочки", logo: "РС", brand: "installment" },
+    { key: "return", label: "Возвраты", logo: "ВЗ", brand: "return" },
+    { key: "archived", label: "Архив", logo: "АР", brand: "archive" },
+  ];
+
+  var CLIENT_DOC_TYPE_FILTERS = [
+    { value: "order", label: "Заказ" },
+    { value: "sale", label: "Продажа" },
+    { value: "return", label: "Возврат" },
+  ];
+
+  var CLIENT_PAYMENT_FILTERS = [
+    { value: "paid", label: "Оплачен" },
+    { value: "partial", label: "Частично" },
+    { value: "unpaid", label: "Не оплачен" },
+  ];
+
+  function docType(doc) {
+    return String(doc.doc_type || doc.group || "sale");
+  }
+
+  function docMatchesTab(doc, key) {
+    if (!key) return true;
+    if (key === "partial") return String(doc.payment_status || "") === "partial";
+    if (key === "archived") return String(doc.status_key || "") === "archived";
+    return docType(doc) === key;
+  }
+
+  function rowMatchesTab(row, key) {
+    if (!key) return true;
+    if (key === "partial") return row.getAttribute("data-doc-payment") === "partial";
+    if (key === "archived") return row.getAttribute("data-doc-status") === "archived";
+    return row.getAttribute("data-doc-type") === key;
+  }
+
+  // Цвет статуса считаем по тем же правилам, что и шапка журнала продаж.
+  function docStatusStyle(doc) {
+    var status = String(doc.status_key || "");
+    if (docType(doc) === "return") return "rejected";
+    if (status === "completed" || status === "archived") return "confirmed";
+    if (status === "shipped" || status === "installation") return "pending";
+    return "draft";
+  }
+
+  function amountNumber(value) {
+    var raw = String(value == null ? "" : value)
+      .replace(/[\s ]/g, "")
+      .replace(",", ".")
+      .replace(/[^\d.-]/g, "");
+    var number = Number(raw);
+    return isFinite(number) ? number : 0;
+  }
+
+  function clientSortValue(row, columnIndex, kind) {
+    var cell = row.cells[columnIndex];
+    if (!cell) return kind === "text" ? "" : 0;
+    var raw = cell.dataset.sortValue || cell.textContent || "";
+    if (kind === "number") return amountNumber(raw);
+    if (kind === "date") {
+      var timestamp = Date.parse(String(raw).trim());
+      return isFinite(timestamp) ? timestamp : 0;
+    }
+    return String(raw).trim().toLocaleLowerCase("ru-RU");
+  }
+
+  /** Вкладки, фильтры и сортировка карточки клиента — как в журнале продаж. */
+  function bindClientJournal(scope) {
+    var body = scope.querySelector("[data-messenger-client-table] tbody");
+    if (!body) return;
+    var rows = Array.from(body.querySelectorAll("[data-messenger-client-row]"));
+    var counter = scope.querySelector("[data-messenger-client-count]");
+    var search = scope.querySelector("[data-client-doc-search]");
+    var typeSelect = scope.querySelector("[data-client-doc-type]");
+    var paymentSelect = scope.querySelector("[data-client-doc-payment]");
+    var statusSelect = scope.querySelector("[data-client-doc-status]");
+    var state = { tab: "", q: "", type: "", payment: "", status: "" };
+
+    rows.forEach(function (row, index) {
+      row.dataset.clientOriginalIndex = String(index);
+    });
+
+    function applyFilters() {
+      var query = state.q.trim().toLocaleLowerCase("ru-RU");
+      var shown = 0;
+      rows.forEach(function (row) {
+        var visible =
+          rowMatchesTab(row, state.tab) &&
+          (!state.type || row.getAttribute("data-doc-type") === state.type) &&
+          (!state.payment || row.getAttribute("data-doc-payment") === state.payment) &&
+          (!state.status || row.getAttribute("data-doc-status-label") === state.status) &&
+          (!query || row.textContent.toLocaleLowerCase("ru-RU").indexOf(query) !== -1);
+        row.hidden = !visible;
+        if (!visible) return;
+        shown += 1;
+        var indexCell = row.querySelector(".sales-journal-row-index");
+        if (indexCell) indexCell.textContent = String(shown);
+      });
+      if (counter) counter.textContent = "Всего: " + shown;
+    }
+
+    scope.querySelectorAll("[data-client-group]").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        state.tab = tab.getAttribute("data-client-group") || "";
+        scope.querySelectorAll("[data-client-group]").forEach(function (node) {
+          node.classList.toggle("active", node === tab);
+          if (node === tab) node.setAttribute("aria-current", "page");
+          else node.removeAttribute("aria-current");
+        });
+        applyFilters();
+      });
+    });
+
+    var filterForm = scope.querySelector("[data-messenger-client-filter]");
+    if (filterForm) {
+      filterForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+      });
+    }
+    if (search) {
+      search.addEventListener("input", function () {
+        state.q = search.value || "";
+        applyFilters();
+      });
+    }
+    [
+      [typeSelect, "type"],
+      [paymentSelect, "payment"],
+      [statusSelect, "status"],
+    ].forEach(function (pair) {
+      var node = pair[0];
+      if (!node) return;
+      node.addEventListener("change", function () {
+        state[pair[1]] = node.value || "";
+        applyFilters();
+      });
+    });
+
+    var table = scope.querySelector("[data-messenger-client-table]");
+    var numericColumns = new Set([5, 6, 7]);
+    var dateColumns = new Set([2]);
+    scope.querySelectorAll("thead .messenger-client-sort-btn").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var header = button.closest("th");
+        if (!header || !table) return;
+        var columnIndex = header.cellIndex;
+        var kind =
+          header.dataset.sortKind ||
+          (numericColumns.has(columnIndex) ? "number" : dateColumns.has(columnIndex) ? "date" : "text");
+        var direction = header.getAttribute("aria-sort") === "descending" ? "ascending" : "descending";
+
+        rows.sort(function (left, right) {
+          var leftValue = clientSortValue(left, columnIndex, kind);
+          var rightValue = clientSortValue(right, columnIndex, kind);
+          var result =
+            kind === "text"
+              ? leftValue.localeCompare(rightValue, "ru-RU", { numeric: true, sensitivity: "base" })
+              : leftValue - rightValue;
+          if (result === 0) {
+            result = Number(left.dataset.clientOriginalIndex) - Number(right.dataset.clientOriginalIndex);
+          }
+          return direction === "ascending" ? result : -result;
+        });
+
+        table.querySelectorAll("thead th[aria-sort]").forEach(function (item) {
+          item.setAttribute("aria-sort", item === header ? direction : "none");
+          var arrow = item.querySelector(".org-shipments-sort-arrow");
+          if (arrow) arrow.textContent = item === header ? (direction === "ascending" ? "↑" : "↓") : "↕";
+        });
+        rows.forEach(function (row) {
+          body.appendChild(row);
+        });
+        applyFilters();
+      });
+    });
+
+    applyFilters();
+  }
+
   function renderClientCard(root, card) {
     var box = root.querySelector("[data-messenger-client-body]");
     if (!box) return;
@@ -527,79 +712,161 @@
       '<button type="submit" class="btn">' + (client ? "Сохранить" : "Создать клиента") + "</button>" +
       "</form>";
 
-    var groups = [
-      { key: "all", label: "Все" },
-      { key: "sale", label: "Продажи" },
-      { key: "order", label: "Заказы" },
-      { key: "return", label: "Возвраты" },
-      { key: "installment", label: "Рассрочки" },
-    ];
     var tabs =
-      '<nav class="messenger-client-groups" data-messenger-client-groups>' +
-      groups
-        .map(function (group) {
-          var count =
-            group.key === "all"
-              ? docs.length
-              : docs.filter(function (doc) {
-                  return String(doc.group || doc.kind) === group.key;
-                }).length;
-          return (
-            '<button type="button" class="messenger-client-group' +
-            (group.key === "all" ? " active" : "") +
-            '" data-client-group="' + group.key + '">' +
-            escapeHtml(group.label) + " <b>" + count + "</b></button>"
-          );
-        })
-        .join("") +
+      '<nav class="messenger-channel-tabs sales-document-tabs messenger-client-doc-tabs" aria-label="Разделы документов клиента">' +
+      '<span class="sales-document-tabs-title">Разделы клиента</span>' +
+      CLIENT_DOC_TABS.map(function (tab) {
+        var count = docs.filter(function (doc) {
+          return docMatchesTab(doc, tab.key);
+        }).length;
+        return (
+          '<button type="button" class="messenger-channel-tab sales-document-tab' +
+          (tab.key === "" ? " active" : "") +
+          '" data-channel-brand="' + tab.brand + '" data-client-group="' + tab.key + '"' +
+          (tab.key === "" ? ' aria-current="page"' : "") + ">" +
+          '<span class="messenger-channel-logo" aria-hidden="true">' + tab.logo + "</span>" +
+          '<span class="messenger-channel-label">' + escapeHtml(tab.label) + "</span>" +
+          "<b>" + count + "</b></button>"
+        );
+      }).join("") +
       "</nav>";
 
-    var history = docs.length
-      ? tabs +
-        '<table class="messenger-client-docs"><thead><tr><th>Дата</th><th>№</th><th>Тип</th><th>Статус</th><th>Сумма</th><th>Долг</th><th></th></tr></thead><tbody>' +
-        docs
-          .map(function (doc) {
-            return (
-              '<tr data-doc-group="' + escapeHtml(String(doc.group || "sale")) + '">' +
-              '<td data-doc-url="' + escapeHtml(doc.url || "") + '">' + escapeHtml(doc.date || "") + "</td>" +
-              '<td data-doc-url="' + escapeHtml(doc.url || "") + '">' + escapeHtml(doc.number || "") + "</td>" +
-              "<td>" + escapeHtml(doc.kind || "") + (String(doc.group) === "installment" ? " · рассрочка" : "") + "</td>" +
-              "<td>" + escapeHtml(doc.status || "") + "</td>" +
-              "<td>" + moneyText(doc.amount, doc.currency) + "</td>" +
-              "<td>" + moneyText(doc.debt, doc.currency) + "</td>" +
-              '<td class="messenger-client-docs-actions">' +
-              '<a class="messenger-client-doc-link" href="/api/sales/' + escapeHtml(doc.id || "") + '/invoice.pdf" target="_blank" rel="noopener">PDF</a>' +
-              '<button type="button" class="messenger-client-doc-send" data-send-invoice="' + escapeHtml(doc.id || "") + '">Отправить</button>' +
-              "</td></tr>"
-            );
+    var statusLabels = [];
+    docs.forEach(function (doc) {
+      var label = String(doc.status || "").trim();
+      if (label && statusLabels.indexOf(label) === -1) statusLabels.push(label);
+    });
+
+    function selectField(label, attribute, options) {
+      return (
+        '<label class="sales-journal-filter-field"><span>' + escapeHtml(label) + "</span>" +
+        '<select class="messenger-client-filter-select" ' + attribute + '><option value="">Все</option>' +
+        options
+          .map(function (option) {
+            return '<option value="' + escapeHtml(option.value) + '">' + escapeHtml(option.label) + "</option>";
           })
           .join("") +
-        "</tbody></table>"
-      : '<p class="messenger-empty">Заказов и продаж пока нет.</p>';
+        "</select></label>"
+      );
+    }
+
+    var filterBar =
+      '<form class="products-catalog-filter sales-filter-bar sales-journal-filter messenger-client-journal-filter" data-messenger-client-filter>' +
+      '<label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">' +
+      "<span>Поиск</span>" +
+      '<input type="search" data-client-doc-search placeholder="Номер, склад, статус" />' +
+      "</label>" +
+      selectField("Тип документа", "data-client-doc-type", CLIENT_DOC_TYPE_FILTERS) +
+      selectField("Оплата", "data-client-doc-payment", CLIENT_PAYMENT_FILTERS) +
+      selectField(
+        "Статус",
+        "data-client-doc-status",
+        statusLabels.map(function (label) {
+          return { value: label, label: label };
+        })
+      ) +
+      "</form>";
+
+    var journalHead =
+      '<header class="products-panel-head sales-journal-head messenger-client-journal-head">' +
+      '<div class="products-panel-title"><h2>Заказы и история</h2>' +
+      '<span data-messenger-client-count>Всего: ' + docs.length + "</span></div>" +
+      filterBar +
+      "</header>";
+
+    function sortHead(label, kind) {
+      return (
+        '<th data-column-label="' + escapeHtml(label) + '"' +
+        (kind ? ' data-sort-kind="' + kind + '"' : "") + ' aria-sort="none">' +
+        '<button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn messenger-client-sort-btn">' +
+        "<span>" + escapeHtml(label) + '</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>' +
+        "</button></th>"
+      );
+    }
+
+    var tableRows = docs
+      .map(function (doc, index) {
+        var type = docType(doc);
+        var progress = Math.max(0, Math.min(100, Number(doc.payment_progress || 0)));
+        var hasDebt = doc.has_debt != null ? Boolean(doc.has_debt) : amountNumber(doc.debt) > 0;
+        return (
+          '<tr class="sales-table-row--' + escapeHtml(type) + '" data-messenger-client-row' +
+          ' data-doc-group="' + escapeHtml(String(doc.group || type)) + '"' +
+          ' data-doc-type="' + escapeHtml(type) + '"' +
+          ' data-doc-payment="' + escapeHtml(String(doc.payment_status || "")) + '"' +
+          ' data-doc-status="' + escapeHtml(String(doc.status_key || "")) + '"' +
+          ' data-doc-status-label="' + escapeHtml(String(doc.status || "")) + '">' +
+          '<td class="sales-journal-row-index">' + (index + 1) + "</td>" +
+          '<td class="sales-journal-id-cell" data-sort-value="' + escapeHtml(doc.number || "") + '"' +
+          ' data-doc-url="' + escapeHtml(doc.url || "") + '" role="button" tabindex="0">' +
+          "<strong>" + escapeHtml(doc.number || "") + "</strong>" +
+          "<small>" + escapeHtml(doc.manager || "Без ответственного") + "</small></td>" +
+          '<td data-sort-value="' + escapeHtml(doc.date || "") + '">' + escapeHtml(doc.date || "-") + "</td>" +
+          '<td class="sales-journal-doc-type-cell">' + escapeHtml(doc.doc_type_label || doc.kind || "") + "</td>" +
+          "<td>" + escapeHtml(doc.warehouse || "-") + "</td>" +
+          '<td data-sort-value="' + amountNumber(doc.amount) + '">' + moneyText(doc.amount, doc.currency) + "</td>" +
+          '<td class="sales-journal-payment-progress" data-payment-progress="' + progress + '"' +
+          ' data-sort-value="' + amountNumber(doc.paid) + '"' +
+          ' style="--sales-payment-progress: ' + progress + '%;" title="Оплачено: ' + progress + '%">' +
+          "<span>" + moneyText(doc.paid, doc.currency) + "</span></td>" +
+          '<td class="sales-journal-debt-cell' + (hasDebt ? " has-debt" : "") + '"' +
+          ' data-sort-value="' + amountNumber(doc.debt) + '">' +
+          (hasDebt
+            ? '<span class="sales-journal-debt-badge"><span class="sales-journal-debt-amount">-' +
+              moneyText(doc.debt, doc.currency) + "</span></span>"
+            : '<span class="sales-journal-no-debt">-</span>') +
+          "</td>" +
+          '<td><span class="kassa-status-select kassa-status-select--' + docStatusStyle(doc) +
+          ' messenger-client-status">' + escapeHtml(doc.status || "") + "</span></td>" +
+          '<td class="products-row-actions messenger-client-docs-actions">' +
+          '<a class="messenger-client-doc-link" href="/api/sales/' + escapeHtml(doc.id || "") +
+          '/invoice.pdf" target="_blank" rel="noopener">PDF</a>' +
+          '<button type="button" class="messenger-client-doc-send" data-send-invoice="' +
+          escapeHtml(doc.id || "") + '">Отправить</button>' +
+          "</td></tr>"
+        );
+      })
+      .join("");
+
+    var history = docs.length
+      ? journalHead + tabs +
+        '<div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel messenger-client-table-wrap">' +
+        '<table class="products-table products-catalog-table sales-table sales-journal-table messenger-client-journal-table"' +
+        ' id="messenger-client-journal-table" data-messenger-client-table data-upos-column-controls>' +
+        "<thead><tr>" +
+        '<th data-column-label="№">№</th>' +
+        sortHead("ID") +
+        sortHead("Дата", "date") +
+        sortHead("Тип") +
+        sortHead("Склад") +
+        sortHead("Сумма", "number") +
+        sortHead("Оплачено", "number") +
+        sortHead("Долг", "number") +
+        sortHead("Статус") +
+        '<th data-column-label="Действия" class="products-actions-head"></th>' +
+        "</tr></thead><tbody>" + tableRows + "</tbody></table></div>"
+      : journalHead + tabs + '<p class="messenger-empty">Заказов и продаж пока нет.</p>';
 
     box.innerHTML =
       '<div class="messenger-client-head">' + head + "</div>" + form +
-      '<h4 class="messenger-client-subtitle">Заказы и история</h4>' + history +
+      '<section class="messenger-client-journal" data-messenger-client-journal>' + history + "</section>" +
       '<p class="messenger-client-note" data-messenger-invoice-status hidden></p>';
 
     box.querySelectorAll("[data-doc-url]").forEach(function (cell) {
-      cell.addEventListener("click", function () {
+      function open() {
         var url = cell.getAttribute("data-doc-url");
         if (url) window.location.assign(url);
+      }
+      cell.addEventListener("click", open);
+      cell.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        open();
       });
     });
 
-    box.querySelectorAll("[data-client-group]").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        var key = tab.getAttribute("data-client-group");
-        box.querySelectorAll("[data-client-group]").forEach(function (node) {
-          node.classList.toggle("active", node === tab);
-        });
-        box.querySelectorAll("[data-doc-group]").forEach(function (rowNode) {
-          rowNode.hidden = key !== "all" && rowNode.getAttribute("data-doc-group") !== key;
-        });
-      });
-    });
+    var journalNode = box.querySelector("[data-messenger-client-journal]");
+    if (journalNode) bindClientJournal(journalNode);
 
     box.querySelectorAll("[data-send-invoice]").forEach(function (button) {
       button.addEventListener("click", function () {

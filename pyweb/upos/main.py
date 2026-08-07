@@ -24130,6 +24130,7 @@ def create_app() -> FastAPI:
             names = {str(row.name or "").strip().casefold()}
             names.discard("")
             documents: list[dict[str, Any]] = []
+            documents_total = 0
             amount_total = Decimal("0")
             debt_total = Decimal("0")
             sale_rows = session.execute(
@@ -24151,29 +24152,55 @@ def create_app() -> FastAPI:
                 debt = max(Decimal("0"), amount - paid) if _sales_status_records_debt(status, doc_type) else Decimal("0")
                 amount_total += amount if doc_type != "return" else -amount
                 debt_total += debt
-                if len(documents) < 20:
+                documents_total += 1
+                if len(documents) < 100:
                     installment = data.get("installment")
                     has_installment = bool(
                         isinstance(installment, dict) and _sales_decimal(installment.get("months")) > 1
                     )
+                    # Разделы карточки повторяют журнал продаж: «Рассрочки» —
+                    # это состояние оплаты, а не отдельный тип документа.
+                    payment_status = (
+                        "paid"
+                        if amount <= 0 or paid >= amount
+                        else "partial"
+                        if paid > 0
+                        else "unpaid"
+                    )
+                    payment_progress = 0
+                    if amount > 0:
+                        payment_progress = int(
+                            ((paid / amount) * Decimal("100")).quantize(
+                                Decimal("1"), rounding=ROUND_HALF_UP
+                            )
+                        )
                     documents.append(
                         {
                             "id": str(sale.id),
                             "number": str(sale.number or ""),
                             "date": _messenger_document_date(data, sale.created_at),
-                            "kind": {"sale": "Продажа", "return": "Возврат", "order": "Заказ"}.get(doc_type, doc_type),
+                            "kind": _sales_doc_type_label(doc_type),
+                            "doc_type": doc_type,
+                            "doc_type_label": _sales_doc_type_label(doc_type),
                             # Рассрочка — это та же продажа, но её ищут отдельно.
                             "group": "installment" if has_installment else doc_type,
                             "status": _sales_status_label(status),
+                            "status_key": status,
                             "amount": _decimal_plain_text(amount),
                             "currency": str(sale.currency or data.get("currency") or "UZS").upper(),
+                            "paid": _decimal_plain_text(paid),
+                            "payment_status": payment_status,
+                            "payment_progress": payment_progress,
                             "debt": _decimal_plain_text(debt),
+                            "has_debt": debt > 0,
+                            "warehouse": str(data.get("warehouse") or ""),
+                            "manager": str(data.get("manager") or ""),
                             "url": f"/sales?document={sale.id}#journal",
                         }
                     )
             payload["documents"] = documents
             payload["totals"] = {
-                "documents": len(documents),
+                "documents": documents_total,
                 "amount": _decimal_plain_text(amount_total),
                 "debt": _decimal_plain_text(debt_total),
             }

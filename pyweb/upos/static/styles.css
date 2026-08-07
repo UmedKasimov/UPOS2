@@ -32532,8 +32532,9 @@ html.dark .client-own-tag--other {
 /* Карточка клиента из переписки: двойной клик по шапке диалога. */
 .messenger-client-card {
   position: relative;
-  width: min(46rem, 92vw);
-  max-height: 86vh;
+  /* Ширина под таблицу журнала продаж: десять колонок в 46rem не помещались. */
+  width: min(76rem, 96vw);
+  max-height: 90vh;
   overflow: auto;
   padding: 1.1rem 1.2rem 1.3rem;
   border-radius: var(--radius-lg);
@@ -32581,37 +32582,94 @@ html.dark .client-own-tag--other {
   font-weight: 700;
 }
 
-.messenger-client-subtitle {
-  margin: 1.1rem 0 0.5rem;
-  font-size: var(--text-sm);
-  font-weight: 800;
+/* «Заказы и история» — это журнал продаж внутри карточки: та же шапка,
+   те же разделы и та же таблица, поэтому переиспользуем классы журнала и
+   правим только ширину под модалку. */
+.messenger-client-journal {
+  /* Ширину блока задаёт модалка, а не окно, поэтому перестроение сетки
+     вешаем на контейнерные запросы, а не на медиазапросы журнала. */
+  container-type: inline-size;
+  margin-top: 1.1rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 7px);
+  overflow: hidden;
 }
 
-.messenger-client-docs {
+.messenger-client-journal-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* В журнале шесть фильтров, в карточке — четыре. Раскладку берём делителями
+   этого числа, иначе в сетке остаётся пустая ячейка цвета разделителя. */
+.messenger-client-journal-filter {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Поиск в каталоге на узких экранах занимает всю строку — в карточке это
+   оставляло дыру в сетке, поэтому он остаётся обычным полем. */
+.messenger-client-journal-filter .products-catalog-search {
+  grid-column: auto;
+}
+
+.messenger-client-filter-select {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 0;
+  height: 2.55rem;
+  min-height: 2.55rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-xs, 6px);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
   font-size: var(--text-sm);
+  font-weight: 700;
 }
 
-.messenger-client-docs th {
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  text-align: left;
+.messenger-client-doc-tabs {
+  --sales-tabs-count: 6;
 }
 
-.messenger-client-docs td {
-  padding: 0.45rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+@container (max-width: 900px) {
+  .messenger-client-journal-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .messenger-client-doc-tabs {
+    --sales-tabs-count: 3;
+  }
+
+  .messenger-client-doc-tabs .sales-document-tab::before,
+  .messenger-client-doc-tabs .sales-document-tab:first-of-type::before,
+  .messenger-client-doc-tabs .sales-document-tab:last-of-type::before {
+    border-radius: var(--workbench-radius-xs, 6px);
+  }
 }
 
-.messenger-client-docs tbody tr {
-  cursor: pointer;
+@container (max-width: 520px) {
+  .messenger-client-journal-filter {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .messenger-client-doc-tabs {
+    --sales-tabs-count: 2;
+  }
 }
 
-.messenger-client-docs tbody tr:hover {
-  background: color-mix(in srgb, var(--primary) 5%, transparent);
+.messenger-client-table-wrap {
+  height: auto;
+  max-height: min(28rem, 46vh);
+  overflow: auto;
+}
+
+/* Статус здесь только показываем: у карточки нет формы смены статуса,
+   поэтому убираем место под стрелку селекта. */
+.messenger-client-status {
+  display: inline-block;
+  min-width: 0;
+  padding: 0.18rem 0.65rem;
+  cursor: default;
 }
 
 /* Результат отправки сообщения — под полем ввода, а не во всплывашке. */
@@ -32644,35 +32702,6 @@ html.dark .client-own-tag--other {
   display: flex;
   gap: 0.4rem;
   flex-shrink: 0;
-}
-
-.messenger-client-groups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.6rem;
-}
-
-.messenger-client-group {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.messenger-client-group b {
-  margin-left: 0.25rem;
-  color: var(--foreground);
-}
-
-.messenger-client-group.active {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--card));
-  color: var(--primary);
 }
 
 .messenger-client-docs-actions {
