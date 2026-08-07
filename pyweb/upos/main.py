@@ -20046,11 +20046,21 @@ def create_app() -> FastAPI:
                 period_calls = [call for call in calls if _report_in_period(str(call.get("started_at") or call.get("created_at") or "")[:10])]
                 answered = [call for call in period_calls if str(call.get("status") or "") == "answered"]
                 missed = [call for call in period_calls if str(call.get("status") or "") == "missed"]
-                call_deals = [
-                    row
-                    for row in crm_rows
-                    if "звон" in str(_json_object(row.data).get("lead_source") or _json_object(row.data).get("contact_type") or "").lower()
-                ]
+                # Сделки со звонков берём за тот же период, что и звонки:
+                # раньше делились все сделки за всю историю на звонки месяца,
+                # и конверсия улетала за 100%.
+                call_deals = []
+                for row in crm_rows:
+                    row_data = _json_object(row.data)
+                    source = str(row_data.get("lead_source") or row_data.get("contact_type") or "").lower()
+                    if "звон" not in source:
+                        continue
+                    row_date = str(row_data.get("date") or "")[:10]
+                    if not row_date and row.created_at:
+                        row_date = row.created_at.date().isoformat()
+                    if not _report_in_period(row_date):
+                        continue
+                    call_deals.append(row)
                 conversion = 0 if not period_calls else round(len(call_deals) / len(period_calls) * 100)
                 business_reports["calls"] = {
                     "summary": {
