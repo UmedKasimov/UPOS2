@@ -2862,8 +2862,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   align-items: start;
 }
 
+/* Высота фиксирована, поэтому прокручиваются список диалогов и лента
+   сообщений, а не вся страница. */
 .messenger-inbox-shell {
-  min-height: clamp(32rem, 66vh, 54rem);
+  height: clamp(30rem, 68vh, 54rem);
+  min-height: 0;
+}
+
+.messenger-inbox-shell > .messenger-dialog-list-panel,
+.messenger-inbox-shell > .messenger-dialog-chat-panel {
+  height: 100%;
+  min-height: 0;
 }
 
 .messenger-dialog-list-panel,
@@ -2878,13 +2887,15 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 
 .messenger-dialog-list-panel,
 .messenger-dialog-chat-panel {
-  min-height: clamp(32rem, 66vh, 54rem);
+  min-height: 0;
   overflow: hidden;
 }
 
 .messenger-dialog-list-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .messenger-dialog-list-head,
@@ -2949,7 +2960,9 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   display: grid;
   align-content: start;
   overflow-y: auto;
-  max-height: clamp(24rem, 58vh, 47rem);
+  /* Высоту задаёт панель: свой лимит растягивал страницу, когда
+     диалогов становилось много. */
+  min-height: 0;
   overscroll-behavior: contain;
 }
 
@@ -3455,9 +3468,17 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
     grid-template-columns: 1fr;
   }
 
+  /* На телефоне колонки идут одна под другой, поэтому общая высота
+     авто, а прокрутка остаётся внутри каждой панели. */
+  .messenger-inbox-shell {
+    height: auto;
+  }
+
   .messenger-dialog-list-panel,
   .messenger-dialog-chat-panel {
+    height: auto;
     min-height: 24rem;
+    max-height: 70vh;
   }
 
   .messenger-dialog-composer,
