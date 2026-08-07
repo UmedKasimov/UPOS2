@@ -77,7 +77,6 @@
       </div>
       <div class="messenger-dialog-list" data-messenger-thread-list data-sync-scroll-key="messenger-dialogs">
         {% for row in messenger_threads %}
-          {% set row_message_count = row.messages|length %}
           <button
             type="button"
             class="messenger-dialog-item"
@@ -116,9 +115,9 @@
                 <time class="messenger-dialog-time">{{ row.time_label }}</time>
               {% endif %}
               <em>{{ row.status_label }}</em>
-              {% if row_message_count %}
-                <b>{{ row_message_count }}</b>
-              {% endif %}
+              {# Счётчик показывает только непрочитанные входящие: открыли
+                 диалог — цифра гаснет. #}
+              <b data-messenger-unread{% if not row.unread %} hidden{% endif %}>{{ row.unread or '' }}</b>
             </span>
           </button>
         {% else %}

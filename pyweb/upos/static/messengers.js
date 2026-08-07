@@ -158,10 +158,58 @@
       .filter(Boolean);
   }
 
+  function timeLabelFor(message) {
+    if (message.time_label) return String(message.time_label);
+    var raw = String(message.created_at || "");
+    if (!raw) return "";
+    var moment = new Date(raw);
+    if (isNaN(moment.getTime())) return "";
+    return ("0" + moment.getHours()).slice(-2) + ":" + ("0" + moment.getMinutes()).slice(-2);
+  }
+
+  function messageFooter(message, kind) {
+    /* Время и статус доставки: одна галочка — отправлено, две — прочитано. */
+    var time = timeLabelFor(message);
+    var ticks = "";
+    if (kind === "out") {
+      var read = String(message.status || "sent") === "read";
+      ticks =
+        '<i class="messenger-message-ticks' +
+        (read ? " messenger-message-ticks--read" : "") +
+        '" aria-label="' +
+        (read ? "Прочитано" : "Отправлено") +
+        '" title="' +
+        (read ? "Прочитано" : "Отправлено") +
+        '"><svg viewBox="0 0 20 12" aria-hidden="true">' +
+        '<path d="M1.5 6.6 4.6 9.8 11 2.6" />' +
+        (read ? '<path d="M7.6 9.8 14 2.6" />' : "") +
+        "</svg></i>";
+    }
+    if (!time && !ticks) return "";
+    return '<span class="messenger-message-meta">' + (time ? "<time>" + escapeHtml(time) + "</time>" : "") + ticks + "</span>";
+  }
+
+  function applyDeliveryStatus(messages) {
+    /* Ответ собеседника означает, что всё отправленное до него прочитано. */
+    var lastIn = 0;
+    messages.forEach(function (message) {
+      if (String(message.kind || "") !== "in") return;
+      var moment = Date.parse(message.created_at || "");
+      if (moment && moment > lastIn) lastIn = moment;
+    });
+    messages.forEach(function (message) {
+      if (String(message.kind || "") !== "out") return;
+      if (String(message.status || "") === "read") return;
+      var moment = Date.parse(message.created_at || "");
+      message.status = lastIn && moment && moment <= lastIn ? "read" : "sent";
+    });
+    return messages;
+  }
+
   function renderMessages(panel, thread) {
     var box = panel.querySelector("[data-messenger-thread-messages]");
     if (!box) return;
-    var messages = threadMessages(thread);
+    var messages = applyDeliveryStatus(threadMessages(thread));
     if (!messages.length) {
       box.innerHTML = '<div class="messenger-empty">История пока пустая. Начните диалог из поля ниже.</div>';
       return;
@@ -181,6 +229,7 @@
           escapeHtml(message.text || "") +
           "</span>" +
           photo +
+          messageFooter(message, kind) +
           "</div>"
         );
       })
@@ -278,11 +327,45 @@
     }
   }
 
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute("content") || "" : "";
+  }
+
+  function clearUnread(root, thread) {
+    /* Счётчик гасим сразу, не дожидаясь ответа сервера: диалог уже открыт. */
+    var item = root.querySelector('[data-messenger-thread-id="' + String(thread.id).replace(/"/g, '\\"') + '"]');
+    if (item) {
+      var badge = item.querySelector("[data-messenger-unread]");
+      if (badge) {
+        badge.textContent = "";
+        badge.hidden = true;
+      }
+      var mark = item.querySelector(".messenger-new-badge");
+      if (mark) mark.remove();
+      item.setAttribute("data-messenger-is-new", "0");
+    }
+    thread.unread = 0;
+    thread.is_new = false;
+    if (!thread.id || thread.restored) return;
+    try {
+      window.fetch("/api/messengers/threads/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+        credentials: "same-origin",
+        body: JSON.stringify({ thread_id: thread.id }),
+      });
+    } catch (err) {
+      /* отметка прочтения не должна мешать работе с диалогом */
+    }
+  }
+
   function selectThread(root, thread) {
     if (!thread) return;
     root.querySelectorAll("[data-messenger-thread-id]").forEach(function (item) {
       item.classList.toggle("active", item.getAttribute("data-messenger-thread-id") === String(thread.id));
     });
+    clearUnread(root, thread);
     updateThreadHeader(root, thread);
     renderMessages(root, thread);
     root.dataset.selectedThreadId = thread.id || "";

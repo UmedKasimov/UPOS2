@@ -17158,6 +17158,72 @@ def create_app() -> FastAPI:
             return "вчера"
         return moment.strftime("%d.%m.%Y")
 
+    def _messenger_read_marks(workspace_owner_id: str) -> dict[str, str]:
+        """Когда сотрудник в последний раз открывал каждый диалог.
+
+        Отметки общие для всех каналов, поэтому счётчик непрочитанных
+        считается одинаково и для Instagram, и для Telegram.
+        """
+        data = load_workspace_settings(workspace_owner_id).get("messenger_reads")
+        if not isinstance(data, dict):
+            return {}
+        return {str(key): str(value or "") for key, value in data.items()}
+
+    def _messenger_mark_thread_read(workspace_owner_id: str, thread_id: str) -> str:
+        thread_key = str(thread_id or "").strip()
+        if not thread_key:
+            return ""
+        moment = datetime.now(timezone.utc).isoformat()
+        settings = load_workspace_settings(workspace_owner_id)
+        marks = settings.get("messenger_reads")
+        if not isinstance(marks, dict):
+            marks = {}
+        marks[thread_key] = moment
+        # Список диалогов ограничен, а словарь рос бы вечно.
+        if len(marks) > 500:
+            marks = dict(sorted(marks.items(), key=lambda item: str(item[1]), reverse=True)[:500])
+        settings["messenger_reads"] = marks
+        save_workspace_settings(workspace_owner_id, settings)
+        if thread_key.startswith("instagram-thread-"):
+            try:
+                messenger_mark_thread_read(workspace_owner_id, thread_key[len("instagram-thread-") :])
+            except Exception:
+                pass
+        return moment
+
+    def _messenger_apply_read_state(workspace_owner_id: str, rows: list[dict[str, Any]]) -> None:
+        """Непрочитанные входящие и статус доставки исходящих.
+
+        Одна галочка — сообщение ушло, две — собеседник его прочитал:
+        признаком считаем любой его ответ после нашего сообщения.
+        """
+        marks = _messenger_read_marks(workspace_owner_id)
+        for item in rows:
+            messages = item.get("messages") or []
+            mark = _parse_iso_datetime(marks.get(str(item.get("id") or ""), ""))
+            unread = 0
+            last_in: datetime | None = None
+            for message in messages:
+                moment = _parse_iso_datetime(message.get("created_at") or "")
+                if message.get("kind") != "in":
+                    continue
+                if moment and (last_in is None or moment > last_in):
+                    last_in = moment
+                if not moment:
+                    # Служебные карточки каналов без даты за переписку не считаем.
+                    continue
+                if mark and moment <= mark:
+                    continue
+                unread += 1
+            for message in messages:
+                if message.get("kind") != "out":
+                    continue
+                moment = _parse_iso_datetime(message.get("created_at") or "")
+                message["status"] = "read" if last_in and moment and moment <= last_in else "sent"
+            item["unread"] = unread
+            if not unread:
+                item["is_new"] = False
+
     def _messenger_threads_from_sources(workspace_owner_id: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         with session_scope() as session:
@@ -17451,6 +17517,7 @@ def create_app() -> FastAPI:
         # диалогов справа, как в самом мессенджере.
         for item in rows:
             item["time_label"] = _messenger_time_label(item.get("updated_at"))
+        _messenger_apply_read_state(workspace_owner_id, rows)
         return rows
 
     def _messenger_filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[dict[str, Any]]:
@@ -23827,6 +23894,24 @@ def create_app() -> FastAPI:
         if handled:
             _instagram_touch(workspace_owner_id)
         return {"ok": True, "handled": handled}
+
+    @app.post("/api/messengers/threads/read")
+    async def api_messenger_thread_read(request: Request):
+        """Диалог открыли — счётчик непрочитанных гасим."""
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        thread_id = str((body or {}).get("thread_id") or "").strip()
+        if not thread_id:
+            return JSONResponse({"error": "Укажите переписку"}, status_code=400)
+        return {"ok": True, "read_at": _messenger_mark_thread_read(wid, thread_id)}
 
     @app.get("/api/messengers/instagram/threads")
     def api_instagram_threads(request: Request):

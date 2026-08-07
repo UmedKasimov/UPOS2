@@ -1066,6 +1066,11 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   line-height: 1;
 }
 
+/* Счётчик непрочитанных прячем полностью: пустой кружок сбивал с толку. */
+.messenger-dialog-side b[hidden] {
+  display: none;
+}
+
 .messenger-channel-tab b {
   margin-left: 0.5rem;
 }
@@ -3136,6 +3141,36 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 .messenger-thread-message--system {
   max-width: 100%;
   background: color-mix(in srgb, var(--muted), transparent 40%);
+}
+
+.messenger-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem;
+  margin-top: 0.1rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+.messenger-message-ticks {
+  display: inline-flex;
+  color: color-mix(in srgb, var(--muted-foreground), transparent 15%);
+}
+
+.messenger-message-ticks svg {
+  width: 1.05rem;
+  height: 0.7rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.messenger-message-ticks--read {
+  color: var(--primary);
 }
 
 .messenger-dialog-composer {
