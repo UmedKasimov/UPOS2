@@ -175,6 +175,17 @@
       <span data-messenger-photo-subtitle>Фото хранится в кеше 5 дней и может быть скачано заново.</span>
     </div>
   </div>
+
+  {# Карточка клиента прямо из переписки: двойной клик по шапке диалога. #}
+  <div class="messenger-photo-dialog messenger-client-dialog" data-messenger-client-dialog hidden>
+    <button type="button" class="messenger-photo-backdrop" data-messenger-client-close aria-label="Закрыть карточку"></button>
+    <div class="messenger-client-card" role="dialog" aria-modal="true" aria-label="Карточка клиента">
+      <button type="button" class="messenger-photo-close" data-messenger-client-close aria-label="Закрыть">×</button>
+      <div class="messenger-client-body" data-messenger-client-body>
+        <p class="messenger-empty">Загружаем карточку…</p>
+      </div>
+    </div>
+  </div>
 </section>
 
 <section class="messenger-telegram-workspace" data-workspace-view="telegram" data-messenger-telegram hidden>

@@ -24056,6 +24056,169 @@ def create_app() -> FastAPI:
             _instagram_touch(workspace_owner_id)
         return {"ok": True, "handled": handled}
 
+    def _messenger_document_date(data: dict[str, Any], created_at: Any) -> str:
+        raw = str(data.get("date") or data.get("created_at") or "").strip()
+        if raw:
+            return raw[:10]
+        try:
+            return created_at.date().isoformat()
+        except Exception:
+            return ""
+
+    def _messenger_thread_client_card(workspace_owner_id: str, thread_id: str) -> dict[str, Any]:
+        """Карточка клиента для открытого диалога.
+
+        Сотруднику в переписке нужно сразу видеть, знаком ли собеседник:
+        его имя из базы, долг и последние документы, чтобы не искать
+        руками в клиентах.
+        """
+        thread = next(
+            (
+                item
+                for item in _messenger_threads_from_sources(workspace_owner_id)
+                if str(item.get("id") or "") == thread_id
+            ),
+            None,
+        )
+        if thread is None:
+            return {}
+
+        contact_name = str(thread.get("contact") or "").strip()
+        username = str(thread.get("username") or "").strip()
+        phone = str(thread.get("phone") or "").strip()
+        payload: dict[str, Any] = {
+            "thread_id": thread_id,
+            "channel": str(thread.get("channel") or ""),
+            "contact": contact_name,
+            "username": username,
+            "phone": phone,
+            "client": None,
+            "documents": [],
+            "totals": {"documents": 0, "amount": "0", "debt": "0"},
+        }
+
+        with session_scope() as session:
+            clients = session.execute(
+                select(Counterparty).where(Counterparty.workspace_owner_id == workspace_owner_id)
+            ).scalars().all()
+            row = None
+            linked_id = str(thread.get("counterparty_id") or "").strip()
+            if linked_id:
+                row = next((item for item in clients if str(item.id) == linked_id), None)
+            if row is None:
+                row = _messenger_match_client(
+                    clients,
+                    phone=phone,
+                    username=username,
+                    display_name=str(thread.get("client") or contact_name),
+                )
+            if row is None:
+                return payload
+
+            extra = _counterparty_extra(row)
+            payload["client"] = {
+                "id": str(row.id),
+                "name": str(row.name or ""),
+                "phone": str(row.phone or extra.get("phone") or ""),
+                "category": str(extra.get("category") or ""),
+                "crm_status": str(extra.get("crm_status") or ""),
+                "comment": str(extra.get("comment") or extra.get("note") or ""),
+                "url": f"/clients?client={row.id}#client-card",
+            }
+
+            names = {str(row.name or "").strip().casefold()}
+            names.discard("")
+            documents: list[dict[str, Any]] = []
+            amount_total = Decimal("0")
+            debt_total = Decimal("0")
+            sale_rows = session.execute(
+                select(SaleDocument)
+                .where(SaleDocument.workspace_owner_id == workspace_owner_id)
+                .order_by(SaleDocument.created_at.desc())
+                .limit(500)
+            ).scalars().all()
+            for sale in sale_rows:
+                data = _json_object(sale.data)
+                doc_client_id = str(data.get("counterparty_id") or "").strip()
+                doc_client = str(data.get("client") or "").strip().casefold()
+                if doc_client_id != str(row.id) and doc_client not in names:
+                    continue
+                doc_type = str(data.get("doc_type") or "sale")
+                status = _sales_workflow_status(data)
+                amount = _sales_decimal(sale.amount)
+                paid = min(amount, _sales_decimal(data.get("paid_amount")))
+                debt = max(Decimal("0"), amount - paid) if _sales_status_records_debt(status, doc_type) else Decimal("0")
+                amount_total += amount if doc_type != "return" else -amount
+                debt_total += debt
+                if len(documents) < 20:
+                    documents.append(
+                        {
+                            "number": str(sale.number or ""),
+                            "date": _messenger_document_date(data, sale.created_at),
+                            "kind": {"sale": "Продажа", "return": "Возврат", "order": "Заказ"}.get(doc_type, doc_type),
+                            "status": _sales_status_label(status),
+                            "amount": _decimal_plain_text(amount),
+                            "currency": str(sale.currency or data.get("currency") or "UZS").upper(),
+                            "debt": _decimal_plain_text(debt),
+                            "url": f"/sales?document={sale.id}#journal",
+                        }
+                    )
+            payload["documents"] = documents
+            payload["totals"] = {
+                "documents": len(documents),
+                "amount": _decimal_plain_text(amount_total),
+                "debt": _decimal_plain_text(debt_total),
+            }
+        return payload
+
+    @app.get("/api/messengers/threads/{thread_id}/client")
+    def api_messenger_thread_client(request: Request, thread_id: str):
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        card = _messenger_thread_client_card(wid, str(thread_id or "").strip())
+        if not card:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        return {"ok": True, "card": card}
+
+    @app.post("/api/messengers/threads/{thread_id}/client")
+    async def api_messenger_thread_client_save(request: Request, thread_id: str):
+        """Заводит клиента прямо из переписки и дополняет его карточку."""
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        name = str((body or {}).get("name") or "").strip()
+        phone = str((body or {}).get("phone") or "").strip()
+        comment = str((body or {}).get("comment") or "").strip()
+        client_id = str((body or {}).get("client_id") or "").strip()
+        if not name and not client_id:
+            return JSONResponse({"error": "Укажите имя клиента"}, status_code=400)
+
+        with session_scope() as session:
+            row = _resolve_counterparty(session, wid, counterparty_id=client_id, name=name, role="client")
+            if row is None:
+                return JSONResponse({"error": "Не удалось создать клиента"}, status_code=400)
+            # Новый словарь, а не правка на месте: иначе SQLAlchemy не видит
+            # изменения JSON-поля и заметка теряется.
+            extra = dict(_counterparty_extra(row))
+            if phone:
+                row.phone = phone
+                extra["phone"] = phone
+            if comment:
+                extra["comment"] = comment
+            row.data = extra
+            row.updated_at = datetime.now(timezone.utc)
+            saved_id = str(row.id)
+        return {"ok": True, "card": _messenger_thread_client_card(wid, str(thread_id or "").strip()), "client_id": saved_id}
+
     @app.post("/api/messengers/telegram/send")
     async def api_messenger_telegram_send(request: Request):
         """Ответ клиенту через бота: подписчику или в чат, где бот состоит.

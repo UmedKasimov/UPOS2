@@ -423,6 +423,142 @@
     }
   }
 
+  function moneyText(value, currency) {
+    var amount = Number(value || 0);
+    if (!isFinite(amount)) amount = 0;
+    return amount.toLocaleString("ru-RU") + " " + (currency || "UZS");
+  }
+
+  function renderClientCard(root, card) {
+    var box = root.querySelector("[data-messenger-client-body]");
+    if (!box) return;
+    var client = card && card.client;
+    var docs = (card && card.documents) || [];
+    var totals = (card && card.totals) || {};
+    var head = client
+      ? '<p class="settings-ios-footnote">Клиент в базе</p><h3>' +
+        escapeHtml(client.name) +
+        "</h3>" +
+        '<div class="messenger-client-facts">' +
+        (client.phone ? "<span>Телефон: <b>" + escapeHtml(client.phone) + "</b></span>" : "") +
+        (client.category ? "<span>Категория: <b>" + escapeHtml(client.category) + "</b></span>" : "") +
+        "<span>Документов: <b>" + docs.length + "</b></span>" +
+        "<span>Оборот: <b>" + moneyText(totals.amount) + "</b></span>" +
+        "<span>Долг: <b>" + moneyText(totals.debt) + "</b></span>" +
+        "</div>" +
+        '<a class="btn btn-secondary" href="' + escapeHtml(client.url || "#") + '">Открыть карточку клиента</a>'
+      : '<p class="settings-ios-footnote">Клиента нет в базе</p><h3>' +
+        escapeHtml((card && card.contact) || "Новый контакт") +
+        "</h3><p>Заведите карточку, чтобы видеть заказы и историю этого собеседника.</p>";
+
+    var form =
+      '<form class="messenger-client-form" data-messenger-client-form>' +
+      '<label><span>Имя клиента</span><input name="name" value="' +
+      escapeHtml((client && client.name) || (card && card.contact) || "") +
+      '" required /></label>' +
+      '<label><span>Телефон</span><input name="phone" value="' +
+      escapeHtml((client && client.phone) || (card && card.phone) || "") +
+      '" placeholder="+998 90 123 45 67" /></label>' +
+      '<label><span>Заметка</span><input name="comment" value="' +
+      escapeHtml((client && client.comment) || "") +
+      '" placeholder="Что важно помнить о клиенте" /></label>' +
+      '<input type="hidden" name="client_id" value="' + escapeHtml((client && client.id) || "") + '" />' +
+      '<button type="submit" class="btn">' + (client ? "Сохранить" : "Создать клиента") + "</button>" +
+      "</form>";
+
+    var history = docs.length
+      ? '<table class="messenger-client-docs"><thead><tr><th>Дата</th><th>№</th><th>Тип</th><th>Статус</th><th>Сумма</th><th>Долг</th></tr></thead><tbody>' +
+        docs
+          .map(function (doc) {
+            return (
+              '<tr data-doc-url="' + escapeHtml(doc.url || "") + '">' +
+              "<td>" + escapeHtml(doc.date || "") + "</td>" +
+              "<td>" + escapeHtml(doc.number || "") + "</td>" +
+              "<td>" + escapeHtml(doc.kind || "") + "</td>" +
+              "<td>" + escapeHtml(doc.status || "") + "</td>" +
+              "<td>" + moneyText(doc.amount, doc.currency) + "</td>" +
+              "<td>" + moneyText(doc.debt, doc.currency) + "</td>" +
+              "</tr>"
+            );
+          })
+          .join("") +
+        "</tbody></table>"
+      : '<p class="messenger-empty">Заказов и продаж пока нет.</p>';
+
+    box.innerHTML =
+      '<div class="messenger-client-head">' + head + "</div>" + form +
+      '<h4 class="messenger-client-subtitle">Заказы и история</h4>' + history;
+
+    box.querySelectorAll("[data-doc-url]").forEach(function (rowNode) {
+      rowNode.addEventListener("click", function () {
+        var url = rowNode.getAttribute("data-doc-url");
+        if (url) window.location.assign(url);
+      });
+    });
+
+    var formNode = box.querySelector("[data-messenger-client-form]");
+    if (formNode) {
+      formNode.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var button = formNode.querySelector("button[type=submit]");
+        if (button) button.disabled = true;
+        var payload = {
+          name: String(formNode.elements.name.value || "").trim(),
+          phone: String(formNode.elements.phone.value || "").trim(),
+          comment: String(formNode.elements.comment.value || "").trim(),
+          client_id: String(formNode.elements.client_id.value || "").trim(),
+        };
+        window
+          .fetch("/api/messengers/threads/" + encodeURIComponent(card.thread_id) + "/client", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+            body: JSON.stringify(payload),
+          })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+              if (!response.ok || !body.ok) throw new Error(body.error || "Не удалось сохранить клиента");
+              return body;
+            });
+          })
+          .then(function (body) {
+            renderClientCard(root, body.card || card);
+          })
+          .catch(function (error) {
+            window.alert(error.message || "Не удалось сохранить клиента");
+          })
+          .then(function () {
+            if (button) button.disabled = false;
+          });
+      });
+    }
+  }
+
+  function openClientDialog(root, thread) {
+    var dialog = root.querySelector("[data-messenger-client-dialog]");
+    if (!dialog || !thread || !thread.id) return;
+    var box = root.querySelector("[data-messenger-client-body]");
+    if (box) box.innerHTML = '<p class="messenger-empty">Загружаем карточку…</p>';
+    dialog.hidden = false;
+    window
+      .fetch("/api/messengers/threads/" + encodeURIComponent(thread.id) + "/client", { credentials: "same-origin" })
+      .then(function (response) {
+        return response.json().catch(function () { return {}; });
+      })
+      .then(function (body) {
+        if (!body || !body.card) throw new Error("Карточка недоступна");
+        renderClientCard(root, body.card);
+      })
+      .catch(function () {
+        if (box) box.innerHTML = '<p class="messenger-empty">Не удалось загрузить карточку клиента.</p>';
+      });
+  }
+
+  function closeClientDialog(root) {
+    var dialog = root.querySelector("[data-messenger-client-dialog]");
+    if (dialog) dialog.hidden = true;
+  }
+
   function openPhotoDialog(root, thread) {
     var dialog = root.querySelector("[data-messenger-photo-dialog]");
     if (!dialog || !thread) return;
@@ -505,7 +641,20 @@
       if (event.target.closest("[data-messenger-photo-close]")) {
         closePhotoDialog(root);
       }
+      if (event.target.closest("[data-messenger-client-close]")) {
+        closeClientDialog(root);
+      }
     });
+
+    // Двойной клик по шапке переписки открывает карточку собеседника.
+    var chatTop = root.querySelector(".messenger-dialog-chat-top");
+    if (chatTop) {
+      chatTop.addEventListener("dblclick", function (event) {
+        if (event.target.closest("button, a")) return;
+        var thread = currentThread();
+        if (thread) openClientDialog(root, thread);
+      });
+    }
 
     var initialId = "";
     try {
