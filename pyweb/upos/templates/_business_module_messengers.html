@@ -168,12 +168,28 @@
            закрыть не читая, а причина отказа нужна перед глазами. #}
         <p class="messenger-send-status" data-messenger-send-status hidden></p>
         <div class="messenger-dialog-composer-actions">
+          {# Оформление заказа тем же способом, что и в CRM: полная форма
+             продажи в модальном окне, клиент подставляется из переписки. #}
+          <button type="button" class="btn btn-secondary" data-messenger-order-button>+ Заказ</button>
           <button type="button" class="btn btn-secondary" data-messenger-template-button>Шаблон</button>
           <button type="button" class="btn" data-messenger-send-button>Отправить</button>
         </div>
       </div>
     </section>
   </div>
+  <dialog class="crm-order-dialog" data-messenger-order-dialog aria-labelledby="messenger-order-dialog-title">
+    <div class="crm-order-dialog-surface">
+      <header class="crm-order-dialog-head">
+        <div>
+          <h2 id="messenger-order-dialog-title">Новый заказ</h2>
+          <p data-messenger-order-dialog-client>Полная форма заказа</p>
+        </div>
+        <button type="button" class="settings-profile-modal-close" data-messenger-order-dialog-close aria-label="Закрыть">×</button>
+      </header>
+      <iframe class="crm-order-dialog-frame" data-messenger-order-dialog-frame src="about:blank" title="Новый заказ"></iframe>
+    </div>
+  </dialog>
+
   <div class="messenger-photo-dialog" data-messenger-photo-dialog hidden>
     <button type="button" class="messenger-photo-backdrop" data-messenger-photo-close aria-label="Закрыть фото"></button>
     <div class="messenger-photo-card" role="dialog" aria-modal="true" aria-label="Фото контакта">

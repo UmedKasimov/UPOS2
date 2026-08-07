@@ -3373,6 +3373,9 @@ a.messenger-message-attachment:focus-visible {
 .messenger-dialog-composer-actions {
   display: flex;
   align-items: stretch;
+  /* Кнопок стало три («Заказ», «Шаблон», «Отправить») — на узкой панели
+     они должны переноситься, а не выезжать за край. */
+  flex-wrap: wrap;
   gap: 0.55rem;
 }
 
