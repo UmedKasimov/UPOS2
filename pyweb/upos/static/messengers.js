@@ -97,6 +97,11 @@
     if (!thread || !thread.id) return;
     var payload = {
       id: thread.id,
+      // Без источника и идентификатора чата восстановленный из кеша диалог
+      // терял связь с каналом, и отправка отвечала «канал не подключён».
+      source: thread.source || "",
+      chat_id: thread.chat_id || "",
+      thread_id: thread.thread_id || "",
       channel: thread.channel || "",
       contact: thread.contact || "",
       client: thread.client || "",
@@ -332,6 +337,33 @@
     return meta ? meta.getAttribute("content") || "" : "";
   }
 
+  function sendErrorText(code) {
+    /* Коды Telegram и Meta сами по себе ничего не говорят сотруднику. */
+    var known = {
+      not_connected: "Бот Telegram не подключён. Откройте Настройки → Телеграм и привяжите бота.",
+      business_not_connected:
+        "Telegram Business не подключён. Нужен Telegram Premium, а в настройках Telegram → Telegram для бизнеса → Чат-боты надо выбрать вашего бота.",
+      business_reply_denied:
+        "Боту не разрешено отвечать за вас. В Telegram → Telegram для бизнеса → Чат-боты включите право отвечать на сообщения.",
+      bot_not_admin: "Бот не администратор в этом чате — добавьте его администратором.",
+      forbidden: "Нет прав на отправку сообщений. Попросите директора выдать доступ к Телеграму.",
+      csrf: "Сессия устарела. Обновите страницу и попробуйте снова.",
+      unauthorized: "Сессия завершена. Войдите заново.",
+      message_required: "Введите текст сообщения.",
+      chat_required: "У переписки нет чата Telegram.",
+      not_found: "Переписка не найдена — обновите список диалогов.",
+    };
+    var raw = String(code || "").trim();
+    if (known[raw]) return known[raw];
+    if (raw.indexOf("Не указан аккаунт Instagram") === 0) {
+      return "Instagram не подключён: в Настройки → Соцсети укажите Instagram Business ID и токен доступа.";
+    }
+    if (raw.indexOf("Не указан получатель") === 0) {
+      return "У этой переписки нет получателя Instagram — обновите список диалогов.";
+    }
+    return raw || "Не удалось отправить сообщение";
+  }
+
   function dropChannelUnread(count) {
     /* Цифра на вкладке канала — сумма непрочитанных его диалогов. */
     if (!count) return;
@@ -500,7 +532,16 @@
       send.addEventListener("click", function () {
         var current = currentThread();
         var value = String(text.value || "").trim();
-        if (!current || !value) return;
+        // Раньше кнопка молча ничего не делала, и выглядело это как поломка.
+        if (!current) {
+          window.alert("Сначала выберите диалог в списке слева.");
+          return;
+        }
+        if (!value) {
+          window.alert("Введите текст сообщения.");
+          text.focus();
+          return;
+        }
 
         // Telegram Business, чаты бота и Instagram Direct уходят клиенту
         // по-настоящему. Каналы без интеграции честно об этом сообщают:
@@ -567,7 +608,7 @@
             renderMessages(root, current);
           })
           .catch(function (error) {
-            window.alert(error.message || "Не удалось отправить сообщение");
+            window.alert(sendErrorText(error.message));
           })
           .then(function () {
             send.disabled = false;
