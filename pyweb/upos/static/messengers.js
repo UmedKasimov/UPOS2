@@ -234,9 +234,12 @@
       escapeHtml(thread.id) +
       '"><span class="messenger-dialog-channel">' +
       avatarMarkup(thread) +
-      '</span><i class="messenger-presence-dot messenger-presence-dot--' +
-      classToken(thread.presence, "offline") +
-      '" aria-hidden="true"></i></span><span class="messenger-dialog-main"><span class="messenger-dialog-name-line"><strong>' +
+      "</span>" +
+      // Точка присутствия — только для тех, кто в сети.
+      (classToken(thread.presence, "offline") === "online"
+        ? '<i class="messenger-presence-dot messenger-presence-dot--online" aria-hidden="true"></i>'
+        : "") +
+      '</span><span class="messenger-dialog-main"><span class="messenger-dialog-name-line"><strong>' +
       escapeHtml(thread.contact || "Диалог") +
       "</strong>" +
       (thread.is_new ? '<mark class="messenger-new-badge">NEW</mark>' : "") +

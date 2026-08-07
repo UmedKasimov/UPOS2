@@ -109,7 +109,11 @@
                   <span>{{ row.channel[:2] }}</span>
                 {% endif %}
               </span>
-              <i class="messenger-presence-dot messenger-presence-dot--{{ row.presence|default('offline') }}" aria-hidden="true"></i>
+              {# Точку показываем только тем, кто в сети: у остальных она
+                 висела серым кружком и ничего не сообщала. #}
+              {% if row.presence == 'online' %}
+                <i class="messenger-presence-dot messenger-presence-dot--online" aria-hidden="true"></i>
+              {% endif %}
             </span>
             <span class="messenger-dialog-main">
               <span class="messenger-dialog-name-line">
