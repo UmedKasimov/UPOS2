@@ -32592,3 +32592,28 @@ html.dark .client-own-tag--other {
 .messenger-client-docs tbody tr:hover {
   background: color-mix(in srgb, var(--primary) 5%, transparent);
 }
+
+/* Результат отправки сообщения — под полем ввода, а не во всплывашке. */
+.messenger-send-status {
+  margin: 0 0 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.messenger-send-status--error {
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  color: #b91c1c;
+}
+
+.messenger-send-status--ok {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #15803d;
+}
+
+.messenger-send-status--pending {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+}

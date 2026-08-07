@@ -337,6 +337,19 @@
     return meta ? meta.getAttribute("content") || "" : "";
   }
 
+  function showSendStatus(root, message, kind) {
+    var node = root.querySelector("[data-messenger-send-status]");
+    if (!node) return;
+    if (!message) {
+      node.hidden = true;
+      node.textContent = "";
+      return;
+    }
+    node.hidden = false;
+    node.textContent = message;
+    node.className = "messenger-send-status messenger-send-status--" + (kind || "error");
+  }
+
   function sendErrorText(code) {
     /* Коды Telegram и Meta сами по себе ничего не говорят сотруднику. */
     var known = {
@@ -683,14 +696,15 @@
         var value = String(text.value || "").trim();
         // Раньше кнопка молча ничего не делала, и выглядело это как поломка.
         if (!current) {
-          window.alert("Сначала выберите диалог в списке слева.");
+          showSendStatus(root, "Сначала выберите диалог в списке слева.", "error");
           return;
         }
         if (!value) {
-          window.alert("Введите текст сообщения.");
+          showSendStatus(root, "Введите текст сообщения.", "error");
           text.focus();
           return;
         }
+        showSendStatus(root, "");
 
         // Telegram Business, чаты бота и Instagram Direct уходят клиенту
         // по-настоящему. Каналы без интеграции честно об этом сообщают:
@@ -699,13 +713,16 @@
         var isInstagram = current.source === "instagram" && current.thread_id;
         var isTelegramBot = current.source === "telegram_bot" && current.id;
         if (!isTelegram && !isInstagram && !isTelegramBot) {
-          window.alert(
+          showSendStatus(
+            root,
             "Канал «" +
               (current.channel || "") +
-              "» ещё не подключён к отправке сообщений. Подключите его в разделе Настройки → Соцсети."
+              "» ещё не подключён к отправке сообщений. Подключите его в разделе Настройки → Соцсети.",
+            "error"
           );
           return;
         }
+        showSendStatus(root, "Отправляем…", "pending");
 
         var csrfInput = document.querySelector('input[name="csrf_token"]');
         var csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -755,9 +772,10 @@
             text.value = "";
             rememberThread(current);
             renderMessages(root, current);
+            showSendStatus(root, "Сообщение отправлено клиенту.", "ok");
           })
           .catch(function (error) {
-            window.alert(sendErrorText(error.message));
+            showSendStatus(root, sendErrorText(error.message), "error");
           })
           .then(function () {
             send.disabled = false;

@@ -159,6 +159,9 @@
       <div class="messenger-dialog-composer">
         <textarea rows="3" placeholder="Напишите сообщение клиенту..." data-messenger-compose-text></textarea>
         <div class="messenger-template-picker" data-messenger-template-picker hidden></div>
+        {# Результат отправки виден прямо здесь: всплывающее окно можно
+           закрыть не читая, а причина отказа нужна перед глазами. #}
+        <p class="messenger-send-status" data-messenger-send-status hidden></p>
         <div class="messenger-dialog-composer-actions">
           <button type="button" class="btn btn-secondary" data-messenger-template-button>Шаблон</button>
           <button type="button" class="btn" data-messenger-send-button>Отправить</button>
