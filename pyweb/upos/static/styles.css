@@ -30254,10 +30254,17 @@ html.dark .warehouse-adjustment-summary {
   overflow: hidden;
 }
 
+/* Выполненная установка — зелёная с галочкой. Раньше отличие было в
+   оттенке синего, и на глаз выполненные не отличались от запланированных. */
 .sales-installation-calendar-order.is-completed {
-  border-color: #93c5fd;
-  background: #dbeafe;
-  color: #1e40af;
+  border-color: #86c79b;
+  background: #e8f7ed;
+  color: #14663a;
+}
+
+.sales-installation-calendar-order.is-completed strong::before {
+  content: "✓ ";
+  font-weight: 900;
 }
 
 .sales-installation-calendar-order strong,
@@ -30329,9 +30336,9 @@ html.dark .sales-installation-calendar-order {
 }
 
 html.dark .sales-installation-calendar-order.is-completed {
-  border-color: #1e40af;
-  background: #1e40af;
-  color: #dbeafe;
+  border-color: #2f7d52;
+  background: #163a27;
+  color: #cdefd9;
 }
 
 @media (max-width: 760px) {

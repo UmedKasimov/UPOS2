@@ -2957,17 +2957,22 @@
         dayOrders.slice(0, 3).forEach(function (order) {
           var event = document.createElement("span");
           event.className = "sales-installation-calendar-order";
-          if (["completed", "archived"].includes(String(order.status || ""))) {
+          // Завершённая установка — зелёная с галочкой. Статуса «archived»
+          // у установок нет, это был остаток от статусов документа продажи.
+          if (String(order.status || "") === "completed") {
             event.classList.add("is-completed");
           }
           var client = order.client || {};
           var time = String(order.scheduled_at || "").slice(11, 16);
           var money = formatMoney(order.amount, order.currency || "UZS") + " " + String(order.currency || "UZS");
+          // Статус в подсказке: по цвету видно «выполнено или нет», а тут
+          // точная стадия — «В пути», «Ожидает оплаты» и прочие.
           event.title = [
             client.name || "Клиент",
             money,
-            client.address || "Адрес не указан"
-          ].join(" · ");
+            client.address || "Адрес не указан",
+            order.status_label || ""
+          ].filter(Boolean).join(" · ");
           event.innerHTML =
             '<strong>' + escapeHtml((time ? time + " " : "") + (client.name || "Клиент")) + "</strong>" +
             '<small>' + escapeHtml(money) + " · " + escapeHtml(shortInstallationAddress(client.address)) + "</small>";
