@@ -24580,6 +24580,7 @@ def create_app() -> FastAPI:
                 lines.append(
                     {
                         "product": str(line.get("product") or line.get("name") or ""),
+                        "warehouse": str(line.get("warehouse") or data.get("warehouse") or ""),
                         "quantity": _decimal_plain_text(quantity),
                         "price": _decimal_plain_text(price),
                         "total": _decimal_plain_text(
@@ -24624,6 +24625,10 @@ def create_app() -> FastAPI:
                 "number": str(row.number or ""),
                 "organization": workspace_display_name(workspace_owner_id),
                 "date": _messenger_document_date(data, row.created_at),
+                "doc_type": doc_type,
+                "doc_type_label": _sales_doc_type_label(doc_type),
+                "warehouse": str(data.get("warehouse") or ""),
+                "manager": str(data.get("manager") or ""),
                 "client": str(data.get("client") or ""),
                 "phone": str(data.get("client_phone") or data.get("phone") or ""),
                 "status": _sales_status_label(_sales_workflow_status(data)),

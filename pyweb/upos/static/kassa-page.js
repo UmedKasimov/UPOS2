@@ -3794,6 +3794,14 @@
     const tx = (transactions || []).find((item) => String(item.id) === String(txId));
     if (!tx) return;
 
+    // Операция по продаже открывается карточкой документа — той же
+    // панелью, что и в журнале продаж, а не маленьким окном с фактами.
+    const sourceInfo = txSourceInfo(tx);
+    if (sourceInfo && sourceInfo.documentId) {
+      openSaleDocPanel(sourceInfo);
+      return;
+    }
+
     const setText = (selector, value) => {
       const node = dialog.querySelector(selector);
       if (node) node.textContent = value;
@@ -3826,7 +3834,7 @@
         .join('');
     }
 
-    const info = txSourceInfo(tx);
+    const info = sourceInfo;
     const sourceSection = dialog.querySelector('[data-kassa-tx-source]');
     const sourceBody = dialog.querySelector('[data-kassa-tx-source-body]');
     if (sourceSection && sourceBody) {
@@ -3847,25 +3855,127 @@
       }
     }
 
-    renderTxSaleItems(dialog, info);
-
     if (!dialog.open) dialog.showModal();
   }
 
-  // Товары и услуги оплаченного документа — как во вкладке «Товары» у
-  // продажи. Видно, за что пришли деньги; товар и сам документ открываются
-  // в новой вкладке, касса при этом остаётся на месте.
-  function renderTxSaleItems(dialog, info) {
-    const host = dialog.querySelector('[data-kassa-tx-items]');
-    if (!host) return;
-    const body = host.querySelector('[data-kassa-tx-items-body]');
-    host.hidden = true;
-    if (body) body.innerHTML = '';
-    if (!info || !info.documentId || !body) return;
-    const requestedId = info.documentId;
-    host.dataset.documentId = requestedId;
-    host.hidden = false;
-    body.innerHTML = '<p class="kassa-tx-manual">Загружаем документ…</p>';
+  // ── Карточка документа продажи ──────────────────────────────────────────
+  // Идентична карточке в журнале продаж: шапка, клиент и склад, вкладки
+  // «Товары / Оплата / Комментарий», итоги. Товар и кнопка журнала
+  // открываются в новой вкладке, касса остаётся на месте.
+
+  function saleDocPanel() {
+    return document.querySelector('[data-kassa-doc-panel]');
+  }
+
+  function closeSaleDocPanel() {
+    const panel = saleDocPanel();
+    const backdrop = document.querySelector('.sales-document-detail-backdrop[data-kassa-doc-close]');
+    if (panel) {
+      panel.classList.remove('is-open');
+      panel.hidden = true;
+      delete panel.dataset.documentId;
+    }
+    if (backdrop) {
+      backdrop.classList.remove('is-open');
+      backdrop.hidden = true;
+    }
+  }
+
+  function activateSaleDocTab(panel, key) {
+    panel.querySelectorAll('[data-kassa-doc-tab]').forEach((button) => {
+      const active = button.dataset.kassaDocTab === key;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    panel.querySelectorAll('[data-kassa-doc-pane]').forEach((pane) => {
+      const active = pane.dataset.kassaDocPane === key;
+      pane.classList.toggle('active', active);
+      pane.hidden = !active;
+    });
+  }
+
+  function renderSaleDocPanel(panel, doc, info) {
+    const currency = String(doc.currency || 'UZS');
+    const setText = (selector, value) => {
+      const node = panel.querySelector(selector);
+      if (node) node.textContent = value;
+    };
+    const typeLabel = String(doc.doc_type_label || 'Продажа');
+    setText('[data-kassa-doc-title]', `${typeLabel}: ${doc.number || '—'}`);
+    setText('[data-kassa-doc-date]', String(doc.date || ''));
+    setText('[data-kassa-doc-client]', String(doc.client || '—'));
+    setText('[data-kassa-doc-warehouse]', String(doc.warehouse || '—'));
+    setText('[data-kassa-doc-manager]', String(doc.manager || '—'));
+    setText('[data-kassa-doc-status]', String(doc.status || '—'));
+    setText('[data-kassa-doc-paid]', formatMoney(doc.paid, currency));
+    setText('[data-kassa-doc-debt]', formatMoney(doc.debt, currency));
+    setText('[data-kassa-doc-total]', formatMoney(doc.amount, currency));
+    setText('[data-kassa-doc-pay-total]', formatMoney(doc.amount, currency));
+    setText('[data-kassa-doc-pay-paid]', formatMoney(doc.paid, currency));
+    setText('[data-kassa-doc-pay-debt]', formatMoney(doc.debt, currency));
+    setText('[data-kassa-doc-note]', String(doc.note || 'Комментария нет.'));
+
+    const journalLink = panel.querySelector('[data-kassa-doc-journal]');
+    if (journalLink) journalLink.href = info.href || `/sales?document=${encodeURIComponent(doc.document_id || '')}#sales-journal`;
+    const pdfLink = panel.querySelector('[data-kassa-doc-pdf]');
+    if (pdfLink) pdfLink.href = `/api/sales/${encodeURIComponent(doc.document_id || '')}/invoice.pdf`;
+
+    const linesBody = panel.querySelector('[data-kassa-doc-lines]');
+    if (linesBody) {
+      const lines = Array.isArray(doc.lines) ? doc.lines : [];
+      linesBody.innerHTML = lines.length
+        ? lines.map((line, index) => {
+            const name = String(line.product || '').trim() || 'Без названия';
+            const productHref = `/products?q=${encodeURIComponent(name)}`;
+            return `<tr>
+              <td>${index + 1}</td>
+              <td><a href="${escapeHtml(productHref)}" target="_blank" rel="noopener" title="Открыть в каталоге">${escapeHtml(name)}</a></td>
+              <td>${escapeHtml(String(line.warehouse || '—'))}</td>
+              <td>${escapeHtml(String(line.quantity || '0'))}</td>
+              <td>${escapeHtml(formatMoney(line.price, currency))}</td>
+              <td>${escapeHtml(formatMoney(line.total, currency))}</td>
+            </tr>`;
+          }).join('')
+        : '<tr><td colspan="6">В документе нет позиций.</td></tr>';
+    }
+
+    const paymentsBody = panel.querySelector('[data-kassa-doc-payments]');
+    if (paymentsBody) {
+      const payments = Array.isArray(doc.payments) ? doc.payments : [];
+      paymentsBody.innerHTML = payments.length
+        ? payments.map((payment, index) => `<tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(String(payment.account || '—'))}</td>
+            <td>${escapeHtml(String(payment.type || '—'))}</td>
+            <td>${escapeHtml(formatMoney(payment.amount, payment.currency || currency))}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="4">Оплат по документу нет.</td></tr>';
+    }
+  }
+
+  function openSaleDocPanel(info) {
+    const panel = saleDocPanel();
+    const backdrop = document.querySelector('.sales-document-detail-backdrop[data-kassa-doc-close]');
+    if (!panel) return;
+    const requestedId = String(info.documentId || '');
+    panel.dataset.documentId = requestedId;
+    activateSaleDocTab(panel, 'items');
+    const linesBody = panel.querySelector('[data-kassa-doc-lines]');
+    if (linesBody) linesBody.innerHTML = '<tr><td colspan="6">Загружаем документ…</td></tr>';
+    const setText = (selector, value) => {
+      const node = panel.querySelector(selector);
+      if (node) node.textContent = value;
+    };
+    setText('[data-kassa-doc-title]', info.title || 'Документ');
+    ['client', 'warehouse', 'manager', 'status', 'paid', 'debt', 'total', 'date', 'note'].forEach((key) => {
+      setText(`[data-kassa-doc-${key}]`, '');
+    });
+    panel.hidden = false;
+    panel.classList.add('is-open');
+    if (backdrop) {
+      backdrop.hidden = false;
+      backdrop.classList.add('is-open');
+    }
     fetch(`/api/sales/${encodeURIComponent(requestedId)}/document`, { credentials: 'same-origin' })
       .then((response) => response.json().catch(() => ({})).then((payload) => {
         if (!response.ok || !payload.ok || !payload.document) {
@@ -3874,38 +3984,34 @@
         return payload.document;
       }))
       .then((doc) => {
-        // Пока грузили, могли открыть другую операцию.
-        if (host.dataset.documentId !== requestedId) return;
-        const lines = Array.isArray(doc.lines) ? doc.lines : [];
-        if (!lines.length) {
-          body.innerHTML = '<p class="kassa-tx-manual">В документе нет позиций.</p>';
-          return;
-        }
-        const currency = String(doc.currency || 'UZS');
-        const rows = lines.map((line, index) => {
-          const name = String(line.product || '').trim() || 'Без названия';
-          const productHref = `/products?q=${encodeURIComponent(name)}`;
-          return `<tr>
-            <td>${index + 1}</td>
-            <td><a href="${escapeHtml(productHref)}" target="_blank" rel="noopener" title="Открыть в каталоге">${escapeHtml(name)}</a></td>
-            <td>${escapeHtml(String(line.quantity || '0'))}</td>
-            <td>${escapeHtml(formatMoney(line.price, currency))}</td>
-            <td>${escapeHtml(formatMoney(line.total, currency))}</td>
-          </tr>`;
-        }).join('');
-        body.innerHTML = `
-          <table class="kassa-tx-items-table">
-            <thead><tr><th>№</th><th>Товар / услуга</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>`;
+        // Пока грузили, панель могли закрыть или открыть другую операцию.
+        if (panel.dataset.documentId !== requestedId) return;
+        renderSaleDocPanel(panel, doc, info);
       })
       .catch(() => {
-        if (host.dataset.documentId !== requestedId) return;
-        // Документ мог быть удалён — блок просто прячем, факты выше остаются.
-        host.hidden = true;
-        body.innerHTML = '';
+        if (panel.dataset.documentId !== requestedId) return;
+        if (linesBody) linesBody.innerHTML = '<tr><td colspan="6">Документ недоступен — возможно, он был удалён.</td></tr>';
       });
   }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-kassa-doc-close]')) {
+      event.preventDefault();
+      closeSaleDocPanel();
+      return;
+    }
+    const tab = event.target.closest?.('[data-kassa-doc-tab]');
+    if (tab) {
+      const panel = tab.closest('[data-kassa-doc-panel]');
+      if (panel) activateSaleDocTab(panel, tab.dataset.kassaDocTab || 'items');
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const panel = saleDocPanel();
+    if (panel && !panel.hidden) closeSaleDocPanel();
+  });
 
   document.addEventListener('click', (event) => {
     const opener = event.target.closest?.('[data-kassa-tx-open]');

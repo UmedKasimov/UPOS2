@@ -2,7 +2,7 @@
 {% block title %}{{ _('kassa.title_page') }}{% endblock %}
 {% block extra_head %}
   <meta name="csrf-token" content="{{ csrf_token }}" />
-  <link rel="stylesheet" href="{{ url_for('static', path='kassa-page.css') }}?v=162" />
+  <link rel="stylesheet" href="{{ url_for('static', path='kassa-page.css') }}?v=163" />
 {% endblock %}
 {% block page_header %}
   <div class="kassa-header-line">
@@ -249,14 +249,127 @@
           <h3>Откуда эти деньги</h3>
           <div class="kassa-tx-source-body" data-kassa-tx-source-body></div>
         </section>
-        {# Позиции оплаченного документа: за что пришли деньги. Товар и сам
-           документ открываются в новой вкладке. #}
-        <section class="kassa-tx-source kassa-tx-items" data-kassa-tx-items hidden>
-          <h3>Товары и услуги по документу</h3>
-          <div class="kassa-tx-source-body" data-kassa-tx-items-body></div>
-        </section>
       </div>
     </dialog>
+
+    {# Операция по продаже открывается карточкой документа — та же панель,
+       что и в журнале продаж: товары, оплата, комментарий, итоги. Товар и
+       кнопка журнала открываются в новой вкладке, касса остаётся на месте. #}
+    <div class="warehouse-purchase-detail-backdrop sales-document-detail-backdrop" data-kassa-doc-close hidden></div>
+    <aside class="warehouse-purchase-detail sales-document-detail" data-kassa-doc-panel hidden aria-live="polite">
+      <header class="warehouse-purchase-detail-head">
+        <div class="sales-document-detail-heading">
+          <div class="sales-document-detail-heading-meta">
+            <p data-kassa-doc-date></p>
+          </div>
+          <h2 data-kassa-doc-title>Продажа</h2>
+        </div>
+        <div class="warehouse-purchase-detail-actions">
+          <a class="btn btn-primary btn-sm" data-kassa-doc-journal href="#" target="_blank" rel="noopener">Открыть в журнале</a>
+          <a class="btn btn-secondary btn-sm" data-kassa-doc-pdf href="#" target="_blank" rel="noopener">Накладная PDF</a>
+          <button class="warehouse-purchase-detail-close" type="button" data-kassa-doc-close aria-label="Закрыть">×</button>
+        </div>
+      </header>
+      <section class="warehouse-purchase-detail-summary">
+        <div>
+          <span>Клиент</span>
+          <strong data-kassa-doc-client></strong>
+        </div>
+        <div>
+          <span>Склад</span>
+          <strong data-kassa-doc-warehouse></strong>
+        </div>
+        <div>
+          <span>Ответственный</span>
+          <strong data-kassa-doc-manager></strong>
+        </div>
+        <div>
+          <span>Статус</span>
+          <strong data-kassa-doc-status></strong>
+        </div>
+      </section>
+      <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы документа">
+        <button type="button" class="active" data-kassa-doc-tab="items" aria-selected="true">Товары</button>
+        <button type="button" data-kassa-doc-tab="payment" aria-selected="false">Оплата</button>
+        <button type="button" data-kassa-doc-tab="note" aria-selected="false">Комментарий</button>
+      </nav>
+      <section class="warehouse-purchase-detail-pane active" data-kassa-doc-pane="items">
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table sales-document-detail-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Товар</th>
+                <th>Склад</th>
+                <th>К-во</th>
+                <th>Цена</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody data-kassa-doc-lines></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-kassa-doc-pane="payment" hidden>
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table purchase-document-payment-table sales-document-payment-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Счёт</th>
+                <th>Тип оплаты</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody data-kassa-doc-payments></tbody>
+          </table>
+        </div>
+        <section class="purchase-document-payment-summary sales-document-payment-summary" aria-label="Сводка по оплате">
+          <div class="purchase-document-payment-summary-item">
+            <span>Сумма продажи</span>
+            <strong data-kassa-doc-pay-total>0 UZS</strong>
+          </div>
+          <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--paid">
+            <span>Оплачено</span>
+            <strong data-kassa-doc-pay-paid>0 UZS</strong>
+          </div>
+          <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--debt">
+            <span>Остаток к оплате</span>
+            <strong data-kassa-doc-pay-debt>0 UZS</strong>
+          </div>
+        </section>
+      </section>
+      <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-kassa-doc-pane="note" hidden>
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table sales-document-note-table">
+            <thead>
+              <tr>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-kassa-doc-note></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <footer class="warehouse-purchase-detail-footer">
+        <div>
+          <span>Оплачено</span>
+          <strong data-kassa-doc-paid></strong>
+        </div>
+        <div>
+          <span>Долг</span>
+          <strong data-kassa-doc-debt></strong>
+        </div>
+        <div class="warehouse-purchase-detail-total">
+          <span>Итого</span>
+          <strong data-kassa-doc-total></strong>
+        </div>
+      </footer>
+    </aside>
 
     <section class="kassa-overview-grid" aria-label="Сводка кассы">
       <article class="kassa-overview-card">
@@ -606,5 +719,5 @@
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
-  <script src="{{ url_for('static', path='kassa-page.js') }}?v=76" defer></script>
+  <script src="{{ url_for('static', path='kassa-page.js') }}?v=77" defer></script>
 {% endblock %}
