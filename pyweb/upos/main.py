@@ -7286,6 +7286,12 @@ def create_app() -> FastAPI:
             ],
             "installation_status": str(data.get("installation_status") or ""),
             "installation_conflict_warning": str(data.get("installation_conflict_warning") or ""),
+            # Рассрочка — для графика платежей в карточке.
+            "installment": (
+                dict(data["installment"])
+                if isinstance(data.get("installment"), dict) and data["installment"].get("enabled")
+                else {}
+            ),
             "lines": lines,
             "updated_at": row.updated_at,
         }
@@ -7814,6 +7820,10 @@ def create_app() -> FastAPI:
                             "type": str(payment.get("type") or "").strip(),
                             "currency": payment_currency[:8],
                             "amount": (_decimal_plain_text(payment_amount) or "0"),
+                            # Дата оплаты: чтобы в карточке было видно, когда
+                            # платили. Пустую заполняем датой документа.
+                            "date": str(payment.get("date") or "").strip()
+                            or str(form.get("date") or "").strip(),
                         }
                     )
         # Рассрочка: срок, первый взнос и наценка. Суммы пересчитываем на

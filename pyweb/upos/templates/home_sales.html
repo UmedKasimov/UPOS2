@@ -796,6 +796,7 @@
                 <thead>
                   <tr>
                     <th>№</th>
+                    <th>Дата</th>
                     <th>Счёт</th>
                     <th>Тип оплаты</th>
                     <th>Сумма</th>
@@ -803,6 +804,23 @@
                 </thead>
                 <tbody data-sales-payment-lines></tbody>
               </table>
+            </div>
+            {# График рассрочки: когда и сколько платить, что уже оплачено. #}
+            <div class="sales-installment-schedule" data-sales-installment-schedule hidden>
+              <h4>График рассрочки</h4>
+              <div class="warehouse-purchase-detail-table-wrap">
+                <table class="warehouse-purchase-detail-table sales-installment-schedule-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Дата платежа</th>
+                      <th>Сумма</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody data-sales-installment-schedule-rows></tbody>
+                </table>
+              </div>
             </div>
             <section class="purchase-document-payment-summary sales-document-payment-summary" data-sales-payment-summary aria-label="Сводка по оплате">
               <div class="purchase-document-payment-summary-item">
@@ -1824,7 +1842,7 @@
 {% block scripts %}
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=35" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=36" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=69" defer></script>
   {% if sales_embed %}

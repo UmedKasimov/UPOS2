@@ -710,6 +710,7 @@
       })
       .map(function (payment) {
         return {
+          date: String(payment.date || "").trim(),
           account: String(payment.account || payment.type || "Оплата").trim() || "Оплата",
           type: String(payment.type || payment.account || "Оплата").trim() || "Оплата",
           amount: payment.amount,
@@ -720,6 +721,7 @@
     var paidAmount = amountNumber(sale.paid_amount || sale.paid_value);
     if (!paymentLines.length && paidAmount > 0) {
       paymentLines.push({
+        date: String(sale.date || "").trim(),
         account: String(sale.payment_type || "Оплата").trim() || "Оплата",
         type: String(sale.payment_type || "Оплата").trim() || "Оплата",
         amount: paidAmount,
@@ -731,7 +733,7 @@
     paymentList.hidden = paymentLines.length === 0;
     paymentLines.forEach(function (payment, index) {
       var row = document.createElement("tr");
-      [index + 1, payment.account, payment.type].forEach(function (value) {
+      [index + 1, payment.date || "—", payment.account, payment.type].forEach(function (value) {
         var cell = document.createElement("td");
         cell.textContent = String(value);
         row.append(cell);
@@ -743,6 +745,79 @@
       row.append(amountCell);
       paymentLinesRoot.append(row);
     });
+
+    renderInstallmentSchedule(panel, sale, paidAmount, currency);
+  }
+
+  // Прибавляет месяцы к дате ISO (YYYY-MM-DD), сохраняя число месяца.
+  function addMonthsIso(iso, months) {
+    var base = new Date(iso);
+    if (isNaN(base.getTime())) return "";
+    var target = new Date(base.getFullYear(), base.getMonth() + months, base.getDate());
+    var y = target.getFullYear();
+    var m = ("0" + (target.getMonth() + 1)).slice(-2);
+    var d = ("0" + target.getDate()).slice(-2);
+    return y + "-" + m + "-" + d;
+  }
+
+  /** График рассрочки: первый взнос и помесячные платежи с датами. */
+  function renderInstallmentSchedule(panel, sale, paidAmount, currency) {
+    var box = panel.querySelector("[data-sales-installment-schedule]");
+    var rowsRoot = panel.querySelector("[data-sales-installment-schedule-rows]");
+    if (!box || !rowsRoot) return;
+    var installment = sale.installment && typeof sale.installment === "object" ? sale.installment : null;
+    if (!installment || !installment.enabled) {
+      box.hidden = true;
+      rowsRoot.replaceChildren();
+      return;
+    }
+    var months = Math.max(1, Math.round(amountNumber(installment.months) || 1));
+    var initial = amountNumber(installment.initial);
+    var monthly = amountNumber(installment.monthly);
+    var startDate = String(sale.date || "").trim();
+
+    var schedule = [];
+    if (initial > 0) {
+      schedule.push({ label: "Первый взнос", date: startDate, amount: initial });
+    }
+    for (var i = 1; i <= months; i += 1) {
+      schedule.push({
+        label: "Платёж " + i,
+        date: startDate ? addMonthsIso(startDate, i) : "",
+        amount: monthly,
+      });
+    }
+
+    // Помечаем платежи как оплаченные по накопленной сумме факта.
+    var covered = paidAmount;
+    rowsRoot.replaceChildren();
+    schedule.forEach(function (entry, index) {
+      var row = document.createElement("tr");
+      var paid = covered >= entry.amount - 0.01 && entry.amount > 0;
+      if (paid) covered -= entry.amount;
+      else if (covered > 0.01) { entry.partial = covered; covered = 0; }
+      [
+        String(index + 1),
+        entry.date || "—",
+        moneyWithCurrency(entry.amount, currency),
+        paid ? "Оплачен" : entry.partial ? "Частично" : "Ожидается",
+      ].forEach(function (value, cellIndex) {
+        var cell = document.createElement("td");
+        if (cellIndex === 3) {
+          var badge = document.createElement("span");
+          badge.className =
+            "sales-schedule-status sales-schedule-status--" +
+            (paid ? "paid" : entry.partial ? "partial" : "pending");
+          badge.textContent = value;
+          cell.append(badge);
+        } else {
+          cell.textContent = value;
+        }
+        row.append(cell);
+      });
+      rowsRoot.append(row);
+    });
+    box.hidden = schedule.length === 0;
   }
 
   function renderSalesPaymentSummary(panel, sale) {
