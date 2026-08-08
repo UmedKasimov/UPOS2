@@ -243,7 +243,13 @@
     if (account && looksLikeIpHost(account.ws_url)) {
       return "АТС указана по IP — для WSS нужен домен из сертификата. Проверьте адрес в настройках телефонии";
     }
-    return `АТС недоступна (${error?.message || "ошибка"}) — звоним через телефон`;
+    const cause = String(error?.message || "");
+    // Rejected — связь с АТС есть, но регистрацию не приняли: дело в
+    // SIP-аккаунте (WebRTC не включён или пароль не тот), а не в сети.
+    if (/rejected|forbidden|authentication/i.test(cause)) {
+      return "АТС отклонила регистрацию — проверьте SIP-аккаунт (WebRTC, пароль). Пока звоним через телефон";
+    }
+    return `АТС недоступна (${cause || "ошибка"}) — звоним через телефон`;
   }
 
   function bindSoftphoneEvents(sip) {

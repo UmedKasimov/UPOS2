@@ -1081,14 +1081,16 @@
             <div class="product-form-grid">
               <label><span>Агент (ответственный)</span><input name="crm_responsible" list="sales-crm-responsible-list" autocomplete="off" placeholder="Сотрудник" /></label>
             </div>
-            {# Поля задачи — те же, что в карточке CRM. #}
+            {# Поля задачи — те же, что в карточке CRM. Подпись «Исполнитель
+               задачи»: рядом уже есть «Агент (ответственный)» документа, и
+               два «ответственных» читались как дубль одного поля. #}
             <div class="crm-task-form-main">
               <input name="crm_task_text" maxlength="500" placeholder="Название задачи" />
             </div>
             <div class="crm-task-form-grid">
               <label><span>Дата</span><input name="crm_task_due_date" type="date" /></label>
               <label><span>Время</span><input name="crm_task_due_time" type="time" /></label>
-              <label><span>Ответственный</span><input name="crm_task_assignee" list="sales-crm-responsible-list" placeholder="Сотрудник" /></label>
+              <label><span>Исполнитель задачи</span><input name="crm_task_assignee" list="sales-crm-responsible-list" placeholder="Сотрудник" /></label>
               <label><span>Приоритет</span><select name="crm_task_priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
               <label><span>Участники</span><input name="crm_task_participants" list="sales-crm-responsible-list" placeholder="Через запятую" /></label>
               <label><span>Напоминание</span><input name="crm_task_reminder_at" type="datetime-local" /></label>
