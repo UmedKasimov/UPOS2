@@ -7228,6 +7228,15 @@ def create_app() -> FastAPI:
             "paid_amount": _sales_money_label(paid_amount),
             "paid_value": str(paid_amount),
             "payment_status": payment_status,
+            # Рассрочка — это оформленная в документе рассрочка (срок больше
+            # месяца или явно включена), а не просто частичная оплата.
+            "is_installment": bool(
+                isinstance(data.get("installment"), dict)
+                and (
+                    data["installment"].get("enabled")
+                    or _sales_decimal(data["installment"].get("months")) > 1
+                )
+            ),
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "debt_value": str(debt_amount if debt_amount > 0 else 0),
             "has_debt": debt_amount > 0,
@@ -9548,6 +9557,7 @@ def create_app() -> FastAPI:
         debt_page: int = 1,
         debt_page_size: int = 100,
         crm_record_id: str = "",
+        installment: str = "",
         embed: str = "",
     ):
         module_redirect = _employee_module_redirect(request, "sales")
@@ -9712,6 +9722,7 @@ def create_app() -> FastAPI:
             "status_summary": status_summary,
             "payment_statuses": selected_payment_statuses,
             "payment_status_summary": payment_status_summary,
+            "installment": str(installment or "").strip() in {"1", "true", "yes"},
             "crm_stages": selected_crm_stages,
             "crm_stage_summary": crm_stage_summary,
             "client": client.strip(),
@@ -9795,7 +9806,7 @@ def create_app() -> FastAPI:
             # условия остальных, иначе фильтры накапливались — «Рассрочки»
             # вместе с «Архивом» давали пустой журнал с нулями во всех
             # счётчиках.
-            _JOURNAL_TAB_RESET = {"doc_type", "status", "payment_status", "journal_page", "view"}
+            _JOURNAL_TAB_RESET = {"doc_type", "status", "payment_status", "installment", "journal_page", "view"}
 
             def _journal_tab_url(extra: list[tuple[str, str]]) -> str:
                 pairs = [
@@ -9816,6 +9827,9 @@ def create_app() -> FastAPI:
 
             def document_tab_url(tab_doc_type: str = "") -> str:
                 return _journal_tab_url([("doc_type", tab_doc_type)] if tab_doc_type else [])
+
+            def installment_tab_url() -> str:
+                return _journal_tab_url([("installment", "1")])
 
             for row in rows:
                 item = _sales_document_data(row)
@@ -9862,13 +9876,15 @@ def create_app() -> FastAPI:
                 journal_doc_type_counts["all"] += 1
                 if item["status"] == "archived":
                     journal_archived_count += 1
-                # Рассрочка — документ, который гасится частями: оплата есть,
-                # но долг ещё не закрыт.
-                if item["payment_status"] == "partial":
+                # В «Рассрочки» попадают документы с оформленной рассрочкой,
+                # а не просто частично оплаченные.
+                if item.get("is_installment"):
                     journal_installment_count += 1
                 if item["doc_type"] in journal_doc_type_counts:
                     journal_doc_type_counts[item["doc_type"]] += 1
                 if filters["doc_types"] and item["doc_type"] not in filters["doc_types"]:
+                    continue
+                if filters.get("installment") and not item.get("is_installment"):
                     continue
                 sales.append(item)
 
@@ -9907,14 +9923,14 @@ def create_app() -> FastAPI:
                     "current": selected_doc_types == ["sale"],
                 },
                 {
-                    "value": "partial",
+                    "value": "installment",
                     "label": "Рассрочки",
                     "logo": "РС",
                     "brand": "installment",
                     "count": journal_installment_count,
-                    "href": payment_tab_url("partial"),
-                    "active": "partial" in (selected_payment_statuses or []),
-                    "current": (selected_payment_statuses or []) == ["partial"],
+                    "href": installment_tab_url(),
+                    "active": bool(filters.get("installment")),
+                    "current": bool(filters.get("installment")),
                 },
                 {
                     "value": "return",
