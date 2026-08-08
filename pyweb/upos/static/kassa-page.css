@@ -3112,3 +3112,60 @@ html.dark .kassa-transfer-badge--in {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
 }
+
+/* Позиции оплаченного документа в карточке операции. Диалог узкий, поэтому
+   таблица компактная; товар — ссылка в каталог, открывается в новой вкладке. */
+.kassa-tx-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.kassa-tx-items-table th {
+  padding: 0.3rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.kassa-tx-items-table td {
+  padding: 0.4rem 0.45rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  vertical-align: top;
+}
+
+.kassa-tx-items-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.kassa-tx-items-table td:first-child {
+  color: var(--muted-foreground);
+}
+
+.kassa-tx-items-table td:nth-child(3),
+.kassa-tx-items-table td:nth-child(4),
+.kassa-tx-items-table td:nth-child(5) {
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.kassa-tx-items-table th:nth-child(3),
+.kassa-tx-items-table th:nth-child(4),
+.kassa-tx-items-table th:nth-child(5) {
+  text-align: right;
+}
+
+.kassa-tx-items-table a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.kassa-tx-items-table a:hover,
+.kassa-tx-items-table a:focus-visible {
+  text-decoration: underline;
+}

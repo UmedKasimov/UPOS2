@@ -5083,7 +5083,7 @@ def create_app() -> FastAPI:
         if price_type.get("pricing_method") != "dependent":
             entry = _product_price_entry(product, price_type)
             if not entry:
-                return "", str(price_type.get("convert_to_currency") or "UZS")
+                return "", str(price_type.get("convert_to_currency") or "UZS").upper()
             return str(entry.get("price") or ""), str(entry.get("currency") or "UZS").upper()
         override = _product_price_entry(product, price_type)
         if override and override.get("manual_override"):
@@ -5319,11 +5319,19 @@ def create_app() -> FastAPI:
                         in {"manual", "dependent"},
                     }
                 )
+            # Выбранный прайс-лист показываем всегда. Раньше фильтр валюты
+            # прятал строку целиком, и товар с ценой в USD выглядел как
+            # «Нет прайс-листов», хотя цена задана — просто в другой валюте.
+            # Пустая цена валюты не имеет, поэтому «Не задана» тоже остаётся.
             display_prices = [
                 price
                 for price in catalog_prices
                 if (not display_price_list_ids or price["id"] in display_price_list_ids)
-                and price["currency"] in selected_currencies
+                and (
+                    not price["has_price"]
+                    or price["currency"] in selected_currencies
+                    or price["id"] in display_price_list_ids
+                )
             ]
             item["catalog_prices"] = catalog_prices
             item["display_prices"] = display_prices

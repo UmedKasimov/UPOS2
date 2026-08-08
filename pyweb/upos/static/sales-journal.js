@@ -1405,6 +1405,15 @@
     document.addEventListener("click", function () {
       closeDetailMenu(scope);
     });
+
+    // Ссылка вида /sales?document=<id> открывает карточку документа сразу:
+    // по таким ссылкам сюда приходят касса и карточка клиента в мессенджере.
+    var requestedDocumentId = String(
+      new URLSearchParams(window.location.search).get("document") || ""
+    ).trim();
+    if (requestedDocumentId && readSale(requestedDocumentId)) {
+      openDetail(scope, requestedDocumentId);
+    }
   }
 
   if (document.readyState === "loading") {

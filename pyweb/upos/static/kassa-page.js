@@ -3734,7 +3734,13 @@
     if (source === 'sales') {
       const number = String(data.sales_number || '').trim();
       const docType = String(data.sales_doc_type || 'sale').trim();
+      const documentId = String(data.sales_document_id || '').trim();
       const kind = docType === 'return' ? 'Возврат продажи' : (docType === 'order' ? 'Заказ' : 'Продажа');
+      // Параметр document сразу раскрывает карточку документа в журнале.
+      const params = new URLSearchParams();
+      if (number) params.set('q', number);
+      params.set('doc_type', docType);
+      if (documentId) params.set('document', documentId);
       return {
         title: number ? `${kind} № ${number}` : kind,
         rows: [
@@ -3744,8 +3750,9 @@
           ['Касса', String(data.payment_account || '') || '—'],
           ['Оформил', String(data.manager || '') || '—'],
         ],
-        href: number ? `/sales?q=${encodeURIComponent(number)}&doc_type=${encodeURIComponent(docType)}#sales-journal` : '',
+        href: number || documentId ? `/sales?${params.toString()}#sales-journal` : '',
         hrefLabel: 'Открыть документ продажи',
+        documentId,
       };
     }
 
@@ -3828,8 +3835,9 @@
           .filter(([, value]) => String(value || '').trim() && String(value) !== '—')
           .map(([label, value]) => `<div class="kassa-tx-fact"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`)
           .join('');
+        // Документ открывается в новой вкладке: касса остаётся на месте.
         const link = info.href
-          ? `<a class="btn btn-secondary kassa-tx-source-link" href="${escapeHtml(info.href)}">${escapeHtml(info.hrefLabel || 'Открыть документ')}</a>`
+          ? `<a class="btn btn-secondary kassa-tx-source-link" href="${escapeHtml(info.href)}" target="_blank" rel="noopener">${escapeHtml(info.hrefLabel || 'Открыть документ')}</a>`
           : '';
         sourceBody.innerHTML = `<dl class="kassa-tx-facts">${rows}</dl>${link}`;
         sourceSection.hidden = false;
@@ -3839,7 +3847,64 @@
       }
     }
 
+    renderTxSaleItems(dialog, info);
+
     if (!dialog.open) dialog.showModal();
+  }
+
+  // Товары и услуги оплаченного документа — как во вкладке «Товары» у
+  // продажи. Видно, за что пришли деньги; товар и сам документ открываются
+  // в новой вкладке, касса при этом остаётся на месте.
+  function renderTxSaleItems(dialog, info) {
+    const host = dialog.querySelector('[data-kassa-tx-items]');
+    if (!host) return;
+    const body = host.querySelector('[data-kassa-tx-items-body]');
+    host.hidden = true;
+    if (body) body.innerHTML = '';
+    if (!info || !info.documentId || !body) return;
+    const requestedId = info.documentId;
+    host.dataset.documentId = requestedId;
+    host.hidden = false;
+    body.innerHTML = '<p class="kassa-tx-manual">Загружаем документ…</p>';
+    fetch(`/api/sales/${encodeURIComponent(requestedId)}/document`, { credentials: 'same-origin' })
+      .then((response) => response.json().catch(() => ({})).then((payload) => {
+        if (!response.ok || !payload.ok || !payload.document) {
+          throw new Error(payload.error || 'Документ недоступен');
+        }
+        return payload.document;
+      }))
+      .then((doc) => {
+        // Пока грузили, могли открыть другую операцию.
+        if (host.dataset.documentId !== requestedId) return;
+        const lines = Array.isArray(doc.lines) ? doc.lines : [];
+        if (!lines.length) {
+          body.innerHTML = '<p class="kassa-tx-manual">В документе нет позиций.</p>';
+          return;
+        }
+        const currency = String(doc.currency || 'UZS');
+        const rows = lines.map((line, index) => {
+          const name = String(line.product || '').trim() || 'Без названия';
+          const productHref = `/products?q=${encodeURIComponent(name)}`;
+          return `<tr>
+            <td>${index + 1}</td>
+            <td><a href="${escapeHtml(productHref)}" target="_blank" rel="noopener" title="Открыть в каталоге">${escapeHtml(name)}</a></td>
+            <td>${escapeHtml(String(line.quantity || '0'))}</td>
+            <td>${escapeHtml(formatMoney(line.price, currency))} ${escapeHtml(currency)}</td>
+            <td>${escapeHtml(formatMoney(line.total, currency))} ${escapeHtml(currency)}</td>
+          </tr>`;
+        }).join('');
+        body.innerHTML = `
+          <table class="kassa-tx-items-table">
+            <thead><tr><th>№</th><th>Товар / услуга</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+      })
+      .catch(() => {
+        if (host.dataset.documentId !== requestedId) return;
+        // Документ мог быть удалён — блок просто прячем, факты выше остаются.
+        host.hidden = true;
+        body.innerHTML = '';
+      });
   }
 
   document.addEventListener('click', (event) => {
@@ -4958,8 +5023,22 @@
 
     function initDateRangeFilter() {
       if (!els.fDateRange || !window.UPOS_DATE_RANGE) return;
+      // По умолчанию касса открывается за текущий месяц — с первого по
+      // последнее число. Раньше диапазон был пуст, показывалось всё подряд.
+      let initialPreset = 'custom';
+      if (!els.fDateStart?.value && !els.fDateEnd?.value) {
+        const now = new Date();
+        const isoDay = (d) =>
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (els.fDateStart) els.fDateStart.value = isoDay(new Date(now.getFullYear(), now.getMonth(), 1));
+        if (els.fDateEnd) els.fDateEnd.value = isoDay(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+        initialPreset = 'month';
+        currentFilter.dateStart = els.fDateStart?.value || '';
+        currentFilter.dateEnd = els.fDateEnd?.value || '';
+        invalidateFilteredCache();
+      }
       const syncPicker = window.UPOS_DATE_RANGE.create(els.fDateRange, {
-        preset: 'custom',
+        preset: initialPreset,
         date_from: els.fDateStart?.value || '',
         date_to: els.fDateEnd?.value || '',
         hideSummary: true,
