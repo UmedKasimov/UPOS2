@@ -18,6 +18,14 @@
 
   const KIND_LABELS = { all: "Все типы", product: "Товары", service: "Услуги" };
 
+  // Число с разделителями тысяч и не более чем 3 знаками после запятой.
+  function formatQuantity(value) {
+    const rounded = Math.round(value * 1000) / 1000;
+    const [intPart, frac] = String(rounded).split(".");
+    const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return frac ? grouped + "." + frac : grouped;
+  }
+
   function init() {
     const panel = document.querySelector(".products-list-panel");
     if (!panel || panel.dataset.catalogKindReady === "1") return;
@@ -32,6 +40,8 @@
     const searchInput = form.querySelector('input[name="q"]');
     const totalLabel = panel.querySelector("[data-products-total-count]");
     const shownLabel = panel.querySelector("[data-products-shown-range]");
+    const totalCountCell = table.querySelector("[data-catalog-total-count]");
+    const totalQtyCell = table.querySelector("[data-catalog-total-quantities]");
 
     const kindOf = (href) => {
       try {
@@ -49,8 +59,7 @@
         .map((el) => (el.value || "").trim().toLowerCase())
         .filter((value) => value && value !== "all");
 
-    // Поле-мультифильтр считается «без ограничений», если отмечено «all» или
-    // не отмечено ничего.
+    // Поле-мультифильтр «без ограничений», если отмечено «all» или ничего.
     const isAll = (name) => {
       const checked = [...form.querySelectorAll('input[name="' + name + '"]:checked')];
       return !checked.length || checked.some((el) => el.value === "all");
@@ -71,6 +80,30 @@
       });
     }
 
+    // Пересчёт итоговой строки под видимые строки: число позиций и суммы
+    // остатков по единицам измерения (как на сервере, но по текущему фильтру).
+    function updateTotals(shown, qtyByUnit) {
+      if (totalCountCell) totalCountCell.textContent = shown + " позиций";
+      if (!totalQtyCell) return;
+      const parts = Object.keys(qtyByUnit)
+        .map((unit) => ({ unit, value: qtyByUnit[unit] }))
+        .filter((part) => Math.abs(part.value) > 1e-9);
+      totalQtyCell.replaceChildren();
+      if (!parts.length) {
+        const span = document.createElement("span");
+        span.textContent = "0";
+        totalQtyCell.append(span);
+        return;
+      }
+      parts.forEach((part) => {
+        const span = document.createElement("span");
+        // «Штука» — единица по умолчанию, в итоге её не подписываем.
+        const suffix = part.unit && part.unit !== "штука" ? " " + part.unit : "";
+        span.textContent = formatQuantity(part.value) + suffix;
+        totalQtyCell.append(span);
+      });
+    }
+
     function apply() {
       const kindAll = isAll("kind");
       const kindVals = checkedValues("kind");
@@ -82,6 +115,7 @@
       const qTerms = query ? query.split(/\s+/).filter(Boolean) : [];
 
       let shown = 0;
+      const qtyByUnit = {};
       rows().forEach((row) => {
         const rkind = row.getAttribute("data-product-kind") || "product";
         const rcat = attr(row, "data-sort-category");
@@ -112,10 +146,14 @@
           shown += 1;
           const indexCell = row.querySelector(".product-history-index");
           if (indexCell) indexCell.textContent = String(shown);
+          const qty = parseFloat((row.getAttribute("data-sort-quantity") || "0").replace(",", ".")) || 0;
+          const unit = attr(row, "data-sort-unit");
+          qtyByUnit[unit] = (qtyByUnit[unit] || 0) + qty;
         }
       });
 
       updateTabs(effectiveKind());
+      updateTotals(shown, qtyByUnit);
       if (totalLabel) totalLabel.textContent = String(shown);
       if (shownLabel) shownLabel.textContent = shown ? "1-" + shown : "0";
     }

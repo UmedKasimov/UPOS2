@@ -18,7 +18,7 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='products-table.js') }}?v=12" defer></script>
-  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=3" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
@@ -616,12 +616,12 @@
                   <td></td>
                   <td>
                     <strong>Итого по выбранному каталогу</strong>
-                    <small>{{ products_total }} позиций</small>
+                    <small data-catalog-total-count>{{ products_total }} позиций</small>
                   </td>
                   <td></td>
                   <td></td>
                   <td></td>
-                  <td class="products-catalog-number">
+                  <td class="products-catalog-number" data-catalog-total-quantities>
                     {% for total in catalog_totals.quantities %}
                       {# «Штука» в итоге не пишем — это единица по умолчанию. #}
                       <span>{{ total.value }}{% if total.unit and total.unit != 'Штука' %} {{ total.unit }}{% endif %}</span>
