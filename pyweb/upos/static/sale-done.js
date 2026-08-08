@@ -100,9 +100,12 @@
     const sumText = message === "paid" && paidNow ? paidNow : doc.amount ? `${doc.amount}` : "";
     dialog.querySelector("[data-sale-done-sum]").textContent = sumText;
     const metaParts = [doc.number ? `№ ${doc.number}` : "", doc.client || "", doc.date || ""];
-    // При частичной оплате подсказываем остаток долга.
-    if (message === "paid" && doc.debt_amount && doc.debt_amount !== "0") {
-      metaParts.push(`Остаток: ${doc.debt_amount}${currency ? " " + currency : ""}`);
+    // При частичной оплате подсказываем остаток к оплате. Берём именно
+    // остаток (outstanding), а не «бухгалтерский» долг: у статуса «Новый»
+    // долг ещё не признан и равен нулю, хотя доплатить нужно.
+    const remaining = String(doc.outstanding_amount || doc.debt_amount || "").trim();
+    if (message === "paid" && remaining && remaining !== "0") {
+      metaParts.push(`Остаток: ${remaining}${currency ? " " + currency : ""}`);
     }
     dialog.querySelector("[data-sale-done-meta]").textContent = metaParts.filter(Boolean).join(" · ");
     dialog._saleDoneDoc = doc;
