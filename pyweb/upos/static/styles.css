@@ -1748,6 +1748,46 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   border-bottom: 0;
 }
 
+/* Цена, которую администратор правит прямо в каталоге. */
+.products-price-list-value.is-editable {
+  border-radius: 4px;
+  cursor: text;
+}
+
+.products-price-list-value.is-editable:hover,
+.products-price-list-value.is-editable:focus-visible {
+  outline: 1px dashed color-mix(in srgb, var(--primary), transparent 45%);
+  outline-offset: 2px;
+}
+
+.products-price-list-value.is-saving {
+  opacity: 0.55;
+}
+
+.products-price-list-value.is-saved {
+  outline: 1px solid color-mix(in srgb, #16a34a, transparent 35%);
+  outline-offset: 2px;
+}
+
+.products-price-list-value.is-error {
+  outline: 1px solid color-mix(in srgb, var(--destructive), transparent 30%);
+  outline-offset: 2px;
+}
+
+.products-price-inline-input {
+  width: 100%;
+  min-width: 0;
+  height: 1.65rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
 .products-price-list-name-cell .products-price-list-value strong {
   min-width: 0;
   overflow: hidden;

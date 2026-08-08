@@ -18,6 +18,9 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='products-table.js') }}?v=11" defer></script>
+  {% if can_edit_catalog_price %}
+    <script src="{{ url_for('static', path='product-price-inline.js') }}?v=1" defer></script>
+  {% endif %}
   <script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
 {% endblock %}
 
@@ -525,8 +528,24 @@
                   </td>
                   <td class="products-price-list-cell products-price-value-cell">
                     <div class="products-price-list-values">
+                      {# Администратор правит цену прямо здесь: расчётные прайсы
+                         не трогаем — их значение пересчитается заново. #}
                       {% for price in product.display_prices %}
-                        <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
+                        {% set price_editable = can_edit_catalog_price and price.editable %}
+                        <div
+                          class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}{% if price_editable %} is-editable{% endif %}"
+                          {% if price_editable %}
+                            data-product-price-edit
+                            data-product-id="{{ product.id }}"
+                            data-price-type-id="{{ price.id }}"
+                            data-price-raw="{{ price.price or '' }}"
+                            data-price-currency="{{ price.currency }}"
+                            data-price-name="{{ price.name }}"
+                            role="button"
+                            tabindex="0"
+                            title="{{ price.name }}: нажмите, чтобы изменить цену"
+                          {% endif %}
+                        >
                           <strong>{% if price.has_price %}{{ price.price_display }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
                         </div>
                       {% else %}

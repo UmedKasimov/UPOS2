@@ -1015,6 +1015,19 @@ def create_app() -> FastAPI:
     def _is_employee_adminish(user: dict | None) -> bool:
         return bool(_employee_role_key(user) in {"general_director", "administrator", "hr_manager"})
 
+    def _can_edit_catalog_price(user: dict | None) -> bool:
+        """Правка цены прямо в каталоге — владельцу и администраторам.
+
+        Обычному сотруднику цена видна, но менять её из списка нельзя:
+        это делается через карточку товара и прайс-листы.
+        """
+        data = user or {}
+        if not data:
+            return False
+        if not data.get("is_employee"):
+            return True
+        return _employee_role_key(data) in {"general_director", "administrator"}
+
     def _first_allowed_user_path(user: dict | None) -> str:
         if _has_permission(user, "schet"):
             return "/schet"
@@ -5299,6 +5312,11 @@ def create_app() -> FastAPI:
                         "price": price,
                         "currency": currency,
                         "has_price": bool(price),
+                        # Правим прямо в каталоге только те прайсы, что задаются
+                        # руками. Расчётные считаются от других — их правка
+                        # молча терялась бы при следующем пересчёте.
+                        "editable": str(price_type.get("pricing_method") or "manual")
+                        in {"manual", "dependent"},
                     }
                 )
             display_prices = [
@@ -5798,6 +5816,8 @@ def create_app() -> FastAPI:
             products=products,
             products_total=products_total,
             catalog_kind_counts=catalog_kind_counts,
+            # Правка цены прямо в списке — только администратору.
+            can_edit_catalog_price=_can_edit_catalog_price(request.session.get("user") or {}),
             default_price_type_id=_workspace_default_price_type_id(wid) or "1",
             service_bonus_percent=(
                 load_earning_rules(wid).get("by_service", {}).get(str(edit_product.get("id") or ""))
@@ -6636,6 +6656,85 @@ def create_app() -> FastAPI:
             return _price_type_redirect(price_type_id, msg="base")
         _save_workspace_price_types(wid, [item for item in price_types if str(item.get("id")) != price_type_id])
         return _price_type_redirect("", msg="deleted")
+
+    @app.post("/api/products/{product_id}/price", name="product_catalog_price_save")
+    async def product_catalog_price_save(request: Request, product_id: str):
+        """Цена товара прямо из каталога — без захода в карточку и прайс-лист."""
+        if not _csrf_header_ok(request):
+            return JSONResponse({"error": "csrf"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        if not _can_edit_catalog_price(request.session.get("user") or {}):
+            return JSONResponse({"error": "Менять цену из каталога может только администратор"}, status_code=403)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        price_type_id = str((body or {}).get("price_type_id") or "").strip()
+        if not price_type_id:
+            return JSONResponse({"error": "Не указан прайс-лист"}, status_code=400)
+        price_type = _price_type_by_id(_workspace_price_types(wid), price_type_id)
+        if not price_type:
+            return JSONResponse({"error": "Прайс-лист не найден"}, status_code=404)
+        pricing_method = str(price_type.get("pricing_method") or "manual")
+        if pricing_method not in {"manual", "dependent"}:
+            return JSONResponse({"error": "Этот прайс считается автоматически"}, status_code=400)
+
+        raw_value = str((body or {}).get("price") or "").strip()
+        currency = str((body or {}).get("currency") or "UZS").strip().upper()
+        if currency not in {"UZS", "USD"}:
+            currency = "UZS"
+        # Пустое значение — способ снять цену, поэтому это не ошибка.
+        if raw_value:
+            amount = _sales_decimal(raw_value.replace(" ", "").replace(" ", "").replace(",", "."))
+            if amount < 0:
+                return JSONResponse({"error": "Цена не может быть отрицательной"}, status_code=400)
+            clean_value = _decimal_plain_text(amount)
+        else:
+            clean_value = ""
+
+        with session_scope() as session:
+            row = session.get(Product, str(product_id or "").strip())
+            if row is None or row.workspace_owner_id != wid:
+                return JSONResponse({"error": "Товар не найден"}, status_code=404)
+            data = dict(row.data if isinstance(row.data, dict) else {})
+            prices = [dict(item) for item in data.get("prices", []) if isinstance(item, dict)]
+            entry = next((item for item in prices if str(item.get("price_type_id") or "") == price_type_id), None)
+            if entry is None:
+                entry = next(
+                    (
+                        item
+                        for item in prices
+                        if str(item.get("name") or "").strip().lower()
+                        == str(price_type.get("name") or "").strip().lower()
+                    ),
+                    None,
+                )
+            if entry is None:
+                entry = {}
+                prices.append(entry)
+            entry.update(
+                {
+                    "price_type_id": price_type_id,
+                    "name": price_type["name"],
+                    "price": clean_value,
+                    "currency": currency,
+                    "manual_override": pricing_method == "dependent",
+                }
+            )
+            data["prices"] = prices
+            row.data = data
+            flag_modified(row, "data")
+        return JSONResponse(
+            {
+                "ok": True,
+                "price": clean_value,
+                "currency": currency,
+                "price_display": _catalog_number_text(clean_value, decimal_places=2) if clean_value else "",
+            }
+        )
 
     @app.post("/products/price-types/prices", name="products_price_type_prices_save")
     async def products_price_type_prices_save(request: Request):
