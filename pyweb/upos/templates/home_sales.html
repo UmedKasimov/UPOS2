@@ -838,6 +838,9 @@
             </section>
             <form class="document-detail-payment-actions" method="post" action="" data-sales-payment-form data-sales-payment-url-template="{{ url_for('sales_pay', sale_id='__sale_id__') }}" hidden>
               {% include "_csrf_field.html" %}
+              {# Кнопка частичной оплаты — только у рассрочки: вносит один
+                 месячный платёж вместо всей суммы сразу. #}
+              <button class="btn btn-secondary document-detail-payment-installment-btn" type="button" data-sales-payment-installment hidden>Оплатить платёж</button>
               <button class="btn document-detail-payment-pay-btn" type="button" data-sales-payment-pay>Оплатить</button>
             </form>
           </section>
@@ -1842,7 +1845,7 @@
 {% block scripts %}
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=36" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=37" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=69" defer></script>
   {% if sales_embed %}

@@ -343,13 +343,17 @@
     dialog.removeAttribute("open");
   }
 
-  function openDetailPaymentDialog(scope, panel) {
+  function openDetailPaymentDialog(scope, panel, presetAmount) {
     var dialog = detailPaymentDialog(scope);
     var actionForm = panel ? panel.querySelector("[data-sales-payment-form]") : null;
     var modalForm = dialog ? dialog.querySelector("[data-sales-detail-payment-modal-form]") : null;
     if (!dialog || !actionForm || !modalForm) return;
     var currency = String(actionForm.dataset.paymentCurrency || "UZS").toUpperCase();
     var due = amountNumber(actionForm.dataset.paymentDue || "0");
+    // Частичная оплата рассрочки: подставляем сумму месячного платежа, но не
+    // больше остатка. Без пресета — как раньше, вся сумма к оплате.
+    var preset = presetAmount != null ? Math.min(amountNumber(presetAmount), due) : due;
+    if (!(preset > 0)) preset = due;
     dialog.dataset.paymentCurrency = currency;
     dialog.dataset.paymentDue = String(due);
     modalForm.action = actionForm.action || "";
@@ -360,7 +364,7 @@
     var currencyInput = row ? row.querySelector("[data-detail-payment-currency]") : null;
     var amountInput = row ? row.querySelector("[data-detail-payment-amount]") : null;
     if (currencyInput) currencyInput.value = currency;
-    if (amountInput) amountInput.value = detailFormatAmount(due, currency);
+    if (amountInput) amountInput.value = detailFormatAmount(preset, currency);
     updateDetailPaymentSummary(dialog);
     if (typeof dialog.showModal === "function") {
       try {
@@ -696,6 +700,22 @@
     form.hidden = !canPay;
     button.disabled = !canPay;
     button.textContent = canPay ? "Оплатить " + moneyWithCurrency(outstanding, sale.currency || "UZS") : "Оплачено";
+
+    // Только у рассрочки — вторая кнопка «Оплатить платёж»: вносит сумму
+    // одного месячного платежа, а не весь остаток сразу.
+    var installmentButton = form.querySelector("[data-sales-payment-installment]");
+    if (installmentButton) {
+      var installment = sale.installment && typeof sale.installment === "object" ? sale.installment : null;
+      var monthly = installment && installment.enabled ? amountNumber(installment.monthly) : 0;
+      var payMonthly = Math.min(monthly, outstanding);
+      var showInstallment = canPay && payMonthly > 0 && payMonthly < outstanding - 0.01;
+      installmentButton.hidden = !showInstallment;
+      installmentButton.disabled = !showInstallment;
+      if (showInstallment) {
+        installmentButton.dataset.paymentAmount = String(payMonthly);
+        installmentButton.textContent = "Оплатить платёж " + moneyWithCurrency(payMonthly, sale.currency || "UZS");
+      }
+    }
   }
 
   function renderSalesPayments(panel, sale) {
@@ -1412,6 +1432,15 @@
       button.addEventListener("click", function () {
         var panel = button.closest("[data-sales-journal-detail]");
         openDetailPaymentDialog(scope, panel);
+      });
+    });
+    scope.querySelectorAll("[data-sales-payment-installment]").forEach(function (button) {
+      if (button.dataset.salesPaymentInstallmentReady === "1") return;
+      button.dataset.salesPaymentInstallmentReady = "1";
+      button.addEventListener("click", function () {
+        var panel = button.closest("[data-sales-journal-detail]");
+        // Частичная оплата: подставляем месячный платёж рассрочки.
+        openDetailPaymentDialog(scope, panel, amountNumber(button.dataset.paymentAmount));
       });
     });
     scope.querySelectorAll("[data-sales-debt-pay]").forEach(function (button) {

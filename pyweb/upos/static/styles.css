@@ -9310,8 +9310,14 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .document-detail-payment-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 0.5rem;
   margin-top: 0.85rem;
+}
+
+.document-detail-payment-installment-btn[hidden] {
+  display: none;
 }
 
 .warehouse-purchase-detail:not(.sales-document-detail) .document-detail-payment-actions {
