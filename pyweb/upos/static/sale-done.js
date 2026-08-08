@@ -92,12 +92,19 @@
 
   function open(dialog, message, saleId) {
     const doc = docData(saleId) || {};
+    const params = new URLSearchParams(window.location.search);
+    const paidNow = String(params.get("paid_now") || "").trim();
+    const currency = String(params.get("currency") || "").trim();
     dialog.querySelector("[data-sale-done-title]").textContent = TITLES[message] || "Готово";
-    dialog.querySelector("[data-sale-done-sum]").textContent = doc.amount ? `${doc.amount}` : "";
-    const meta = [doc.number ? `№ ${doc.number}` : "", doc.client || "", doc.date || ""]
-      .filter(Boolean)
-      .join(" · ");
-    dialog.querySelector("[data-sale-done-meta]").textContent = meta;
+    // Для оплаты показываем сумму именно этого платежа, а не всего документа.
+    const sumText = message === "paid" && paidNow ? paidNow : doc.amount ? `${doc.amount}` : "";
+    dialog.querySelector("[data-sale-done-sum]").textContent = sumText;
+    const metaParts = [doc.number ? `№ ${doc.number}` : "", doc.client || "", doc.date || ""];
+    // При частичной оплате подсказываем остаток долга.
+    if (message === "paid" && doc.debt_amount && doc.debt_amount !== "0") {
+      metaParts.push(`Остаток: ${doc.debt_amount}${currency ? " " + currency : ""}`);
+    }
+    dialog.querySelector("[data-sale-done-meta]").textContent = metaParts.filter(Boolean).join(" · ");
     dialog._saleDoneDoc = doc;
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
@@ -134,6 +141,8 @@
       const url = new URL(window.location.href);
       url.searchParams.delete("msg");
       url.searchParams.delete("saved_id");
+      url.searchParams.delete("paid_now");
+      url.searchParams.delete("currency");
       window.history.replaceState(null, "", url.toString());
     }
   }

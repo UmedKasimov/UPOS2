@@ -11502,7 +11502,17 @@ def create_app() -> FastAPI:
                 url="/installer",
                 tag=f"pay-{saved_sale_id}",
             )
-        return RedirectResponse(url=f"/sales?msg=paid&saved_id={quote(saved_sale_id)}#sales-journal", status_code=302)
+        # paid_now — сумма именно этого платежа: карточка «Оплата внесена»
+        # показывает её, а не общую сумму документа (при частичной оплате
+        # рассрочки это вводило в заблуждение).
+        return RedirectResponse(
+            url=(
+                f"/sales?msg=paid&saved_id={quote(saved_sale_id)}"
+                f"&paid_now={quote(_sales_money_label(payment_amount))}"
+                f"&currency={quote(currency)}#sales-journal"
+            ),
+            status_code=302,
+        )
 
     _PURCHASE_WORKFLOW_STATUSES = {
         "draft": "Черновик",
