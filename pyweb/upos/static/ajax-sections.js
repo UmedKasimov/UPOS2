@@ -6,11 +6,17 @@
  * заменяет только нужные контейнеры, сохраняя позицию прокрутки.
  *
  * Разметка:
- *   <nav data-ajax-nav data-ajax-targets="#sales-journal-filter,#sales-journal">
+ *   <nav data-ajax-nav data-ajax-targets="#sales-journal" data-ajax-reinit="Fn">
  *     <a href="...">Раздел</a> ...
  *   </nav>
  * data-ajax-targets — список селекторов контейнеров, которые нужно заменить
  * свежими из ответа. После замены вызываются реинициализаторы (data-ajax-reinit).
+ *
+ * Скорость: при наведении/фокусе на раздел его страница не только скачивается,
+ * но и СРАЗУ парсится в фоне (dom-дерево кэшируется). К моменту клика остаётся
+ * лишь подменить узлы — переход ощущается почти мгновенным, как клиентский
+ * фильтр в товарах. Затемнение панели показываем только если данные всё же не
+ * успели прийти (задержка появления), иначе оно мельтешит на быстрых переходах.
  *
  * Столбцы (table-column-controls.js) переинициализируются сами — через свой
  * MutationObserver, поэтому здесь их трогать не нужно.
@@ -33,8 +39,7 @@
     });
   }
 
-  function swapTargets(html, selectors) {
-    const parsed = new DOMParser().parseFromString(html, "text/html");
+  function swapParsed(parsed, selectors) {
     let swapped = 0;
     selectors.forEach((selector) => {
       const fresh = parsed.querySelector(selector);
@@ -49,24 +54,27 @@
     return swapped;
   }
 
-  // Кэш предзагрузки: наведение на раздел заранее тянет его HTML в фон, чтобы
-  // клик срабатывал почти мгновенно (как клиентский фильтр в товарах).
-  const prefetchCache = new Map();
-
-  function fetchSection(href) {
+  // fetch + парсинг сразу (тяжёлый DOMParser уходит в фон предзагрузки, а не в
+  // момент клика). Возвращает Document.
+  function fetchParsed(href) {
     return fetch(href, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
       credentials: "same-origin",
-    }).then((response) => {
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      return response.text();
-    });
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.text();
+      })
+      .then((html) => new DOMParser().parseFromString(html, "text/html"));
   }
+
+  // Кэш предзагрузки: href -> Promise<Document>.
+  const prefetchCache = new Map();
 
   function prefetch(href) {
     if (!href || href.startsWith("#") || prefetchCache.has(href)) return;
-    // Промах (сеть/ошибка) убираем из кэша — при клике попробуем ещё раз.
-    const pending = fetchSection(href).catch(() => {
+    const pending = fetchParsed(href).catch(() => {
+      // Промах (сеть/ошибка) убираем — при клике попробуем ещё раз.
       prefetchCache.delete(href);
       return null;
     });
@@ -88,12 +96,14 @@
     }
 
     const panel = nav.closest(".products-list-panel") || nav;
-    panel.classList.add("ajax-section-loading");
+    // Затемняем только если ответ не пришёл за ~140 мс — на предзагруженных
+    // разделах переход мгновенный и мельтешения затемнения не будет.
+    const dimTimer = window.setTimeout(() => panel.classList.add("ajax-section-loading"), 140);
     try {
-      // Готовый результат из предзагрузки — либо тянем сейчас.
-      const html = (prefetchCache.has(href) ? await prefetchCache.get(href) : null) || (await fetchSection(href));
+      const parsed =
+        (prefetchCache.has(href) ? await prefetchCache.get(href) : null) || (await fetchParsed(href));
       prefetchCache.delete(href);
-      const swapped = swapTargets(html, targets);
+      const swapped = swapParsed(parsed, targets);
       if (!swapped) throw new Error("targets not found");
       window.history.pushState({ ajaxSection: true }, "", href);
       reinit(reinitNames);
@@ -101,6 +111,7 @@
       // Любой сбой — честный полный переход, чтобы не оставить список сломанным.
       window.location.href = href;
     } finally {
+      window.clearTimeout(dimTimer);
       panel.classList.remove("ajax-section-loading");
     }
   }
@@ -117,7 +128,8 @@
     load(href, nav);
   });
 
-  // Предзагрузка при наведении/фокусе: к моменту клика данные уже в кэше.
+  // Предзагрузка при наведении/фокусе: к моменту клика раздел уже скачан и
+  // разобран в фоне.
   document.addEventListener("mouseover", (event) => {
     const link = event.target.closest("[data-ajax-nav] a[href]");
     if (link) prefetch(link.getAttribute("href") || "");
