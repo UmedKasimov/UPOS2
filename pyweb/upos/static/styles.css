@@ -2459,9 +2459,10 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
 }
 
 #products-catalog-table .product-history-actions {
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.35rem;
+  justify-content: center;
+  gap: 0.2rem 0.35rem;
 }
 
 /* Кнопки истории везде в рамках — единый вид со «стенкой» отчётов. */
@@ -31661,7 +31662,12 @@ html.dark .crm-task-calendar-event {
   height: 1.75rem;
 }
 
-#products-catalog-table .product-history-actions .product-history-index,
+#products-catalog-table .product-history-actions .product-history-index {
+  /* Номер строки — над кнопками истории (на всю ширину ячейки, по центру). */
+  flex: 0 0 100%;
+  min-width: 0;
+  text-align: center;
+}
 .reports-stock-analysis-table .product-history-actions .product-history-index {
   flex: 0 0 auto;
   min-width: 1.25rem;
