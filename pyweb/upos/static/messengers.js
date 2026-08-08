@@ -335,8 +335,10 @@
             (Number(sale.amount || 0)
               ? '<span class="messenger-message-sale-sum">' + moneyText(sale.amount, sale.currency) + "</span>"
               : "") +
-            '<a class="messenger-message-sale-link" href="/api/sales/' + escapeHtml(sale.id) +
-            '/invoice.pdf" target="_blank" rel="noopener">Открыть накладную</a>' +
+            // Открываем документ карточкой в журнале (новая вкладка), а не
+            // скачиваем PDF: заказ удобнее смотреть попапом.
+            '<a class="messenger-message-sale-link" href="/sales?document=' +
+            encodeURIComponent(sale.id) + '#sales-journal" target="_blank" rel="noopener">Открыть заказ</a>' +
             "</span>"
           : "";
         var body = String(message.text || "");
