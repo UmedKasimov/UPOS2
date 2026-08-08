@@ -28567,6 +28567,20 @@ body.upos-table-column-resizing * {
   gap: 8px;
 }
 
+/* Разговор идёт в браузере — кнопка отбоя появляется под набором. */
+.upos-floating-phone-hangup {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.upos-floating-phone-hangup[hidden] {
+  display: none;
+}
+
+#upos-floating-phone-audio {
+  display: none;
+}
+
 .upos-floating-phone-form label {
   display: grid;
   gap: 5px;

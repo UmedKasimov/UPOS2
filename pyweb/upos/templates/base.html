@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=609" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=610" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -370,6 +370,10 @@
           </label>
           <button class="btn" type="submit">Позвонить</button>
         </form>
+        {# Разговор идёт в самом браузере, поэтому нужен приёмник звука и
+           кнопка отбоя — раньше вызов только уходил в десктопное приложение. #}
+        <button class="btn btn-secondary upos-floating-phone-hangup" type="button" data-floating-phone-hangup hidden>Завершить</button>
+        <audio id="upos-floating-phone-audio" autoplay playsinline></audio>
         <div class="upos-floating-phone-status" data-floating-phone-status>
           <span aria-hidden="true"></span>
           SIP готов к набору
@@ -399,191 +403,7 @@
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
     <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=8" defer></script>
     {% if user %}
-    <script>
-      (() => {
-        const root = document.querySelector("[data-floating-phone]");
-        if (!root) return;
-        const toggle = root.querySelector("[data-floating-phone-toggle]");
-        const panel = root.querySelector("[data-floating-phone-panel]");
-        const close = root.querySelector("[data-floating-phone-close]");
-        const head = root.querySelector(".upos-floating-phone-head");
-        const form = root.querySelector("[data-floating-phone-form]");
-        const input = root.querySelector("[data-floating-phone-input]");
-        const providerSelect = root.querySelector("[data-floating-phone-provider]");
-        const status = root.querySelector("[data-floating-phone-status]");
-        const submitButton = form?.querySelector('button[type="submit"]');
-        const bridgeUrl = root.dataset.floatingPhoneBridge || "http://127.0.0.1:5058/call";
-        const storageKey = "upos:floating-phone-position";
-        const edgeGap = 8;
-        const dragGap = 4;
-        let dragState = null;
-        let ignoreNextToggleClick = false;
-        const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
-        const alignPanel = () => {
-          if (!panel || panel.hidden) return;
-          panel.style.left = "0";
-          panel.style.right = "auto";
-          panel.style.top = "auto";
-          panel.style.bottom = "70px";
-          const phoneRect = root.getBoundingClientRect();
-          const panelRect = panel.getBoundingClientRect();
-          if (phoneRect.left + panelRect.width > window.innerWidth - edgeGap) {
-            panel.style.left = "auto";
-            panel.style.right = "0";
-          }
-          if (phoneRect.top - panelRect.height < edgeGap) {
-            panel.style.top = "70px";
-            panel.style.bottom = "auto";
-          }
-        };
-        const applyPosition = (position, save = false) => {
-          const rect = root.getBoundingClientRect();
-          const maxX = window.innerWidth - rect.width - edgeGap;
-          const maxY = window.innerHeight - rect.height - edgeGap;
-          const x = clamp(position.x, edgeGap, maxX);
-          const y = clamp(position.y, edgeGap, maxY);
-          root.style.left = `${x}px`;
-          root.style.top = `${y}px`;
-          root.style.right = "auto";
-          root.style.bottom = "auto";
-          root.classList.add("is-positioned");
-          alignPanel();
-          if (save) {
-            try {
-              window.localStorage.setItem(storageKey, JSON.stringify({ x, y }));
-            } catch (error) {
-              // Local storage can be disabled in some browser modes.
-            }
-          }
-        };
-        const restorePosition = () => {
-          try {
-            const saved = JSON.parse(window.localStorage.getItem(storageKey) || "null");
-            if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-              applyPosition(saved);
-            }
-          } catch (error) {
-            window.localStorage.removeItem(storageKey);
-          }
-        };
-        const openPanel = () => {
-          panel.hidden = false;
-          toggle.setAttribute("aria-expanded", "true");
-          window.requestAnimationFrame(() => {
-            alignPanel();
-            input?.focus();
-          });
-        };
-        const closePanel = () => {
-          panel.hidden = true;
-          toggle.setAttribute("aria-expanded", "false");
-        };
-        const startDrag = (event) => {
-          if (event.button !== undefined && event.button !== 0) return;
-          const target = event.target instanceof Element ? event.target : null;
-          if (target?.closest("[data-floating-phone-close], input, a")) return;
-          const rect = root.getBoundingClientRect();
-          dragState = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            originX: rect.left,
-            originY: rect.top,
-            moved: false,
-          };
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-        };
-        const moveDrag = (event) => {
-          if (!dragState || event.pointerId !== dragState.pointerId) return;
-          const dx = event.clientX - dragState.startX;
-          const dy = event.clientY - dragState.startY;
-          if (!dragState.moved && Math.hypot(dx, dy) < dragGap) return;
-          dragState.moved = true;
-          root.classList.add("is-dragging");
-          event.preventDefault();
-          applyPosition({ x: dragState.originX + dx, y: dragState.originY + dy });
-        };
-        const endDrag = (event) => {
-          if (!dragState || event.pointerId !== dragState.pointerId) return;
-          const wasMoved = dragState.moved;
-          dragState = null;
-          root.classList.remove("is-dragging");
-          if (wasMoved) {
-            const rect = root.getBoundingClientRect();
-            applyPosition({ x: rect.left, y: rect.top }, true);
-            ignoreNextToggleClick = true;
-            window.setTimeout(() => {
-              ignoreNextToggleClick = false;
-            }, 0);
-          }
-        };
-        restorePosition();
-        toggle?.addEventListener("pointerdown", startDrag);
-        head?.addEventListener("pointerdown", startDrag);
-        document.addEventListener("pointermove", moveDrag);
-        document.addEventListener("pointerup", endDrag);
-        document.addEventListener("pointercancel", endDrag);
-        window.addEventListener("resize", () => {
-          if (!root.classList.contains("is-positioned")) return;
-          const rect = root.getBoundingClientRect();
-          applyPosition({ x: rect.left, y: rect.top }, true);
-        });
-        toggle?.addEventListener("click", (event) => {
-          if (ignoreNextToggleClick) {
-            event.preventDefault();
-            event.stopPropagation();
-            ignoreNextToggleClick = false;
-            return;
-          }
-          panel.hidden ? openPanel() : closePanel();
-        });
-        close?.addEventListener("click", closePanel);
-        document.addEventListener("click", (event) => {
-          if (!panel.hidden && !root.contains(event.target)) closePanel();
-        });
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") closePanel();
-        });
-        const setStatus = (message, tone = "ready") => {
-          if (!status) return;
-          status.dataset.state = tone;
-          const dot = status.querySelector("span");
-          status.textContent = "";
-          if (dot) status.append(dot);
-          status.append(document.createTextNode(message));
-        };
-        form?.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          const phone = (input?.value || "").trim();
-          const selectedProvider = providerSelect?.selectedOptions?.[0] || null;
-          const providerId = providerSelect?.value || "";
-          const providerName = selectedProvider?.dataset.providerName || selectedProvider?.textContent?.trim() || "";
-          const providerLogin = selectedProvider?.dataset.login || "";
-          if (!phone) {
-            input?.focus();
-            return;
-          }
-          submitButton?.setAttribute("disabled", "disabled");
-          setStatus("Отправляю вызов в SIP...", "pending");
-          try {
-            const response = await fetch(bridgeUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ phone, provider_id: providerId, provider: providerName, provider_login: providerLogin }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok || payload.ok === false) {
-              throw new Error(payload.error || "SIP-приложение не приняло вызов");
-            }
-            setStatus("Вызов отправлен в SIP", "ok");
-          } catch (error) {
-            setStatus(`Запустите SIP-приложение: ${error.message || "нет связи"}`, "error");
-          } finally {
-            submitButton?.removeAttribute("disabled");
-          }
-        });
-      })();
-    </script>
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

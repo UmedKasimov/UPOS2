@@ -19,8 +19,11 @@
   let session = null;
   let account = null;
   let registered = false;
+  // Модуль общий для установщика и плавающего телефона в вебе: элемент для
+  // входящего звука у них разный, поэтому он настраивается.
+  let audioElementId = "installer-call-audio";
 
-  const audio = () => document.getElementById("installer-call-audio");
+  const audio = () => document.getElementById(audioElementId);
 
   function attachRemoteAudio() {
     if (!session || !session.connection) return;
@@ -49,6 +52,18 @@
   }
 
   const softphone = {
+    configure(options) {
+      if (options && options.audioId) audioElementId = String(options.audioId);
+    },
+
+    account() {
+      return account;
+    },
+
+    inCall() {
+      return Boolean(session);
+    },
+
     available() {
       return typeof window.JsSIP !== "undefined";
     },
@@ -150,5 +165,7 @@
     },
   };
 
+  // Историческое имя оставляем: на нём завязано приложение установщика.
   window.InstallerSoftphone = softphone;
+  window.UposSoftphone = softphone;
 })();

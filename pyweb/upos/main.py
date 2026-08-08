@@ -16330,6 +16330,44 @@ def create_app() -> FastAPI:
             )
         return accounts
 
+    @app.get("/api/telephony/sip", name="telephony_sip_api")
+    def telephony_sip_api(request: Request):
+        """SIP-аккаунты для софтфона в браузере (плавающий телефон).
+
+        Тот же набор данных, что отдаёт установщику `/api/installer/sip`:
+        браузер регистрируется на АТС сам, поэтому пароль нужен на клиенте.
+        Отдаём только авторизованному сотруднику своей организации по HTTPS.
+        """
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        data = load_workspace_settings(wid)
+        provider_ws = {
+            str(provider.get("id") or ""): str(provider.get("ws_url") or "")
+            for provider in (data.get("telephony_providers") or [])
+            if isinstance(provider, dict)
+        }
+        accounts = []
+        for account in _telephony_sip_accounts_for_softphone(data):
+            host = str(account.get("host") or "")
+            if not host:
+                continue
+            accounts.append(
+                {
+                    "id": account.get("id"),
+                    "label": account.get("label"),
+                    "extension": account.get("extension"),
+                    "auth_id": account.get("auth_id") or account.get("extension"),
+                    "password": account.get("password"),
+                    "host": host,
+                    "display_name": account.get("display_name") or account.get("label"),
+                    "ws_url": _installer_sip_ws_url(host, provider_ws.get(str(account.get("provider_id") or ""))),
+                    "sip_uri": f"sip:{account.get('extension')}@{host}",
+                }
+            )
+        return JSONResponse({"ok": True, "accounts": accounts})
+
     def _telephony_first(payload: dict[str, Any], *keys: str) -> Any:
         for key in keys:
             value = payload.get(key)

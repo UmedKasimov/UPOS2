@@ -1,0 +1,381 @@
+/* Плавающий телефон: звонок прямо из браузера.
+ *
+ * Раньше виджет только отдавал номер десктопному мосту UposSip на
+ * 127.0.0.1:5058. На телефоне и в обычном браузере такого моста нет, и вызов
+ * навсегда оставался в статусе «Отправляю вызов в SIP…». Теперь звоним через
+ * WebRTC (JsSIP по SIP-over-WSS) тем же модулем, что и приложение
+ * установщика, а мост и набор через SIM остаются запасными путями.
+ *
+ * Тяжёлую библиотеку JsSIP грузим только когда телефон открыли: на страницах,
+ * где им не пользуются, она не нужна.
+ */
+(() => {
+  "use strict";
+
+  const root = document.querySelector("[data-floating-phone]");
+  if (!root) return;
+
+  const toggle = root.querySelector("[data-floating-phone-toggle]");
+  const panel = root.querySelector("[data-floating-phone-panel]");
+  const close = root.querySelector("[data-floating-phone-close]");
+  const head = root.querySelector(".upos-floating-phone-head");
+  const form = root.querySelector("[data-floating-phone-form]");
+  const input = root.querySelector("[data-floating-phone-input]");
+  const providerSelect = root.querySelector("[data-floating-phone-provider]");
+  const status = root.querySelector("[data-floating-phone-status]");
+  const submitButton = form?.querySelector('button[type="submit"]');
+  const hangupButton = root.querySelector("[data-floating-phone-hangup]");
+  const bridgeUrl = root.dataset.floatingPhoneBridge || "http://127.0.0.1:5058/call";
+
+  /* ── Положение и раскрытие панели (поведение прежнее) ───────────────── */
+
+  const storageKey = "upos:floating-phone-position";
+  const edgeGap = 8;
+  const dragGap = 4;
+  let dragState = null;
+  let ignoreNextToggleClick = false;
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+
+  const alignPanel = () => {
+    if (!panel || panel.hidden) return;
+    panel.style.left = "0";
+    panel.style.right = "auto";
+    panel.style.top = "auto";
+    panel.style.bottom = "70px";
+    const phoneRect = root.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    if (phoneRect.left + panelRect.width > window.innerWidth - edgeGap) {
+      panel.style.left = "auto";
+      panel.style.right = "0";
+    }
+    if (phoneRect.top - panelRect.height < edgeGap) {
+      panel.style.top = "70px";
+      panel.style.bottom = "auto";
+    }
+  };
+
+  const applyPosition = (position, save = false) => {
+    const rect = root.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width - edgeGap;
+    const maxY = window.innerHeight - rect.height - edgeGap;
+    const x = clamp(position.x, edgeGap, maxX);
+    const y = clamp(position.y, edgeGap, maxY);
+    root.style.left = `${x}px`;
+    root.style.top = `${y}px`;
+    root.style.right = "auto";
+    root.style.bottom = "auto";
+    root.classList.add("is-positioned");
+    alignPanel();
+    if (save) {
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify({ x, y }));
+      } catch (error) {
+        // В некоторых режимах браузера localStorage отключён.
+      }
+    }
+  };
+
+  const restorePosition = () => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) || "null");
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) applyPosition(saved);
+    } catch (error) {
+      window.localStorage.removeItem(storageKey);
+    }
+  };
+
+  const openPanel = () => {
+    panel.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    window.requestAnimationFrame(() => {
+      alignPanel();
+      input?.focus();
+    });
+    ensureSoftphone();
+  };
+
+  const closePanel = () => {
+    panel.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  };
+
+  const startDrag = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("[data-floating-phone-close], input, a, select, button[type=submit]")) return;
+    const rect = root.getBoundingClientRect();
+    dragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.left,
+      originY: rect.top,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const moveDrag = (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(dx, dy) < dragGap) return;
+    dragState.moved = true;
+    root.classList.add("is-dragging");
+    event.preventDefault();
+    applyPosition({ x: dragState.originX + dx, y: dragState.originY + dy });
+  };
+
+  const endDrag = (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    const wasMoved = dragState.moved;
+    dragState = null;
+    root.classList.remove("is-dragging");
+    if (wasMoved) {
+      const rect = root.getBoundingClientRect();
+      applyPosition({ x: rect.left, y: rect.top }, true);
+      ignoreNextToggleClick = true;
+      window.setTimeout(() => {
+        ignoreNextToggleClick = false;
+      }, 0);
+    }
+  };
+
+  restorePosition();
+  toggle?.addEventListener("pointerdown", startDrag);
+  head?.addEventListener("pointerdown", startDrag);
+  document.addEventListener("pointermove", moveDrag);
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
+  window.addEventListener("resize", () => {
+    if (!root.classList.contains("is-positioned")) return;
+    const rect = root.getBoundingClientRect();
+    applyPosition({ x: rect.left, y: rect.top }, true);
+  });
+  toggle?.addEventListener("click", (event) => {
+    if (ignoreNextToggleClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      ignoreNextToggleClick = false;
+      return;
+    }
+    panel.hidden ? openPanel() : closePanel();
+  });
+  close?.addEventListener("click", closePanel);
+  document.addEventListener("click", (event) => {
+    // Во время разговора панель не прячем: из неё кладут трубку.
+    if (!panel.hidden && !root.contains(event.target) && !inCall) closePanel();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !inCall) closePanel();
+  });
+
+  const setStatus = (message, tone = "ready") => {
+    if (!status) return;
+    status.dataset.state = tone;
+    const dot = status.querySelector("span");
+    status.textContent = "";
+    if (dot) status.append(dot);
+    status.append(document.createTextNode(message));
+  };
+
+  /* ── Софтфон ───────────────────────────────────────────────────────── */
+
+  let softphoneReady = null;
+  let accounts = [];
+  let inCall = false;
+
+  const loadScript = (src) =>
+    new Promise((resolve, reject) => {
+      if (document.querySelector(`script[data-phone-src="${src}"]`)) return resolve();
+      const node = document.createElement("script");
+      node.src = src;
+      node.dataset.phoneSrc = src;
+      node.onload = () => resolve();
+      node.onerror = () => reject(new Error(`Не загрузился ${src}`));
+      document.head.appendChild(node);
+    });
+
+  function accountById(id) {
+    return accounts.find((item) => String(item.id) === String(id)) || null;
+  }
+
+  function selectedAccount() {
+    const value = providerSelect?.value || "";
+    if (!value) return accounts[0] || null;
+    return accountById(value);
+  }
+
+  function fillProviders() {
+    if (!providerSelect || !accounts.length) return;
+    // Список провайдеров в шаблоне приходит не на каждой странице, поэтому
+    // заполняем его из API — иначе в выборе оставалось одно «Авто».
+    const previous = providerSelect.value;
+    providerSelect.textContent = "";
+    accounts.forEach((account) => {
+      const option = document.createElement("option");
+      option.value = String(account.id);
+      option.textContent = account.label || account.extension || "SIP";
+      option.dataset.login = account.extension || "";
+      option.dataset.providerName = account.label || account.extension || "SIP";
+      providerSelect.append(option);
+    });
+    const auto = document.createElement("option");
+    auto.value = "";
+    auto.textContent = "Авто (SIP приложение)";
+    auto.dataset.providerName = "Авто";
+    providerSelect.append(auto);
+    if (previous && accountById(previous)) providerSelect.value = previous;
+  }
+
+  function bindSoftphoneEvents(sip) {
+    if (sip.__floatingPhoneBound) return;
+    sip.__floatingPhoneBound = true;
+    sip.on("registered", () => {
+      if (!inCall) setStatus("SIP на связи — можно звонить", "ok");
+    });
+    sip.on("registrationFailed", (event) => {
+      setStatus(`АТС отклонила регистрацию (${event?.cause || "ошибка"}) — звоним через телефон`, "error");
+    });
+    sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
+    sip.on("accepted", () => {
+      inCall = true;
+      setStatus("Разговор идёт", "ok");
+      setCallUi(true);
+    });
+    sip.on("incoming", (event) => {
+      setStatus(`Входящий: ${event?.name || event?.from || "неизвестный"}`, "pending");
+    });
+    sip.on("ended", () => {
+      inCall = false;
+      setStatus("Звонок завершён", "ready");
+      setCallUi(false);
+    });
+    sip.on("failed", (event) => {
+      inCall = false;
+      setStatus(`Звонок не состоялся: ${event?.cause || "ошибка"}`, "error");
+      setCallUi(false);
+    });
+  }
+
+  function setCallUi(active) {
+    if (hangupButton) hangupButton.hidden = !active;
+    if (submitButton) submitButton.disabled = active;
+  }
+
+  function ensureSoftphone() {
+    if (softphoneReady) return softphoneReady;
+    softphoneReady = (async () => {
+      const response = await fetch("/api/telephony/sip", { credentials: "same-origin" });
+      const payload = await response.json().catch(() => ({}));
+      accounts = Array.isArray(payload.accounts)
+        ? payload.accounts.filter((item) => item && item.ws_url && item.sip_uri)
+        : [];
+      if (!accounts.length) {
+        setStatus("SIP-аккаунт не настроен — вызов уйдёт в приложение", "ready");
+        return null;
+      }
+      fillProviders();
+      await loadScript("/static/jssip.min.js?v=1");
+      await loadScript("/static/installer-softphone.js?v=2");
+      const sip = window.UposSoftphone;
+      if (!sip || !sip.available()) {
+        setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");
+        return null;
+      }
+      sip.configure({ audioId: "upos-floating-phone-audio" });
+      bindSoftphoneEvents(sip);
+      const account = selectedAccount();
+      if (!account) return sip;
+      setStatus("Подключаюсь к АТС…", "pending");
+      try {
+        await sip.connect(account);
+      } catch (error) {
+        // Регистрация не удалась — остаются мост и набор через SIM.
+        setStatus(`АТС недоступна (${error?.message || "ошибка"}) — звоним через телефон`, "error");
+      }
+      return sip;
+    })().catch((error) => {
+      setStatus(`Телефон недоступен: ${error?.message || "ошибка"}`, "error");
+      return null;
+    });
+    return softphoneReady;
+  }
+
+  providerSelect?.addEventListener("change", async () => {
+    const sip = await ensureSoftphone();
+    const account = selectedAccount();
+    if (!sip || !account) return;
+    setStatus("Подключаюсь к АТС…", "pending");
+    try {
+      await sip.connect(account);
+    } catch (error) {
+      setStatus(`АТС недоступна (${error?.message || "ошибка"}) — звоним через телефон`, "error");
+    }
+  });
+
+  hangupButton?.addEventListener("click", () => {
+    window.UposSoftphone?.hangup();
+    inCall = false;
+    setCallUi(false);
+    setStatus("Звонок завершён", "ready");
+  });
+
+  /* ── Набор номера ──────────────────────────────────────────────────── */
+
+  async function callViaBridge(phone) {
+    const selected = providerSelect?.selectedOptions?.[0] || null;
+    const response = await fetch(bridgeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone,
+        provider_id: providerSelect?.value || "",
+        provider: selected?.dataset.providerName || "",
+        provider_login: selected?.dataset.login || "",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "SIP-приложение не приняло вызов");
+    }
+  }
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const phone = (input?.value || "").trim();
+    if (!phone) {
+      input?.focus();
+      return;
+    }
+    submitButton?.setAttribute("disabled", "disabled");
+    try {
+      const sip = await ensureSoftphone();
+      // Первый путь — звонок прямо из браузера.
+      if (sip && sip.isRegistered() && sip.call(phone)) {
+        inCall = true;
+        setCallUi(true);
+        setStatus("Набираю…", "pending");
+        return;
+      }
+      // Второй — десктопное SIP-приложение на этом же компьютере.
+      setStatus("Отправляю вызов в SIP…", "pending");
+      try {
+        await callViaBridge(phone);
+        setStatus("Вызов отправлен в SIP", "ok");
+        return;
+      } catch (bridgeError) {
+        // Третий — набор средствами самого телефона.
+        const clean = phone.replace(/[^\d+*#]/g, "");
+        if (clean && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          setStatus("Открываю набор телефона", "ready");
+          window.location.href = `tel:${clean}`;
+          return;
+        }
+        setStatus(`Запустите SIP-приложение: ${bridgeError.message || "нет связи"}`, "error");
+      }
+    } finally {
+      if (!inCall) submitButton?.removeAttribute("disabled");
+    }
+  });
+})();
