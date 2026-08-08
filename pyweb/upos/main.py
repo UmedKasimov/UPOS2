@@ -5756,12 +5756,24 @@ def create_app() -> FastAPI:
             kind_values=query.getlist("kind"),
         )
         product_page_size = _product_page_size(page_size)
-        # Таблицу каталога рендерим целиком — и товары, и услуги. Раздел
-        # («Все / Товары / Услуги») переключается мгновенно на клиенте
-        # (catalog-kind-tabs.js), без перезагрузки страницы и «прыжка» якоря.
+        # Таблицу каталога рендерим целиком и фильтруем на клиенте
+        # (catalog-kind-tabs.js): раздел, категория, группа, бренд, папка и
+        # поиск переключаются мгновенно, без перезагрузки страницы и «прыжка»
+        # якоря. На сервере оставляем только статус (по умолчанию «активные» —
+        # иначе архивные мелькали бы до срабатывания скрипта) и прайс-лист/
+        # валюту (они меняют состав колонок цен, а не набор строк).
         table_filters = dict(filters)
         table_filters["kind"] = "all"
         table_filters["kind_values"] = ["all"]
+        table_filters["q"] = ""
+        table_filters["category"] = ""
+        table_filters["category_values"] = []
+        table_filters["group"] = ""
+        table_filters["group_values"] = []
+        table_filters["brand"] = ""
+        table_filters["brand_values"] = []
+        table_filters["folder"] = ""
+        table_filters["folder_values"] = []
         with session_scope() as session:
             products, edit_product, options = _collect_products_view_data(session, wid, table_filters, edit=edit)
             price_products = [

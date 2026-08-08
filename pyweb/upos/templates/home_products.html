@@ -17,8 +17,8 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=11" defer></script>
-  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=1" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=12" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=2" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
@@ -414,6 +414,9 @@
                 <tr
                   data-product-row
                   data-product-kind="{{ 'service' if product.kind == 'service' else 'product' }}"
+                  data-filter-group="{{ (product.group or '')|lower }}"
+                  data-filter-brand="{{ (product.brand or '')|lower }}"
+                  data-filter-folder="{{ (product.folder or '')|lower }}"
                   data-sort-name="{{ (product.name or '')|lower }}"
                   data-sort-sku="{{ (product.sku or '')|lower }}"
                   data-sort-barcode="{{ (product.barcode or '')|lower }}"

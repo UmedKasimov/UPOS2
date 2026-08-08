@@ -1,6 +1,19 @@
 (() => {
   const TABLE_SELECTOR = "table[data-products-table]";
   const READY_ATTR = "data-products-table-ready";
+  // Эти фильтры каталога применяются мгновенно на клиенте (catalog-kind-tabs.js),
+  // без перезагрузки страницы. Остальные (статус, прайс-лист, валюта) меняют
+  // состав строк/колонок на сервере и по-прежнему отправляют форму.
+  const CLIENT_FILTER_FIELDS = new Set(["q", "kind", "category", "group", "brand", "folder"]);
+
+  function triggerFilter(form, control) {
+    const name = control && control.name ? control.name : "";
+    if (CLIENT_FILTER_FIELDS.has(name) && window.CatalogClientFilter) {
+      window.CatalogClientFilter.apply();
+      return;
+    }
+    submitFilterForm(form);
+  }
 
   function tableIndex(table) {
     return Array.from(document.querySelectorAll(TABLE_SELECTOR)).indexOf(table);
@@ -182,12 +195,10 @@
         if (control.matches('input[type="search"]')) {
           control.addEventListener("input", () => {
             highlightProductSearch(root);
-            window.clearTimeout(searchTimer);
-            searchTimer = window.setTimeout(() => submitFilterForm(form), 450);
+            triggerFilter(form, control);
           });
           control.addEventListener("search", () => {
-            window.clearTimeout(searchTimer);
-            submitFilterForm(form);
+            triggerFilter(form, control);
           });
           return;
         }
@@ -203,12 +214,21 @@
               updateMultiFilterLabel(wrapper);
               syncMultiFilterSelectAllState(wrapper);
             }
+            // «Выбрать все» без name — берём поле из соседнего чекбокса группы.
+            const fieldName =
+              control.name ||
+              (wrapper && wrapper.querySelector('input[type="checkbox"][name]')?.name) ||
+              "";
             window.clearTimeout(checkboxTimer);
-            checkboxTimer = window.setTimeout(() => submitFilterForm(form), 900);
+            if (CLIENT_FILTER_FIELDS.has(fieldName) && window.CatalogClientFilter) {
+              window.CatalogClientFilter.apply();
+            } else {
+              checkboxTimer = window.setTimeout(() => submitFilterForm(form), 900);
+            }
           });
           return;
         }
-        control.addEventListener("change", () => submitFilterForm(form));
+        control.addEventListener("change", () => triggerFilter(form, control));
       });
 
       form.addEventListener("submit", () => updateFilterAction(form));
@@ -299,6 +319,9 @@
     );
     rows.sort((left, right) => compareRows(left, right, state.key, state.direction));
     rows.forEach((row) => body.append(row));
+    // После пересортировки заново применяем клиентский фильтр — иначе скрытые
+    // строки остаются скрытыми, но сквозная нумерация сбивается.
+    if (window.CatalogClientFilter) window.CatalogClientFilter.apply();
     if (persist) saveState(table, state);
     updateSortControls(table, state);
   }
