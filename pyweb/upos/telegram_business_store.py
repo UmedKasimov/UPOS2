@@ -88,7 +88,14 @@ def _attachment_payload(message: dict[str, Any]) -> dict[str, Any]:
 
 def attachment_is_image(payload: Any) -> bool:
     data = payload if isinstance(payload, dict) else {}
-    return bool(data.get("is_image"))
+    if data.get("is_image"):
+        return True
+    # Старые записи сохранены без флага is_image — определяем картинку по виду
+    # вложения, чтобы превью работало и для уже полученных фото.
+    kind = _clean(data.get("kind"))
+    if kind in {"photo", "sticker"} or data.get("photo") or data.get("sticker"):
+        return True
+    return _clean(data.get("mime_type")).startswith("image/")
 
 
 def attachment_file_ref(payload: Any, *, thumb: bool = False) -> dict[str, str]:
