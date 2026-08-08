@@ -6215,6 +6215,49 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "private, no-cache"},
         )
 
+    def _product_price_log_entries(data: dict[str, Any]) -> list[dict[str, Any]]:
+        return [entry for entry in data.get("price_change_log", []) if isinstance(entry, dict)]
+
+    def _log_product_price_change(
+        data: dict[str, Any],
+        *,
+        price_type_id: str,
+        kind: str,
+        old_price: Any,
+        new_price: Any,
+        currency: str,
+        actor: str,
+        source: str,
+    ) -> None:
+        """Правка прайса — в журнал внутри данных товара.
+
+        История цен раньше собиралась только из документов, поэтому прямое
+        изменение продажной цены (каталог, прайс-листы, карточка товара)
+        в ней не появлялось вовсе.
+        """
+        old_clean = _decimal_plain_text(_sales_decimal(old_price)) or "0"
+        new_clean = _decimal_plain_text(_sales_decimal(new_price)) or "0"
+        if old_clean == new_clean:
+            return
+        log = _product_price_log_entries(data)
+        log.append(
+            {
+                "moment": datetime.now(timezone.utc).isoformat(),
+                "price_type_id": str(price_type_id or ""),
+                "kind": str(kind or "Прайс"),
+                "old_price": old_clean,
+                "price": new_clean,
+                "currency": str(currency or "UZS").upper(),
+                "actor": str(actor or ""),
+                "source": str(source or ""),
+            }
+        )
+        data["price_change_log"] = log[-200:]
+
+    def _session_actor_name(request: Request) -> str:
+        user = request.session.get("user") or {}
+        return str(user.get("name") or user.get("login") or user.get("username") or "").strip()
+
     @app.get("/api/products/{product_id}/history", name="product_history_api")
     def product_history_api(request: Request, product_id: str):
         """История движений и цен товара из продаж, закупок и складских операций."""
@@ -6345,6 +6388,28 @@ def create_app() -> FastAPI:
                     }
                 )
 
+            # Прямые правки прайсов: каталог, экран прайс-листов, карточка
+            # товара. Документов за ними нет, поэтому они хранятся в журнале
+            # внутри данных товара.
+            price_log_sources = {
+                "catalog": "Каталог товаров",
+                "price_types": "Прайс-листы",
+                "product_card": "Карточка товара",
+            }
+            for entry in _product_price_log_entries(_json_object(product.data)):
+                prices.append(
+                    {
+                        "moment": str(entry.get("moment") or ""),
+                        "kind": str(entry.get("kind") or "Прайс"),
+                        "price": _sales_money_label(_sales_decimal(entry.get("price"))),
+                        "currency": str(entry.get("currency") or "UZS"),
+                        "document": price_log_sources.get(
+                            str(entry.get("source") or ""), "Правка прайса"
+                        ),
+                        "actor": str(entry.get("actor") or ""),
+                    }
+                )
+
             movements.sort(key=lambda item: str(item.get("moment") or ""), reverse=True)
             # Остатки «до/после» восстанавливаем от текущего остатка назад во
             # времени: стартовые остатки iBox не оформлены документами, поэтому
@@ -6415,6 +6480,11 @@ def create_app() -> FastAPI:
                 url="/products?error=" + quote(str(exc)) + "#product-form",
                 status_code=302,
             )
+        # Имена прайсов — для журнала изменений цен; берём до открытия сессии.
+        price_type_names = {
+            str(item.get("id") or ""): str(item.get("name") or "Прайс")
+            for item in _workspace_price_types(wid)
+        }
         with session_scope() as session:
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
@@ -6500,6 +6570,31 @@ def create_app() -> FastAPI:
                     data["prices"] = prices
                     data["sale_price"] = _decimal_plain_text(_sales_decimal(service_price))
                     data["sale_currency"] = service_currency
+            # Журнал изменений прайса живёт в данных товара: карточка заменяет
+            # data целиком, без переноса история правок стиралась бы. Заодно
+            # фиксируем, какие цены поменяли этим сохранением.
+            data["price_change_log"] = _product_price_log_entries(old_data)
+            old_prices_by_type = {
+                str(item.get("price_type_id") or ""): item
+                for item in old_data.get("prices", [])
+                if isinstance(item, dict)
+            }
+            for new_entry in data.get("prices", []):
+                if not isinstance(new_entry, dict):
+                    continue
+                entry_type_id = str(new_entry.get("price_type_id") or "")
+                old_entry = old_prices_by_type.get(entry_type_id, {})
+                _log_product_price_change(
+                    data,
+                    price_type_id=entry_type_id,
+                    kind=price_type_names.get(entry_type_id)
+                    or str(new_entry.get("name") or "Прайс"),
+                    old_price=old_entry.get("price"),
+                    new_price=new_entry.get("price"),
+                    currency=str(new_entry.get("currency") or "UZS"),
+                    actor=_session_actor_name(request),
+                    source="product_card",
+                )
             row.data = data
         service_bonus_raw = str(form.get("service_bonus_percent") or "").strip()
         if str(data.get("kind") or "product") == "service" and service_bonus_raw:
@@ -6723,6 +6818,16 @@ def create_app() -> FastAPI:
             if entry is None:
                 entry = {}
                 prices.append(entry)
+            _log_product_price_change(
+                data,
+                price_type_id=price_type_id,
+                kind=str(price_type.get("name") or "Прайс"),
+                old_price=entry.get("price"),
+                new_price=clean_value,
+                currency=currency,
+                actor=_session_actor_name(request),
+                source="catalog",
+            )
             entry.update(
                 {
                     "price_type_id": price_type_id,
@@ -6791,6 +6896,16 @@ def create_app() -> FastAPI:
                 if entry is None:
                     entry = {}
                     prices.append(entry)
+                _log_product_price_change(
+                    data,
+                    price_type_id=price_type_id,
+                    kind=str(price_type.get("name") or "Прайс"),
+                    old_price=entry.get("price"),
+                    new_price=value,
+                    currency=currency,
+                    actor=_session_actor_name(request),
+                    source="price_types",
+                )
                 entry.update(
                     {
                         "price_type_id": price_type_id,

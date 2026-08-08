@@ -1840,7 +1840,7 @@
 {% block scripts %}
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=33" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=34" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=1" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=67" defer></script>
   {% if sales_embed %}

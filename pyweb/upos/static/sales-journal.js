@@ -1413,6 +1413,12 @@
     ).trim();
     if (requestedDocumentId && readSale(requestedDocumentId)) {
       openDetail(scope, requestedDocumentId);
+      // Без анимации: requestAnimationFrame в фоновой вкладке не срабатывает,
+      // и открытая по ссылке карточка оставалась выдвинутой за экран.
+      var requestedPanel = scope.querySelector("[data-sales-journal-detail]");
+      var requestedBackdrop = scope.querySelector(".sales-document-detail-backdrop");
+      if (requestedPanel) requestedPanel.classList.add("is-open");
+      if (requestedBackdrop) requestedBackdrop.classList.add("is-open");
     }
   }
 
