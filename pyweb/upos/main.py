@@ -5716,7 +5716,7 @@ def create_app() -> FastAPI:
         status: str = "active",
         kind: str = "product",
         catalog_currency: str = "",
-        page_size: str = "100",
+        page_size: str = "500",
         page: str = "1",
         edit: str = "",
         price_type: str = "",
@@ -5756,8 +5756,14 @@ def create_app() -> FastAPI:
             kind_values=query.getlist("kind"),
         )
         product_page_size = _product_page_size(page_size)
+        # Таблицу каталога рендерим целиком — и товары, и услуги. Раздел
+        # («Все / Товары / Услуги») переключается мгновенно на клиенте
+        # (catalog-kind-tabs.js), без перезагрузки страницы и «прыжка» якоря.
+        table_filters = dict(filters)
+        table_filters["kind"] = "all"
+        table_filters["kind_values"] = ["all"]
         with session_scope() as session:
-            products, edit_product, options = _collect_products_view_data(session, wid, filters, edit=edit)
+            products, edit_product, options = _collect_products_view_data(session, wid, table_filters, edit=edit)
             price_products = [
                 _product_data(row)
                 for row in session.execute(

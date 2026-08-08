@@ -18,6 +18,7 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='products-table.js') }}?v=11" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=1" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
@@ -412,6 +413,7 @@
                 {% set product_tab_href = url_for('products_get') ~ '?edit=' ~ product.id %}
                 <tr
                   data-product-row
+                  data-product-kind="{{ 'service' if product.kind == 'service' else 'product' }}"
                   data-sort-name="{{ (product.name or '')|lower }}"
                   data-sort-sku="{{ (product.sku or '')|lower }}"
                   data-sort-barcode="{{ (product.barcode or '')|lower }}"
@@ -650,8 +652,8 @@
           </nav>
           <div class="products-catalog-footer-meta">
             <div class="products-panel-stats" aria-label="Информация по списку">
-              <span>Всего: {{ products_total|default(products|length) }}</span>
-              <span>Показано: {{ product_page_from }}-{{ product_page_to }}</span>
+              <span>Всего: <b data-products-total-count>{{ products_total|default(products|length) }}</b></span>
+              <span>Показано: <span data-products-shown-range>{{ product_page_from }}-{{ product_page_to }}</span></span>
             </div>
             <label class="products-page-size products-page-size--footer">
               <span>Показать</span>
