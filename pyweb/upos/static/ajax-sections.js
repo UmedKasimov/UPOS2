@@ -49,6 +49,30 @@
     return swapped;
   }
 
+  // Кэш предзагрузки: наведение на раздел заранее тянет его HTML в фон, чтобы
+  // клик срабатывал почти мгновенно (как клиентский фильтр в товарах).
+  const prefetchCache = new Map();
+
+  function fetchSection(href) {
+    return fetch(href, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    }).then((response) => {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.text();
+    });
+  }
+
+  function prefetch(href) {
+    if (!href || href.startsWith("#") || prefetchCache.has(href)) return;
+    // Промах (сеть/ошибка) убираем из кэша — при клике попробуем ещё раз.
+    const pending = fetchSection(href).catch(() => {
+      prefetchCache.delete(href);
+      return null;
+    });
+    prefetchCache.set(href, pending);
+  }
+
   async function load(href, nav) {
     const targets = (nav.getAttribute("data-ajax-targets") || "")
       .split(",")
@@ -66,12 +90,9 @@
     const panel = nav.closest(".products-list-panel") || nav;
     panel.classList.add("ajax-section-loading");
     try {
-      const response = await fetch(href, {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-        credentials: "same-origin",
-      });
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      const html = await response.text();
+      // Готовый результат из предзагрузки — либо тянем сейчас.
+      const html = (prefetchCache.has(href) ? await prefetchCache.get(href) : null) || (await fetchSection(href));
+      prefetchCache.delete(href);
       const swapped = swapTargets(html, targets);
       if (!swapped) throw new Error("targets not found");
       window.history.pushState({ ajaxSection: true }, "", href);
@@ -94,6 +115,16 @@
     if (!href || href.startsWith("#")) return;
     event.preventDefault();
     load(href, nav);
+  });
+
+  // Предзагрузка при наведении/фокусе: к моменту клика данные уже в кэше.
+  document.addEventListener("mouseover", (event) => {
+    const link = event.target.closest("[data-ajax-nav] a[href]");
+    if (link) prefetch(link.getAttribute("href") || "");
+  });
+  document.addEventListener("focusin", (event) => {
+    const link = event.target.closest("[data-ajax-nav] a[href]");
+    if (link) prefetch(link.getAttribute("href") || "");
   });
 
   // Назад/вперёд по истории после AJAX-переключения: проще всего честно
