@@ -3889,8 +3889,8 @@
             <td>${index + 1}</td>
             <td><a href="${escapeHtml(productHref)}" target="_blank" rel="noopener" title="Открыть в каталоге">${escapeHtml(name)}</a></td>
             <td>${escapeHtml(String(line.quantity || '0'))}</td>
-            <td>${escapeHtml(formatMoney(line.price, currency))} ${escapeHtml(currency)}</td>
-            <td>${escapeHtml(formatMoney(line.total, currency))} ${escapeHtml(currency)}</td>
+            <td>${escapeHtml(formatMoney(line.price, currency))}</td>
+            <td>${escapeHtml(formatMoney(line.total, currency))}</td>
           </tr>`;
         }).join('');
         body.innerHTML = `
