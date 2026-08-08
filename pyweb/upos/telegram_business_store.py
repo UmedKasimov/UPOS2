@@ -88,10 +88,13 @@ def _attachment_payload(message: dict[str, Any]) -> dict[str, Any]:
 
 def attachment_is_image(payload: Any) -> bool:
     data = payload if isinstance(payload, dict) else {}
+    # Превью можем показать, только зная file_id для выгрузки из Telegram.
+    # У самых старых записей его нет — там останется ссылка на диалог.
+    if not _clean(data.get("file_id")):
+        return False
     if data.get("is_image"):
         return True
-    # Старые записи сохранены без флага is_image — определяем картинку по виду
-    # вложения, чтобы превью работало и для уже полученных фото.
+    # Записи без флага is_image определяем по виду вложения.
     kind = _clean(data.get("kind"))
     if kind in {"photo", "sticker"} or data.get("photo") or data.get("sticker"):
         return True
