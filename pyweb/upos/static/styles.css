@@ -32383,6 +32383,30 @@ button.products-page-link {
   display: block;
 }
 
+/* Клик по миниатюре открывает фото товара на весь экран. */
+.purchase-line-photo[data-photo-zoom] {
+  cursor: zoom-in;
+}
+
+.purchase-photo-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(15 23 42 / 0.78);
+  backdrop-filter: blur(3px);
+  cursor: zoom-out;
+}
+
+.purchase-photo-zoom img {
+  max-width: min(92vw, 60rem);
+  max-height: 92vh;
+  border-radius: 10px;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.5);
+}
+
 /* Позиция без снимка: нейтральная заглушка вместо пустой рамки. */
 .purchase-line-photo[data-fallback]::before {
   font-size: 1rem;

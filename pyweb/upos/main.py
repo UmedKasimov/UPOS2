@@ -5358,6 +5358,24 @@ def create_app() -> FastAPI:
                     or price["id"] in display_price_list_ids
                 )
             ]
+            # Одна валюта в колонке: если в фильтре выбрана единственная
+            # валюта, цены в другой валюте пересчитываем в неё по курсу —
+            # иначе в списке смешивались UZS и USD. Пересчитанную цену править
+            # прямо в каталоге нельзя (это перезаписало бы исходную валюту).
+            target_currency = next(iter(selected_currencies)) if len(selected_currencies) == 1 else ""
+            if target_currency:
+                for price in display_prices:
+                    if price["has_price"] and price["currency"] != target_currency:
+                        converted = _convert_product_currency(
+                            _sales_decimal(price["price"]),
+                            price["currency"],
+                            target_currency,
+                            usd_rate,
+                        )
+                        price["price"] = _decimal_plain_text(converted)
+                        price["currency"] = target_currency
+                        price["converted"] = True
+                        price["editable"] = False
             item["catalog_prices"] = catalog_prices
             item["display_prices"] = display_prices
             item["quantity_display"] = _catalog_number_text(item.get("quantity"), empty="0")

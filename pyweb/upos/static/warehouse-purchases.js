@@ -2090,9 +2090,13 @@
         // Битая ссылка не должна оставлять рамку с крестиком.
         image.addEventListener("error", () => {
           media.dataset.fallback = isService ? "service" : "product";
+          media.removeAttribute("data-photo-zoom");
           image.remove();
         });
         media.append(image);
+        // Клик по фото открывает его увеличенным.
+        media.dataset.photoZoom = photoUrl;
+        media.title = "Нажмите, чтобы увеличить";
       } else {
         media.dataset.fallback = isService ? "service" : "product";
       }
@@ -2371,6 +2375,35 @@
       openDetail(root, requestedPurchaseId);
     }
   }
+
+  // Увеличение фото товара: клик по миниатюре открывает её на весь экран.
+  function openPhotoZoom(url) {
+    if (!url) return;
+    const overlay = document.createElement("div");
+    overlay.className = "purchase-photo-zoom";
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = "Фото товара";
+    overlay.append(image);
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", close);
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close();
+      },
+      { once: true }
+    );
+    document.body.append(overlay);
+  }
+
+  document.addEventListener("click", (event) => {
+    const media = event.target.closest("[data-photo-zoom]");
+    if (!media) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openPhotoZoom(media.dataset.photoZoom);
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => init());
