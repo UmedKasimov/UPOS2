@@ -10140,8 +10140,9 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 /* display:flex перебивал браузерный [hidden] (он только в user-agent
    стилях), из-за чего секция рассрочки показывалась даже со скрытым
-   атрибутом. Явно прячем скрытые секции. */
-.product-form-section[hidden] {
+   атрибутом. Прячем скрытые секции только в форме продажи, чтобы не
+   влиять на другие формы (например «Приход на склад»). */
+#sales-form .product-form-section[hidden] {
   display: none;
 }
 
