@@ -163,7 +163,19 @@
   }
 
   function mountReportTab(tab) {
-    if (tab.querySelector('.general-module-tab-sync')) return;
+    const existing = tab.querySelector('.general-module-tab-sync');
+    if (existing) {
+      // Кнопку уже создал workspace-module-tabs.js (чтобы ⟳ не мигала при
+      // перезагрузке) — навешиваем обработчик один раз на готовую кнопку.
+      if (existing.dataset.syncBound === '1') return;
+      existing.dataset.syncBound = '1';
+      existing.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        syncNow(existing);
+      });
+      return;
+    }
     const activate = tab.querySelector('.general-module-tab-activate');
     if (!activate) return;
     tab.insertBefore(createButton(), activate);

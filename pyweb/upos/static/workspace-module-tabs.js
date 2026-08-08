@@ -225,6 +225,20 @@
       holder.className = "general-module-tab general-module-tab--report";
       holder.dataset.workspaceOpenTab = tabId;
 
+      // Кнопку синхронизации создаём сразу вместе с вкладкой, а не отдельным
+      // проходом (module-tabs-sync.js) — иначе при каждой перезагрузке ⟳
+      // заметно «исчезает и появляется». Обработчик клика навешивает
+      // module-tabs-sync.js на уже готовую кнопку.
+      const syncButton = document.createElement("button");
+      syncButton.type = "button";
+      syncButton.className = "general-module-tab-sync";
+      syncButton.title = "Синхронизировать";
+      syncButton.setAttribute("aria-label", "Синхронизировать");
+      syncButton.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M3 12a9 9 0 0 1 14.7-7" /><path d="M17.7 5H13" /><path d="M17.7 5v4.7" />' +
+        '<path d="M21 12a9 9 0 0 1-14.7 7" /><path d="M6.3 19H11" /><path d="M6.3 19v-4.7" /></svg>';
+
       const activateButton = document.createElement("button");
       activateButton.type = "button";
       activateButton.className = "general-module-tab-activate";
@@ -236,7 +250,7 @@
       closeButton.dataset.workspaceCloseTab = tabId;
       closeButton.textContent = "×";
 
-      holder.append(activateButton, closeButton);
+      holder.append(syncButton, activateButton, closeButton);
       return holder;
     }
 
