@@ -1504,16 +1504,6 @@
         closeDetail(scope);
       });
     });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        closeDetailMenu(scope);
-        closeDetail(scope);
-      }
-    });
-    document.addEventListener("click", function () {
-      closeDetailMenu(scope);
-    });
-
     // Ссылка вида /sales?document=<id> открывает карточку документа сразу:
     // по таким ссылкам сюда приходят касса и карточка клиента в мессенджере.
     var requestedDocumentId = String(
@@ -1540,6 +1530,23 @@
       }
     }
   }
+
+  // Глобальные горячие клавиши и клик-вне вешаем один раз — не в init(),
+  // иначе повторная инициализация (AJAX-переключение разделов журнала)
+  // плодит дубли обработчиков на document.
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeDetailMenu(document);
+      closeDetail(document);
+    }
+  });
+  document.addEventListener("click", function () {
+    closeDetailMenu(document);
+  });
+
+  // Экспорт для AJAX-переключения разделов журнала: повторно навешивает
+  // обработчики на свежую разметку (идемпотентно — по data-*Ready-флагам).
+  window.SalesJournalInit = init;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { init(document); });

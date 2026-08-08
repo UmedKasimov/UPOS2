@@ -33137,3 +33137,11 @@ html.dark .client-own-tag--other {
   background: color-mix(in srgb, #dc2626 10%, transparent);
   color: #b91c1c;
 }
+
+/* AJAX-переключение разделов списка (ajax-sections.js): пока грузится свежая
+   таблица — слегка гасим панель и блокируем клики, без резкого мельтешения. */
+.ajax-section-loading {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
