@@ -128,7 +128,8 @@
               {% if row.time_label %}
                 <time class="messenger-dialog-time">{{ row.time_label }}</time>
               {% endif %}
-              <em>{{ row.status_label }}</em>
+              {# Подпись статуса убрана: «Активный» стояло почти у всех
+                 диалогов и ничего не сообщало. #}
               {# Счётчик показывает только непрочитанные входящие: открыли
                  диалог — цифра гаснет. #}
               <b data-messenger-unread{% if not row.unread %} hidden{% endif %}>{{ row.unread or '' }}</b>

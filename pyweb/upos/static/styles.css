@@ -3093,7 +3093,7 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   gap: 0.34rem;
 }
 
-/* Время последнего сообщения — как в мессенджере, над статусом. */
+/* Время последнего сообщения — как в мессенджере, над счётчиком. */
 .messenger-dialog-time {
   color: var(--muted-foreground);
   font-size: 0.72rem;
@@ -32645,6 +32645,12 @@ html.dark .client-own-tag--other {
   box-shadow: 0 24px 60px rgb(15 23 42 / 0.28);
 }
 
+/* Ширину строк карточки задаёт модалка, а не окно, поэтому перестроение
+   сеток внутри вешаем на контейнерные запросы. */
+.messenger-client-body {
+  container-type: inline-size;
+}
+
 .messenger-client-head h3 {
   margin: 0.15rem 0 0.5rem;
   font-size: 1.15rem;
@@ -32665,12 +32671,37 @@ html.dark .client-own-tag--other {
 
 .messenger-client-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  /* Кнопка попадала в общую сетку равными долями, и после расширения
+     карточки «Сохранить» растягивалось на треть строки. Поля делят место
+     по смыслу: заметка длиннее имени, телефон короче — кнопка по тексту. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.4fr) auto;
   gap: 0.6rem;
   align-items: end;
   margin: 0.9rem 0 0.4rem;
   padding-top: 0.9rem;
   border-top: 1px solid var(--border);
+}
+
+.messenger-client-form > button {
+  justify-self: start;
+  min-width: 8.5rem;
+}
+
+@container (max-width: 800px) {
+  .messenger-client-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .messenger-client-form > button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+}
+
+@container (max-width: 460px) {
+  .messenger-client-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .messenger-client-form label {
