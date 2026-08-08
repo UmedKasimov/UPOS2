@@ -62,16 +62,64 @@ def _attachment_payload(message: dict[str, Any]) -> dict[str, Any]:
         item = raw[-1] if isinstance(raw, list) and raw else raw
         item = item if isinstance(item, dict) else {}
         file_name = _clean(item.get("file_name"), 255)
+        mime_type = _clean(item.get("mime_type"), 120)
+        # Картинки показываем превью прямо в чате. Это фото и стикеры, а также
+        # документы с картиночным mime (когда фото отправили файлом).
+        is_image = key in {"photo", "sticker"} or mime_type.startswith("image/")
+        # Средний размер — для превью: оригинал грузим только по клику.
+        thumb_file_id = ""
+        if key == "photo" and isinstance(raw, list) and raw:
+            thumb = raw[len(raw) // 2] if len(raw) > 1 else raw[0]
+            thumb_file_id = _clean((thumb or {}).get("file_id"), 255)
         return {
             key: True,
             "kind": key,
             "label": f"{label}: {file_name}" if file_name else label,
             "file_id": _clean(item.get("file_id"), 255),
+            "thumb_file_id": thumb_file_id,
+            "file_unique_id": _clean(item.get("file_unique_id"), 120),
             "file_name": file_name,
             "file_size": int(item.get("file_size") or 0),
-            "mime_type": _clean(item.get("mime_type"), 120),
+            "mime_type": mime_type,
+            "is_image": is_image,
         }
     return {}
+
+
+def attachment_is_image(payload: Any) -> bool:
+    data = payload if isinstance(payload, dict) else {}
+    return bool(data.get("is_image"))
+
+
+def attachment_file_ref(payload: Any, *, thumb: bool = False) -> dict[str, str]:
+    """file_id вложения для выгрузки из Telegram. thumb=True — превью-размер."""
+    data = payload if isinstance(payload, dict) else {}
+    file_id = ""
+    if thumb:
+        file_id = _clean(data.get("thumb_file_id")) or _clean(data.get("file_id"))
+    else:
+        file_id = _clean(data.get("file_id"))
+    return {
+        "file_id": file_id,
+        "file_unique_id": _clean(data.get("file_unique_id")),
+        "mime_type": _clean(data.get("mime_type")),
+        "file_name": _clean(data.get("file_name")),
+        "is_image": "1" if data.get("is_image") else "",
+    }
+
+
+def message_attachment_ref(workspace_owner_id: str, message_id: str, *, thumb: bool = False) -> dict[str, Any]:
+    """Ссылка на вложение сообщения: file_id, чат и connection для getFile."""
+    with session_scope() as session:
+        row = session.get(TelegramBusinessMessage, str(message_id or ""))
+        if row is None or row.workspace_owner_id != workspace_owner_id:
+            return {}
+        ref = attachment_file_ref(row.payload, thumb=thumb)
+        if not ref.get("file_id"):
+            return {}
+        ref["chat_id"] = row.chat_id
+        ref["connection_id"] = row.connection_id or ""
+        return ref
 
 
 def sale_document(payload: Any) -> dict[str, Any]:
@@ -385,6 +433,7 @@ def thread_messages(workspace_owner_id: str, chat_id: int, limit: int = 200) -> 
                 "sent_at": row.sent_at.isoformat() if row.sent_at else "",
                 "has_attachment": bool(row.payload),
                 "attachment_label": attachment_label(row.payload),
+                "attachment_is_image": attachment_is_image(row.payload),
                 "sale_document": sale_document(row.payload),
             }
             for row in rows

@@ -294,6 +294,31 @@ from upos.users_store import (
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
+# Кеш картинок из переписки Telegram: временный, чистится каждый вечер.
+MESSENGER_ATTACHMENT_CACHE_DIR = BASE_DIR / "runtime_cache" / "telegram_attachments"
+
+
+def _messenger_attachment_cache_dir() -> Path:
+    MESSENGER_ATTACHMENT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return MESSENGER_ATTACHMENT_CACHE_DIR
+
+
+def clear_messenger_attachment_cache() -> int:
+    """Удаляет кешированные картинки переписки. Возвращает число файлов."""
+    removed = 0
+    directory = MESSENGER_ATTACHMENT_CACHE_DIR
+    if not directory.exists():
+        return 0
+    for item in directory.iterdir():
+        try:
+            if item.is_file():
+                item.unlink()
+                removed += 1
+        except OSError:
+            logger.exception("[messenger] не удалось удалить кеш %s", item.name)
+    return removed
+
+
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 # Отступы шаблонов давали больше половины веса страниц со списками
 # (в строке карты клиентов 3 КБ из 5.3 КБ — только пробелы). Обрезаем их:
@@ -17799,6 +17824,15 @@ def create_app() -> FastAPI:
                                 if message["has_attachment"]
                                 else ""
                             ),
+                            # Картинку показываем превью прямо в чате. Файл в UPOS
+                            # не хранится: превью и оригинал берём с Telegram
+                            # через прокси только по клику.
+                            "attachment_is_image": bool(message.get("attachment_is_image")),
+                            "attachment_image_url": (
+                                f"/api/messengers/attachment/{message['id']}"
+                                if message.get("attachment_is_image")
+                                else ""
+                            ),
                             # Заказ, который ушёл клиенту этим сообщением.
                             "sale_document": message.get("sale_document") or {},
                         }
@@ -24672,6 +24706,71 @@ def create_app() -> FastAPI:
             media_type="application/pdf",
             headers={"Content-Disposition": f'inline; filename="{name}"'},
         )
+
+    @app.get("/api/messengers/attachment/{message_id}")
+    def api_messenger_attachment(request: Request, message_id: str, thumb: str = ""):
+        """Отдаёт картинку из переписки Telegram по клику, без хранения в UPOS.
+
+        Файл берётся с серверов Telegram (getFile + download) и кладётся в
+        дисковый кеш, который чистится каждый вечер. Оригинал грузится, только
+        когда оператор нажал на превью, — трафик и кеш не тратятся зря.
+        """
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        assert wid is not None
+        from upos.telegram_business_store import message_attachment_ref
+        from upos.telegram_client import TelegramApiError, download_file, get_file_path
+        from upos.telegram_store import get_bot_config_with_token
+
+        want_thumb = str(thumb or "").strip() in {"1", "true", "yes"}
+        ref = message_attachment_ref(wid, str(message_id or "").strip(), thumb=want_thumb)
+        if not ref or not ref.get("file_id"):
+            return JSONResponse({"error": "Вложение не найдено"}, status_code=404)
+
+        cache_dir = _messenger_attachment_cache_dir()
+        unique = re.sub(r"[^A-Za-z0-9_-]", "", str(ref.get("file_unique_id") or "")) or re.sub(
+            r"[^A-Za-z0-9_-]", "", str(message_id or "")
+        )
+        cache_name = f"{unique}{'-thumb' if want_thumb else ''}"
+        meta_path = cache_dir / f"{cache_name}.type"
+        blob_path = cache_dir / f"{cache_name}.bin"
+
+        content: bytes | None = None
+        content_type = "application/octet-stream"
+        if blob_path.exists():
+            try:
+                content = blob_path.read_bytes()
+                if meta_path.exists():
+                    content_type = meta_path.read_text(encoding="utf-8").strip() or content_type
+            except OSError:
+                content = None
+
+        if content is None:
+            _cfg, token = get_bot_config_with_token(wid)
+            if not token:
+                return JSONResponse({"error": "Бот Telegram не подключён"}, status_code=400)
+            try:
+                file_path = get_file_path(token, str(ref["file_id"]))
+                if not file_path:
+                    return JSONResponse({"error": "Файл недоступен в Telegram"}, status_code=404)
+                content, content_type = download_file(token, file_path)
+            except TelegramApiError as exc:
+                return JSONResponse({"error": str(exc)}, status_code=502)
+            declared = str(ref.get("mime_type") or "").strip()
+            if declared:
+                content_type = declared
+            try:
+                blob_path.write_bytes(content)
+                meta_path.write_text(content_type, encoding="utf-8")
+            except OSError:
+                logger.exception("[messenger] не удалось записать кеш вложения %s", cache_name)
+
+        headers = {"Cache-Control": "private, max-age=3600"}
+        file_name = str(ref.get("file_name") or "").strip()
+        if file_name and not want_thumb:
+            headers["Content-Disposition"] = f'inline; filename="{quote(file_name)}"'
+        return Response(content=content, media_type=content_type, headers=headers)
 
     @app.post("/api/messengers/threads/{thread_id}/invoice")
     async def api_messenger_send_invoice(request: Request, thread_id: str):

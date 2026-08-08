@@ -3200,6 +3200,21 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   background: color-mix(in srgb, var(--background), var(--primary) 2%);
 }
 
+/* Разделитель даты между сообщениями разных дней — плашка по центру, как в
+   мессенджерах: видно, когда шла переписка. */
+.messenger-day-divider {
+  align-self: center;
+  margin: 0.2rem 0;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground), transparent 88%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .messenger-thread-message {
   display: grid;
   gap: 0.22rem;
@@ -3224,6 +3239,55 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   max-height: 16rem;
   border-radius: 0.5rem;
   object-fit: cover;
+}
+
+/* Фото сразу не грузим: показываем плашку, картинка приходит по клику. */
+.messenger-message-photo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  justify-self: start;
+  max-width: 100%;
+  padding: 0.4rem 0.7rem;
+  border: 1px dashed color-mix(in srgb, var(--primary), transparent 55%);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--primary), transparent 92%);
+  color: var(--primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.messenger-message-photo-btn small {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.messenger-message-photo-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary), transparent 84%);
+}
+
+.messenger-message-photo-btn.is-loading {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.messenger-message-photo-btn.is-error {
+  border-color: color-mix(in srgb, var(--destructive), transparent 40%);
+  color: var(--destructive);
+}
+
+.messenger-message-photo-icon {
+  font-size: 1rem;
+}
+
+.messenger-message-photo-link {
+  display: inline-block;
+  justify-self: start;
+  line-height: 0;
 }
 
 /* Вложение: файл лежит в Telegram, поэтому показываем подписанную ссылку,

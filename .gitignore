@@ -79,3 +79,4 @@ _legacy_nextjs/node_modules/
 *.swp
 *.swo
 *~
+pyweb/upos/runtime_cache/

@@ -16,6 +16,28 @@ logger = logging.getLogger(__name__)
 
 _task: asyncio.Task[None] | None = None
 _sent_today: set[str] = set()
+# Раз в сутки чистим кеш картинок Telegram — вечером, когда рабочий день
+# закрыт. Ключ по дате, чтобы за один вечер чистка прошла один раз.
+_cache_cleared_on: str | None = None
+_CACHE_CLEAR_HOUR = 22
+
+
+async def _clear_attachment_cache_if_due() -> None:
+    global _cache_cleared_on
+    now_local = datetime.now(ZoneInfo("Asia/Tashkent"))
+    if now_local.hour < _CACHE_CLEAR_HOUR:
+        return
+    today = now_local.date().isoformat()
+    if _cache_cleared_on == today:
+        return
+    try:
+        from upos.main import clear_messenger_attachment_cache
+
+        removed = await asyncio.to_thread(clear_messenger_attachment_cache)
+        _cache_cleared_on = today
+        logger.info("[telegram] вечерняя очистка кеша вложений: удалено %s", removed)
+    except Exception:
+        logger.exception("[telegram] очистка кеша вложений не удалась")
 
 
 def _daily_key(workspace_owner_id: str, tz_name: str) -> tuple[str, bool]:
@@ -56,6 +78,7 @@ async def _scheduler_loop() -> None:
                     _sent_today.add(key)
             if len(_sent_today) > 1000:
                 _sent_today.clear()
+            await _clear_attachment_cache_if_due()
         except asyncio.CancelledError:
             raise
         except Exception:

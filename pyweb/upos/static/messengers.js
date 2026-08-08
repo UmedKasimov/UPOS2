@@ -247,6 +247,33 @@
     return messages;
   }
 
+  // День сообщения: по нему решаем, где вставить разделитель даты.
+  function messageDayKey(message) {
+    var raw = String((message && message.created_at) || "");
+    if (!raw) return "";
+    var moment = new Date(raw);
+    if (isNaN(moment.getTime())) return "";
+    return moment.getFullYear() + "-" + (moment.getMonth() + 1) + "-" + moment.getDate();
+  }
+
+  // Подпись разделителя: «Сегодня», «Вчера» или «5 августа» (с годом, если
+  // сообщение из прошлого года).
+  function dayDividerLabel(message) {
+    var raw = String((message && message.created_at) || "");
+    if (!raw) return "";
+    var moment = new Date(raw);
+    if (isNaN(moment.getTime())) return "";
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var day = new Date(moment.getFullYear(), moment.getMonth(), moment.getDate());
+    var diffDays = Math.round((today.getTime() - day.getTime()) / 86400000);
+    if (diffDays === 0) return "Сегодня";
+    if (diffDays === 1) return "Вчера";
+    var options = { day: "numeric", month: "long" };
+    if (moment.getFullYear() !== now.getFullYear()) options.year = "numeric";
+    return moment.toLocaleDateString("ru-RU", options);
+  }
+
   function renderMessages(panel, thread) {
     var box = panel.querySelector("[data-messenger-thread-messages]");
     if (!box) return;
@@ -255,8 +282,20 @@
       box.innerHTML = '<div class="messenger-empty">История пока пустая. Начните диалог из поля ниже.</div>';
       return;
     }
+    var lastDayKey = "";
     box.innerHTML = messages
       .map(function (message) {
+        // Разделитель даты появляется перед первым сообщением нового дня —
+        // так видно, когда именно шла переписка.
+        var divider = "";
+        var dayKey = messageDayKey(message);
+        if (dayKey && dayKey !== lastDayKey) {
+          lastDayKey = dayKey;
+          var dayLabel = dayDividerLabel(message);
+          if (dayLabel) {
+            divider = '<div class="messenger-day-divider"><span>' + escapeHtml(dayLabel) + "</span></div>";
+          }
+        }
         var kind = classToken(String(message.kind || "in").toLowerCase(), "in");
         var photo = message.photo_url
           ? '<img class="messenger-message-photo" src="' + escapeHtml(message.photo_url) + '" alt="" loading="lazy" />'
@@ -266,7 +305,18 @@
         var attachmentLabel = String(message.attachment_label || "");
         var attachmentUrl = String(message.attachment_url || thread.telegram_url || "");
         var attachment = "";
-        if (attachmentLabel || message.attachment_url) {
+        if (message.attachment_is_image && message.attachment_image_url) {
+          // Картинку сразу не грузим: показываем кликабельный плейсхолдер.
+          // Клик подгружает превью, клик по превью открывает оригинал.
+          var imgUrl = String(message.attachment_image_url);
+          attachment =
+            '<button type="button" class="messenger-message-photo-btn" data-messenger-photo-load="' +
+            escapeHtml(imgUrl) + '">' +
+            '<span class="messenger-message-photo-icon" aria-hidden="true">🖼</span>' +
+            "<span>" + escapeHtml(attachmentLabel || "Фото") + "</span>" +
+            '<small>нажмите, чтобы показать</small>' +
+            "</button>";
+        } else if (attachmentLabel || message.attachment_url) {
           var label = attachmentLabel || "Вложение";
           attachment = attachmentUrl
             ? '<a class="messenger-message-attachment" href="' + escapeHtml(attachmentUrl) +
@@ -292,6 +342,7 @@
         var body = String(message.text || "");
         if (sale && attachment) attachment = "";
         return (
+          divider +
           '<div class="messenger-thread-message messenger-thread-message--' +
           escapeHtml(kind) +
           '"><strong>' +
@@ -306,6 +357,41 @@
         );
       })
       .join("");
+
+    // Клик по плейсхолдеру фото: грузим превью прокси-эндпоинтом. Оригинал
+    // (без ?thumb) открывается по клику уже загруженной картинкой.
+    box.querySelectorAll("[data-messenger-photo-load]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var url = button.getAttribute("data-messenger-photo-load");
+        if (!url) return;
+        button.disabled = true;
+        button.classList.add("is-loading");
+        var img = new Image();
+        img.className = "messenger-message-photo";
+        img.alt = "Фото";
+        img.loading = "lazy";
+        img.addEventListener("load", function () {
+          var link = document.createElement("a");
+          link.href = url; // оригинал в полном размере
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.title = "Открыть оригинал";
+          link.className = "messenger-message-photo-link";
+          link.appendChild(img);
+          button.replaceWith(link);
+          box.scrollTop = box.scrollHeight;
+        });
+        img.addEventListener("error", function () {
+          button.disabled = false;
+          button.classList.remove("is-loading");
+          button.classList.add("is-error");
+          var hint = button.querySelector("small");
+          if (hint) hint.textContent = "не удалось загрузить";
+        });
+        img.src = url + (url.indexOf("?") === -1 ? "?thumb=1" : "&thumb=1");
+      });
+    });
+
     box.scrollTop = box.scrollHeight;
   }
 

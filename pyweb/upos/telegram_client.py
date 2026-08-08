@@ -249,6 +249,37 @@ def send_document(
     return result if isinstance(result, dict) else {}
 
 
+def get_file_path(token: str, file_id: str) -> str:
+    """Путь к файлу на серверах Telegram по его file_id (getFile)."""
+    result = _api_call(
+        token,
+        "getFile",
+        json_body={"file_id": str(file_id or "")},
+        timeout=8.0,
+        max_attempts=2,
+    )
+    return str((result or {}).get("file_path") or "") if isinstance(result, dict) else ""
+
+
+def download_file(token: str, file_path: str) -> tuple[bytes, str]:
+    """Скачивает файл по пути из getFile. Возвращает (содержимое, content-type)."""
+    clean_token = (token or "").strip()
+    clean_path = str(file_path or "").strip().lstrip("/")
+    if not clean_token or not clean_path:
+        raise TelegramApiError("Telegram file path is empty")
+    url = f"https://api.telegram.org/file/bot{clean_token}/{clean_path}"
+    try:
+        resp = _http_client().get(url, timeout=25.0)
+    except httpx.HTTPError as exc:
+        raise TelegramApiError(f"Telegram file download error: {exc}") from exc
+    if resp.status_code != 200:
+        raise TelegramApiError(
+            f"Telegram file download failed ({resp.status_code})",
+            status_code=resp.status_code,
+        )
+    return resp.content, str(resp.headers.get("Content-Type") or "application/octet-stream")
+
+
 def get_chat_member(token: str, chat_id: int, user_id: int) -> dict[str, Any]:
     result = _api_call(
         token,
