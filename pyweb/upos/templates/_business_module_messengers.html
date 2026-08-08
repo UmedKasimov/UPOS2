@@ -168,6 +168,15 @@
         {# Результат отправки виден прямо здесь: всплывающее окно можно
            закрыть не читая, а причина отказа нужна перед глазами. #}
         <p class="messenger-send-status" data-messenger-send-status hidden></p>
+        {# Итог оформления заказа: подтверждение и сразу отправка накладной,
+           чтобы не искать документ в карточке клиента. #}
+        <div class="messenger-order-created" data-messenger-order-created hidden>
+          <strong data-messenger-order-created-text>Заказ оформлен</strong>
+          <div class="messenger-order-created-actions">
+            <button type="button" class="btn btn-sm" data-messenger-order-invoice>Отправить накладную клиенту</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-messenger-order-created-close>Закрыть</button>
+          </div>
+        </div>
         <div class="messenger-dialog-composer-actions">
           {# Оформление заказа тем же способом, что и в CRM: полная форма
              продажи в модальном окне, клиент подставляется из переписки. #}

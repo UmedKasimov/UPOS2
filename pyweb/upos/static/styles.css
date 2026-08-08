@@ -32859,6 +32859,29 @@ html.dark .client-own-tag--other {
   cursor: default;
 }
 
+/* Заказ оформлен: подтверждение и сразу отправка накладной клиенту. */
+.messenger-order-created {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid color-mix(in srgb, #16a34a 32%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, #16a34a 10%, transparent);
+  color: #14663a;
+  font-size: var(--text-sm);
+}
+
+.messenger-order-created[hidden] {
+  display: none;
+}
+
+.messenger-order-created-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 /* Результат отправки сообщения — под полем ввода, а не во всплывашке. */
 .messenger-send-status {
   margin: 0 0 0.4rem;

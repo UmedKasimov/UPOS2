@@ -448,6 +448,39 @@
     return meta ? meta.getAttribute("content") || "" : "";
   }
 
+  /** Итог оформления заказа: подтверждение и кнопка отправки накладной. */
+  function showOrderCreated(root, saleId) {
+    var box = root.querySelector("[data-messenger-order-created]");
+    if (!box) {
+      showSendStatus(root, "Заказ оформлен. Он появится в карточке клиента.", "ok");
+      return;
+    }
+    var label = box.querySelector("[data-messenger-order-created-text]");
+    if (label) {
+      label.textContent = saleId
+        ? "Заказ оформлен и добавлен в карточку клиента."
+        : "Заказ оформлен.";
+    }
+    box.dataset.saleId = saleId || "";
+    var invoiceButton = box.querySelector("[data-messenger-order-invoice]");
+    if (invoiceButton) {
+      // Без номера документа отправлять нечего: у формы не было saved_id.
+      invoiceButton.hidden = !saleId;
+      invoiceButton.disabled = false;
+      invoiceButton.textContent = "Отправить накладную клиенту";
+    }
+    box.hidden = false;
+    showSendStatus(root, "");
+  }
+
+  function hideOrderCreated(root) {
+    var box = root.querySelector("[data-messenger-order-created]");
+    if (box) {
+      box.hidden = true;
+      box.dataset.saleId = "";
+    }
+  }
+
   function showSendStatus(root, message, kind) {
     var node = root.querySelector("[data-messenger-send-status]");
     if (!node) return;
@@ -1397,8 +1430,45 @@
         if (event.data.type === "upos:sales-order-saved") {
           // Страницу не перезагружаем: оператор потерял бы открытый диалог.
           closeOrderDialog();
-          showSendStatus(root, "Заказ создан. Он появится в карточке клиента.", "ok");
+          showOrderCreated(root, String(event.data.saleId || ""));
         }
+      });
+    }
+
+    var orderCreatedBox = root.querySelector("[data-messenger-order-created]");
+    if (orderCreatedBox) {
+      orderCreatedBox.querySelector("[data-messenger-order-created-close]")?.addEventListener("click", function () {
+        hideOrderCreated(root);
+      });
+      var invoiceButton = orderCreatedBox.querySelector("[data-messenger-order-invoice]");
+      invoiceButton?.addEventListener("click", function () {
+        var current = currentThread();
+        var saleId = orderCreatedBox.dataset.saleId || "";
+        if (!current || !saleId) return;
+        invoiceButton.disabled = true;
+        invoiceButton.textContent = "Отправляем…";
+        window
+          .fetch("/api/messengers/threads/" + encodeURIComponent(current.id) + "/invoice", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+            body: JSON.stringify({ document_id: saleId }),
+          })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+              if (!response.ok || !body.ok) throw new Error(body.error || "Не удалось отправить накладную");
+              return body;
+            });
+          })
+          .then(function (body) {
+            hideOrderCreated(root);
+            showSendStatus(root, "Накладная отправлена клиенту: " + (body.caption || ""), "ok");
+          })
+          .catch(function (error) {
+            invoiceButton.disabled = false;
+            invoiceButton.textContent = "Отправить накладную клиенту";
+            showSendStatus(root, sendErrorText(error.message), "error");
+          });
       });
     }
 

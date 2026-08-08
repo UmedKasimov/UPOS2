@@ -1175,7 +1175,18 @@
     setDraftField(root, "[data-sales-payment-type]", draft.paymentType);
     setDraftField(root, "[data-sales-payment-lines]", draft.paymentLines);
     setDraftField(root, 'textarea[name="note"]', draft.note);
-    setDraftField(root, "[data-sales-installment-enabled]", draft.installmentEnabled);
+    // Рассрочку возвращаем, только если в ней что-то заполнено. Иначе флаг
+    // «включено» тянулся из прошлого черновика, и каждая новая форма
+    // открывалась с раскрытым пустым блоком, хотя «+ Рассрочка» не нажимали.
+    var draftInstallmentFilled =
+      Math.round(numberValue(draft.installmentMonths) || 1) > 1 ||
+      numberValue(draft.installmentInitial) > 0 ||
+      numberValue(draft.installmentMarkup) > 0;
+    setDraftField(
+      root,
+      "[data-sales-installment-enabled]",
+      String(draft.installmentEnabled || "0") === "1" && draftInstallmentFilled ? "1" : "0"
+    );
     setDraftField(root, "[data-sales-installment-months-field]", draft.installmentMonths);
     setDraftField(root, "[data-sales-installment-initial-field]", draft.installmentInitial);
     setDraftField(root, "[data-sales-installment-markup-field]", draft.installmentMarkup);
