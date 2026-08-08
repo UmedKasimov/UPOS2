@@ -461,6 +461,19 @@
     list.insertBefore(button, searchEmpty || null);
   }
 
+  function moveThreadItemToTop(root, id) {
+    /* Диалог с новым сообщением поднимаем в начало списка, как в мессенджере.
+       Заглушки-каналы висят внизу, поэтому вставляем перед первым живым. */
+    var list = root.querySelector("[data-messenger-thread-list]");
+    if (!list) return;
+    var item = list.querySelector(
+      '[data-messenger-thread-id="' + String(id).replace(/"/g, '\\"') + '"]'
+    );
+    if (!item) return;
+    var first = list.querySelector("[data-messenger-thread-id]");
+    if (first && first !== item) list.insertBefore(item, first);
+  }
+
   function updateThreadListItem(root, thread) {
     /* Обновляет строку списка на месте: пересборка убила бы выделение
        выбранного диалога и позицию прокрутки. */
@@ -1765,6 +1778,7 @@
             }
             // Сравниваем состав, а не длину: подтверждение отправленного
             // сообщения её не меняет, но перерисовать переписку нужно.
+            var prevLength = threadMessages(existing).length;
             var before = threadMessages(existing).map(messageKey).join("\n");
             var fresh = mergeThreadMessages(threadMessages(existing), threadMessages(incoming));
             existing.messages = fresh;
@@ -1780,6 +1794,8 @@
             existing.unread = incoming.unread;
             existing.client = incoming.client || existing.client;
             updateThreadListItem(root, existing);
+            // Пришло новое сообщение — поднимаем диалог наверх списка.
+            if (fresh.length > prevLength) moveThreadItemToTop(root, id);
             rememberThread(existing);
             if (id === selectedId && fresh.map(messageKey).join("\n") !== before) {
               renderMessages(root, existing);

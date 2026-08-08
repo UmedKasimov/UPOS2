@@ -17988,7 +17988,10 @@ def create_app() -> FastAPI:
                     "avatar_url": "",
                     "avatar_ttl_days": 5,
                     "is_new": False,
-                    "updated_at": datetime.now(timezone.utc),
+                    # Это карточка-заглушка канала, а не живой диалог. Раньше у
+                    # неё стояло текущее время, и заглушки выталкивали реальные
+                    # переписки вниз списка. Без времени они уходят в конец.
+                    "updated_at": None,
                     "messages": messages,
                 }
             )
@@ -17999,6 +18002,15 @@ def create_app() -> FastAPI:
         for item in rows:
             item["time_label"] = _messenger_time_label(item.get("updated_at"))
         _messenger_apply_read_state(workspace_owner_id, rows)
+        # Новое сообщение — наверх: диалоги с непрочитанными идут первыми, а
+        # внутри и между прочитанными сохраняется порядок по времени.
+        rows.sort(
+            key=lambda item: (
+                1 if int(item.get("unread") or 0) > 0 else 0,
+                item.get("updated_at") or datetime.min.replace(tzinfo=timezone.utc),
+            ),
+            reverse=True,
+        )
         return rows
 
     def _messenger_filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[dict[str, Any]]:

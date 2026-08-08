@@ -23,6 +23,41 @@
     return number.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
   }
 
+  // Чистое число без пробелов — для сравнения и отправки на сервер.
+  function stripGrouping(value) {
+    return String(value || "")
+      .replace(/[\s ]/g, "")
+      .replace(",", ".")
+      .trim();
+  }
+
+  // Группировка разрядов пробелами прямо в поле: «100000» → «100 000».
+  function groupThousands(value) {
+    const clean = stripGrouping(value).replace(/[^\d.]/g, "");
+    if (!clean) return "";
+    const parts = clean.split(".");
+    const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return parts.length > 1 ? `${intPart}.${parts.slice(1).join("")}` : intPart;
+  }
+
+  // Сколько цифр стоит до курсора — чтобы вернуть его на место после
+  // вставки пробелов (иначе курсор прыгал бы в конец).
+  function countDigitsBeforeCaret(value, caret) {
+    return (String(value).slice(0, caret).match(/\d/g) || []).length;
+  }
+
+  function caretAfterDigits(formatted, digitCount) {
+    if (digitCount <= 0) return 0;
+    let seen = 0;
+    for (let i = 0; i < formatted.length; i += 1) {
+      if (/\d/.test(formatted[i])) {
+        seen += 1;
+        if (seen === digitCount) return i + 1;
+      }
+    }
+    return formatted.length;
+  }
+
   function renderValue(cell) {
     const raw = cell.dataset.priceRaw || "";
     const currency = cell.dataset.priceCurrency || "UZS";
@@ -50,14 +85,23 @@
     input.type = "text";
     input.inputMode = "decimal";
     input.className = "products-price-inline-input";
-    input.value = cell.dataset.priceRaw || "";
+    input.value = groupThousands(cell.dataset.priceRaw || "");
     input.setAttribute("aria-label", `${cell.dataset.priceName || "Цена"} — новое значение`);
+    input.inputMode = "decimal";
     cell.textContent = "";
     cell.append(input);
     input.focus();
     input.select();
 
     let settled = false;
+
+    // Пробелы между разрядами прямо во время ввода: «100000» → «100 000».
+    input.addEventListener("input", () => {
+      const digitsBefore = countDigitsBeforeCaret(input.value, input.selectionStart);
+      input.value = groupThousands(input.value);
+      const caret = caretAfterDigits(input.value, digitsBefore);
+      input.setSelectionRange(caret, caret);
+    });
 
     const finish = (save) => {
       if (settled) return;
@@ -67,7 +111,8 @@
         renderValue(cell);
         return;
       }
-      const next = String(input.value || "").trim();
+      // На сервер уходит чистое число без пробелов.
+      const next = stripGrouping(input.value);
       if (next === String(cell.dataset.priceRaw || "").trim()) {
         renderValue(cell);
         return;
