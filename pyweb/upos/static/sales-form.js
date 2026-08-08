@@ -1045,6 +1045,7 @@
       number: root.querySelector('input[name="number"]')?.value || "",
       crmRecordId: root.querySelector('input[name="crm_record_id"]')?.value || "",
       sourceSaleId: root.querySelector('input[name="source_sale_id"]')?.value || "",
+      nextStatus: root.querySelector("[data-sales-next-status]")?.value || "",
       date: root.querySelector('input[name="date"]')?.value || "",
       dateTo: root.querySelector('input[name="date_to"]')?.value || "",
       client: root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]')?.value || "",
@@ -1161,6 +1162,8 @@
     setDraftField(root, 'input[name="number"]', draft.number);
     setDraftField(root, 'input[name="crm_record_id"]', draft.crmRecordId);
     setDraftField(root, 'input[name="source_sale_id"]', draft.sourceSaleId);
+    // Продажа из заказа: после сохранения сразу уходит в отгрузку.
+    setDraftField(root, "[data-sales-next-status]", draft.nextStatus || "");
     setDraftField(root, 'input[name="date"]', draft.date);
     setDraftField(root, 'input[name="date_to"]', draft.dateTo);
     setDraftField(root, 'select[name="installer_user_id"]', draft.installerUserId);

@@ -468,9 +468,13 @@
     return draft;
   }
 
-  function openEditFromSale(sale) {
+  function openEditFromSale(sale, options) {
     if (!sale || !sale.id) return;
-    saveSalesDraftText(JSON.stringify(editDraftFromSale(sale)));
+    var draft = editDraftFromSale(sale);
+    // nextStatus — статус, в который продажа перейдёт после сохранения
+    // (продажа из заказа сразу идёт в отгрузку).
+    if (options && options.nextStatus) draft.nextStatus = String(options.nextStatus);
+    saveSalesDraftText(JSON.stringify(draft));
     var docType = encodeURIComponent(textValue(sale.doc_type || "sale").toLowerCase() || "sale");
     window.location.href = "/sales?doc_type=" + docType + "&edit_id=" + encodeURIComponent(sale.id) + "#sales-form";
   }
@@ -1419,6 +1423,17 @@
       var requestedBackdrop = scope.querySelector(".sales-document-detail-backdrop");
       if (requestedPanel) requestedPanel.classList.add("is-open");
       if (requestedBackdrop) requestedBackdrop.classList.add("is-open");
+    }
+
+    // Продажа только что создана из заказа: сразу открываем её на
+    // редактирование, а после сохранения она уйдёт в отгрузку.
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("edit_after") === "shipment") {
+      var savedId = String(params.get("saved_id") || "").trim();
+      var savedSale = savedId ? readSale(savedId) : null;
+      if (savedSale) {
+        openEditFromSale(savedSale, { nextStatus: "shipped" });
+      }
     }
   }
 

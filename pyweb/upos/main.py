@@ -7774,6 +7774,15 @@ def create_app() -> FastAPI:
         if paid_amount < 0:
             raise ValueError("Оплачено не может быть отрицательным")
         status = "return" if doc_type == "return" else "new"
+        # Продажа, созданная из заказа: после редактирования и сохранения
+        # сразу уходит в отгрузку. Флаг ставит форма при таком сценарии.
+        requested_status = str(form.get("next_status") or "").strip()
+        if doc_type != "return" and requested_status in {
+            "shipped",
+            "installation",
+            "completed",
+        }:
+            status = requested_status
         payment_lines: list[dict[str, str]] = []
         raw_payment_lines = str(form.get("payment_lines") or "").strip()
         if raw_payment_lines:
@@ -10951,8 +10960,14 @@ def create_app() -> FastAPI:
         assert wid is not None
 
         def converted_redirect(document_id: str, message: str = "converted"):
+            # Сразу открываем созданную продажу на редактирование: после
+            # сохранения она уйдёт в отгрузку (флаг edit_after=shipment).
             return RedirectResponse(
-                url=f"/sales?view=journal&doc_type=sale&msg={message}&saved_id={quote(document_id)}#sales-journal",
+                url=(
+                    "/sales?view=journal&doc_type=sale"
+                    f"&msg={message}&saved_id={quote(document_id)}"
+                    "&edit_after=shipment#sales-journal"
+                ),
                 status_code=302,
             )
 
