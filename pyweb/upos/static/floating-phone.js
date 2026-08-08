@@ -200,6 +200,17 @@
     return accounts.find((item) => String(item.id) === String(id)) || null;
   }
 
+  // Типовая ошибка настройки: в адресе АТС указан IP. Сертификат выписывают на
+  // домен, поэтому браузер рвёт WSS ещё до SIP — и причина никак не видна.
+  function looksLikeIpHost(wsUrl) {
+    try {
+      const host = new URL(String(wsUrl)).hostname;
+      return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
+    } catch (error) {
+      return false;
+    }
+  }
+
   function selectedAccount() {
     const value = providerSelect?.value || "";
     if (!value) return accounts[0] || null;
@@ -226,6 +237,13 @@
     auto.dataset.providerName = "Авто";
     providerSelect.append(auto);
     if (previous && accountById(previous)) providerSelect.value = previous;
+  }
+
+  function connectErrorText(account, error) {
+    if (account && looksLikeIpHost(account.ws_url)) {
+      return "АТС указана по IP — для WSS нужен домен из сертификата. Проверьте адрес в настройках телефонии";
+    }
+    return `АТС недоступна (${error?.message || "ошибка"}) — звоним через телефон`;
   }
 
   function bindSoftphoneEvents(sip) {
@@ -292,7 +310,7 @@
         await sip.connect(account);
       } catch (error) {
         // Регистрация не удалась — остаются мост и набор через SIM.
-        setStatus(`АТС недоступна (${error?.message || "ошибка"}) — звоним через телефон`, "error");
+        setStatus(connectErrorText(account, error), "error");
       }
       return sip;
     })().catch((error) => {
@@ -310,7 +328,7 @@
     try {
       await sip.connect(account);
     } catch (error) {
-      setStatus(`АТС недоступна (${error?.message || "ошибка"}) — звоним через телефон`, "error");
+      setStatus(connectErrorText(account, error), "error");
     }
   });
 
