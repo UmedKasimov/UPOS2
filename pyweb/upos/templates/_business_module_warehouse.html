@@ -1099,14 +1099,11 @@
 
   {% set adjustment_direction = warehouse_operation_preset if warehouse_operation_preset in ['in', 'out'] else 'out' %}
   <article class="warehouse-adjustment-entry product-form-panel" data-workspace-view="adjustments" hidden>
-    <header class="products-panel-head warehouse-adjustment-entry-head">
+    <header class="products-panel-head">
       <div>
         <h2>{{ 'Приход на склад' if adjustment_direction == 'in' else 'Списание со склада' }}</h2>
         <span>{{ 'Укажите поступившее количество: остатки увеличатся.' if adjustment_direction == 'in' else 'Укажите списываемое количество: остатки уменьшатся.' }}</span>
       </div>
-      <span class="warehouse-adjustment-direction warehouse-adjustment-direction--{{ adjustment_direction }}">
-        {{ '+ Приход' if adjustment_direction == 'in' else '− Списание' }}
-      </span>
     </header>
     <form
       method="post"
@@ -1148,8 +1145,8 @@
           <h3>Товары</h3>
           <button type="button" class="btn btn-secondary warehouse-adjustment-add" data-adjustment-add-row>+ Строка</button>
         </div>
-        <div class="products-table-wrap warehouse-adjustment-table-wrap">
-          <table class="products-table warehouse-adjustment-table">
+        <div class="products-table-wrap warehouse-adjustment-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table warehouse-adjustment-table">
             <thead>
               <tr>
                 <th>№</th>
