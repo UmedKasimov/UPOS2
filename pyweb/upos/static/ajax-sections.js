@@ -39,7 +39,9 @@
     selectors.forEach((selector) => {
       const fresh = parsed.querySelector(selector);
       const current = document.querySelector(selector);
-      if (fresh && current) {
+      // current.isConnected: если контейнер уже удалён из DOM (был вложен в
+      // ранее заменённый target), пропускаем — иначе потеряем свежую разметку.
+      if (fresh && current && current.isConnected) {
         current.replaceWith(fresh);
         swapped += 1;
       }
