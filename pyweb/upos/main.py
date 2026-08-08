@@ -9917,6 +9917,33 @@ def create_app() -> FastAPI:
                 if str(item.get("warehouse") or "").strip()
             ]
             sales = sales[journal_page_start:journal_page_end]
+            # Прямая ссылка «?document=<id>» приходит из кассы и карточки
+            # клиента. Документ обязан быть на странице, иначе карточке не из
+            # чего открыться — фильтры и пагинация для него не преграда.
+            requested_document_id = str(request.query_params.get("document") or "").strip()
+            if requested_document_id and not any(
+                str(item.get("id")) == requested_document_id for item in sales
+            ):
+                requested_row = next(
+                    (row for row in rows if str(row.id) == requested_document_id),
+                    None,
+                )
+                if requested_row is not None:
+                    extra_item = _sales_document_data(requested_row)
+                    extra_item["document_age_label"] = _sales_document_age_label(
+                        extra_item.get("date"),
+                        today_date,
+                    )
+                    extra_timing = _sales_debt_timing(
+                        str(extra_item.get("date_to") or extra_item.get("date") or ""),
+                        today_date,
+                    )
+                    extra_item["debt_age_days"] = (
+                        None
+                        if extra_timing["state"] == "none"
+                        else int(extra_timing["days_overdue"] or 0)
+                    )
+                    sales.insert(0, extra_item)
             for item in sales:
                 crm_context = _sales_crm_context(item, sales_crm_index)
                 item.update(crm_context)
