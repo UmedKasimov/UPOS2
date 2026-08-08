@@ -2342,9 +2342,14 @@
         openDetailPaymentDialog(root, panel);
       });
     });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeDetail(root);
-    });
+    // Один раз на страницу — иначе повторная инициализация (AJAX-переключение
+    // разделов закупок) множит обработчики Escape на document.
+    if (document.body.dataset.warehouseEscGlobalReady !== "1") {
+      document.body.dataset.warehouseEscGlobalReady = "1";
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeDetail(document);
+      });
+    }
     if (document.body.dataset.warehouseProductPickerGlobalReady !== "1") {
       document.body.dataset.warehouseProductPickerGlobalReady = "1";
       document.addEventListener("mousedown", (event) => {
@@ -2404,6 +2409,10 @@
     event.stopPropagation();
     openPhotoZoom(media.dataset.photoZoom);
   });
+
+  // Экспорт для AJAX-переключения разделов закупок (ajax-sections.js):
+  // повторно навешивает обработчики на свежую панель, идемпотентно.
+  window.WarehousePurchasesInit = init;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => init());

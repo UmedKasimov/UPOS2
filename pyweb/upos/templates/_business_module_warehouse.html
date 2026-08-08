@@ -221,7 +221,7 @@
     </form>
   </aside>
 
-  <article class="products-list-panel warehouse-purchases-board" data-workspace-view="purchases" hidden>
+  <article class="products-list-panel warehouse-purchases-board" id="warehouse-purchases" data-workspace-view="purchases" hidden>
     <header class="products-panel-head sales-journal-head">
       <div class="products-panel-title">
         <h2>Закупки</h2>
@@ -253,7 +253,13 @@
         {% if warehouse_filters.critical %}<input type="hidden" name="critical" value="{{ warehouse_filters.critical }}" />{% endif %}
       </form>
     </header>
-    <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы закупок">
+    <nav
+      class="messenger-channel-tabs sales-document-tabs"
+      aria-label="Разделы закупок"
+      data-ajax-nav
+      data-ajax-targets="#warehouse-purchases"
+      data-ajax-reinit="WarehousePurchasesInit"
+    >
       <span class="sales-document-tabs-title">Разделы закупок</span>
       {% for tab in warehouse_purchase_tabs %}
         <a
