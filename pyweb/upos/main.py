@@ -6402,6 +6402,9 @@ def create_app() -> FastAPI:
                         "moment": str(entry.get("moment") or ""),
                         "kind": str(entry.get("kind") or "Прайс"),
                         "price": _sales_money_label(_sales_decimal(entry.get("price"))),
+                        # Журнал знает настоящее «было» — без него первая
+                        # запись линии показывала бы ноль.
+                        "old_price": _sales_money_label(_sales_decimal(entry.get("old_price"))),
                         "currency": str(entry.get("currency") or "UZS"),
                         "document": price_log_sources.get(
                             str(entry.get("source") or ""), "Правка прайса"
@@ -6442,7 +6445,10 @@ def create_app() -> FastAPI:
                 key = f"{entry['kind']}:{entry['currency']}"
                 if last_by_kind.get(key) == entry["price"]:
                     continue
-                entry["old_price"] = last_by_kind.get(key) or "0"
+                # У записей журнала «было» уже точное — не затираем его
+                # восстановленным по соседям значением.
+                if not str(entry.get("old_price") or "").strip():
+                    entry["old_price"] = last_by_kind.get(key) or "0"
                 last_by_kind[key] = entry["price"]
                 moment = str(entry.get("moment") or "")
                 entry["date"] = moment[:10]
