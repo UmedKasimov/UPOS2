@@ -31712,7 +31712,10 @@ html.dark .crm-task-calendar-event {
   max-width: 100%;
 }
 
-#products-catalog-table .product-history-actions .product-history-index,
+#products-catalog-table .product-history-actions .product-history-index {
+  /* Номер над кнопками — по центру, без бокового отступа. */
+  padding: 0;
+}
 .reports-stock-analysis-table .product-history-actions .product-history-index {
   padding: 0 0.15rem 0 0.4rem;
 }

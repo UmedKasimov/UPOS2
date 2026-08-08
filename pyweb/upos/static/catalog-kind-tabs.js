@@ -144,8 +144,9 @@
         row.hidden = !ok;
         if (ok) {
           shown += 1;
-          const indexCell = row.querySelector(".product-history-index");
-          if (indexCell) indexCell.textContent = String(shown);
+          // Номер строки рисует CSS-счётчик (::before): скрытые строки он
+          // пропускает сам, поэтому вручную его писать не нужно — иначе номер
+          // дублируется (было «11» → «1111»).
           const qty = parseFloat((row.getAttribute("data-sort-quantity") || "0").replace(",", ".")) || 0;
           const unit = attr(row, "data-sort-unit");
           qtyByUnit[unit] = (qtyByUnit[unit] || 0) + qty;
