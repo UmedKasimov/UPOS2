@@ -1677,14 +1677,108 @@
           control.removeAttribute("aria-invalid");
           delete control.dataset.adjustmentAutoPrice;
         });
+        // Разблокировать комбобокс товара и скрыть его панель.
+        const picker = row.querySelector("[data-adjustment-product-picker]");
+        if (picker) picker.classList.remove("is-locked");
+        const pickerInput = row.querySelector("[data-adjustment-product-input]");
+        if (pickerInput) pickerInput.readOnly = false;
+        const pickerEdit = row.querySelector("[data-adjustment-product-edit]");
+        if (pickerEdit) pickerEdit.hidden = true;
+        const pickerPanel = row.querySelector("[data-adjustment-product-panel]");
+        if (pickerPanel) pickerPanel.hidden = true;
         setOutput(row, "[data-adjustment-current]", "0");
         setOutput(row, "[data-adjustment-after]", "0");
         setOutput(row, "[data-adjustment-unit]", "");
         setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
       };
+      // Выбор товара — поиском (комбобокс как в продаже), а не выпадающим
+      // списком: печатаешь название, выпадают совпадения с остатком.
+      const wireAdjustmentPicker = (row) => {
+        const picker = row.querySelector("[data-adjustment-product-picker]");
+        const search = row.querySelector("[data-adjustment-product-input]");
+        const hidden = row.querySelector("[data-adjustment-product]");
+        const editBtn = row.querySelector("[data-adjustment-product-edit]");
+        const panel = row.querySelector("[data-adjustment-product-panel]");
+        if (!picker || !search || !hidden || !panel) return;
+        const closePanel = () => {
+          panel.hidden = true;
+        };
+        const lock = (locked) => {
+          picker.classList.toggle("is-locked", locked);
+          search.readOnly = locked;
+          if (editBtn) editBtn.hidden = !locked;
+          if (locked) closePanel();
+        };
+        const pick = (item) => {
+          if (!item) return;
+          search.value = item.name || "";
+          hidden.value = item.id || "";
+          lock(true);
+          // Тот же change, что и у прежнего select — подставит цену и пересчёт.
+          hidden.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        const render = (query) => {
+          const selected = new Set(
+            rows()
+              .map((r) => String(r.querySelector("[data-adjustment-product]")?.value || ""))
+              .filter(Boolean),
+          );
+          const currentId = String(hidden.value || "");
+          const list = products
+            .filter((item) => productKind(item) === "product" && itemMatches(item, query))
+            .filter((item) => !selected.has(String(item.id)) || String(item.id) === currentId)
+            .slice(0, 100);
+          panel.innerHTML = list.length
+            ? list
+                .map((item) => {
+                  const code = item.sku || item.barcode || "Товар";
+                  return (
+                    '<button type="button" class="sales-combo-option">' +
+                    '<span class="sales-combo-main">' +
+                    highlightText(item.name, query) +
+                    '</span><span class="sales-combo-meta"><span>' +
+                    escapeHtml(`${code} · ${productStockLabel(item)}`) +
+                    "</span></span></button>"
+                  );
+                })
+                .join("")
+            : '<div class="sales-combo-empty">Ничего не найдено</div>';
+          panel.hidden = false;
+          positionFloatingPanel(search, panel, 420);
+          panel.querySelectorAll(".sales-combo-option").forEach((button, index) => {
+            button.addEventListener("mousedown", (event) => {
+              event.preventDefault();
+              pick(list[index]);
+            });
+          });
+        };
+        search.addEventListener("focus", () => {
+          if (!search.readOnly) render(search.value);
+        });
+        search.addEventListener("input", () => {
+          if (!search.readOnly) render(search.value);
+        });
+        search.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closePanel();
+          if (event.key === "Enter") {
+            const first = panel.querySelector(".sales-combo-option");
+            if (first && !panel.hidden) {
+              event.preventDefault();
+              first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+            }
+          }
+        });
+        editBtn?.addEventListener("click", () => {
+          lock(false);
+          search.focus();
+          search.select();
+          render(search.value);
+        });
+      };
       const wireRow = (row) => {
         if (row.dataset.warehouseAdjustmentRowReady === "1") return;
         row.dataset.warehouseAdjustmentRowReady = "1";
+        wireAdjustmentPicker(row);
         const productInput = row.querySelector("[data-adjustment-product]");
         const quantityInput = row.querySelector("[data-adjustment-quantity]");
         const priceInput = row.querySelector("[data-adjustment-price]");
@@ -1733,7 +1827,7 @@
         body.append(clone);
         wireRow(clone);
         recalc();
-        clone.querySelector("[data-adjustment-product]")?.focus();
+        clone.querySelector("[data-adjustment-product-input]")?.focus();
       };
       rows().forEach(wireRow);
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
@@ -2358,6 +2452,12 @@
         });
         document.querySelectorAll("[data-warehouse-supplier-picker]").forEach((picker) => {
           if (!picker.contains(event.target)) closeSupplierPanel(picker);
+        });
+        document.querySelectorAll("[data-adjustment-product-picker]").forEach((picker) => {
+          if (!picker.contains(event.target)) {
+            const panel = picker.querySelector("[data-adjustment-product-panel]");
+            if (panel) panel.hidden = true;
+          }
         });
       });
       window.addEventListener("resize", () => {

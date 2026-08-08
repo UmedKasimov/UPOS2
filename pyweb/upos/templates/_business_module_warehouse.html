@@ -1163,14 +1163,14 @@
               <tr data-adjustment-row>
                 <td class="warehouse-adjustment-row-number">1</td>
                 <td>
-                  <select name="line_product" data-adjustment-product>
-                    <option value="">Выберите товар</option>
-                    {% for product in warehouse_options.product_rows %}
-                      {% if product.kind != 'service' %}
-                        <option value="{{ product.id }}">{{ product.name }}</option>
-                      {% endif %}
-                    {% endfor %}
-                  </select>
+                  <label class="sales-combobox sales-product-picker warehouse-adjustment-product-picker" data-adjustment-product-picker>
+                    <div class="sales-lock-field">
+                      <input placeholder="Товар или услуга" autocomplete="off" data-adjustment-product-input />
+                      <button type="button" class="sales-combo-edit" data-adjustment-product-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                    </div>
+                    <input type="hidden" name="line_product" data-adjustment-product />
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-adjustment-product-panel hidden></div>
+                  </label>
                 </td>
                 <td>
                   <strong class="warehouse-adjustment-stock" data-adjustment-current>0</strong>
