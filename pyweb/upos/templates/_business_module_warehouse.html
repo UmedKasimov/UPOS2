@@ -535,6 +535,7 @@
             <thead>
               <tr>
                 <th>№</th>
+                <th>Дата</th>
                 <th>Счёт</th>
                 <th>Тип оплаты</th>
                 <th>Сумма</th>
@@ -597,7 +598,7 @@
                 <span class="settings-profile-field-label">Счёт</span>
                 <select class="settings-profile-input" data-detail-payment-account>
                   {% for account in warehouse_options.payment_accounts %}
-                    <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                    <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}{% if account.balance %} · остаток {{ account.balance }}{% endif %}</option>
                   {% else %}
                     <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
                   {% endfor %}

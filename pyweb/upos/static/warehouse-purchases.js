@@ -1969,6 +1969,7 @@
     const paymentLines = (Array.isArray(purchase.payment_lines) ? purchase.payment_lines : [])
       .filter((payment) => purchaseEntryNumber(payment?.amount) > 0)
       .map((payment) => ({
+        date: String(payment.date || "").trim(),
         account: String(payment.account || payment.type || "Оплата").trim() || "Оплата",
         type: String(payment.type || payment.account || "Оплата").trim() || "Оплата",
         amount: payment.amount,
@@ -1978,6 +1979,7 @@
     const paidAmount = purchaseEntryNumber(purchase.paid_amount);
     if (!paymentLines.length && paidAmount > 0) {
       paymentLines.push({
+        date: String(purchase.date || "").trim(),
         account: String(purchase.payment_type || "Оплата").trim() || "Оплата",
         type: String(purchase.payment_type || "Оплата").trim() || "Оплата",
         amount: paidAmount,
@@ -1989,7 +1991,7 @@
     paymentList.hidden = paymentLines.length === 0;
     paymentLines.forEach((payment, index) => {
       const row = document.createElement("tr");
-      [index + 1, payment.account, payment.type].forEach((value) => {
+      [index + 1, payment.date || "—", payment.account, payment.type].forEach((value) => {
         const cell = document.createElement("td");
         cell.textContent = String(value);
         row.append(cell);

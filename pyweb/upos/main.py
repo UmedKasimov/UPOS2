@@ -7939,6 +7939,20 @@ def create_app() -> FastAPI:
             normalized.append(item)
         return normalized
 
+    def _pocket_balance_label(pocket: dict[str, Any]) -> str:
+        """Остаток денег на счёте по данным казны — для подсказки в списке."""
+        entries = pocket.get("entries") if isinstance(pocket.get("entries"), list) else []
+        parts: list[str] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            amount = _sales_decimal(entry.get("amount"))
+            if amount == 0:
+                continue
+            currency = str(entry.get("currency") or "UZS").strip().upper() or "UZS"
+            parts.append(f"{_sales_money_label(amount)} {currency}")
+        return ", ".join(parts)
+
     def _workspace_today_iso(workspace_owner_id: str) -> str:
         """Сегодняшняя дата в часовом поясе воркспейса."""
         tz_id = normalize_workspace_timezone(
@@ -10295,6 +10309,7 @@ def create_app() -> FastAPI:
                     "id": str(pocket.get("id") or "").strip(),
                     "label": label,
                     "template_id": str(pocket.get("template_id") or "").strip(),
+                    "balance": _pocket_balance_label(pocket),
                 }
             )
         # Никаких заглушек «Наличные»/«Карта»: оплата сохраняется только на реальный
@@ -13577,6 +13592,7 @@ def create_app() -> FastAPI:
                     "id": str(pocket.get("id") or "").strip(),
                     "label": label,
                     "template_id": str(pocket.get("template_id") or "").strip(),
+                    "balance": _pocket_balance_label(pocket),
                 }
             )
         # См. комментарий в sales_get: подставлять несуществующие счета нельзя.
