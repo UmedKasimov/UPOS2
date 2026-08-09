@@ -9951,6 +9951,9 @@ def create_app() -> FastAPI:
             # Строим после цикла: счётчики наполняются там же.
             # Порядок разделов задан заказчиком: Все, Заказы, Продажи,
             # Рассрочки, Возвраты, Архив.
+            installment_tab_active = bool(filters.get("installment"))
+            archive_tab_active = "archived" in (selected_statuses or [])
+            regular_document_tab_active = not installment_tab_active and not archive_tab_active
             document_tabs = [
                 {
                     "value": "",
@@ -9959,8 +9962,8 @@ def create_app() -> FastAPI:
                     "brand": "all",
                     "count": journal_doc_type_counts["all"],
                     "href": document_tab_url(),
-                    "active": not selected_doc_types,
-                    "current": not selected_doc_types,
+                    "active": regular_document_tab_active and not selected_doc_types,
+                    "current": regular_document_tab_active and not selected_doc_types,
                 },
                 {
                     "value": "order",
@@ -9969,8 +9972,8 @@ def create_app() -> FastAPI:
                     "brand": "order",
                     "count": journal_doc_type_counts["order"],
                     "href": document_tab_url("order"),
-                    "active": "order" in selected_doc_types,
-                    "current": selected_doc_types == ["order"],
+                    "active": regular_document_tab_active and "order" in selected_doc_types,
+                    "current": regular_document_tab_active and selected_doc_types == ["order"],
                 },
                 {
                     "value": "sale",
@@ -9979,8 +9982,8 @@ def create_app() -> FastAPI:
                     "brand": "sale",
                     "count": journal_doc_type_counts["sale"],
                     "href": document_tab_url("sale"),
-                    "active": "sale" in selected_doc_types,
-                    "current": selected_doc_types == ["sale"],
+                    "active": regular_document_tab_active and "sale" in selected_doc_types,
+                    "current": regular_document_tab_active and selected_doc_types == ["sale"],
                 },
                 {
                     "value": "installment",
@@ -9989,8 +9992,8 @@ def create_app() -> FastAPI:
                     "brand": "installment",
                     "count": journal_installment_count,
                     "href": installment_tab_url(),
-                    "active": bool(filters.get("installment")),
-                    "current": bool(filters.get("installment")),
+                    "active": installment_tab_active,
+                    "current": installment_tab_active,
                 },
                 {
                     "value": "return",
@@ -9999,8 +10002,8 @@ def create_app() -> FastAPI:
                     "brand": "return",
                     "count": journal_doc_type_counts["return"],
                     "href": document_tab_url("return"),
-                    "active": "return" in selected_doc_types,
-                    "current": selected_doc_types == ["return"],
+                    "active": regular_document_tab_active and "return" in selected_doc_types,
+                    "current": regular_document_tab_active and selected_doc_types == ["return"],
                 },
                 {
                     "value": "archived",
@@ -10009,8 +10012,8 @@ def create_app() -> FastAPI:
                     "brand": "archive",
                     "count": journal_archived_count,
                     "href": archive_tab_url(),
-                    "active": "archived" in (selected_statuses or []),
-                    "current": (selected_statuses or []) == ["archived"],
+                    "active": archive_tab_active,
+                    "current": archive_tab_active,
                 },
             ]
             sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)

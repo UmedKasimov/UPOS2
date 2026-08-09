@@ -110,11 +110,11 @@
 
 
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
-    {% macro render_sales_journal_filter() %}
-    <form id="sales-journal-filter" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if sales_filters.status == 'debt' else '#sales-journal' }}" data-sales-journal-auto-filter data-workspace-view="journal order return debt"{% if sales_default_tab not in ['journal', 'order', 'return', 'debt'] %} hidden{% endif %}>
+    {% macro render_sales_journal_filter(form_id, target_view, workspace_views) %}
+    <form id="{{ form_id }}" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if target_view == 'debt' else '#sales-journal' }}" data-sales-journal-auto-filter data-sales-filter-target="{{ target_view }}" data-workspace-view="{{ workspace_views }}">
       <input type="hidden" name="journal_page_size" value="{{ sales_journal_pagination.page_size }}" />
       <input type="hidden" name="debt_page_size" value="{{ sales_debt_workspace.page_size }}" />
-      {% if sales_filters.status != 'debt' %}<input type="hidden" name="view" value="journal" />{% endif %}
+      {% if target_view != 'debt' %}<input type="hidden" name="view" value="journal" />{% endif %}
       <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
         <span>Поиск</span>
         <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
@@ -231,10 +231,6 @@
       </div>
     </form>
     {% endmacro %}
-    {% if sales_filters.status == 'debt' %}
-      {{ render_sales_journal_filter() }}
-    {% endif %}
-
     <datalist id="sales-client-list">
       {% for item in sales_options.clients %}<option value="{{ item }}">{% endfor %}
     </datalist>
@@ -254,6 +250,9 @@
           </div>
           <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
         </header>
+        {% if sales_filters.status == 'debt' %}
+          {{ render_sales_journal_filter('sales-debt-filter', 'debt', 'debt') }}
+        {% endif %}
         <section class="sales-debt-summary" aria-label="Сводка долгов">
           <div class="sales-debt-metric sales-debt-metric--total">
             <span>Общий долг</span>
@@ -400,7 +399,7 @@
           </div>
           <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
           {% if sales_filters.status != 'debt' %}
-            {{ render_sales_journal_filter() }}
+            {{ render_sales_journal_filter('sales-journal-filter', 'journal', 'journal order return') }}
           {% endif %}
         </header>
         <nav

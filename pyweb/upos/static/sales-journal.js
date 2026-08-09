@@ -972,9 +972,9 @@
   }
 
   function bindSalesJournalFilter(scope) {
-    var form = scope.querySelector("#sales-journal-filter");
-    if (!form || form.dataset.salesJournalFilterReady === "1") return;
-    form.dataset.salesJournalFilterReady = "1";
+    scope.querySelectorAll("[data-sales-journal-auto-filter]").forEach(function (form) {
+      if (form.dataset.salesJournalFilterReady === "1") return;
+      form.dataset.salesJournalFilterReady = "1";
     var bindCheckboxFilter = function (root, allSelector, optionSelector, summarySelector) {
       if (!root) return;
       var allOption = root.querySelector(allSelector);
@@ -1053,9 +1053,15 @@
       form.querySelectorAll("[data-sales-crm-stage-option]:checked").forEach(function (field) {
         params.append("crm_stage", String(field.value || "").trim());
       });
+      var targetView = form.dataset.salesFilterTarget || "journal";
+      if (targetView === "debt") {
+        params.delete("status");
+        params.set("status", "debt");
+        params.delete("view");
+      }
       if (!params.has("doc_type")) params.set("doc_type", "all");
       var query = params.toString();
-      var targetHash = params.get("status") === "debt" ? "#debt" : "#sales-journal";
+      var targetHash = targetView === "debt" ? "#debt" : "#sales-journal";
       window.location.href = "/sales" + (query ? "?" + query : "") + targetHash;
     };
     form.addEventListener("submit", function (event) {
@@ -1087,6 +1093,7 @@
         navigate();
       });
     }
+    });
   }
 
   function highlightSalesJournalMatches(scope) {

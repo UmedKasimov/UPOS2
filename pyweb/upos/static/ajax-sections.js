@@ -95,10 +95,6 @@
       return;
     }
 
-    const panel = nav.closest(".products-list-panel") || nav;
-    // Затемняем только если ответ не пришёл за ~140 мс — на предзагруженных
-    // разделах переход мгновенный и мельтешения затемнения не будет.
-    const dimTimer = window.setTimeout(() => panel.classList.add("ajax-section-loading"), 140);
     try {
       const parsed =
         (prefetchCache.has(href) ? await prefetchCache.get(href) : null) || (await fetchParsed(href));
@@ -110,10 +106,16 @@
     } catch (error) {
       // Любой сбой — честный полный переход, чтобы не оставить список сломанным.
       window.location.href = href;
-    } finally {
-      window.clearTimeout(dimTimer);
-      panel.classList.remove("ajax-section-loading");
     }
+  }
+
+  function markActiveLink(nav, activeLink) {
+    nav.querySelectorAll("a[href]").forEach((link) => {
+      const active = link === activeLink;
+      link.classList.toggle("active", active);
+      if (active) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
   }
 
   document.addEventListener("click", (event) => {
@@ -125,7 +127,15 @@
     const href = link.getAttribute("href") || "";
     if (!href || href.startsWith("#")) return;
     event.preventDefault();
+    markActiveLink(nav, link);
     load(href, nav);
+  });
+
+  // Touch/pointer users do not have a hover phase. Start the same background
+  // request on pointer down so the click can reuse the in-flight response.
+  document.addEventListener("pointerdown", (event) => {
+    const link = event.target.closest("[data-ajax-nav] a[href]");
+    if (link) prefetch(link.getAttribute("href") || "");
   });
 
   // Предзагрузка при наведении/фокусе: к моменту клика раздел уже скачан и
