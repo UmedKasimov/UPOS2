@@ -813,7 +813,7 @@
     }
 
     api.layer.clearLayers();
-    const bounds = [];
+    let renderedCount = 0;
     for (const point of geocodable) {
       const resolved = await overviewPointCoords(point);
       if (!resolved) continue;
@@ -839,20 +839,16 @@
         if (event.originalEvent) window.L.DomEvent.stop(event.originalEvent);
         marker.openPopup();
       });
-      bounds.push([resolved.lat, resolved.lon]);
+      renderedCount += 1;
     }
     bindLabelZoom(api);
 
-    if (!bounds.length) {
+    if (!renderedCount) {
       container.classList.add("clients-overview-map--empty");
       if (empty) empty.textContent = "Не удалось найти адреса выбранных клиентов на карте.";
       return;
     }
-    if (bounds.length === 1) {
-      api.map.setView(bounds[0], PICK_ZOOM);
-    } else {
-      api.map.fitBounds(bounds, { padding: [34, 34] });
-    }
+    // Keep the user's current center and zoom while filters refresh the markers.
     scheduleInvalidate(api);
   }
 
