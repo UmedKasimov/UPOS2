@@ -1118,6 +1118,7 @@
       class="product-form warehouse-adjustment-form"
       data-warehouse-adjustment-entry
       data-adjustment-direction="{{ adjustment_direction }}"
+      data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
     >
       {% include "_csrf_field.html" %}
       <input type="hidden" name="operation_type" value="{{ adjustment_direction }}" />
@@ -1179,6 +1180,7 @@
                   <label class="sales-combobox sales-product-picker warehouse-adjustment-product-picker" data-adjustment-product-picker>
                     <div class="sales-lock-field">
                       <input placeholder="Товар" autocomplete="off" data-adjustment-product-input />
+                      <button type="button" class="sales-combo-add" data-adjustment-product-create-open aria-label="Создать новый товар" title="Новый товар">+</button>
                       <button type="button" class="sales-combo-edit" data-adjustment-product-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
                     </div>
                     <input type="hidden" name="line_product" data-adjustment-product />

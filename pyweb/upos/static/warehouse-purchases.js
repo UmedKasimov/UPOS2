@@ -1,6 +1,7 @@
 (function () {
   let activeSupplierPicker = null;
   let activeProductPicker = null;
+  let activeProductEntryForm = null;
   let activeExpenseTypeInput = null;
 
   function updateAction(form) {
@@ -677,6 +678,7 @@
     else dialog.hidden = true;
     dialog.removeAttribute("open");
     activeProductPicker = null;
+    activeProductEntryForm = null;
   }
 
   function openProductDialog(entryForm, picker, query) {
@@ -684,6 +686,7 @@
     const form = dialog?.querySelector("[data-warehouse-product-form]");
     if (!dialog || !form) return;
     activeProductPicker = picker || null;
+    activeProductEntryForm = entryForm || null;
     closeProductPanel(picker);
     form.reset();
     const nameInput = form.querySelector("[data-warehouse-product-name]");
@@ -692,8 +695,12 @@
     const warehouseInput = form.querySelector("[data-warehouse-product-warehouse]");
     if (nameInput) nameInput.value = String(query || "").trim();
     if (unitInput) unitInput.value = "Штука";
-    if (currencyInput) currencyInput.value = entryForm.querySelector("[data-purchase-entry-currency]")?.value || "UZS";
-    if (warehouseInput) warehouseInput.value = entryForm.querySelector('input[name="warehouse"]')?.value || warehouseInput.defaultValue || "Основной склад";
+    if (currencyInput) {
+      currencyInput.value = entryForm.querySelector("[data-purchase-entry-currency], [data-adjustment-currency]")?.value || "UZS";
+    }
+    if (warehouseInput) {
+      warehouseInput.value = entryForm.querySelector('[name="warehouse"]')?.value || warehouseInput.defaultValue || "Основной склад";
+    }
     setProductDialogStatus(form, "", "");
     if (typeof dialog.showModal === "function") {
       try {
@@ -735,7 +742,10 @@
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const submit = form.querySelector("[data-warehouse-product-submit]");
-      const endpoint = entryForm.getAttribute("data-warehouse-product-quick-save-url") || "/sales/products/quick-save";
+      const targetEntryForm = activeProductEntryForm && document.contains(activeProductEntryForm)
+        ? activeProductEntryForm
+        : entryForm;
+      const endpoint = targetEntryForm.getAttribute("data-warehouse-product-quick-save-url") || "/sales/products/quick-save";
       setProductDialogStatus(form, "Сохраняю...", "");
       if (submit) submit.disabled = true;
       fetch(endpoint, {
@@ -753,10 +763,17 @@
           upsertProductOption(product);
           const picker = activeProductPicker && document.contains(activeProductPicker)
             ? activeProductPicker
-            : entryForm.querySelector("[data-warehouse-product-picker]");
-          applyProductSelection(entryForm, picker, product);
+            : targetEntryForm.querySelector("[data-warehouse-product-picker], [data-adjustment-product-picker]");
+          if (picker?.matches("[data-adjustment-product-picker]")) {
+            picker.dispatchEvent(new CustomEvent("warehouse-adjustment-product-created", {
+              bubbles: true,
+              detail: { product },
+            }));
+          } else {
+            applyProductSelection(targetEntryForm, picker, product);
+          }
           setProductDialogStatus(form, "Сохранено", "ok");
-          closeProductDialog(entryForm);
+          closeProductDialog(targetEntryForm);
         })
         .catch((error) => {
           setProductDialogStatus(form, error.message || "Не удалось сохранить", "err");
@@ -1594,6 +1611,7 @@
       form.dataset.warehouseAdjustmentReady = "1";
       const options = readPurchaseOptions();
       const products = Array.isArray(options.product_rows) ? options.product_rows : [];
+      wireProductDialog(form);
       const body = form.querySelector("[data-adjustment-lines]");
       const warehouseInput = form.querySelector("[data-adjustment-warehouse]");
       const currencyInput = form.querySelector("[data-adjustment-currency]");
@@ -1741,6 +1759,7 @@
         const search = row.querySelector("[data-adjustment-product-input]");
         const hidden = row.querySelector("[data-adjustment-product]");
         const editBtn = row.querySelector("[data-adjustment-product-edit]");
+        const createBtn = row.querySelector("[data-adjustment-product-create-open]");
         const panel = row.querySelector("[data-adjustment-product-panel]");
         if (!picker || !search || !hidden || !panel) return;
         const closePanel = () => {
@@ -1761,6 +1780,7 @@
           hidden.dispatchEvent(new Event("change", { bubbles: true }));
         };
         const render = (query) => {
+          const cleanQuery = String(query || "").trim();
           const selected = new Set(
             rows()
               .map((r) => String(r.querySelector("[data-adjustment-product]")?.value || ""))
@@ -1771,23 +1791,45 @@
             .filter((item) => productKind(item) === "product" && itemMatches(item, query))
             .filter((item) => !selected.has(String(item.id)) || String(item.id) === currentId)
             .slice(0, 100);
-          panel.innerHTML = list.length
+          const createLabel = cleanQuery ? `+ Создать товар "${cleanQuery}"` : "+ Создать товар";
+          panel.innerHTML =
+            `<button type="button" class="sales-combo-create" data-adjustment-product-create>${escapeHtml(createLabel)}</button>` +
+            (list.length
             ? list
                 .map((item) => {
                   const code = item.sku || item.barcode || "Товар";
+                  const priceRows = (Array.isArray(item.prices) ? item.prices : [])
+                    .filter((price) => purchaseEntryNumber(price?.price) > 0)
+                    .slice(0, 2);
+                  const priceLabel = priceRows.length
+                    ? priceRows.map((price) => {
+                      const priceCurrency = String(price.currency || currency()).toUpperCase();
+                      const priceName = String(price.name || "Прайс").trim() || "Прайс";
+                      return `${priceName}: ${purchaseEntryFormatCurrency(purchaseEntryNumber(price.price), priceCurrency)} ${priceCurrency}`;
+                    }).join(" · ")
+                    : (() => {
+                      const price = latestPurchasePrice(item);
+                      return price ? `${purchaseEntryFormatCurrency(purchaseEntryNumber(price), currency())} ${currency()}` : "Без цены";
+                    })();
                   return (
                     '<button type="button" class="sales-combo-option">' +
                     '<span class="sales-combo-main">' +
                     highlightText(item.name, query) +
                     '</span><span class="sales-combo-meta"><span>' +
                     escapeHtml(`${code} · ${productStockLabel(item)}`) +
-                    "</span></span></button>"
+                    "</span><strong>" +
+                    escapeHtml(priceLabel) +
+                    "</strong></span></button>"
                   );
                 })
                 .join("")
-            : '<div class="sales-combo-empty">Ничего не найдено</div>';
+            : '<div class="sales-combo-empty">Ничего не найдено</div>');
           panel.hidden = false;
           positionFloatingPanel(search, panel, 420);
+          panel.querySelector("[data-adjustment-product-create]")?.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            openProductDialog(form, picker, cleanQuery);
+          });
           panel.querySelectorAll(".sales-combo-option").forEach((button, index) => {
             button.addEventListener("mousedown", (event) => {
               event.preventDefault();
@@ -1816,6 +1858,22 @@
           search.focus();
           search.select();
           render(search.value);
+        });
+        createBtn?.addEventListener("click", () => {
+          openProductDialog(form, picker, search.value);
+        });
+        picker.addEventListener("warehouse-adjustment-product-created", (event) => {
+          const product = event.detail?.product;
+          if (!product?.name) return;
+          const productId = String(product.id || "");
+          const index = products.findIndex((item) => (
+            (productId && String(item?.id || "") === productId)
+            || normalize(item?.name) === normalize(product.name)
+          ));
+          if (index >= 0) products[index] = product;
+          else products.push(product);
+          products.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || ""), "ru"));
+          pick(product);
         });
       };
       const wireRow = (row) => {
