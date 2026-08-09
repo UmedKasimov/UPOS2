@@ -2594,17 +2594,17 @@
     }
     if (document.body.dataset.warehouseProductPickerGlobalReady !== "1") {
       document.body.dataset.warehouseProductPickerGlobalReady = "1";
-      document.addEventListener("mousedown", (event) => {
+      document.addEventListener("click", (event) => {
         const adjustmentCreateButton = event.target?.closest?.("[data-adjustment-product-create-open]");
-        if (adjustmentCreateButton) {
-          event.preventDefault();
-          const row = adjustmentCreateButton.closest("[data-adjustment-row]");
-          const form = adjustmentCreateButton.closest("[data-warehouse-adjustment-entry]");
-          const picker = row?.querySelector("[data-adjustment-product-picker]");
-          const search = row?.querySelector("[data-adjustment-product-input]");
-          if (form && picker) openProductDialog(form, picker, search?.value || "");
-          return;
-        }
+        if (!adjustmentCreateButton) return;
+        event.preventDefault();
+        const row = adjustmentCreateButton.closest("[data-adjustment-row]");
+        const form = adjustmentCreateButton.closest("[data-warehouse-adjustment-entry]");
+        const picker = row?.querySelector("[data-adjustment-product-picker]");
+        const search = row?.querySelector("[data-adjustment-product-input]");
+        if (form && picker) openProductDialog(form, picker, search?.value || "");
+      }, true);
+      document.addEventListener("mousedown", (event) => {
         document.querySelectorAll("[data-warehouse-product-picker]").forEach((picker) => {
           if (!picker.contains(event.target)) closeProductPanel(picker);
         });
