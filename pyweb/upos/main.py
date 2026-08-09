@@ -9789,6 +9789,10 @@ def create_app() -> FastAPI:
             "date_from": date_from_clean,
             "date_to": date_to_clean,
         }
+        sales_ajax_section = (
+            request.headers.get("x-requested-with") == "XMLHttpRequest"
+            and str(request.query_params.get("view") or "").strip() == "journal"
+        )
         sales_embed = str(embed or "").strip() == "1"
         sales: list[dict[str, Any]] = []
         filtered_sale_clients: list[str] = []
@@ -9803,25 +9807,88 @@ def create_app() -> FastAPI:
         payment_accounts: list[dict[str, str]] = []
         next_numbers: dict[str, str] = {}
         sales_prefill = {"crm_record_id": "", "client": client.strip()}
-        business_segments = _workspace_business_segments(wid)
-        installer_options = list_installers(wid)
-        installation_templates = list_installation_templates(wid)
+        business_segments = [] if sales_ajax_section else _workspace_business_segments(wid)
+        installer_options = [] if sales_ajax_section else list_installers(wid)
+        installation_templates = [] if sales_ajax_section else list_installation_templates(wid)
         usd_rate = _workspace_usd_uzs_rate(wid)
         # Агент и ответственный по задаче выбираются из сотрудников — тот же
         # список имён, что подсказывает CRM.
-        sales_agent_options = sorted(
-            {
-                name
-                for name in (
-                    [str((request.session.get("user") or {}).get("name") or "").strip()]
-                    + [
-                        str(emp.get("name") or emp.get("username") or "").strip()
-                        for emp in list_employees_safe(wid)
-                    ]
-                )
-                if name
-            }
+        sales_agent_options = (
+            []
+            if sales_ajax_section
+            else sorted(
+                {
+                    name
+                    for name in (
+                        [str((request.session.get("user") or {}).get("name") or "").strip()]
+                        + [
+                            str(emp.get("name") or emp.get("username") or "").strip()
+                            for emp in list_employees_safe(wid)
+                        ]
+                    )
+                    if name
+                }
+            )
         )
+
+        def render_sales_page():
+            return tpl(
+                request,
+                "home_sales.html",
+                variant="user",
+                active="sales",
+                sales=sales,
+                sales_journal_totals=sales_journal_totals,
+                sales_journal_pagination=sales_journal_pagination,
+                sales_debt_workspace=sales_debt_workspace,
+                sales_filters=filters,
+                sales_options={
+                    "clients": clients,
+                    "client_rows": client_options,
+                    "warehouses": warehouses,
+                    "warehouse_rows": warehouse_options,
+                    "products": product_names,
+                    "product_rows": product_options,
+                    "price_types": price_type_options,
+                    "payment_accounts": payment_accounts,
+                    "doc_type_filters": doc_type_filter_options,
+                    "document_tabs": document_tabs,
+                    "status_filters": status_filter_options,
+                    "payment_status_filters": payment_status_filter_options,
+                    "crm_stage_filters": crm_stage_filter_options,
+                    "business_segments": business_segments,
+                    "crm_stages": crm_stages,
+                    "responsibles": sales_agent_options,
+                    "installers": installer_options,
+                    "installation_templates": installation_templates,
+                    "installation_priorities": [
+                        {
+                            "value": priority,
+                            "label": INSTALLATION_PRIORITY_LABELS[priority],
+                        }
+                        for priority in INSTALLATION_PRIORITIES
+                    ],
+                    "currencies": sorted(
+                        {*(item["currency"] for item in price_type_options), "UZS", "USD"}
+                    ),
+                    "next_numbers": next_numbers,
+                    "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
+                },
+                today=today_date.isoformat(),
+                flash_ok=request.query_params.get("msg"),
+                flash_err=request.query_params.get("error")
+                or (
+                    "Форма устарела. Обновите страницу и повторите."
+                    if request.query_params.get("err") == "csrf"
+                    else ""
+                ),
+                sales_saved_id=request.query_params.get("saved_id") or "",
+                sales_price_tag=(load_workspace_settings(wid) or {}).get("price_tag") or {},
+                sales_prefill=sales_prefill,
+                sales_embed=sales_embed,
+                body_embed="sales-order" if sales_embed else "",
+            )
+
         with session_scope() as session:
             requested_crm_id = str(crm_record_id or "").strip()
             if requested_crm_id:
@@ -10182,6 +10249,74 @@ def create_app() -> FastAPI:
                 crm_context = _sales_crm_context(item, sales_crm_index)
                 item.update(crm_context)
                 item["detail_json"].update(crm_context)
+            if sales_ajax_section:
+                current_client_ids = {
+                    str(item.get("counterparty_id") or "").strip()
+                    for item in sales
+                    if str(item.get("counterparty_id") or "").strip()
+                }
+                current_client_names = {
+                    str(item.get("client") or "").strip()
+                    for item in sales
+                    if str(item.get("client") or "").strip()
+                }
+                client_conditions = []
+                if current_client_ids:
+                    client_conditions.append(Counterparty.id.in_(current_client_ids))
+                if current_client_names:
+                    client_conditions.append(Counterparty.name.in_(current_client_names))
+                segment_rows = (
+                    list(
+                        session.execute(
+                            select(Counterparty).where(
+                                Counterparty.workspace_owner_id == wid,
+                                Counterparty.kind.in_(["client", "both"]),
+                                or_(*client_conditions),
+                            )
+                        ).scalars()
+                    )
+                    if client_conditions
+                    else []
+                )
+                segment_by_id: dict[str, dict[str, str]] = {}
+                segment_by_name: dict[str, dict[str, str]] = {}
+                for row in segment_rows:
+                    extra = _counterparty_extra(row)
+                    segment_data = {
+                        "business_segment_id": str(extra.get("business_segment_id") or ""),
+                        "business_segment": str(extra.get("business_segment") or ""),
+                        "business_segment_icon": str(
+                            extra.get("business_segment_icon") or extra.get("map_icon") or ""
+                        ),
+                    }
+                    segment_by_id[str(row.id)] = segment_data
+                    segment_by_name[str(row.name or "").strip().casefold()] = segment_data
+                for item in sales:
+                    if str(item.get("business_segment") or "").strip():
+                        continue
+                    segment_data = segment_by_id.get(
+                        str(item.get("counterparty_id") or "").strip()
+                    ) or segment_by_name.get(str(item.get("client") or "").strip().casefold())
+                    if not segment_data:
+                        continue
+                    item.update(segment_data)
+                    item["detail_json"].update(segment_data)
+                treasury = load_treasury(wid)
+                for pocket in treasury.get("pockets") or []:
+                    if not isinstance(pocket, dict):
+                        continue
+                    label = str(pocket.get("label") or "").strip()
+                    if not label:
+                        continue
+                    payment_accounts.append(
+                        {
+                            "id": str(pocket.get("id") or "").strip(),
+                            "label": label,
+                            "template_id": str(pocket.get("template_id") or "").strip(),
+                            "balance": _pocket_balance_label(pocket),
+                        }
+                    )
+                return render_sales_page()
             price_types = _workspace_price_types(wid)
             active_sales_price_types = [
                 item
@@ -10354,56 +10489,7 @@ def create_app() -> FastAPI:
         # Никаких заглушек «Наличные»/«Карта»: оплата сохраняется только на реальный
         # FinanceAccount, поэтому выдуманный счёт довёл бы пользователя до формы оплаты
         # и упал бы уже на сохранении.
-        return tpl(
-            request,
-            "home_sales.html",
-            variant="user",
-            active="sales",
-            sales=sales,
-            sales_journal_totals=sales_journal_totals,
-            sales_journal_pagination=sales_journal_pagination,
-            sales_debt_workspace=sales_debt_workspace,
-            sales_filters=filters,
-            sales_options={
-                "clients": clients,
-                "client_rows": client_options,
-                "warehouses": warehouses,
-                "warehouse_rows": warehouse_options,
-                "products": product_names,
-                "product_rows": product_options,
-                "price_types": price_type_options,
-                "payment_accounts": payment_accounts,
-                "doc_type_filters": doc_type_filter_options,
-                "document_tabs": document_tabs,
-                "status_filters": status_filter_options,
-                "payment_status_filters": payment_status_filter_options,
-                "crm_stage_filters": crm_stage_filter_options,
-                "business_segments": business_segments,
-                "crm_stages": crm_stages,
-                "responsibles": sales_agent_options,
-                "installers": installer_options,
-                "installation_templates": installation_templates,
-                "installation_priorities": [
-                    {
-                        "value": priority,
-                        "label": INSTALLATION_PRIORITY_LABELS[priority],
-                    }
-                    for priority in INSTALLATION_PRIORITIES
-                ],
-                "currencies": sorted({*(item["currency"] for item in price_type_options), "UZS", "USD"}),
-                "next_numbers": next_numbers,
-                "fx": {"USD_UZS": _decimal_plain_text(usd_rate)},
-            },
-            today=today_date.isoformat(),
-            flash_ok=request.query_params.get("msg"),
-            flash_err=request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else ""),
-            sales_saved_id=request.query_params.get("saved_id") or "",
-            # Настройки ценника нужны попапу после продажи — печать этикеток.
-            sales_price_tag=(load_workspace_settings(wid) or {}).get("price_tag") or {},
-            sales_prefill=sales_prefill,
-            sales_embed=sales_embed,
-            body_embed="sales-order" if sales_embed else "",
-        )
+        return render_sales_page()
 
     @app.get("/api/sales/clients/{client_id}/card", name="sales_client_card_api")
     def sales_client_card_api(request: Request, client_id: str):
