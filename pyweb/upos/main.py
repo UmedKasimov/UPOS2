@@ -12387,6 +12387,56 @@ def create_app() -> FastAPI:
             )
         if not lines:
             raise ValueError("Добавьте хотя бы один товар")
+        extra_expenses: list[dict[str, str]] = []
+        extra_expense_total = Decimal("0")
+        if operation_type == "in":
+            expense_names = list(form.getlist("extra_expense_name"))
+            expense_amounts = list(form.getlist("extra_expense_amount"))
+            for index in range(max(len(expense_names), len(expense_amounts), 0)):
+                expense_name = str(expense_names[index] if index < len(expense_names) else "").strip()
+                expense_amount = _sales_decimal_strict(
+                    expense_amounts[index] if index < len(expense_amounts) else "",
+                    "Дополнительный расход",
+                )
+                if expense_amount < 0:
+                    raise ValueError("Дополнительный расход не может быть отрицательным")
+                if expense_amount <= 0:
+                    continue
+                extra_expenses.append(
+                    {
+                        "name": expense_name or "Дополнительный расход",
+                        "amount": _decimal_plain_text(expense_amount),
+                    }
+                )
+                extra_expense_total += expense_amount
+
+            allocation_total = sum((_sales_decimal(line.get("total")) for line in lines), Decimal("0"))
+            use_quantity_basis = allocation_total <= 0
+            if use_quantity_basis:
+                allocation_total = sum((_sales_decimal(line.get("quantity")) for line in lines), Decimal("0"))
+            remaining_expense = extra_expense_total
+            for index, line in enumerate(lines):
+                quantity = _sales_decimal(line.get("quantity"))
+                line_total = _sales_decimal(line.get("total"))
+                basis = quantity if use_quantity_basis else line_total
+                if index == len(lines) - 1:
+                    allocated_expense = remaining_expense
+                elif allocation_total > 0 and extra_expense_total > 0:
+                    allocated_expense = (
+                        (extra_expense_total * basis / allocation_total)
+                        .quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+                    )
+                    allocated_expense = min(remaining_expense, max(Decimal("0"), allocated_expense))
+                    remaining_expense -= allocated_expense
+                else:
+                    allocated_expense = Decimal("0")
+                cost_total = line_total + allocated_expense
+                cost_price = cost_total / quantity if quantity > 0 else Decimal("0")
+                line["extra_expense"] = _decimal_plain_text(allocated_expense)
+                line["cost_total"] = _decimal_plain_text(cost_total)
+                line["cost_price"] = _decimal_plain_text(
+                    cost_price.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+                )
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
         data = {
             "date": str(form.get("date") or "").strip(),
@@ -12394,8 +12444,11 @@ def create_app() -> FastAPI:
             "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
             "responsible": str(form.get("responsible") or "").strip(),
             "note": str(form.get("note") or "").strip(),
+            "extra_expenses": extra_expenses,
+            "extra_expense_total": _decimal_plain_text(extra_expense_total),
+            "landed_cost_total": _decimal_plain_text(total + extra_expense_total),
         }
-        return data, lines, total, currency
+        return data, lines, total + extra_expense_total, currency
 
     def _warehouse_operation_data(row: WarehouseOperation) -> dict[str, Any]:
         data = _json_object(row.data)
@@ -13875,6 +13928,7 @@ def create_app() -> FastAPI:
                 for index, line in enumerate(resolved_lines, start=1):
                     quantity = _sales_decimal(line.get("quantity"))
                     price = _sales_decimal(line.get("price"))
+                    cost_price = _sales_decimal(line.get("cost_price")) or price
                     line_data = {
                         **data,
                         **line,
@@ -13891,7 +13945,7 @@ def create_app() -> FastAPI:
                             warehouse_id=warehouse_row.id,
                             product_id=str(line.get("product_id") or "") or None,
                             quantity=quantity,
-                            amount=quantity * price,
+                            amount=quantity * cost_price,
                             currency=currency,
                             data=line_data,
                         )

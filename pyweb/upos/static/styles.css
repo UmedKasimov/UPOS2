@@ -29639,10 +29639,44 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-stock,
 .warehouse-adjustment-table [data-adjustment-after],
+.warehouse-adjustment-cost-price,
 .warehouse-adjustment-line-total {
   display: block;
   color: var(--foreground);
   font-variant-numeric: tabular-nums;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table {
+  min-width: 1220px;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(2),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(2) {
+  width: 25%;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(3),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(3),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(4),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(4),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(5),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(5) {
+  width: 10%;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(6),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(6),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(7),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(7),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(8),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(8) {
+  width: 13%;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(9),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(9) {
+  width: 44px;
+  text-align: center;
 }
 
 .warehouse-adjustment-table [data-adjustment-unit] {
@@ -32592,6 +32626,14 @@ html.dark .client-own-tag--other {
   width: 100%;
   max-width: 72rem;
   margin-inline: auto;
+}
+
+/* Закупка и складской приход используют рабочую ширину формы продажи:
+   таблица товаров, расходы и итоги остаются в одной читаемой сетке. */
+.workspace-module-root .warehouse-purchase-entry,
+.workspace-module-root .warehouse-adjustment-entry {
+  max-width: none;
+  margin-inline: 0;
 }
 
 /* ЕДИНЫЙ ДИЗАЙН КАРТОЧЕК СОЗДАНИЯ

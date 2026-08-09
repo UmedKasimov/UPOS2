@@ -1499,6 +1499,16 @@
 
       rows().forEach(wireRow);
       expenseRows().forEach(wireExpenseRow);
+      form.querySelector("[data-purchase-entry-add-product]")?.addEventListener("click", () => {
+        ensureBlankLine();
+        const blankRow = rows().find((row) => !rowHasProduct(row)) || rows()[rows().length - 1];
+        blankRow?.querySelector("[data-warehouse-product-input]")?.focus();
+      });
+      form.querySelector("[data-purchase-expense-open]")?.addEventListener("click", () => {
+        const row = addExpenseRow();
+        form.querySelector("[data-purchase-expenses]")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        row?.querySelector('select[name="extra_expense_name"]')?.focus({ preventScroll: true });
+      });
       form.querySelector("[data-purchase-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
         row?.querySelector('select[name="extra_expense_name"]')?.focus();
@@ -1590,10 +1600,19 @@
       const totalOutput = form.querySelector("[data-adjustment-total]");
       const errorOutput = form.querySelector("[data-adjustment-error]");
       const submitButton = form.querySelector("[data-adjustment-submit]");
+      const expenseSection = form.querySelector("[data-adjustment-expenses]");
+      const expenseLines = form.querySelector("[data-adjustment-expense-lines]");
+      const goodsTotalOutput = form.querySelector("[data-adjustment-goods-total]");
+      const expenseTotalOutput = form.querySelector("[data-adjustment-expense-total]");
+      const landedTotalOutput = form.querySelector("[data-adjustment-landed-total]");
       const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
       const directionSign = direction === "in" ? 1 : -1;
       const signLabel = direction === "in" ? "+" : "−";
       const rows = () => Array.from(body?.querySelectorAll("[data-adjustment-row]") || []);
+      const expenseRows = () => Array.from(expenseLines?.querySelectorAll("[data-adjustment-expense-row]") || []);
+      const expenseTotal = () => expenseRows().reduce((sum, row) => {
+        return sum + Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-expense-amount]")?.value || ""));
+      }, 0);
       const productForRow = (row) => {
         const productId = String(row.querySelector("[data-adjustment-product]")?.value || "");
         return products.find((product) => String(product?.id || "") === productId) || null;
@@ -1659,7 +1678,30 @@
           );
           if (product && quantity > 0) total += lineTotal;
         });
-        if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(total, currency())}`;
+        const extraTotal = direction === "in" ? expenseTotal() : 0;
+        const quantityTotal = rows().reduce((sum, row) => {
+          if (!productForRow(row)) return sum;
+          return sum + Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-quantity]")?.value));
+        }, 0);
+        rows().forEach((row) => {
+          const product = productForRow(row);
+          const quantity = Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-quantity]")?.value));
+          const price = Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-price]")?.value));
+          const lineTotal = quantity * price;
+          const basis = total > 0 ? lineTotal : quantity;
+          const basisTotal = total > 0 ? total : quantityTotal;
+          const allocatedExpense = product && basisTotal > 0 ? extraTotal * basis / basisTotal : 0;
+          const costPrice = quantity > 0 ? (lineTotal + allocatedExpense) / quantity : 0;
+          setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(costPrice, currency()));
+        });
+        const landedTotal = total + extraTotal;
+        if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(direction === "in" ? landedTotal : total, currency())}`;
+        if (goodsTotalOutput) goodsTotalOutput.textContent = purchaseEntryMoney(total, currency());
+        if (expenseTotalOutput) expenseTotalOutput.textContent = purchaseEntryMoney(extraTotal, currency());
+        if (landedTotalOutput) landedTotalOutput.textContent = purchaseEntryMoney(landedTotal, currency());
+        form.querySelectorAll("[data-adjustment-expense-currency]").forEach((node) => {
+          node.textContent = currency();
+        });
         if (errorOutput) {
           errorOutput.textContent = duplicateProduct
             ? "Один товар нельзя добавлять дважды."
@@ -1689,6 +1731,7 @@
         setOutput(row, "[data-adjustment-current]", "0");
         setOutput(row, "[data-adjustment-after]", "0");
         setOutput(row, "[data-adjustment-unit]", "");
+        setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(0, currency()));
         setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
       };
       // Выбор товара — поиском (комбобокс как в продаже), а не выпадающим
@@ -1829,8 +1872,53 @@
         recalc();
         clone.querySelector("[data-adjustment-product-input]")?.focus();
       };
+      const wireExpenseRow = (row) => {
+        if (!row || row.dataset.adjustmentExpenseReady === "1") return;
+        row.dataset.adjustmentExpenseReady = "1";
+        const amount = row.querySelector("[data-adjustment-expense-amount]");
+        amount?.addEventListener("input", () => {
+          formatPurchasePriceInput(amount, currency());
+          recalc();
+        });
+        amount?.addEventListener("blur", () => {
+          const value = purchaseEntryNumber(amount.value);
+          amount.value = value ? purchaseEntryFormatCurrency(value, currency()) : "";
+          recalc();
+        });
+        row.querySelector('select[name="extra_expense_name"]')?.addEventListener("change", recalc);
+        row.querySelector("[data-adjustment-expense-type-open]")?.addEventListener("click", () => {
+          openExpenseTypeDialog(form, row.querySelector('select[name="extra_expense_name"]'));
+        });
+        row.querySelector("[data-adjustment-expense-remove]")?.addEventListener("click", () => {
+          if (expenseRows().length > 1) row.remove();
+          else row.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
+          recalc();
+        });
+      };
+      const addExpenseRow = () => {
+        const source = expenseRows()[0];
+        if (!source || !expenseLines) return null;
+        const clone = source.cloneNode(true);
+        delete clone.dataset.adjustmentExpenseReady;
+        clone.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
+        expenseLines.append(clone);
+        wireExpenseRow(clone);
+        recalc();
+        return clone;
+      };
       rows().forEach(wireRow);
+      expenseRows().forEach(wireExpenseRow);
+      wireExpenseTypeDialog(form);
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
+      form.querySelector("[data-adjustment-expense-add]")?.addEventListener("click", () => {
+        const row = addExpenseRow();
+        row?.querySelector('select[name="extra_expense_name"]')?.focus();
+      });
+      form.querySelector("[data-adjustment-expense-open]")?.addEventListener("click", () => {
+        const row = addExpenseRow();
+        expenseSection?.scrollIntoView({ behavior: "smooth", block: "center" });
+        row?.querySelector('select[name="extra_expense_name"]')?.focus({ preventScroll: true });
+      });
       warehouseInput?.addEventListener("change", () => {
         rows().forEach((row) => {
           const priceInput = row.querySelector("[data-adjustment-price]");
@@ -1852,6 +1940,11 @@
             const value = purchaseEntryNumber(input.value);
             input.value = value ? String(value) : "";
           });
+        });
+        expenseRows().forEach((row) => {
+          const input = row.querySelector("[data-adjustment-expense-amount]");
+          const value = purchaseEntryNumber(input?.value || "");
+          if (input) input.value = value ? String(value) : "";
         });
       });
       recalc();

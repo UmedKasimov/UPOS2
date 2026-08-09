@@ -724,7 +724,11 @@
 
       <section class="product-form-section warehouse-purchase-entry-section">
         <div class="sales-section-head warehouse-purchase-entry-section-head">
-          <h3>Позиции</h3>
+          <h3>Товары</h3>
+          <div class="sales-section-actions">
+            <button type="button" class="btn btn-secondary btn-sm" data-purchase-entry-add-product>+ Товар</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-purchase-expense-open>+ Доп. расходы</button>
+          </div>
         </div>
         <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel warehouse-purchase-entry-table-wrap">
           <table class="products-table products-catalog-table sales-lines-table warehouse-purchase-entry-table">
@@ -748,7 +752,7 @@
                 <td>
                   <label class="sales-combobox sales-product-picker warehouse-product-picker{{ ' is-locked' if purchase_line else '' }}" data-warehouse-product-picker {% if purchase_line %}data-product-id="{{ purchase_line.product_id }}"{% endif %}>
                     <div class="sales-lock-field">
-                      <input name="line_product" value="{{ purchase_line.product if purchase_line else '' }}" placeholder="Товар или услуга" autocomplete="off" data-warehouse-product-input {{ 'readonly aria-readonly=true' if purchase_line else '' }} />
+                      <input name="line_product" value="{{ purchase_line.product if purchase_line else '' }}" placeholder="Товар" autocomplete="off" data-warehouse-product-input {{ 'readonly aria-readonly=true' if purchase_line else '' }} />
                       <button type="button" class="sales-combo-edit" data-warehouse-product-edit aria-label="Сменить товар" title="Сменить товар" {{ 'hidden' if not purchase_line else '' }}>✎</button>
                     </div>
                     <div class="sales-combo-panel sales-combo-panel--wide" data-warehouse-product-panel hidden></div>
@@ -805,7 +809,7 @@
             <h3>Дополнительные расходы</h3>
             <span>Доставка, таможня и другие расходы распределяются по себестоимости товаров.</span>
           </div>
-          <button class="btn btn-secondary" type="button" data-purchase-expense-add>+ Расход</button>
+          <button class="btn btn-secondary" type="button" data-purchase-expense-add>+ Доп. расход</button>
         </div>
         <div class="warehouse-purchase-expenses-list" data-purchase-expense-lines>
           {% set purchase_extra_expenses = (warehouse_purchase_edit.extra_expenses + [none]) if warehouse_purchase_edit and warehouse_purchase_edit.extra_expenses else [none] %}
@@ -1099,11 +1103,14 @@
 
   {% set adjustment_direction = warehouse_operation_preset if warehouse_operation_preset in ['in', 'out'] else 'out' %}
   <article class="warehouse-adjustment-entry product-form-panel" data-workspace-view="adjustments" hidden>
-    <header class="products-panel-head">
+    <header class="products-panel-head warehouse-adjustment-entry-head">
       <div>
         <h2>{{ 'Приход на склад' if adjustment_direction == 'in' else 'Списание со склада' }}</h2>
         <span>{{ 'Укажите поступившее количество: остатки увеличатся.' if adjustment_direction == 'in' else 'Укажите списываемое количество: остатки уменьшатся.' }}</span>
       </div>
+      <span class="warehouse-adjustment-direction warehouse-adjustment-direction--{{ adjustment_direction }}">
+        {{ 'Приход' if adjustment_direction == 'in' else 'Списание' }}
+      </span>
     </header>
     <form
       method="post"
@@ -1143,7 +1150,12 @@
       <section class="product-form-section warehouse-adjustment-section">
         <div class="sales-section-head warehouse-adjustment-section-head">
           <h3>Товары</h3>
-          <button type="button" class="btn btn-secondary warehouse-adjustment-add" data-adjustment-add-row>+ Строка</button>
+          <div class="sales-section-actions">
+            <button type="button" class="btn btn-secondary btn-sm warehouse-adjustment-add" data-adjustment-add-row>+ Товар</button>
+            {% if adjustment_direction == 'in' %}
+              <button type="button" class="btn btn-secondary btn-sm" data-adjustment-expense-open>+ Доп. расходы</button>
+            {% endif %}
+          </div>
         </div>
         <div class="products-table-wrap warehouse-adjustment-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
           <table class="products-table products-catalog-table warehouse-adjustment-table">
@@ -1154,7 +1166,8 @@
                 <th>Остаток</th>
                 <th>Изменение</th>
                 <th>После операции</th>
-                <th>Цена</th>
+                <th>Приходная цена</th>
+                {% if adjustment_direction == 'in' %}<th>Цена после расходов</th>{% endif %}
                 <th>Сумма</th>
                 <th></th>
               </tr>
@@ -1165,7 +1178,7 @@
                 <td>
                   <label class="sales-combobox sales-product-picker warehouse-adjustment-product-picker" data-adjustment-product-picker>
                     <div class="sales-lock-field">
-                      <input placeholder="Товар или услуга" autocomplete="off" data-adjustment-product-input />
+                      <input placeholder="Товар" autocomplete="off" data-adjustment-product-input />
                       <button type="button" class="sales-combo-edit" data-adjustment-product-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
                     </div>
                     <input type="hidden" name="line_product" data-adjustment-product />
@@ -1188,6 +1201,11 @@
                 <td>
                   <input name="line_price" inputmode="decimal" placeholder="0" data-adjustment-price />
                 </td>
+                {% if adjustment_direction == 'in' %}
+                  <td>
+                    <strong class="warehouse-adjustment-cost-price" data-adjustment-cost-price>0 UZS</strong>
+                  </td>
+                {% endif %}
                 <td>
                   <strong class="warehouse-adjustment-line-total" data-adjustment-line-total>0 UZS</strong>
                 </td>
@@ -1204,6 +1222,39 @@
         </div>
         <p class="warehouse-adjustment-error" data-adjustment-error aria-live="polite"></p>
       </section>
+
+      {% if adjustment_direction == 'in' %}
+        <section class="product-form-section warehouse-purchase-expenses warehouse-adjustment-expenses" data-adjustment-expenses>
+          <div class="sales-section-head warehouse-purchase-expenses-head">
+            <div>
+              <h3>Дополнительные расходы</h3>
+              <span>Доставка, таможня и другие расходы распределяются по себестоимости товаров.</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" type="button" data-adjustment-expense-add>+ Доп. расход</button>
+          </div>
+          <div class="warehouse-purchase-expenses-list" data-adjustment-expense-lines>
+            <div class="warehouse-purchase-expense-row" data-adjustment-expense-row>
+              <div class="warehouse-purchase-expense-type-field">
+                <select name="extra_expense_name" data-purchase-expense-type-select>
+                  <option value="" selected>Выберите вид расхода</option>
+                  {% for expense_type in warehouse_options.expense_types %}
+                    <option value="{{ expense_type.name }}">{{ expense_type.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="button" class="warehouse-purchase-expense-type-add" data-adjustment-expense-type-open aria-label="Создать вид расхода" title="Создать вид расхода">+</button>
+              </div>
+              <input name="extra_expense_amount" placeholder="Сумма" inputmode="decimal" data-adjustment-expense-amount />
+              <span data-purchase-expense-currency data-adjustment-expense-currency>UZS</span>
+              <button type="button" class="sales-line-remove" data-adjustment-expense-remove aria-label="Удалить расход">×</button>
+            </div>
+          </div>
+          <div class="warehouse-purchase-expenses-summary">
+            <span>Товары <strong data-adjustment-goods-total>0 UZS</strong></span>
+            <span>Доп. расходы <strong data-adjustment-expense-total>0 UZS</strong></span>
+            <span class="warehouse-purchase-expenses-landed">Себестоимость <strong data-adjustment-landed-total>0 UZS</strong></span>
+          </div>
+        </section>
+      {% endif %}
 
       <label class="warehouse-adjustment-note">
         <span>Комментарий</span>
