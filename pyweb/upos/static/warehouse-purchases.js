@@ -1760,7 +1760,6 @@
         const search = row.querySelector("[data-adjustment-product-input]");
         const hidden = row.querySelector("[data-adjustment-product]");
         const editBtn = row.querySelector("[data-adjustment-product-edit]");
-        const createBtn = row.querySelector("[data-adjustment-product-create-open]");
         const panel = row.querySelector("[data-adjustment-product-panel]");
         if (!picker || !search || !hidden || !panel) return;
         const closePanel = () => {
@@ -1859,10 +1858,6 @@
           search.focus();
           search.select();
           render(search.value);
-        });
-        createBtn?.addEventListener("mousedown", (event) => {
-          event.preventDefault();
-          openProductDialog(form, picker, search.value);
         });
         picker.addEventListener("warehouse-adjustment-product-created", (event) => {
           const product = event.detail?.product;
@@ -2600,6 +2595,16 @@
     if (document.body.dataset.warehouseProductPickerGlobalReady !== "1") {
       document.body.dataset.warehouseProductPickerGlobalReady = "1";
       document.addEventListener("mousedown", (event) => {
+        const adjustmentCreateButton = event.target?.closest?.("[data-adjustment-product-create-open]");
+        if (adjustmentCreateButton) {
+          event.preventDefault();
+          const row = adjustmentCreateButton.closest("[data-adjustment-row]");
+          const form = adjustmentCreateButton.closest("[data-warehouse-adjustment-entry]");
+          const picker = row?.querySelector("[data-adjustment-product-picker]");
+          const search = row?.querySelector("[data-adjustment-product-input]");
+          if (form && picker) openProductDialog(form, picker, search?.value || "");
+          return;
+        }
         document.querySelectorAll("[data-warehouse-product-picker]").forEach((picker) => {
           if (!picker.contains(event.target)) closeProductPanel(picker);
         });
