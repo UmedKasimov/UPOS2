@@ -685,6 +685,7 @@
     const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-product-dialog]") || document.querySelector("[data-warehouse-product-dialog]");
     const form = dialog?.querySelector("[data-warehouse-product-form]");
     if (!dialog || !form) return;
+    if (dialog.parentElement !== document.body) document.body.append(dialog);
     activeProductPicker = picker || null;
     activeProductEntryForm = entryForm || null;
     closeProductPanel(picker);
