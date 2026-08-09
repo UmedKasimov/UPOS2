@@ -1166,7 +1166,7 @@
                 <th>Остаток</th>
                 <th>Изменение</th>
                 <th>После операции</th>
-                <th>Приходная цена</th>
+                <th>{{ 'Приходная цена' if adjustment_direction == 'in' else 'Цена' }}</th>
                 {% if adjustment_direction == 'in' %}<th>Цена после расходов</th>{% endif %}
                 <th>Сумма</th>
                 <th></th>
