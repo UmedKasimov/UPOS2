@@ -1166,6 +1166,13 @@
     setDraftField(root, "[data-sales-next-status]", draft.nextStatus || "");
     setDraftField(root, 'input[name="date"]', draft.date);
     setDraftField(root, 'input[name="date_to"]', draft.dateTo);
+    var restoredDate = root.querySelector('input[name="date"]');
+    if (restoredDate) {
+      // The custom date picker is enhanced before the saved draft is restored.
+      // Notify it after both date fields are populated so the visible label and
+      // the submitted values cannot disagree.
+      restoredDate.dispatchEvent(new Event("change", { bubbles: true }));
+    }
     setDraftField(root, 'select[name="installer_user_id"]', draft.installerUserId);
     setDraftField(root, 'input[name="installation_scheduled_at"]', draft.installationScheduledAt);
     setDraftField(root, 'select[name="installation_template_id"]', draft.installationTemplateId);
