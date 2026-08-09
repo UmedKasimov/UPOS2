@@ -1760,6 +1760,7 @@
         const search = row.querySelector("[data-adjustment-product-input]");
         const hidden = row.querySelector("[data-adjustment-product]");
         const editBtn = row.querySelector("[data-adjustment-product-edit]");
+        const createBtn = row.querySelector("[data-adjustment-product-create-open]");
         const panel = row.querySelector("[data-adjustment-product-panel]");
         if (!picker || !search || !hidden || !panel) return;
         const closePanel = () => {
@@ -1858,6 +1859,10 @@
           search.focus();
           search.select();
           render(search.value);
+        });
+        createBtn?.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          openProductDialog(form, picker, search.value);
         });
         picker.addEventListener("warehouse-adjustment-product-created", (event) => {
           const product = event.detail?.product;
@@ -1964,16 +1969,6 @@
       rows().forEach(wireRow);
       expenseRows().forEach(wireExpenseRow);
       wireExpenseTypeDialog(form);
-      form.addEventListener("click", (event) => {
-        const button = event.target instanceof Element
-          ? event.target.closest("[data-adjustment-product-create-open]")
-          : null;
-        if (!button || !form.contains(button)) return;
-        const row = button.closest("[data-adjustment-row]");
-        const picker = row?.querySelector("[data-adjustment-product-picker]");
-        const search = row?.querySelector("[data-adjustment-product-input]");
-        if (picker) openProductDialog(form, picker, search?.value || "");
-      });
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
       form.querySelector("[data-adjustment-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
