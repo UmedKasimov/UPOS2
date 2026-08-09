@@ -10450,6 +10450,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-combo-edit,
 .sales-combo-add {
   position: absolute;
+  z-index: 2;
   inset-inline-end: 0.32rem;
   top: 50%;
   display: inline-grid;
