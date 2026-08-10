@@ -1317,6 +1317,35 @@
         </div>
       </div>
     </form>
+
+    {% if adjustment_direction == 'in' %}
+      <dialog class="settings-profile-modal warehouse-expense-type-dialog" data-purchase-expense-type-dialog>
+        <form class="settings-profile-modal-surface warehouse-expense-type-dialog-surface" data-purchase-expense-type-form>
+          {% include "_csrf_field.html" %}
+          <div class="settings-profile-modal-head">
+            <div>
+              <h2 class="settings-profile-modal-title">Виды расходов</h2>
+              <p class="settings-profile-modal-sub">Создайте новый тип или выберите расход из финансов.</p>
+            </div>
+            <button type="button" class="settings-profile-modal-close" data-purchase-expense-type-close aria-label="Закрыть">×</button>
+          </div>
+          <div class="settings-profile-modal-body warehouse-expense-type-dialog-body">
+            <label class="settings-profile-field">
+              <span class="settings-profile-field-label">Новый тип расхода</span>
+              <div class="warehouse-expense-type-create">
+                <input class="settings-profile-input" name="name" maxlength="120" required placeholder="Например, доставка" data-purchase-expense-type-name />
+                <button type="submit" class="btn" data-purchase-expense-type-submit>Создать</button>
+              </div>
+            </label>
+            <p class="sales-product-dialog-status" data-purchase-expense-type-status aria-live="polite"></p>
+            <div class="warehouse-expense-type-list" data-purchase-expense-type-list></div>
+          </div>
+          <div class="settings-profile-modal-foot">
+            <button type="button" class="btn btn-secondary" data-purchase-expense-type-close>Готово</button>
+          </div>
+        </form>
+      </dialog>
+    {% endif %}
   </article>
 </div>
 
