@@ -103,8 +103,20 @@
           });
           ua.on("registrationFailed", (e) => {
             registered = false;
-            emit("registrationFailed", {cause: e && e.cause});
-            if (!settled) { settled = true; reject(new Error((e && e.cause) || "registration_failed")); }
+            const response = e && e.response;
+            const detail = {
+              cause: (e && e.cause) || "registration_failed",
+              statusCode: (response && response.status_code) || 0,
+              reasonPhrase: (response && response.reason_phrase) || "",
+            };
+            emit("registrationFailed", detail);
+            if (!settled) {
+              settled = true;
+              const error = new Error(detail.cause);
+              error.statusCode = detail.statusCode;
+              error.reasonPhrase = detail.reasonPhrase;
+              reject(error);
+            }
           });
           ua.on("disconnected", () => {
             registered = false;

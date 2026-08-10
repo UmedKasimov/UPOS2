@@ -30,6 +30,7 @@
   /* ── Положение и раскрытие панели (поведение прежнее) ───────────────── */
 
   const storageKey = "upos:floating-phone-position";
+  const providerStorageKey = "upos:floating-phone-provider";
   const edgeGap = 8;
   const dragGap = 4;
   let dragState = null;
@@ -222,6 +223,12 @@
     // Список провайдеров в шаблоне приходит не на каждой странице, поэтому
     // заполняем его из API — иначе в выборе оставалось одно «Авто».
     const previous = providerSelect.value;
+    let savedProvider = "";
+    try {
+      savedProvider = window.localStorage.getItem(providerStorageKey) || "";
+    } catch (error) {
+      savedProvider = "";
+    }
     providerSelect.textContent = "";
     accounts.forEach((account) => {
       const option = document.createElement("option");
@@ -236,7 +243,12 @@
     auto.textContent = "Авто (SIP приложение)";
     auto.dataset.providerName = "Авто";
     providerSelect.append(auto);
-    if (previous && accountById(previous)) providerSelect.value = previous;
+    const preferredAccount =
+      accountById(savedProvider) ||
+      accountById(previous) ||
+      accounts.find((account) => /^\d+$/.test(String(account.extension || "").trim())) ||
+      accounts[0];
+    if (preferredAccount) providerSelect.value = String(preferredAccount.id);
   }
 
   function connectErrorText(account, error) {
@@ -244,10 +256,13 @@
       return "АТС указана по IP — для WSS нужен домен из сертификата. Проверьте адрес в настройках телефонии";
     }
     const cause = String(error?.message || "");
+    const statusCode = Number(error?.statusCode || 0);
+    const reasonPhrase = String(error?.reasonPhrase || "").trim();
+    const responseDetails = statusCode ? ` (${statusCode}${reasonPhrase ? ` ${reasonPhrase}` : ""})` : "";
     // Rejected — связь с АТС есть, но регистрацию не приняли: дело в
     // SIP-аккаунте (WebRTC не включён или пароль не тот), а не в сети.
     if (/rejected|forbidden|authentication/i.test(cause)) {
-      return "АТС отклонила регистрацию — проверьте SIP-аккаунт (WebRTC, пароль). Пока звоним через телефон";
+      return `АТС отклонила регистрацию${responseDetails} — проверьте SIP-аккаунт и WebRTC. Пока звоним через телефон`;
     }
     return `АТС недоступна (${cause || "ошибка"}) — звоним через телефон`;
   }
@@ -259,7 +274,10 @@
       if (!inCall) setStatus("SIP на связи — можно звонить", "ok");
     });
     sip.on("registrationFailed", (event) => {
-      setStatus(`АТС отклонила регистрацию (${event?.cause || "ошибка"}) — звоним через телефон`, "error");
+      const statusCode = Number(event?.statusCode || 0);
+      const reasonPhrase = String(event?.reasonPhrase || "").trim();
+      const details = statusCode ? `${statusCode}${reasonPhrase ? ` ${reasonPhrase}` : ""}` : event?.cause || "ошибка";
+      setStatus(`АТС отклонила регистрацию (${details}) — звоним через телефон`, "error");
     });
     sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
     sip.on("accepted", () => {
@@ -301,7 +319,7 @@
       }
       fillProviders();
       await loadScript("/static/jssip.min.js?v=1");
-      await loadScript("/static/installer-softphone.js?v=2");
+      await loadScript("/static/installer-softphone.js?v=3");
       const sip = window.UposSoftphone;
       if (!sip || !sip.available()) {
         setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");
@@ -327,6 +345,11 @@
   }
 
   providerSelect?.addEventListener("change", async () => {
+    try {
+      window.localStorage.setItem(providerStorageKey, providerSelect.value || "");
+    } catch (error) {
+      // В некоторых режимах браузера localStorage отключён.
+    }
     const sip = await ensureSoftphone();
     const account = selectedAccount();
     if (!sip || !account) return;
