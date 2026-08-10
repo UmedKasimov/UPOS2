@@ -45,12 +45,13 @@
   }
 
   function createController(root) {
+    if (root.dataset.workspaceTabsReady === "1") return null;
     const key = normalize(root.dataset.workspaceKey);
     const tabsShell = root.querySelector("[data-workspace-open-tabs]");
     const homeTab = root.querySelector("[data-workspace-home-tab]");
     const launcher = root.querySelector("[data-workspace-launcher]");
-    const viewNodes = Array.from(root.querySelectorAll("[data-workspace-view]"));
     if (!key || !tabsShell || !homeTab) return null;
+    root.dataset.workspaceTabsReady = "1";
 
     const storageKey = `upos.${key}.openTabs`;
     const tabMeta = new Map();
@@ -204,7 +205,7 @@
     function renderViews() {
       const currentView = activeTab ? tabMeta.get(activeTab)?.viewId || activeTab : "home";
       if (launcher) launcher.hidden = Boolean(activeTab);
-      viewNodes.forEach((node) => {
+      root.querySelectorAll("[data-workspace-view]").forEach((node) => {
         const views = splitViews(node.dataset.workspaceView);
         node.hidden = views.length ? !views.includes(currentView) : false;
       });
@@ -310,6 +311,8 @@
       saveState();
       const url = tabUrl(tabId);
       if (options.navigate !== false && url && !matchesLocation(url)) {
+        // Show the already-rendered panel immediately while the new URL loads.
+        render();
         window.location.assign(url.toString());
         return;
       }
@@ -446,12 +449,14 @@
     return { openTab, goHome };
   }
 
-  function init() {
-    document.querySelectorAll("[data-workspace-tabs]").forEach(createController);
+  function init(scope = document) {
+    scope.querySelectorAll("[data-workspace-tabs]").forEach(createController);
   }
 
+  window.initWorkspaceModuleTabs = init;
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+    document.addEventListener("DOMContentLoaded", () => init(), { once: true });
   } else {
     init();
   }

@@ -103,6 +103,9 @@
       if (!swapped) throw new Error("targets not found");
       window.history.pushState({ ajaxSection: true }, "", href);
       reinit(reinitNames);
+      if (typeof window.initWorkspaceModuleTabs === "function") {
+        window.initWorkspaceModuleTabs(document);
+      }
     } catch (error) {
       // Любой сбой — честный полный переход, чтобы не оставить список сломанным.
       window.location.href = href;
