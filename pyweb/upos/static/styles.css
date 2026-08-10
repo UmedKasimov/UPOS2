@@ -10468,6 +10468,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   transform: translateY(-50%);
 }
 
+.sales-combo-edit[hidden],
+.sales-combo-add[hidden] {
+  display: none;
+}
+
 .sales-combo-add {
   inset-inline-end: 2.22rem;
   background: var(--brand-box, #2563eb);
@@ -29794,6 +29799,11 @@ html.dark .clients-map-empty {
   flex: 0 0 auto;
 }
 
+.warehouse-purchase-expenses-head > .sales-section-actions {
+  display: flex;
+  align-items: center;
+}
+
 .warehouse-adjustment-error {
   min-height: 18px;
   margin: 6px 0 0;
@@ -29827,12 +29837,6 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-footer {
   margin-top: 0;
   padding-top: 0.25rem;
-}
-
-.warehouse-adjustment-footer-hint {
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 700;
 }
 
 html.dark .warehouse-adjustment-direction {
