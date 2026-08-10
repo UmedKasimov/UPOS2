@@ -1641,16 +1641,26 @@
       const stockForProduct = (product) => {
         const warehouse = normalize(warehouseInput?.value);
         const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
-        return stocks
-          .filter((stock) => normalize(stock?.warehouse) === warehouse)
-          .reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
+        const matching = stocks.filter((stock) => normalize(stock?.warehouse) === warehouse);
+        if (matching.length) {
+          return matching.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
+        }
+        const totalStock = stocks.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
+        return stocks.length ? totalStock : purchaseEntryNumber(product?.quantity);
       };
       const priceForProduct = (product) => {
         const warehouse = normalize(warehouseInput?.value);
         const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
-        const matching = stocks.filter((stock) => normalize(stock?.warehouse) === warehouse);
-        const priced = [...matching].reverse().find((stock) => purchaseEntryNumber(stock?.price) > 0)
-          || [...stocks].reverse().find((stock) => purchaseEntryNumber(stock?.price) > 0);
+        const history = Array.isArray(product?.purchase_history) ? product.purchase_history : [];
+        const newestPriced = (entries) => [...entries]
+          .filter((entry) => purchaseEntryNumber(entry?.price) > 0)
+          .sort((left, right) => String(right?.date || "").localeCompare(String(left?.date || "")))[0];
+        const matchingHistory = history.filter((entry) => normalize(entry?.warehouse) === warehouse);
+        const matchingStocks = stocks.filter((stock) => normalize(stock?.warehouse) === warehouse);
+        const priced = newestPriced(matchingHistory)
+          || newestPriced(history)
+          || newestPriced(matchingStocks)
+          || newestPriced(stocks);
         return purchaseEntryNumber(priced?.price);
       };
       const selectedAdjustmentPriceType = () => {
