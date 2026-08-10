@@ -1867,29 +1867,11 @@
             (list.length
             ? list
                 .map((item) => {
-                  const code = item.sku || item.barcode || "Товар";
-                  const priceRows = (Array.isArray(item.prices) ? item.prices : [])
-                    .filter((price) => purchaseEntryNumber(price?.price) > 0)
-                    .slice(0, 2);
-                  const priceLabel = priceRows.length
-                    ? priceRows.map((price) => {
-                      const priceCurrency = String(price.currency || currency()).toUpperCase();
-                      const priceName = String(price.name || "Прайс").trim() || "Прайс";
-                      return `${priceName}: ${purchaseEntryFormatCurrency(purchaseEntryNumber(price.price), priceCurrency)} ${priceCurrency}`;
-                    }).join(" · ")
-                    : (() => {
-                      const price = latestPurchasePrice(item);
-                      return price ? `${purchaseEntryFormatCurrency(purchaseEntryNumber(price), currency())} ${currency()}` : "Без цены";
-                    })();
                   return (
                     '<button type="button" class="sales-combo-option">' +
                     '<span class="sales-combo-main">' +
                     highlightText(item.name, query) +
-                    '</span><span class="sales-combo-meta"><span>' +
-                    escapeHtml(`${code} · ${productStockLabel(item)}`) +
-                    "</span><strong>" +
-                    escapeHtml(priceLabel) +
-                    "</strong></span></button>"
+                    "</span></button>"
                   );
                 })
                 .join("")
