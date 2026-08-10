@@ -1,4 +1,6 @@
 (() => {
+  const controllers = new WeakMap();
+
   function parseState(key) {
     try {
       const raw = JSON.parse(localStorage.getItem(key) || "{}");
@@ -45,6 +47,11 @@
   }
 
   function createController(root) {
+    const existingController = controllers.get(root);
+    if (existingController) {
+      existingController.refresh();
+      return existingController;
+    }
     if (root.dataset.workspaceTabsReady === "1") return null;
     const key = normalize(root.dataset.workspaceKey);
     const tabsShell = root.querySelector("[data-workspace-open-tabs]");
@@ -446,7 +453,16 @@
       const url = tabUrl(activeTab);
       if (url && matchesLocation(url)) syncLocalUrl(url);
     }
-    return { openTab, goHome };
+    const controller = {
+      openTab,
+      goHome,
+      refresh() {
+        collectMeta();
+        render();
+      },
+    };
+    controllers.set(root, controller);
+    return controller;
   }
 
   function init(scope = document) {
