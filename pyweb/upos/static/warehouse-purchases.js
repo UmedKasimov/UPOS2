@@ -1621,7 +1621,8 @@
       const submitButton = form.querySelector("[data-adjustment-submit]");
       const expenseSection = form.querySelector("[data-adjustment-expenses]");
       const expenseLines = form.querySelector("[data-adjustment-expense-lines]");
-      const goodsTotalOutput = form.querySelector("[data-adjustment-goods-total]");
+      const goodsTotalOutputs = Array.from(form.querySelectorAll("[data-adjustment-goods-total], [data-adjustment-expense-goods-total]"));
+      const productsQuantityOutput = form.querySelector("[data-adjustment-products-quantity]");
       const expenseTotalOutput = form.querySelector("[data-adjustment-expense-total]");
       const landedTotalOutput = form.querySelector("[data-adjustment-landed-total]");
       const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
@@ -1659,6 +1660,13 @@
       const renumber = () => {
         rows().forEach((row, index) => {
           setOutput(row, ".warehouse-adjustment-row-number", index + 1);
+        });
+      };
+      const syncSearchRows = () => {
+        const lineRows = rows();
+        lineRows.forEach((row, index) => {
+          const isSearchRow = index === lineRows.length - 1 && !productForRow(row);
+          row.classList.toggle("is-search-row", isSearchRow);
         });
       };
       const recalc = () => {
@@ -1715,7 +1723,10 @@
         });
         const landedTotal = total + extraTotal;
         if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(direction === "in" ? landedTotal : total, currency())}`;
-        if (goodsTotalOutput) goodsTotalOutput.textContent = purchaseEntryMoney(total, currency());
+        goodsTotalOutputs.forEach((output) => {
+          output.textContent = purchaseEntryMoney(total, currency());
+        });
+        if (productsQuantityOutput) productsQuantityOutput.textContent = quantityText(quantityTotal);
         if (expenseTotalOutput) expenseTotalOutput.textContent = purchaseEntryMoney(extraTotal, currency());
         if (landedTotalOutput) landedTotalOutput.textContent = purchaseEntryMoney(landedTotal, currency());
         form.querySelectorAll("[data-adjustment-expense-currency]").forEach((node) => {
@@ -1730,6 +1741,7 @@
         }
         if (submitButton) submitButton.disabled = !hasLine || invalidStock || duplicateProduct;
         renumber();
+        syncSearchRows();
       };
       const resetRow = (row) => {
         row.classList.remove("is-insufficient");
@@ -1887,6 +1899,9 @@
             priceInput.dataset.adjustmentAutoPrice = "1";
           }
           recalc();
+          if (productForRow(row) && rows().every((line) => Boolean(productForRow(line)))) {
+            addRow({ focus: false });
+          }
           quantityInput?.focus();
         });
         quantityInput?.addEventListener("input", () => {
@@ -1916,7 +1931,7 @@
           recalc();
         });
       };
-      const addRow = () => {
+      const addRow = ({ focus = true } = {}) => {
         const source = rows()[0];
         if (!source || !body) return;
         const clone = source.cloneNode(true);
@@ -1925,7 +1940,7 @@
         body.append(clone);
         wireRow(clone);
         recalc();
-        clone.querySelector("[data-adjustment-product-input]")?.focus();
+        if (focus) clone.querySelector("[data-adjustment-product-input]")?.focus();
       };
       const wireExpenseRow = (row) => {
         if (!row || row.dataset.adjustmentExpenseReady === "1") return;
@@ -1970,9 +1985,17 @@
         row?.querySelector('select[name="extra_expense_name"]')?.focus();
       });
       form.querySelector("[data-adjustment-expense-open]")?.addEventListener("click", () => {
-        const row = addExpenseRow();
+        if (expenseSection) expenseSection.hidden = false;
+        const row = expenseRows().find((item) => {
+          const name = item.querySelector('select[name="extra_expense_name"]')?.value || "";
+          const amount = item.querySelector("[data-adjustment-expense-amount]")?.value || "";
+          return !name && !purchaseEntryNumber(amount);
+        }) || addExpenseRow();
         expenseSection?.scrollIntoView({ behavior: "smooth", block: "center" });
         row?.querySelector('select[name="extra_expense_name"]')?.focus({ preventScroll: true });
+      });
+      form.querySelector("[data-adjustment-expense-close]")?.addEventListener("click", () => {
+        if (expenseSection) expenseSection.hidden = true;
       });
       warehouseInput?.addEventListener("change", () => {
         rows().forEach((row) => {

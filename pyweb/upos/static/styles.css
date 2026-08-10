@@ -10492,14 +10492,12 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-adjustment-product-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 1.75rem;
-  gap: 0.35rem;
-  align-items: center;
+  display: block;
+  min-width: 0;
 }
 
 .warehouse-adjustment-product-control .sales-combo-add {
-  display: none;
+  display: inline-grid;
 }
 
 .warehouse-adjustment-product-create {
@@ -29547,6 +29545,8 @@ html.dark .clients-map-empty {
 
 /* Warehouse stock receipt and write-off editor */
 .warehouse-adjustment-entry {
+  width: 100%;
+  max-width: none;
   min-width: 0;
 }
 
@@ -29576,7 +29576,9 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-form {
   display: grid;
-  gap: 14px;
+  gap: 1rem;
+  width: 100%;
+  max-width: none;
 }
 
 .warehouse-adjustment-meta {
@@ -29591,7 +29593,7 @@ html.dark .clients-map-empty {
 }
 
 .warehouse-adjustment-section-head {
-  margin-bottom: 8px;
+  margin-bottom: 0.55rem;
 }
 
 .warehouse-adjustment-add {
@@ -29601,8 +29603,8 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 6px 6px 0 0;
+  border: 0;
+  border-radius: 0;
 }
 
 .warehouse-adjustment-table {
@@ -29664,6 +29666,11 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-table td {
   vertical-align: middle;
+}
+
+.warehouse-adjustment-table th,
+.warehouse-adjustment-table td {
+  border-color: color-mix(in srgb, var(--brand-box, #2563eb) 18%, var(--workbench-line, var(--border)));
 }
 
 .warehouse-adjustment-table td:nth-child(3) {
@@ -29734,12 +29741,12 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-change > span,
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-line-total,
-.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-summary strong {
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-summary output {
   color: #1e40af;
 }
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-line-total,
-.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-summary strong {
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--out) .warehouse-adjustment-summary output {
   color: #334155;
 }
 
@@ -29752,23 +29759,39 @@ html.dark .clients-map-empty {
 }
 
 .warehouse-adjustment-summary {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 18px;
-  min-height: 46px;
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-top: 0;
-  background: color-mix(in srgb, var(--primary), white 95%);
-  font-size: 13px;
+  margin-top: 0.75rem;
+  cursor: default;
 }
 
-.warehouse-adjustment-summary strong {
+.warehouse-adjustment-summary output {
   min-width: 160px;
   text-align: right;
   font-size: 15px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+.warehouse-adjustment-subtotal-row output {
+  color: var(--brand-box, #2563eb);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.warehouse-adjustment-table .is-search-row .sales-line-remove {
+  display: none;
+}
+
+.warehouse-adjustment-expenses[hidden] {
+  display: none;
+}
+
+.warehouse-adjustment-expenses {
+  border-top: 1px solid var(--workbench-line, var(--border));
+  padding-top: 0.9rem;
+}
+
+.warehouse-adjustment-expense-close {
+  flex: 0 0 auto;
 }
 
 .warehouse-adjustment-error {
@@ -29799,6 +29822,17 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-actions {
   justify-content: flex-end;
+}
+
+.warehouse-adjustment-footer {
+  margin-top: 0;
+  padding-top: 0.25rem;
+}
+
+.warehouse-adjustment-footer-hint {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 html.dark .warehouse-adjustment-direction {
@@ -29842,6 +29876,15 @@ html.dark .warehouse-adjustment-summary {
 
   .warehouse-adjustment-summary {
     justify-content: space-between;
+  }
+
+  .warehouse-adjustment-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .warehouse-adjustment-footer .product-form-actions {
+    margin-left: 0;
   }
 }
 /* Dashboard */

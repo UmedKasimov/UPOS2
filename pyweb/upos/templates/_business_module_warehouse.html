@@ -1115,7 +1115,7 @@
     <form
       method="post"
       action="{{ url_for('warehouse_operation_save') }}"
-      class="product-form warehouse-adjustment-form"
+      class="product-form warehouse-adjustment-form warehouse-adjustment-form--sales warehouse-adjustment-form--wide"
       data-warehouse-adjustment-entry
       data-adjustment-direction="{{ adjustment_direction }}"
       data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
@@ -1152,14 +1152,13 @@
         <div class="sales-section-head warehouse-adjustment-section-head">
           <h3>Товары</h3>
           <div class="sales-section-actions">
-            <button type="button" class="btn btn-secondary btn-sm warehouse-adjustment-add" data-adjustment-add-row>+ Товар</button>
             {% if adjustment_direction == 'in' %}
               <button type="button" class="btn btn-secondary btn-sm" data-adjustment-expense-open>+ Доп. расходы</button>
             {% endif %}
           </div>
         </div>
-        <div class="products-table-wrap warehouse-adjustment-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
-          <table class="products-table products-catalog-table warehouse-adjustment-table">
+        <div class="sales-lines-table-wrap products-table-wrap warehouse-adjustment-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table sales-lines-table warehouse-adjustment-table">
             <thead>
               <tr>
                 <th>№</th>
@@ -1174,7 +1173,7 @@
               </tr>
             </thead>
             <tbody data-adjustment-lines>
-              <tr data-adjustment-row>
+              <tr class="sales-line-grid sales-line-grid--compact" data-adjustment-row>
                 <td class="warehouse-adjustment-row-number">1</td>
                 <td>
                   <div class="warehouse-adjustment-product-control">
@@ -1187,7 +1186,6 @@
                     <input type="hidden" name="line_product" data-adjustment-product />
                       <div class="sales-combo-panel sales-combo-panel--wide" data-adjustment-product-panel hidden></div>
                     </div>
-                    <button type="button" class="warehouse-adjustment-product-create" data-adjustment-product-create-open aria-label="Create product" title="New product">+</button>
                   </div>
                 </td>
                 <td>
@@ -1219,23 +1217,35 @@
                 </td>
               </tr>
             </tbody>
+            <tfoot>
+              <tr class="sales-subtotal-row warehouse-adjustment-subtotal-row">
+                <td colspan="3">Итого товары</td>
+                <td><output data-adjustment-products-quantity>0</output></td>
+                <td colspan="{{ 3 if adjustment_direction == 'in' else 2 }}"></td>
+                <td><output data-adjustment-goods-total>0 UZS</output></td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
-        <div class="warehouse-adjustment-summary">
-          <span>Итого изменение</span>
-          <strong data-adjustment-total>− 0 UZS</strong>
+        <div class="sales-total-bar warehouse-adjustment-summary">
+          <span>{{ 'Итого себестоимость' if adjustment_direction == 'in' else 'Итого списание' }}</span>
+          <output data-adjustment-total>− 0 UZS</output>
         </div>
         <p class="warehouse-adjustment-error" data-adjustment-error aria-live="polite"></p>
       </section>
 
       {% if adjustment_direction == 'in' %}
-        <section class="product-form-section warehouse-purchase-expenses warehouse-adjustment-expenses" data-adjustment-expenses>
+        <section class="product-form-section warehouse-purchase-expenses warehouse-adjustment-expenses" data-adjustment-expenses hidden>
           <div class="sales-section-head warehouse-purchase-expenses-head">
             <div>
               <h3>Дополнительные расходы</h3>
               <span>Доставка, таможня и другие расходы распределяются по себестоимости товаров.</span>
             </div>
-            <button class="btn btn-secondary btn-sm" type="button" data-adjustment-expense-add>+ Доп. расход</button>
+            <div class="sales-section-actions">
+              <button class="btn btn-secondary btn-sm" type="button" data-adjustment-expense-add>+ Доп. расход</button>
+              <button type="button" class="sales-line-remove warehouse-adjustment-expense-close" data-adjustment-expense-close aria-label="Скрыть дополнительные расходы" title="Скрыть дополнительные расходы">×</button>
+            </div>
           </div>
           <div class="warehouse-purchase-expenses-list" data-adjustment-expense-lines>
             <div class="warehouse-purchase-expense-row" data-adjustment-expense-row>
@@ -1254,22 +1264,25 @@
             </div>
           </div>
           <div class="warehouse-purchase-expenses-summary">
-            <span>Товары <strong data-adjustment-goods-total>0 UZS</strong></span>
+            <span>Товары <strong data-adjustment-expense-goods-total>0 UZS</strong></span>
             <span>Доп. расходы <strong data-adjustment-expense-total>0 UZS</strong></span>
             <span class="warehouse-purchase-expenses-landed">Себестоимость <strong data-adjustment-landed-total>0 UZS</strong></span>
           </div>
         </section>
       {% endif %}
 
-      <label class="warehouse-adjustment-note">
+      <label class="wide sales-document-note warehouse-adjustment-note">
         <span>Комментарий</span>
         <textarea name="note" rows="2" placeholder="Причина складской операции"></textarea>
       </label>
-      <div class="product-form-actions warehouse-adjustment-actions">
-        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#adjustments">Отмена</a>
-        <button class="btn" type="submit" data-adjustment-submit>
-          {{ 'Оприходовать' if adjustment_direction == 'in' else 'Списать со склада' }}
-        </button>
+      <div class="sales-form-footer warehouse-adjustment-footer">
+        <span class="warehouse-adjustment-footer-hint">Пустая строка добавляется автоматически</span>
+        <div class="product-form-actions warehouse-adjustment-actions">
+          <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#adjustments">Отмена</a>
+          <button class="btn" type="submit" data-adjustment-submit>
+            {{ 'Оприходовать' if adjustment_direction == 'in' else 'Списать со склада' }}
+          </button>
+        </div>
       </div>
     </form>
   </article>
