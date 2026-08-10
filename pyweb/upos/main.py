@@ -560,6 +560,42 @@ def _workspace_purchase_expense_types(workspace_owner_id: str) -> list[dict[str,
     return sorted(items, key=lambda item: item["name"].casefold())
 
 
+def _warehouse_expense_type_options(workspace_owner_id: str) -> list[dict[str, str]]:
+    items = [
+        {**item, "source": "warehouse"}
+        for item in _workspace_purchase_expense_types(workspace_owner_id)
+    ]
+    seen_names = {item["name"].casefold() for item in items}
+    for category in list_categories(workspace_owner_id):
+        if str(category.get("type") or "") != "expense":
+            continue
+        category_id = str(category.get("id") or "").strip()
+        category_name = str(category.get("name") or "").strip()
+        if category_name and category_name.casefold() not in seen_names:
+            seen_names.add(category_name.casefold())
+            items.append(
+                {
+                    "id": f"finance:{category_id}",
+                    "name": category_name,
+                    "source": "finance",
+                }
+            )
+        for index, raw_subcategory in enumerate(category.get("subcategories") or []):
+            subcategory = str(raw_subcategory or "").strip()
+            option_name = f"{category_name} / {subcategory}" if category_name else subcategory
+            if not option_name or option_name.casefold() in seen_names:
+                continue
+            seen_names.add(option_name.casefold())
+            items.append(
+                {
+                    "id": f"finance:{category_id}:{index}",
+                    "name": option_name,
+                    "source": "finance",
+                }
+            )
+    return sorted(items, key=lambda item: item["name"].casefold())
+
+
 def billing_clients_context() -> list[dict[str, Any]]:
     clients = []
     for row in list_users_safe():
@@ -13851,7 +13887,7 @@ def create_app() -> FastAPI:
             "suppliers": supplier_names,
             "supplier_rows": warehouse_supplier_options,
             "payment_accounts": payment_accounts,
-            "expense_types": _workspace_purchase_expense_types(wid),
+            "expense_types": _warehouse_expense_type_options(wid),
             "fx": {"USD_UZS": _decimal_plain_text(_workspace_usd_uzs_rate(wid))},
         }
         return tpl(
@@ -15696,7 +15732,10 @@ def create_app() -> FastAPI:
         if len(name) > 120:
             return JSONResponse({"error": "Название не должно превышать 120 символов"}, status_code=400)
         items = _workspace_purchase_expense_types(wid)
-        expense_type = next((item for item in items if item["name"].casefold() == name.casefold()), None)
+        expense_type = next(
+            (item for item in _warehouse_expense_type_options(wid) if item["name"].casefold() == name.casefold()),
+            None,
+        )
         if expense_type is None:
             expense_type = {"id": str(uuid.uuid4()), "name": name}
             items.append(expense_type)
@@ -15704,7 +15743,13 @@ def create_app() -> FastAPI:
             settings = load_workspace_settings(wid)
             settings["purchase_expense_types"] = items
             save_workspace_settings(wid, settings)
-        return JSONResponse({"ok": True, "expense_type": expense_type, "expense_types": items})
+        return JSONResponse(
+            {
+                "ok": True,
+                "expense_type": expense_type,
+                "expense_types": _warehouse_expense_type_options(wid),
+            }
+        )
 
     @app.post("/warehouse/purchase-expense-types/delete", name="warehouse_purchase_expense_type_delete")
     async def warehouse_purchase_expense_type_delete(request: Request):
@@ -15722,7 +15767,7 @@ def create_app() -> FastAPI:
             settings = load_workspace_settings(wid)
             settings["purchase_expense_types"] = filtered
             save_workspace_settings(wid, settings)
-        return JSONResponse({"ok": True, "expense_types": filtered})
+        return JSONResponse({"ok": True, "expense_types": _warehouse_expense_type_options(wid)})
 
     @app.post("/suppliers/save", name="suppliers_save")
     async def suppliers_save(request: Request):

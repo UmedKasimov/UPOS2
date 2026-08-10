@@ -11409,6 +11409,20 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   border-bottom: 0;
 }
 
+.warehouse-expense-type-source {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  margin: auto;
+  border: 1px solid color-mix(in srgb, #16a34a 40%, var(--border));
+  border-radius: 50%;
+  background: color-mix(in srgb, #16a34a 10%, var(--card));
+  color: #15803d;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
 .warehouse-expense-type-select {
   min-width: 0;
   align-self: stretch;
@@ -29836,6 +29850,15 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-expenses {
   border-top: 1px solid var(--workbench-line, var(--border));
   padding-top: 0.9rem;
+}
+
+.warehouse-adjustment-expenses .warehouse-purchase-expenses-list,
+.warehouse-adjustment-expenses .warehouse-purchase-expenses-summary {
+  width: min(100%, 720px);
+}
+
+.warehouse-adjustment-expenses .warehouse-purchase-expense-row {
+  grid-template-columns: minmax(190px, 360px) minmax(130px, 180px) 64px 44px;
 }
 
 .warehouse-adjustment-expense-close {

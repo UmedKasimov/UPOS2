@@ -465,7 +465,9 @@
       ? items.map((item) => (
         `<div class="warehouse-expense-type-item">` +
         `<button type="button" class="warehouse-expense-type-select" data-expense-type-id="${escapeHtml(item.id || "")}">${escapeHtml(item.name || "")}</button>` +
-        `<button type="button" class="sales-line-remove" data-expense-type-delete="${escapeHtml(item.id || "")}" aria-label="Удалить ${escapeHtml(item.name || "")}" title="Удалить">×</button>` +
+        (String(item.source || "") === "finance"
+          ? `<span class="warehouse-expense-type-source" title="Категория из финансов">Ф</span>`
+          : `<button type="button" class="sales-line-remove" data-expense-type-delete="${escapeHtml(item.id || "")}" aria-label="Удалить ${escapeHtml(item.name || "")}" title="Удалить">×</button>`) +
         `</div>`
       )).join("")
       : '<p class="warehouse-expense-type-empty">Сохранённых видов пока нет.</p>';

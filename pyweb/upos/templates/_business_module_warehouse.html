@@ -827,7 +827,7 @@
                     {% endif %}
                   {% endfor %}
                 </select>
-                <button type="button" class="warehouse-purchase-expense-type-add" data-purchase-expense-type-open aria-label="Создать вид расхода" title="Создать вид расхода">+</button>
+                <button type="button" class="warehouse-purchase-expense-type-add" data-purchase-expense-type-open aria-label="Добавить новый тип расхода" title="Добавить новый тип расхода">+</button>
               </div>
               <input name="extra_expense_amount" value="{{ expense.amount if expense else '' }}" placeholder="Сумма" inputmode="decimal" data-purchase-expense-amount />
               <span data-purchase-expense-currency>{{ warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS' }}</span>
@@ -1289,7 +1289,7 @@
                     <option value="{{ expense_type.name }}">{{ expense_type.name }}</option>
                   {% endfor %}
                 </select>
-                <button type="button" class="warehouse-purchase-expense-type-add" data-adjustment-expense-type-open aria-label="Создать вид расхода" title="Создать вид расхода">+</button>
+                <button type="button" class="warehouse-purchase-expense-type-add" data-adjustment-expense-type-open aria-label="Добавить новый тип расхода" title="Добавить новый тип расхода">+</button>
               </div>
               <input name="extra_expense_amount" placeholder="Сумма" inputmode="decimal" data-adjustment-expense-amount />
               <span data-purchase-expense-currency data-adjustment-expense-currency>UZS</span>
