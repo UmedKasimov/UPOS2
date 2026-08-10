@@ -227,7 +227,15 @@
         <h2>Закупки</h2>
         <span>Всего: {{ warehouse_purchases_pagination.total }}</span>
       </div>
-      <button type="button" class="btn sales-journal-create-btn" data-warehouse-open-operation>+ Закупка</button>
+      <button
+        type="button"
+        class="btn sales-journal-create-btn"
+        data-workspace-trigger="purchase-new"
+        data-workspace-tab-id="purchase-new"
+        data-workspace-view-id="purchase_edit"
+        data-workspace-tab-title="Новая закупка"
+        data-workspace-tab-hash="purchase-new"
+      >+ Закупка</button>
       <form class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
         <input type="hidden" name="purchase_page_size" value="{{ warehouse_purchases_pagination.page_size }}" />
         <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
@@ -375,6 +383,15 @@
               </td>
               <td class="warehouse-purchase-row-actions">
                 <div class="warehouse-purchase-row-actions-inner">
+                  {% if doc.debt_amount and doc.debt_amount != '0' %}
+                    <button
+                      class="btn btn-secondary warehouse-purchase-row-pay"
+                      type="button"
+                      data-purchase-row-pay
+                      data-purchase-id="{{ doc.id }}"
+                      title="Оплатить закупку {{ doc.number }}"
+                    >Оплатить</button>
+                  {% endif %}
                   <a
                     class="products-action-icon products-action-icon--edit"
                     href="{{ url_for('warehouse_get') }}?purchase_id={{ doc.id }}#purchases"

@@ -49,7 +49,7 @@
   {% set module_stack_views = module_views ~ " profile supplier_create" %}
 {% elif active == "suppliers" %}
   {% set module_stack_views = module_views ~ " supplier_create" %}
-{% elif active == "warehouse" and warehouse_purchase_edit %}
+{% elif active == "warehouse" %}
   {% set module_stack_views = module_views ~ " purchase_edit" %}
 {% else %}
   {% set module_stack_views = module_views %}

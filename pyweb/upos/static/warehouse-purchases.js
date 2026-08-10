@@ -2632,6 +2632,20 @@
         openDetail(root, trigger.dataset.purchaseId || "");
       });
     });
+    root.querySelectorAll("[data-purchase-row-pay]").forEach((button) => {
+      if (button.dataset.purchaseRowPayReady === "1") return;
+      button.dataset.purchaseRowPayReady = "1";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const purchaseId = button.dataset.purchaseId || "";
+        openDetail(root, purchaseId);
+        const panel = root.querySelector("[data-warehouse-purchase-detail]");
+        if (!panel || panel.dataset.purchaseId !== purchaseId) return;
+        activatePurchaseDetailTab(panel, "payment");
+        openDetailPaymentDialog(root, panel);
+      });
+    });
     root.querySelectorAll("[data-warehouse-purchase-close]").forEach((trigger) => {
       if (trigger.dataset.warehousePurchaseCloseReady === "1") return;
       trigger.dataset.warehousePurchaseCloseReady = "1";

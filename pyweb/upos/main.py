@@ -130,6 +130,7 @@ from upos.transactions_store import (
     get_account_movements,
     get_pnl_data,
 )
+from upos.purchase_cash import build_purchase_cash_transaction_payloads
 from PIL import Image
 from upos.clients_geocode import (
     clients_without_location,
@@ -8237,6 +8238,69 @@ def create_app() -> FastAPI:
                 tx_data["to_account_id"] = account_id
             create_transaction(workspace_owner_id, tx_data)
 
+    def _delete_purchase_cash_transactions(workspace_owner_id: str, purchase_id: str) -> None:
+        clean_purchase_id = str(purchase_id or "").strip()
+        if not clean_purchase_id:
+            return
+        with session_scope() as session:
+            tx_ids = list(
+                session.execute(
+                    select(Transaction.id).where(
+                        Transaction.workspace_owner_id == workspace_owner_id,
+                        Transaction.data.op("->>")("source") == "purchase",
+                        Transaction.data.op("->>")("purchase_document_id") == clean_purchase_id,
+                    )
+                ).scalars()
+            )
+        for tx_id in tx_ids:
+            delete_transaction(workspace_owner_id, str(tx_id))
+
+    def _sync_purchase_cash_transactions(
+        workspace_owner_id: str,
+        *,
+        purchase_id: str,
+        purchase_number: str,
+        data: dict[str, Any],
+        currency: str,
+        user: dict[str, Any] | None = None,
+    ) -> None:
+        payment_rows = [
+            dict(item)
+            for item in (data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else [])
+            if isinstance(item, dict) and _sales_decimal(item.get("amount")) > 0
+        ]
+        paid_amount = _sales_decimal(data.get("paid_amount"))
+        if not payment_rows and paid_amount > 0:
+            payment_rows.append(
+                {
+                    "amount": _decimal_plain_text(paid_amount),
+                    "currency": currency,
+                    "type": str(data.get("payment_type") or "Оплата").strip() or "Оплата",
+                    "account": "",
+                    "account_id": "",
+                    "date": str(data.get("date") or "").strip(),
+                }
+            )
+        if payment_rows:
+            payment_rows = _normalize_sales_payment_lines(workspace_owner_id, payment_rows)
+
+        normalized_data = dict(data)
+        normalized_data["payment_lines"] = payment_rows
+        actor_name = str((user or {}).get("name") or (user or {}).get("username") or "").strip()
+        employee_id = str((user or {}).get("user_id") or (user or {}).get("id") or "").strip()
+        payloads = build_purchase_cash_transaction_payloads(
+            purchase_id=purchase_id,
+            purchase_number=purchase_number,
+            data=normalized_data,
+            currency=currency,
+            created_at=_document_created_at_with_time(workspace_owner_id, data.get("date")),
+            employee_id=employee_id,
+            actor_name=actor_name,
+        )
+        _delete_purchase_cash_transactions(workspace_owner_id, purchase_id)
+        for payload in payloads:
+            create_transaction(workspace_owner_id, payload, actor=user)
+
     def _sales_cash_payment_count(data: dict[str, Any]) -> int:
         count = 0
         for payment in data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []:
@@ -12053,8 +12117,8 @@ def create_app() -> FastAPI:
             "date": str(form.get("date") or "").strip(),
             "supplier": str(form.get("supplier") or "").strip(),
             "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
-            "status": "ordered",
-            "workflow_status": "ordered",
+            "status": "purchased",
+            "workflow_status": "purchased",
             "payment_status": payment_status,
             "paid_amount": (_decimal_plain_text(paid_amount) or "0"),
             "payment_type": payment_type,
@@ -13238,7 +13302,12 @@ def create_app() -> FastAPI:
     def _module_flash_error(request: Request) -> str:
         return request.query_params.get("error") or ("Форма устарела. Обновите страницу и повторите." if request.query_params.get("err") == "csrf" else "")
 
-    def _purchase_save_redirect(form: Any, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+    def _purchase_save_redirect(
+        form: Any,
+        workspace_owner_id: str,
+        base_url: str,
+        actor: dict[str, Any] | None = None,
+    ) -> RedirectResponse:
         try:
             data, amount, currency = _purchase_document_payload(form)
         except ValueError as exc:
@@ -13311,6 +13380,23 @@ def create_app() -> FastAPI:
                 data=data,
             )
             session.add(row)
+            saved_purchase_id = row.id
+            saved_purchase_number = row.number
+        try:
+            _sync_purchase_cash_transactions(
+                workspace_owner_id,
+                purchase_id=saved_purchase_id,
+                purchase_number=saved_purchase_number,
+                data=data,
+                currency=currency,
+                user=actor,
+            )
+        except Exception:
+            logger.exception("[purchases] failed to sync purchase %s with kassa", saved_purchase_id)
+            return RedirectResponse(
+                url=f"{base_url}?error=" + quote("Закупка сохранена, но операции кассы не записались") + "#purchases",
+                status_code=302,
+            )
         return RedirectResponse(url=f"{base_url}?msg=saved#purchases", status_code=302)
 
     def _purchase_update_redirect(
@@ -13318,6 +13404,7 @@ def create_app() -> FastAPI:
         purchase_id: str,
         workspace_owner_id: str,
         base_url: str,
+        actor: dict[str, Any] | None = None,
     ) -> RedirectResponse:
         try:
             data, amount, currency = _purchase_document_payload(form)
@@ -13397,9 +13484,25 @@ def create_app() -> FastAPI:
                 row.data = data
                 flag_modified(row, "data")
                 session.add(row)
+                saved_purchase_number = row.number
         except ValueError as exc:
             return RedirectResponse(
                 url=f"{base_url}?edit_purchase={quote(purchase_id)}&error=" + quote(str(exc)) + "#purchase-edit",
+                status_code=302,
+            )
+        try:
+            _sync_purchase_cash_transactions(
+                workspace_owner_id,
+                purchase_id=purchase_id,
+                purchase_number=saved_purchase_number,
+                data=data,
+                currency=currency,
+                user=actor,
+            )
+        except Exception:
+            logger.exception("[purchases] failed to resync purchase %s with kassa", purchase_id)
+            return RedirectResponse(
+                url=f"{base_url}?error=" + quote("Закупка изменена, но операции кассы не обновились") + "#purchases",
                 status_code=302,
             )
         return RedirectResponse(url=f"{base_url}?msg=updated#purchases", status_code=302)
@@ -13490,9 +13593,16 @@ def create_app() -> FastAPI:
                     status_code=302,
                 )
             session.delete(row)
+        _delete_purchase_cash_transactions(workspace_owner_id, purchase_id)
         return RedirectResponse(url=f"{base_url}?msg=deleted#purchases", status_code=302)
 
-    def _purchase_pay_redirect(form: Any, purchase_id: str, workspace_owner_id: str, base_url: str) -> RedirectResponse:
+    def _purchase_pay_redirect(
+        form: Any,
+        purchase_id: str,
+        workspace_owner_id: str,
+        base_url: str,
+        actor: dict[str, Any] | None = None,
+    ) -> RedirectResponse:
         with session_scope() as session:
             row = session.get(PurchaseDocument, purchase_id)
             if not row or row.workspace_owner_id != workspace_owner_id:
@@ -13532,6 +13642,22 @@ def create_app() -> FastAPI:
             row.data = data
             flag_modified(row, "data")
             session.add(row)
+            saved_purchase_number = row.number
+        try:
+            _sync_purchase_cash_transactions(
+                workspace_owner_id,
+                purchase_id=purchase_id,
+                purchase_number=saved_purchase_number,
+                data=data,
+                currency=currency,
+                user=actor,
+            )
+        except Exception:
+            logger.exception("[purchases] failed to sync payment for purchase %s", purchase_id)
+            return RedirectResponse(
+                url=f"{base_url}?error=" + quote("Оплата внесена, но операция кассы не записалась") + "#purchases",
+                status_code=302,
+            )
         return RedirectResponse(url=f"{base_url}?msg=paid#purchases", status_code=302)
 
     @app.get("/warehouse", response_class=HTMLResponse, name="warehouse_get")
@@ -14207,7 +14333,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_save_redirect(form, wid, "/warehouse")
+        return _purchase_save_redirect(form, wid, "/warehouse", request.session.get("user") or {})
 
     @app.post("/warehouse/purchases/{purchase_id}/update", name="warehouse_purchase_update")
     async def warehouse_purchase_update(request: Request, purchase_id: str):
@@ -14218,7 +14344,13 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_update_redirect(form, purchase_id, wid, "/warehouse")
+        return _purchase_update_redirect(
+            form,
+            purchase_id,
+            wid,
+            "/warehouse",
+            request.session.get("user") or {},
+        )
 
     @app.post("/warehouse/purchases/{purchase_id}/status", name="warehouse_purchase_status")
     async def warehouse_purchase_status(request: Request, purchase_id: str):
@@ -14257,7 +14389,13 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_pay_redirect(form, purchase_id, wid, "/warehouse")
+        return _purchase_pay_redirect(
+            form,
+            purchase_id,
+            wid,
+            "/warehouse",
+            request.session.get("user") or {},
+        )
 
     @app.get("/clients", response_class=HTMLResponse, name="clients_get")
     def clients_get(
@@ -15851,7 +15989,7 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_save_redirect(form, wid, "/suppliers")
+        return _purchase_save_redirect(form, wid, "/suppliers", request.session.get("user") or {})
 
     @app.post("/suppliers/purchases/{purchase_id}/delete", name="suppliers_purchase_delete")
     async def suppliers_purchase_delete(request: Request, purchase_id: str):
@@ -15873,7 +16011,13 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
-        return _purchase_pay_redirect(purchase_id, wid, "/suppliers")
+        return _purchase_pay_redirect(
+            form,
+            purchase_id,
+            wid,
+            "/suppliers",
+            request.session.get("user") or {},
+        )
 
     @app.get("/crm", response_class=HTMLResponse, name="crm_get")
     def crm_get(
