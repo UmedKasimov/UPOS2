@@ -1118,6 +1118,7 @@
       class="product-form warehouse-adjustment-form warehouse-adjustment-form--sales warehouse-adjustment-form--wide"
       data-warehouse-adjustment-entry
       data-adjustment-direction="{{ adjustment_direction }}"
+      data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}"
       data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
     >
       {% include "_csrf_field.html" %}
@@ -1130,17 +1131,30 @@
         {% if adjustment_direction == 'in' %}
           <label class="warehouse-adjustment-supplier-field">
             <span>Поставщик</span>
-            <select name="counterparty_id" data-adjustment-supplier>
-              <option value="" data-name="" data-balance="Нет долга" data-balance-kind="zero">Не выбран</option>
-              {% for supplier in warehouse_options.supplier_rows %}
-                <option
-                  value="{{ supplier.id }}"
-                  data-name="{{ supplier.name }}"
-                  data-balance="{{ supplier.balance }}"
-                  data-balance-kind="{{ supplier.balance_kind }}"
-                >{{ supplier.name }}</option>
-              {% endfor %}
-            </select>
+            <div
+              class="sales-combobox warehouse-supplier-picker"
+              data-warehouse-supplier-picker
+              data-adjustment-supplier-picker
+            >
+              <div class="sales-lock-field">
+                <input
+                  placeholder="Выберите поставщика"
+                  autocomplete="off"
+                  data-warehouse-supplier-input
+                  data-adjustment-supplier-input
+                />
+                <button
+                  type="button"
+                  class="sales-combo-edit"
+                  data-warehouse-supplier-edit
+                  aria-label="Сменить поставщика"
+                  title="Сменить поставщика"
+                  hidden
+                >✎</button>
+              </div>
+              <div class="sales-combo-panel" data-warehouse-supplier-panel hidden></div>
+            </div>
+            <input type="hidden" name="counterparty_id" data-adjustment-supplier />
             <input type="hidden" name="supplier" data-adjustment-supplier-name />
             <small class="warehouse-adjustment-supplier-balance is-zero" data-adjustment-supplier-balance>Нет долга</small>
           </label>

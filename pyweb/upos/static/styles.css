@@ -29616,6 +29616,10 @@ html.dark .clients-map-empty {
   min-width: 0;
 }
 
+.warehouse-adjustment-supplier-field > .sales-combobox {
+  width: 100%;
+}
+
 .warehouse-adjustment-supplier-balance {
   min-height: 17px;
   overflow: hidden;

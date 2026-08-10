@@ -374,8 +374,24 @@
   function commitSupplier(picker, value) {
     const input = picker?.querySelector("[data-warehouse-supplier-input]");
     if (!input) return;
-    input.value = String(value || "").trim();
-    setSupplierLocked(picker, Boolean(input.value));
+    const supplier = value && typeof value === "object" ? value : { name: value };
+    const supplierName = String(supplier.name || "").trim();
+    input.value = supplierName;
+    if (picker.matches("[data-adjustment-supplier-picker]")) {
+      const form = picker.closest("[data-warehouse-adjustment-entry]");
+      const supplierIdInput = form?.querySelector("[data-adjustment-supplier]");
+      const supplierNameInput = form?.querySelector("[data-adjustment-supplier-name]");
+      const supplierBalance = form?.querySelector("[data-adjustment-supplier-balance]");
+      if (supplierIdInput) supplierIdInput.value = String(supplier.id || "").trim();
+      if (supplierNameInput) supplierNameInput.value = supplierName;
+      if (supplierBalance) {
+        supplierBalance.textContent = String(supplier.balance || "Нет долга").trim() || "Нет долга";
+        supplierBalance.classList.remove("is-debt", "is-advance", "is-mixed", "is-zero");
+        supplierBalance.classList.add(`is-${String(supplier.balance_kind || "zero")}`);
+      }
+      supplierIdInput?.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    setSupplierLocked(picker, Boolean(supplierName));
   }
 
   function setSupplierDialogStatus(form, message, variant) {
@@ -412,18 +428,34 @@
     writePurchaseOptions(options);
   }
 
-  function upsertSupplierOption(name) {
-    const cleanName = String(name || "").trim();
+  function upsertSupplierOption(value) {
+    const supplier = value && typeof value === "object" ? value : { name: value };
+    const cleanName = String(supplier.name || "").trim();
     if (!cleanName) return;
-    const node = document.getElementById("warehouse-purchase-options");
     const options = readPurchaseOptions();
     const suppliers = Array.isArray(options.suppliers) ? options.suppliers : [];
     if (!suppliers.some((item) => normalize(item) === normalize(cleanName))) {
       suppliers.push(cleanName);
       suppliers.sort((a, b) => String(a || "").localeCompare(String(b || ""), "ru"));
     }
+    const supplierRows = Array.isArray(options.supplier_rows) ? options.supplier_rows : [];
+    const normalizedSupplier = {
+      ...supplier,
+      id: String(supplier.id || "").trim(),
+      name: cleanName,
+      balance: String(supplier.balance || "Нет долга").trim() || "Нет долга",
+      balance_kind: String(supplier.balance_kind || "zero").trim() || "zero",
+    };
+    const supplierIndex = supplierRows.findIndex((item) => {
+      return (normalizedSupplier.id && String(item.id || "").trim() === normalizedSupplier.id)
+        || normalize(item.name) === normalize(cleanName);
+    });
+    if (supplierIndex >= 0) supplierRows[supplierIndex] = { ...supplierRows[supplierIndex], ...normalizedSupplier };
+    else supplierRows.push(normalizedSupplier);
+    supplierRows.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ru"));
     options.suppliers = suppliers;
-    if (node) node.textContent = JSON.stringify(options);
+    options.supplier_rows = supplierRows;
+    writePurchaseOptions(options);
   }
 
   function writeExpenseTypes(items) {
@@ -605,6 +637,7 @@
     const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-supplier-dialog]") || document.querySelector("[data-warehouse-supplier-dialog]");
     const form = dialog?.querySelector("[data-warehouse-supplier-form]");
     if (!dialog || !form) return;
+    if (dialog.parentElement !== document.body) document.body.append(dialog);
     activeSupplierPicker = picker || null;
     closeSupplierPanel(picker);
     form.reset();
@@ -656,11 +689,11 @@
           })
         )
         .then((supplier) => {
-          upsertSupplierOption(supplier.name);
+          upsertSupplierOption(supplier);
           const picker = activeSupplierPicker && document.contains(activeSupplierPicker)
             ? activeSupplierPicker
             : entryForm.querySelector("[data-warehouse-supplier-picker]");
-          commitSupplier(picker, supplier.name);
+          commitSupplier(picker, supplier);
           setSupplierDialogStatus(form, "Сохранено", "ok");
           closeSupplierDialog(entryForm);
         })
@@ -792,21 +825,25 @@
     const panel = picker.querySelector("[data-warehouse-supplier-panel]");
     if (!panel) return;
     const cleanQuery = String(query || "").trim();
-    const rows = (options.suppliers || [])
-      .filter((name) => supplierMatches(name, cleanQuery))
+    const supplierRows = Array.isArray(options.supplier_rows) && options.supplier_rows.length
+      ? options.supplier_rows
+      : (options.suppliers || []).map((name) => ({ name, balance: "Нет долга", balance_kind: "zero" }));
+    const rows = supplierRows
+      .filter((supplier) => supplierMatches(supplier.name, cleanQuery))
       .slice(0, 80);
     const createLabel = cleanQuery ? `+ Создать поставщика "${cleanQuery}"` : "+ Создать поставщика";
+    const isAdjustmentPicker = picker.matches("[data-adjustment-supplier-picker]");
     panel.innerHTML =
       `<button type="button" class="sales-combo-create" data-warehouse-supplier-create>${escapeHtml(createLabel)}</button>` +
       (rows.length
         ? rows
             .map(
-              (name) =>
+              (supplier) =>
                 '<button type="button" class="sales-combo-option">' +
                 '<span class="sales-combo-main">' +
-                highlightText(name, cleanQuery) +
+                highlightText(supplier.name, cleanQuery) +
                 "</span>" +
-                '<span class="sales-combo-meta"><span>Поставщик</span><strong>Контрагент</strong></span>' +
+                `<span class="sales-combo-meta"><span>Поставщик</span><strong>${escapeHtml(isAdjustmentPicker ? supplier.balance || "Нет долга" : "Контрагент")}</strong></span>` +
                 "</button>"
             )
             .join("")
@@ -815,7 +852,7 @@
     positionSupplierPanel(picker);
     panel.querySelector("[data-warehouse-supplier-create]")?.addEventListener("mousedown", (event) => {
       event.preventDefault();
-      openSupplierDialog(picker.closest("[data-warehouse-purchase-entry]"), picker, cleanQuery);
+      openSupplierDialog(picker.closest("[data-warehouse-purchase-entry], [data-warehouse-adjustment-entry]"), picker, cleanQuery);
     });
     panel.querySelectorAll(".sales-combo-option").forEach((button, index) => {
       button.addEventListener("mousedown", (event) => {
@@ -1615,6 +1652,8 @@
       const options = readPurchaseOptions();
       const products = Array.isArray(options.product_rows) ? options.product_rows : [];
       wireProductDialog(form);
+      wireSupplierPicker(form);
+      wireSupplierDialog(form);
       const body = form.querySelector("[data-adjustment-lines]");
       const supplierInput = form.querySelector("[data-adjustment-supplier]");
       const supplierNameInput = form.querySelector("[data-adjustment-supplier-name]");
@@ -1635,12 +1674,14 @@
       const directionSign = direction === "in" ? 1 : -1;
       const signLabel = direction === "in" ? "+" : "−";
       const syncSupplier = () => {
-        const option = supplierInput?.selectedOptions?.[0] || null;
-        if (supplierNameInput) supplierNameInput.value = String(option?.dataset?.name || "").trim();
+        const supplierId = String(supplierInput?.value || "").trim();
+        const supplier = (readPurchaseOptions().supplier_rows || []).find((item) => String(item.id || "").trim() === supplierId) || null;
+        const supplierName = String(supplier?.name || form.querySelector("[data-adjustment-supplier-input]")?.value || "").trim();
+        if (supplierNameInput) supplierNameInput.value = supplierName;
         if (supplierBalance) {
-          supplierBalance.textContent = String(option?.dataset?.balance || "Нет долга").trim() || "Нет долга";
+          supplierBalance.textContent = String(supplier?.balance || "Нет долга").trim() || "Нет долга";
           supplierBalance.classList.remove("is-debt", "is-advance", "is-mixed", "is-zero");
-          supplierBalance.classList.add(`is-${String(option?.dataset?.balanceKind || "zero")}`);
+          supplierBalance.classList.add(`is-${String(supplier?.balance_kind || "zero")}`);
         }
       };
       const rows = () => Array.from(body?.querySelectorAll("[data-adjustment-row]") || []);
