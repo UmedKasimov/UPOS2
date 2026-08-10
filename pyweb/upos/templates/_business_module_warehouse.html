@@ -1146,6 +1146,18 @@
           <span>Ответственный</span>
           <input name="responsible" value="{{ user.name if user else '' }}" autocomplete="off" />
         </label>
+        {% if adjustment_direction == 'in' %}
+          <label>
+            <span>Прайс-лист</span>
+            <select name="price_type_id" data-adjustment-price-type>
+              {% for price_type in warehouse_options.price_types %}
+                <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="price_type_name" data-adjustment-price-type-name />
+            <input type="hidden" name="price_type_currency" data-adjustment-price-type-currency />
+          </label>
+        {% endif %}
       </div>
 
       <section class="product-form-section warehouse-adjustment-section">
@@ -1168,6 +1180,7 @@
                 <th>После операции</th>
                 <th>{{ 'Приходная цена' if adjustment_direction == 'in' else 'Цена' }}</th>
                 {% if adjustment_direction == 'in' %}<th>Цена после расходов</th>{% endif %}
+                {% if adjustment_direction == 'in' %}<th data-adjustment-sale-price-title>Продажная цена</th>{% endif %}
                 <th>Сумма</th>
                 <th></th>
               </tr>
@@ -1208,6 +1221,9 @@
                   <td>
                     <strong class="warehouse-adjustment-cost-price" data-adjustment-cost-price>0 UZS</strong>
                   </td>
+                  <td>
+                    <strong class="warehouse-adjustment-sale-price" data-adjustment-sale-price>—</strong>
+                  </td>
                 {% endif %}
                 <td>
                   <strong class="warehouse-adjustment-line-total" data-adjustment-line-total>0 UZS</strong>
@@ -1221,7 +1237,7 @@
               <tr class="sales-subtotal-row warehouse-adjustment-subtotal-row">
                 <td colspan="3">Итого товары</td>
                 <td><output data-adjustment-products-quantity>0</output></td>
-                <td colspan="{{ 3 if adjustment_direction == 'in' else 2 }}"></td>
+                <td colspan="{{ 4 if adjustment_direction == 'in' else 2 }}"></td>
                 <td><output data-adjustment-goods-total>0 UZS</output></td>
                 <td></td>
               </tr>

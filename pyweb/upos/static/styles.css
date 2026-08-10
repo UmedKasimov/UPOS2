@@ -29590,6 +29590,10 @@ html.dark .clients-map-empty {
   grid-template-columns: minmax(150px, 0.7fr) minmax(220px, 1.3fr) minmax(130px, 0.6fr) minmax(220px, 1fr);
 }
 
+.warehouse-adjustment-meta:has([data-adjustment-price-type]) {
+  grid-template-columns: minmax(130px, 0.65fr) minmax(220px, 1.15fr) minmax(110px, 0.55fr) minmax(180px, 0.85fr) minmax(200px, 1fr);
+}
+
 .warehouse-adjustment-section {
   min-width: 0;
   margin: 0;
@@ -29692,12 +29696,12 @@ html.dark .clients-map-empty {
 }
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table {
-  min-width: 1220px;
+  min-width: 1360px;
 }
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(2),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(2) {
-  width: 25%;
+  width: 23%;
 }
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(3),
@@ -29706,7 +29710,7 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(4),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(5),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(5) {
-  width: 10%;
+  width: 9%;
 }
 
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(6),
@@ -29714,14 +29718,22 @@ html.dark .clients-map-empty {
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(7),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(7),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(8),
-.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(8) {
-  width: 13%;
-}
-
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(8),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(9),
 .warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(9) {
+  width: 12%;
+}
+
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table th:nth-child(10),
+.warehouse-adjustment-entry:has(.warehouse-adjustment-direction--in) .warehouse-adjustment-table td:nth-child(10) {
   width: 44px;
   text-align: center;
+}
+
+.warehouse-adjustment-sale-price {
+  color: #166534;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .warehouse-adjustment-table [data-adjustment-unit] {

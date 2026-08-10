@@ -1616,6 +1616,7 @@
       const body = form.querySelector("[data-adjustment-lines]");
       const warehouseInput = form.querySelector("[data-adjustment-warehouse]");
       const currencyInput = form.querySelector("[data-adjustment-currency]");
+      const priceTypeInput = form.querySelector("[data-adjustment-price-type]");
       const totalOutput = form.querySelector("[data-adjustment-total]");
       const errorOutput = form.querySelector("[data-adjustment-error]");
       const submitButton = form.querySelector("[data-adjustment-submit]");
@@ -1651,6 +1652,29 @@
         const priced = [...matching].reverse().find((stock) => purchaseEntryNumber(stock?.price) > 0)
           || [...stocks].reverse().find((stock) => purchaseEntryNumber(stock?.price) > 0);
         return purchaseEntryNumber(priced?.price);
+      };
+      const selectedAdjustmentPriceType = () => {
+        const option = priceTypeInput?.selectedOptions?.[0] || null;
+        const priceType = {
+          id: String(priceTypeInput?.value || "").trim(),
+          name: String(option?.dataset?.name || option?.textContent || "").trim(),
+          currency: String(option?.dataset?.currency || "UZS").trim().toUpperCase() || "UZS",
+        };
+        const nameInput = form.querySelector("[data-adjustment-price-type-name]");
+        const currencyField = form.querySelector("[data-adjustment-price-type-currency]");
+        const title = form.querySelector("[data-adjustment-sale-price-title]");
+        if (nameInput) nameInput.value = priceType.name;
+        if (currencyField) currencyField.value = priceType.currency;
+        if (title) title.textContent = priceType.name || "Продажная цена";
+        return priceType;
+      };
+      const salesPriceForProduct = (product) => {
+        const priceType = selectedAdjustmentPriceType();
+        const entry = productPriceEntryForType(product, priceType);
+        return {
+          price: purchaseEntryNumber(entry?.price),
+          currency: String(entry?.currency || priceType.currency || "UZS").toUpperCase(),
+        };
       };
       const currency = () => String(currencyInput?.value || "UZS").toUpperCase();
       const setOutput = (row, selector, value) => {
@@ -1698,6 +1722,12 @@
           setOutput(row, "[data-adjustment-after]", quantityText(after));
           setOutput(row, "[data-adjustment-unit]", product?.unit || "");
           setOutput(row, "[data-adjustment-sign]", signLabel);
+          const salesPrice = product ? salesPriceForProduct(product) : { price: 0, currency: "UZS" };
+          setOutput(
+            row,
+            "[data-adjustment-sale-price]",
+            salesPrice.price ? purchaseEntryMoney(salesPrice.price, salesPrice.currency) : "—",
+          );
           setOutput(
             row,
             "[data-adjustment-line-total]",
@@ -1763,6 +1793,7 @@
         setOutput(row, "[data-adjustment-after]", "0");
         setOutput(row, "[data-adjustment-unit]", "");
         setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(0, currency()));
+        setOutput(row, "[data-adjustment-sale-price]", "—");
         setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
       };
       // Выбор товара — поиском (комбобокс как в продаже), а не выпадающим
@@ -2007,6 +2038,7 @@
         recalc();
       });
       currencyInput?.addEventListener("change", recalc);
+      priceTypeInput?.addEventListener("change", recalc);
       form.addEventListener("submit", (event) => {
         recalc();
         if (submitButton?.disabled) {
