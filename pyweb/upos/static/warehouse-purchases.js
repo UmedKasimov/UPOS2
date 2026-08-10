@@ -1614,6 +1614,9 @@
       const products = Array.isArray(options.product_rows) ? options.product_rows : [];
       wireProductDialog(form);
       const body = form.querySelector("[data-adjustment-lines]");
+      const supplierInput = form.querySelector("[data-adjustment-supplier]");
+      const supplierNameInput = form.querySelector("[data-adjustment-supplier-name]");
+      const supplierBalance = form.querySelector("[data-adjustment-supplier-balance]");
       const warehouseInput = form.querySelector("[data-adjustment-warehouse]");
       const currencyInput = form.querySelector("[data-adjustment-currency]");
       const priceTypeInput = form.querySelector("[data-adjustment-price-type]");
@@ -1629,6 +1632,15 @@
       const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
       const directionSign = direction === "in" ? 1 : -1;
       const signLabel = direction === "in" ? "+" : "−";
+      const syncSupplier = () => {
+        const option = supplierInput?.selectedOptions?.[0] || null;
+        if (supplierNameInput) supplierNameInput.value = String(option?.dataset?.name || "").trim();
+        if (supplierBalance) {
+          supplierBalance.textContent = String(option?.dataset?.balance || "Нет долга").trim() || "Нет долга";
+          supplierBalance.classList.remove("is-debt", "is-advance", "is-mixed", "is-zero");
+          supplierBalance.classList.add(`is-${String(option?.dataset?.balanceKind || "zero")}`);
+        }
+      };
       const rows = () => Array.from(body?.querySelectorAll("[data-adjustment-row]") || []);
       const expenseRows = () => Array.from(expenseLines?.querySelectorAll("[data-adjustment-expense-row]") || []);
       const expenseTotal = () => expenseRows().reduce((sum, row) => {
@@ -2061,6 +2073,7 @@
         recalc();
       });
       currencyInput?.addEventListener("change", recalc);
+      supplierInput?.addEventListener("change", syncSupplier);
       priceTypeInput?.addEventListener("change", () => {
         rows().forEach((row) => {
           const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
@@ -2086,6 +2099,7 @@
           if (input) input.value = value ? String(value) : "";
         });
       });
+      syncSupplier();
       recalc();
     });
   }

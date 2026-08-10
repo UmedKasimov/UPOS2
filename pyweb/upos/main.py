@@ -12449,6 +12449,8 @@ def create_app() -> FastAPI:
             "operation_type": operation_type,
             "warehouse": str(form.get("warehouse") or "").strip() or "Основной склад",
             "responsible": str(form.get("responsible") or "").strip(),
+            "supplier": str(form.get("supplier") or "").strip(),
+            "counterparty_id": str(form.get("counterparty_id") or "").strip(),
             "price_type_id": str(form.get("price_type_id") or "").strip(),
             "price_type_name": str(form.get("price_type_name") or "").strip(),
             "price_type_currency": str(form.get("price_type_currency") or "").strip().upper(),
@@ -12476,6 +12478,8 @@ def create_app() -> FastAPI:
             "amount": _sales_money_label(row.amount),
             "currency": row.currency,
             "responsible": str(data.get("responsible") or ""),
+            "supplier": str(data.get("supplier") or ""),
+            "counterparty_id": str(data.get("counterparty_id") or ""),
             "note": str(data.get("note") or ""),
         }
 
@@ -13543,6 +13547,7 @@ def create_app() -> FastAPI:
         warehouse_purchases: list[dict[str, Any]] = []
         product_names: list[str] = []
         supplier_names: list[str] = []
+        warehouse_supplier_options: list[dict[str, str]] = []
         warehouse_stock_total = Decimal("0")
         purchase_status_counts: dict[str, int] = {"all": 0}
         warehouse_purchase_totals: dict[str, Decimal] = {}
@@ -13578,9 +13583,8 @@ def create_app() -> FastAPI:
                     .order_by(PurchaseDocument.updated_at.desc())
                 ).scalars()
             )
-            supplier_names = [
-                str(row.name)
-                for row in session.execute(
+            supplier_rows = list(
+                session.execute(
                     select(Counterparty)
                     .where(
                         Counterparty.workspace_owner_id == wid,
@@ -13588,7 +13592,51 @@ def create_app() -> FastAPI:
                     )
                     .order_by(Counterparty.name.asc())
                 ).scalars()
-            ]
+            )
+            supplier_names = [str(row.name) for row in supplier_rows]
+            (
+                supplier_balance_by_id,
+                supplier_balance_by_name,
+                supplier_last_date_by_id,
+                supplier_last_date_by_name,
+                supplier_currency_by_id,
+                supplier_currency_by_name,
+            ) = _purchase_rollup_all(session, wid)
+            for supplier_row in supplier_rows:
+                supplier_item = _counterparty_view_data(
+                    supplier_row,
+                    balance_by_id=supplier_balance_by_id,
+                    balance_by_name=supplier_balance_by_name,
+                    last_date_by_id=supplier_last_date_by_id,
+                    last_date_by_name=supplier_last_date_by_name,
+                    balance_currency_by_id=supplier_currency_by_id,
+                    balance_currency_by_name=supplier_currency_by_name,
+                )
+                balance_parts: list[str] = []
+                balance_kinds: set[str] = set()
+                for balance_line in supplier_item.get("balance_lines") or []:
+                    balance_value = _sales_decimal(balance_line.get("value"))
+                    if not balance_value:
+                        continue
+                    balance_kind = "debt" if balance_value > 0 else "advance"
+                    balance_kinds.add(balance_kind)
+                    balance_parts.append(
+                        f"{'Мы должны' if balance_value > 0 else 'Он должен'}: "
+                        f"{_sales_money_label(abs(balance_value))} "
+                        f"{str(balance_line.get('currency') or 'UZS').upper()}"
+                    )
+                warehouse_supplier_options.append(
+                    {
+                        "id": str(supplier_item.get("id") or ""),
+                        "name": str(supplier_item.get("name") or ""),
+                        "balance": " · ".join(balance_parts) or "Нет долга",
+                        "balance_kind": (
+                            "mixed"
+                            if len(balance_kinds) > 1
+                            else next(iter(balance_kinds), "zero")
+                        ),
+                    }
+                )
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
             product_names = [str(row.name) for row in product_rows]
             for product_row in product_rows:
@@ -13801,6 +13849,7 @@ def create_app() -> FastAPI:
                 key=lambda item: (item["sort_order"], item["name"]),
             ),
             "suppliers": supplier_names,
+            "supplier_rows": warehouse_supplier_options,
             "payment_accounts": payment_accounts,
             "expense_types": _workspace_purchase_expense_types(wid),
             "fx": {"USD_UZS": _decimal_plain_text(_workspace_usd_uzs_rate(wid))},
@@ -13892,6 +13941,21 @@ def create_app() -> FastAPI:
                 )
             with session_scope() as session:
                 warehouse_row = _ensure_warehouse(session, wid, name=data["warehouse"])
+                if data["operation_type"] == "in" and data.get("counterparty_id"):
+                    supplier_row = _resolve_counterparty(
+                        session,
+                        wid,
+                        counterparty_id=str(data.get("counterparty_id") or ""),
+                        name=str(data.get("supplier") or ""),
+                        role="supplier",
+                    )
+                    if supplier_row is None:
+                        return RedirectResponse(
+                            url="/warehouse?op=in&error=" + quote("Поставщик не найден") + "#adjustments",
+                            status_code=302,
+                        )
+                    data["supplier"] = supplier_row.name
+                    data["counterparty_id"] = supplier_row.id
                 delta_sign = 1 if data["operation_type"] == "in" else -1
                 prepared_lines: list[dict[str, Any]] = []
                 for line in lines:

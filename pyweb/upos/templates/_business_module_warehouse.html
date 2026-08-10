@@ -1127,6 +1127,24 @@
           <span>Дата</span>
           <input name="date" type="date" value="{{ today }}" required />
         </label>
+        {% if adjustment_direction == 'in' %}
+          <label class="warehouse-adjustment-supplier-field">
+            <span>Поставщик</span>
+            <select name="counterparty_id" data-adjustment-supplier>
+              <option value="" data-name="" data-balance="Нет долга" data-balance-kind="zero">Не выбран</option>
+              {% for supplier in warehouse_options.supplier_rows %}
+                <option
+                  value="{{ supplier.id }}"
+                  data-name="{{ supplier.name }}"
+                  data-balance="{{ supplier.balance }}"
+                  data-balance-kind="{{ supplier.balance_kind }}"
+                >{{ supplier.name }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="supplier" data-adjustment-supplier-name />
+            <small class="warehouse-adjustment-supplier-balance is-zero" data-adjustment-supplier-balance>Нет долга</small>
+          </label>
+        {% endif %}
         <label>
           <span>Склад*</span>
           <select name="warehouse" required data-adjustment-warehouse>
