@@ -12359,22 +12359,27 @@ def create_app() -> FastAPI:
         products = list(form.getlist("line_product"))
         quantities = list(form.getlist("line_quantity"))
         prices = list(form.getlist("line_price"))
+        sale_prices = list(form.getlist("line_sale_price"))
         lines: list[dict[str, Any]] = []
         total = Decimal("0")
-        for index in range(max(len(products), len(quantities), len(prices))):
+        for index in range(max(len(products), len(quantities), len(prices), len(sale_prices))):
             product = str(products[index] if index < len(products) else "").strip()
             quantity_raw = quantities[index] if index < len(quantities) else ""
             price_raw = prices[index] if index < len(prices) else ""
-            if not product and not str(quantity_raw or "").strip() and not str(price_raw or "").strip():
+            sale_price_raw = sale_prices[index] if index < len(sale_prices) else ""
+            if not product and not str(quantity_raw or "").strip() and not str(price_raw or "").strip() and not str(sale_price_raw or "").strip():
                 continue
             if not product:
                 raise ValueError("Выберите товар в каждой заполненной строке")
             quantity = _sales_decimal_strict(quantity_raw, "Количество")
             price = _sales_decimal_strict(price_raw, "Цена")
+            sale_price = _sales_decimal_strict(sale_price_raw, "Продажная цена")
             if quantity <= 0:
                 raise ValueError("Количество должно быть больше нуля")
             if price < 0:
                 raise ValueError("Цена не может быть отрицательной")
+            if sale_price < 0:
+                raise ValueError("Продажная цена не может быть отрицательной")
             line_total = quantity * price
             total += line_total
             lines.append(
@@ -12382,6 +12387,7 @@ def create_app() -> FastAPI:
                     "product": product,
                     "quantity": _decimal_plain_text(quantity),
                     "price": (_decimal_plain_text(price) or "0"),
+                    "sale_price": (_decimal_plain_text(sale_price) or "0"),
                     "total": (_decimal_plain_text(line_total) or "0"),
                 }
             )
@@ -13923,6 +13929,23 @@ def create_app() -> FastAPI:
                         url=f"/warehouse?op={data['operation_type']}&error=" + quote(str(exc)) + "#adjustments",
                         status_code=302,
                     )
+                price_types = _workspace_price_types(wid)
+                selected_price_type = next(
+                    (item for item in price_types if str(item.get("id") or "") == str(data.get("price_type_id") or "")),
+                    None,
+                )
+                if selected_price_type and data["operation_type"] == "in":
+                    price_currency = str(selected_price_type.get("convert_to_currency") or data.get("price_type_currency") or currency or "UZS").strip().upper() or "UZS"
+                    data["price_type_name"] = str(selected_price_type.get("name") or data.get("price_type_name") or "")
+                    data["price_type_currency"] = price_currency
+                    for line in resolved_lines:
+                        sale_price = _sales_decimal(line.get("sale_price"))
+                        product_id = str(line.get("product_id") or "").strip()
+                        if sale_price <= 0 or not product_id:
+                            continue
+                        product_row = session.get(Product, product_id)
+                        if product_row and product_row.workspace_owner_id == wid:
+                            _apply_product_price_change(product_row, selected_price_type, sale_price, price_currency)
                 count = session.execute(
                     select(func.count(WarehouseOperation.id)).where(WarehouseOperation.workspace_owner_id == wid)
                 ).scalar_one()

@@ -1713,6 +1713,7 @@
           const product = productForRow(row);
           const quantityInput = row.querySelector("[data-adjustment-quantity]");
           const priceInput = row.querySelector("[data-adjustment-price]");
+          const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
           const quantity = Math.max(0, purchaseEntryNumber(quantityInput?.value));
           const price = Math.max(0, purchaseEntryNumber(priceInput?.value));
           const current = product ? stockForProduct(product) : 0;
@@ -1732,12 +1733,12 @@
           setOutput(row, "[data-adjustment-after]", quantityText(after));
           setOutput(row, "[data-adjustment-unit]", product?.unit || "");
           setOutput(row, "[data-adjustment-sign]", signLabel);
-          const salesPrice = product ? salesPriceForProduct(product) : { price: 0, currency: "UZS" };
-          setOutput(
-            row,
-            "[data-adjustment-sale-price]",
-            salesPrice.price ? purchaseEntryMoney(salesPrice.price, salesPrice.currency) : "—",
-          );
+          if (salePriceInput && salePriceInput.dataset.adjustmentManualSalePrice !== "1") {
+            const salesPrice = product ? salesPriceForProduct(product) : { price: 0, currency: "UZS" };
+            salePriceInput.value = salesPrice.price
+              ? purchaseEntryFormatCurrency(salesPrice.price, salesPrice.currency)
+              : "";
+          }
           setOutput(
             row,
             "[data-adjustment-line-total]",
@@ -1789,6 +1790,7 @@
           control.value = "";
           control.removeAttribute("aria-invalid");
           delete control.dataset.adjustmentAutoPrice;
+          delete control.dataset.adjustmentManualSalePrice;
         });
         // Разблокировать комбобокс товара и скрыть его панель.
         const picker = row.querySelector("[data-adjustment-product-picker]");
@@ -1803,7 +1805,8 @@
         setOutput(row, "[data-adjustment-after]", "0");
         setOutput(row, "[data-adjustment-unit]", "");
         setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(0, currency()));
-        setOutput(row, "[data-adjustment-sale-price]", "—");
+        const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
+        if (salePriceInput) salePriceInput.value = "";
         setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
       };
       // Выбор товара — поиском (комбобокс как в продаже), а не выпадающим
@@ -1933,12 +1936,14 @@
         const productInput = row.querySelector("[data-adjustment-product]");
         const quantityInput = row.querySelector("[data-adjustment-quantity]");
         const priceInput = row.querySelector("[data-adjustment-price]");
+        const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
         productInput?.addEventListener("change", () => {
           const suggestedPrice = priceForProduct(productForRow(row));
           if (priceInput) {
             priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
             priceInput.dataset.adjustmentAutoPrice = "1";
           }
+          if (salePriceInput) salePriceInput.dataset.adjustmentManualSalePrice = "0";
           recalc();
           if (productForRow(row) && rows().every((line) => Boolean(productForRow(line)))) {
             addRow({ focus: false });
@@ -1954,14 +1959,22 @@
           priceInput.dataset.adjustmentAutoPrice = "0";
           recalc();
         });
-        [quantityInput, priceInput].forEach((input) => {
+        salePriceInput?.addEventListener("input", () => {
+          const saleCurrency = selectedAdjustmentPriceType().currency;
+          formatPurchasePriceInput(salePriceInput, saleCurrency);
+          salePriceInput.dataset.adjustmentManualSalePrice = "1";
+        });
+        [quantityInput, priceInput, salePriceInput].forEach((input) => {
           input?.addEventListener("focus", () => window.setTimeout(() => input.select(), 0));
           input?.addEventListener("blur", () => {
             const value = purchaseEntryNumber(input.value);
             input.value = value
               ? input === quantityInput
                 ? quantityText(value)
-                : purchaseEntryFormatCurrency(value, currency())
+                : purchaseEntryFormatCurrency(
+                  value,
+                  input === salePriceInput ? selectedAdjustmentPriceType().currency : currency(),
+                )
               : "";
             recalc();
           });
@@ -2048,7 +2061,13 @@
         recalc();
       });
       currencyInput?.addEventListener("change", recalc);
-      priceTypeInput?.addEventListener("change", recalc);
+      priceTypeInput?.addEventListener("change", () => {
+        rows().forEach((row) => {
+          const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
+          if (salePriceInput) salePriceInput.dataset.adjustmentManualSalePrice = "0";
+        });
+        recalc();
+      });
       form.addEventListener("submit", (event) => {
         recalc();
         if (submitButton?.disabled) {
@@ -2056,7 +2075,7 @@
           return;
         }
         rows().forEach((row) => {
-          row.querySelectorAll("[data-adjustment-quantity], [data-adjustment-price]").forEach((input) => {
+          row.querySelectorAll("[data-adjustment-quantity], [data-adjustment-price], [data-adjustment-sale-price]").forEach((input) => {
             const value = purchaseEntryNumber(input.value);
             input.value = value ? String(value) : "";
           });
