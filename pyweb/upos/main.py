@@ -9054,38 +9054,32 @@ def create_app() -> FastAPI:
 
     @app.get("/api/installer/phonebook", name="installer_phonebook_api")
     def installer_phonebook_api(request: Request):
-        """Телефоны клиентов по заказам установщика плюс его последние звонки."""
-        wid, installer_user_id, can_manage = _installer_request_scope(request)
+        """Клиентская телефонная книга организации и последние звонки сотрудника."""
+        wid, installer_user_id, _can_manage = _installer_request_scope(request)
         if not wid:
             return _installer_api_error("Нужно войти заново", 401)
         actor_id = installer_user_id or _session_user_id(request.session.get("user") or {})
-        timezone_name = normalize_workspace_timezone(
-            str(load_workspace_settings(wid).get("timezone") or "")
-        )
         contacts: list[dict[str, Any]] = []
         seen_phones: set[str] = set()
         with session_scope() as session:
-            orders = installer_orders(
-                session,
-                workspace_owner_id=wid,
-                installer_user_id="" if can_manage else installer_user_id,
-            )
-            for order in orders:
-                payload = _installer_order_payload(
-                    session, order, timezone_name=timezone_name, can_manage=can_manage
+            client_rows = session.execute(
+                select(Counterparty)
+                .where(
+                    Counterparty.workspace_owner_id == wid,
+                    Counterparty.kind.in_(["client", "both"]),
                 )
-                client = payload.get("client") or {}
-                phone = str(client.get("phone") or "").strip()
-                if not phone or phone in seen_phones:
+                .order_by(Counterparty.name.asc())
+            )
+            for client in client_rows.scalars():
+                phone = str(client.phone or "").strip()
+                phone_key = "".join(char for char in phone if char.isdigit())
+                if not phone_key or phone_key in seen_phones:
                     continue
-                seen_phones.add(phone)
+                seen_phones.add(phone_key)
                 contacts.append(
                     {
-                        "name": str(client.get("name") or "Клиент"),
+                        "name": str(client.name or "Клиент").strip() or "Клиент",
                         "phone": phone,
-                        "address": str(client.get("address") or ""),
-                        "order_number": str(payload.get("number") or ""),
-                        "status_label": str(payload.get("status_label") or ""),
                     }
                 )
         raw_calls = load_workspace_settings(wid).get("telephony_calls")

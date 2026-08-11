@@ -680,22 +680,29 @@
 
   function renderPhonebook(filter) {
     const list = document.getElementById("installer-phone-list");
+    const meta = document.getElementById("installer-phone-list-meta");
     if (!list) return;
     const needle = String(filter || "").trim().toLowerCase();
     const rows = needle
       ? phonebookContacts.filter((row) =>
-          `${row.name} ${row.phone} ${row.order_number}`.toLowerCase().includes(needle))
+          `${row.name} ${row.phone}`.toLowerCase().includes(needle))
       : phonebookContacts;
+    if (meta) {
+      meta.textContent = needle
+        ? `Найдено: ${rows.length}`
+        : `Контактов: ${rows.length}`;
+    }
     list.innerHTML = rows.length
       ? rows.map((row) => `
           <article class="installer-phone-item">
+            <span class="installer-phone-avatar" aria-hidden="true">${escapeHtml((row.name || "?").trim().charAt(0).toUpperCase())}</span>
             <div class="installer-phone-info">
               <strong>${escapeHtml(row.name)}</strong>
               <span>${escapeHtml(row.phone)}</span>
-              <small>${escapeHtml([row.order_number, row.address].filter(Boolean).join(" · "))}</small>
             </div>
-            <button type="button" class="installer-primary-button installer-phone-call"
-              data-call-phone="${escapeHtml(row.phone)}" data-call-name="${escapeHtml(row.name)}">Позвонить</button>
+            <button type="button" class="installer-phone-call"
+              data-call-phone="${escapeHtml(row.phone)}" data-call-name="${escapeHtml(row.name)}"
+              title="Позвонить" aria-label="Позвонить ${escapeHtml(row.name)}">&#128222;</button>
           </article>`).join("")
       : '<div class="installer-empty">Клиентов с телефоном не найдено</div>';
   }

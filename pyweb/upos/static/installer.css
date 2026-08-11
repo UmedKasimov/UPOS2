@@ -1303,22 +1303,40 @@ main {
 .installer-phone-search input {
   width: 100%;
   min-height: 40px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   padding: 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
 }
 
+.installer-phone-list-meta {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .installer-phone-item {
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: 40px minmax(0, 1fr) 42px;
   gap: 10px;
-  padding: 11px 12px;
-  margin-bottom: 8px;
-  border: 1px solid #dbe3ef;
-  border-radius: 10px;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
   background: #fff;
+}
+
+.installer-phone-avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  color: #1d4ed8;
+  background: #e8f1ff;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .installer-phone-info {
@@ -1339,14 +1357,21 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-.installer-phone-info small {
-  display: block;
-  color: #94a3b8;
-  font-size: 11px;
+.installer-phone-call {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #b8d5ff;
+  border-radius: 50%;
+  color: #1268ce;
+  background: #edf5ff;
+  font-size: 17px;
 }
 
-.installer-phone-call {
-  flex: 0 0 auto;
+.installer-phone-call:active {
+  background: #dbeafe;
 }
 
 .installer-phone-call-row {
@@ -1740,12 +1765,27 @@ main {
 
 /* ===== Телефония: нижние вкладки Набор / Журнал / Контакты ===== */
 .installer-phone-body {
-  padding-bottom: 74px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 18px;
+}
+
+#installer-phonebook .installer-earnings-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#installer-phonebook .installer-phone-tab {
+  width: min(100%, 560px);
+  margin: 0 auto;
 }
 
 .installer-phone-nav {
-  position: sticky;
-  bottom: 0;
+  position: relative;
+  z-index: 6;
+  flex: 0 0 auto;
+  margin-top: auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border-top: 1px solid #dbe3ef;

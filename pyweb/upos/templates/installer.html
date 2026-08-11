@@ -12,10 +12,10 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=20">
+  <link rel="stylesheet" href="/static/installer.css?v=21">
   <script defer src="/static/jssip.min.js?v=1"></script>
   <script defer src="/static/installer-softphone.js?v=2"></script>
-  <script defer src="/static/installer.js?v=20"></script>
+  <script defer src="/static/installer.js?v=21"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -236,7 +236,7 @@
     <div class="installer-earnings-shell">
       <header class="installer-earnings-head">
         <div>
-          <p>Клиенты по вашим заказам</p>
+          <p>Клиентская база</p>
           <h2>Телефония</h2>
         </div>
         <button class="installer-icon-button" id="installer-phonebook-close" type="button" aria-label="Назад">←</button>
@@ -278,6 +278,7 @@
           <label class="installer-phone-search">
             <input type="search" id="installer-phone-search" placeholder="Поиск по имени или номеру" />
           </label>
+          <p class="installer-phone-list-meta" id="installer-phone-list-meta"></p>
           <div class="installer-phone-list" id="installer-phone-list"></div>
         </section>
       </div>
