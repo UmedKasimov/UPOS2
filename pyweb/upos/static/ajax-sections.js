@@ -145,8 +145,14 @@
 
   document.addEventListener("change", (event) => {
     const select = event.target.closest?.("select[data-ajax-page-size]");
-    if (select) load(pageSizeHref(select), select);
-  });
+    if (!select) return;
+
+    // Page-size controls often belong to auto-submit filter forms. Handle them
+    // before those form listeners so the active workspace never does a full reload.
+    event.preventDefault();
+    event.stopPropagation();
+    load(pageSizeHref(select), select);
+  }, true);
 
   ["pointerdown", "mouseover", "focusin"].forEach((eventName) => {
     document.addEventListener(eventName, (event) => {
