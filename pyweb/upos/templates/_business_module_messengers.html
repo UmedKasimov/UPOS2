@@ -64,7 +64,7 @@
 
 {# Имя текущего сотрудника подписывает только что отправленное сообщение —
    до ответа сервера подписи взять больше неоткуда. #}
-<section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox data-messenger-author="{{ (user.name if user else '') or (user.username if user else '') or 'Вы' }}" hidden>
+<section class="messenger-inbox-workspace" data-workspace-view="inbox" data-messenger-inbox data-messenger-connected="{{ '1' if messenger_active_channel_connected else '0' }}" data-messenger-author="{{ (user.name if user else '') or (user.username if user else '') or 'Вы' }}" hidden>
   {% set active_channel_accounts = (messenger_channel_accounts|default({})).get(active_channel_profile.data.value, []) %}
   {% if active_channel_accounts %}
     {# Вместо общих фраз про канал — к каким аккаунтам привязаны чаты. #}
@@ -77,6 +77,7 @@
       {% endfor %}
     </div>
   {% endif %}
+  {% if messenger_active_channel_connected %}
   <div class="messenger-inbox-shell">
     <aside class="messenger-dialog-list-panel" aria-label="Диалоги">
       <div class="messenger-dialog-list-head">
@@ -186,6 +187,13 @@
       </div>
     </section>
   </div>
+  {% else %}
+  <section class="messenger-channel-disconnected" data-channel-brand="{{ active_channel_profile.data.brand }}" role="status">
+    <span class="messenger-channel-logo" aria-hidden="true">{{ active_channel_profile.data.logo }}</span>
+    <strong>Не подключено</strong>
+    <small>{{ active_channel_profile.data.label }}</small>
+  </section>
+  {% endif %}
   <dialog class="crm-order-dialog" data-messenger-order-dialog aria-labelledby="messenger-order-dialog-title">
     <div class="crm-order-dialog-surface">
       <header class="crm-order-dialog-head">

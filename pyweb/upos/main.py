@@ -18167,6 +18167,16 @@ def create_app() -> FastAPI:
         ]
         return accounts
 
+    def _messenger_channel_connected(
+        accounts: dict[str, list[dict[str, str]]],
+        channel: str,
+    ) -> bool:
+        channel_key = _messenger_channel_key(channel)
+        return any(
+            str(account.get("state") or "").strip().lower() == "on"
+            for account in accounts.get(channel_key, [])
+        )
+
     def _messenger_threads_from_sources(workspace_owner_id: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         with session_scope() as session:
@@ -19520,7 +19530,7 @@ def create_app() -> FastAPI:
         assert wid is not None
         filters = {
             "q": q.strip(),
-            "channel": channel.strip() or "Telegram",
+            "channel": _messenger_channel_key(channel.strip() or "Telegram"),
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
         }
@@ -19528,15 +19538,22 @@ def create_app() -> FastAPI:
         channel_options = ["Telegram", "Instagram", "WhatsApp", "Facebook", "Сайт"]
         responsible_options = sorted({str(user.get("name") or "").strip()} - {""})
         data = _messenger_settings_payload(wid)
-        all_threads = _messenger_threads_from_sources(wid)
+        channel_accounts = _messenger_channel_accounts(wid)
+        connected_channels = {
+            option
+            for option in channel_options
+            if _messenger_channel_connected(channel_accounts, option)
+        }
+        active_channel_connected = filters["channel"] in connected_channels
+        all_threads = _messenger_threads_from_sources(wid) if connected_channels else []
         # На вкладке канала — непрочитанные, как и в списке диалогов: общее
         # число сообщений висело бы там вечно.
         channel_unread_counts: dict[str, int] = {}
         for item in all_threads:
             key = _messenger_channel_key(str(item.get("channel") or ""))
-            if key:
+            if key in connected_channels:
                 channel_unread_counts[key] = channel_unread_counts.get(key, 0) + int(item.get("unread") or 0)
-        threads = _messenger_filter_rows(all_threads, filters)
+        threads = _messenger_filter_rows(all_threads, filters) if active_channel_connected else []
         campaigns = _messenger_filter_rows(
             [dict(row, status_label=_messenger_status_label(str(row.get("status") or ""))) for row in data.get("messenger_campaigns") or []],
             filters,
@@ -19561,7 +19578,8 @@ def create_app() -> FastAPI:
                 "clients": _messenger_client_options(wid),
             },
             messenger_channel_unread_counts=channel_unread_counts,
-            messenger_channel_accounts=_messenger_channel_accounts(wid),
+            messenger_channel_accounts=channel_accounts,
+            messenger_active_channel_connected=active_channel_connected,
             messenger_threads=threads,
             messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,
@@ -25547,13 +25565,18 @@ def create_app() -> FastAPI:
         if err:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         assert wid is not None
-        rows = _messenger_threads_from_sources(wid)
         wanted = _messenger_channel_key(str(channel or ""))
+        connected = True
+        if wanted:
+            connected = _messenger_channel_connected(_messenger_channel_accounts(wid), wanted)
+            if not connected:
+                return {"ok": True, "connected": False, "threads": []}
+        rows = _messenger_threads_from_sources(wid)
         if wanted:
             rows = [row for row in rows if _messenger_channel_key(str(row.get("channel") or "")) == wanted]
         # updated_at — datetime, в JSON он не сериализуется сам.
         payload = json.loads(json.dumps(rows, ensure_ascii=False, default=str))
-        return {"ok": True, "threads": payload}
+        return {"ok": True, "connected": connected, "threads": payload}
 
     @app.post("/api/messengers/threads/read")
     async def api_messenger_thread_read(request: Request):

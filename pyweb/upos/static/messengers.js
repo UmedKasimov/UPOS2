@@ -1392,6 +1392,7 @@
   }
 
   function boot(root) {
+    if (root.dataset.messengerConnected === "0") return;
     var threads = readThreads().map(normalizeThread);
     var channelInput = document.querySelector("[data-messenger-channel-input]");
     var activeChannel = channelKey(channelInput && channelInput.value);
@@ -1764,6 +1765,10 @@
           return response.json().catch(function () { return {}; });
         })
         .then(function (payload) {
+          if (payload && payload.connected === false) {
+            window.location.reload();
+            return;
+          }
           if (!payload || !Array.isArray(payload.threads)) return;
           var selectedId = String(root.dataset.selectedThreadId || "");
           payload.threads.forEach(function (raw) {

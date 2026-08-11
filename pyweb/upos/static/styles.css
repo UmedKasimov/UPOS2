@@ -1112,6 +1112,33 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   font-weight: 600;
 }
 
+.messenger-channel-disconnected {
+  min-height: clamp(24rem, 58vh, 42rem);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.65rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  background: var(--card);
+  color: var(--muted-foreground);
+}
+
+.messenger-channel-disconnected .messenger-channel-logo {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 0.82rem;
+}
+
+.messenger-channel-disconnected strong {
+  color: var(--foreground);
+  font-size: 1.15rem;
+}
+
+.messenger-channel-disconnected small {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
 .messenger-channel-tab b {
   margin-left: 0.5rem;
 }
