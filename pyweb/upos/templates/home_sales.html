@@ -3,7 +3,7 @@
 {% block extra_head %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="{{ url_for('static', path='clients.js') }}?v=50" defer></script>
+  <script src="{{ url_for('static', path='clients.js') }}?v=51" defer></script>
 {% endblock %}
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid', 'converted', 'already_converted'] %}
@@ -362,7 +362,7 @@
           </table>
         </div>
         <footer class="products-catalog-footer sales-debt-footer">
-          <nav class="products-pagination" aria-label="Страницы долгов клиентов">
+          <nav class="products-pagination" aria-label="Страницы долгов клиентов" data-ajax-nav data-ajax-targets="#debt" data-ajax-reinit="SalesJournalInit">
             <a class="products-page-link {% if sales_debt_workspace.page <= 1 %}disabled{% endif %}" href="{{ sales_debt_workspace.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
             {% for page_no in sales_debt_workspace.pagination_pages %}
               <a class="products-page-link {% if page_no == sales_debt_workspace.page %}active{% endif %}" href="{{ sales_debt_workspace.page_urls[page_no] }}" {% if page_no == sales_debt_workspace.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
@@ -381,7 +381,7 @@
             </div>
             <label class="products-page-size products-page-size--footer">
               <span>Показать</span>
-              <select aria-label="Количество клиентов на странице" onchange="window.location.href=this.value">
+              <select aria-label="Количество клиентов на странице" data-ajax-page-size data-ajax-targets="#debt" data-ajax-reinit="SalesJournalInit">
                 {% for size in [100, 500, 1000] %}
                   <option value="{{ sales_debt_workspace.page_size_urls[size] }}" {% if sales_debt_workspace.page_size == size %}selected{% endif %}>{{ size }} шт</option>
                 {% endfor %}
@@ -640,7 +640,7 @@
           </table>
         </div>
         <footer class="products-catalog-footer sales-journal-footer">
-          <nav class="products-pagination" aria-label="Страницы журнала продаж">
+          <nav class="products-pagination" aria-label="Страницы журнала продаж" data-ajax-nav data-ajax-targets="#sales-journal" data-ajax-reinit="SalesJournalInit">
             <a class="products-page-link {% if sales_journal_pagination.page <= 1 %}disabled{% endif %}" href="{{ sales_journal_pagination.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
             {% for page_no in sales_journal_pagination.pagination_pages %}
               <a class="products-page-link {% if page_no == sales_journal_pagination.page %}active{% endif %}" href="{{ sales_journal_pagination.page_urls[page_no] }}" {% if page_no == sales_journal_pagination.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
@@ -655,7 +655,7 @@
             </div>
             <label class="products-page-size products-page-size--footer">
               <span>Показать</span>
-              <select aria-label="Количество продаж на странице" onchange="window.location.href=this.value">
+              <select aria-label="Количество продаж на странице" data-ajax-page-size data-ajax-targets="#sales-journal" data-ajax-reinit="SalesJournalInit">
                 {% for size in [100, 500, 1000] %}
                   <option value="{{ sales_journal_pagination.page_size_urls[size] }}" {% if sales_journal_pagination.page_size == size %}selected{% endif %}>{{ size }} шт</option>
                 {% endfor %}

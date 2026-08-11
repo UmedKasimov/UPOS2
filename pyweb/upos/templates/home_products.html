@@ -17,7 +17,7 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=12" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
   <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=4" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
@@ -104,7 +104,7 @@
     </datalist>
 
     <div class="products-layout">
-      <article class="products-list-panel" data-workspace-view="catalog service" hidden>
+      <article id="products-catalog-panel" class="products-list-panel" data-workspace-view="catalog service" hidden>
         <header class="products-panel-head">
           <div class="products-panel-title">
             <h2>Товары</h2>
@@ -645,7 +645,7 @@
           </table>
         </div>
         <footer class="products-catalog-footer">
-          <nav class="products-pagination" aria-label="Страницы товаров">
+          <nav class="products-pagination" aria-label="Страницы товаров" data-ajax-nav data-ajax-targets="#products-catalog-panel" data-ajax-reinit="ProductsTableInit">
             <a class="products-page-link {% if product_page <= 1 %}disabled{% endif %}" href="{{ product_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
             {% for page_no in product_pagination_pages %}
               <a class="products-page-link {% if page_no == product_page %}active{% endif %}" href="{{ product_page_urls[page_no] }}" {% if page_no == product_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
@@ -660,7 +660,7 @@
             </div>
             <label class="products-page-size products-page-size--footer">
               <span>Показать</span>
-              <select name="page_size" form="products-catalog-filter">
+              <select name="page_size" form="products-catalog-filter" data-ajax-page-size data-ajax-page-param="page_size" data-ajax-reset-params="page" data-ajax-targets="#products-catalog-panel" data-ajax-reinit="ProductsTableInit">
                 {% for size in [100, 500, 1000] %}
                   <option value="{{ size }}" {% if product_page_size == size %}selected{% endif %}>{{ size }} шт</option>
                 {% endfor %}
@@ -985,7 +985,7 @@
               </table>
             </div>
             <footer class="products-catalog-footer">
-              <div class="products-pagination">
+              <div class="products-pagination" data-ajax-nav data-ajax-targets="#price-type-detail" data-ajax-reinit="ProductsTableInit">
                 <a class="products-page-btn" href="{{ price_type_state.prev_url }}">‹</a>
                 {% for page_no, page_url in price_type_state.page_urls.items() %}
                   <a class="products-page-btn {% if page_no == price_type_state.page %}active{% endif %}" href="{{ page_url }}">{{ page_no }}</a>

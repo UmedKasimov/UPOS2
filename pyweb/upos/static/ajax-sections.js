@@ -1,42 +1,31 @@
-/* Быстрое переключение разделов списка без полной перезагрузки страницы.
- *
- * Раньше клик по разделу (например, в журнале продаж: Все / Заказы / Продажи /
- * Рассрочки / Возвраты / Архив) перезагружал всю страницу — долго и с «прыжком»
- * якоря на промежуточный экран. Здесь клик подгружает страницу в фоне (fetch) и
- * заменяет только нужные контейнеры, сохраняя позицию прокрутки.
- *
- * Разметка:
- *   <nav data-ajax-nav data-ajax-targets="#sales-journal" data-ajax-reinit="Fn">
- *     <a href="...">Раздел</a> ...
- *   </nav>
- * data-ajax-targets — список селекторов контейнеров, которые нужно заменить
- * свежими из ответа. После замены вызываются реинициализаторы (data-ajax-reinit).
- *
- * Скорость: при наведении/фокусе на раздел его страница не только скачивается,
- * но и СРАЗУ парсится в фоне (dom-дерево кэшируется). К моменту клика остаётся
- * лишь подменить узлы — переход ощущается почти мгновенным, как клиентский
- * фильтр в товарах. Затемнение панели показываем только если данные всё же не
- * успели прийти (задержка появления), иначе оно мельтешит на быстрых переходах.
- *
- * Столбцы (table-column-controls.js) переинициализируются сами — через свой
- * MutationObserver, поэтому здесь их трогать не нужно.
- */
+/* Обновляет разделы и серверную пагинацию без перезагрузки всей страницы. */
 (() => {
   "use strict";
 
-  // Реинициализаторы клиентских модулей после подмены разметки. Идемпотентны
-  // (внутри — свои data-*Ready-флаги), поэтому повторный вызов безопасен.
   function reinit(names) {
     (names || []).forEach((name) => {
       const fn = window[name];
-      if (typeof fn === "function") {
-        try {
-          fn(document);
-        } catch (error) {
-          /* один сломавшийся модуль не должен ронять остальные */
-        }
+      if (typeof fn !== "function") return;
+      try {
+        fn(document);
+      } catch {
+        /* Один модуль не должен останавливать обновление остальных. */
       }
     });
+  }
+
+  function readConfig(source) {
+    const owner = source?.closest?.("[data-ajax-targets]") || source;
+    return {
+      targets: (owner?.getAttribute?.("data-ajax-targets") || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      reinitNames: (owner?.getAttribute?.("data-ajax-reinit") || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    };
   }
 
   function swapParsed(parsed, selectors) {
@@ -44,8 +33,6 @@
     selectors.forEach((selector) => {
       const fresh = parsed.querySelector(selector);
       const current = document.querySelector(selector);
-      // current.isConnected: если контейнер уже удалён из DOM (был вложен в
-      // ранее заменённый target), пропускаем — иначе потеряем свежую разметку.
       if (fresh && current && current.isConnected) {
         current.replaceWith(fresh);
         swapped += 1;
@@ -54,62 +41,85 @@
     return swapped;
   }
 
-  // fetch + парсинг сразу (тяжёлый DOMParser уходит в фон предзагрузки, а не в
-  // момент клика). Возвращает Document.
   function fetchParsed(href) {
     return fetch(href, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
       credentials: "same-origin",
     })
       .then((response) => {
-        if (!response.ok) throw new Error("HTTP " + response.status);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.text();
       })
       .then((html) => new DOMParser().parseFromString(html, "text/html"));
   }
 
-  // Кэш предзагрузки: href -> Promise<Document>.
   const prefetchCache = new Map();
 
   function prefetch(href) {
     if (!href || href.startsWith("#") || prefetchCache.has(href)) return;
     const pending = fetchParsed(href).catch(() => {
-      // Промах (сеть/ошибка) убираем — при клике попробуем ещё раз.
       prefetchCache.delete(href);
       return null;
     });
     prefetchCache.set(href, pending);
   }
 
-  async function load(href, nav) {
-    const targets = (nav.getAttribute("data-ajax-targets") || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const reinitNames = (nav.getAttribute("data-ajax-reinit") || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
+  async function load(href, source, options = {}) {
+    const config = options.config || readConfig(source);
+    const { targets, reinitNames } = config;
     if (!targets.length) {
       window.location.href = href;
       return;
     }
 
+    const currentTargets = targets.map((selector) => document.querySelector(selector)).filter(Boolean);
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const busyTimer = window.setTimeout(() => {
+      currentTargets.forEach((node) => node.setAttribute("aria-busy", "true"));
+    }, 160);
+
     try {
       const parsed =
         (prefetchCache.has(href) ? await prefetchCache.get(href) : null) || (await fetchParsed(href));
       prefetchCache.delete(href);
-      const swapped = swapParsed(parsed, targets);
-      if (!swapped) throw new Error("targets not found");
-      window.history.pushState({ ajaxSection: true }, "", href);
+      if (!swapParsed(parsed, targets)) throw new Error("targets not found");
+      if (options.history !== false) {
+        const currentState = window.history.state && typeof window.history.state === "object"
+          ? window.history.state
+          : {};
+        if (!currentState.ajaxSection) {
+          window.history.replaceState({ ...currentState, ajaxSection: config }, "", window.location.href);
+        }
+        window.history.pushState({ ajaxSection: config }, "", href);
+      }
       reinit(reinitNames);
       if (typeof window.initWorkspaceModuleTabs === "function") {
         window.initWorkspaceModuleTabs(document);
       }
-    } catch (error) {
-      // Любой сбой — честный полный переход, чтобы не оставить список сломанным.
+      requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
+    } catch {
       window.location.href = href;
+    } finally {
+      window.clearTimeout(busyTimer);
+      currentTargets.forEach((node) => node.removeAttribute("aria-busy"));
     }
+  }
+
+  function pageSizeHref(select) {
+    const value = String(select.value || "").trim();
+    if (/^(?:https?:\/\/|\/|\?)/i.test(value)) {
+      return new URL(value, window.location.href).toString();
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set(select.dataset.ajaxPageParam || select.name || "page_size", value);
+    (select.dataset.ajaxResetParams || "page")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .forEach((name) => url.searchParams.delete(name));
+    if (select.dataset.ajaxHash) url.hash = select.dataset.ajaxHash;
+    return url.toString();
   }
 
   function markActiveLink(nav, activeLink) {
@@ -123,40 +133,32 @@
 
   document.addEventListener("click", (event) => {
     const link = event.target.closest("[data-ajax-nav] a[href]");
-    if (!link) return;
+    if (!link || link.classList.contains("disabled") || link.getAttribute("aria-disabled") === "true") return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1) return;
     const nav = link.closest("[data-ajax-nav]");
-    if (!nav) return;
     const href = link.getAttribute("href") || "";
-    if (!href || href.startsWith("#")) return;
+    if (!nav || !href || href.startsWith("#")) return;
     event.preventDefault();
     markActiveLink(nav, link);
     load(href, nav);
   });
 
-  // Touch/pointer users do not have a hover phase. Start the same background
-  // request on pointer down so the click can reuse the in-flight response.
-  document.addEventListener("pointerdown", (event) => {
-    const link = event.target.closest("[data-ajax-nav] a[href]");
-    if (link) prefetch(link.getAttribute("href") || "");
+  document.addEventListener("change", (event) => {
+    const select = event.target.closest?.("select[data-ajax-page-size]");
+    if (select) load(pageSizeHref(select), select);
   });
 
-  // Предзагрузка при наведении/фокусе: к моменту клика раздел уже скачан и
-  // разобран в фоне.
-  document.addEventListener("mouseover", (event) => {
-    const link = event.target.closest("[data-ajax-nav] a[href]");
-    if (link) prefetch(link.getAttribute("href") || "");
-  });
-  document.addEventListener("focusin", (event) => {
-    const link = event.target.closest("[data-ajax-nav] a[href]");
-    if (link) prefetch(link.getAttribute("href") || "");
+  ["pointerdown", "mouseover", "focusin"].forEach((eventName) => {
+    document.addEventListener(eventName, (event) => {
+      const link = event.target.closest("[data-ajax-nav] a[href]");
+      if (link && !link.classList.contains("disabled")) prefetch(link.getAttribute("href") || "");
+    });
   });
 
-  // Назад/вперёд по истории после AJAX-переключения: проще всего честно
-  // перезагрузить нужный адрес — состояние списка полностью серверное.
   window.addEventListener("popstate", (event) => {
-    if (event.state && event.state.ajaxSection) {
-      window.location.reload();
+    const config = event.state?.ajaxSection;
+    if (config?.targets?.length) {
+      load(window.location.href, null, { config, history: false });
     }
   });
 })();

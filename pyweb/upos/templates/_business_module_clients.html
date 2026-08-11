@@ -23,7 +23,7 @@
 {% set client_program_defaults = ["YESPOS", "BILLZ", "1C", "iiko", "R-Keeper", "Poster", "Jowi", "МойСклад", "Excel"] %}
 
 <div class="products-layout clients-module-layout" data-workspace-view="clients" hidden>
-  <article class="products-list-panel clients-list-panel" data-workspace-view="clients" hidden>
+  <article id="clients-directory-panel" class="products-list-panel clients-list-panel" data-workspace-view="clients" hidden>
     <header class="products-panel-head clients-panel-head">
       <div class="products-panel-titleline">
         <h2>{{ 'Архив клиентов' if clients_archive_mode else 'Клиенты' }}</h2>
@@ -306,7 +306,7 @@
       </table>
     </div>
     <footer class="products-catalog-footer clients-catalog-footer">
-      <nav class="products-pagination" aria-label="Страницы клиентов">
+      <nav class="products-pagination" aria-label="Страницы клиентов" data-ajax-nav data-ajax-targets="#clients-directory-panel" data-ajax-reinit="ClientsInit">
         <a class="products-page-link {% if clients_page <= 1 %}disabled{% endif %}" href="{{ clients_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
         {% for page_no in clients_pagination_pages %}
           <a class="products-page-link {% if page_no == clients_page %}active{% endif %}" href="{{ clients_page_urls[page_no] }}" {% if page_no == clients_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
@@ -321,7 +321,7 @@
         </div>
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
-          <select form="clients-filter-form" data-clients-page-size onchange="this.form.querySelector('[data-clients-page-size-value]').value=this.value; this.form.requestSubmit()">
+          <select form="clients-filter-form" data-clients-page-size data-ajax-page-size data-ajax-page-param="page_size" data-ajax-reset-params="page" data-ajax-hash="clients" data-ajax-targets="#clients-directory-panel" data-ajax-reinit="ClientsInit">
             {% for size in [100, 500, 1000] %}
               <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
             {% endfor %}
@@ -1408,7 +1408,7 @@
 {% endif %}
 
 <section class="products-dictionaries clients-dictionaries" data-workspace-view="routes balances" hidden>
-  <article class="products-list-panel clients-list-panel" data-workspace-view="balances" hidden>
+  <article id="clients-balances-panel" class="products-list-panel clients-list-panel" data-workspace-view="balances" hidden>
     <header class="products-panel-head clients-panel-head">
       <div class="products-panel-titleline">
         <h2>Должники</h2>
@@ -1480,7 +1480,7 @@
       </table>
     </div>
     <footer class="products-catalog-footer clients-catalog-footer">
-      <nav class="products-pagination" aria-label="Страницы должников">
+      <nav class="products-pagination" aria-label="Страницы должников" data-ajax-nav data-ajax-targets="#clients-balances-panel" data-ajax-reinit="ClientsInit">
         <a class="products-page-link {% if client_balances_page <= 1 %}disabled{% endif %}" href="{{ client_balances_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
         {% for page_no in client_balances_pagination_pages %}
           <a class="products-page-link {% if page_no == client_balances_page %}active{% endif %}" href="{{ client_balances_page_urls[page_no] }}" {% if page_no == client_balances_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
@@ -1495,7 +1495,7 @@
         </div>
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
-          <select form="clients-filter-form" data-clients-page-size onchange="this.form.querySelector('[data-clients-page-size-value]').value=this.value; this.form.requestSubmit()">
+          <select form="clients-filter-form" data-clients-page-size data-ajax-page-size data-ajax-page-param="page_size" data-ajax-reset-params="balance_page" data-ajax-hash="balances" data-ajax-targets="#clients-balances-panel" data-ajax-reinit="ClientsInit">
             {% for size in [100, 500, 1000] %}
               <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
             {% endfor %}

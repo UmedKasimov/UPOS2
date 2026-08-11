@@ -2489,20 +2489,24 @@
     });
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
-    initializeClientDirectoryTables();
+  function initClients(root = document) {
+    initializeClientDirectoryTables(root);
     highlightClientSearchMatches();
-    syncDirectoryClientSelection();
-    initializeProgramDropdowns();
-    initializeSegmentPickers();
-    initializeDirectorySegmentPickers();
+    syncDirectoryClientSelection(root);
+    initializeProgramDropdowns(root);
+    initializeSegmentPickers(root);
+    initializeDirectorySegmentPickers(root);
     showClientSection();
-    initializeMaps();
+    initializeMaps(root);
     setTimeout(refreshMaps, 250);
     if (new URLSearchParams(window.location.search).get("focus") === "location") {
       setTimeout(focusClientLocationPanel, 320);
     }
-  });
+  }
+
+  window.ClientsInit = initClients;
+
+  document.addEventListener("DOMContentLoaded", () => initClients(document));
 
   document.addEventListener("toggle", (event) => {
     // Список сегментов подставляется при открытии — и в карте, и в таблице

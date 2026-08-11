@@ -448,7 +448,7 @@
       </table>
     </div>
     <footer class="warehouse-purchases-footer">
-      <nav class="products-pagination" aria-label="Страницы закупок">
+      <nav class="products-pagination" aria-label="Страницы закупок" data-ajax-nav data-ajax-targets="#warehouse-purchases" data-ajax-reinit="WarehousePurchasesInit">
         <a class="products-page-link {% if warehouse_purchases_pagination.page <= 1 %}disabled{% endif %}" href="{{ warehouse_purchases_pagination.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
         {% for page_no in warehouse_purchases_pagination.pagination_pages %}
           <a class="products-page-link {% if page_no == warehouse_purchases_pagination.page %}active{% endif %}" href="{{ warehouse_purchases_pagination.page_urls[page_no] }}" {% if page_no == warehouse_purchases_pagination.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
@@ -463,7 +463,7 @@
         </div>
         <label class="products-page-size products-page-size--footer">
           <span>Показать</span>
-          <select aria-label="Размер страницы закупок" onchange="window.location.href=this.value">
+          <select aria-label="Размер страницы закупок" data-ajax-page-size data-ajax-targets="#warehouse-purchases" data-ajax-reinit="WarehousePurchasesInit">
             {% for size in [100, 500, 1000] %}
               <option value="{{ warehouse_purchases_pagination.page_size_urls[size] }}" {% if warehouse_purchases_pagination.page_size == size %}selected{% endif %}>{{ size }} шт</option>
             {% endfor %}

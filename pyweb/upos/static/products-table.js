@@ -627,13 +627,16 @@
     });
   }
 
+  function initProductsTable(root = document) {
+    initAll(root);
+    initProductForms(root);
+  }
+
+  window.ProductsTableInit = initProductsTable;
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      initAll();
-      initProductForms();
-    }, { once: true });
+    document.addEventListener("DOMContentLoaded", () => initProductsTable(document), { once: true });
   } else {
-    initAll();
-    initProductForms();
+    initProductsTable(document);
   }
 })();
