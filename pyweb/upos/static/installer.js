@@ -139,11 +139,6 @@
       });
   }
 
-  function phoneHref(phone) {
-    const clean = String(phone || "").replace(/[^\d+]/g, "");
-    return clean ? `tel:${clean}` : "";
-  }
-
   function mapHref(order) {
     const lat = String(order.latitude || "").trim();
     const lng = String(order.longitude || "").trim();
@@ -775,22 +770,59 @@
     if (mute) mute.classList.remove("is-on");
   }
 
-  // Софтфон доступен только когда у аккаунта есть WebSocket-адрес и он
-  // зарегистрировался. Иначе звоним через телефон (SIM).
-  function placeCall(number, name) {
+  function sipCallErrorMessage(error) {
+    const code = String((error && (error.code || error.name || error.message)) || "").toLowerCase();
+    const statusCode = Number(error && error.statusCode) || 0;
+    if (code.includes("notallowed") || code.includes("permission") || code.includes("microphone_denied")) {
+      return "Разрешите U-POS доступ к микрофону в настройках браузера";
+    }
+    if (code.includes("notfound") || code.includes("microphone_unavailable")) {
+      return "Микрофон на телефоне не найден";
+    }
+    if (statusCode === 401 || statusCode === 403) {
+      return "SIP-сервер отклонил логин или пароль";
+    }
+    if (code.includes("timeout") || code.includes("disconnected") || code.includes("connection")) {
+      return "Нет соединения с SIP-сервером MySputnik";
+    }
+    if (code.includes("no_ws")) return "У SIP-аккаунта не указан WebSocket";
+    return "Не удалось начать SIP-звонок";
+  }
+
+  async function placeCall(number, name) {
     const clean = String(number || "").replace(/[^\d+*#]/g, "");
     if (!clean) { showToast("Введите номер", true); return; }
+    if (!sipAccounts.length) await loadSipAccounts();
     const account = currentSipAccount();
     const sip = window.InstallerSoftphone;
+    const callButton = document.getElementById("installer-dial-call");
 
-    logCall({phone: clean, name: name || "", status: "dialed"}).then((id) => { callLogId = id; });
-
-    if (sip && sip.isRegistered() && sip.call(clean)) {
-      openCallScreen(name, clean, false);
+    if (!account || !sip || !sip.available() || !account.ws_url || !account.sip_uri) {
+      const message = "SIP-аккаунт MySputnik не настроен";
+      setSipHint(message);
+      showToast(message, true);
       return;
     }
-    // Резервный путь — набор средствами телефона.
-    window.location.href = `tel:${clean}`;
+    if (callButton && callButton.disabled) return;
+    if (callButton) callButton.disabled = true;
+    try {
+      setSipHint("Разрешите доступ к микрофону…");
+      await sip.prepareAudio();
+      if (!sip.isRegistered()) {
+        setSipHint("Подключение к SIP MySputnik…");
+        await sip.connect(account);
+      }
+      if (!sip.call(clean)) throw new Error("sip_not_registered");
+      setSipHint("");
+      logCall({phone: clean, name: name || "", status: "dialed"}).then((id) => { callLogId = id; });
+      openCallScreen(name, clean, false);
+    } catch (error) {
+      const message = sipCallErrorMessage(error);
+      setSipHint(message);
+      showToast(message, true);
+    } finally {
+      if (callButton) callButton.disabled = false;
+    }
   }
 
   async function logCall(payload) {
@@ -828,8 +860,12 @@
     window.InstallerSoftphone?.hangup();
     closeCallScreen();
   });
-  document.getElementById("installer-call-accept")?.addEventListener("click", () => {
-    window.InstallerSoftphone?.answer();
+  document.getElementById("installer-call-accept")?.addEventListener("click", async () => {
+    try {
+      await window.InstallerSoftphone?.answer();
+    } catch (error) {
+      showToast(sipCallErrorMessage(error), true);
+    }
   });
   document.getElementById("installer-call-decline")?.addEventListener("click", () => {
     window.InstallerSoftphone?.hangup();
@@ -895,15 +931,15 @@
     const sip = window.InstallerSoftphone;
     if (!account || !sip || !sip.available() || !account.ws_url || !account.sip_uri) {
       dot?.classList.remove("is-online");
-      return;
+      return Promise.resolve(false);
     }
     setSipHint("Подключение к SIP…");
-    sip.connect(account)
-      .then(() => { dot?.classList.add("is-online"); setSipHint(""); })
-      .catch(() => {
+    return sip.connect(account)
+      .then(() => { dot?.classList.add("is-online"); setSipHint(""); return true; })
+      .catch((error) => {
         dot?.classList.remove("is-online");
-        // Тихо переходим в режим набора через SIM — не пугаем установщика.
-        setSipHint("Звонки идут через телефон");
+        setSipHint(sipCallErrorMessage(error));
+        return false;
       });
   }
 
@@ -1255,7 +1291,7 @@
 
   function renderDetail(order) {
     const client = order.client || {};
-    const phone = phoneHref(client.phone);
+    const phone = String(client.phone || "").replace(/[^\d+*#]/g, "");
     const map = mapHref(order);
     document.getElementById("installer-detail-number").textContent =
       `Заказ № ${order.number || order.id.slice(0, 8)}`;
@@ -1269,7 +1305,7 @@
           <div><span>Адрес</span><strong class="installer-detail-value">${escapeHtml(client.address || "Не указан")}</strong></div>
         </div>
         <div class="installer-client-actions">
-          ${phone ? `<a class="installer-primary-button" href="${escapeHtml(phone)}">Позвонить</a>` : ""}
+          ${phone ? `<button class="installer-primary-button" type="button" data-action="call-client" data-phone="${escapeHtml(phone)}">Позвонить</button>` : ""}
           ${map ? `<a class="installer-secondary-button" href="${escapeHtml(map)}" target="_blank" rel="noopener">Открыть карту</a>` : ""}
         </div>
       </section>
@@ -1532,6 +1568,9 @@
     if (!button) return;
     const order = state.orders.find((item) => item.id === state.activeId);
     if (!order) return;
+    if (button.dataset.action === "call-client") {
+      placeCall(button.dataset.phone, order.client?.name || "");
+    }
     if (button.dataset.action === "schedule") saveSchedule();
     if (button.dataset.action === "detail-status") {
       updateStatus(order.id, button.dataset.status, document.getElementById("installer-result-comment")?.value || "");

@@ -14,8 +14,8 @@
   <link rel="apple-touch-icon" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/installer.css?v=23">
   <script defer src="/static/jssip.min.js?v=1"></script>
-  <script defer src="/static/installer-softphone.js?v=2"></script>
-  <script defer src="/static/installer.js?v=22"></script>
+  <script defer src="/static/installer-softphone.js?v=3"></script>
+  <script defer src="/static/installer.js?v=23"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -371,7 +371,7 @@
         <button type="button" class="installer-call-btn is-hangup" id="installer-call-hangup" aria-label="Завершить">&#128222;</button>
         <button type="button" class="installer-call-btn is-speaker" id="installer-call-speaker" aria-label="Динамик">&#128266;</button>
       </div>
-      <audio id="installer-call-audio" autoplay></audio>
+      <audio id="installer-call-audio" autoplay playsinline></audio>
     </div>
   </div>
 

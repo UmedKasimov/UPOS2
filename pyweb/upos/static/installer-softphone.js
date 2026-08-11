@@ -1,9 +1,8 @@
 /* Софтфон установщика: SIP-звонки из браузера через WebSocket (JsSIP).
  *
  * Браузер не умеет обычный SIP по UDP/TCP, поэтому голос идёт по SIP-over-WSS.
- * Если у аккаунта нет ws_url или сервер недоступен — телефония работает в
- * режиме набора через SIM (это делает installer.js), а этот модуль просто
- * сообщает, что регистрация не удалась.
+ * Если у аккаунта нет ws_url или сервер недоступен, модуль сообщает точную
+ * ошибку. Звонки установщика всегда остаются внутри SIP.
  */
 (() => {
   "use strict";
@@ -19,6 +18,8 @@
   let session = null;
   let account = null;
   let registered = false;
+  let connecting = null;
+  let connectingAccountId = "";
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
   // входящего звука у них разный, поэтому он настраивается.
   let audioElementId = "installer-call-audio";
@@ -33,8 +34,10 @@
     });
     const el = audio();
     if (el) {
+      el.playsInline = true;
+      el.muted = false;
       el.srcObject = stream;
-      el.play().catch(() => {});
+      el.play().catch((error) => emit("audioBlocked", {error}));
     }
   }
 
@@ -82,15 +85,42 @@
       (listeners[event] = listeners[event] || []).push(fn);
     },
 
+    async prepareAudio() {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+        const error = new Error("microphone_unavailable");
+        error.code = "microphone_unavailable";
+        throw error;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+        stream.getTracks().forEach((track) => track.stop());
+        emit("microphoneReady", {});
+        return true;
+      } catch (error) {
+        if (error && !error.code) error.code = "microphone_denied";
+        emit("microphoneFailed", {error});
+        throw error;
+      }
+    },
+
     // Подключение к SIP-серверу по данным аккаунта из /api/installer/sip.
     connect(acc) {
       if (!softphone.available()) return Promise.reject(new Error("Библиотека софтфона не загрузилась"));
       if (!acc || !acc.ws_url || !acc.sip_uri) return Promise.reject(new Error("no_ws"));
       if (ua && account && account.id === acc.id && registered) return Promise.resolve();
+      if (connecting && connectingAccountId === String(acc.id || "")) return connecting;
       softphone.disconnect();
       account = acc;
-      return new Promise((resolve, reject) => {
+      connectingAccountId = String(acc.id || "");
+      const pending = new Promise((resolve, reject) => {
         let settled = false;
+        let registrationTimer = null;
+        const settle = (callback, value) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(registrationTimer);
+          callback(value);
+        };
         try {
           const socket = new window.JsSIP.WebSocketInterface(acc.ws_url);
           const configuration = {
@@ -102,6 +132,7 @@
             register: true,
             register_expires: Number(acc.register_expires || acc.expire_time || 300),
             session_timers: false,
+            user_agent: "U-POS Integrator / JsSIP",
           };
           if (acc.realm) configuration.realm = String(acc.realm).trim();
           if (acc.registrar_server) configuration.registrar_server = registrarUri(acc.registrar_server);
@@ -109,7 +140,7 @@
           ua.on("registered", () => {
             registered = true;
             emit("registered", {account: acc});
-            if (!settled) { settled = true; resolve(); }
+            settle(resolve);
           });
           ua.on("registrationFailed", (e) => {
             registered = false;
@@ -120,18 +151,15 @@
               reasonPhrase: (response && response.reason_phrase) || "",
             };
             emit("registrationFailed", detail);
-            if (!settled) {
-              settled = true;
-              const error = new Error(detail.cause);
-              error.statusCode = detail.statusCode;
-              error.reasonPhrase = detail.reasonPhrase;
-              reject(error);
-            }
+            const error = new Error(detail.cause);
+            error.statusCode = detail.statusCode;
+            error.reasonPhrase = detail.reasonPhrase;
+            settle(reject, error);
           });
           ua.on("disconnected", () => {
             registered = false;
             emit("disconnected", {});
-            if (!settled) { settled = true; reject(new Error("disconnected")); }
+            settle(reject, new Error("disconnected"));
           });
           ua.on("newRTCSession", (data) => {
             if (data.originator === "remote") {
@@ -143,10 +171,23 @@
             }
           });
           ua.start();
+          registrationTimer = window.setTimeout(() => {
+            settle(reject, new Error("registration_timeout"));
+          }, 15000);
         } catch (error) {
-          if (!settled) { settled = true; reject(error); }
+          settle(reject, error);
         }
       });
+      connecting = pending;
+      pending.then(
+        () => {
+          if (connecting === pending) connecting = null;
+        },
+        () => {
+          if (connecting === pending) connecting = null;
+        },
+      );
+      return pending;
     },
 
     call(number) {
@@ -154,15 +195,18 @@
       const target = `sip:${String(number).replace(/[^\d+*#]/g, "")}@${account.host}`;
       const options = {
         mediaConstraints: {audio: true, video: false},
-        pcConfig: {rtcpMuxPolicy: "require", iceServers: []},
+        // Совпадает с рабочим WebRTC-клиентом MySputnik: ICE определяет АТС.
+        pcConfig: {},
       };
       const newSession = ua.call(target, options);
       wireSession(newSession, "outgoing");
+      attachRemoteAudio();
       return true;
     },
 
-    answer() {
+    async answer() {
       if (!session) return false;
+      await softphone.prepareAudio();
       session.answer({mediaConstraints: {audio: true, video: false}});
       return true;
     },
@@ -192,6 +236,8 @@
       if (ua) { try { ua.stop(); } catch (_e) { /* уже остановлен */ } }
       ua = null;
       registered = false;
+      connecting = null;
+      connectingAccountId = "";
     },
   };
 
