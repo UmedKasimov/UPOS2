@@ -20,38 +20,130 @@
   let registered = false;
   let connecting = null;
   let connectingAccountId = "";
+  let microphoneStream = null;
+  let remoteStream = null;
+  let speakerEnabled = true;
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
   // входящего звука у них разный, поэтому он настраивается.
   let audioElementId = "installer-call-audio";
 
   const audio = () => document.getElementById(audioElementId);
 
-  function attachRemoteAudio() {
-    if (!session || !session.connection) return;
-    const stream = new MediaStream();
-    session.connection.getReceivers().forEach((receiver) => {
-      if (receiver.track) stream.addTrack(receiver.track);
-    });
+  function liveMicrophoneStream() {
+    if (!microphoneStream) return null;
+    return microphoneStream.getAudioTracks().some((track) => track.readyState === "live")
+      ? microphoneStream
+      : null;
+  }
+
+  function releaseMicrophone() {
+    if (microphoneStream) microphoneStream.getTracks().forEach((track) => track.stop());
+    microphoneStream = null;
+  }
+
+  function clearRemoteAudio() {
     const el = audio();
     if (el) {
-      el.playsInline = true;
-      el.muted = false;
-      el.srcObject = stream;
-      el.play().catch((error) => emit("audioBlocked", {error}));
+      el.pause();
+      el.srcObject = null;
     }
+    remoteStream = null;
+  }
+
+  async function playRemoteAudio() {
+    const el = audio();
+    const tracks = remoteStream ? remoteStream.getAudioTracks().filter((track) => track.readyState === "live") : [];
+    if (!el || !tracks.length) {
+      emit("audioWaiting", {});
+      return false;
+    }
+    el.playsInline = true;
+    el.autoplay = true;
+    el.volume = 1;
+    el.muted = !speakerEnabled;
+    if (!speakerEnabled) {
+      emit("speakerChanged", {enabled: false});
+      return true;
+    }
+    try {
+      await el.play();
+      emit("audioPlaying", {tracks: tracks.length});
+      return true;
+    } catch (error) {
+      emit("audioBlocked", {error});
+      return false;
+    }
+  }
+
+  function addRemoteTrack(track) {
+    if (!track || track.kind !== "audio") return;
+    if (!remoteStream) remoteStream = new MediaStream();
+    if (!remoteStream.getTracks().some((item) => item.id === track.id)) remoteStream.addTrack(track);
+    track.addEventListener("unmute", playRemoteAudio);
+    track.addEventListener("ended", () => emit("audioEnded", {}));
+  }
+
+  function attachRemoteAudio(event) {
+    const pc = session && session.connection;
+    if (!pc) {
+      emit("audioWaiting", {});
+      return;
+    }
+    const eventStream = event && event.streams && event.streams[0];
+    if (eventStream) eventStream.getAudioTracks().forEach(addRemoteTrack);
+    if (event && event.track) addRemoteTrack(event.track);
+    pc.getReceivers().forEach((receiver) => addRemoteTrack(receiver.track));
+    const el = audio();
+    if (el && remoteStream && el.srcObject !== remoteStream) el.srcObject = remoteStream;
+    playRemoteAudio();
+  }
+
+  function wirePeerConnection(pc) {
+    if (!pc || pc.__uposSoftphoneWired) return;
+    pc.__uposSoftphoneWired = true;
+    pc.addEventListener("track", attachRemoteAudio);
+    pc.addEventListener("connectionstatechange", () => {
+      emit("connectionState", {state: pc.connectionState || ""});
+      if (pc.connectionState === "connected") attachRemoteAudio();
+    });
+    pc.addEventListener("iceconnectionstatechange", () => {
+      emit("iceState", {state: pc.iceConnectionState || ""});
+    });
+    attachRemoteAudio();
   }
 
   function wireSession(newSession, direction) {
     session = newSession;
-    session.on("progress", () => emit("progress", {direction}));
-    session.on("accepted", () => { attachRemoteAudio(); emit("accepted", {direction}); });
-    session.on("confirmed", () => { attachRemoteAudio(); emit("accepted", {direction}); });
-    session.on("ended", (e) => { emit("ended", {cause: e && e.cause}); session = null; });
-    session.on("failed", (e) => { emit("failed", {cause: e && e.cause}); session = null; });
+    remoteStream = null;
+    let accepted = false;
+    const markAccepted = () => {
+      attachRemoteAudio();
+      if (accepted) return;
+      accepted = true;
+      emit("accepted", {direction});
+      window.setTimeout(attachRemoteAudio, 250);
+      window.setTimeout(attachRemoteAudio, 1000);
+    };
+    const finish = (event, detail) => {
+      emit(event, detail);
+      clearRemoteAudio();
+      releaseMicrophone();
+      session = null;
+    };
+    session.on("connecting", () => emit("sessionConnecting", {direction}));
+    session.on("progress", (e) => emit("progress", {
+      direction,
+      statusCode: e && e.response && e.response.status_code,
+    }));
+    session.on("accepted", markAccepted);
+    session.on("confirmed", markAccepted);
+    session.on("ended", (e) => finish("ended", {cause: e && e.cause}));
+    session.on("failed", (e) => finish("failed", {cause: e && e.cause}));
     session.on("peerconnection", (e) => {
       const pc = e && e.peerconnection;
-      if (pc) pc.addEventListener("track", attachRemoteAudio);
+      wirePeerConnection(pc);
     });
+    wirePeerConnection(session.connection);
   }
 
   function registrarUri(value) {
@@ -92,10 +184,18 @@
         throw error;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
-        stream.getTracks().forEach((track) => track.stop());
+        const current = liveMicrophoneStream();
+        if (current) return current;
+        microphoneStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
+        });
         emit("microphoneReady", {});
-        return true;
+        return microphoneStream;
       } catch (error) {
         if (error && !error.code) error.code = "microphone_denied";
         emit("microphoneFailed", {error});
@@ -109,7 +209,10 @@
       if (!acc || !acc.ws_url || !acc.sip_uri) return Promise.reject(new Error("no_ws"));
       if (ua && account && account.id === acc.id && registered) return Promise.resolve();
       if (connecting && connectingAccountId === String(acc.id || "")) return connecting;
-      softphone.disconnect();
+      // Пользователь уже разрешил микрофон жестом на кнопке «Позвонить».
+      // При переподключении SIP сохраняем этот поток: повторный запрос после
+      // асинхронной регистрации часто блокируется мобильными браузерами.
+      softphone.disconnect({preserveMicrophone: true});
       account = acc;
       connectingAccountId = String(acc.id || "");
       const pending = new Promise((resolve, reject) => {
@@ -195,6 +298,7 @@
       const target = `sip:${String(number).replace(/[^\d+*#]/g, "")}@${account.host}`;
       const options = {
         mediaConstraints: {audio: true, video: false},
+        mediaStream: liveMicrophoneStream() || undefined,
         // Совпадает с рабочим WebRTC-клиентом MySputnik: ICE определяет АТС.
         pcConfig: {},
       };
@@ -206,8 +310,12 @@
 
     async answer() {
       if (!session) return false;
-      await softphone.prepareAudio();
-      session.answer({mediaConstraints: {audio: true, video: false}});
+      const stream = await softphone.prepareAudio();
+      session.answer({
+        mediaConstraints: {audio: true, video: false},
+        mediaStream: stream,
+        pcConfig: {},
+      });
       return true;
     },
 
@@ -227,17 +335,34 @@
       else session.unmute({audio: true});
     },
 
+    setSpeaker(enabled) {
+      speakerEnabled = Boolean(enabled);
+      const el = audio();
+      if (el) el.muted = !speakerEnabled;
+      emit("speakerChanged", {enabled: speakerEnabled});
+      if (speakerEnabled) playRemoteAudio();
+      return speakerEnabled;
+    },
+
+    resumeRemoteAudio() {
+      speakerEnabled = true;
+      return playRemoteAudio();
+    },
+
     sendDtmf(tone) {
       if (session) { try { session.sendDTMF(tone); } catch (_e) { /* нет активной сессии */ } }
     },
 
-    disconnect() {
+    disconnect(options) {
+      const preserveMicrophone = Boolean(options && options.preserveMicrophone);
       softphone.hangup();
       if (ua) { try { ua.stop(); } catch (_e) { /* уже остановлен */ } }
       ua = null;
       registered = false;
       connecting = null;
       connectingAccountId = "";
+      clearRemoteAudio();
+      if (!preserveMicrophone) releaseMicrophone();
     },
   };
 

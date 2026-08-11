@@ -713,6 +713,8 @@
   let callTimer = null;
   let callSeconds = 0;
   let callLogId = "";
+  let activeCall = null;
+  let callCloseTimer = null;
 
   function dialInput() {
     return document.getElementById("installer-dial-number");
@@ -729,16 +731,25 @@
     return `${m}:${s}`;
   }
 
-  function setCallState(text) {
+  function setCallState(text, phase) {
     const node = document.getElementById("installer-call-state");
     if (node) node.textContent = text;
+    if (callScreen && phase) callScreen.dataset.phase = phase;
+  }
+
+  function setCallAudioState(text, state) {
+    const node = document.getElementById("installer-call-audio-state");
+    const label = document.getElementById("installer-call-audio-label");
+    if (label) label.textContent = text;
+    if (node) node.dataset.state = state || "waiting";
   }
 
   function startCallTimer() {
     callSeconds = 0;
     const timer = document.getElementById("installer-call-timer");
     if (timer) { timer.hidden = false; timer.textContent = "00:00"; }
-    setCallState("Разговор");
+    setCallState("Соединено", "connected");
+    if (activeCall) activeCall.connected = true;
     window.clearInterval(callTimer);
     callTimer = window.setInterval(() => {
       callSeconds += 1;
@@ -748,24 +759,45 @@
 
   function openCallScreen(name, number, incoming) {
     if (!callScreen) return;
+    window.clearTimeout(callCloseTimer);
+    callCloseTimer = null;
+    activeCall = {name: name || "", number: number || "", direction: incoming ? "incoming" : "outgoing", connected: false};
     document.getElementById("installer-call-name").textContent = name || number || "Клиент";
     document.getElementById("installer-call-number").textContent = number || "";
     document.getElementById("installer-call-avatar").textContent = (name || number || "?").trim().charAt(0).toUpperCase();
     document.getElementById("installer-call-timer").hidden = true;
     document.getElementById("installer-call-actions-incoming").hidden = !incoming;
     document.getElementById("installer-call-actions-active").hidden = incoming;
-    setCallState(incoming ? "Входящий вызов" : "Вызов…");
+    setCallState(incoming ? "Входящий SIP-звонок" : "Подготовка SIP-звонка…", incoming ? "incoming" : "preparing");
+    setCallAudioState(incoming ? "Нажмите «Принять», чтобы подключить голос" : "Подключаем голос…", "waiting");
+    const mute = document.getElementById("installer-call-mute");
+    const speaker = document.getElementById("installer-call-speaker");
+    mute?.classList.remove("is-on");
+    mute?.setAttribute("aria-pressed", "false");
+    speaker?.classList.add("is-on");
+    speaker?.setAttribute("aria-pressed", "true");
     callScreen.hidden = false;
+    if (typeof callScreen.showModal === "function" && !callScreen.open) callScreen.showModal();
+    else callScreen.setAttribute("open", "");
     callScreen.classList.add("is-ringing");
   }
 
-  function closeCallScreen() {
+  function closeCallScreen(delay) {
     window.clearInterval(callTimer);
     callTimer = null;
-    if (callScreen) {
-      callScreen.hidden = true;
-      callScreen.classList.remove("is-ringing");
-    }
+    window.clearTimeout(callCloseTimer);
+    const close = () => {
+      if (callScreen) {
+        if (callScreen.open && typeof callScreen.close === "function") callScreen.close();
+        else callScreen.removeAttribute("open");
+        callScreen.hidden = true;
+        callScreen.classList.remove("is-ringing");
+        delete callScreen.dataset.phase;
+      }
+      activeCall = null;
+    };
+    if (delay) callCloseTimer = window.setTimeout(close, delay);
+    else close();
     const mute = document.getElementById("installer-call-mute");
     if (mute) mute.classList.remove("is-on");
   }
@@ -805,20 +837,27 @@
     }
     if (callButton && callButton.disabled) return;
     if (callButton) callButton.disabled = true;
+    openCallScreen(name, clean, false);
     try {
       setSipHint("Разрешите доступ к микрофону…");
+      setCallState("Проверяем микрофон…", "preparing");
       await sip.prepareAudio();
       if (!sip.isRegistered()) {
         setSipHint("Подключение к SIP MySputnik…");
+        setCallState("Подключаем SIP MySputnik…", "connecting");
         await sip.connect(account);
       }
+      setCallState("Набираем номер…", "dialing");
       if (!sip.call(clean)) throw new Error("sip_not_registered");
       setSipHint("");
       logCall({phone: clean, name: name || "", status: "dialed"}).then((id) => { callLogId = id; });
-      openCallScreen(name, clean, false);
     } catch (error) {
       const message = sipCallErrorMessage(error);
+      sip.disconnect();
       setSipHint(message);
+      setCallState(message, "failed");
+      setCallAudioState("Голос не подключён", "failed");
+      callScreen?.classList.remove("is-ringing");
       showToast(message, true);
     } finally {
       if (callButton) callButton.disabled = false;
@@ -858,47 +897,115 @@
   // Кнопки экрана звонка.
   document.getElementById("installer-call-hangup")?.addEventListener("click", () => {
     window.InstallerSoftphone?.hangup();
-    closeCallScreen();
+    setCallState("Звонок завершён", "ended");
+    setCallAudioState("Соединение закрыто", "ended");
+    closeCallScreen(700);
   });
   document.getElementById("installer-call-accept")?.addEventListener("click", async () => {
     try {
+      setCallState("Подключаем разговор…", "connecting");
+      setCallAudioState("Включаем микрофон и голос…", "waiting");
       await window.InstallerSoftphone?.answer();
     } catch (error) {
-      showToast(sipCallErrorMessage(error), true);
+      const message = sipCallErrorMessage(error);
+      setCallState(message, "failed");
+      setCallAudioState("Голос не подключён", "failed");
+      showToast(message, true);
     }
   });
   document.getElementById("installer-call-decline")?.addEventListener("click", () => {
-    window.InstallerSoftphone?.hangup();
-    closeCallScreen();
+    window.InstallerSoftphone?.reject();
+    setCallState("Вызов отклонён", "ended");
+    closeCallScreen(500);
   });
   document.getElementById("installer-call-mute")?.addEventListener("click", (event) => {
     const on = !event.currentTarget.classList.contains("is-on");
     event.currentTarget.classList.toggle("is-on", on);
+    event.currentTarget.setAttribute("aria-pressed", String(on));
+    event.currentTarget.setAttribute("aria-label", on ? "Включить микрофон" : "Выключить микрофон");
+    const label = event.currentTarget.querySelector("small");
+    if (label) label.textContent = on ? "Без звука" : "Микрофон";
     window.InstallerSoftphone?.setMuted(on);
+  });
+  document.getElementById("installer-call-speaker")?.addEventListener("click", async (event) => {
+    const on = !event.currentTarget.classList.contains("is-on");
+    event.currentTarget.classList.toggle("is-on", on);
+    event.currentTarget.setAttribute("aria-pressed", String(on));
+    event.currentTarget.setAttribute("aria-label", on ? "Выключить звук" : "Включить звук");
+    const label = event.currentTarget.querySelector("small");
+    if (label) label.textContent = on ? "Динамик" : "Звук выкл.";
+    window.InstallerSoftphone?.setSpeaker(on);
+    setCallAudioState(on ? "Подключаем голос…" : "Звук выключен", on ? "waiting" : "muted");
+    if (on) await window.InstallerSoftphone?.resumeRemoteAudio();
+  });
+
+  callScreen?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    window.InstallerSoftphone?.hangup();
+    setCallState("Звонок завершён", "ended");
+    closeCallScreen(500);
   });
 
   function wireSoftphoneEvents() {
     const sip = window.InstallerSoftphone;
     if (!sip) return;
-    sip.on("progress", () => setCallState("Идёт вызов…"));
+    sip.on("sessionConnecting", () => setCallState("Отправляем SIP-вызов…", "dialing"));
+    sip.on("progress", (detail) => {
+      const statusCode = Number(detail && detail.statusCode) || 0;
+      setCallState(statusCode === 183 ? "Подключается голосовой канал…" : "У абонента звонит…", "ringing");
+    });
     sip.on("accepted", () => {
       document.getElementById("installer-call-actions-incoming").hidden = true;
       document.getElementById("installer-call-actions-active").hidden = false;
       callScreen?.classList.remove("is-ringing");
       startCallTimer();
+      setCallAudioState("Подключаем голос собеседника…", "waiting");
     });
     sip.on("incoming", (detail) => {
-      openCallScreen(detail && detail.name, detail && detail.from, true);
+      const number = String((detail && detail.from) || "");
+      const digits = number.replace(/\D/g, "");
+      const contact = phonebookContacts.find((row) => {
+        const candidate = String(row.phone || "").replace(/\D/g, "");
+        return candidate && (candidate === digits || candidate.endsWith(digits) || digits.endsWith(candidate));
+      });
+      const name = (contact && contact.name) || (detail && detail.name) || "Входящий звонок";
+      openCallScreen(name, number, true);
+      logCall({phone: number, name, direction: "incoming", status: "ringing"}).then((id) => { callLogId = id; });
     });
     const finish = (status) => {
-      if (callLogId) logCall({id: callLogId, phone: dialInput()?.value || "", status: status, duration: callSeconds});
+      if (callLogId && activeCall) {
+        logCall({
+          id: callLogId,
+          phone: activeCall.number,
+          direction: activeCall.direction,
+          status,
+          duration: callSeconds,
+        });
+      }
       callLogId = "";
-      closeCallScreen();
+      setCallState(status === "answered" ? "Звонок завершён" : "Соединение не состоялось", "ended");
+      setCallAudioState("Соединение закрыто", "ended");
+      closeCallScreen(800);
     };
     sip.on("ended", () => finish(callSeconds > 0 ? "answered" : "cancelled"));
     sip.on("failed", (detail) => {
       finish("missed");
       showToast("Звонок не удался" + (detail && detail.cause ? `: ${detail.cause}` : ""), true);
+    });
+    sip.on("audioWaiting", () => setCallAudioState("Подключаем голос собеседника…", "waiting"));
+    sip.on("audioPlaying", () => setCallAudioState("Голос подключён", "playing"));
+    sip.on("audioBlocked", () => {
+      setCallAudioState("Нажмите «Динамик», чтобы включить голос", "blocked");
+      showToast("Браузер заблокировал звук. Нажмите «Динамик» на экране звонка.", true);
+    });
+    sip.on("speakerChanged", (detail) => {
+      if (detail && detail.enabled === false) setCallAudioState("Звук выключен", "muted");
+    });
+    sip.on("connectionState", (detail) => {
+      const state = String((detail && detail.state) || "");
+      if (state === "connected" && callSeconds === 0) setCallAudioState("Голосовой канал подключён", "waiting");
+      if (state === "failed") setCallAudioState("Ошибка голосового канала", "failed");
+      if (state === "disconnected") setCallAudioState("Восстанавливаем голос…", "waiting");
     });
   }
 

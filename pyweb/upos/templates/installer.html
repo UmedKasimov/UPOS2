@@ -12,10 +12,10 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=23">
+  <link rel="stylesheet" href="/static/installer.css?v=24">
   <script defer src="/static/jssip.min.js?v=1"></script>
-  <script defer src="/static/installer-softphone.js?v=3"></script>
-  <script defer src="/static/installer.js?v=23"></script>
+  <script defer src="/static/installer-softphone.js?v=4"></script>
+  <script defer src="/static/installer.js?v=24"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -355,25 +355,43 @@
     </div>
   </dialog>
 
-  <div class="installer-call-screen" id="installer-call-screen" hidden>
+  <dialog class="installer-call-screen" id="installer-call-screen">
     <div class="installer-call-inner">
+      <div class="installer-call-topline">
+        <span class="installer-call-live"><i aria-hidden="true"></i>SIP MySputnik</span>
+        <span class="installer-call-secure">Защищённый звонок</span>
+      </div>
       <div class="installer-call-avatar" id="installer-call-avatar" aria-hidden="true"></div>
       <h2 class="installer-call-name" id="installer-call-name">Клиент</h2>
       <p class="installer-call-number" id="installer-call-number"></p>
       <p class="installer-call-state" id="installer-call-state">Вызов…</p>
       <p class="installer-call-timer" id="installer-call-timer" hidden>00:00</p>
+      <div class="installer-call-audio-state" id="installer-call-audio-state" data-state="waiting">
+        <span class="installer-call-wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span id="installer-call-audio-label">Подключаем голос…</span>
+      </div>
       <div class="installer-call-actions" id="installer-call-actions-incoming" hidden>
-        <button type="button" class="installer-call-btn is-decline" id="installer-call-decline" aria-label="Отклонить">&#128222;</button>
-        <button type="button" class="installer-call-btn is-accept" id="installer-call-accept" aria-label="Принять">&#128222;</button>
+        <button type="button" class="installer-call-control is-decline" id="installer-call-decline" aria-label="Отклонить">
+          <span class="installer-call-btn">&#128222;</span><small>Отклонить</small>
+        </button>
+        <button type="button" class="installer-call-control is-accept" id="installer-call-accept" aria-label="Принять">
+          <span class="installer-call-btn">&#128222;</span><small>Принять</small>
+        </button>
       </div>
       <div class="installer-call-actions" id="installer-call-actions-active">
-        <button type="button" class="installer-call-btn is-mute" id="installer-call-mute" aria-label="Микрофон">&#127908;</button>
-        <button type="button" class="installer-call-btn is-hangup" id="installer-call-hangup" aria-label="Завершить">&#128222;</button>
-        <button type="button" class="installer-call-btn is-speaker" id="installer-call-speaker" aria-label="Динамик">&#128266;</button>
+        <button type="button" class="installer-call-control is-mute" id="installer-call-mute" aria-label="Выключить микрофон" aria-pressed="false">
+          <span class="installer-call-btn">&#127908;</span><small>Микрофон</small>
+        </button>
+        <button type="button" class="installer-call-control is-hangup" id="installer-call-hangup" aria-label="Завершить">
+          <span class="installer-call-btn">&#128222;</span><small>Завершить</small>
+        </button>
+        <button type="button" class="installer-call-control is-speaker is-on" id="installer-call-speaker" aria-label="Выключить звук" aria-pressed="true">
+          <span class="installer-call-btn">&#128266;</span><small>Динамик</small>
+        </button>
       </div>
       <audio id="installer-call-audio" autoplay playsinline></audio>
     </div>
-  </div>
+  </dialog>
 
   <div class="installer-toast" id="installer-toast" role="status" aria-live="polite"></div>
 </body>

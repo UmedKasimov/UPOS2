@@ -1733,32 +1733,78 @@ main {
   position: fixed;
   z-index: 80;
   inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
   display: grid;
   place-items: center;
   background: #0f172a;
   color: #fff;
+  overflow: hidden;
 }
 
+.installer-call-screen:not([open]),
 .installer-call-screen[hidden] {
   display: none;
 }
 
+.installer-call-screen::backdrop {
+  background: #0f172a;
+}
+
 .installer-call-inner {
   display: grid;
+  grid-template-rows: auto 1fr auto auto auto auto;
   justify-items: center;
-  gap: 12px;
-  padding: 24px;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 520px);
+  min-height: 100%;
+  min-height: 100dvh;
+  padding: max(18px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
   text-align: center;
+}
+
+.installer-call-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 0 18px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.installer-call-live,
+.installer-call-secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.installer-call-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
 }
 
 .installer-call-avatar {
   display: grid;
   place-items: center;
-  width: 108px;
-  height: 108px;
+  align-self: end;
+  width: 118px;
+  height: 118px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 44px;
+  font-size: 48px;
   font-weight: 800;
 }
 
@@ -1773,8 +1819,12 @@ main {
 }
 
 .installer-call-name {
-  margin: 6px 0 0;
-  font-size: 24px;
+  margin: 0;
+  max-width: 100%;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .installer-call-number {
@@ -1785,22 +1835,77 @@ main {
 }
 
 .installer-call-state {
-  margin: 4px 0 0;
-  color: #cbd5e1;
-  font-size: 14px;
+  margin: 8px 0 0;
+  color: #e2e8f0;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .installer-call-timer {
-  margin: 0;
-  font-size: 30px;
+  margin: 2px 0 0;
+  font-size: 34px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
 }
 
+.installer-call-audio-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 7px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 7px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.installer-call-audio-state[data-state="playing"] {
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #bbf7d0;
+}
+
+.installer-call-audio-state[data-state="blocked"],
+.installer-call-audio-state[data-state="failed"] {
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+.installer-call-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.installer-call-wave i {
+  width: 3px;
+  height: 5px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.installer-call-audio-state[data-state="playing"] .installer-call-wave i {
+  animation: installerVoiceWave 0.8s ease-in-out infinite alternate;
+}
+
+.installer-call-wave i:nth-child(2) { animation-delay: 0.12s; }
+.installer-call-wave i:nth-child(3) { animation-delay: 0.24s; }
+.installer-call-wave i:nth-child(4) { animation-delay: 0.36s; }
+
+@keyframes installerVoiceWave {
+  from { height: 5px; }
+  to { height: 16px; }
+}
+
 .installer-call-actions {
   display: flex;
-  gap: 34px;
-  margin-top: 26px;
+  align-items: start;
+  justify-content: center;
+  gap: clamp(24px, 9vw, 42px);
+  width: 100%;
+  margin-top: 24px;
 }
 
 /* Атрибут hidden должен побеждать display:flex. */
@@ -1810,6 +1915,23 @@ main {
 
 .installer-call-timer[hidden] {
   display: none;
+}
+
+.installer-call-control {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 72px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-call-control small {
+  font: inherit;
 }
 
 .installer-call-btn {
@@ -1823,26 +1945,57 @@ main {
   color: #fff;
 }
 
-.installer-call-btn.is-hangup,
-.installer-call-btn.is-decline {
-  background: #475569;
+.installer-call-control.is-hangup .installer-call-btn,
+.installer-call-control.is-decline .installer-call-btn {
+  background: #dc2626;
   transform: rotate(135deg);
 }
 
-.installer-call-btn.is-accept {
-  background: #2563eb;
+.installer-call-control.is-accept .installer-call-btn {
+  background: #16a34a;
 }
 
-.installer-call-btn.is-mute,
-.installer-call-btn.is-speaker {
+.installer-call-control.is-mute .installer-call-btn,
+.installer-call-control.is-speaker .installer-call-btn {
   width: 58px;
   height: 58px;
   background: rgba(255, 255, 255, 0.14);
   font-size: 24px;
 }
 
-.installer-call-btn.is-mute.is-on {
-  background: #64748b;
+.installer-call-control.is-mute.is-on .installer-call-btn,
+.installer-call-control.is-speaker.is-on .installer-call-btn {
+  background: #2563eb;
+}
+
+.installer-call-control:active .installer-call-btn {
+  transform: scale(0.94);
+}
+
+.installer-call-control.is-hangup:active .installer-call-btn,
+.installer-call-control.is-decline:active .installer-call-btn {
+  transform: rotate(135deg) scale(0.94);
+}
+
+@media (max-width: 600px) {
+  .installer-call-inner {
+    width: 100%;
+    padding-inline: 18px;
+  }
+
+  .installer-call-avatar {
+    width: 104px;
+    height: 104px;
+    font-size: 42px;
+  }
+
+  .installer-call-name {
+    font-size: 25px;
+  }
+
+  .installer-call-actions {
+    margin-top: 18px;
+  }
 }
 
 .installer-sip-hint {
