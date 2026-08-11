@@ -15,6 +15,8 @@
   const menuBackdrop = document.getElementById("installer-menu-backdrop");
   const helpDialog = document.getElementById("installer-help");
   const toastNode = document.getElementById("installer-toast");
+  const homePhoneButton = document.getElementById("installer-home-phone");
+  const installerMain = document.querySelector(".installer-app > main");
 
   const TAB_STATUSES = {
     new: ["new", "pending"],
@@ -298,8 +300,10 @@
         archive: "Архив завершённых проектов пока пуст",
       };
       listNode.innerHTML = `<div class="installer-empty">${messages[state.activeTab]}</div>`;
+      if (homePhoneButton) homePhoneButton.hidden = state.activeTab !== "new";
       return;
     }
+    if (homePhoneButton) homePhoneButton.hidden = true;
     listNode.innerHTML = orders.map(orderCardMarkup).join("");
   }
 
@@ -1397,16 +1401,65 @@
   }
 
   async function loadOrders({ quiet = false } = {}) {
-    if (!quiet) listNode.innerHTML = '<div class="installer-loading">Загрузка заказов...</div>';
+    if (!quiet) {
+      listNode.innerHTML = '<div class="installer-loading">Загрузка заказов...</div>';
+      if (homePhoneButton) homePhoneButton.hidden = true;
+    }
     try {
       const payload = await apiRequest("/api/installer/orders");
       state.orders = Array.isArray(payload.orders) ? payload.orders : [];
       render();
     } catch (error) {
       listNode.innerHTML = `<div class="installer-empty">${escapeHtml(error.message)}</div>`;
+      if (homePhoneButton) homePhoneButton.hidden = true;
       showToast(error.message, true);
     }
   }
+
+  homePhoneButton?.addEventListener("click", openPhonebook);
+
+  const phoneSwipe = {
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startedAt: 0,
+  };
+
+  function resetPhoneSwipe() {
+    phoneSwipe.active = false;
+    phoneSwipe.pointerId = null;
+  }
+
+  installerMain?.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("button, a, input, select, textarea, [contenteditable], dialog")) return;
+    if (document.querySelector("dialog[open]") || !menuNode.hidden) return;
+    phoneSwipe.active = true;
+    phoneSwipe.pointerId = event.pointerId;
+    phoneSwipe.startX = event.clientX;
+    phoneSwipe.startY = event.clientY;
+    phoneSwipe.startedAt = performance.now();
+    try {
+      installerMain.setPointerCapture?.(event.pointerId);
+    } catch (_error) {
+      // Pointer capture is optional and can be unavailable in embedded webviews.
+    }
+  });
+
+  installerMain?.addEventListener("pointerup", (event) => {
+    if (!phoneSwipe.active || event.pointerId !== phoneSwipe.pointerId) return;
+    const deltaX = event.clientX - phoneSwipe.startX;
+    const deltaY = event.clientY - phoneSwipe.startY;
+    const elapsed = performance.now() - phoneSwipe.startedAt;
+    resetPhoneSwipe();
+    if (deltaX <= -64 && Math.abs(deltaX) > Math.abs(deltaY) * 1.35 && elapsed <= 900) {
+      openPhonebook();
+    }
+  });
+
+  installerMain?.addEventListener("pointercancel", resetPhoneSwipe);
 
   menuToggle.addEventListener("click", () => {
     if (menuNode.hidden) openInstallerMenu();

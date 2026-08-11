@@ -12,10 +12,10 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=21">
+  <link rel="stylesheet" href="/static/installer.css?v=22">
   <script defer src="/static/jssip.min.js?v=1"></script>
   <script defer src="/static/installer-softphone.js?v=2"></script>
-  <script defer src="/static/installer.js?v=21"></script>
+  <script defer src="/static/installer.js?v=22"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -75,6 +75,15 @@
       <section class="installer-order-list" id="installer-order-list" aria-live="polite">
         <div class="installer-loading">Загрузка заказов...</div>
       </section>
+
+      <button
+        class="installer-home-phone"
+        id="installer-home-phone"
+        type="button"
+        title="Открыть телефонию"
+        aria-label="Открыть телефонию"
+        hidden
+      ><span aria-hidden="true">&#9742;</span></button>
     </main>
 
     <nav class="installer-tabs" aria-label="Разделы установщика">

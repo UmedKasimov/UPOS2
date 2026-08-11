@@ -227,7 +227,11 @@ button {
 }
 
 main {
+  position: relative;
+  min-height: calc(100vh - 156px);
+  min-height: calc(100dvh - 156px);
   padding: 14px;
+  touch-action: pan-y;
 }
 
 .installer-summary {
@@ -288,6 +292,92 @@ main {
   padding: 56px 16px;
   color: #64748b;
   text-align: center;
+}
+
+.installer-home-phone {
+  position: fixed;
+  z-index: 8;
+  top: 52%;
+  left: 50%;
+  display: grid;
+  width: 78px;
+  height: 78px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  border: 1px solid #0f62bd;
+  border-radius: 50%;
+  color: #fff;
+  background: #1673dc;
+  box-shadow: 0 12px 28px rgba(22, 115, 220, 0.28);
+}
+
+.installer-home-phone[hidden] {
+  display: none;
+}
+
+.installer-home-phone::before,
+.installer-home-phone::after {
+  position: absolute;
+  inset: -1px;
+  border: 2px solid rgba(37, 99, 235, 0.42);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  animation: installerHomePhoneRing 2.4s ease-out infinite;
+}
+
+.installer-home-phone::after {
+  animation-delay: 1.2s;
+}
+
+.installer-home-phone span {
+  display: block;
+  font-size: 34px;
+  line-height: 1;
+  animation: installerHomePhoneCall 2.4s ease-in-out infinite;
+}
+
+.installer-home-phone:hover,
+.installer-home-phone:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.24);
+  background: #0f62bd;
+}
+
+@keyframes installerHomePhoneRing {
+  0% {
+    opacity: 0.62;
+    transform: scale(1);
+  }
+  72%,
+  100% {
+    opacity: 0;
+    transform: scale(1.62);
+  }
+}
+
+@keyframes installerHomePhoneCall {
+  0%,
+  72%,
+  100% {
+    transform: rotate(0deg);
+  }
+  8%,
+  24% {
+    transform: rotate(-8deg);
+  }
+  16%,
+  32% {
+    transform: rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .installer-home-phone::before,
+  .installer-home-phone::after,
+  .installer-home-phone span {
+    animation: none;
+  }
 }
 
 .installer-order-card {
