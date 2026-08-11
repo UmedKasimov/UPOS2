@@ -1,5 +1,29 @@
 (() => {
+  "use strict";
+
   const controllers = new WeakMap();
+
+  function normalize(value) {
+    return String(value || "").trim();
+  }
+
+  function splitViews(value) {
+    return normalize(value).split(/\s+/).filter(Boolean);
+  }
+
+  function unique(items) {
+    return Array.from(new Set(items.filter(Boolean)));
+  }
+
+  function emptyState() {
+    return {
+      openTabs: [],
+      activeTab: "",
+      lastActiveTab: "",
+      meta: {},
+      tabState: {},
+    };
+  }
 
   function parseState(key) {
     try {
@@ -7,25 +31,13 @@
       return {
         openTabs: Array.isArray(raw.openTabs) ? raw.openTabs : [],
         activeTab: typeof raw.activeTab === "string" ? raw.activeTab : "",
+        lastActiveTab: typeof raw.lastActiveTab === "string" ? raw.lastActiveTab : "",
+        meta: raw.meta && typeof raw.meta === "object" ? raw.meta : {},
+        tabState: raw.tabState && typeof raw.tabState === "object" ? raw.tabState : {},
       };
     } catch {
-      return { openTabs: [], activeTab: "" };
+      return emptyState();
     }
-  }
-
-  function normalize(value) {
-    return String(value || "").trim();
-  }
-
-  function splitViews(value) {
-    return String(value || "")
-      .split(/\s+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  function unique(items) {
-    return Array.from(new Set(items.filter(Boolean)));
   }
 
   function resolveTabId(source) {
@@ -46,6 +58,23 @@
     );
   }
 
+  function notifyLocationChange() {
+    window.dispatchEvent(new Event("upos:locationchange"));
+  }
+
+  if (!window.__uposWorkspaceHistoryReady && window.history) {
+    window.__uposWorkspaceHistoryReady = true;
+    ["pushState", "replaceState"].forEach((method) => {
+      const original = window.history[method];
+      if (typeof original !== "function") return;
+      window.history[method] = function (...args) {
+        const result = original.apply(this, args);
+        notifyLocationChange();
+        return result;
+      };
+    });
+  }
+
   function createController(root) {
     const existingController = controllers.get(root);
     if (existingController) {
@@ -53,6 +82,7 @@
       return existingController;
     }
     if (root.dataset.workspaceTabsReady === "1") return null;
+
     const key = normalize(root.dataset.workspaceKey);
     const tabsShell = root.querySelector("[data-workspace-open-tabs]");
     const homeTab = root.querySelector("[data-workspace-home-tab]");
@@ -64,6 +94,9 @@
     const tabMeta = new Map();
     let openTabs = [];
     let activeTab = "";
+    let lastActiveTab = "";
+    let tabState = {};
+    let scrollSaveTimer = 0;
 
     function homeUrl() {
       const href = root.dataset.workspaceHomeHref || homeTab.getAttribute("href") || "";
@@ -73,26 +106,49 @@
     function registerMeta(source) {
       const tabId = resolveTabId(source);
       if (!tabId) return "";
-      const viewId = resolveViewId(source, tabId);
+      const existing = tabMeta.get(tabId) || {};
+      const viewId = resolveViewId(source) || existing.viewId || tabId;
       const title =
         normalize(source.dataset.workspaceTabTitle) ||
         normalize(source.dataset.workspaceTitle) ||
-        normalize(source.textContent);
-      const hash = normalize(source.dataset.workspaceTabHash || source.dataset.workspaceHash || tabId).replace(/^#/, "");
+        normalize(source.querySelector?.("[data-workspace-activate-tab]")?.textContent) ||
+        normalize(source.textContent) ||
+        existing.title ||
+        tabId;
+      const hash = normalize(
+        source.dataset.workspaceTabHash || source.dataset.workspaceHash || existing.hash || tabId
+      ).replace(/^#/, "");
       const href = normalize(
-        source.dataset.workspaceTabHref || source.dataset.workspaceSyncUrl || source.getAttribute("href") || ""
+        source.dataset.workspaceTabHref ||
+          source.getAttribute("href") ||
+          existing.href ||
+          source.dataset.workspaceSyncUrl ||
+          ""
       );
-      tabMeta.set(tabId, { id: tabId, viewId, title: title || tabId, hash, href });
+      tabMeta.set(tabId, { id: tabId, viewId, title, hash, href });
       return tabId;
     }
 
     function collectMeta() {
       root
-        .querySelectorAll("[data-workspace-card], [data-workspace-trigger]")
+        .querySelectorAll("[data-workspace-card], [data-workspace-trigger], [data-workspace-open-tab]")
         .forEach(registerMeta);
     }
 
-    function tabUrl(tabId) {
+    function hydrateSavedMeta(savedMeta) {
+      Object.entries(savedMeta || {}).forEach(([tabId, item]) => {
+        if (!tabId || !item || typeof item !== "object") return;
+        tabMeta.set(tabId, {
+          id: tabId,
+          viewId: normalize(item.viewId) || tabId,
+          title: normalize(item.title) || tabId,
+          hash: normalize(item.hash) || tabId,
+          href: normalize(item.href),
+        });
+      });
+    }
+
+    function canonicalTabUrl(tabId) {
       const meta = tabMeta.get(tabId);
       if (!meta) return null;
       const base = meta.href || `${window.location.pathname}${window.location.search}`;
@@ -101,37 +157,43 @@
       return url;
     }
 
-    function matchesLocation(url) {
+    function rememberedTabUrl(tabId) {
+      const remembered = normalize(tabState[tabId]?.url);
+      if (!remembered) return null;
+      try {
+        const url = new URL(remembered, window.location.origin);
+        return url.origin === window.location.origin ? url : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function tabUrl(tabId) {
+      return rememberedTabUrl(tabId) || canonicalTabUrl(tabId);
+    }
+
+    function matchesLocation(url, includeHash = false) {
       if (!url) return false;
-      return url.pathname === window.location.pathname && url.search === window.location.search;
+      if (url.pathname !== window.location.pathname || url.search !== window.location.search) return false;
+      return !includeHash || normalize(url.hash) === normalize(window.location.hash);
     }
 
     function tabFromLocation() {
       const hash = normalize(window.location.hash).replace(/^#/, "");
-      const aliasMap = {
-        telephony: {
-          providers: "integrations",
-        },
-      };
+      const aliasMap = { telephony: { providers: "integrations" } };
       const aliasTab = aliasMap[key]?.[hash];
       if (aliasTab && tabMeta.has(aliasTab)) return aliasTab;
+
       if (key === "products" && hash === "price-type-detail") {
         const priceTypeId = new URLSearchParams(window.location.search).get("price_type");
         const priceTab = priceTypeId ? `price-type-${priceTypeId}` : "";
         if (priceTab && tabMeta.has(priceTab)) return priceTab;
       }
-      if (hash && tabMeta.has(hash)) return hash;
+
       for (const tabId of tabMeta.keys()) {
-        const url = tabUrl(tabId);
-        if (!url) continue;
-        if (
-          url.pathname === window.location.pathname &&
-          url.search === window.location.search &&
-          normalize(url.hash) === normalize(window.location.hash)
-        ) {
-          return tabId;
-        }
+        if (matchesLocation(tabUrl(tabId), true)) return tabId;
       }
+      if (hash && tabMeta.has(hash)) return hash;
       if (!hash) return "";
       for (const [tabId, meta] of tabMeta.entries()) {
         if (meta.hash === hash) return tabId;
@@ -143,24 +205,63 @@
       if (tabId && !openTabs.includes(tabId)) openTabs.push(tabId);
     }
 
+    function currentUrl() {
+      return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    }
+
+    function rememberTab(tabId, options = {}) {
+      if (!tabId || !tabMeta.has(tabId)) return;
+      const previous = tabState[tabId] && typeof tabState[tabId] === "object" ? tabState[tabId] : {};
+      const next = { ...previous };
+      if (options.captureUrl !== false) next.url = currentUrl();
+      if (options.captureScroll !== false) {
+        next.scrollX = Math.max(0, Math.round(window.scrollX || 0));
+        next.scrollY = Math.max(0, Math.round(window.scrollY || 0));
+      }
+      tabState[tabId] = next;
+    }
+
+    function restoreTabScroll(tabId) {
+      const remembered = tabState[tabId];
+      const url = rememberedTabUrl(tabId);
+      if (!remembered || !matchesLocation(url, true)) return;
+      const x = Number(remembered.scrollX);
+      const y = Number(remembered.scrollY);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => window.scrollTo({ left: x, top: y, behavior: "auto" }));
+      });
+    }
+
     function saveState() {
       try {
-        // Подписи вкладок храним рядом с составом: ранний скрипт рисует панель
-        // из этого же ключа, до разбора остальной страницы.
         const meta = {};
         openTabs.forEach((tabId) => {
           const item = tabMeta.get(tabId);
-          if (item) meta[tabId] = { title: item.title, hash: item.hash };
+          if (!item) return;
+          meta[tabId] = {
+            title: item.title,
+            hash: item.hash,
+            href: item.href,
+            viewId: item.viewId,
+          };
         });
-        localStorage.setItem(storageKey, JSON.stringify({ openTabs, activeTab, meta }));
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ openTabs, activeTab, lastActiveTab, meta, tabState })
+        );
       } catch {}
     }
 
     function loadState() {
-      collectMeta();
       const saved = parseState(storageKey);
+      hydrateSavedMeta(saved.meta);
+      collectMeta();
       openTabs = unique(saved.openTabs.filter((tabId) => tabMeta.has(tabId)));
+      tabState = saved.tabState;
+
       const storedActive = tabMeta.has(saved.activeTab) ? saved.activeTab : "";
+      lastActiveTab = tabMeta.has(saved.lastActiveTab) ? saved.lastActiveTab : storedActive;
       const defaultTab = normalize(root.dataset.workspaceDefaultTab);
       const forceTab = normalize(root.dataset.workspaceForceTab);
       const closeTabsOnLoad = splitViews(root.dataset.workspaceCloseTabsOnLoad);
@@ -172,41 +273,27 @@
       }
       if (forceTab && tabMeta.has(forceTab)) {
         activeTab = forceTab;
-        ensureOpen(forceTab);
-        return;
-      }
-      if (hashTab) {
+      } else if (hashTab) {
         activeTab = hashTab;
-        ensureOpen(hashTab);
-        return;
-      }
-      if (defaultTab && tabMeta.has(defaultTab)) {
+      } else if (defaultTab && tabMeta.has(defaultTab)) {
         activeTab = defaultTab;
-        ensureOpen(defaultTab);
-        return;
-      }
-      if (!hasLocationHash) {
+      } else if (hasLocationHash && storedActive && matchesLocation(tabUrl(storedActive))) {
+        activeTab = storedActive;
+      } else {
         activeTab = "";
-        return;
       }
-      if (storedActive) {
-        const currentUrl = tabUrl(storedActive);
-        if (!currentUrl || matchesLocation(currentUrl)) {
-          activeTab = storedActive;
-          ensureOpen(storedActive);
-          return;
-        }
+
+      if (activeTab) {
+        lastActiveTab = activeTab;
+        ensureOpen(activeTab);
       }
-      activeTab = "";
     }
 
     function syncLocalUrl(url) {
       if (!window.history?.replaceState || !url) return;
-      const next = `${url.pathname}${url.search}${url.hash}`;
-      window.history.replaceState(null, "", next);
-      // Раньше страница прокручивалась к якорю вкладки и уезжала вниз: шапка
-      // раздела оставалась выше экрана. Вкладку открываем с самого верха.
-      window.scrollTo({ top: 0 });
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      if (activeTab) rememberTab(activeTab, { captureScroll: false });
+      saveState();
     }
 
     function renderViews() {
@@ -217,14 +304,10 @@
         node.hidden = views.length ? !views.includes(currentView) : false;
       });
       root.querySelectorAll("[data-workspace-card]").forEach((card) => {
-        const cardId = normalize(card.dataset.workspaceCard);
-        const isActive = Boolean(activeTab) && cardId === currentView;
+        const isActive = Boolean(activeTab) && normalize(card.dataset.workspaceCard) === currentView;
         card.classList.toggle("active", isActive);
-        if (isActive) {
-          card.setAttribute("aria-current", "page");
-        } else {
-          card.removeAttribute("aria-current");
-        }
+        if (isActive) card.setAttribute("aria-current", "page");
+        else card.removeAttribute("aria-current");
       });
     }
 
@@ -233,15 +316,14 @@
       holder.className = "general-module-tab general-module-tab--report";
       holder.dataset.workspaceOpenTab = tabId;
 
-      // Кнопку синхронизации создаём сразу вместе с вкладкой, а не отдельным
-      // проходом (module-tabs-sync.js) — иначе при каждой перезагрузке ⟳
-      // заметно «исчезает и появляется». Обработчик клика навешивает
-      // module-tabs-sync.js на уже готовую кнопку.
       const syncButton = document.createElement("button");
       syncButton.type = "button";
       syncButton.className = "general-module-tab-sync";
-      syncButton.title = "Синхронизировать";
-      syncButton.setAttribute("aria-label", "Синхронизировать");
+      syncButton.title = "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c";
+      syncButton.setAttribute(
+        "aria-label",
+        "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c"
+      );
       syncButton.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
         '<path d="M3 12a9 9 0 0 1 14.7-7" /><path d="M17.7 5H13" /><path d="M17.7 5v4.7" />' +
@@ -256,7 +338,7 @@
       closeButton.type = "button";
       closeButton.className = "general-module-tab-close";
       closeButton.dataset.workspaceCloseTab = tabId;
-      closeButton.textContent = "×";
+      closeButton.textContent = "\u00d7";
 
       holder.append(syncButton, activateButton, closeButton);
       return holder;
@@ -267,8 +349,6 @@
       homeTab.classList.toggle("active", homeActive);
       homeTab.setAttribute("aria-current", homeActive ? "page" : "false");
 
-      // Узлы вкладок переиспользуются: раньше панель каждый раз собиралась
-      // заново, и вкладки заметно мигали на каждом переходе.
       const existing = new Map();
       tabsShell.querySelectorAll("[data-workspace-open-tab]").forEach((node) => {
         const tabId = normalize(node.dataset.workspaceOpenTab);
@@ -285,23 +365,18 @@
         else holder = buildTabNode(tabId);
 
         holder.classList.toggle("active", tabId === activeTab);
-        if (holder.dataset.workspaceHash !== meta.hash) holder.dataset.workspaceHash = meta.hash;
-        const syncUrl = tabUrl(tabId);
-        const syncValue = syncUrl ? syncUrl.toString() : "";
-        if (syncValue && holder.dataset.workspaceSyncUrl !== syncValue) {
-          holder.dataset.workspaceSyncUrl = syncValue;
-        }
-        const activateButton = holder.querySelector("[data-workspace-activate-tab]");
-        if (activateButton && activateButton.textContent !== meta.title) {
-          activateButton.textContent = meta.title;
-        }
-        const closeButton = holder.querySelector("[data-workspace-close-tab]");
-        closeButton?.setAttribute("aria-label", `Закрыть ${meta.title}`);
+        holder.dataset.workspaceHash = meta.hash;
+        const url = tabUrl(tabId);
+        if (url) holder.dataset.workspaceSyncUrl = url.toString();
+        const activate = holder.querySelector("[data-workspace-activate-tab]");
+        if (activate) activate.textContent = meta.title;
+        holder
+          .querySelector("[data-workspace-close-tab]")
+          ?.setAttribute("aria-label", `\u0417\u0430\u043a\u0440\u044b\u0442\u044c ${meta.title}`);
 
         if (previous.nextElementSibling !== holder) previous.after(holder);
         previous = holder;
       });
-
       existing.forEach((node) => node.remove());
     }
 
@@ -311,30 +386,31 @@
     }
 
     function openTab(tabId, options = {}) {
-      const meta = tabMeta.get(tabId);
-      if (!meta) return;
+      if (!tabMeta.has(tabId)) return;
+      if (activeTab) rememberTab(activeTab);
       ensureOpen(tabId);
       activeTab = tabId;
+      lastActiveTab = tabId;
       saveState();
+
       const url = tabUrl(tabId);
       if (options.navigate !== false && url && !matchesLocation(url)) {
-        // Show the already-rendered panel immediately while the new URL loads.
         render();
         window.location.assign(url.toString());
         return;
       }
       render();
       if (url) syncLocalUrl(url);
+      restoreTabScroll(tabId);
     }
 
     function goHome(options = {}) {
-      // У раздела без домашнего экрана кнопка раздела открывает главную
-      // вкладку: в продажах карточек больше нет, и «домой» вело в пустоту.
       const homeTabId = normalize(root.dataset.workspaceHomeTabId);
       if (homeTabId && tabMeta.has(homeTabId)) {
         openTab(homeTabId, options);
         return;
       }
+      if (activeTab) rememberTab(activeTab);
       activeTab = "";
       saveState();
       const url = homeUrl();
@@ -343,36 +419,24 @@
         return;
       }
       render();
-      syncLocalUrl(url);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     }
 
     function closeTab(tabId) {
       const index = openTabs.indexOf(tabId);
       if (index >= 0) openTabs.splice(index, 1);
-      if (activeTab === tabId) {
-        activeTab = openTabs[index] || openTabs[index - 1] || "";
-      }
+      if (activeTab === tabId) activeTab = openTabs[index] || openTabs[index - 1] || "";
+      delete tabState[tabId];
+      if (lastActiveTab === tabId) lastActiveTab = activeTab;
       saveState();
-      if (activeTab) {
-        const nextUrl = tabUrl(activeTab);
-        if (nextUrl && !matchesLocation(nextUrl)) {
-          window.location.assign(nextUrl.toString());
-          return;
-        }
-      } else {
-        const url = homeUrl();
-        if (!matchesLocation(url) || window.location.hash) {
-          window.location.assign(url.toString());
-          return;
-        }
+
+      const url = activeTab ? tabUrl(activeTab) : homeUrl();
+      if (url && (!matchesLocation(url) || normalize(url.hash) !== normalize(window.location.hash))) {
+        window.location.assign(url.toString());
+        return;
       }
       render();
-      syncLocalUrl(activeTab ? tabUrl(activeTab) : homeUrl());
-    }
-
-    function handleTrigger(source, tabId) {
-      registerMeta(source);
-      openTab(tabId, { navigate: true });
+      if (url) syncLocalUrl(url);
     }
 
     function bind() {
@@ -388,13 +452,12 @@
           goHome({ navigate: true });
           return;
         }
-
         const trigger = event.target.closest("[data-workspace-card], [data-workspace-trigger]");
         if (!trigger || !root.contains(trigger)) return;
-        const tabId = resolveTabId(trigger);
+        const tabId = registerMeta(trigger);
         if (!tabId) return;
         event.preventDefault();
-        handleTrigger(trigger, tabId);
+        openTab(tabId, { navigate: true });
       });
 
       tabsShell.addEventListener("click", (event) => {
@@ -411,23 +474,21 @@
         openTab(normalize(activateButton.dataset.workspaceActivateTab), { navigate: true });
       });
 
-      // Фильтры, сортировка и размер страницы отправляют обычную форму с
-      // жёстким якорем вида «#clients». После перезагрузки открывался не тот
-      // раздел: сначала мелькала домашняя кнопка, потом возвращалась вкладка.
-      // Подставляем в адрес формы якорь текущей вкладки — страница
-      // возвращается ровно туда, где нажали.
-      root.addEventListener("submit", (event) => {
-        const form = event.target;
-        if (!(form instanceof HTMLFormElement)) return;
-        if ((form.getAttribute("method") || "get").toLowerCase() !== "get") return;
-        if (!activeTab) return;
-        const meta = tabMeta.get(activeTab);
-        if (!meta || !meta.hash) return;
-        try {
-          const url = new URL(form.getAttribute("action") || window.location.href, window.location.href);
-          form.setAttribute("action", `${url.pathname}${url.search}#${meta.hash}`);
-        } catch {}
-      }, true);
+      root.addEventListener(
+        "submit",
+        (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) return;
+          if ((form.getAttribute("method") || "get").toLowerCase() !== "get" || !activeTab) return;
+          const meta = tabMeta.get(activeTab);
+          if (!meta?.hash) return;
+          try {
+            const url = new URL(form.getAttribute("action") || window.location.href, window.location.href);
+            form.setAttribute("action", `${url.pathname}${url.search}#${meta.hash}`);
+          } catch {}
+        },
+        true
+      );
 
       window.addEventListener("hashchange", () => {
         const nextTab = tabFromLocation();
@@ -435,13 +496,40 @@
         if (nextTab) {
           ensureOpen(nextTab);
           activeTab = nextTab;
+          lastActiveTab = nextTab;
+          rememberTab(nextTab, { captureScroll: false });
           saveState();
           render();
+          restoreTabScroll(nextTab);
         } else if (!hasHash) {
           activeTab = "";
           saveState();
           render();
         }
+      });
+
+      window.addEventListener(
+        "scroll",
+        () => {
+          if (!activeTab) return;
+          window.clearTimeout(scrollSaveTimer);
+          scrollSaveTimer = window.setTimeout(() => {
+            rememberTab(activeTab);
+            saveState();
+          }, 160);
+        },
+        { passive: true }
+      );
+
+      window.addEventListener("upos:locationchange", () => {
+        if (!activeTab) return;
+        rememberTab(activeTab, { captureScroll: false });
+        saveState();
+      });
+
+      window.addEventListener("pagehide", () => {
+        if (activeTab) rememberTab(activeTab);
+        saveState();
       });
     }
 
@@ -452,7 +540,9 @@
     if (activeTab) {
       const url = tabUrl(activeTab);
       if (url && matchesLocation(url)) syncLocalUrl(url);
+      restoreTabScroll(activeTab);
     }
+
     const controller = {
       openTab,
       goHome,
@@ -470,7 +560,6 @@
   }
 
   window.initWorkspaceModuleTabs = init;
-
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => init(), { once: true });
   } else {
