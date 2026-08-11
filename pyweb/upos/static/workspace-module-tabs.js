@@ -58,23 +58,6 @@
     );
   }
 
-  function notifyLocationChange() {
-    window.dispatchEvent(new Event("upos:locationchange"));
-  }
-
-  if (!window.__uposWorkspaceHistoryReady && window.history) {
-    window.__uposWorkspaceHistoryReady = true;
-    ["pushState", "replaceState"].forEach((method) => {
-      const original = window.history[method];
-      if (typeof original !== "function") return;
-      window.history[method] = function (...args) {
-        const result = original.apply(this, args);
-        notifyLocationChange();
-        return result;
-      };
-    });
-  }
-
   function createController(root) {
     const existingController = controllers.get(root);
     if (existingController) {
@@ -96,7 +79,7 @@
     let activeTab = "";
     let lastActiveTab = "";
     let tabState = {};
-    let scrollSaveTimer = 0;
+    let lastSerializedState = "";
 
     function homeUrl() {
       const href = root.dataset.workspaceHomeHref || homeTab.getAttribute("href") || "";
@@ -162,6 +145,9 @@
       if (!remembered) return null;
       try {
         const url = new URL(remembered, window.location.origin);
+        if (key === "sales" && tabId === "journal" && !url.searchParams.has("view")) {
+          url.searchParams.set("view", "journal");
+        }
         return url.origin === window.location.origin ? url : null;
       } catch {
         return null;
@@ -209,28 +195,9 @@
       return `${window.location.pathname}${window.location.search}${window.location.hash}`;
     }
 
-    function rememberTab(tabId, options = {}) {
+    function rememberTab(tabId) {
       if (!tabId || !tabMeta.has(tabId)) return;
-      const previous = tabState[tabId] && typeof tabState[tabId] === "object" ? tabState[tabId] : {};
-      const next = { ...previous };
-      if (options.captureUrl !== false) next.url = currentUrl();
-      if (options.captureScroll !== false) {
-        next.scrollX = Math.max(0, Math.round(window.scrollX || 0));
-        next.scrollY = Math.max(0, Math.round(window.scrollY || 0));
-      }
-      tabState[tabId] = next;
-    }
-
-    function restoreTabScroll(tabId) {
-      const remembered = tabState[tabId];
-      const url = rememberedTabUrl(tabId);
-      if (!remembered || !matchesLocation(url, true)) return;
-      const x = Number(remembered.scrollX);
-      const y = Number(remembered.scrollY);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => window.scrollTo({ left: x, top: y, behavior: "auto" }));
-      });
+      tabState[tabId] = { url: currentUrl() };
     }
 
     function saveState() {
@@ -246,10 +213,10 @@
             viewId: item.viewId,
           };
         });
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify({ openTabs, activeTab, lastActiveTab, meta, tabState })
-        );
+        const serialized = JSON.stringify({ openTabs, activeTab, lastActiveTab, meta, tabState });
+        if (serialized === lastSerializedState) return;
+        localStorage.setItem(storageKey, serialized);
+        lastSerializedState = serialized;
       } catch {}
     }
 
@@ -292,7 +259,7 @@
     function syncLocalUrl(url) {
       if (!window.history?.replaceState || !url) return;
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-      if (activeTab) rememberTab(activeTab, { captureScroll: false });
+      if (activeTab) rememberTab(activeTab);
       saveState();
     }
 
@@ -393,7 +360,7 @@
       lastActiveTab = tabId;
       saveState();
 
-      const url = tabUrl(tabId);
+      const url = options.url ? new URL(options.url, window.location.href) : tabUrl(tabId);
       if (options.navigate !== false && url && !matchesLocation(url)) {
         render();
         window.location.assign(url.toString());
@@ -401,7 +368,6 @@
       }
       render();
       if (url) syncLocalUrl(url);
-      restoreTabScroll(tabId);
     }
 
     function goHome(options = {}) {
@@ -457,7 +423,10 @@
         const tabId = registerMeta(trigger);
         if (!tabId) return;
         event.preventDefault();
-        openTab(tabId, { navigate: true });
+        openTab(tabId, {
+          navigate: true,
+          url: normalize(trigger.dataset.workspaceNavigateHref),
+        });
       });
 
       tabsShell.addEventListener("click", (event) => {
@@ -497,34 +466,14 @@
           ensureOpen(nextTab);
           activeTab = nextTab;
           lastActiveTab = nextTab;
-          rememberTab(nextTab, { captureScroll: false });
+          rememberTab(nextTab);
           saveState();
           render();
-          restoreTabScroll(nextTab);
         } else if (!hasHash) {
           activeTab = "";
           saveState();
           render();
         }
-      });
-
-      window.addEventListener(
-        "scroll",
-        () => {
-          if (!activeTab) return;
-          window.clearTimeout(scrollSaveTimer);
-          scrollSaveTimer = window.setTimeout(() => {
-            rememberTab(activeTab);
-            saveState();
-          }, 160);
-        },
-        { passive: true }
-      );
-
-      window.addEventListener("upos:locationchange", () => {
-        if (!activeTab) return;
-        rememberTab(activeTab, { captureScroll: false });
-        saveState();
       });
 
       window.addEventListener("pagehide", () => {
@@ -540,7 +489,6 @@
     if (activeTab) {
       const url = tabUrl(activeTab);
       if (url && matchesLocation(url)) syncLocalUrl(url);
-      restoreTabScroll(activeTab);
     }
 
     const controller = {

@@ -41,6 +41,9 @@
         const meta = saved.meta?.[tabId];
         const fallback = normalizeTabId(meta?.href) || (meta?.hash ? `${route.path}#${meta.hash}` : "");
         const url = new URL(storedUrl || fallback, window.location.origin);
+        if (route.path === "/sales" && tabId === "journal" && !url.searchParams.has("view")) {
+          url.searchParams.set("view", "journal");
+        }
         if (url.origin === window.location.origin && url.pathname === route.path) {
           return `${url.pathname}${url.search}${url.hash}`;
         }

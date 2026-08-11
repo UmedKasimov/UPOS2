@@ -9888,11 +9888,11 @@ def create_app() -> FastAPI:
             "date_from": date_from_clean,
             "date_to": date_to_clean,
         }
+        sales_embed = str(embed or "").strip() == "1"
         sales_ajax_section = (
-            request.headers.get("x-requested-with") == "XMLHttpRequest"
+            not sales_embed
             and str(request.query_params.get("view") or "").strip() == "journal"
         )
-        sales_embed = str(embed or "").strip() == "1"
         sales: list[dict[str, Any]] = []
         filtered_sale_clients: list[str] = []
         filtered_sale_warehouses: list[str] = []
@@ -10182,7 +10182,8 @@ def create_app() -> FastAPI:
                     "current": archive_tab_active,
                 },
             ]
-            sales_debt_workspace = _sales_debt_workspace(rows, filters, q_clean, today_date)
+            debt_rows = [] if sales_ajax_section and not debt_filter_active else rows
+            sales_debt_workspace = _sales_debt_workspace(debt_rows, filters, q_clean, today_date)
             debt_page_size = _table_page_size(debt_page_size)
             debt_clients_total = int(sales_debt_workspace["clients_count"])
             debt_total_pages = max(1, math.ceil(debt_clients_total / debt_page_size))

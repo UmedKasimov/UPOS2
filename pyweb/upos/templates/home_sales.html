@@ -60,7 +60,7 @@
     {% include "_workspace_tabs_early.html" %}
 
     <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher{% if sales_default_tab %} hidden{% endif %}>
-      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">
+      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}{% if sales_form_doc_type != 'sale' %}?doc_type={{ sales_form_doc_type }}{% endif %}#sales-form">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <path d="M5 5h14v14H5z" />
@@ -71,7 +71,7 @@
         <span>{{ sales_form_title }}</span>
         <small>Счёт, заказ или реализация</small>
       </a>
-      <a class="general-report-card" href="#sales-journal" data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal">
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?view=journal#sales-journal" data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal" data-workspace-tab-href="{{ url_for('sales_get') }}?view=journal">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <path d="M5 4h14v16H5z" />
@@ -248,7 +248,7 @@
             <h2>Дебиторская задолженность</h2>
             <span>{{ sales_debt_workspace.clients_count }} клиентов · {{ sales_debt_workspace.documents_count }} документов</span>
           </div>
-          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
+          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}{% if sales_form_doc_type != 'sale' %}?doc_type={{ sales_form_doc_type }}{% endif %}#sales-form">{{ sales_form_action_label }}</a>
         </header>
         {% if sales_filters.status == 'debt' %}
           {{ render_sales_journal_filter('sales-debt-filter', 'debt', 'debt') }}
@@ -397,7 +397,7 @@
             <h2>Журнал продаж</h2>
             <span>Всего: {{ sales_journal_pagination.total }}</span>
           </div>
-          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form">{{ sales_form_action_label }}</a>
+          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}{% if sales_form_doc_type != 'sale' %}?doc_type={{ sales_form_doc_type }}{% endif %}#sales-form">{{ sales_form_action_label }}</a>
           {% if sales_filters.status != 'debt' %}
             {{ render_sales_journal_filter('sales-journal-filter', 'journal', 'journal order return') }}
           {% endif %}
