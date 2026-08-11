@@ -9,6 +9,12 @@
     { path: "/organizations/shipments", keys: ["upos.shipments.openTabs"] },
     { path: "/organizations/hr", keys: ["upos.hr.openTabs"] },
     { path: "/sales", keys: ["upos.sales.openTabs"] },
+    {
+      path: "/finance",
+      keys: [],
+      allowedPaths: ["/finance", "/schet", "/kassa", "/earnings"],
+      lastUrlKey: "upos.finance.lastUrl",
+    },
     { path: "/products", keys: ["upos.products.openTabs"] },
     { path: "/warehouse", keys: ["upos.warehouse.openTabs"] },
     { path: "/clients", keys: ["upos.clients.openTabs"] },
@@ -33,6 +39,15 @@
 
   function rememberedUrl(route) {
     try {
+      if (route.lastUrlKey) {
+        const stored = normalizeTabId(localStorage.getItem(route.lastUrlKey));
+        if (stored) {
+          const url = new URL(stored, window.location.origin);
+          if (url.origin === window.location.origin && routeAllowsPath(route, url.pathname)) {
+            return `${url.pathname}${url.search}${url.hash}`;
+          }
+        }
+      }
       for (const key of route.keys) {
         const saved = JSON.parse(localStorage.getItem(key) || "{}");
         const tabId = normalizeTabId(saved.activeTab || saved.lastActiveTab);
@@ -44,7 +59,7 @@
         if (route.path === "/sales" && tabId === "journal" && !url.searchParams.has("view")) {
           url.searchParams.set("view", "journal");
         }
-        if (url.origin === window.location.origin && url.pathname === route.path) {
+        if (url.origin === window.location.origin && routeAllowsPath(route, url.pathname)) {
           return `${url.pathname}${url.search}${url.hash}`;
         }
       }
@@ -54,6 +69,24 @@
 
   function normalizeTabId(value) {
     return String(value || "").trim();
+  }
+
+  function routeAllowsPath(route, pathname) {
+    return (route.allowedPaths || [route.path]).includes(pathname);
+  }
+
+  function rememberCurrentSection() {
+    routes.forEach((route) => {
+      if (!route.lastUrlKey || !routeAllowsPath(route, window.location.pathname)) return;
+      if (window.location.pathname === route.path) {
+        localStorage.removeItem(route.lastUrlKey);
+        return;
+      }
+      localStorage.setItem(
+        route.lastUrlKey,
+        `${window.location.pathname}${window.location.search}${window.location.hash}`
+      );
+    });
   }
 
   function restoreSidebarLinks(scope = document) {
@@ -85,8 +118,16 @@
   window.addEventListener("storage", () => restoreSidebarLinks());
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => restoreSidebarLinks(), { once: true });
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        rememberCurrentSection();
+        restoreSidebarLinks();
+      },
+      { once: true }
+    );
   } else {
+    rememberCurrentSection();
     restoreSidebarLinks();
   }
 })();

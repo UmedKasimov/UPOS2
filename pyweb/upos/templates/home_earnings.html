@@ -12,6 +12,7 @@
 {% endblock %}
 
 {% block main %}
+  {% include "_finance_module_tabs.html" %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
     {% if flash_ok %}<div class="flash ok settings-ios-flash">{{ flash_ok }}</div>{% endif %}
     {% if flash_err %}<div class="flash err settings-ios-flash">{{ flash_err }}</div>{% endif %}
