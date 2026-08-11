@@ -145,6 +145,13 @@
       if (!remembered) return null;
       try {
         const url = new URL(remembered, window.location.origin);
+        const meta = tabMeta.get(tabId);
+        const expectedHash = normalize(meta?.hash).replace(/^#/, "");
+        const rememberedHash = normalize(url.hash).replace(/^#/, "");
+        if (expectedHash && rememberedHash !== expectedHash) {
+          delete tabState[tabId];
+          return null;
+        }
         if (key === "sales" && tabId === "journal" && !url.searchParams.has("view")) {
           url.searchParams.set("view", "journal");
         }
@@ -176,14 +183,16 @@
         if (priceTab && tabMeta.has(priceTab)) return priceTab;
       }
 
+      if (hash && tabMeta.has(hash)) return hash;
+      if (hash) {
+        for (const [tabId, meta] of tabMeta.entries()) {
+          if (meta.hash === hash) return tabId;
+        }
+      }
       for (const tabId of tabMeta.keys()) {
         if (matchesLocation(tabUrl(tabId), true)) return tabId;
       }
-      if (hash && tabMeta.has(hash)) return hash;
       if (!hash) return "";
-      for (const [tabId, meta] of tabMeta.entries()) {
-        if (meta.hash === hash) return tabId;
-      }
       return "";
     }
 
@@ -197,6 +206,10 @@
 
     function rememberTab(tabId) {
       if (!tabId || !tabMeta.has(tabId)) return;
+      const meta = tabMeta.get(tabId);
+      const expectedHash = normalize(meta?.hash).replace(/^#/, "");
+      const currentHash = normalize(window.location.hash).replace(/^#/, "");
+      if (expectedHash && currentHash !== expectedHash) return;
       tabState[tabId] = { url: currentUrl() };
     }
 
