@@ -51,6 +51,12 @@
     });
   }
 
+  function registrarUri(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    return /^sips?:/i.test(raw) ? raw : `sip:${raw}`;
+  }
+
   const softphone = {
     configure(options) {
       if (options && options.audioId) audioElementId = String(options.audioId);
@@ -87,15 +93,19 @@
         let settled = false;
         try {
           const socket = new window.JsSIP.WebSocketInterface(acc.ws_url);
-          ua = new window.JsSIP.UA({
+          const configuration = {
             sockets: [socket],
             uri: acc.sip_uri,
             authorization_user: acc.auth_id || acc.extension,
             password: acc.password || "",
             display_name: acc.display_name || acc.extension,
             register: true,
+            register_expires: Number(acc.register_expires || acc.expire_time || 300),
             session_timers: false,
-          });
+          };
+          if (acc.realm) configuration.realm = String(acc.realm).trim();
+          if (acc.registrar_server) configuration.registrar_server = registrarUri(acc.registrar_server);
+          ua = new window.JsSIP.UA(configuration);
           ua.on("registered", () => {
             registered = true;
             emit("registered", {account: acc});
@@ -152,7 +162,15 @@
     },
 
     answer() {
-      if (session) session.answer({mediaConstraints: {audio: true, video: false}});
+      if (!session) return false;
+      session.answer({mediaConstraints: {audio: true, video: false}});
+      return true;
+    },
+
+    reject() {
+      if (!session) return false;
+      try { session.terminate({status_code: 486, reason_phrase: "Busy Here"}); } catch (_e) { session = null; }
+      return true;
     },
 
     hangup() {

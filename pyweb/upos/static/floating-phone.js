@@ -6,8 +6,7 @@
  * WebRTC (JsSIP по SIP-over-WSS) тем же модулем, что и приложение
  * установщика, а мост и набор через SIM остаются запасными путями.
  *
- * Тяжёлую библиотеку JsSIP грузим только когда телефон открыли: на страницах,
- * где им не пользуются, она не нужна.
+ * Для приёма входящих JsSIP регистрируется автоматически после загрузки страницы.
  */
 (() => {
   "use strict";
@@ -25,6 +24,10 @@
   const status = root.querySelector("[data-floating-phone-status]");
   const submitButton = form?.querySelector('button[type="submit"]');
   const hangupButton = root.querySelector("[data-floating-phone-hangup]");
+  const incomingPanel = root.querySelector("[data-floating-phone-incoming]");
+  const incomingCaller = root.querySelector("[data-floating-phone-caller]");
+  const answerButton = root.querySelector("[data-floating-phone-answer]");
+  const rejectButton = root.querySelector("[data-floating-phone-reject]");
   const bridgeUrl = root.dataset.floatingPhoneBridge || "http://127.0.0.1:5058/call";
 
   /* ── Положение и раскрытие панели (поведение прежнее) ───────────────── */
@@ -185,6 +188,52 @@
   let softphoneReady = null;
   let accounts = [];
   let inCall = false;
+  let ringTimer = null;
+  let ringContext = null;
+
+  function ringOnce() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    try {
+      ringContext = ringContext || new AudioContext();
+      ringContext.resume().catch(() => {});
+      const oscillator = ringContext.createOscillator();
+      const gain = ringContext.createGain();
+      oscillator.frequency.value = 440;
+      gain.gain.setValueAtTime(0.0001, ringContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ringContext.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ringContext.currentTime + 0.38);
+      oscillator.connect(gain);
+      gain.connect(ringContext.destination);
+      oscillator.start();
+      oscillator.stop(ringContext.currentTime + 0.4);
+    } catch (_error) {
+      // Some browsers block sound until the first user interaction; visual ringing remains active.
+    }
+  }
+
+  function startRinging() {
+    stopRinging();
+    root.classList.add("is-ringing");
+    navigator.vibrate?.([250, 120, 250]);
+    ringOnce();
+    ringTimer = window.setInterval(ringOnce, 1800);
+  }
+
+  function stopRinging() {
+    root.classList.remove("is-ringing");
+    navigator.vibrate?.(0);
+    window.clearInterval(ringTimer);
+    ringTimer = null;
+  }
+
+  function setIncomingUi(event = null) {
+    const active = Boolean(event);
+    if (incomingPanel) incomingPanel.hidden = !active;
+    if (incomingCaller && active) incomingCaller.textContent = event.name || event.from || "Неизвестный номер";
+    if (submitButton) submitButton.disabled = active || inCall;
+    if (!active) stopRinging();
+  }
 
   const loadScript = (src) =>
     new Promise((resolve, reject) => {
@@ -282,19 +331,28 @@
     sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
     sip.on("accepted", () => {
       inCall = true;
+      setIncomingUi(null);
       setStatus("Разговор идёт", "ok");
       setCallUi(true);
     });
     sip.on("incoming", (event) => {
+      inCall = true;
+      panel.hidden = false;
+      toggle.setAttribute("aria-expanded", "true");
+      setIncomingUi(event || {});
+      startRinging();
+      window.requestAnimationFrame(alignPanel);
       setStatus(`Входящий: ${event?.name || event?.from || "неизвестный"}`, "pending");
     });
     sip.on("ended", () => {
       inCall = false;
+      setIncomingUi(null);
       setStatus("Звонок завершён", "ready");
       setCallUi(false);
     });
     sip.on("failed", (event) => {
       inCall = false;
+      setIncomingUi(null);
       setStatus(`Звонок не состоялся: ${event?.cause || "ошибка"}`, "error");
       setCallUi(false);
     });
@@ -302,7 +360,7 @@
 
   function setCallUi(active) {
     if (hangupButton) hangupButton.hidden = !active;
-    if (submitButton) submitButton.disabled = active;
+    if (submitButton) submitButton.disabled = active || (incomingPanel && !incomingPanel.hidden);
   }
 
   function ensureSoftphone() {
@@ -319,7 +377,7 @@
       }
       fillProviders();
       await loadScript("/static/jssip.min.js?v=1");
-      await loadScript("/static/installer-softphone.js?v=3");
+      await loadScript("/static/installer-softphone.js?v=4");
       const sip = window.UposSoftphone;
       if (!sip || !sip.available()) {
         setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");
@@ -364,8 +422,25 @@
   hangupButton?.addEventListener("click", () => {
     window.UposSoftphone?.hangup();
     inCall = false;
+    setIncomingUi(null);
     setCallUi(false);
     setStatus("Звонок завершён", "ready");
+  });
+
+  answerButton?.addEventListener("click", () => {
+    if (!window.UposSoftphone?.answer()) return;
+    setIncomingUi(null);
+    setCallUi(true);
+    setStatus("Соединяю разговор…", "pending");
+  });
+
+  rejectButton?.addEventListener("click", () => {
+    if (typeof window.UposSoftphone?.reject === "function") window.UposSoftphone.reject();
+    else window.UposSoftphone?.hangup();
+    inCall = false;
+    setIncomingUi(null);
+    setCallUi(false);
+    setStatus("Входящий звонок отклонён", "ready");
   });
 
   /* ── Набор номера ──────────────────────────────────────────────────── */
@@ -425,4 +500,9 @@
       if (!inCall) submitButton?.removeAttribute("disabled");
     }
   });
+
+  // A receiver must be registered before the first call arrives, not after the panel is opened.
+  window.setTimeout(() => {
+    ensureSoftphone();
+  }, 300);
 })();

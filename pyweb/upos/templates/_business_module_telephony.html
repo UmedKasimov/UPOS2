@@ -485,6 +485,10 @@
                     data-provider-host="{{ row.host or '' }}"
                     data-provider-port="{{ row.port or '5060' }}"
                     data-provider-login="{{ row.login or row.account or '' }}"
+                    data-provider-auth-id="{{ row.auth_id or row.login or row.account or '' }}"
+                    data-provider-realm="{{ row.realm or '' }}"
+                    data-provider-registrar-server="{{ row.registrar_server or '' }}"
+                    data-provider-ws-url="{{ row.ws_url or '' }}"
                     data-provider-has-password="{{ '1' if row.has_password else '0' }}"
                     data-provider-codec="{{ row.codec or 'G711' }}"
                     data-provider-transport="{{ row.transport or 'UDP' }}"
@@ -521,6 +525,7 @@
           <label><span>SIP-сервер*</span><input name="host" required placeholder="sip.example.com" /></label>
           <label><span>Порт</span><input name="port" inputmode="numeric" value="5060" /></label>
           <label><span>Логин*</span><input name="login" required autocomplete="username" /></label>
+          <label><span>Логин авторизации</span><input name="auth_id" autocomplete="username" placeholder="Обычно совпадает с логином" /></label>
           <label>
             <span>Пароль*</span>
             <span class="telephony-password-wrap">
@@ -534,6 +539,9 @@
             </span>
             <small data-telephony-provider-password-help>Обязателен для подключения телефона.</small>
           </label>
+          <label class="wide"><span>WebSocket WSS</span><input name="ws_url" type="url" placeholder="wss://pbx.example.com:8089/ws" /></label>
+          <label><span>SIP realm</span><input name="realm" placeholder="Например: asterisk" /></label>
+          <label><span>Registrar</span><input name="registrar_server" placeholder="sip:pbx.example.com" /></label>
           <label>
             <span>Кодек</span>
             <select name="codec">
@@ -548,6 +556,7 @@
               <option value="UDP">UDP</option>
               <option value="TCP">TCP</option>
               <option value="TLS">TLS</option>
+              <option value="WSS">WSS / WebRTC</option>
             </select>
           </label>
           <label><span>Сотрудник по умолчанию</span><input name="employee" list="telephony-responsible-list" /></label>

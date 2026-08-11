@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=634" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=635" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -370,6 +370,14 @@
           </label>
           <button class="btn" type="submit">Позвонить</button>
         </form>
+        <section class="upos-floating-phone-incoming" data-floating-phone-incoming hidden aria-live="assertive">
+          <span>Входящий звонок</span>
+          <strong data-floating-phone-caller>Неизвестный номер</strong>
+          <div class="upos-floating-phone-incoming-actions">
+            <button class="btn" type="button" data-floating-phone-answer>Ответить</button>
+            <button class="btn btn-secondary" type="button" data-floating-phone-reject>Отклонить</button>
+          </div>
+        </section>
         {# Разговор идёт в самом браузере, поэтому нужен приёмник звука и
            кнопка отбоя — раньше вызов только уходил в десктопное приложение. #}
         <button class="btn btn-secondary upos-floating-phone-hangup" type="button" data-floating-phone-hangup hidden>Завершить</button>
@@ -404,7 +412,7 @@
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
     <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=8" defer></script>
     {% if user %}
-    <script src="{{ url_for('static', path='floating-phone.js') }}?v=4" defer></script>
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

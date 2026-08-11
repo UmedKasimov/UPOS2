@@ -28801,6 +28801,55 @@ body.upos-table-column-resizing * {
   display: none;
 }
 
+.upos-floating-phone.is-ringing .upos-floating-phone-toggle {
+  background: #16a34a;
+  box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.16), 0 18px 34px rgba(22, 163, 74, 0.32);
+  animation: upos-phone-ring 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes upos-phone-ring {
+  from { transform: rotate(-4deg); }
+  to { transform: rotate(4deg); }
+}
+
+.upos-floating-phone-incoming {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid #86efac;
+  border-radius: var(--workbench-radius-sm, 10px);
+  padding: 10px;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.upos-floating-phone-incoming[hidden] {
+  display: none;
+}
+
+.upos-floating-phone-incoming > span {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.upos-floating-phone-incoming > strong {
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upos-floating-phone-incoming-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.upos-floating-phone-incoming-actions .btn {
+  min-width: 0;
+}
+
 #upos-floating-phone-audio {
   display: none;
 }

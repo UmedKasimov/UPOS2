@@ -9027,20 +9027,18 @@ def create_app() -> FastAPI:
         if not wid:
             return _installer_api_error("Нужно войти заново", 401)
         data = load_workspace_settings(wid)
-        provider_ws = {}
-        for provider in data.get("telephony_providers") or []:
-            if isinstance(provider, dict):
-                provider_ws[str(provider.get("id") or "")] = str(provider.get("ws_url") or "")
         accounts = []
         for account in _telephony_sip_accounts_for_softphone(data):
             host = str(account.get("host") or "")
-            ws_url = _installer_sip_ws_url(host, provider_ws.get(str(account.get("provider_id") or "")))
+            ws_url = str(account.get("ws_url") or "") or _installer_sip_ws_url(host, "")
             accounts.append(
                 {
                     "id": account.get("id"),
                     "label": account.get("label"),
                     "extension": account.get("extension"),
                     "auth_id": account.get("auth_id") or account.get("extension"),
+                    "realm": account.get("realm"),
+                    "registrar_server": account.get("registrar_server"),
                     "password": account.get("password"),
                     "server": account.get("server"),
                     "host": host,
@@ -9049,6 +9047,7 @@ def create_app() -> FastAPI:
                     "display_name": account.get("display_name") or account.get("label"),
                     "ws_url": ws_url,
                     "sip_uri": f"sip:{account.get('extension')}@{host}" if host else "",
+                    "register_expires": account.get("expire_time") or 300,
                 }
             )
         return JSONResponse({"ok": True, "accounts": accounts})
@@ -17123,6 +17122,8 @@ def create_app() -> FastAPI:
                     "port": str(port),
                     "extension": login,
                     "auth_id": str(provider.get("auth_id") or login).strip(),
+                    "realm": str(provider.get("realm") or "").strip(),
+                    "registrar_server": str(provider.get("registrar_server") or "").strip(),
                     "password": password,
                     "display_name": str(provider.get("display_name") or provider.get("employee") or name or login).strip(),
                     "transport": str(provider.get("transport") or "UDP").strip().upper() or "UDP",
@@ -17131,6 +17132,7 @@ def create_app() -> FastAPI:
                     "label": name or f"Account {login}",
                     "codec": str(provider.get("codec") or "G711").strip(),
                     "status": str(provider.get("status") or "").strip(),
+                    "ws_url": _installer_sip_ws_url(host, str(provider.get("ws_url") or "")),
                 }
             )
         return accounts
@@ -17148,11 +17150,6 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         assert wid is not None
         data = load_workspace_settings(wid)
-        provider_ws = {
-            str(provider.get("id") or ""): str(provider.get("ws_url") or "")
-            for provider in (data.get("telephony_providers") or [])
-            if isinstance(provider, dict)
-        }
         accounts = []
         for account in _telephony_sip_accounts_for_softphone(data):
             host = str(account.get("host") or "")
@@ -17164,11 +17161,14 @@ def create_app() -> FastAPI:
                     "label": account.get("label"),
                     "extension": account.get("extension"),
                     "auth_id": account.get("auth_id") or account.get("extension"),
+                    "realm": account.get("realm"),
+                    "registrar_server": account.get("registrar_server"),
                     "password": account.get("password"),
                     "host": host,
                     "display_name": account.get("display_name") or account.get("label"),
-                    "ws_url": _installer_sip_ws_url(host, provider_ws.get(str(account.get("provider_id") or ""))),
+                    "ws_url": account.get("ws_url") or _installer_sip_ws_url(host, ""),
                     "sip_uri": f"sip:{account.get('extension')}@{host}",
+                    "register_expires": account.get("expire_time") or 300,
                 }
             )
         return JSONResponse({"ok": True, "accounts": accounts})
@@ -19066,6 +19066,9 @@ def create_app() -> FastAPI:
             "endpoint": endpoint,
             "login": login,
             "account": login,
+            "auth_id": str(form.get("auth_id") or login).strip(),
+            "realm": str(form.get("realm") or "").strip(),
+            "registrar_server": str(form.get("registrar_server") or "").strip(),
             "password": password,
             "codec": str(form.get("codec") or "G711").strip(),
             "transport": str(form.get("transport") or "UDP").strip().upper(),
@@ -19077,7 +19080,17 @@ def create_app() -> FastAPI:
             "created_at": existing.get("created_at") or datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        connection_fields = ("host", "port", "login", "password", "transport")
+        connection_fields = (
+            "host",
+            "port",
+            "login",
+            "auth_id",
+            "realm",
+            "registrar_server",
+            "password",
+            "transport",
+            "ws_url",
+        )
         connection_changed = not existing or any(
             str(existing.get(key) or "") != str(updated.get(key) or "") for key in connection_fields
         )

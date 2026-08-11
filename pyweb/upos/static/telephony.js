@@ -535,6 +535,10 @@
       setProviderField("host", data.providerHost);
       setProviderField("port", data.providerPort || "5060");
       setProviderField("login", data.providerLogin);
+      setProviderField("auth_id", data.providerAuthId || data.providerLogin);
+      setProviderField("realm", data.providerRealm);
+      setProviderField("registrar_server", data.providerRegistrarServer);
+      setProviderField("ws_url", data.providerWsUrl);
       setProviderField("password", "");
       setProviderField("codec", data.providerCodec || "G711");
       setProviderField("transport", data.providerTransport || "UDP");
