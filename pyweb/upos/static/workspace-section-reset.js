@@ -11,7 +11,7 @@
     { path: "/sales", keys: ["upos.sales.openTabs"] },
     {
       path: "/finance",
-      keys: [],
+      keys: ["upos.finance.openTabs"],
       allowedPaths: ["/finance", "/schet", "/kassa", "/earnings"],
       lastUrlKey: "upos.finance.lastUrl",
     },

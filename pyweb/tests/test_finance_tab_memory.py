@@ -19,11 +19,21 @@ class FinanceTabMemoryTests(unittest.TestCase):
         self.assertIn('window.location.replace(target.pathname + target.search + target.hash)', template)
         self.assertIn('["/schet", "/kassa", "/earnings"]', template)
 
-    def test_finance_home_and_close_are_explicit_actions(self):
+    def test_finance_tabs_use_a_persistent_open_tab_list(self):
         template = (ROOT / "upos" / "templates" / "_finance_module_tabs.html").read_text(encoding="utf-8")
+        script = (ROOT / "upos" / "static" / "finance-tabs.js").read_text(encoding="utf-8")
 
         self.assertIn("?finance_home=1", template)
-        self.assertIn("?finance_reset=1", template)
+        self.assertIn("data-finance-tabs", template)
+        self.assertIn('const storageKey = "upos.finance.openTabs"', script)
+        self.assertIn("return { openTabs: [...allowed], activeTab: currentTab }", script)
+        self.assertIn("openTabs: [...state.openTabs, currentTab]", script)
+        self.assertIn("const closeTab = (tabId)", script)
+
+    def test_finance_home_renders_the_same_persistent_tab_bar(self):
+        template = (ROOT / "upos" / "templates" / "home_finance.html").read_text(encoding="utf-8")
+
+        self.assertIn('{% include "_finance_module_tabs.html" %}', template)
 
 
 if __name__ == "__main__":

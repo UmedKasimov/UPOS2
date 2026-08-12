@@ -1,21 +1,41 @@
-{#
-  Полоса вкладок для страниц раздела «Финансы».
-
-  Разделы финансов — отдельные страницы, а не view внутри одного модуля, поэтому
-  вкладку текущего раздела рисуем по active, а не по списку открытых вкладок.
-#}
+{% set emp_perms = user.get('employee_permissions') or {} %}
+{% set can_account = not user.get('is_employee') or emp_perms.get('schet') %}
+{% set can_kassa = not user.get('is_employee') or emp_perms.get('kassa') %}
+{% set can_earnings = not user.get('is_employee') or emp_perms.get('earnings') %}
 {% set finance_tab_titles = {
   'home_account': _('nav.account'),
   'home_kassa': _('nav.kassa'),
   'home_earnings': 'Заработок',
 } %}
 {% set finance_tab_title = finance_tab_titles.get(active) %}
-<nav class="general-module-tabs workbench-open-tabs" aria-label="Открытые вкладки финансов">
-  <a class="general-module-tab" href="{{ url_for('home_finance') }}?finance_home=1">Финансы</a>
+<nav
+  class="general-module-tabs workbench-open-tabs"
+  aria-label="Открытые вкладки финансов"
+  data-finance-tabs
+  data-finance-current="{{ active if finance_tab_title else '' }}"
+  data-finance-allowed="{% if can_account %}home_account,{% endif %}{% if can_kassa %}home_kassa,{% endif %}{% if can_earnings %}home_earnings{% endif %}"
+  data-finance-account-title="{{ _('nav.account') }}"
+  data-finance-account-url="{{ url_for('home_schet') }}"
+  data-finance-kassa-title="{{ _('nav.kassa') }}"
+  data-finance-kassa-url="{{ url_for('home_kassa') }}"
+  data-finance-earnings-title="Заработок"
+  data-finance-earnings-url="{{ url_for('home_earnings') }}"
+>
+  <a
+    class="general-module-tab{% if not finance_tab_title %} active{% endif %}"
+    href="{{ url_for('home_finance') }}?finance_home=1"
+    data-finance-home-tab
+    {% if not finance_tab_title %}aria-current="page"{% endif %}
+  >Финансы</a>
   {% if finance_tab_title %}
-    <span class="general-module-tab general-module-tab--report active">
-      <button type="button" class="general-module-tab-activate" aria-current="page">{{ finance_tab_title }}</button>
-      <a class="general-module-tab-close" href="{{ url_for('home_finance') }}?finance_reset=1" aria-label="Закрыть {{ finance_tab_title }}">×</a>
+    <span class="general-module-tab general-module-tab--report active" data-finance-open-tab="{{ active }}">
+      <a
+        class="general-module-tab-activate"
+        href="{% if active == 'home_account' %}{{ url_for('home_schet') }}{% elif active == 'home_kassa' %}{{ url_for('home_kassa') }}{% else %}{{ url_for('home_earnings') }}{% endif %}"
+        aria-current="page"
+      >{{ finance_tab_title }}</a>
+      <button type="button" class="general-module-tab-close" data-finance-close-tab="{{ active }}" aria-label="Закрыть {{ finance_tab_title }}">×</button>
     </span>
   {% endif %}
 </nav>
+<script src="{{ url_for('static', path='finance-tabs.js') }}?v=1"></script>

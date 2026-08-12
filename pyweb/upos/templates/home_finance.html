@@ -37,9 +37,7 @@
 {% block main %}
   {% set emp_perms = user.get('employee_permissions') or {} %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
-    <nav class="general-module-tabs workbench-open-tabs" aria-label="Открытые вкладки финансов">
-      <button type="button" class="general-module-tab active" aria-current="page">Финансы</button>
-    </nav>
+    {% include "_finance_module_tabs.html" %}
 
     <section class="general-report-launcher workbench-launcher" aria-label="Разделы финансов">
       {% if not user.get('is_employee') or emp_perms.get('schet') %}
