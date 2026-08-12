@@ -78,10 +78,9 @@
   function rememberCurrentSection() {
     routes.forEach((route) => {
       if (!route.lastUrlKey || !routeAllowsPath(route, window.location.pathname)) return;
-      if (window.location.pathname === route.path) {
-        localStorage.removeItem(route.lastUrlKey);
-        return;
-      }
+      // Стартовая страница модуля не должна стирать последнюю рабочую вкладку.
+      // Память очищается только явной кнопкой закрытия самой вкладки.
+      if (window.location.pathname === route.path) return;
       localStorage.setItem(
         route.lastUrlKey,
         `${window.location.pathname}${window.location.search}${window.location.hash}`

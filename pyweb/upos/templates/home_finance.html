@@ -1,6 +1,32 @@
 {% extends "base.html" %}
 {% block title %}Финансы · UPOS FINANCE{% endblock %}
 
+{% block extra_head %}
+  <script>
+    (function () {
+      var key = "upos.finance.lastUrl";
+      var query = new URLSearchParams(window.location.search);
+      if (query.has("finance_reset")) {
+        try { localStorage.removeItem(key); } catch (error) {}
+        window.history.replaceState(null, "", "/finance");
+        return;
+      }
+      // Вкладка «Финансы» открывает лаунчер намеренно. Переход из бокового
+      // меню приходит без этого флага и сразу возвращает рабочую вкладку.
+      if (query.has("finance_home")) return;
+      try {
+        var saved = localStorage.getItem(key) || "";
+        if (!saved) return;
+        var target = new URL(saved, window.location.origin);
+        var allowed = ["/schet", "/kassa", "/earnings"];
+        if (target.origin === window.location.origin && allowed.indexOf(target.pathname) !== -1) {
+          window.location.replace(target.pathname + target.search + target.hash);
+        }
+      } catch (error) {}
+    })();
+  </script>
+{% endblock %}
+
 {% block page_header %}
   <div class="general-page-header">
     <span class="general-page-kicker">{{ user.get('active_organization_name') or _('workspace.default_name') }}</span>
