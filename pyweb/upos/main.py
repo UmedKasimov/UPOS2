@@ -9052,6 +9052,59 @@ def create_app() -> FastAPI:
             )
         return JSONResponse({"ok": True, "accounts": accounts})
 
+    @app.post("/api/installer/sip/diagnostics", name="installer_sip_diagnostics_api")
+    async def installer_sip_diagnostics_api(request: Request):
+        """Stores a short, password-free trail of mobile WebRTC call states."""
+        if not _installer_csrf_valid(request):
+            return _installer_api_error("Форма устарела. Обновите страницу.", 403)
+        wid, installer_user_id, _can_manage = _installer_request_scope(request)
+        if not wid:
+            return _installer_api_error("Нужно войти заново", 401)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        raw_events = body.get("events") if isinstance(body, dict) else []
+        events = raw_events if isinstance(raw_events, list) else []
+        user = request.session.get("user") or {}
+        actor_id = installer_user_id or _session_user_id(user)
+        clean_events: list[dict[str, Any]] = []
+        allowed = {
+            "audio_unlocked", "microphone_ready", "microphone_failed", "registered",
+            "registration_failed", "websocket_disconnected", "outgoing_call",
+            "peer_connection", "ice_connection", "remote_audio_playing", "remote_audio_blocked",
+        }
+        for raw in events[:30]:
+            if not isinstance(raw, dict):
+                continue
+            event_name = str(raw.get("event") or "").strip()[:50]
+            if event_name not in allowed:
+                continue
+            detail = raw.get("detail") if isinstance(raw.get("detail"), dict) else {}
+            clean_events.append({
+                "event": event_name,
+                "detail": {str(k)[:40]: str(v)[:240] for k, v in detail.items()},
+                "extension": str(raw.get("extension") or "")[:40],
+                "online": bool(raw.get("online", True)),
+                "user_agent": str(raw.get("userAgent") or "")[:300],
+                "at": str(raw.get("at") or datetime.now(timezone.utc).isoformat())[:60],
+            })
+        if clean_events:
+            settings = load_workspace_settings(wid)
+            stored = settings.get("installer_sip_diagnostics")
+            diagnostics = stored if isinstance(stored, list) else []
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for event in clean_events:
+                event.update({
+                    "id": str(uuid.uuid4()),
+                    "user_id": actor_id,
+                    "user_name": str(user.get("name") or user.get("username") or "")[:120],
+                    "received_at": now_iso,
+                })
+            settings["installer_sip_diagnostics"] = (clean_events + diagnostics)[:300]
+            save_workspace_settings(wid, settings)
+        return JSONResponse({"ok": True, "saved": len(clean_events)})
+
     @app.get("/api/installer/phonebook", name="installer_phonebook_api")
     def installer_phonebook_api(request: Request):
         """Клиентская телефонная книга организации и последние звонки сотрудника."""

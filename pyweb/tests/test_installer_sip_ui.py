@@ -30,6 +30,9 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("el.srcObject = remoteStream", script)
         self.assertIn("setSpeaker(enabled)", script)
         self.assertIn("resumeRemoteAudio()", script)
+        self.assertIn("unlockAudio()", script)
+        self.assertIn("window.AudioContext || window.webkitAudioContext", script)
+        self.assertIn('diagnostic("remote_audio_playing"', script)
 
     def test_installer_has_modal_call_experience(self):
         template = (ROOT / "upos" / "templates" / "installer.html").read_text(encoding="utf-8")
@@ -41,6 +44,25 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("callScreen.showModal()", script)
         self.assertIn('sip.on("audioPlaying"', script)
         self.assertIn('document.getElementById("installer-call-speaker")', script)
+
+    def test_installer_remembers_sip_account_and_reports_diagnostics(self):
+        script = (ROOT / "upos" / "static" / "installer.js").read_text(encoding="utf-8")
+
+        self.assertIn('const SIP_ACCOUNT_STORAGE_KEY = "upos.installer.sipAccount"', script)
+        self.assertIn('/api/installer/sip/diagnostics', script)
+        self.assertIn('await sip.unlockAudio?.()', script)
+
+    def test_pwa_cache_uses_current_installer_assets(self):
+        template = (ROOT / "upos" / "templates" / "installer.html").read_text(encoding="utf-8")
+        service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
+
+        for asset in (
+            "/static/installer.css?v=25",
+            "/static/installer.js?v=25",
+            "/static/installer-softphone.js?v=5",
+        ):
+            self.assertIn(asset, template)
+            self.assertIn(asset, service_worker)
 
 
 if __name__ == "__main__":

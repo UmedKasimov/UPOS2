@@ -715,6 +715,9 @@
   let callLogId = "";
   let activeCall = null;
   let callCloseTimer = null;
+  let sipDiagnosticQueue = [];
+  let sipDiagnosticTimer = null;
+  const SIP_ACCOUNT_STORAGE_KEY = "upos.installer.sipAccount";
 
   function dialInput() {
     return document.getElementById("installer-dial-number");
@@ -735,6 +738,41 @@
     const node = document.getElementById("installer-call-state");
     if (node) node.textContent = text;
     if (callScreen && phase) callScreen.dataset.phase = phase;
+  }
+
+  function preferredSipAccount(accounts) {
+    let savedId = "";
+    try {
+      savedId = window.localStorage.getItem(SIP_ACCOUNT_STORAGE_KEY) || "";
+    } catch (_error) {
+      // Storage may be unavailable in private browser sessions.
+    }
+    return accounts.find((account) => String(account.id || "") === savedId)
+      || accounts.find((account) => String(account.extension || "").trim() === "210")
+      || accounts[0]
+      || null;
+  }
+
+  function queueSipDiagnostic(payload) {
+    sipDiagnosticQueue.push({
+      ...payload,
+      online: navigator.onLine,
+      userAgent: navigator.userAgent,
+      at: new Date().toISOString(),
+    });
+    window.clearTimeout(sipDiagnosticTimer);
+    sipDiagnosticTimer = window.setTimeout(async () => {
+      const events = sipDiagnosticQueue.splice(0, sipDiagnosticQueue.length);
+      if (!events.length) return;
+      try {
+        await apiRequest("/api/installer/sip/diagnostics", {
+          method: "POST",
+          body: JSON.stringify({events}),
+        });
+      } catch (_error) {
+        // Diagnostics never block calling.
+      }
+    }, 250);
   }
 
   function setCallAudioState(text, state) {
@@ -839,6 +877,9 @@
     if (callButton) callButton.disabled = true;
     openCallScreen(name, clean, false);
     try {
+      // iOS and Android allow media playback reliably only while handling the
+      // original tap. Unlock the remote audio element before async SIP work.
+      await sip.unlockAudio?.();
       setSipHint("Разрешите доступ к микрофону…");
       setCallState("Проверяем микрофон…", "preparing");
       await sip.prepareAudio();
@@ -1007,6 +1048,7 @@
       if (state === "failed") setCallAudioState("Ошибка голосового канала", "failed");
       if (state === "disconnected") setCallAudioState("Восстанавливаем голос…", "waiting");
     });
+    sip.on("diagnostic", (detail) => queueSipDiagnostic(detail || {}));
   }
 
   async function loadSipAccounts() {
@@ -1024,8 +1066,13 @@
       select.innerHTML = sipAccounts
         .map((acc) => `<option value="${escapeHtml(acc.id || "")}">${escapeHtml(acc.label || acc.extension || "Аккаунт")} · ${escapeHtml(acc.server || "")}</option>`)
         .join("");
+      const preferred = preferredSipAccount(sipAccounts);
+      if (preferred) select.value = String(preferred.id || "");
       // Пытаемся зарегистрировать выбранный аккаунт на SIP-сервере.
-      registerSelectedAccount();
+      const activeAccountId = String(window.InstallerSoftphone?.account()?.id || "");
+      if (!window.InstallerSoftphone?.isRegistered() || activeAccountId !== String(preferred?.id || "")) {
+        registerSelectedAccount();
+      }
     } catch (error) {
       select.innerHTML = '<option value="">SIP недоступен</option>';
       dot?.classList.remove("is-online");
@@ -1064,7 +1111,14 @@
     hint.hidden = !text;
   }
 
-  document.getElementById("installer-sip-account")?.addEventListener("change", registerSelectedAccount);
+  document.getElementById("installer-sip-account")?.addEventListener("change", (event) => {
+    try {
+      window.localStorage.setItem(SIP_ACCOUNT_STORAGE_KEY, String(event.currentTarget.value || ""));
+    } catch (_error) {
+      // Calling still works when storage is blocked.
+    }
+    registerSelectedAccount();
+  });
 
   async function openPhonebook() {
     closeInstallerMenu();

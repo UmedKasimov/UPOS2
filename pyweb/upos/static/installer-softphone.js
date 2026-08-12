@@ -23,11 +23,21 @@
   let microphoneStream = null;
   let remoteStream = null;
   let speakerEnabled = true;
+  let audioContext = null;
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
   // входящего звука у них разный, поэтому он настраивается.
   let audioElementId = "installer-call-audio";
 
   const audio = () => document.getElementById(audioElementId);
+
+  function diagnostic(event, detail) {
+    emit("diagnostic", {
+      event,
+      detail: detail || {},
+      accountId: String((account && account.id) || ""),
+      extension: String((account && account.extension) || ""),
+    });
+  }
 
   function liveMicrophoneStream() {
     if (!microphoneStream) return null;
@@ -68,11 +78,41 @@
     try {
       await el.play();
       emit("audioPlaying", {tracks: tracks.length});
+      diagnostic("remote_audio_playing", {tracks: tracks.length});
       return true;
     } catch (error) {
       emit("audioBlocked", {error});
+      diagnostic("remote_audio_blocked", {name: error && error.name, message: error && error.message});
       return false;
     }
+  }
+
+  async function unlockRemoteAudio() {
+    const el = audio();
+    if (!el) return false;
+    el.playsInline = true;
+    el.autoplay = true;
+    el.muted = true;
+    let contextState = "unavailable";
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      try {
+        if (!audioContext) audioContext = new AudioContextClass();
+        if (audioContext.state === "suspended") await audioContext.resume();
+        contextState = audioContext.state;
+      } catch (_error) {
+        contextState = "blocked";
+      }
+    }
+    try {
+      await el.play();
+    } catch (_error) {
+      // A silent element without a source may still reject; the user gesture was
+      // nevertheless consumed and the real stream will retry through playRemoteAudio().
+    }
+    el.muted = !speakerEnabled;
+    diagnostic("audio_unlocked", {contextState});
+    return true;
   }
 
   function addRemoteTrack(track) {
@@ -104,10 +144,12 @@
     pc.addEventListener("track", attachRemoteAudio);
     pc.addEventListener("connectionstatechange", () => {
       emit("connectionState", {state: pc.connectionState || ""});
+      diagnostic("peer_connection", {state: pc.connectionState || ""});
       if (pc.connectionState === "connected") attachRemoteAudio();
     });
     pc.addEventListener("iceconnectionstatechange", () => {
       emit("iceState", {state: pc.iceConnectionState || ""});
+      diagnostic("ice_connection", {state: pc.iceConnectionState || ""});
     });
     attachRemoteAudio();
   }
@@ -195,12 +237,20 @@
           video: false,
         });
         emit("microphoneReady", {});
+        diagnostic("microphone_ready", {
+          tracks: microphoneStream.getAudioTracks().length,
+        });
         return microphoneStream;
       } catch (error) {
         if (error && !error.code) error.code = "microphone_denied";
         emit("microphoneFailed", {error});
+        diagnostic("microphone_failed", {name: error && error.name, message: error && error.message});
         throw error;
       }
+    },
+
+    unlockAudio() {
+      return unlockRemoteAudio();
     },
 
     // Подключение к SIP-серверу по данным аккаунта из /api/installer/sip.
@@ -243,6 +293,7 @@
           ua.on("registered", () => {
             registered = true;
             emit("registered", {account: acc});
+            diagnostic("registered", {wsUrl: acc.ws_url, host: acc.host});
             settle(resolve);
           });
           ua.on("registrationFailed", (e) => {
@@ -254,6 +305,7 @@
               reasonPhrase: (response && response.reason_phrase) || "",
             };
             emit("registrationFailed", detail);
+            diagnostic("registration_failed", detail);
             const error = new Error(detail.cause);
             error.statusCode = detail.statusCode;
             error.reasonPhrase = detail.reasonPhrase;
@@ -262,6 +314,7 @@
           ua.on("disconnected", () => {
             registered = false;
             emit("disconnected", {});
+            diagnostic("websocket_disconnected", {});
             settle(reject, new Error("disconnected"));
           });
           ua.on("newRTCSession", (data) => {
@@ -304,6 +357,7 @@
       };
       const newSession = ua.call(target, options);
       wireSession(newSession, "outgoing");
+      diagnostic("outgoing_call", {});
       attachRemoteAudio();
       return true;
     },
