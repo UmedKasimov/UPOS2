@@ -717,6 +717,7 @@
   let callCloseTimer = null;
   let sipDiagnosticQueue = [];
   let sipDiagnosticTimer = null;
+  let sipAccountsLoadPromise = null;
   const SIP_ACCOUNT_STORAGE_KEY = "upos.installer.sipAccount";
 
   function dialInput() {
@@ -747,8 +748,10 @@
     } catch (_error) {
       // Storage may be unavailable in private browser sessions.
     }
-    return accounts.find((account) => String(account.id || "") === savedId)
-      || accounts.find((account) => String(account.extension || "").trim() === "210")
+    const activeId = String(window.InstallerSoftphone?.account()?.id || "");
+    return accounts.find((account) => String(account.extension || "").trim() === "210")
+      || accounts.find((account) => activeId && String(account.id || "") === activeId)
+      || accounts.find((account) => String(account.id || "") === savedId)
       || accounts[0]
       || null;
   }
@@ -884,7 +887,8 @@
       setSipHint("Разрешите доступ к микрофону…");
       setCallState("Проверяем микрофон…", "preparing");
       await sip.prepareAudio();
-      if (!sip.isRegistered()) {
+      const registeredAccountId = String(sip.account()?.id || "");
+      if (!sip.isRegistered() || registeredAccountId !== String(account.id || "")) {
         setSipHint("Подключение к SIP MySputnik…");
         setCallState("Подключаем SIP MySputnik…", "connecting");
         await sip.connect(account);
@@ -1056,10 +1060,30 @@
       if (state === "failed") setCallAudioState("Ошибка голосового канала", "failed");
       if (state === "disconnected") setCallAudioState("Восстанавливаем голос…", "waiting");
     });
+    sip.on("noResponse", () => {
+      setCallState("АТС не ответила на вызов", "failed");
+      setCallAudioState("Проверьте SIP-маршрут исходящих звонков", "failed");
+      showToast("MySputnik не ответил на SIP-вызов за 15 секунд", true);
+    });
+    sip.on("transportLost", () => {
+      setCallState("SIP-соединение прервано", "failed");
+      setCallAudioState("Переподключаемся к MySputnik", "failed");
+      showToast("Связь с SIP-сервером прервалась. Повторите звонок.", true);
+    });
     sip.on("diagnostic", (detail) => queueSipDiagnostic(detail || {}));
   }
 
   async function loadSipAccounts() {
+    if (sipAccountsLoadPromise) return sipAccountsLoadPromise;
+    sipAccountsLoadPromise = loadSipAccountsOnce();
+    try {
+      return await sipAccountsLoadPromise;
+    } finally {
+      sipAccountsLoadPromise = null;
+    }
+  }
+
+  async function loadSipAccountsOnce() {
     const select = document.getElementById("installer-sip-account");
     const dot = document.getElementById("installer-sip-dot");
     if (!select) return;
@@ -1078,8 +1102,9 @@
       if (preferred) select.value = String(preferred.id || "");
       // Пытаемся зарегистрировать выбранный аккаунт на SIP-сервере.
       const activeAccountId = String(window.InstallerSoftphone?.account()?.id || "");
-      if (!window.InstallerSoftphone?.isRegistered() || activeAccountId !== String(preferred?.id || "")) {
-        registerSelectedAccount();
+      if (!window.InstallerSoftphone?.inCall()
+          && (!window.InstallerSoftphone?.isRegistered() || activeAccountId !== String(preferred?.id || ""))) {
+        await registerSelectedAccount();
       }
     } catch (error) {
       select.innerHTML = '<option value="">SIP недоступен</option>';
@@ -1095,6 +1120,7 @@
       dot?.classList.remove("is-online");
       return Promise.resolve(false);
     }
+    if (sip.inCall()) return Promise.resolve(true);
     setSipHint("Подключение к SIP…");
     return sip.connect(account)
       .then(() => { dot?.classList.add("is-online"); setSipHint(""); return true; })
@@ -1120,6 +1146,12 @@
   }
 
   document.getElementById("installer-sip-account")?.addEventListener("change", (event) => {
+    const sip = window.InstallerSoftphone;
+    if (sip?.inCall()) {
+      event.currentTarget.value = String(sip.account()?.id || "");
+      showToast("Завершите текущий звонок перед сменой SIP-аккаунта", true);
+      return;
+    }
     try {
       window.localStorage.setItem(SIP_ACCOUNT_STORAGE_KEY, String(event.currentTarget.value || ""));
     } catch (_error) {

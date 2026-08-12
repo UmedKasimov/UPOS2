@@ -25,6 +25,7 @@
   let speakerEnabled = true;
   let audioContext = null;
   let ringback = null;
+  let responseTimer = null;
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
   // входящего звука у них разный, поэтому он настраивается.
   let audioElementId = "installer-call-audio";
@@ -72,6 +73,11 @@
       // The oscillator may already be stopped by the browser.
     }
     ringback = null;
+  }
+
+  function clearResponseTimer() {
+    window.clearTimeout(responseTimer);
+    responseTimer = null;
   }
 
   async function startRingback() {
@@ -125,7 +131,6 @@
       return true;
     }
     try {
-      stopRingback();
       await el.play();
       emit("audioPlaying", {tracks: tracks.length});
       diagnostic("remote_audio_playing", {tracks: tracks.length});
@@ -202,11 +207,12 @@
     attachRemoteAudio();
   }
 
-  function wireSession(newSession, direction) {
-    session = newSession;
-    remoteStream = null;
+  function createSessionHandlers(direction, lifecycle) {
+    const state = lifecycle || {responded: false};
     let accepted = false;
     const markAccepted = () => {
+      state.responded = true;
+      clearResponseTimer();
       stopRingback();
       attachRemoteAudio();
       if (accepted) return;
@@ -216,6 +222,8 @@
       window.setTimeout(attachRemoteAudio, 1000);
     };
     const finish = (event, detail) => {
+      state.responded = true;
+      clearResponseTimer();
       stopRingback();
       diagnostic(`session_${event}`, detail || {});
       emit(event, detail);
@@ -232,28 +240,38 @@
         reasonPhrase: (response && response.reason_phrase) || "",
       };
     };
-    session.on("connecting", () => {
-      diagnostic("session_connecting", {direction});
-      emit("sessionConnecting", {direction});
-    });
-    session.on("progress", (e) => {
-      const response = e && e.response;
-      const detail = {
-        direction,
-        statusCode: (response && response.status_code) || 0,
-        reasonPhrase: (response && response.reason_phrase) || "",
-      };
-      diagnostic("session_progress", detail);
-      emit("progress", detail);
-    });
-    session.on("accepted", markAccepted);
-    session.on("confirmed", markAccepted);
-    session.on("ended", (e) => finish("ended", resultDetail(e)));
-    session.on("failed", (e) => finish("failed", resultDetail(e)));
-    session.on("peerconnection", (e) => {
-      const pc = e && e.peerconnection;
-      wirePeerConnection(pc);
-    });
+    return {
+      connecting() {
+        diagnostic("session_connecting", {direction});
+        emit("sessionConnecting", {direction});
+      },
+      progress(e) {
+        state.responded = true;
+        clearResponseTimer();
+        const response = e && e.response;
+        const detail = {
+          direction,
+          statusCode: (response && response.status_code) || 0,
+          reasonPhrase: (response && response.reason_phrase) || "",
+        };
+        diagnostic("session_progress", detail);
+        emit("progress", detail);
+      },
+      accepted: markAccepted,
+      confirmed: markAccepted,
+      ended(e) { finish("ended", resultDetail(e)); },
+      failed(e) { finish("failed", resultDetail(e)); },
+      peerconnection(e) { wirePeerConnection(e && e.peerconnection); },
+    };
+  }
+
+  function wireSession(newSession, direction, existingHandlers) {
+    session = newSession;
+    remoteStream = null;
+    if (!existingHandlers) {
+      const handlers = createSessionHandlers(direction);
+      Object.entries(handlers).forEach(([event, handler]) => newSession.on(event, handler));
+    }
     wirePeerConnection(session.connection);
   }
 
@@ -328,6 +346,11 @@
       if (!acc || !acc.ws_url || !acc.sip_uri) return Promise.reject(new Error("no_ws"));
       if (ua && account && account.id === acc.id && registered) return Promise.resolve();
       if (connecting && connectingAccountId === String(acc.id || "")) return connecting;
+      if (session) {
+        const error = new Error("account_change_during_call");
+        error.code = "account_change_during_call";
+        return Promise.reject(error);
+      }
       // Пользователь уже разрешил микрофон жестом на кнопке «Позвонить».
       // При переподключении SIP сохраняем этот поток: повторный запрос после
       // асинхронной регистрации часто блокируется мобильными браузерами.
@@ -380,10 +403,28 @@
             error.reasonPhrase = detail.reasonPhrase;
             settle(reject, error);
           });
-          ua.on("disconnected", () => {
+          ua.on("disconnected", (e) => {
             registered = false;
-            emit("disconnected", {});
-            diagnostic("websocket_disconnected", {});
+            const detail = {
+              code: (e && (e.code || (e.socket && e.socket.code))) || 0,
+              reason: (e && (e.reason || e.data || (e.socket && e.socket.reason))) || "",
+              activeCall: Boolean(session),
+            };
+            emit("disconnected", detail);
+            diagnostic("websocket_disconnected", detail);
+            if (session && !(typeof session.isEstablished === "function" && session.isEstablished())) {
+              const interruptedSession = session;
+              clearResponseTimer();
+              stopRingback();
+              diagnostic("transport_lost", detail);
+              emit("transportLost", detail);
+              try { interruptedSession.terminate(); } catch (_error) { /* Session is already gone. */ }
+              if (session === interruptedSession) {
+                clearRemoteAudio();
+                releaseMicrophone();
+                session = null;
+              }
+            }
             settle(reject, new Error("disconnected"));
           });
           ua.on("newRTCSession", (data) => {
@@ -418,16 +459,27 @@
     call(number) {
       if (!ua || !registered) return false;
       const target = `sip:${String(number).replace(/[^\d+*#]/g, "")}@${account.host}`;
+      const lifecycle = {responded: false};
+      const handlers = createSessionHandlers("outgoing", lifecycle);
       const options = {
+        eventHandlers: handlers,
         mediaConstraints: {audio: true, video: false},
         mediaStream: liveMicrophoneStream() || undefined,
         // Совпадает с рабочим WebRTC-клиентом MySputnik: ICE определяет АТС.
         pcConfig: {},
       };
       const newSession = ua.call(target, options);
-      wireSession(newSession, "outgoing");
-      diagnostic("outgoing_call", {});
-      startRingback();
+      wireSession(newSession, "outgoing", handlers);
+      diagnostic("outgoing_call", {digits: String(number).replace(/\D/g, "").length});
+      void startRingback();
+      clearResponseTimer();
+      responseTimer = window.setTimeout(() => {
+        if (session !== newSession || lifecycle.responded) return;
+        diagnostic("session_no_response", {seconds: 15});
+        emit("noResponse", {});
+        try { newSession.terminate(); } catch (_error) { session = null; }
+        stopRingback();
+      }, 15000);
       attachRemoteAudio();
       return true;
     },
@@ -450,6 +502,7 @@
     },
 
     hangup() {
+      clearResponseTimer();
       stopRingback();
       if (session) { try { session.terminate(); } catch (_e) { /* уже завершён */ } session = null; }
     },

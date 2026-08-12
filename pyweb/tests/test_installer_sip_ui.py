@@ -35,7 +35,10 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("Never await play() on an empty element", script)
         self.assertIn('diagnostic("ringback_started"', script)
         self.assertIn('diagnostic(`session_${event}`', script)
+        self.assertIn('diagnostic("session_no_response"', script)
+        self.assertIn('diagnostic("transport_lost"', script)
         self.assertIn('diagnostic("remote_audio_playing"', script)
+        self.assertNotIn("stopRingback();\n      await el.play();", script)
 
     def test_installer_has_modal_call_experience(self):
         template = (ROOT / "upos" / "templates" / "installer.html").read_text(encoding="utf-8")
@@ -55,15 +58,18 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn('/api/installer/sip/diagnostics', script)
         self.assertIn('await sip.unlockAudio?.()', script)
         self.assertIn('event: "call_button_pressed"', script)
+        self.assertIn('registeredAccountId !== String(account.id || "")', script)
+        self.assertIn("if (sip.inCall()) return Promise.resolve(true);", script)
+        self.assertIn('String(account.extension || "").trim() === "210"', script)
 
     def test_pwa_cache_uses_current_installer_assets(self):
         template = (ROOT / "upos" / "templates" / "installer.html").read_text(encoding="utf-8")
         service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
 
         for asset in (
-            "/static/installer.css?v=26",
-            "/static/installer.js?v=26",
-            "/static/installer-softphone.js?v=6",
+            "/static/installer.css?v=27",
+            "/static/installer.js?v=27",
+            "/static/installer-softphone.js?v=7",
         ):
             self.assertIn(asset, template)
             self.assertIn(asset, service_worker)
