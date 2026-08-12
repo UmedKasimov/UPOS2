@@ -9073,6 +9073,9 @@ def create_app() -> FastAPI:
             "audio_unlocked", "microphone_ready", "microphone_failed", "registered",
             "registration_failed", "websocket_disconnected", "outgoing_call",
             "peer_connection", "ice_connection", "remote_audio_playing", "remote_audio_blocked",
+            "ringback_started", "ringback_failed", "session_connecting", "session_progress",
+            "session_ended", "session_failed",
+            "call_button_pressed", "call_preflight_failed",
         }
         for raw in events[:30]:
             if not isinstance(raw, dict):

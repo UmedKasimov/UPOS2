@@ -861,6 +861,7 @@
 
   async function placeCall(number, name) {
     const clean = String(number || "").replace(/[^\d+*#]/g, "");
+    queueSipDiagnostic({event: "call_button_pressed", detail: {hasNumber: Boolean(clean)}});
     if (!clean) { showToast("Введите номер", true); return; }
     if (!sipAccounts.length) await loadSipAccounts();
     const account = currentSipAccount();
@@ -893,6 +894,13 @@
       setSipHint("");
       logCall({phone: clean, name: name || "", status: "dialed"}).then((id) => { callLogId = id; });
     } catch (error) {
+      queueSipDiagnostic({
+        event: "call_preflight_failed",
+        detail: {
+          code: String((error && (error.code || error.name)) || ""),
+          message: String((error && error.message) || ""),
+        },
+      });
       const message = sipCallErrorMessage(error);
       sip.disconnect();
       setSipHint(message);

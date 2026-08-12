@@ -24,6 +24,7 @@
   let remoteStream = null;
   let speakerEnabled = true;
   let audioContext = null;
+  let ringback = null;
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
   // входящего звука у них разный, поэтому он настраивается.
   let audioElementId = "installer-call-audio";
@@ -60,6 +61,54 @@
     remoteStream = null;
   }
 
+  function stopRingback() {
+    if (!ringback) return;
+    window.clearInterval(ringback.timer);
+    try {
+      ringback.gain.gain.cancelScheduledValues(audioContext.currentTime);
+      ringback.gain.gain.setTargetAtTime(0, audioContext.currentTime, 0.02);
+      ringback.oscillator.stop(audioContext.currentTime + 0.08);
+    } catch (_error) {
+      // The oscillator may already be stopped by the browser.
+    }
+    ringback = null;
+  }
+
+  async function startRingback() {
+    if (ringback) return true;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return false;
+    try {
+      if (!audioContext) audioContext = new AudioContextClass();
+      if (audioContext.state === "suspended") await audioContext.resume();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = 425;
+      gain.gain.value = 0;
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      const pulse = () => {
+        if (!ringback) return;
+        const now = audioContext.currentTime;
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + 0.03);
+        gain.gain.setValueAtTime(0.08, now + 0.95);
+        gain.gain.linearRampToValueAtTime(0, now + 1);
+      };
+      oscillator.start();
+      ringback = {oscillator, gain, timer: window.setInterval(pulse, 4000)};
+      pulse();
+      diagnostic("ringback_started", {});
+      return true;
+    } catch (error) {
+      diagnostic("ringback_failed", {name: error && error.name, message: error && error.message});
+      stopRingback();
+      return false;
+    }
+  }
+
   async function playRemoteAudio() {
     const el = audio();
     const tracks = remoteStream ? remoteStream.getAudioTracks().filter((track) => track.readyState === "live") : [];
@@ -76,6 +125,7 @@
       return true;
     }
     try {
+      stopRingback();
       await el.play();
       emit("audioPlaying", {tracks: tracks.length});
       diagnostic("remote_audio_playing", {tracks: tracks.length});
@@ -104,12 +154,10 @@
         contextState = "blocked";
       }
     }
-    try {
-      await el.play();
-    } catch (_error) {
-      // A silent element without a source may still reject; the user gesture was
-      // nevertheless consumed and the real stream will retry through playRemoteAudio().
-    }
+    // Never await play() on an empty element: Android Chrome may leave that
+    // promise pending forever and prevent the SIP INVITE from being sent.
+    const playAttempt = el.play();
+    if (playAttempt && typeof playAttempt.catch === "function") playAttempt.catch(() => {});
     el.muted = !speakerEnabled;
     diagnostic("audio_unlocked", {contextState});
     return true;
@@ -159,6 +207,7 @@
     remoteStream = null;
     let accepted = false;
     const markAccepted = () => {
+      stopRingback();
       attachRemoteAudio();
       if (accepted) return;
       accepted = true;
@@ -167,20 +216,40 @@
       window.setTimeout(attachRemoteAudio, 1000);
     };
     const finish = (event, detail) => {
+      stopRingback();
+      diagnostic(`session_${event}`, detail || {});
       emit(event, detail);
       clearRemoteAudio();
       releaseMicrophone();
       session = null;
     };
-    session.on("connecting", () => emit("sessionConnecting", {direction}));
-    session.on("progress", (e) => emit("progress", {
-      direction,
-      statusCode: e && e.response && e.response.status_code,
-    }));
+    const resultDetail = (e) => {
+      const response = e && (e.response || (e.message && e.message.data));
+      return {
+        cause: (e && e.cause) || "",
+        originator: (e && e.originator) || "",
+        statusCode: (response && response.status_code) || 0,
+        reasonPhrase: (response && response.reason_phrase) || "",
+      };
+    };
+    session.on("connecting", () => {
+      diagnostic("session_connecting", {direction});
+      emit("sessionConnecting", {direction});
+    });
+    session.on("progress", (e) => {
+      const response = e && e.response;
+      const detail = {
+        direction,
+        statusCode: (response && response.status_code) || 0,
+        reasonPhrase: (response && response.reason_phrase) || "",
+      };
+      diagnostic("session_progress", detail);
+      emit("progress", detail);
+    });
     session.on("accepted", markAccepted);
     session.on("confirmed", markAccepted);
-    session.on("ended", (e) => finish("ended", {cause: e && e.cause}));
-    session.on("failed", (e) => finish("failed", {cause: e && e.cause}));
+    session.on("ended", (e) => finish("ended", resultDetail(e)));
+    session.on("failed", (e) => finish("failed", resultDetail(e)));
     session.on("peerconnection", (e) => {
       const pc = e && e.peerconnection;
       wirePeerConnection(pc);
@@ -358,6 +427,7 @@
       const newSession = ua.call(target, options);
       wireSession(newSession, "outgoing");
       diagnostic("outgoing_call", {});
+      startRingback();
       attachRemoteAudio();
       return true;
     },
@@ -380,6 +450,7 @@
     },
 
     hangup() {
+      stopRingback();
       if (session) { try { session.terminate(); } catch (_e) { /* уже завершён */ } session = null; }
     },
 
