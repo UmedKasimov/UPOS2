@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const SOFTPHONE_VERSION = "12";
+  const SOFTPHONE_VERSION = "13";
   const listeners = {};
   function emit(event, detail) {
     (listeners[event] || []).forEach((fn) => {
@@ -36,6 +36,30 @@
   let audioElementId = "installer-call-audio";
 
   const audio = () => document.getElementById(audioElementId);
+
+  function nativeAudioBridge() {
+    const bridge = window.UposAndroidAudio;
+    return bridge && typeof bridge.setSpeaker === "function" ? bridge : null;
+  }
+
+  function beginNativeCall() {
+    const bridge = nativeAudioBridge();
+    if (!bridge) return false;
+    try {
+      bridge.beginCall();
+      diagnostic("native_audio_call_started", {nativeVersion: String(bridge.getVersion?.() || "")});
+      return true;
+    } catch (error) {
+      diagnostic("native_audio_call_failed", {name: error && error.name, message: error && error.message});
+      return false;
+    }
+  }
+
+  function endNativeCall() {
+    const bridge = nativeAudioBridge();
+    if (!bridge) return;
+    try { bridge.endCall(); } catch (_error) { /* Native activity may already be closing. */ }
+  }
 
   function diagnostic(event, detail) {
     emit("diagnostic", {
@@ -237,7 +261,11 @@
     el.playsInline = true;
     el.autoplay = true;
     el.volume = 1;
-    if (speakerEnabled) {
+    const nativeBridge = nativeAudioBridge();
+    if (nativeBridge) {
+      try { nativeBridge.setSpeaker(speakerEnabled); } catch (_error) { /* Native activity may be resuming. */ }
+    }
+    if (speakerEnabled && !nativeBridge) {
       const contextState = await ensureAudioContext();
       if (connectRemoteAudioGraph()) {
         el.muted = true;
@@ -253,8 +281,10 @@
     if (!streamChanged && !el.paused && !el.ended && el.readyState >= 2) return true;
     try {
       await el.play();
-      const output = speakerEnabled ? "phone_fallback" : "phone";
-      if (speakerEnabled) diagnostic("remote_audio_fallback", {tracks: tracks.length});
+      const output = nativeBridge
+        ? (speakerEnabled ? "native_speaker" : "native_earpiece")
+        : (speakerEnabled ? "phone_fallback" : "browser_default");
+      if (speakerEnabled && !nativeBridge) diagnostic("remote_audio_fallback", {tracks: tracks.length});
       emit("audioPlaying", {tracks: tracks.length, output});
       diagnostic("remote_audio_playing", {tracks: tracks.length, output, mode: "direct"});
       return true;
@@ -361,6 +391,7 @@
       emit(event, detail);
       clearRemoteAudio();
       releaseMicrophone();
+      endNativeCall();
       session = null;
     };
     const resultDetail = (e) => {
@@ -439,6 +470,7 @@
     },
 
     async prepareAudio() {
+      beginNativeCall();
       if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
         const error = new Error("microphone_unavailable");
         error.code = "microphone_unavailable";
@@ -602,6 +634,7 @@
 
     call(number) {
       if (!ua || !registered) return false;
+      beginNativeCall();
       const target = `sip:${String(number).replace(/[^\d+*#]/g, "")}@${account.host}`;
       const lifecycle = {responded: false};
       const handlers = createSessionHandlers("outgoing", lifecycle);
@@ -627,6 +660,7 @@
 
     async answer() {
       if (!session) return false;
+      beginNativeCall();
       const stream = await softphone.prepareAudio();
       session.answer({
         mediaConstraints: {audio: true, video: false},
@@ -646,6 +680,7 @@
       clearResponseTimer();
       stopMediaQualityMonitor();
       if (session) { try { session.terminate(); } catch (_e) { /* уже завершён */ } session = null; }
+      endNativeCall();
     },
 
     setMuted(muted) {
@@ -657,6 +692,23 @@
     setSpeaker(enabled) {
       speakerEnabled = Boolean(enabled);
       const el = audio();
+      const bridge = nativeAudioBridge();
+      if (bridge) {
+        closeAudioContext();
+        if (el) el.muted = false;
+        try {
+          bridge.setSpeaker(speakerEnabled);
+          diagnostic("native_audio_route", {
+            enabled: speakerEnabled,
+            output: speakerEnabled ? "speaker" : "earpiece",
+          });
+        } catch (error) {
+          diagnostic("native_audio_route_failed", {name: error && error.name, message: error && error.message});
+        }
+        emit("speakerChanged", {enabled: speakerEnabled, native: true});
+        void playRemoteAudio();
+        return speakerEnabled;
+      }
       if (!speakerEnabled) closeAudioContext();
       if (el) el.muted = speakerEnabled;
       emit("speakerChanged", {enabled: speakerEnabled});
@@ -665,6 +717,7 @@
     },
 
     async resumeRemoteAudio() {
+      if (nativeAudioBridge()) return playRemoteAudio();
       speakerEnabled = true;
       await ensureAudioContext();
       return playRemoteAudio();
@@ -684,6 +737,7 @@
       connectingAccountId = "";
       clearRemoteAudio();
       if (!preserveMicrophone) releaseMicrophone();
+      endNativeCall();
     },
   };
 

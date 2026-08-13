@@ -24,7 +24,7 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("autoGainControl: false", script)
         self.assertIn("channelCount: {ideal: 1}", script)
         self.assertNotIn("latency: {ideal: 0.02}", script)
-        self.assertIn('const SOFTPHONE_VERSION = "12"', script)
+        self.assertIn('const SOFTPHONE_VERSION = "13"', script)
         self.assertIn("softphoneVersion: SOFTPHONE_VERSION", script)
         self.assertIn("mediaStream: liveMicrophoneStream() || undefined", script)
         self.assertIn("disconnect({preserveMicrophone: true})", script)
@@ -51,6 +51,8 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn('diagnostic("media_quality"', script)
         self.assertIn('track.contentHint = "speech"', script)
         self.assertIn("if (!speakerEnabled) closeAudioContext()", script)
+        self.assertIn("window.UposAndroidAudio", script)
+        self.assertIn('diagnostic("native_audio_route"', script)
         self.assertIn("el.muted = false", script)
         self.assertIn('diagnostic("audio_unlocked", {mode: "direct"})', script)
         self.assertIn("if (!streamChanged && !el.paused", script)
@@ -86,9 +88,9 @@ class InstallerSipUiTests(unittest.TestCase):
         service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
 
         for asset in (
-            "/static/installer.css?v=32",
-            "/static/installer.js?v=32",
-            "/static/installer-softphone.js?v=12",
+            "/static/installer.css?v=33",
+            "/static/installer.js?v=33",
+            "/static/installer-softphone.js?v=13",
         ):
             self.assertIn(asset, template)
             self.assertIn(asset, service_worker)
@@ -98,7 +100,22 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn('fetch(event.request, {cache: "no-store"})', service_worker)
 
         self.assertIn('addEventListener("controllerchange"', script)
-        self.assertIn('register("/installer-sw.js?v=32"', script)
+        self.assertIn('register("/installer-sw.js?v=33"', script)
+
+    def test_android_installer_uses_native_audio_bridge_and_direct_apk(self):
+        script = (ROOT / "upos" / "static" / "installer.js").read_text(encoding="utf-8")
+        activity = (ROOT.parent / "android" / "upos-integrator" / "app" / "src" / "main" / "java" / "uz" / "upos" / "integrator" / "MainActivity.java").read_text(encoding="utf-8")
+
+        self.assertIn('window.location.assign("/installer/android.apk?v=13")', script)
+        self.assertIn('addJavascriptInterface(audioBridge, "UposAndroidAudio")', activity)
+        self.assertIn("AudioManager.MODE_IN_COMMUNICATION", activity)
+        self.assertIn("AudioDeviceInfo.TYPE_BUILTIN_EARPIECE", activity)
+        self.assertIn("AudioDeviceInfo.TYPE_BUILTIN_SPEAKER", activity)
+
+        main = (ROOT / "upos" / "main.py").read_text(encoding="utf-8")
+        self.assertIn('@app.get("/installer/android.apk"', main)
+        self.assertIn('media_type="application/vnd.android.package-archive"', main)
+        self.assertIn('"/installer/android.apk"}', main)
 
     def test_service_worker_update_is_public_and_not_cached(self):
         main = (ROOT / "upos" / "main.py").read_text(encoding="utf-8")

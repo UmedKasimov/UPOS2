@@ -1830,6 +1830,15 @@
   });
 
   document.getElementById("installer-install").addEventListener("click", async () => {
+    const nativeAndroid = Boolean(window.UposAndroidAudio);
+    if (nativeAndroid) {
+      showToast("Приложение уже установлено");
+      return;
+    }
+    if (/Android/i.test(navigator.userAgent)) {
+      window.location.assign("/installer/android.apk?v=13");
+      return;
+    }
     if (!state.deferredInstallPrompt) {
       helpDialog.showModal();
       return;
@@ -1838,6 +1847,8 @@
     await state.deferredInstallPrompt.userChoice;
     state.deferredInstallPrompt = null;
   });
+
+  if (window.UposAndroidAudio) document.getElementById("installer-install").hidden = true;
 
   function updateConnection() {
     const node = document.getElementById("installer-connection");
@@ -1947,7 +1958,7 @@
   });
 
   if ("serviceWorker" in navigator) {
-    const installerBuild = "32";
+    const installerBuild = "33";
     const reloadForInstallerUpdate = (build = installerBuild) => {
       const url = new URL(window.location.href);
       if (url.searchParams.get("pwa_v") === String(build)) return;
@@ -1966,7 +1977,7 @@
 
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("/installer-sw.js?v=32", {updateViaCache: "none"})
+        .register("/installer-sw.js?v=33", {updateViaCache: "none"})
         .then((registration) => {
           registration.waiting?.postMessage({type: "SKIP_WAITING"});
           registration.update().catch(() => {});

@@ -1,10 +1,10 @@
-const INSTALLER_BUILD = "32";
+const INSTALLER_BUILD = "33";
 const CACHE_NAME = `upos-installer-v${INSTALLER_BUILD}`;
 const APP_SHELL = [
   `/installer?pwa_v=${INSTALLER_BUILD}`,
-  "/static/installer.css?v=32",
-  "/static/installer.js?v=32",
-  "/static/installer-softphone.js?v=12",
+  "/static/installer.css?v=33",
+  "/static/installer.js?v=33",
+  "/static/installer-softphone.js?v=13",
   "/static/jssip.min.js?v=1",
   "/static/installer-manifest.webmanifest",
   "/static/favicon.svg"
@@ -96,6 +96,16 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith("/api/installer/")) {
+    event.respondWith(fetch(event.request, {cache: "no-store"}));
+    return;
+  }
+
+  if (url.pathname.startsWith("/static/downloads/")) {
+    event.respondWith(fetch(event.request, {cache: "no-store"}));
+    return;
+  }
+
+  if (url.pathname === "/installer/android.apk") {
     event.respondWith(fetch(event.request, {cache: "no-store"}));
     return;
   }

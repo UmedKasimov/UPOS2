@@ -26,7 +26,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, Form, Query, Request, UploadFile, File
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -1411,7 +1411,7 @@ def create_app() -> FastAPI:
         path = request.url.path
         if (
             path.startswith("/static")
-            or path in {"/favicon.ico", "/health", "/health/db", "/installer-sw.js"}
+            or path in {"/favicon.ico", "/health", "/health/db", "/installer-sw.js", "/installer/android.apk"}
             or path.startswith("/auth")
             or path.startswith("/billing")
             or path.startswith("/api/telegram/webhook/")
@@ -9947,6 +9947,18 @@ def create_app() -> FastAPI:
         sales_ajax_section = (
             not sales_embed
             and str(request.query_params.get("view") or "").strip() == "journal"
+        )
+
+    @app.get("/installer/android.apk", name="installer_android_apk")
+    def installer_android_apk():
+        path = BASE_DIR / "static" / "downloads" / "upos-integrator.apk"
+        if not path.exists():
+            return Response("Android application is not available", status_code=404)
+        return FileResponse(
+            path,
+            media_type="application/vnd.android.package-archive",
+            filename="U-POS-Integrator.apk",
+            headers={"Cache-Control": "no-store, max-age=0"},
         )
         sales: list[dict[str, Any]] = []
         filtered_sale_clients: list[str] = []
