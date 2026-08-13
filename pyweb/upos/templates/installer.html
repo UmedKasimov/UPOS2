@@ -12,10 +12,10 @@
   <link rel="manifest" href="/static/installer-manifest.webmanifest">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/installer.css?v=28">
+  <link rel="stylesheet" href="/static/installer.css?v=29">
   <script defer src="/static/jssip.min.js?v=1"></script>
-  <script defer src="/static/installer-softphone.js?v=8"></script>
-  <script defer src="/static/installer.js?v=28"></script>
+  <script defer src="/static/installer-softphone.js?v=9"></script>
+  <script defer src="/static/installer.js?v=29"></script>
 </head>
 <body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
   <div class="installer-app">
@@ -385,8 +385,8 @@
         <button type="button" class="installer-call-control is-hangup" id="installer-call-hangup" aria-label="Завершить">
           <span class="installer-call-btn">&#128222;</span><small>Завершить</small>
         </button>
-        <button type="button" class="installer-call-control is-speaker is-on" id="installer-call-speaker" aria-label="Выключить звук" aria-pressed="true">
-          <span class="installer-call-btn">&#128266;</span><small>Динамик</small>
+        <button type="button" class="installer-call-control is-speaker" id="installer-call-speaker" aria-label="Включить динамик" aria-pressed="false">
+          <span class="installer-call-btn">&#128266;</span><small>Телефон</small>
         </button>
       </div>
       <audio id="installer-call-audio" autoplay playsinline></audio>

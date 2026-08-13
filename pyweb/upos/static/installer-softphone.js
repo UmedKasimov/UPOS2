@@ -22,11 +22,14 @@
   let connectingAccountId = "";
   let microphoneStream = null;
   let remoteStream = null;
-  let speakerEnabled = true;
+  let speakerEnabled = false;
   let audioContext = null;
+  let remoteAudioElementOutput = null;
   let remoteAudioSource = null;
   let remoteAudioGain = null;
   let remoteAudioGraphStream = null;
+  let mediaQualityTimer = null;
+  let mediaQualitySample = null;
   let ringback = null;
   let responseTimer = null;
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
@@ -56,6 +59,21 @@
     microphoneStream = null;
   }
 
+  async function resumeAudioContext() {
+    if (!audioContext) return "unavailable";
+    try {
+      if (audioContext.state !== "running") await audioContext.resume();
+      return audioContext.state;
+    } catch (error) {
+      diagnostic("audio_context_resume_failed", {
+        state: audioContext.state || "unknown",
+        name: error && error.name,
+        message: error && error.message,
+      });
+      return audioContext.state || "blocked";
+    }
+  }
+
   function disconnectRemoteAudioGraph() {
     try { remoteAudioSource?.disconnect(); } catch (_error) { /* Already disconnected. */ }
     try { remoteAudioGain?.disconnect(); } catch (_error) { /* Already disconnected. */ }
@@ -64,22 +82,43 @@
     remoteAudioGraphStream = null;
   }
 
+  function ensureRemoteAudioElementOutput() {
+    if (!audioContext || typeof audioContext.createMediaStreamDestination !== "function") return null;
+    if (!remoteAudioElementOutput) remoteAudioElementOutput = audioContext.createMediaStreamDestination();
+    return remoteAudioElementOutput;
+  }
+
+  function routeRemoteAudioGraph() {
+    if (!remoteAudioGain || !audioContext) return false;
+    try {
+      remoteAudioGain.disconnect();
+      remoteAudioGain.gain.value = 1;
+      remoteAudioGain.connect(audioContext.destination);
+      return true;
+    } catch (error) {
+      diagnostic("remote_audio_route_failed", {name: error && error.name, message: error && error.message});
+      return false;
+    }
+  }
+
   function connectRemoteAudioGraph() {
     const tracks = remoteStream ? remoteStream.getAudioTracks().filter((track) => track.readyState === "live") : [];
-    if (!audioContext || audioContext.state !== "running" || !remoteStream || !tracks.length) return false;
+    if (!speakerEnabled || !audioContext || audioContext.state !== "running" || !remoteStream || !tracks.length) return false;
     if (remoteAudioSource && remoteAudioGraphStream === remoteStream) {
-      if (remoteAudioGain) remoteAudioGain.gain.value = speakerEnabled ? 1 : 0;
-      return true;
+      return routeRemoteAudioGraph();
     }
     disconnectRemoteAudioGraph();
     try {
       remoteAudioSource = audioContext.createMediaStreamSource(remoteStream);
       remoteAudioGain = audioContext.createGain();
-      remoteAudioGain.gain.value = speakerEnabled ? 1 : 0;
       remoteAudioSource.connect(remoteAudioGain);
-      remoteAudioGain.connect(audioContext.destination);
+      if (!routeRemoteAudioGraph()) throw new Error("audio_output_unavailable");
       remoteAudioGraphStream = remoteStream;
-      diagnostic("remote_audio_webaudio", {tracks: tracks.length, contextState: audioContext.state});
+      diagnostic("remote_audio_webaudio", {
+        tracks: tracks.length,
+        contextState: audioContext.state,
+        output: "speaker",
+      });
       return true;
     } catch (error) {
       disconnectRemoteAudioGraph();
@@ -96,6 +135,79 @@
       el.srcObject = null;
     }
     remoteStream = null;
+  }
+
+  function stopMediaQualityMonitor() {
+    window.clearInterval(mediaQualityTimer);
+    mediaQualityTimer = null;
+    mediaQualitySample = null;
+  }
+
+  async function reportMediaQuality(pc) {
+    if (!pc || pc.connectionState === "closed") return;
+    try {
+      const report = await pc.getStats();
+      const current = {
+        at: Date.now(),
+        inboundBytes: 0,
+        inboundPackets: 0,
+        inboundLost: 0,
+        outboundBytes: 0,
+        outboundPackets: 0,
+        remoteLost: 0,
+        jitterMs: 0,
+        rttMs: 0,
+      };
+      report.forEach((stat) => {
+        const mediaKind = stat.kind || stat.mediaType || "";
+        if (mediaKind !== "audio" || stat.isRemote) return;
+        if (stat.type === "inbound-rtp") {
+          current.inboundBytes += Number(stat.bytesReceived || 0);
+          current.inboundPackets += Number(stat.packetsReceived || 0);
+          current.inboundLost += Number(stat.packetsLost || 0);
+          current.jitterMs = Math.max(current.jitterMs, Number(stat.jitter || 0) * 1000);
+        } else if (stat.type === "outbound-rtp") {
+          current.outboundBytes += Number(stat.bytesSent || 0);
+          current.outboundPackets += Number(stat.packetsSent || 0);
+        } else if (stat.type === "remote-inbound-rtp") {
+          current.remoteLost += Number(stat.packetsLost || 0);
+          current.rttMs = Math.max(current.rttMs, Number(stat.roundTripTime || 0) * 1000);
+          current.jitterMs = Math.max(current.jitterMs, Number(stat.jitter || 0) * 1000);
+        }
+      });
+      const previous = mediaQualitySample;
+      mediaQualitySample = current;
+      const elapsedSeconds = previous ? Math.max((current.at - previous.at) / 1000, 1) : 0;
+      const inboundKbps = previous
+        ? Math.max(0, Math.round(((current.inboundBytes - previous.inboundBytes) * 8) / elapsedSeconds / 1000))
+        : 0;
+      const outboundKbps = previous
+        ? Math.max(0, Math.round(((current.outboundBytes - previous.outboundBytes) * 8) / elapsedSeconds / 1000))
+        : 0;
+      diagnostic("media_quality", {
+        connection: pc.connectionState || "",
+        ice: pc.iceConnectionState || "",
+        inboundKbps,
+        outboundKbps,
+        inboundPackets: current.inboundPackets,
+        outboundPackets: current.outboundPackets,
+        inboundLost: current.inboundLost,
+        remoteLost: current.remoteLost,
+        jitterMs: Math.round(current.jitterMs),
+        rttMs: Math.round(current.rttMs),
+      });
+      if (previous && (inboundKbps === 0 || outboundKbps === 0 || current.jitterMs > 80 || current.rttMs > 600)) {
+        emit("mediaQuality", {inboundKbps, outboundKbps, jitterMs: current.jitterMs, rttMs: current.rttMs});
+      }
+    } catch (error) {
+      diagnostic("media_quality_failed", {name: error && error.name, message: error && error.message});
+    }
+  }
+
+  function startMediaQualityMonitor(pc) {
+    stopMediaQualityMonitor();
+    void reportMediaQuality(pc);
+    mediaQualityTimer = window.setInterval(() => void reportMediaQuality(pc), 8000);
   }
 
   function stopRingback() {
@@ -161,25 +273,22 @@
     el.playsInline = true;
     el.autoplay = true;
     el.volume = 1;
-    if (connectRemoteAudioGraph()) {
-      // The AudioContext was resumed by the original tap on "Call". Routing
-      // the later WebRTC stream through it avoids Android's second-tap
-      // autoplay requirement while the media element remains a fallback.
-      el.pause();
+    const contextState = await resumeAudioContext();
+    if (speakerEnabled && connectRemoteAudioGraph()) {
       el.muted = true;
-      emit("audioPlaying", {tracks: tracks.length, output: "webaudio"});
-      diagnostic("remote_audio_playing", {tracks: tracks.length, output: "webaudio"});
+      emit("audioPlaying", {tracks: tracks.length, output: "speaker"});
+      diagnostic("remote_audio_playing", {tracks: tracks.length, output: "speaker", contextState});
       return true;
     }
-    el.muted = !speakerEnabled;
-    if (!speakerEnabled) {
-      emit("speakerChanged", {enabled: false});
-      return true;
-    }
+    disconnectRemoteAudioGraph();
+    if (el.srcObject !== remoteStream) el.srcObject = remoteStream;
+    el.muted = false;
     try {
       await el.play();
-      emit("audioPlaying", {tracks: tracks.length});
-      diagnostic("remote_audio_playing", {tracks: tracks.length});
+      const output = speakerEnabled ? "phone_fallback" : "phone";
+      if (speakerEnabled) diagnostic("remote_audio_fallback", {tracks: tracks.length, contextState});
+      emit("audioPlaying", {tracks: tracks.length, output});
+      diagnostic("remote_audio_playing", {tracks: tracks.length, output, contextState});
       return true;
     } catch (error) {
       emit("audioBlocked", {error});
@@ -199,27 +308,32 @@
     if (AudioContextClass) {
       try {
         if (!audioContext) audioContext = new AudioContextClass();
-        if (audioContext.state === "suspended") await audioContext.resume();
-        contextState = audioContext.state;
+        contextState = await resumeAudioContext();
       } catch (_error) {
         contextState = "blocked";
       }
     }
-    // Never await play() on an empty element: Android Chrome may leave that
-    // promise pending forever and prevent the SIP INVITE from being sent.
-    const playAttempt = el.play();
+    const elementOutput = ensureRemoteAudioElementOutput();
+    if (elementOutput) el.srcObject = elementOutput.stream;
+    // Prime the real media element during the original tap. Its silent Web Audio
+    // stream stays alive until remote RTP arrives, avoiding a second Android tap.
+    const playAttempt = elementOutput ? el.play() : null;
     if (playAttempt && typeof playAttempt.catch === "function") playAttempt.catch(() => {});
-    el.muted = !speakerEnabled;
-    diagnostic("audio_unlocked", {contextState});
+    el.muted = speakerEnabled;
+    diagnostic("audio_unlocked", {contextState, elementOutput: Boolean(elementOutput)});
     return true;
   }
 
   function addRemoteTrack(track) {
     if (!track || track.kind !== "audio") return;
+    try { track.contentHint = "speech"; } catch (_error) { /* Optional browser hint. */ }
     if (!remoteStream) remoteStream = new MediaStream();
     if (!remoteStream.getTracks().some((item) => item.id === track.id)) remoteStream.addTrack(track);
-    track.addEventListener("unmute", playRemoteAudio);
-    track.addEventListener("ended", () => emit("audioEnded", {}));
+    if (!track.__uposSoftphoneWired) {
+      track.__uposSoftphoneWired = true;
+      track.addEventListener("unmute", playRemoteAudio);
+      track.addEventListener("ended", () => emit("audioEnded", {}));
+    }
   }
 
   function attachRemoteAudio(event) {
@@ -229,11 +343,25 @@
       return;
     }
     const eventStream = event && event.streams && event.streams[0];
-    if (eventStream) eventStream.getAudioTracks().forEach(addRemoteTrack);
-    if (event && event.track) addRemoteTrack(event.track);
-    pc.getReceivers().forEach((receiver) => addRemoteTrack(receiver.track));
-    const el = audio();
-    if (el && remoteStream && el.srcObject !== remoteStream) el.srcObject = remoteStream;
+    const eventTrack = event && event.track && event.track.kind === "audio" ? event.track : null;
+    let nextStream = null;
+    if (eventStream && eventStream.getAudioTracks().length) {
+      nextStream = eventStream;
+    } else if (eventTrack) {
+      nextStream = new MediaStream([eventTrack]);
+    } else {
+      const receiverTracks = pc.getReceivers()
+        .map((receiver) => receiver.track)
+        .filter((track) => track && track.kind === "audio" && track.readyState === "live");
+      if (receiverTracks.length) nextStream = new MediaStream(receiverTracks);
+    }
+    if (nextStream) {
+      const currentIds = remoteStream ? remoteStream.getAudioTracks().map((track) => track.id).sort().join(",") : "";
+      const nextIds = nextStream.getAudioTracks().map((track) => track.id).sort().join(",");
+      if (currentIds !== nextIds) disconnectRemoteAudioGraph();
+      remoteStream = nextStream;
+      remoteStream.getAudioTracks().forEach(addRemoteTrack);
+    }
     playRemoteAudio();
   }
 
@@ -244,7 +372,11 @@
     pc.addEventListener("connectionstatechange", () => {
       emit("connectionState", {state: pc.connectionState || ""});
       diagnostic("peer_connection", {state: pc.connectionState || ""});
-      if (pc.connectionState === "connected") attachRemoteAudio();
+      if (pc.connectionState === "connected") {
+        attachRemoteAudio();
+        startMediaQualityMonitor(pc);
+      }
+      if (["failed", "closed"].includes(pc.connectionState)) stopMediaQualityMonitor();
     });
     pc.addEventListener("iceconnectionstatechange", () => {
       emit("iceState", {state: pc.iceConnectionState || ""});
@@ -271,6 +403,7 @@
       state.responded = true;
       clearResponseTimer();
       stopRingback();
+      stopMediaQualityMonitor();
       diagnostic(`session_${event}`, detail || {});
       emit(event, detail);
       clearRemoteAudio();
@@ -366,12 +499,27 @@
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
+            channelCount: {ideal: 1},
+            sampleRate: {ideal: 48000},
+            latency: {ideal: 0.02},
           },
           video: false,
         });
+        microphoneStream.getAudioTracks().forEach((track) => {
+          try { track.contentHint = "speech"; } catch (_error) { /* Optional browser hint. */ }
+        });
+        const microphoneTrack = microphoneStream.getAudioTracks()[0];
+        const microphoneSettings = microphoneTrack && typeof microphoneTrack.getSettings === "function"
+          ? microphoneTrack.getSettings()
+          : {};
         emit("microphoneReady", {});
         diagnostic("microphone_ready", {
           tracks: microphoneStream.getAudioTracks().length,
+          sampleRate: microphoneSettings.sampleRate || 0,
+          channelCount: microphoneSettings.channelCount || 0,
+          echoCancellation: microphoneSettings.echoCancellation,
+          noiseSuppression: microphoneSettings.noiseSuppression,
+          autoGainControl: microphoneSettings.autoGainControl,
         });
         return microphoneStream;
       } catch (error) {
@@ -550,6 +698,7 @@
     hangup() {
       clearResponseTimer();
       stopRingback();
+      stopMediaQualityMonitor();
       if (session) { try { session.terminate(); } catch (_e) { /* уже завершён */ } session = null; }
     },
 
@@ -561,17 +710,17 @@
 
     setSpeaker(enabled) {
       speakerEnabled = Boolean(enabled);
-      if (remoteAudioGain) remoteAudioGain.gain.value = speakerEnabled ? 1 : 0;
       const el = audio();
-      if (el) el.muted = remoteAudioSource ? true : !speakerEnabled;
+      if (!speakerEnabled) disconnectRemoteAudioGraph();
+      if (el) el.muted = speakerEnabled;
       emit("speakerChanged", {enabled: speakerEnabled});
-      if (speakerEnabled) playRemoteAudio();
+      void playRemoteAudio();
       return speakerEnabled;
     },
 
-    resumeRemoteAudio() {
+    async resumeRemoteAudio() {
       speakerEnabled = true;
-      if (remoteAudioGain) remoteAudioGain.gain.value = 1;
+      await unlockRemoteAudio();
       return playRemoteAudio();
     },
 

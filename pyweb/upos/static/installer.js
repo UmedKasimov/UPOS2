@@ -815,8 +815,11 @@
     const speaker = document.getElementById("installer-call-speaker");
     mute?.classList.remove("is-on");
     mute?.setAttribute("aria-pressed", "false");
-    speaker?.classList.add("is-on");
-    speaker?.setAttribute("aria-pressed", "true");
+    speaker?.classList.remove("is-on");
+    speaker?.setAttribute("aria-pressed", "false");
+    speaker?.setAttribute("aria-label", "Включить динамик");
+    const speakerLabel = speaker?.querySelector("small");
+    if (speakerLabel) speakerLabel.textContent = "Телефон";
     callScreen.hidden = false;
     if (typeof callScreen.showModal === "function" && !callScreen.open) callScreen.showModal();
     else callScreen.setAttribute("open", "");
@@ -883,7 +886,7 @@
     try {
       // iOS and Android allow media playback reliably only while handling the
       // original tap. Unlock the remote audio element before async SIP work.
-      sip.setSpeaker(true);
+      sip.setSpeaker(false);
       await sip.unlockAudio?.();
       setSipHint("Разрешите доступ к микрофону…");
       setCallState("Проверяем микрофон…", "preparing");
@@ -959,7 +962,7 @@
     try {
       setCallState("Подключаем разговор…", "connecting");
       setCallAudioState("Включаем микрофон и голос…", "waiting");
-      window.InstallerSoftphone?.setSpeaker(true);
+      window.InstallerSoftphone?.setSpeaker(false);
       await window.InstallerSoftphone?.unlockAudio?.();
       await window.InstallerSoftphone?.answer();
     } catch (error) {
@@ -989,9 +992,9 @@
     event.currentTarget.setAttribute("aria-pressed", String(on));
     event.currentTarget.setAttribute("aria-label", on ? "Выключить звук" : "Включить звук");
     const label = event.currentTarget.querySelector("small");
-    if (label) label.textContent = on ? "Динамик" : "Звук выкл.";
+    if (label) label.textContent = on ? "Динамик" : "Телефон";
     window.InstallerSoftphone?.setSpeaker(on);
-    setCallAudioState(on ? "Подключаем голос…" : "Звук выключен", on ? "waiting" : "muted");
+    setCallAudioState(on ? "Громкая связь" : "Голос через телефон", "waiting");
     if (on) await window.InstallerSoftphone?.resumeRemoteAudio();
   });
 
@@ -1055,13 +1058,20 @@
       showToast("Браузер заблокировал звук. Нажмите «Динамик» на экране звонка.", true);
     });
     sip.on("speakerChanged", (detail) => {
-      if (detail && detail.enabled === false) setCallAudioState("Звук выключен", "muted");
+      if (detail && detail.enabled === false) setCallAudioState("Голос через телефон", "playing");
     });
     sip.on("connectionState", (detail) => {
       const state = String((detail && detail.state) || "");
       if (state === "connected" && callSeconds === 0) setCallAudioState("Голосовой канал подключён", "waiting");
       if (state === "failed") setCallAudioState("Ошибка голосового канала", "failed");
       if (state === "disconnected") setCallAudioState("Восстанавливаем голос…", "waiting");
+    });
+    sip.on("mediaQuality", (detail) => {
+      const inbound = Number(detail && detail.inboundKbps) || 0;
+      const outbound = Number(detail && detail.outboundKbps) || 0;
+      if (!inbound) setCallAudioState("Нет входящего голоса. Восстанавливаем аудио…", "waiting");
+      else if (!outbound) setCallAudioState("Проверяем передачу микрофона…", "waiting");
+      else setCallAudioState("Нестабильная мобильная сеть", "waiting");
     });
     sip.on("noResponse", () => {
       setCallState("АТС не ответила на вызов", "failed");
@@ -1939,8 +1949,11 @@
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("/installer-sw.js")
-        .then(() => syncPushButton())
+        .register("/installer-sw.js?v=29", {updateViaCache: "none"})
+        .then((registration) => {
+          registration.update().catch(() => {});
+          return syncPushButton();
+        })
         .catch(() => {});
     });
   }

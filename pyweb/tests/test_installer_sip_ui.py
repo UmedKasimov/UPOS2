@@ -20,6 +20,8 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertNotIn('rtcpMuxPolicy: "require"', script)
         self.assertIn("navigator.mediaDevices.getUserMedia", script)
         self.assertIn("echoCancellation: true", script)
+        self.assertIn("channelCount: {ideal: 1}", script)
+        self.assertIn("sampleRate: {ideal: 48000}", script)
         self.assertIn("mediaStream: liveMicrophoneStream() || undefined", script)
         self.assertIn("disconnect({preserveMicrophone: true})", script)
 
@@ -32,14 +34,21 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("resumeRemoteAudio()", script)
         self.assertIn("unlockAudio()", script)
         self.assertIn("window.AudioContext || window.webkitAudioContext", script)
-        self.assertIn("Never await play() on an empty element", script)
+        self.assertIn("Prime the real media element during the original tap", script)
         self.assertIn('diagnostic("ringback_started"', script)
         self.assertIn('diagnostic(`session_${event}`', script)
         self.assertIn('diagnostic("session_no_response"', script)
         self.assertIn('diagnostic("transport_lost"', script)
         self.assertIn('diagnostic("remote_audio_playing"', script)
         self.assertIn("audioContext.createMediaStreamSource(remoteStream)", script)
-        self.assertIn('output: "webaudio"', script)
+        self.assertIn("audioContext.createMediaStreamDestination()", script)
+        self.assertIn("remoteAudioGain.connect(audioContext.destination)", script)
+        self.assertIn("await resumeAudioContext()", script)
+        self.assertIn('diagnostic("remote_audio_fallback"', script)
+        self.assertIn('diagnostic("media_quality"', script)
+        self.assertIn('track.contentHint = "speech"', script)
+        self.assertIn("if (!speakerEnabled) disconnectRemoteAudioGraph()", script)
+        self.assertIn("el.muted = false", script)
         self.assertNotIn("stopRingback();\n      await el.play();", script)
 
     def test_installer_has_modal_call_experience(self):
@@ -59,7 +68,7 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn('const SIP_ACCOUNT_STORAGE_KEY = "upos.installer.sipAccount"', script)
         self.assertIn('/api/installer/sip/diagnostics', script)
         self.assertIn('await sip.unlockAudio?.()', script)
-        self.assertIn("sip.setSpeaker(true)", script)
+        self.assertIn("sip.setSpeaker(false)", script)
         self.assertIn("await window.InstallerSoftphone?.unlockAudio?.()", script)
         self.assertIn('event: "call_button_pressed"', script)
         self.assertIn('registeredAccountId !== String(account.id || "")', script)
@@ -71,9 +80,9 @@ class InstallerSipUiTests(unittest.TestCase):
         service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
 
         for asset in (
-            "/static/installer.css?v=28",
-            "/static/installer.js?v=28",
-            "/static/installer-softphone.js?v=8",
+            "/static/installer.css?v=29",
+            "/static/installer.js?v=29",
+            "/static/installer-softphone.js?v=9",
         ):
             self.assertIn(asset, template)
             self.assertIn(asset, service_worker)
