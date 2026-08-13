@@ -1947,10 +1947,28 @@
   });
 
   if ("serviceWorker" in navigator) {
+    const installerBuild = "32";
+    const reloadForInstallerUpdate = (build = installerBuild) => {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("pwa_v") === String(build)) return;
+      url.searchParams.set("pwa_v", String(build));
+      window.location.replace(url.href);
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      reloadForInstallerUpdate(installerBuild);
+    });
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "UPOS_INSTALLER_UPDATE") {
+        reloadForInstallerUpdate(event.data.build || installerBuild);
+      }
+    });
+
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("/installer-sw.js?v=31", {updateViaCache: "none"})
+        .register("/installer-sw.js?v=32", {updateViaCache: "none"})
         .then((registration) => {
+          registration.waiting?.postMessage({type: "SKIP_WAITING"});
           registration.update().catch(() => {});
           return syncPushButton();
         })

@@ -1,23 +1,42 @@
-const CACHE_NAME = "upos-installer-v31";
+const INSTALLER_BUILD = "32";
+const CACHE_NAME = `upos-installer-v${INSTALLER_BUILD}`;
 const APP_SHELL = [
-  "/installer",
-  "/static/installer.css?v=31",
-  "/static/installer.js?v=31",
-  "/static/installer-softphone.js?v=11",
+  `/installer?pwa_v=${INSTALLER_BUILD}`,
+  "/static/installer.css?v=32",
+  "/static/installer.js?v=32",
+  "/static/installer-softphone.js?v=12",
   "/static/jssip.min.js?v=1",
   "/static/installer-manifest.webmanifest",
   "/static/favicon.svg"
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.all(APP_SHELL.map(async (path) => {
+      try {
+        const response = await fetch(path, {cache: "reload"});
+        if (response.ok) await cache.put(path, response);
+      } catch (_error) {
+        // A transient asset failure must not prevent the update from activating.
+      }
+    }));
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith("upos-installer-") && key !== CACHE_NAME)
+        .map((key) => caches.delete(key))
+    );
     await self.clients.claim();
 
     // Existing Android installations can keep the old document open for days.
@@ -27,7 +46,10 @@ self.addEventListener("activate", (event) => {
     await Promise.all(clients.map((client) => {
       const url = new URL(client.url);
       if (url.origin !== self.location.origin || url.pathname !== "/installer") return null;
-      return client.navigate(client.url).catch(() => null);
+      client.postMessage({type: "UPOS_INSTALLER_UPDATE", build: INSTALLER_BUILD});
+      if (url.searchParams.get("pwa_v") === INSTALLER_BUILD) return null;
+      url.searchParams.set("pwa_v", INSTALLER_BUILD);
+      return client.navigate(url.href).catch(() => null);
     }));
   })());
 });
@@ -74,7 +96,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith("/api/installer/")) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(fetch(event.request, {cache: "no-store"}));
     return;
   }
 
@@ -87,6 +109,8 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/installer")))
+      .catch(() => caches.match(event.request).then(
+        (cached) => cached || caches.match(`/installer?pwa_v=${INSTALLER_BUILD}`)
+      ))
   );
 });

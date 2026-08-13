@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const SOFTPHONE_VERSION = "11";
+  const SOFTPHONE_VERSION = "12";
   const listeners = {};
   function emit(event, detail) {
     (listeners[event] || []).forEach((fn) => {

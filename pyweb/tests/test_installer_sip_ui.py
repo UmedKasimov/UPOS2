@@ -24,7 +24,7 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("autoGainControl: false", script)
         self.assertIn("channelCount: {ideal: 1}", script)
         self.assertNotIn("latency: {ideal: 0.02}", script)
-        self.assertIn('const SOFTPHONE_VERSION = "11"', script)
+        self.assertIn('const SOFTPHONE_VERSION = "12"', script)
         self.assertIn("softphoneVersion: SOFTPHONE_VERSION", script)
         self.assertIn("mediaStream: liveMicrophoneStream() || undefined", script)
         self.assertIn("disconnect({preserveMicrophone: true})", script)
@@ -82,18 +82,23 @@ class InstallerSipUiTests(unittest.TestCase):
 
     def test_pwa_cache_uses_current_installer_assets(self):
         template = (ROOT / "upos" / "templates" / "installer.html").read_text(encoding="utf-8")
+        script = (ROOT / "upos" / "static" / "installer.js").read_text(encoding="utf-8")
         service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
 
         for asset in (
-            "/static/installer.css?v=31",
-            "/static/installer.js?v=31",
-            "/static/installer-softphone.js?v=11",
+            "/static/installer.css?v=32",
+            "/static/installer.js?v=32",
+            "/static/installer-softphone.js?v=12",
         ):
             self.assertIn(asset, template)
             self.assertIn(asset, service_worker)
 
-        self.assertIn('client.navigate(client.url)', service_worker)
+        self.assertIn('client.navigate(url.href)', service_worker)
+        self.assertIn('url.searchParams.set("pwa_v", INSTALLER_BUILD)', service_worker)
         self.assertIn('fetch(event.request, {cache: "no-store"})', service_worker)
+
+        self.assertIn('addEventListener("controllerchange"', script)
+        self.assertIn('register("/installer-sw.js?v=32"', script)
 
     def test_service_worker_update_is_public_and_not_cached(self):
         main = (ROOT / "upos" / "main.py").read_text(encoding="utf-8")
