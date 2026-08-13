@@ -21,7 +21,9 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("navigator.mediaDevices.getUserMedia", script)
         self.assertIn("echoCancellation: true", script)
         self.assertIn("channelCount: {ideal: 1}", script)
-        self.assertIn("sampleRate: {ideal: 48000}", script)
+        self.assertNotIn("latency: {ideal: 0.02}", script)
+        self.assertIn('const SOFTPHONE_VERSION = "10"', script)
+        self.assertIn("softphoneVersion: SOFTPHONE_VERSION", script)
         self.assertIn("mediaStream: liveMicrophoneStream() || undefined", script)
         self.assertIn("disconnect({preserveMicrophone: true})", script)
 
@@ -80,12 +82,21 @@ class InstallerSipUiTests(unittest.TestCase):
         service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
 
         for asset in (
-            "/static/installer.css?v=29",
-            "/static/installer.js?v=29",
-            "/static/installer-softphone.js?v=9",
+            "/static/installer.css?v=30",
+            "/static/installer.js?v=30",
+            "/static/installer-softphone.js?v=10",
         ):
             self.assertIn(asset, template)
             self.assertIn(asset, service_worker)
+
+        self.assertIn('client.navigate(client.url)', service_worker)
+        self.assertIn('fetch(event.request, {cache: "no-store"})', service_worker)
+
+    def test_service_worker_update_is_public_and_not_cached(self):
+        main = (ROOT / "upos" / "main.py").read_text(encoding="utf-8")
+
+        self.assertIn('"/installer-sw.js"', main)
+        self.assertIn('"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"', main)
 
 
 if __name__ == "__main__":

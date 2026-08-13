@@ -1949,7 +1949,7 @@
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("/installer-sw.js?v=29", {updateViaCache: "none"})
+        .register("/installer-sw.js?v=30", {updateViaCache: "none"})
         .then((registration) => {
           registration.update().catch(() => {});
           return syncPushButton();

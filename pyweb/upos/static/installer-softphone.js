@@ -7,6 +7,7 @@
 (() => {
   "use strict";
 
+  const SOFTPHONE_VERSION = "10";
   const listeners = {};
   function emit(event, detail) {
     (listeners[event] || []).forEach((fn) => {
@@ -41,7 +42,7 @@
   function diagnostic(event, detail) {
     emit("diagnostic", {
       event,
-      detail: detail || {},
+      detail: {...(detail || {}), softphoneVersion: SOFTPHONE_VERSION},
       accountId: String((account && account.id) || ""),
       extension: String((account && account.extension) || ""),
     });
@@ -500,8 +501,6 @@
             noiseSuppression: true,
             autoGainControl: true,
             channelCount: {ideal: 1},
-            sampleRate: {ideal: 48000},
-            latency: {ideal: 0.02},
           },
           video: false,
         });

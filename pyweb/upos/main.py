@@ -1411,7 +1411,7 @@ def create_app() -> FastAPI:
         path = request.url.path
         if (
             path.startswith("/static")
-            or path in {"/favicon.ico", "/health", "/health/db"}
+            or path in {"/favicon.ico", "/health", "/health/db", "/installer-sw.js"}
             or path.startswith("/auth")
             or path.startswith("/billing")
             or path.startswith("/api/telegram/webhook/")
@@ -8590,7 +8590,9 @@ def create_app() -> FastAPI:
             path.read_text(encoding="utf-8"),
             media_type="application/javascript",
             headers={
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
                 "Service-Worker-Allowed": "/",
             },
         )
