@@ -9073,6 +9073,7 @@ def create_app() -> FastAPI:
             "audio_unlocked", "microphone_ready", "microphone_failed", "registered",
             "registration_failed", "websocket_disconnected", "outgoing_call",
             "peer_connection", "ice_connection", "remote_audio_playing", "remote_audio_blocked",
+            "remote_audio_webaudio", "remote_audio_webaudio_failed",
             "ringback_started", "ringback_failed", "session_connecting", "session_progress",
             "session_ended", "session_failed",
             "session_no_response", "transport_lost", "call_button_pressed", "call_preflight_failed",

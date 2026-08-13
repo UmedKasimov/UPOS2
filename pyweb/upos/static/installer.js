@@ -883,6 +883,7 @@
     try {
       // iOS and Android allow media playback reliably only while handling the
       // original tap. Unlock the remote audio element before async SIP work.
+      sip.setSpeaker(true);
       await sip.unlockAudio?.();
       setSipHint("Разрешите доступ к микрофону…");
       setCallState("Проверяем микрофон…", "preparing");
@@ -958,6 +959,8 @@
     try {
       setCallState("Подключаем разговор…", "connecting");
       setCallAudioState("Включаем микрофон и голос…", "waiting");
+      window.InstallerSoftphone?.setSpeaker(true);
+      await window.InstallerSoftphone?.unlockAudio?.();
       await window.InstallerSoftphone?.answer();
     } catch (error) {
       const message = sipCallErrorMessage(error);

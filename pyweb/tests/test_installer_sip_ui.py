@@ -38,6 +38,8 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn('diagnostic("session_no_response"', script)
         self.assertIn('diagnostic("transport_lost"', script)
         self.assertIn('diagnostic("remote_audio_playing"', script)
+        self.assertIn("audioContext.createMediaStreamSource(remoteStream)", script)
+        self.assertIn('output: "webaudio"', script)
         self.assertNotIn("stopRingback();\n      await el.play();", script)
 
     def test_installer_has_modal_call_experience(self):
@@ -57,6 +59,8 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn('const SIP_ACCOUNT_STORAGE_KEY = "upos.installer.sipAccount"', script)
         self.assertIn('/api/installer/sip/diagnostics', script)
         self.assertIn('await sip.unlockAudio?.()', script)
+        self.assertIn("sip.setSpeaker(true)", script)
+        self.assertIn("await window.InstallerSoftphone?.unlockAudio?.()", script)
         self.assertIn('event: "call_button_pressed"', script)
         self.assertIn('registeredAccountId !== String(account.id || "")', script)
         self.assertIn("if (sip.inCall()) return Promise.resolve(true);", script)
@@ -67,9 +71,9 @@ class InstallerSipUiTests(unittest.TestCase):
         service_worker = (ROOT / "upos" / "static" / "installer-sw.js").read_text(encoding="utf-8")
 
         for asset in (
-            "/static/installer.css?v=27",
-            "/static/installer.js?v=27",
-            "/static/installer-softphone.js?v=7",
+            "/static/installer.css?v=28",
+            "/static/installer.js?v=28",
+            "/static/installer-softphone.js?v=8",
         ):
             self.assertIn(asset, template)
             self.assertIn(asset, service_worker)

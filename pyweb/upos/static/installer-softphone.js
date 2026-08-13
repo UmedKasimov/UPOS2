@@ -24,6 +24,9 @@
   let remoteStream = null;
   let speakerEnabled = true;
   let audioContext = null;
+  let remoteAudioSource = null;
+  let remoteAudioGain = null;
+  let remoteAudioGraphStream = null;
   let ringback = null;
   let responseTimer = null;
   // Модуль общий для установщика и плавающего телефона в вебе: элемент для
@@ -53,7 +56,40 @@
     microphoneStream = null;
   }
 
+  function disconnectRemoteAudioGraph() {
+    try { remoteAudioSource?.disconnect(); } catch (_error) { /* Already disconnected. */ }
+    try { remoteAudioGain?.disconnect(); } catch (_error) { /* Already disconnected. */ }
+    remoteAudioSource = null;
+    remoteAudioGain = null;
+    remoteAudioGraphStream = null;
+  }
+
+  function connectRemoteAudioGraph() {
+    const tracks = remoteStream ? remoteStream.getAudioTracks().filter((track) => track.readyState === "live") : [];
+    if (!audioContext || audioContext.state !== "running" || !remoteStream || !tracks.length) return false;
+    if (remoteAudioSource && remoteAudioGraphStream === remoteStream) {
+      if (remoteAudioGain) remoteAudioGain.gain.value = speakerEnabled ? 1 : 0;
+      return true;
+    }
+    disconnectRemoteAudioGraph();
+    try {
+      remoteAudioSource = audioContext.createMediaStreamSource(remoteStream);
+      remoteAudioGain = audioContext.createGain();
+      remoteAudioGain.gain.value = speakerEnabled ? 1 : 0;
+      remoteAudioSource.connect(remoteAudioGain);
+      remoteAudioGain.connect(audioContext.destination);
+      remoteAudioGraphStream = remoteStream;
+      diagnostic("remote_audio_webaudio", {tracks: tracks.length, contextState: audioContext.state});
+      return true;
+    } catch (error) {
+      disconnectRemoteAudioGraph();
+      diagnostic("remote_audio_webaudio_failed", {name: error && error.name, message: error && error.message});
+      return false;
+    }
+  }
+
   function clearRemoteAudio() {
+    disconnectRemoteAudioGraph();
     const el = audio();
     if (el) {
       el.pause();
@@ -125,6 +161,16 @@
     el.playsInline = true;
     el.autoplay = true;
     el.volume = 1;
+    if (connectRemoteAudioGraph()) {
+      // The AudioContext was resumed by the original tap on "Call". Routing
+      // the later WebRTC stream through it avoids Android's second-tap
+      // autoplay requirement while the media element remains a fallback.
+      el.pause();
+      el.muted = true;
+      emit("audioPlaying", {tracks: tracks.length, output: "webaudio"});
+      diagnostic("remote_audio_playing", {tracks: tracks.length, output: "webaudio"});
+      return true;
+    }
     el.muted = !speakerEnabled;
     if (!speakerEnabled) {
       emit("speakerChanged", {enabled: false});
@@ -515,8 +561,9 @@
 
     setSpeaker(enabled) {
       speakerEnabled = Boolean(enabled);
+      if (remoteAudioGain) remoteAudioGain.gain.value = speakerEnabled ? 1 : 0;
       const el = audio();
-      if (el) el.muted = !speakerEnabled;
+      if (el) el.muted = remoteAudioSource ? true : !speakerEnabled;
       emit("speakerChanged", {enabled: speakerEnabled});
       if (speakerEnabled) playRemoteAudio();
       return speakerEnabled;
@@ -524,6 +571,7 @@
 
     resumeRemoteAudio() {
       speakerEnabled = true;
+      if (remoteAudioGain) remoteAudioGain.gain.value = 1;
       return playRemoteAudio();
     },
 
