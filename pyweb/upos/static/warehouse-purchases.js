@@ -2980,6 +2980,56 @@
     summary.dataset.paymentState = debt > 0 ? (paid > 0 ? "partial" : "debt") : "paid";
   }
 
+  function renderPurchaseExtraExpenses(panel, purchase) {
+    const root = panel.querySelector("[data-purchase-detail-expense-lines]");
+    if (!root) return;
+    const currency = String(purchase.currency || "UZS").toUpperCase();
+    const expenses = (Array.isArray(purchase.extra_expenses) ? purchase.extra_expenses : [])
+      .filter((expense) => purchaseEntryNumber(expense?.amount || expense?.document_amount) > 0);
+    root.replaceChildren();
+    if (!expenses.length) return;
+
+    const titleRow = document.createElement("tr");
+    titleRow.className = "warehouse-purchase-detail-expense-head";
+    const titleCell = document.createElement("td");
+    titleCell.colSpan = 7;
+    titleCell.textContent = "Дополнительные расходы";
+    titleRow.append(titleCell);
+    root.append(titleRow);
+
+    expenses.forEach((expense, index) => {
+      const expenseCurrency = String(expense.currency || currency).toUpperCase();
+      const amount = expense.amount || expense.document_amount || "0";
+      const documentAmount = expense.document_amount || amount;
+      const row = document.createElement("tr");
+      row.className = "warehouse-purchase-detail-expense-row";
+
+      const numberCell = document.createElement("td");
+      numberCell.textContent = `Р${index + 1}`;
+      row.append(numberCell);
+
+      const nameCell = document.createElement("td");
+      nameCell.colSpan = 3;
+      const name = document.createElement("strong");
+      name.textContent = String(expense.name || "Дополнительный расход");
+      nameCell.append(name);
+      row.append(nameCell);
+
+      const amountCell = document.createElement("td");
+      amountCell.colSpan = 2;
+      amountCell.textContent = moneyWithCurrency(amount, expenseCurrency);
+      row.append(amountCell);
+
+      const totalCell = document.createElement("td");
+      const total = document.createElement("strong");
+      total.textContent = moneyWithCurrency(documentAmount, currency);
+      totalCell.append(total);
+      row.append(totalCell);
+
+      root.append(row);
+    });
+  }
+
   function renderDetail(panel, purchase) {
     const currency = purchase.currency || "UZS";
     const linesRoot = panel.querySelector("[data-purchase-detail-lines]");
@@ -3011,6 +3061,7 @@
     if (paymentPane) paymentPane.dataset.paymentState = purchaseEntryNumber(purchase.debt_amount) > 0 ? "debt" : "paid";
     renderPurchasePayments(panel, purchase);
     renderPurchasePaymentSummary(panel, purchase);
+    renderPurchaseExtraExpenses(panel, purchase);
     updatePurchasePaymentButton(panel, purchase);
     setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
     setText(

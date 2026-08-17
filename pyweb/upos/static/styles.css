@@ -9683,6 +9683,31 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 12%, var(--card));
 }
 
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-expense-head td {
+  background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 10%, var(--card));
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-expense-row td {
+  background: color-mix(in srgb, #f59e0b 5%, var(--card));
+  border-color: var(--border);
+  font-weight: 800;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-expense-row td:nth-child(3),
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-expense-row td:nth-child(4) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-expense-row td:last-child {
+  color: #b45309;
+}
+
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table .warehouse-purchase-detail-cost-summary td {
   text-align: right;
 }
