@@ -20987,6 +20987,24 @@ def create_app() -> FastAPI:
         def _report_money(raw: Any, currency: str = "UZS") -> str:
             return f"{_sales_money_label(raw)} {str(currency or 'UZS').upper()}"
 
+        def _report_filter_text(raw: Any) -> str:
+            return re.sub(r"\s+", " ", str(raw or "").strip()).casefold()
+
+        sales_cost_filters = {
+            "employee": str(request.query_params.get("sales_cost_employee") or "").strip(),
+            "client": str(request.query_params.get("sales_cost_client") or "").strip(),
+            "product": str(request.query_params.get("sales_cost_product") or "").strip(),
+        }
+        sales_cost_filter_keys = {
+            key: _report_filter_text(value)
+            for key, value in sales_cost_filters.items()
+        }
+        sales_cost_filter_options: dict[str, list[str]] = {
+            "employees": [],
+            "clients": [],
+            "products": [],
+        }
+
         if valid_workspace_owner_id(wid):
             try:
                 recompute_delivery_debts(wid)
@@ -21032,6 +21050,18 @@ def create_app() -> FastAPI:
 
                 product_by_id = {str(product.id): product for product in products}
                 product_by_name = {str(product.name or "").strip().casefold(): product for product in products if product.name}
+                sales_cost_employee_names: set[str] = set()
+                sales_cost_employee_by_id: dict[str, str] = {}
+                try:
+                    for employee in list_employees_safe(wid):
+                        employee_name = str(employee.get("name") or employee.get("username") or "").strip()
+                        if employee_name:
+                            sales_cost_employee_names.add(employee_name)
+                            sales_cost_employee_by_id[str(employee.get("id") or "").strip()] = employee_name
+                except Exception:
+                    logger.exception("[upos] employee options failed for sales-cost report; wid=%s", wid)
+                sales_cost_client_names: set[str] = set()
+                sales_cost_product_names: set[str] = set()
                 # В продажах из IBOX в строке лежит идентификатор IBOX, а не
                 # внутренний номер карточки: без этой карты товар не находился
                 # и себестоимость всего документа выходила нулевой.
@@ -21122,6 +21152,68 @@ def create_app() -> FastAPI:
                 sale_count = 0
                 return_count = 0
                 order_count = 0
+
+                def _sales_cost_line_names(lines: Any) -> list[str]:
+                    names: list[str] = []
+                    for line in lines if isinstance(lines, list) else []:
+                        if not isinstance(line, dict) or report_line_is_subscription(line):
+                            continue
+                        product_name = str(line.get("product") or "").strip()
+                        product = report_product_for_line(line)
+                        if product is not None and product.name:
+                            product_name = str(product.name or "").strip() or product_name
+                        if product_name:
+                            names.append(product_name)
+                    return list(dict.fromkeys(names))
+
+                def _sales_cost_employee_names(data: dict[str, Any]) -> list[str]:
+                    names: list[str] = []
+                    for key in ("manager", "crm_responsible", "installer_name"):
+                        value = str(data.get(key) or "").strip()
+                        if value:
+                            names.append(value)
+                    installer_id = str(data.get("installer_user_id") or "").strip()
+                    installer_name = sales_cost_employee_by_id.get(installer_id, "")
+                    if installer_name:
+                        names.append(installer_name)
+                    return list(dict.fromkeys(names))
+
+                def _sales_cost_row_payload(
+                    *,
+                    doc_date: str,
+                    number: str,
+                    client: str,
+                    kind: str,
+                    stage: str,
+                    amount_value: Decimal,
+                    cost_value: Decimal,
+                    line_names: list[str],
+                    employee_names: list[str],
+                ) -> dict[str, Any]:
+                    return {
+                        "date": doc_date,
+                        "number": number,
+                        "client": client,
+                        "kind": kind,
+                        "stage": stage,
+                        "amount_value": amount_value,
+                        "cost_value": cost_value,
+                        "_product_filter": [_report_filter_text(name) for name in line_names],
+                        "_employee_filter": [_report_filter_text(name) for name in employee_names],
+                    }
+
+                def _sales_cost_row_matches(item: dict[str, Any]) -> bool:
+                    employee_key = sales_cost_filter_keys.get("employee") or ""
+                    if employee_key and employee_key not in (item.get("_employee_filter") or []):
+                        return False
+                    client_key = sales_cost_filter_keys.get("client") or ""
+                    if client_key and client_key not in _report_filter_text(item.get("client")):
+                        return False
+                    product_key = sales_cost_filter_keys.get("product") or ""
+                    if product_key and not any(product_key in str(value or "") for value in (item.get("_product_filter") or [])):
+                        return False
+                    return True
+
                 for row in sales_rows:
                     data = _json_object(row.data)
                     doc_date = _report_date(data, row.created_at)
@@ -21136,9 +21228,14 @@ def create_app() -> FastAPI:
                     currency = str(row.currency or data.get("currency") or "UZS").upper()
                     amount_primary = report_to_primary(amount, currency)
                     client = str(data.get("client") or "Без клиента").strip() or "Без клиента"
+                    sales_cost_client_names.add(client)
                     paid_amount = min(amount, _sales_decimal(data.get("paid_amount")))
                     debt_amount = max(Decimal("0"), amount - paid_amount) if records_debt else Decimal("0")
                     lines = data.get("lines") if isinstance(data.get("lines"), list) else []
+                    sales_cost_line_names = _sales_cost_line_names(lines)
+                    sales_cost_product_names.update(sales_cost_line_names)
+                    sales_cost_doc_employee_names = _sales_cost_employee_names(data)
+                    sales_cost_employee_names.update(sales_cost_doc_employee_names)
                     document_cost_uzs = sum(
                         (_sales_decimal(line.get("quantity")) * report_product_unit_cost(line) for line in lines if isinstance(line, dict)),
                         Decimal("0"),
@@ -21181,17 +21278,19 @@ def create_app() -> FastAPI:
                             # сумма показывалась чистой прибылью.
                             cost_total += regular_document_cost
                             if regular_amount_primary or regular_document_cost:
-                                profit_sales_rows.append({
-                                    "date": doc_date,
-                                    "number": str(row.number or ""),
-                                    "client": client,
-                                    "kind": "Продажа",
+                                profit_sales_rows.append(_sales_cost_row_payload(
+                                    doc_date=doc_date,
+                                    number=str(row.number or ""),
+                                    client=client,
+                                    kind="Продажа",
                                     # Прибыль программы считается только по архиву;
                                     # у остальных отгрузок она пока ожидаемая.
-                                    "stage": "archive" if records_profit else "shipment",
-                                    "amount_value": regular_amount_primary,
-                                    "cost_value": regular_document_cost,
-                                })
+                                    stage="archive" if records_profit else "shipment",
+                                    amount_value=regular_amount_primary,
+                                    cost_value=regular_document_cost,
+                                    line_names=sales_cost_line_names,
+                                    employee_names=sales_cost_doc_employee_names,
+                                ))
                             if subscription_line_count:
                                 subscription_profit_total += subscription_amount - subscription_cost
                                 subscription_profit_count += subscription_line_count
@@ -21202,15 +21301,17 @@ def create_app() -> FastAPI:
                         returns_total += regular_amount_primary
                         cost_total -= regular_document_cost
                         if regular_amount_primary or regular_document_cost:
-                            profit_sales_rows.append({
-                                "date": doc_date,
-                                "number": str(row.number or ""),
-                                "client": client,
-                                "kind": "Возврат",
-                                "stage": "archive",
-                                "amount_value": -regular_amount_primary,
-                                "cost_value": -regular_document_cost,
-                            })
+                            profit_sales_rows.append(_sales_cost_row_payload(
+                                doc_date=doc_date,
+                                number=str(row.number or ""),
+                                client=client,
+                                kind="Возврат",
+                                stage="archive",
+                                amount_value=-regular_amount_primary,
+                                cost_value=-regular_document_cost,
+                                line_names=sales_cost_line_names,
+                                employee_names=sales_cost_doc_employee_names,
+                            ))
                         profit_total -= regular_amount_primary - regular_document_cost
                         top_clients[client] = top_clients.get(client, Decimal("0")) - regular_amount_primary
                         day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) - regular_amount_primary
@@ -21225,15 +21326,17 @@ def create_app() -> FastAPI:
                             debt_total += regular_debt_primary
                             cost_total += regular_document_cost
                             if regular_amount_primary or regular_document_cost:
-                                profit_sales_rows.append({
-                                    "date": doc_date,
-                                    "number": str(row.number or ""),
-                                    "client": client,
-                                    "kind": "Заказ",
-                                    "stage": "archive" if records_profit else "shipment",
-                                    "amount_value": regular_amount_primary,
-                                    "cost_value": regular_document_cost,
-                                })
+                                profit_sales_rows.append(_sales_cost_row_payload(
+                                    doc_date=doc_date,
+                                    number=str(row.number or ""),
+                                    client=client,
+                                    kind="Заказ",
+                                    stage="archive" if records_profit else "shipment",
+                                    amount_value=regular_amount_primary,
+                                    cost_value=regular_document_cost,
+                                    line_names=sales_cost_line_names,
+                                    employee_names=sales_cost_doc_employee_names,
+                                ))
                             if subscription_line_count:
                                 subscription_profit_total += subscription_amount - subscription_cost
                                 subscription_profit_count += subscription_line_count
@@ -21413,6 +21516,16 @@ def create_app() -> FastAPI:
                 for profit_row in profit_other_income_rows:
                     profit_row["amount_uzs"] = profit_to_uzs(profit_row.get("amount_primary") or Decimal("0"))
 
+                sales_cost_filter_options = {
+                    "employees": sorted(sales_cost_employee_names, key=lambda item: item.casefold()),
+                    "clients": sorted(sales_cost_client_names, key=lambda item: item.casefold()),
+                    "products": sorted(sales_cost_product_names, key=lambda item: item.casefold()),
+                }
+                profit_sales_rows = [
+                    item
+                    for item in profit_sales_rows
+                    if _sales_cost_row_matches(item)
+                ]
                 profit_sales_rows.sort(key=lambda item: str(item.get("date") or ""), reverse=True)
                 # Отгрузки дают ожидаемую прибыль, архив — реальную: считаем
                 # обе суммы отдельно, чтобы разделы отчёта не спорили друг с другом.
@@ -21423,6 +21536,8 @@ def create_app() -> FastAPI:
                 for sales_row in profit_sales_rows:
                     row_amount = sales_row.pop("amount_value")
                     row_cost = sales_row.pop("cost_value")
+                    sales_row.pop("_product_filter", None)
+                    sales_row.pop("_employee_filter", None)
                     row_profit = row_amount - row_cost
                     stage_bucket = stage_totals.get(str(sales_row.get("stage") or "shipment"))
                     if stage_bucket is not None:
@@ -21502,6 +21617,8 @@ def create_app() -> FastAPI:
                     "expenses": profit_expense_rows[:100],
                     "other_income": profit_other_income_rows[:50],
                     "sales_rows": profit_sales_rows[:300],
+                    "filters": sales_cost_filters,
+                    "filter_options": sales_cost_filter_options,
                 }
 
                 stock_movements: dict[str, dict[str, Any]] = {}

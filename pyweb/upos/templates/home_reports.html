@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=134" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=135" />
 {% endblock %}
 
 {% block page_header %}
@@ -401,21 +401,51 @@
         {% set sc_summary = (business_reports.profit or {}).summary or {} %}
         {% set sc_rows = (business_reports.profit or {}).sales_rows or [] %}
         {% set sc_stages = (business_reports.profit or {}).stages or {'all': {}, 'shipment': {}, 'archive': {}} %}
+        {% set sc_filters = (business_reports.profit or {}).filters or {} %}
+        {% set sc_filter_options = (business_reports.profit or {}).filter_options or {'employees': [], 'clients': [], 'products': []} %}
         <header class="reports-panel-head">
           <div>
             <p class="reports-section-kicker">Прибыль</p>
             <h2>Продажи и себестоимость</h2>
             <p>{{ sc_summary.period }} · документов: {{ sc_rows | length }}</p>
           </div>
-          <form class="reports-profit-period" method="get" action="{{ url_for('home_reports') }}" data-reports-period-form>
+          <form class="reports-profit-period reports-sales-cost-filters" method="get" action="{{ url_for('home_reports') }}" data-reports-period-form>
             <input type="hidden" name="period" value="custom" />
             <input type="hidden" name="open_report" value="sales-cost" />
+            <input type="hidden" name="currency" value="{{ report_currency }}" />
             <label class="sales-journal-filter-field sales-journal-filter-date">
               <span>Период</span>
               <input name="date_from" type="date" value="{{ reports.period_date_from or '' }}" onchange="this.form.submit()" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период продаж и себестоимости" />
               <input id="sales_cost_date_to" name="date_to" type="hidden" value="{{ reports.period_date_to or '' }}" />
             </label>
+            <label class="reports-filter-field">
+              <span>Сотрудник</span>
+              <select name="sales_cost_employee" onchange="this.form.submit()">
+                <option value="">Все</option>
+                {% for employee in sc_filter_options.employees %}
+                  <option value="{{ employee }}" {% if sc_filters.employee == employee %}selected{% endif %}>{{ employee }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="reports-filter-field">
+              <span>Клиент</span>
+              <input name="sales_cost_client" type="search" value="{{ sc_filters.client or '' }}" list="sales-cost-client-list" placeholder="Поиск клиента" />
+            </label>
+            <label class="reports-filter-field">
+              <span>Программа</span>
+              <input name="sales_cost_product" type="search" value="{{ sc_filters.product or '' }}" list="sales-cost-product-list" placeholder="Продукт" />
+            </label>
+            <button class="btn btn-secondary" type="submit">Найти</button>
+            {% if sc_filters.employee or sc_filters.client or sc_filters.product %}
+              <a class="btn btn-secondary" href="{{ url_for('home_reports') }}?period=custom&date_from={{ reports.period_date_from }}&date_to={{ reports.period_date_to }}&open_report=sales-cost&currency={{ report_currency }}">Сбросить</a>
+            {% endif %}
           </form>
+          <datalist id="sales-cost-client-list">
+            {% for client in sc_filter_options.clients %}<option value="{{ client }}"></option>{% endfor %}
+          </datalist>
+          <datalist id="sales-cost-product-list">
+            {% for product in sc_filter_options.products %}<option value="{{ product }}"></option>{% endfor %}
+          </datalist>
           <div class="reports-stock-analysis-tools">
             <button type="button" class="btn btn-secondary" data-sales-cost-export>
               Скачать Excel
