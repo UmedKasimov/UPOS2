@@ -708,10 +708,10 @@
             <div class="product-form-grid product-form-grid--identity">
               <div class="product-dictionary-select">
                 <label>
-                  <span data-product-category-label>{{ "Программа*" if (current.kind or product_filters.kind) == "subscription" else "Категория*" }}</span>
+                  <span data-product-category-label>{{ "Название программы*" if (current.kind or product_filters.kind) == "subscription" else "Категория*" }}</span>
                   <input type="hidden" name="category" value="{{ current.category or '' }}" data-product-dictionary-value="category" />
                   <select data-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
-                    <option value="">{{ "Выберите программу" if (current.kind or product_filters.kind) == "subscription" else "Выберите категорию" }}</option>
+                    <option value="">{{ "Выберите название программы" if (current.kind or product_filters.kind) == "subscription" else "Выберите категорию" }}</option>
                     {% if current.category and current.category not in product_options.categories %}
                       <option value="{{ current.category }}" selected>{{ current.category }}</option>
                     {% endif %}
@@ -724,7 +724,7 @@
                       type="text"
                       autocomplete="off"
                       value="{{ current.category or '' }}"
-                      placeholder="{{ 'Выберите программу' if (current.kind or product_filters.kind) == 'subscription' else 'Выберите категорию' }}"
+                      placeholder="{{ 'Выберите название программы' if (current.kind or product_filters.kind) == 'subscription' else 'Выберите категорию' }}"
                       data-product-dictionary-combo-input
                       {% if not edit_product %}required{% endif %}
                     />
@@ -734,7 +734,7 @@
                     <div class="product-dictionary-combo-panel" data-product-dictionary-combo-panel hidden></div>
                   </div>
                 </label>
-                <button class="products-inline-add-btn" type="button" data-product-dictionary-open data-product-dictionary-type="category" data-product-dictionary-title="Новая категория" aria-label="Создать категорию">+</button>
+                <button class="products-inline-add-btn" type="button" data-product-dictionary-open data-product-dictionary-type="category" data-product-dictionary-title="Новая категория" data-product-program-title="Новая программа" data-product-program-label="Название программы*" aria-label="Создать категорию">+</button>
               </div>
               <div class="product-dictionary-select" data-product-brand-field {% if (current.kind or product_filters.kind) == 'subscription' %}hidden{% endif %}>
                 <label>
@@ -909,12 +909,12 @@
                 form.querySelectorAll('[data-subscription-modifier-required]').forEach(function (input) {
                   input.required = isSubscription && isCreate;
                 });
-                if (categoryLabel) categoryLabel.textContent = isSubscription ? 'Программа*' : 'Категория*';
+                if (categoryLabel) categoryLabel.textContent = isSubscription ? 'Название программы*' : 'Категория*';
                 if (categorySelect && categorySelect.options.length) {
-                  categorySelect.options[0].textContent = isSubscription ? 'Выберите программу' : 'Выберите категорию';
+                  categorySelect.options[0].textContent = isSubscription ? 'Выберите название программы' : 'Выберите категорию';
                 }
                 if (categoryComboInput) {
-                  categoryComboInput.placeholder = isSubscription ? 'Выберите программу' : 'Выберите категорию';
+                  categoryComboInput.placeholder = isSubscription ? 'Выберите название программы' : 'Выберите категорию';
                 }
                 if (brandField) {
                   brandField.hidden = isSubscription;
@@ -1593,8 +1593,9 @@
           if (!quickDialog || !quickInput) return;
           quickType = button.dataset.productDictionaryType || 'category';
           const isBrand = quickType === 'brand';
-          if (quickTitle) quickTitle.textContent = button.dataset.productDictionaryTitle || (isBrand ? 'Новый бренд' : 'Новая категория');
-          if (quickLabel) quickLabel.textContent = isBrand ? 'Название бренда*' : 'Название категории*';
+          const isProgram = !isBrand && document.querySelector('input[name="kind"][value="subscription"]')?.checked;
+          if (quickTitle) quickTitle.textContent = (isProgram && button.dataset.productProgramTitle) || button.dataset.productDictionaryTitle || (isBrand ? 'Новый бренд' : 'Новая категория');
+          if (quickLabel) quickLabel.textContent = (isProgram && button.dataset.productProgramLabel) || (isBrand ? 'Название бренда*' : 'Название категории*');
           if (quickError) {
             quickError.hidden = true;
             quickError.textContent = '';
