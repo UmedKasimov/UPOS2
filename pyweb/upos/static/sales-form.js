@@ -1218,7 +1218,9 @@
     if (line.subscriptionMonths) row.dataset.salesSubscriptionMonths = line.subscriptionMonths;
     var subscriptionMeta = row.querySelector("[data-sales-subscription-line-meta]");
     if (subscriptionMeta && (line.subscriptionProgram || line.subscriptionPlan)) {
-      subscriptionMeta.textContent = [line.subscriptionProgram, line.subscriptionPlan, line.subscriptionMonths ? line.subscriptionMonths + " мес." : ""].filter(Boolean).join(" · ");
+      subscriptionMeta.textContent = rowKind(row) === "subscription" && line.subscriptionMonths
+        ? "Срок: " + line.subscriptionMonths + " мес."
+        : [line.subscriptionProgram, line.subscriptionPlan, line.subscriptionMonths ? line.subscriptionMonths + " мес." : ""].filter(Boolean).join(" · ");
       subscriptionMeta.hidden = false;
     }
     syncRowState(row);
@@ -3497,9 +3499,10 @@
       selections.forEach(function (selection, selectionIndex) {
         var choice = selection.choice;
         var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="subscription"]')).find(function (row) {
+          var programField = row.querySelector('input[name="line_subscription_program"]');
           var planField = row.querySelector('input[name="line_subscription_plan"]');
           return !usedRows.has(row)
-            && normalize(rowProductValue(row)) === normalize(choice.productName)
+            && normalize(programField ? programField.value : "") === normalize(choice.program)
             && normalize(planField ? planField.value : "") === normalize(choice.planName);
         });
         var combo = existingRow
@@ -3509,6 +3512,7 @@
         if (!existingRow) applyProductSelection(root, combo, options, choice.item, true);
         var row = combo.closest(".sales-line-grid");
         if (!row) return;
+        commitCombo(combo, choice.label);
         usedRows.add(row);
         var monthly = selection.monthly;
         var quantityField = row.querySelector('input[name="line_quantity"]');
@@ -3542,7 +3546,7 @@
         row.dataset.salesBaseCurrency = choice.currency;
         var meta = row.querySelector("[data-sales-subscription-line-meta]");
         if (meta) {
-          meta.textContent = choice.program + " · " + choice.planName + " · " + selection.months + " мес.";
+          meta.textContent = "Срок: " + selection.months + " мес.";
           meta.hidden = false;
         }
         syncRowState(row);
