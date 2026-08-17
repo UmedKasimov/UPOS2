@@ -1478,6 +1478,24 @@
     returnTo.value = `${url.pathname}${url.search}`;
   });
 
+  document.addEventListener('click', (event) => {
+    const archiveButton = event.target.closest('.reports-sales-cost-archive-button');
+    if (!archiveButton) return;
+    event.stopPropagation();
+    const form = archiveButton.closest('[data-sales-cost-archive-form]');
+    if (!form || archiveButton.dataset.requestedSubmit === '1') return;
+    archiveButton.dataset.requestedSubmit = '1';
+    event.preventDefault();
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit(archiveButton);
+    } else {
+      form.submit();
+    }
+    setTimeout(() => {
+      archiveButton.dataset.requestedSubmit = '';
+    }, 0);
+  });
+
   const initialProfitStage = new URLSearchParams(window.location.search).get('profit_stage');
   if (['all', 'shipment', 'archive'].includes(initialProfitStage)) {
     applySalesCostStage(initialProfitStage);

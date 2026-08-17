@@ -693,10 +693,15 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
 .reports-sales-cost-action-cell {
   min-width: 8.75rem;
+  position: relative;
+  z-index: 2;
 }
 
 .reports-sales-cost-archive-form {
   margin: 0;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .reports-sales-cost-archive-button {
@@ -705,6 +710,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   border: 1px solid color-mix(in srgb, var(--primary) 38%, var(--border));
   border-radius: var(--workbench-radius-xs, 6px);
   padding: 0.35rem 0.65rem;
+  pointer-events: auto;
   white-space: nowrap;
 }
 
