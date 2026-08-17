@@ -387,7 +387,11 @@
     if (!cleanName) return null;
     const options = readPurchaseOptions();
     const supplierRows = Array.isArray(options.supplier_rows) ? options.supplier_rows : [];
-    return supplierRows.find((supplier) => normalize(supplier?.name) === cleanName) || null;
+    const found = supplierRows.find((supplier) => normalize(supplier?.name) === cleanName);
+    if (found) return found;
+    const fallbackName = (Array.isArray(options.suppliers) ? options.suppliers : [])
+      .find((supplierName) => normalize(supplierName) === cleanName);
+    return fallbackName ? { name: fallbackName, balance: "Нет долга", balance_kind: "zero" } : null;
   }
 
   function updatePurchaseSupplierBalance(picker, supplier) {
@@ -409,6 +413,13 @@
         : "-";
       valueNode.textContent = `Баланс: ${balanceText}`;
     }
+  }
+
+  function syncPurchaseSupplierBalance(form) {
+    const picker = form?.querySelector("[data-warehouse-supplier-picker]");
+    if (!picker) return;
+    const input = picker.querySelector("[data-warehouse-supplier-input]");
+    updatePurchaseSupplierBalance(picker, supplierByName(input?.value || ""));
   }
 
   function commitSupplier(picker, value) {
@@ -1204,6 +1215,7 @@
       openSupplierDialog(form, picker, input.value);
     });
     updatePurchaseSupplierBalance(picker, supplierByName(input.value));
+    requestAnimationFrame(() => updatePurchaseSupplierBalance(picker, supplierByName(input.value)));
   }
 
   function renderProductPicker(form, picker, query) {
@@ -1357,6 +1369,8 @@
       wireProductDialog(form);
       wireExpenseTypeDialog(form);
       syncPurchasePriceTitle(form);
+      syncPurchaseSupplierBalance(form);
+      requestAnimationFrame(() => syncPurchaseSupplierBalance(form));
 
       const rows = () => Array.from(body.querySelectorAll("[data-purchase-entry-row]"));
       const rowHasProduct = (row) => Boolean(row.querySelector('input[name="line_product"]')?.value.trim());
