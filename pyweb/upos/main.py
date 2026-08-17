@@ -12526,11 +12526,8 @@ def create_app() -> FastAPI:
                     Decimal("1"), rounding=ROUND_HALF_UP
                 )
         )
-        payment_age_label = ""
-        payment_age_days = None
-        if amount_value > 0 and Decimal("0") < paid_amount < amount_value:
-            payment_age_days = _purchase_elapsed_days(data.get("date"))
-            payment_age_label = _purchase_elapsed_days_label(data.get("date"))
+        payment_age_days = _purchase_elapsed_days(data.get("date"))
+        payment_age_label = _purchase_elapsed_days_label(data.get("date"))
         raw_lines = data.get("lines") if isinstance(data.get("lines"), list) else []
         safe_lines: list[dict[str, str]] = []
         for line in raw_lines:
