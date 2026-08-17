@@ -7717,6 +7717,38 @@ def create_app() -> FastAPI:
         }
         return item
 
+    def _document_number_sort_value(number: Any) -> tuple[int, str]:
+        text_value = str(number or "")
+        numeric_parts = re.findall(r"\d+", text_value)
+        numeric_value = int(numeric_parts[-1]) if numeric_parts else 0
+        return numeric_value, text_value
+
+    def _document_created_sort_value(row: Any) -> str:
+        created_at = getattr(row, "created_at", None)
+        return created_at.isoformat() if created_at else ""
+
+    def _sales_document_order_key(row: SaleDocument) -> tuple[str, str, int, str]:
+        data = _json_object(row.data)
+        doc_date = str(data.get("date") or "").strip()
+        number_value, number_text = _document_number_sort_value(row.number)
+        return (
+            doc_date or _document_created_sort_value(row)[:10],
+            _document_created_sort_value(row),
+            number_value,
+            number_text,
+        )
+
+    def _purchase_document_order_key(row: PurchaseDocument) -> tuple[str, str, int, str]:
+        data = _json_object(row.data)
+        doc_date = str(data.get("date") or "").strip()
+        number_value, number_text = _document_number_sort_value(row.number)
+        return (
+            doc_date or _document_created_sort_value(row)[:10],
+            _document_created_sort_value(row),
+            number_value,
+            number_text,
+        )
+
     def _sales_crm_index(rows: list[CrmRecord], stages: list[dict[str, str]]) -> dict[str, Any]:
         records_by_id: dict[str, CrmRecord] = {}
         deals_by_counterparty: dict[str, CrmRecord] = {}
@@ -10443,6 +10475,7 @@ def create_app() -> FastAPI:
                     .order_by(SaleDocument.updated_at.desc())
                 ).scalars()
             )
+            rows.sort(key=_sales_document_order_key, reverse=True)
             # Заполняется ниже, в цикле по документам: счётчики должны отражать
             # текущий период и остальные фильтры, иначе вкладки показывали бы
             # общее количество по базе независимо от выбранной даты.
@@ -13198,6 +13231,17 @@ def create_app() -> FastAPI:
             "note": str(data.get("note") or ""),
         }
 
+    def _warehouse_operation_order_key(row: WarehouseOperation) -> tuple[str, str, int, str]:
+        data = _json_object(row.data)
+        doc_date = str(data.get("date") or "").strip()
+        number_value, number_text = _document_number_sort_value(row.number)
+        return (
+            doc_date or _document_created_sort_value(row)[:10],
+            _document_created_sort_value(row),
+            number_value,
+            number_text,
+        )
+
     def _crm_record_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
         item_type = str(form.get("item_type") or "task").strip()
         if item_type not in {"task", "deal", "history"}:
@@ -13508,6 +13552,7 @@ def create_app() -> FastAPI:
                 .order_by(SaleDocument.updated_at.desc())
             ).scalars()
         )
+        sale_rows.sort(key=_sales_document_order_key, reverse=True)
         sales: list[dict[str, Any]] = []
         orders: list[dict[str, Any]] = []
         returns: list[dict[str, Any]] = []
@@ -13885,6 +13930,7 @@ def create_app() -> FastAPI:
                 .order_by(PurchaseDocument.updated_at.desc())
             ).scalars()
         )
+        purchase_rows.sort(key=_purchase_document_order_key, reverse=True)
         purchases: list[dict[str, Any]] = []
         payables: list[dict[str, Any]] = []
         reconciliation_rows: list[dict[str, str]] = []
@@ -14432,6 +14478,7 @@ def create_app() -> FastAPI:
                     .order_by(WarehouseOperation.updated_at.desc())
                 ).scalars()
             )
+            operation_rows.sort(key=_warehouse_operation_order_key, reverse=True)
             purchase_rows = list(
                 session.execute(
                     select(PurchaseDocument)
@@ -14439,6 +14486,7 @@ def create_app() -> FastAPI:
                     .order_by(PurchaseDocument.updated_at.desc())
                 ).scalars()
             )
+            purchase_rows.sort(key=_purchase_document_order_key, reverse=True)
             supplier_rows = list(
                 session.execute(
                     select(Counterparty)
@@ -16482,6 +16530,7 @@ def create_app() -> FastAPI:
                     .order_by(PurchaseDocument.updated_at.desc())
                 ).scalars()
             )
+            purchase_rows.sort(key=_purchase_document_order_key, reverse=True)
             purchase_product_meta = _purchase_line_product_meta(session, wid)
             for row in purchase_rows:
                 item = _purchase_document_data(row, purchase_product_meta)
@@ -21362,6 +21411,9 @@ def create_app() -> FastAPI:
                         .where(WarehouseOperation.workspace_owner_id == wid)
                         .order_by(WarehouseOperation.created_at.desc())
                     ).scalars().all()
+                    sales_rows.sort(key=_sales_document_order_key, reverse=True)
+                    purchase_rows.sort(key=_purchase_document_order_key, reverse=True)
+                    operations.sort(key=_warehouse_operation_order_key, reverse=True)
                     products = session.execute(
                         select(Product)
                         .where(Product.workspace_owner_id == wid)
