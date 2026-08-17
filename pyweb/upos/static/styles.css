@@ -13356,6 +13356,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   --sales-tabs-count: 3;
 }
 
+[data-sales-cost-stages] {
+  --sales-tabs-count: 3;
+}
+
 .products-list-panel[data-workspace-view~="catalog"] .sales-document-tabs {
   --sales-tabs-count: 4;
 }
