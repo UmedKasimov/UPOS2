@@ -16,10 +16,14 @@ for model_name in (
     "ExternalRecord",
     "FinanceAccount",
     "IntegrationSyncRun",
+    "EmployeeOrganization",
+    "Organization",
     "PaymentDocument",
     "Product",
     "PurchaseDocument",
+    "Role",
     "SaleDocument",
+    "User",
     "Warehouse",
 ):
     setattr(models_stub, model_name, type(model_name, (), {}))
@@ -32,6 +36,9 @@ sys.modules["upos.storage"] = storage_stub
 
 from upos.smpro_store import (
     _ibox_cashbox_movements,
+    _ibox_employee_name,
+    _ibox_employee_position,
+    _ibox_employee_username,
     _ibox_payment_credit,
     _ibox_product_data,
     _ibox_price_type_rows,
@@ -43,6 +50,21 @@ from upos.smpro_store import (
 
 
 class SMProStoreTests(unittest.TestCase):
+    def test_ibox_employee_username_uses_stable_remote_id(self) -> None:
+        payload = {"id": 77, "login": "azamat", "name": "Азамжон Умаров"}
+
+        self.assertEqual(_ibox_employee_username(payload), "ibox_77")
+
+    def test_ibox_employee_name_and_position_from_payload(self) -> None:
+        payload = {
+            "first_name": "Азамжон",
+            "last_name": "Умаров",
+            "position": "Отдел продаж",
+        }
+
+        self.assertEqual(_ibox_employee_name(payload), "Умаров Азамжон")
+        self.assertEqual(_ibox_employee_position(payload), "Отдел продаж")
+
     def test_ibox_order_keeps_product_names_and_lines(self) -> None:
         document = _ibox_sales_document_data(
             {

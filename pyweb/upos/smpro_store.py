@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import secrets
+import string
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from passlib.context import CryptContext
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
@@ -19,10 +23,14 @@ from upos.db_models import (
     ExternalRecord,
     FinanceAccount,
     IntegrationSyncRun,
+    EmployeeOrganization,
+    Organization,
     PaymentDocument,
     Product,
     PurchaseDocument,
+    Role,
     SaleDocument,
+    User,
     Warehouse,
 )
 from upos.integrations import integration_configured
@@ -31,6 +39,8 @@ from upos.storage import load_workspace_settings, save_workspace_settings
 
 
 INTEGRATION = "ibox"
+_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_USERNAME_SAFE_RE = re.compile(r"[^a-zA-Z0-9._-]+")
 
 
 def _json_copy(value: Any) -> Any:
@@ -92,6 +102,57 @@ def _bool_value(value: Any, default: bool = True) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() not in {"0", "false", "no", "off", "inactive"}
+
+
+def _ibox_user_external_id(payload: dict[str, Any]) -> str:
+    value = _walk(payload, "id", "user_id", "uuid", "guid", "code", "login", "username", "phone")
+    if value not in (None, "") and not isinstance(value, (dict, list)):
+        return str(value).strip()[:80]
+    return _identity_key(payload, "users").split(":")[-1][:32]
+
+
+def _ibox_employee_username(payload: dict[str, Any]) -> str:
+    external_id = _ibox_user_external_id(payload)
+    source = str(external_id or _walk(payload, "login", "username") or "").strip()
+    source = _USERNAME_SAFE_RE.sub("_", source).strip("._-")
+    if not source or len(source) < 2:
+        source = f"user_{external_id}" if external_id else "user"
+    username = f"ibox_{source}"[:64].strip("._-")
+    if len(username) < 2:
+        username = f"ibox_{hashlib.sha1(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:10]}"
+    return username
+
+
+def _ibox_employee_name(payload: dict[str, Any]) -> str:
+    direct = _text(payload, "full_name", "fio", "name", "title", "display_name")
+    if direct:
+        return direct[:160]
+    parts = [
+        _text(payload, "last_name", "surname"),
+        _text(payload, "first_name"),
+        _text(payload, "middle_name", "patronymic"),
+    ]
+    name = " ".join(part for part in parts if part).strip()
+    return name[:160]
+
+
+def _ibox_employee_position(payload: dict[str, Any]) -> str:
+    return (
+        _text(payload, "position", "job_title", "role_name", "role", "team_name", "team")
+        or "IBOX"
+    )[:160]
+
+
+def _ibox_employee_email(payload: dict[str, Any]) -> str:
+    email = _scalar(payload, "email", "mail")
+    return email.lower()[:320] if "@" in email else ""
+
+
+def _ibox_employee_active(payload: dict[str, Any]) -> bool:
+    return _bool_value(
+        _walk(payload, "is_active", "active", "enabled", "status"),
+        True,
+    )
 
 
 def _ibox_price_type_id(filial_id: Any, remote_id: Any) -> str:
@@ -1195,6 +1256,131 @@ def _sync_ibox_accounts(session, workspace_owner_id: str) -> None:
             account.is_active = False
 
 
+def _workspace_employee_owner_and_org(session, workspace_owner_id: str) -> tuple[str, str]:
+    wid = str(workspace_owner_id or "").strip()
+    organization = session.get(Organization, wid) if wid else None
+    if organization is not None:
+        return str(organization.owner_user_id or "").strip(), str(organization.id or "").strip()
+    owner_id = wid
+    default_org = session.scalar(
+        select(Organization)
+        .where(Organization.owner_user_id == owner_id, Organization.is_active.is_(True))
+        .order_by(Organization.is_default.desc(), func.lower(Organization.name), Organization.id)
+        .limit(1)
+    )
+    return owner_id, str(default_org.id if default_org else "")
+
+
+def _employee_role_id_for_import(session, workspace_owner_id: str, owner_user_id: str) -> str:
+    role = session.scalar(
+        select(Role)
+        .where(Role.workspace_owner_id.in_([workspace_owner_id, owner_user_id]), Role.key == "cashier")
+        .order_by((Role.workspace_owner_id == workspace_owner_id).desc())
+        .limit(1)
+    )
+    return str(role.id or "") if role is not None else ""
+
+
+def _employee_email_available(session, email: str, employee_id: str = "") -> bool:
+    clean = str(email or "").strip().lower()
+    if not clean:
+        return False
+    stmt = select(User.id).where(func.lower(User.email) == clean)
+    if employee_id:
+        stmt = stmt.where(User.id != employee_id)
+    return session.scalar(stmt.limit(1)) is None
+
+
+def _temporary_employee_password_hash() -> str:
+    alphabet = string.ascii_letters + string.digits
+    password = "".join(secrets.choice(alphabet) for _ in range(18))
+    return _pwd.hash(password)
+
+
+def _sync_ibox_employees(
+    session,
+    workspace_owner_id: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    if not rows:
+        return
+    owner_user_id, organization_id = _workspace_employee_owner_and_org(session, workspace_owner_id)
+    if not owner_user_id:
+        return
+    owner = session.get(User, owner_user_id)
+    if owner is None or str(owner.role or "") != "user" or owner.employer_user_id:
+        return
+    employee_role_id = _employee_role_id_for_import(session, workspace_owner_id, owner_user_id)
+    for payload in rows:
+        if not isinstance(payload, dict):
+            continue
+        remote_id = _ibox_user_external_id(payload)
+        if not remote_id:
+            continue
+        username = _ibox_employee_username(payload)
+        existing = session.scalar(
+            select(User).where(
+                User.employer_user_id == owner_user_id,
+                func.lower(User.username) == username.lower(),
+            )
+        )
+        if existing is None:
+            collision = session.scalar(select(User.id).where(func.lower(User.username) == username.lower()).limit(1))
+            if collision is not None:
+                suffix = hashlib.sha1(f"{owner_user_id}:{remote_id}".encode("utf-8")).hexdigest()[:8]
+                username = f"{username[:55]}_{suffix}".strip("._-")
+                existing = session.scalar(
+                    select(User).where(
+                        User.employer_user_id == owner_user_id,
+                        func.lower(User.username) == username.lower(),
+                    )
+                )
+        name = _ibox_employee_name(payload) or username
+        email = _ibox_employee_email(payload)
+        position = _ibox_employee_position(payload)
+        if existing is None:
+            employee = User(
+                id=str(uuid.uuid4()),
+                username=username,
+                email=None,
+                password_hash=_temporary_employee_password_hash(),
+                name=name,
+                role="user",
+                employer_user_id=owner_user_id,
+                organization_id=organization_id or None,
+                position=position,
+                staff_role="viewer",
+                employee_role_id=employee_role_id or None,
+                is_frozen=not _ibox_employee_active(payload),
+            )
+            if email and _employee_email_available(session, email):
+                employee.email = email
+            session.add(employee)
+            session.flush()
+        else:
+            employee = existing
+            employee.name = name
+            employee.position = position
+            employee.organization_id = organization_id or employee.organization_id
+            employee.staff_role = employee.staff_role or "viewer"
+            if employee_role_id and not employee.employee_role_id:
+                employee.employee_role_id = employee_role_id
+            employee.is_frozen = not _ibox_employee_active(payload)
+            if email and _employee_email_available(session, email, str(employee.id)):
+                employee.email = email
+        if organization_id:
+            has_access = session.scalar(
+                select(EmployeeOrganization.employee_id)
+                .where(
+                    EmployeeOrganization.employee_id == employee.id,
+                    EmployeeOrganization.organization_id == organization_id,
+                )
+                .limit(1)
+            )
+            if has_access is None:
+                session.add(EmployeeOrganization(employee_id=employee.id, organization_id=organization_id))
+
+
 def _run_dict(run: IntegrationSyncRun) -> dict[str, Any]:
     error = str(run.error or "")
     if "codec can't encode" in error or "ordinal not in range" in error:
@@ -1567,6 +1753,7 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
     ordered = (
         "filials",
         "offices",
+        "users",
         "clients",
         "warehouses",
         "products",
@@ -1629,6 +1816,8 @@ def _store_entities(workspace_owner_id: str, entities: dict[str, list[dict[str, 
             )
         ):
             _sync_ibox_accounts(session, workspace_owner_id)
+        if "users" in entities:
+            _sync_ibox_employees(session, workspace_owner_id, entities.get("users") or [])
     _sync_ibox_price_types(
         workspace_owner_id,
         entities.get("price_types") or [],
