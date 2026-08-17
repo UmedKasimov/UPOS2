@@ -1579,30 +1579,32 @@
                     <span class="settings-profile-field-label">Количество</span>
                     <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-quantity required />
                   </label>
-                  <label class="settings-profile-field">
-                    <span class="settings-profile-field-label">Месяцы</span>
-                    <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-months required />
-                  </label>
                   <button type="button" class="sales-subscription-remove-row" data-sales-subscription-remove-row aria-label="Удалить подписку" title="Удалить подписку">×</button>
                   <p class="sales-subscription-description" data-sales-subscription-description hidden></p>
                 </div>
               </template>
-              <div class="sales-subscription-discount">
-                <label class="settings-profile-field">
-                  <span class="settings-profile-field-label">Ручная скидка</span>
-                  <div class="sales-subscription-discount-control">
-                    <input class="settings-profile-input" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal" data-sales-subscription-discount />
-                    <select class="settings-profile-input" data-sales-subscription-discount-unit aria-label="Тип скидки">
-                      <option value="percent">%</option>
-                      <option value="amount">Сумма</option>
-                    </select>
-                  </div>
-                </label>
-              </div>
               <div class="sales-subscription-summary" data-sales-subscription-summary>
-                <span data-sales-subscription-total-label>Итого за период</span>
-                <strong data-sales-subscription-total>0 UZS</strong>
+                <label class="sales-subscription-common-months">
+                  <span>Месяцы</span>
+                  <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-months required />
+                </label>
+                <button type="button" class="sales-subscription-total-trigger" data-sales-subscription-discount-toggle aria-expanded="false" title="Добавить скидку">
+                  <span data-sales-subscription-total-label>Итого за период</span>
+                  <strong data-sales-subscription-total>0 UZS</strong>
+                </button>
                 <small data-sales-subscription-formula></small>
+                <div class="sales-subscription-discount" data-sales-subscription-discount-panel hidden>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Ручная скидка</span>
+                    <div class="sales-subscription-discount-control">
+                      <input class="settings-profile-input" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal" data-sales-subscription-discount />
+                      <select class="settings-profile-input" data-sales-subscription-discount-unit aria-label="Тип скидки">
+                        <option value="percent">%</option>
+                        <option value="amount">Сумма</option>
+                      </select>
+                    </div>
+                  </label>
+                </div>
               </div>
               <div class="sales-subscription-empty" data-sales-subscription-empty hidden>
                 В разделе «Товары» пока нет доступных подписок.
@@ -2001,7 +2003,7 @@
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=38" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=5" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=74" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=75" defer></script>
   {% if sales_embed %}
     <script>
       (() => {

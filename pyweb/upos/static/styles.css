@@ -10885,7 +10885,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-subscription-line {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(6rem, 0.32fr) minmax(6rem, 0.32fr) 2rem;
+  grid-template-columns: minmax(12rem, 1fr) minmax(6rem, 0.32fr) 2rem;
   align-items: end;
   gap: 0.65rem;
   padding: 0.7rem;
@@ -10913,13 +10913,20 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-subscription-discount {
+  grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.75rem;
+  justify-self: stretch;
+  padding-top: 0.55rem;
+  border-top: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+}
+
+.sales-subscription-discount[hidden] {
+  display: none;
 }
 
 .sales-subscription-discount > label {
-  width: min(15rem, 100%);
+  width: min(17rem, 100%);
 }
 
 .sales-subscription-discount-control {
@@ -10936,13 +10943,43 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .sales-subscription-summary {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: baseline;
+  align-items: center;
   gap: 0.25rem 1rem;
   margin-top: 0.9rem;
   padding: 0.85rem 0.95rem;
   border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 7%, var(--card));
+}
+
+.sales-subscription-common-months {
+  display: grid;
+  grid-template-columns: auto 4.5rem;
+  align-items: center;
+  gap: 0.55rem;
+  width: max-content;
+}
+
+.sales-subscription-common-months input {
+  min-width: 0;
+  text-align: center;
+}
+
+.sales-subscription-total-trigger {
+  display: grid;
+  justify-items: end;
+  gap: 0.12rem;
+  min-width: 0;
+  padding: 0.2rem 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sales-subscription-total-trigger:hover strong,
+.sales-subscription-total-trigger:focus-visible strong {
+  color: var(--primary);
 }
 
 .sales-subscription-summary span {
@@ -10983,11 +11020,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   }
 
   .sales-subscription-line {
-    grid-template-columns: 1fr 1fr 2rem;
+    grid-template-columns: 1fr 2rem;
   }
 
   .sales-subscription-plan-field {
     grid-column: 1 / -1;
+  }
+
+  .sales-subscription-summary {
+    grid-template-columns: 1fr auto;
   }
 }
 
