@@ -89,6 +89,7 @@
               data-crm-task-row
               data-task-title="{{ row.title|e }}"
               data-task-client="{{ row.client|e }}"
+              data-task-order="{{ row.related_sale_number|e }}"
               data-task-responsible="{{ row.responsible|e }}"
               data-task-priority="{{ row.priority|e }}"
               data-task-status="{{ row.status|e }}"
@@ -114,7 +115,10 @@
                 >{{ row.title }}</button>
                 {% if row.next_step %}<small>{{ row.next_step }}</small>{% endif %}
               </td>
-              <td>{{ row.client or "—" }}</td>
+              <td>
+                {{ row.client or "—" }}
+                {% if row.related_sale_number %}<small>Заказ № {{ row.related_sale_number }}</small>{% endif %}
+              </td>
               <td>{{ row.responsible or "Не назначен" }}</td>
               <td><span class="crm-task-priority crm-task-priority--{{ row.priority }}">{{ row.priority_label }}</span></td>
               <td>{{ row.due_date or "Без срока" }}</td>
@@ -624,6 +628,24 @@
               <option value="{{ item.name }}" data-checklist="{{ item.checklist_text|e }}">{{ item.name }}</option>
               {% endfor %}
             </select>
+          </label>
+          <label class="crm-order-picker-field" data-crm-task-only hidden>
+            <span>Заказ клиента</span>
+            <select name="related_sale_id" data-crm-order-select hidden>
+              <option value="">Не выбрано</option>
+              {% for item in crm_options.orders %}
+                <option
+                  value="{{ item.id }}"
+                  data-number="{{ item.number|e }}"
+                  data-client="{{ item.client|e }}"
+                  data-amount="{{ item.amount|e }}"
+                  data-currency="{{ item.currency|e }}"
+                  data-date="{{ item.date|e }}"
+                >№ {{ item.number }}{% if item.client %} · {{ item.client }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <input autocomplete="off" data-crm-order-input placeholder="Номер заказа или клиент" />
+            <div class="sales-combo-panel sales-combo-panel--wide" data-crm-order-panel hidden></div>
           </label>
           <label data-crm-deal-create-field data-crm-task-hidden><span>Канал · Откуда о нас узнали</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
           <label class="wide crm-deal-contact-field" data-crm-deal-create-field data-crm-task-hidden>

@@ -1273,12 +1273,15 @@
     const responsibleInput = form?.querySelector('input[name="responsible"]');
     const dealSelect = form?.querySelector("[data-crm-deal-select]");
     const dealInput = form?.querySelector("[data-crm-deal-input]");
+    const orderSelect = form?.querySelector("[data-crm-order-select]");
+    const orderInput = form?.querySelector("[data-crm-order-input]");
     const contactInput = form?.querySelector('input[name="contact"]');
     const duplicateNote = dialog.querySelector("[data-crm-client-duplicate]");
     const contactMatchNote = dialog.querySelector("[data-crm-contact-match]");
     const clientPanel = dialog.querySelector("[data-crm-client-panel]");
     const responsiblePanel = dialog.querySelector("[data-crm-responsible-panel]");
     const dealPanel = dialog.querySelector("[data-crm-deal-panel]");
+    const orderPanel = dialog.querySelector("[data-crm-order-panel]");
     const taskTypeSelect = form?.querySelector("[data-crm-task-type-select]");
     const taskChecklist = form?.querySelector("[data-crm-task-checklist]");
     const clientRows = Array.from(document.querySelectorAll("#crm-client-list option"))
@@ -1299,6 +1302,17 @@
         title: String(option.dataset.title || option.textContent || "").trim(),
         client: String(option.dataset.client || "").trim(),
         amount: String(option.dataset.amount || "").trim(),
+      }))
+      .filter((item) => item.id);
+    const orderRows = Array.from(orderSelect?.options || [])
+      .map((option) => ({
+        id: String(option.value || "").trim(),
+        label: String(option.textContent || "").trim(),
+        number: String(option.dataset.number || "").trim(),
+        client: String(option.dataset.client || "").trim(),
+        amount: String(option.dataset.amount || "").trim(),
+        currency: String(option.dataset.currency || "").trim(),
+        date: String(option.dataset.date || "").trim(),
       }))
       .filter((item) => item.id);
     const existingClients = new Set(clientRows.map((item) => item.name.toLocaleLowerCase()));
@@ -1502,6 +1516,76 @@
       });
     };
 
+    const positionOrderPanel = () => {
+      if (!orderInput || !orderPanel || orderPanel.hidden) return;
+      const rect = orderInput.getBoundingClientRect();
+      const width = Math.min(Math.max(rect.width, 360), window.innerWidth - 24);
+      orderPanel.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+      orderPanel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 96)}px`;
+      orderPanel.style.width = `${width}px`;
+    };
+
+    const closeOrderPanel = () => {
+      if (!orderPanel) return;
+      orderPanel.hidden = true;
+      orderPanel.innerHTML = "";
+    };
+
+    const syncOrderDisplay = () => {
+      if (!orderInput || !orderSelect) return;
+      const selected = orderRows.find((item) => item.id === String(orderSelect.value || ""));
+      orderInput.value = selected ? [`№ ${selected.number}`, selected.client].filter(Boolean).join(" · ") : "";
+    };
+
+    const chooseOrder = (item) => {
+      if (!orderSelect || !orderInput) return;
+      orderSelect.value = item?.id || "";
+      syncOrderDisplay();
+      orderSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      if (item?.client && clientInput) {
+        clientInput.value = item.client;
+        clientInput.dispatchEvent(new Event("input", { bubbles: true }));
+        clientInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      closeOrderPanel();
+    };
+
+    const renderOrderPanel = () => {
+      if (!orderInput || !orderPanel) return;
+      const query = String(orderInput.value || "").trim().toLocaleLowerCase();
+      const rows = orderRows
+        .filter((item) => {
+          const hay = `${item.number} ${item.client} ${item.amount} ${item.currency} ${item.date}`.toLocaleLowerCase();
+          return !query || hay.includes(query);
+        })
+        .slice(0, 80);
+      orderPanel.innerHTML =
+        '<button type="button" class="sales-combo-option" data-crm-order-choice data-order-index="-1">' +
+        '<span class="sales-combo-main">Не выбрано</span>' +
+        '<span class="sales-combo-meta"><span>Без привязки к заказу</span><strong></strong></span>' +
+        "</button>" +
+        (rows.length
+          ? rows
+              .map((item, index) => (
+                `<button type="button" class="sales-combo-option" data-crm-order-choice data-order-index="${index}">` +
+                `<span class="sales-combo-main">№ ${escapeHtml(item.number)}</span>` +
+                `<span class="sales-combo-meta"><span>${escapeHtml(item.client || "Клиент не указан")}</span>` +
+                `<strong>${escapeHtml([item.amount, item.currency, item.date].filter(Boolean).join(" · "))}</strong></span>` +
+                "</button>"
+              ))
+              .join("")
+          : '<div class="sales-combo-empty">Заказы не найдены</div>');
+      orderPanel.hidden = false;
+      positionOrderPanel();
+      orderPanel.querySelectorAll("[data-crm-order-choice]").forEach((button) => {
+        button.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          const index = Number.parseInt(button.dataset.orderIndex || "-1", 10);
+          chooseOrder(index >= 0 ? rows[index] : null);
+        });
+      });
+    };
+
     const syncContactMatch = () => {
       if (!contactInput || !contactMatchNote || !clientInput) return;
       const match = clientsByPhone.get(normalizePhone(contactInput.value));
@@ -1609,6 +1693,7 @@
       setField("record_id", "");
       if (taskChecklist) delete taskChecklist.dataset.crmTaskAutofilled;
       syncDealDisplay();
+      syncOrderDisplay();
       if (title) title.textContent = "Новая запись";
       if (subtitle) subtitle.textContent = "Сделка, задача или история контакта";
       if (submit) submit.textContent = "Сохранить запись";
@@ -1702,6 +1787,13 @@
     dealInput?.addEventListener("focus", renderDealPanel);
     dealInput?.addEventListener("click", renderDealPanel);
     dealSelect?.addEventListener("change", syncDealDisplay);
+    orderInput?.addEventListener("input", () => {
+      if (orderSelect) orderSelect.value = "";
+      renderOrderPanel();
+    });
+    orderInput?.addEventListener("focus", renderOrderPanel);
+    orderInput?.addEventListener("click", renderOrderPanel);
+    orderSelect?.addEventListener("change", syncOrderDisplay);
     taskTypeSelect?.addEventListener("change", () => applyTaskTypeChecklist(true));
     taskChecklist?.addEventListener("input", () => {
       if (document.activeElement === taskChecklist) delete taskChecklist.dataset.crmTaskAutofilled;
@@ -1709,9 +1801,11 @@
     window.addEventListener("resize", positionClientPanel);
     window.addEventListener("resize", positionResponsiblePanel);
     window.addEventListener("resize", positionDealPanel);
+    window.addEventListener("resize", positionOrderPanel);
     window.addEventListener("scroll", positionClientPanel, true);
     window.addEventListener("scroll", positionResponsiblePanel, true);
     window.addEventListener("scroll", positionDealPanel, true);
+    window.addEventListener("scroll", positionOrderPanel, true);
     document.addEventListener("mousedown", (event) => {
       if (!clientPanel || !clientInput) return;
       if (event.target === clientInput || clientPanel.contains(event.target)) return;
@@ -1727,11 +1821,27 @@
       if (event.target === dealInput || dealPanel.contains(event.target)) return;
       closeDealPanel();
     });
+    document.addEventListener("mousedown", (event) => {
+      if (!orderPanel || !orderInput) return;
+      if (event.target === orderInput || orderPanel.contains(event.target)) return;
+      closeOrderPanel();
+    });
     contactInput?.addEventListener("input", syncContactMatch);
     document.addEventListener("crm:edit-record", (event) => {
       const payload = parsePayload(event.detail?.payload);
       if (!payload?.id) return;
       openDialog(payload.item_type || "deal", payload, "edit");
+    });
+    document.addEventListener("crm:create-task", (event) => {
+      const dueDate = String(event.detail?.dueDate || new Date().toISOString().slice(0, 10));
+      openDialog("task", {
+        item_type: "task",
+        date: dueDate,
+        due_date: dueDate,
+        status: "planned",
+        priority: "normal",
+        currency: "UZS",
+      }, "create");
     });
     document.querySelectorAll("[data-crm-followup]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1872,7 +1982,8 @@
         const matchesSearch =
           !search ||
           normalize(row.dataset.taskTitle).includes(search) ||
-          normalize(row.dataset.taskClient).includes(search);
+          normalize(row.dataset.taskClient).includes(search) ||
+          normalize(row.dataset.taskOrder).includes(search);
         const matchesResponsible = !responsible || row.dataset.taskResponsible === responsible;
         const matchesPriority = !priority || row.dataset.taskPriority === priority;
         const matchesDate = !date || row.dataset.taskDueDate === date;
@@ -1923,6 +2034,8 @@
         if (dateKey === today) day.classList.add("is-today");
         if (date.getDay() === 0 || date.getDay() === 6) day.classList.add("is-weekend");
         day.dataset.date = dateKey;
+        day.tabIndex = 0;
+        day.title = `Добавить задачу на ${dateKey}`;
 
         const number = document.createElement("span");
         number.className = "crm-task-calendar-date";
@@ -1940,7 +2053,10 @@
           task.title = [row.dataset.taskTitle, row.dataset.taskResponsible]
             .filter(Boolean)
             .join(" · ");
-          task.addEventListener("click", () => openTask(row));
+          task.addEventListener("click", (event) => {
+            event.stopPropagation();
+            openTask(row);
+          });
           day.append(task);
         });
         if (dayTasks.length > 4) {
@@ -1949,6 +2065,15 @@
           more.textContent = `Ещё ${dayTasks.length - 4}`;
           day.append(more);
         }
+        const createTask = () => {
+          document.dispatchEvent(new CustomEvent("crm:create-task", { detail: { dueDate: dateKey } }));
+        };
+        day.addEventListener("click", createTask);
+        day.addEventListener("keydown", (event) => {
+          if (event.target !== day || !["Enter", " "].includes(event.key)) return;
+          event.preventDefault();
+          createTask();
+        });
         calendar.append(day);
       }
     };

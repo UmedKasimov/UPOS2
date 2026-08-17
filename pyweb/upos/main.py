@@ -12925,6 +12925,7 @@ def create_app() -> FastAPI:
             "stage": str(form.get("stage") or "").strip(),
             "stage_id": str(form.get("stage_id") or "").strip(),
             "related_deal_id": str(form.get("related_deal_id") or "").strip(),
+            "related_sale_id": str(form.get("related_sale_id") or "").strip(),
             "lead_source": str(form.get("lead_source") or form.get("contact_type") or "").strip(),
             "contact_type": str(form.get("contact_type") or "").strip(),
             "chat_ref": str(form.get("chat_ref") or "").strip(),
@@ -12940,6 +12941,45 @@ def create_app() -> FastAPI:
         if data["priority"] not in CRM_PRIORITY_LABELS:
             data["priority"] = "normal"
         return data, amount, currency
+
+    def _crm_apply_related_order(session: Any, workspace_owner_id: str, data: dict[str, Any]) -> str | None:
+        if data.get("item_type") != "task":
+            return None
+        related_sale_id = str(data.get("related_sale_id") or "").strip()
+        if not related_sale_id:
+            data.pop("related_sale_number", None)
+            data.pop("related_sale_type", None)
+            if data.get("item_type") == "task":
+                data["sales_document_ids"] = []
+            return None
+        sale_row = session.get(SaleDocument, related_sale_id)
+        sale_data = _json_object(sale_row.data) if sale_row else {}
+        if (
+            sale_row is None
+            or sale_row.workspace_owner_id != workspace_owner_id
+            or str(sale_data.get("doc_type") or "sale") != "order"
+        ):
+            data["related_sale_id"] = ""
+            data.pop("related_sale_number", None)
+            data.pop("related_sale_type", None)
+            if data.get("item_type") == "task":
+                data["sales_document_ids"] = []
+            return None
+        data["related_sale_number"] = str(sale_row.number or "")
+        data["related_sale_type"] = "order"
+        if data.get("item_type") == "task":
+            data["sales_document_ids"] = [sale_row.id]
+        counterparty_id = str(sale_row.counterparty_id or sale_data.get("counterparty_id") or "").strip()
+        client_name = str(sale_data.get("client") or "").strip()
+        if counterparty_id:
+            counterparty = session.get(Counterparty, counterparty_id)
+            if counterparty and counterparty.workspace_owner_id == workspace_owner_id:
+                client_name = str(counterparty.name or client_name).strip()
+            else:
+                counterparty_id = ""
+        if client_name:
+            data["client"] = client_name
+        return counterparty_id or None
 
     def _crm_record_data(row: CrmRecord) -> dict[str, Any]:
         data = _json_object(row.data)
@@ -12975,6 +13015,9 @@ def create_app() -> FastAPI:
             "stage": str(data.get("stage") or ""),
             "stage_id": str(data.get("stage_id") or ""),
             "related_deal_id": str(data.get("related_deal_id") or ""),
+            "related_sale_id": str(data.get("related_sale_id") or ""),
+            "related_sale_number": str(data.get("related_sale_number") or ""),
+            "related_sale_type": str(data.get("related_sale_type") or ""),
             "lead_source": str(data.get("lead_source") or ""),
             "contact_type": str(data.get("contact_type") or ""),
             "chat_ref": str(data.get("chat_ref") or ""),
@@ -13009,6 +13052,7 @@ def create_app() -> FastAPI:
             "lead_source",
             "stage_id",
             "related_deal_id",
+            "related_sale_id",
             "service_type",
             "priority",
             "contact_type",
@@ -16391,7 +16435,7 @@ def create_app() -> FastAPI:
         summary_pipeline_total = Decimal("0")
         summary_won = 0
         summary_lost = 0
-        crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": []}
+        crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": [], "orders": []}
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_task_types = _crm_clean_task_types(crm_workspace_settings.get("crm_task_types"))
@@ -16429,6 +16473,7 @@ def create_app() -> FastAPI:
             sale_by_key: dict[str, dict[str, Any]] = {}
             sales_by_key: dict[str, list[dict[str, Any]]] = {}
             sale_by_id: dict[str, dict[str, Any]] = {}
+            order_options: list[dict[str, str]] = []
             for sale_row in session.execute(
                 select(SaleDocument)
                 .where(SaleDocument.workspace_owner_id == wid)
@@ -16438,6 +16483,17 @@ def create_app() -> FastAPI:
                 sale_item = _sales_document_data(sale_row)
                 sale_item["amount_value"] = _sales_decimal(sale_row.amount)
                 sale_by_id[str(sale_row.id)] = sale_item
+                if str(sale_item.get("doc_type") or "") == "order":
+                    order_options.append(
+                        {
+                            "id": str(sale_row.id),
+                            "number": str(sale_item.get("number") or ""),
+                            "client": str(sale_item.get("client") or ""),
+                            "amount": str(sale_item.get("amount") or "0"),
+                            "currency": str(sale_item.get("currency") or "UZS"),
+                            "date": str(sale_item.get("date") or ""),
+                        }
+                    )
                 keys = {
                     str(sale_data.get("counterparty_id") or sale_row.counterparty_id or "").strip(),
                     str(sale_data.get("client") or "").strip().lower(),
@@ -16808,6 +16864,7 @@ def create_app() -> FastAPI:
                     | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())
                 ),
                 "deals": deal_options,
+                "orders": order_options,
             }
         crm_kanban_columns = []
         for stage in crm_stages:
@@ -20093,13 +20150,15 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=f"/crm?error={quote(validation_error)}#{target_hash}", status_code=302)
         _crm_append_activity(data, "Карточка создана", _crm_actor_name(request))
         with session_scope() as session:
-            counterparty_id = None
+            counterparty_id = _crm_apply_related_order(session, wid, data)
             contact_match = (
                 _counterparty_duplicate(session, wid, phone=data["contact"])
                 if data["contact"]
                 else None
             )
-            if contact_match and contact_match[1] == "phone":
+            if counterparty_id:
+                pass
+            elif contact_match and contact_match[1] == "phone":
                 counterparty = contact_match[0]
                 # Имя клиента, введённое человеком, не перетираем: совпадение
                 # идёт по последним 9 цифрам, и общий номер офиса подставлял
@@ -20155,13 +20214,15 @@ def create_app() -> FastAPI:
             row = session.get(CrmRecord, record_id)
             if not row or row.workspace_owner_id != wid:
                 return RedirectResponse(url="/crm?error=" + quote("CRM-запись не найдена") + "#tasks", status_code=302)
-            counterparty_id = None
+            counterparty_id = _crm_apply_related_order(session, wid, data)
             contact_match = (
                 _counterparty_duplicate(session, wid, phone=data["contact"])
                 if data["contact"]
                 else None
             )
-            if contact_match and contact_match[1] == "phone":
+            if counterparty_id:
+                pass
+            elif contact_match and contact_match[1] == "phone":
                 counterparty = contact_match[0]
                 # Имя клиента, введённое человеком, не перетираем: совпадение
                 # идёт по последним 9 цифрам, и общий номер офиса подставлял
@@ -20178,15 +20239,16 @@ def create_app() -> FastAPI:
             data["activity_log"] = list(old_log)
             # Форма карточки не знает про служебные поля, а payload собирается
             # с нуля: без переноса терялись связь с продажами и признак архива.
-            for carry_key in (
-                "related_sale_id",
-                "related_sale_number",
-                "related_sale_type",
-                "sales_document_ids",
-                "archived_status",
-                "archived_at",
-                "counterparty_id",
-            ):
+            carry_keys = ["archived_status", "archived_at", "counterparty_id"]
+            if data.get("item_type") != "task":
+                carry_keys = [
+                    "related_sale_id",
+                    "related_sale_number",
+                    "related_sale_type",
+                    "sales_document_ids",
+                    *carry_keys,
+                ]
+            for carry_key in carry_keys:
                 if carry_key in old_data and not data.get(carry_key):
                     data[carry_key] = old_data[carry_key]
             if counterparty_id:

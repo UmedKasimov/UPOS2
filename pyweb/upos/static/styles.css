@@ -31450,6 +31450,15 @@ html.dark .sales-installation-calendar-order.is-completed {
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   background: var(--card);
+  cursor: pointer;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.crm-task-calendar-day:hover,
+.crm-task-calendar-day:focus-visible {
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 55%, transparent);
+  outline: none;
 }
 
 .crm-task-calendar-day.is-weekend {
