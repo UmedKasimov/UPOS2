@@ -1146,7 +1146,7 @@
                     <td>
                       <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
                         <div class="sales-lock-field">
-                          <input name="line_product" autocomplete="off" placeholder="Товар или услуга" data-sales-combo-input />
+                          <input name="line_product" autocomplete="off" placeholder="Товар" data-sales-combo-input />
                           <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
                         </div>
                         <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
@@ -1242,6 +1242,79 @@
                     <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
                   </label>
                   <input type="hidden" name="line_warehouse" value="Услуги" />
+                  <input type="hidden" name="line_subscription_program" />
+                  <input type="hidden" name="line_subscription_plan" />
+                  <input type="hidden" name="line_subscription_months" />
+                </td>
+                <td class="sales-line-category" data-sales-line-category></td>
+                <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                <td class="sales-line-discount-cell">
+                  <div class="sales-discount-control" data-sales-discount>
+                    <button type="button" class="sales-discount-mode" data-sales-discount-mode-button data-mode="discount">-</button>
+                    <input type="hidden" name="line_discount_mode" value="discount" data-sales-discount-mode />
+                    <div class="sales-discount-menu" data-sales-discount-menu hidden>
+                      <button type="button" data-sales-discount-pick="discount">- Скидка</button>
+                      <button type="button" data-sales-discount-pick="markup">+ Наценка</button>
+                    </div>
+                    <input name="line_discount_value" value="0" inputmode="decimal" data-sales-discount-value />
+                    <select name="line_discount_unit" data-sales-discount-unit>
+                      <option value="percent">%</option>
+                      <option value="amount">UZS</option>
+                    </select>
+                  </div>
+                </td>
+                <td class="sales-line-total" data-sales-line-total></td>
+                <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
+              </tr>
+            </template>
+
+            <div class="sales-services-block" data-sales-subscriptions-block hidden>
+              <div class="sales-section-head sales-section-head--sub">
+                <h3>Подписки</h3>
+              </div>
+              <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+                <table class="products-table products-catalog-table sales-lines-table sales-services-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Подписка</th>
+                      <th>Программа</th>
+                      <th>К-во</th>
+                      <th>Цена</th>
+                      <th>Скидка</th>
+                      <th>Сумма</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody data-sales-subscriptions-body></tbody>
+                  <tfoot>
+                    <tr class="sales-subtotal-row" data-sales-total-trigger-kind="subscription" role="button" tabindex="0" title="Изменить сумму подписок">
+                      <td colspan="3">Итого подписки</td>
+                      <td><output data-sales-subscriptions-quantity>0</output></td>
+                      <td></td>
+                      <td></td>
+                      <td><output data-sales-subscriptions-total>0 UZS</output></td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <template id="sales-subscription-row-template">
+              <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--service" data-sales-line-kind="subscription">
+                <td class="sales-line-number"></td>
+                <td>
+                  <label class="sales-combobox sales-product-picker" data-sales-combobox="subscription">
+                    <div class="sales-lock-field">
+                      <input name="line_product" autocomplete="off" placeholder="Подписка" data-sales-combo-input />
+                      <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить подписку" title="Сменить подписку" hidden>✎</button>
+                    </div>
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                    <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
+                  </label>
+                  <input type="hidden" name="line_warehouse" value="Подписки" />
                   <input type="hidden" name="line_subscription_program" />
                   <input type="hidden" name="line_subscription_plan" />
                   <input type="hidden" name="line_subscription_months" />
@@ -1916,7 +1989,7 @@
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=38" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=4" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=72" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=73" defer></script>
   {% if sales_embed %}
     <script>
       (() => {

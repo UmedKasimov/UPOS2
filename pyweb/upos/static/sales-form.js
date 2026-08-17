@@ -278,7 +278,7 @@
         return normalize(row.name) === name;
       });
     }
-    if (type === "product" || type === "service") {
+    if (type === "product" || type === "service" || type === "subscription") {
       return (options.product_rows || []).some(function (row) {
         return productKind(row) === type && normalize(row.name) === name;
       });
@@ -599,6 +599,7 @@
   function rowProductValue(row) {
     var input = row ? row.querySelector('[data-sales-combobox="product"] [data-sales-combo-input]') : null;
     if (!input && row) input = row.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]');
+    if (!input && row) input = row.querySelector('[data-sales-combobox="subscription"] [data-sales-combo-input]');
     return input ? input.value.trim() : "";
   }
 
@@ -803,6 +804,7 @@
     if (!row) return;
     resetCombo(row.querySelector('[data-sales-combobox="product"]'));
     resetCombo(row.querySelector('[data-sales-combobox="service"]'));
+    resetCombo(row.querySelector('[data-sales-combobox="subscription"]'));
     var categoryCell = row.querySelector("[data-sales-line-category]");
     if (categoryCell) categoryCell.textContent = "";
     row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_discount_value"]').forEach(function (input) {
@@ -857,7 +859,7 @@
         cloneLine(root, productRows[productRows.length - 1], options);
       }
     }
-    syncServiceControls(root);
+    syncExtraLineControls(root);
     updateTotal(root);
   }
 
@@ -888,49 +890,75 @@
     return row;
   }
 
+  function extraLineRows(root, kind) {
+    return Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="' + kind + '"]'));
+  }
+
   function serviceRows(root) {
-    return Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="service"]'));
+    return extraLineRows(root, "service");
+  }
+
+  function subscriptionRows(root) {
+    return extraLineRows(root, "subscription");
+  }
+
+  function syncExtraLineControls(root) {
+    if (!root) return;
+    [
+      {kind: "service", block: "[data-sales-services-block]", button: "[data-sales-add-service]"},
+      {kind: "subscription", block: "[data-sales-subscriptions-block]", button: ""}
+    ].forEach(function (config) {
+      var hasRows = extraLineRows(root, config.kind).length > 0;
+      var block = root.querySelector(config.block);
+      var button = config.button ? root.querySelector(config.button) : null;
+      if (block) block.hidden = !hasRows;
+      if (button) button.hidden = hasRows;
+    });
   }
 
   function syncServiceControls(root) {
-    if (!root) return;
-    var hasServices = serviceRows(root).length > 0;
-    var servicesBlock = root.querySelector("[data-sales-services-block]");
-    var addServiceBtn = root.querySelector("[data-sales-add-service]");
-    if (servicesBlock) servicesBlock.hidden = !hasServices;
-    if (addServiceBtn) addServiceBtn.hidden = hasServices;
+    syncExtraLineControls(root);
   }
 
   function ensureNextLine(root, currentRow, options) {
     if (!currentRow) return;
     var kind = rowKind(currentRow);
-    var comboType = kind === "service" ? "service" : "product";
+    var comboType = kind === "service" || kind === "subscription" ? kind : "product";
     var rows = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="' + kind + '"]'));
     var currentIndex = rows.indexOf(currentRow);
     var nextBlank = rows.slice(currentIndex + 1).find(function (row) {
       return !rowProductValue(row);
     });
     if (!nextBlank) {
-      nextBlank = kind === "service" ? addServiceLine(root, options) : cloneLine(root, rows[rows.length - 1] || currentRow, options);
+      nextBlank = kind === "service" || kind === "subscription" ? addExtraLine(root, kind, options) : cloneLine(root, rows[rows.length - 1] || currentRow, options);
     }
     var nextInput = nextBlank ? nextBlank.querySelector('[data-sales-combobox="' + comboType + '"] [data-sales-combo-input]') : null;
     if (nextInput) nextInput.focus();
   }
 
-  function addServiceLine(root, options, settings) {
+  function addExtraLine(root, kind, options, settings) {
     var config = settings || {};
-    var block = root.querySelector("[data-sales-services-block]");
-    var body = root.querySelector("[data-sales-services-body]");
-    var template = document.getElementById("sales-service-row-template");
+    var cleanKind = kind === "subscription" ? "subscription" : "service";
+    var block = root.querySelector(cleanKind === "subscription" ? "[data-sales-subscriptions-block]" : "[data-sales-services-block]");
+    var body = root.querySelector(cleanKind === "subscription" ? "[data-sales-subscriptions-body]" : "[data-sales-services-body]");
+    var template = document.getElementById(cleanKind === "subscription" ? "sales-subscription-row-template" : "sales-service-row-template");
     if (!body || !template || !template.content) return null;
     if (block) block.hidden = false;
     var row = template.content.firstElementChild.cloneNode(true);
     body.appendChild(row);
     wireLine(root, row, options);
-    syncServiceControls(root);
-    var input = row.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]');
+    syncExtraLineControls(root);
+    var input = row.querySelector('[data-sales-combobox="' + cleanKind + '"] [data-sales-combo-input]');
     if (input && config.focus !== false) input.focus();
     return row;
+  }
+
+  function addServiceLine(root, options, settings) {
+    return addExtraLine(root, "service", options, settings);
+  }
+
+  function addSubscriptionLine(root, options, settings) {
+    return addExtraLine(root, "subscription", options, settings);
   }
 
   function draftStorage(name) {
@@ -1045,7 +1073,7 @@
   }
 
   function lineDraft(row) {
-    var combo = row.querySelector('[data-sales-combobox="product"], [data-sales-combobox="service"]');
+    var combo = row.querySelector('[data-sales-combobox="product"], [data-sales-combobox="service"], [data-sales-combobox="subscription"]');
     var input = combo ? combo.querySelector("[data-sales-combo-input]") : null;
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     var quantity = row.querySelector('input[name="line_quantity"]');
@@ -1112,7 +1140,8 @@
       installmentMarkup: root.querySelector("[data-sales-installment-markup-field]")?.value || "",
       manualOriginalTotal: root.dataset.salesManualOriginalTotal || "",
       products: Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).map(lineDraft).filter(hasDraftLine),
-      services: serviceRows(root).map(lineDraft).filter(hasDraftLine)
+      services: serviceRows(root).map(lineDraft).filter(hasDraftLine),
+      subscriptions: subscriptionRows(root).map(lineDraft).filter(hasDraftLine)
     };
   }
 
@@ -1155,7 +1184,8 @@
 
   function applyLineDraft(root, row, line) {
     if (!row || !line) return;
-    var comboType = rowKind(row) === "service" ? "service" : "product";
+    var cleanKind = rowKind(row);
+    var comboType = cleanKind === "service" || cleanKind === "subscription" ? cleanKind : "product";
     var combo = row.querySelector('[data-sales-combobox="' + comboType + '"]');
     if (combo) commitCombo(combo, line.product || "");
     var warehouse = row.querySelector('input[name="line_warehouse"]');
@@ -1206,6 +1236,21 @@
     addServiceLine(root, options, { focus: false });
   }
 
+  function ensureBlankSubscriptionLine(root, options) {
+    var rows = subscriptionRows(root);
+    if (!rows.length || rows.some(function (row) { return !rowProductValue(row); })) return;
+    addSubscriptionLine(root, options, { focus: false });
+  }
+
+  function draftLineProductKind(options, line) {
+    var name = normalize(line && line.product);
+    if (!name) return "product";
+    var item = (options.product_rows || []).find(function (row) {
+      return normalize(row.name) === name;
+    });
+    return item ? productKind(item) : "product";
+  }
+
   function restoreSalesDraft(root, options) {
     var draft = null;
     try {
@@ -1254,7 +1299,14 @@
     else delete root.dataset.salesManualOriginalTotal;
     var clientCombo = root.querySelector('[data-sales-combobox="client"]');
     if (clientCombo) commitCombo(clientCombo, draft.client || "");
-    var productLines = (Array.isArray(draft.products) ? draft.products : []).filter(hasDraftLine);
+    var migratedSubscriptionLines = [];
+    var productLines = (Array.isArray(draft.products) ? draft.products : []).filter(hasDraftLine).filter(function (line) {
+      if (draftLineProductKind(options, line) === "subscription") {
+        migratedSubscriptionLines.push(line);
+        return false;
+      }
+      return true;
+    });
     var productRows = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]'));
     var firstProduct = productRows[0];
     productRows.slice(1).forEach(function (row) { row.remove(); });
@@ -1271,7 +1323,15 @@
       applyLineDraft(root, addServiceLine(root, options, { focus: false }), line);
     });
     ensureBlankServiceLine(root, options);
-    syncServiceControls(root);
+    subscriptionRows(root).forEach(function (row) { row.remove(); });
+    (Array.isArray(draft.subscriptions) ? draft.subscriptions : [])
+      .filter(hasDraftLine)
+      .concat(migratedSubscriptionLines)
+      .forEach(function (line) {
+      applyLineDraft(root, addSubscriptionLine(root, options, { focus: false }), line);
+    });
+    ensureBlankSubscriptionLine(root, options);
+    syncExtraLineControls(root);
     var matchedClient = (options.client_rows || []).find(function (item) {
       return normalize(item.name) === normalize(draft.client);
     });
@@ -1313,7 +1373,8 @@
   }
 
   function rowKind(row) {
-    return row && row.getAttribute("data-sales-line-kind") === "service" ? "service" : "product";
+    var kind = row ? row.getAttribute("data-sales-line-kind") : "";
+    return kind === "service" || kind === "subscription" ? kind : "product";
   }
 
   function rowsQuantityByKind(root, kind) {
@@ -1391,16 +1452,22 @@
     var total = rowsTotal(root, false);
     var productsTotal = rowsTotal(root, false, "product");
     var servicesTotal = rowsTotal(root, false, "service");
+    var subscriptionsTotal = rowsTotal(root, false, "subscription");
     var productsQuantity = rowsQuantityByKind(root, "product");
     var servicesQuantity = rowsQuantityByKind(root, "service");
+    var subscriptionsQuantity = rowsQuantityByKind(root, "subscription");
     var productsQuantityOutput = root.querySelector("[data-sales-products-quantity]");
     var servicesQuantityOutput = root.querySelector("[data-sales-services-quantity]");
+    var subscriptionsQuantityOutput = root.querySelector("[data-sales-subscriptions-quantity]");
     var productsTotalOutput = root.querySelector("[data-sales-products-total]");
     var servicesTotalOutput = root.querySelector("[data-sales-services-total]");
+    var subscriptionsTotalOutput = root.querySelector("[data-sales-subscriptions-total]");
     if (productsQuantityOutput) productsQuantityOutput.textContent = productsQuantity.toLocaleString("ru-RU");
     if (servicesQuantityOutput) servicesQuantityOutput.textContent = servicesQuantity.toLocaleString("ru-RU");
+    if (subscriptionsQuantityOutput) subscriptionsQuantityOutput.textContent = subscriptionsQuantity.toLocaleString("ru-RU");
     if (productsTotalOutput) productsTotalOutput.textContent = formatMoney(productsTotal, selectedCurrency(root)) + " " + selectedCurrency(root);
     if (servicesTotalOutput) servicesTotalOutput.textContent = formatMoney(servicesTotal, selectedCurrency(root)) + " " + selectedCurrency(root);
+    if (subscriptionsTotalOutput) subscriptionsTotalOutput.textContent = formatMoney(subscriptionsTotal, selectedCurrency(root)) + " " + selectedCurrency(root);
     var quantityOutput = root.querySelector("[data-sales-lines-quantity]");
     if (quantityOutput) quantityOutput.textContent = rowsQuantity(root).toLocaleString("ru-RU");
     var output = root.querySelector("[data-sales-lines-total]");
@@ -1643,7 +1710,7 @@
   }
 
   function applyManualTotal(root, manualTotal, kind) {
-    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var targetKind = kind === "product" || kind === "service" || kind === "subscription" ? kind : "";
     var originalTotal = rowsTotal(root, true, targetKind);
     if (!originalTotal || originalTotal <= 0) return false;
     var currency = selectedCurrency(root);
@@ -1695,21 +1762,22 @@
   }
 
   function totalFromPercent(root, percent, kind) {
-    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var targetKind = kind === "product" || kind === "service" || kind === "subscription" ? kind : "";
     var originalTotal = rowsTotal(root, true, targetKind);
     if (!originalTotal || originalTotal <= 0) return 0;
     return roundCurrency(originalTotal * (1 - percent / 100), selectedCurrency(root));
   }
 
   function percentFromTotal(root, total, kind) {
-    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var targetKind = kind === "product" || kind === "service" || kind === "subscription" ? kind : "";
     var originalTotal = rowsTotal(root, true, targetKind);
     if (!originalTotal || originalTotal <= 0) return 0;
     return ((originalTotal - total) / originalTotal) * 100;
   }
 
   function productKind(item) {
-    return String(item.kind || "product").toLowerCase() === "service" ? "service" : "product";
+    var kind = String(item.kind || "product").toLowerCase();
+    return kind === "service" || kind === "subscription" ? kind : "product";
   }
 
   function selectedLineNames(root, comboType, currentLine) {
@@ -1755,12 +1823,13 @@
   }
 
   function firstAvailableCombo(root, kind, options) {
-    var comboType = kind === "service" ? "service" : "product";
+    var comboType = kind === "service" || kind === "subscription" ? kind : "product";
     var selector = '.sales-line-grid[data-sales-line-kind="' + comboType + '"]';
     var row = Array.from(root.querySelectorAll(selector)).find(function (item) {
       return !rowProductValue(item);
     });
     if (!row && comboType === "service") row = addServiceLine(root, options);
+    if (!row && comboType === "subscription") row = addSubscriptionLine(root, options);
     if (!row && comboType === "product") {
       var rows = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]'));
       row = rows.length ? cloneLine(root, rows[rows.length - 1], options) : null;
@@ -1771,7 +1840,8 @@
   function applyProductSelection(root, combo, options, item, allowDuplicate) {
     if (!combo || !item) return;
     if (root.dataset.salesApplyingTotal !== "1") clearManualTotal(root, false);
-    var comboType = combo.getAttribute("data-sales-combobox") === "service" ? "service" : "product";
+    var comboKind = combo.getAttribute("data-sales-combobox");
+    var comboType = comboKind === "service" || comboKind === "subscription" ? comboKind : "product";
     var line = combo.closest(".sales-line-grid");
     if (!allowDuplicate && selectedLineNames(root, comboType, line).indexOf(normalize(item.name)) !== -1) {
       closePanel(combo);
@@ -1793,7 +1863,7 @@
       if (quantityInput && !quantityInput.value.trim()) quantityInput.value = "1";
       syncRowState(line);
       updateTotal(root);
-      if (comboType === "product" || comboType === "service") ensureNextLine(root, line, options);
+      if (comboType === "product" || comboType === "service" || comboType === "subscription") ensureNextLine(root, line, options);
     }
     closePanel(combo);
   }
@@ -2093,7 +2163,8 @@
     var warehouse = selectedLineWarehouse(root, combo);
     var priceTypeId = selectedPriceTypeId(root);
     var currency = selectedCurrency(root);
-    var comboType = combo.getAttribute("data-sales-combobox") === "service" ? "service" : "product";
+    var comboKind = combo.getAttribute("data-sales-combobox");
+    var comboType = comboKind === "service" || comboKind === "subscription" ? comboKind : "product";
     var line = combo.closest(".sales-line-grid");
     var selectedNames = selectedLineNames(root, comboType, line);
     var rows = (options.product_rows || []).filter(function (item) {
@@ -2104,16 +2175,16 @@
         itemMatches(item, query, ["name", "sku", "barcode"])
       );
     }).slice(0, 100);
-    var createLabel = comboType === "service" ? "Создать услугу" : "Создать товар";
+    var createLabel = comboType === "subscription" ? "Создать подписку" : comboType === "service" ? "Создать услугу" : "Создать товар";
     panel.innerHTML =
-      '<button type="button" class="sales-combo-create" data-sales-combo-create>+ ' +
+      (comboType === "subscription" ? "" : '<button type="button" class="sales-combo-create" data-sales-combo-create>+ ' +
       escapeHtml(createLabel) +
-      "</button>" +
+      "</button>") +
       (rows.length
       ? rows.map(function (item) {
           var price = salesPrice(item, priceTypeId, currency, options);
-          var code = item.sku || item.barcode || (comboType === "service" ? "Услуга" : "Товар");
-          var meta = comboType === "service" ? (item.category || "Услуга") : code + " · " + stockLabel(item, warehouse);
+          var code = item.sku || item.barcode || (comboType === "subscription" ? "Подписка" : comboType === "service" ? "Услуга" : "Товар");
+          var meta = comboType === "service" || comboType === "subscription" ? (item.category || code) : code + " · " + stockLabel(item, warehouse);
           var priceLabel = price.price ? price.price + " " + (price.currency || "") : "Без цены";
           return buttonHtml(item.name, meta, priceLabel, query);
         }).join("")
@@ -2181,7 +2252,7 @@
         return;
       }
       if (type === "client") renderClient(combo, options, input.value);
-      if (type === "product" || type === "service") renderProduct(root, combo, options, input.value);
+      if (type === "product" || type === "service" || type === "subscription") renderProduct(root, combo, options, input.value);
       if (type === "warehouse") renderWarehouse(root, combo, options, "");
     };
     var edit = combo.querySelector("[data-sales-combo-edit]");
@@ -2359,7 +2430,7 @@
     var input = dialog ? dialog.querySelector("[data-sales-total-input]") : null;
     var percentInput = dialog ? dialog.querySelector("[data-sales-total-percent]") : null;
     if (!dialog || !input) return;
-    var targetKind = kind === "product" || kind === "service" ? kind : "";
+    var targetKind = kind === "product" || kind === "service" || kind === "subscription" ? kind : "";
     dialog.dataset.salesTotalKind = targetKind;
     input.value = formatMoney(rowsTotal(root, false, targetKind), selectedCurrency(root));
     if (percentInput) {
@@ -3363,15 +3434,15 @@
       var added = 0;
       selections.forEach(function (selection) {
         var choice = selection.choice;
-        var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).find(function (row) {
+        var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="subscription"]')).find(function (row) {
           var planField = row.querySelector('input[name="line_subscription_plan"]');
           return !usedRows.has(row)
             && normalize(rowProductValue(row)) === normalize(choice.productName)
             && normalize(planField ? planField.value : "") === normalize(choice.planName);
         });
         var combo = existingRow
-          ? existingRow.querySelector('[data-sales-combobox="product"]')
-          : firstAvailableCombo(root, "product", options);
+          ? existingRow.querySelector('[data-sales-combobox="subscription"]')
+          : firstAvailableCombo(root, "subscription", options);
         if (!combo) return;
         if (!existingRow) applyProductSelection(root, combo, options, choice.item, true);
         var row = combo.closest(".sales-line-grid");
@@ -3457,7 +3528,7 @@
     root.querySelectorAll(".sales-lines-table tbody .sales-line-grid").forEach(function (row) {
       wireLine(root, row, options);
     });
-    syncServiceControls(root);
+    syncExtraLineControls(root);
     var addServiceBtn = root.querySelector("[data-sales-add-service]");
     if (addServiceBtn) {
       addServiceBtn.addEventListener("click", function () {
@@ -3510,9 +3581,9 @@
       });
       if (!filledLine) {
         event.preventDefault();
-        var productInput = root.querySelector('[data-sales-combobox="product"] [data-sales-combo-input]') || root.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]');
+        var productInput = root.querySelector('[data-sales-combobox="product"] [data-sales-combo-input]') || root.querySelector('[data-sales-combobox="service"] [data-sales-combo-input]') || root.querySelector('[data-sales-combobox="subscription"] [data-sales-combo-input]');
         if (productInput) {
-          productInput.setCustomValidity("Добавьте товар или услугу");
+          productInput.setCustomValidity("Добавьте товар, услугу или подписку");
           productInput.reportValidity();
           productInput.focus();
           setTimeout(function () {
