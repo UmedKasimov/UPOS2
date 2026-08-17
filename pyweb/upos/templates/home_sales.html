@@ -536,8 +536,8 @@
                       <span class="sales-journal-no-debt">-</span>
                     {% endif %}
                   </td>
-                  <td class="sales-journal-debt-age-cell" data-sort-value="{{ sale.debt_age_days if sale.debt_age_days is not none else '' }}">
-                    {% if sale.debt_age_days is not none %}{{ sale.debt_age_days }} дн.{% else %}-{% endif %}
+                  <td class="sales-journal-debt-age-cell" data-sort-value="{{ sale.debt_age_days if sale.has_debt and sale.debt_age_days is not none else '' }}">
+                    {% if sale.has_debt and sale.debt_age_days is not none %}{{ sale.debt_age_days }} дн.{% else %}-{% endif %}
                   </td>
                   <td class="sales-journal-tasks-cell" data-sort-value="{{ sale.task_total_count }}">
                     {% if sale.task_total_count %}
