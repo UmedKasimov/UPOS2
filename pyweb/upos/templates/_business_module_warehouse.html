@@ -930,7 +930,7 @@
     </form>
 
     <dialog class="settings-profile-modal sales-product-dialog warehouse-product-dialog" data-warehouse-product-dialog>
-      <form class="settings-profile-modal-surface sales-product-dialog-surface" data-warehouse-product-form>
+      <form class="settings-profile-modal-surface sales-product-dialog-surface product-form product-form--clean client-photo-form warehouse-product-quick-form" data-warehouse-product-form>
         {% include "_csrf_field.html" %}
         <input type="hidden" name="kind" value="product" data-warehouse-product-kind />
         <div class="settings-profile-modal-head">
@@ -942,56 +942,95 @@
         </div>
         <div class="settings-profile-modal-scroll">
           <div class="settings-profile-modal-body">
-            <div class="settings-profile-form-grid sales-product-dialog-grid">
-              <label class="settings-profile-field settings-profile-field--full">
-                <span class="settings-profile-field-label">Название*</span>
-                <input class="settings-profile-input" name="name" required data-warehouse-product-name />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Категория</span>
-                <input class="settings-profile-input" name="category" />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Бренд</span>
-                <input class="settings-profile-input" name="brand" />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Артикул</span>
-                <input class="settings-profile-input" name="sku" />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Штрихкод</span>
-                <input class="settings-profile-input" name="barcode" />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Единица*</span>
-                <input class="settings-profile-input" name="unit" value="Штука" required data-warehouse-product-unit />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Статус</span>
-                <select class="settings-profile-input" name="status">
-                  <option value="active" selected>Активный</option>
-                  <option value="inactive">Неактивный</option>
-                </select>
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Цена</span>
-                <input class="settings-profile-input" name="price_value" inputmode="decimal" data-warehouse-product-price />
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Валюта</span>
-                <select class="settings-profile-input" name="price_currency" data-warehouse-product-currency>
-                  <option value="UZS">UZS</option>
-                  <option value="USD">USD</option>
-                </select>
-              </label>
-              <input type="hidden" name="price_name" value="Продажная цена" />
-              <input type="hidden" name="stock_warehouse" value="{{ warehouse_options.warehouses[0] if warehouse_options.warehouses else 'Основной склад' }}" data-warehouse-product-warehouse />
-              <input type="hidden" name="stock_quantity" value="" />
-              <input type="hidden" name="stock_price" value="" />
-              <input type="hidden" name="stock_date" value="{{ today }}" />
-              <input type="hidden" name="barcode_type" value="EAN13" />
+            <div class="client-edit-photo-row warehouse-product-quick-photo-row">
+              <div class="client-profile-photo client-profile-photo--edit" data-warehouse-product-photo aria-hidden="true"><span></span></div>
+              <div class="product-form-grid client-photo-data-table">
+                <label class="wide"><span>Название товара*</span><input name="name" required data-warehouse-product-name /></label>
+                <div class="client-photo-source-field wide">
+                  <span>Фото*</span>
+                  <div class="client-photo-source-controls">
+                    <input name="photo_url" type="text" inputmode="url" placeholder="URL фото: https://..." data-warehouse-product-photo-url />
+                    <input name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-warehouse-product-photo-file />
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <div class="product-form-grid product-form-grid--identity sales-product-dialog-grid">
+              <div class="product-dictionary-select">
+                <label>
+                  <span>Категория*</span>
+                  <input type="hidden" name="category" value="" data-warehouse-product-dictionary-value="category" />
+                  <select data-warehouse-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
+                    <option value="">Выберите категорию</option>
+                    {% for item in warehouse_options.product_categories %}
+                      <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="product-dictionary-combo" data-warehouse-product-dictionary-combo="category">
+                    <input type="text" autocomplete="off" placeholder="Выберите категорию" required data-warehouse-product-dictionary-combo-input />
+                    <div class="product-dictionary-combo-panel" data-warehouse-product-dictionary-combo-panel hidden></div>
+                  </div>
+                </label>
+                <button class="products-inline-add-btn" type="button" data-warehouse-product-dictionary-add="category" aria-label="Создать категорию">+</button>
+              </div>
+              <div class="product-dictionary-select">
+                <label>
+                  <span>Бренд*</span>
+                  <input type="hidden" name="brand" value="" data-warehouse-product-dictionary-value="brand" />
+                  <select data-warehouse-product-dictionary-select="brand" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
+                    <option value="">Выберите бренд</option>
+                    {% for item in warehouse_options.product_brands %}
+                      <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="product-dictionary-combo" data-warehouse-product-dictionary-combo="brand">
+                    <input type="text" autocomplete="off" placeholder="Выберите бренд" required data-warehouse-product-dictionary-combo-input />
+                    <div class="product-dictionary-combo-panel" data-warehouse-product-dictionary-combo-panel hidden></div>
+                  </div>
+                </label>
+                <button class="products-inline-add-btn" type="button" data-warehouse-product-dictionary-add="brand" aria-label="Создать бренд">+</button>
+              </div>
+              <label><span>Артикул</span><input name="sku" value="{{ warehouse_options.next_product_sku or '21000' }}" readonly title="Артикул создаётся автоматически" data-warehouse-product-sku /></label>
+              <label><span>Единица*</span><input name="unit" value="Штука" required data-warehouse-product-unit /></label>
+              <label><span>Статус</span><select name="status"><option value="active" selected>Активный</option><option value="inactive">Неактивный</option></select></label>
+            </div>
+
+            <section class="product-form-section product-form-section--primary warehouse-product-quick-price">
+              <div class="product-form-section-head">
+                <h3>Продажная цена</h3>
+              </div>
+              <div class="product-form-grid">
+                <input type="hidden" name="price_name" value="Продажная цена" />
+                <label><span>Продажная цена*</span><input name="price_value" inputmode="decimal" placeholder="0" required data-warehouse-product-price data-upos-money-format data-upos-money-decimals="0" /></label>
+                <label>
+                  <span>Валюта</span>
+                  <select name="price_currency" data-warehouse-product-currency>
+                    <option value="UZS">UZS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="product-form-section product-form-section--primary warehouse-product-quick-barcode">
+              <div class="product-form-section-head">
+                <h3>Штрихкод</h3>
+              </div>
+              <div class="product-line-grid product-line-grid--barcode">
+                <input name="barcode" placeholder="Штрихкод" inputmode="numeric" />
+                <select name="barcode_type">
+                  <option value="EAN13" selected>EAN-13</option>
+                  <option value="EAN8">EAN-8</option>
+                  <option value="CODE128">CODE-128</option>
+                  <option value="QR">QR</option>
+                </select>
+              </div>
+            </section>
+            <input type="hidden" name="stock_warehouse" value="{{ warehouse_options.warehouses[0] if warehouse_options.warehouses else 'Основной склад' }}" data-warehouse-product-warehouse />
+            <input type="hidden" name="stock_quantity" value="" />
+            <input type="hidden" name="stock_price" value="" />
+            <input type="hidden" name="stock_date" value="{{ today }}" />
             <p class="sales-product-dialog-status" data-warehouse-product-status aria-live="polite"></p>
           </div>
         </div>

@@ -11090,7 +11090,14 @@ def create_app() -> FastAPI:
         if kind == "service":
             data["stocks"] = []
             data["unit"] = data.get("unit") or "Услуга"
+        try:
+            uploaded_photo = await _prepare_product_photo_upload(form.get("photo_file"))
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
         with session_scope() as session:
+            if not sku:
+                sku = _next_product_sku(session, wid)
+                data["sku"] = sku
             normalized_duplicate = _product_duplicate(session, wid, name=name, sku=sku, barcode=barcode)
             if normalized_duplicate:
                 return JSONResponse(
@@ -11110,6 +11117,18 @@ def create_app() -> FastAPI:
             )
             session.add(row)
             session.flush()
+            if uploaded_photo:
+                content, content_type = uploaded_photo
+                session.add(
+                    ProductPhoto(
+                        product_id=product_id,
+                        workspace_owner_id=wid,
+                        content_type=content_type,
+                        content=content,
+                    )
+                )
+                data["photo_url"] = f"/products/{product_id}/photo"
+                row.data = data
             price_types = _workspace_price_types(wid)
             active_sales_price_types = [
                 item
@@ -14496,9 +14515,29 @@ def create_app() -> FastAPI:
                     }
                 )
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
+            product_view_rows = [_product_data(row) for row in product_rows]
             product_names = [str(row.name) for row in product_rows]
-            for product_row in product_rows:
-                item = _product_data(product_row)
+            settings_payload = load_workspace_settings(wid)
+            stored_product_categories = [
+                str(item or "").strip()
+                for item in settings_payload.get("product_categories", [])
+                if str(item or "").strip()
+            ]
+            stored_product_brands = [
+                str(item or "").strip()
+                for item in settings_payload.get("product_brands", [])
+                if str(item or "").strip()
+            ]
+            product_category_options = sorted({
+                *stored_product_categories,
+                *{str(item.get("category") or "").strip() for item in product_view_rows if str(item.get("category") or "").strip()},
+            })
+            product_brand_options = sorted({
+                *stored_product_brands,
+                *{str(item.get("brand") or "").strip() for item in product_view_rows if str(item.get("brand") or "").strip()},
+            })
+            next_warehouse_product_sku = _next_product_sku(session, wid)
+            for item in product_view_rows:
                 for stock in item["stocks"]:
                     quantity_value = _sales_decimal(stock.get("quantity"))
                     cost_value = _sales_decimal(stock.get("price"))
@@ -14698,7 +14737,10 @@ def create_app() -> FastAPI:
         warehouse_options = {
             "warehouses": [item["name"] for item in warehouse_records] or ["Основной склад"],
             "products": product_names,
-            "product_rows": [_product_data(row) for row in product_rows],
+            "product_rows": product_view_rows,
+            "product_categories": product_category_options,
+            "product_brands": product_brand_options,
+            "next_product_sku": next_warehouse_product_sku,
             "price_types": sorted(
                 [
                     {

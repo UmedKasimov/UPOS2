@@ -12623,8 +12623,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   max-width: min(48rem, 94vw);
 }
 
+.warehouse-product-dialog {
+  width: min(72rem, 96vw);
+  max-width: min(72rem, 96vw);
+}
+
 .sales-product-dialog-surface {
   max-height: min(92vh, 48rem);
+}
+
+.warehouse-product-dialog .sales-product-dialog-surface {
+  max-height: min(92vh, 58rem);
 }
 
 .sales-product-dialog-grid {

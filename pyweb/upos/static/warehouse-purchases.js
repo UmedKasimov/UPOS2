@@ -899,14 +899,21 @@
     const unitInput = form.querySelector("[data-warehouse-product-unit]");
     const currencyInput = form.querySelector("[data-warehouse-product-currency]");
     const warehouseInput = form.querySelector("[data-warehouse-product-warehouse]");
+    const skuInput = form.querySelector("[data-warehouse-product-sku]");
     if (nameInput) nameInput.value = String(query || "").trim();
     if (unitInput) unitInput.value = "Штука";
+    if (skuInput) skuInput.value = String(readPurchaseOptions().next_product_sku || skuInput.defaultValue || "21000").trim();
     if (currencyInput) {
       currencyInput.value = entryForm.querySelector("[data-purchase-entry-currency], [data-adjustment-currency]")?.value || "UZS";
     }
     if (warehouseInput) {
       warehouseInput.value = entryForm.querySelector('[name="warehouse"]')?.value || warehouseInput.defaultValue || "Основной склад";
     }
+    resetWarehouseProductPreview(form);
+    form.querySelectorAll("[data-warehouse-product-dictionary-combo]").forEach((combo) => {
+      syncWarehouseProductDictionary(combo, "");
+      closeWarehouseProductDictionary(combo);
+    });
     setProductDialogStatus(form, "", "");
     if (typeof dialog.showModal === "function") {
       try {
@@ -927,11 +934,134 @@
     }, 0);
   }
 
+  function warehouseProductDictionaryValues(form, type) {
+    const options = readPurchaseOptions();
+    const source = type === "brand" ? options.product_brands : options.product_categories;
+    const select = form?.querySelector(`[data-warehouse-product-dictionary-select="${type}"]`);
+    const values = Array.isArray(source) ? source : [];
+    return Array.from(new Set([
+      ...values,
+      ...Array.from(select?.options || []).map((option) => option.value),
+    ].map((value) => String(value || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru"));
+  }
+
+  function closeWarehouseProductDictionary(combo) {
+    const panel = combo?.querySelector("[data-warehouse-product-dictionary-combo-panel]");
+    if (panel) panel.hidden = true;
+    combo?.classList.remove("is-open");
+  }
+
+  function syncWarehouseProductDictionary(combo, value) {
+    const form = combo?.closest("[data-warehouse-product-form]");
+    const type = combo?.dataset.warehouseProductDictionaryCombo || "";
+    const clean = String(value || "").trim();
+    const input = combo?.querySelector("[data-warehouse-product-dictionary-combo-input]");
+    const hidden = form?.querySelector(`[data-warehouse-product-dictionary-value="${type}"]`);
+    const select = form?.querySelector(`[data-warehouse-product-dictionary-select="${type}"]`);
+    if (input) input.value = clean;
+    if (hidden) hidden.value = clean;
+    if (select) {
+      if (clean && !Array.from(select.options).some((option) => option.value === clean)) {
+        select.appendChild(new Option(clean, clean));
+      }
+      select.value = clean;
+    }
+  }
+
+  function renderWarehouseProductDictionary(combo, query) {
+    const form = combo?.closest("[data-warehouse-product-form]");
+    const type = combo?.dataset.warehouseProductDictionaryCombo || "";
+    const panel = combo?.querySelector("[data-warehouse-product-dictionary-combo-panel]");
+    if (!form || !combo || !panel || !type) return;
+    const needle = normalize(query);
+    const rows = warehouseProductDictionaryValues(form, type).filter((value) => !needle || normalize(value).includes(needle));
+    panel.innerHTML = rows.length
+      ? rows.map((value) => `<button type="button" class="product-dictionary-combo-option" data-value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span></button>`).join("")
+      : '<div class="product-dictionary-combo-empty">Ничего не найдено</div>';
+    panel.hidden = false;
+    combo.classList.add("is-open");
+  }
+
+  function resetWarehouseProductPreview(form) {
+    const preview = form?.querySelector("[data-warehouse-product-photo]");
+    const urlField = form?.querySelector("[data-warehouse-product-photo-url]");
+    if (urlField) urlField.value = "";
+    if (preview) preview.innerHTML = "<span></span>";
+  }
+
+  function showWarehouseProductPreview(form, src) {
+    const preview = form?.querySelector("[data-warehouse-product-photo]");
+    if (!preview) return;
+    const clean = String(src || "").trim();
+    preview.innerHTML = clean ? `<img src="${escapeHtml(clean)}" alt="" />` : "<span></span>";
+  }
+
+  function wireWarehouseProductQuickForm(form) {
+    if (!form || form.dataset.warehouseProductQuickReady === "1") return;
+    form.dataset.warehouseProductQuickReady = "1";
+    form.querySelectorAll("[data-warehouse-product-dictionary-combo]").forEach((combo) => {
+      const input = combo.querySelector("[data-warehouse-product-dictionary-combo-input]");
+      const panel = combo.querySelector("[data-warehouse-product-dictionary-combo-panel]");
+      if (!input || !panel) return;
+      input.addEventListener("focus", () => renderWarehouseProductDictionary(combo, input.value));
+      input.addEventListener("input", () => {
+        syncWarehouseProductDictionary(combo, input.value);
+        renderWarehouseProductDictionary(combo, input.value);
+      });
+      input.addEventListener("keydown", (event) => {
+        const options = Array.from(panel.querySelectorAll(".product-dictionary-combo-option"));
+        if (event.key === "Escape") closeWarehouseProductDictionary(combo);
+        if (event.key === "Enter" && !panel.hidden && options.length) {
+          event.preventDefault();
+          syncWarehouseProductDictionary(combo, options[0].dataset.value || "");
+          closeWarehouseProductDictionary(combo);
+        }
+      });
+      panel.addEventListener("mousedown", (event) => {
+        const button = event.target.closest(".product-dictionary-combo-option");
+        if (!button) return;
+        event.preventDefault();
+        syncWarehouseProductDictionary(combo, button.dataset.value || "");
+        closeWarehouseProductDictionary(combo);
+        input.focus();
+      });
+    });
+    form.querySelectorAll("[data-warehouse-product-dictionary-add]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.dataset.warehouseProductDictionaryAdd || "";
+        const combo = form.querySelector(`[data-warehouse-product-dictionary-combo="${type}"]`);
+        const input = combo?.querySelector("[data-warehouse-product-dictionary-combo-input]");
+        const value = String(input?.value || "").trim();
+        if (value) {
+          syncWarehouseProductDictionary(combo, value);
+          closeWarehouseProductDictionary(combo);
+        }
+        input?.focus();
+      });
+    });
+    const urlField = form.querySelector("[data-warehouse-product-photo-url]");
+    const fileField = form.querySelector("[data-warehouse-product-photo-file]");
+    urlField?.addEventListener("input", () => showWarehouseProductPreview(form, urlField.value));
+    fileField?.addEventListener("change", () => {
+      const file = fileField.files && fileField.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => showWarehouseProductPreview(form, reader.result);
+      reader.readAsDataURL(file);
+    });
+    document.addEventListener("mousedown", (event) => {
+      form.querySelectorAll("[data-warehouse-product-dictionary-combo]").forEach((combo) => {
+        if (!combo.contains(event.target)) closeWarehouseProductDictionary(combo);
+      });
+    });
+  }
+
   function wireProductDialog(entryForm) {
     const dialog = entryForm?.parentElement?.querySelector("[data-warehouse-product-dialog]") || document.querySelector("[data-warehouse-product-dialog]");
     const form = dialog?.querySelector("[data-warehouse-product-form]");
     if (!dialog || !form || dialog.dataset.warehouseProductDialogReady === "1") return;
     dialog.dataset.warehouseProductDialogReady = "1";
+    wireWarehouseProductQuickForm(form);
     dialog.querySelectorAll("[data-warehouse-product-dialog-close], [data-warehouse-product-dialog-cancel]").forEach((button) => {
       button.addEventListener("click", () => closeProductDialog(entryForm));
     });
