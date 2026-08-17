@@ -134,30 +134,49 @@
     const items = normalizedItems(doc);
     const payments = Array.isArray(doc.payment_lines) ? doc.payment_lines : [];
     const clientHtml = doc.client
-      ? `<section class="sale-done-section sale-done-client"><span>Клиент</span><strong>${escapeHtml(doc.client)}</strong></section>`
+      ? `<section class="sale-done-section sale-done-client">
+          <span>Клиент</span>
+          <table class="sale-done-table">
+            <tbody><tr><th>Имя</th><td>${escapeHtml(doc.client)}</td></tr></tbody>
+          </table>
+        </section>`
       : "";
     const itemRows = items.map((item) => {
       const qty = lineQuantity(item);
       const price = moneyWithCurrency(linePrice(item), doc.currency);
       const total = moneyWithCurrency(lineTotal(item), doc.currency);
-      return `<div class="sale-done-row">
-        <span class="sale-done-row-main">${escapeHtml(lineName(item))}</span>
-        <span>${escapeHtml(qty)}</span>
-        <strong>${escapeHtml(total || price)}</strong>
-      </div>`;
+      return `<tr>
+        <td>${escapeHtml(lineName(item))}</td>
+        <td class="sale-done-num">${escapeHtml(qty)}</td>
+        <td class="sale-done-num">${escapeHtml(price)}</td>
+        <td class="sale-done-num"><strong>${escapeHtml(total || price)}</strong></td>
+      </tr>`;
     }).join("");
     const paymentRows = payments.length
       ? payments.map((payment, index) => {
           const label = payment.account || payment.type || `Оплата ${index + 1}`;
-          return `<div class="sale-done-row">
-            <span class="sale-done-row-main">${escapeHtml(label)}</span>
-            <strong>${escapeHtml(moneyWithCurrency(payment.amount, payment.currency || doc.currency))}</strong>
-          </div>`;
+          return `<tr>
+            <td>${escapeHtml(label)}</td>
+            <td>${escapeHtml(payment.type || "-")}</td>
+            <td class="sale-done-num"><strong>${escapeHtml(moneyWithCurrency(payment.amount, payment.currency || doc.currency))}</strong></td>
+          </tr>`;
         }).join("")
-      : `<div class="sale-done-row sale-done-row--muted"><span>Оплата не внесена</span><strong>${escapeHtml(moneyWithCurrency(doc.outstanding_amount || doc.amount, doc.currency))}</strong></div>`;
+      : `<tr class="sale-done-muted"><td>Оплата не внесена</td><td>-</td><td class="sale-done-num"><strong>${escapeHtml(moneyWithCurrency(doc.outstanding_amount || doc.amount, doc.currency))}</strong></td></tr>`;
     node.innerHTML = `${clientHtml}
-      ${items.length ? `<section class="sale-done-section"><span>Заказ</span>${itemRows}</section>` : ""}
-      <section class="sale-done-section"><span>Оплата</span>${paymentRows}</section>`;
+      ${items.length ? `<section class="sale-done-section">
+        <span>Заказ</span>
+        <table class="sale-done-table">
+          <thead><tr><th>Товар</th><th class="sale-done-num">К-во</th><th class="sale-done-num">Цена</th><th class="sale-done-num">Сумма</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+      </section>` : ""}
+      <section class="sale-done-section">
+        <span>Оплата</span>
+        <table class="sale-done-table">
+          <thead><tr><th>Счёт</th><th>Тип</th><th class="sale-done-num">Сумма</th></tr></thead>
+          <tbody>${paymentRows}</tbody>
+        </table>
+      </section>`;
   }
 
   function open(dialog, message, saleId) {

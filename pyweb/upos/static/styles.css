@@ -28951,6 +28951,43 @@ table.upos-table-resizable-columns {
   font-size: var(--text-sm);
 }
 
+.sale-done-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  table-layout: fixed;
+}
+
+.sale-done-table th,
+.sale-done-table td {
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.sale-done-table th {
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+  color: var(--muted-foreground);
+  font-weight: 800;
+  text-align: left;
+}
+
+.sale-done-table strong {
+  color: var(--foreground);
+  font-weight: 800;
+}
+
+.sale-done-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sale-done-muted {
+  color: var(--muted-foreground);
+}
+
 .sale-done-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
