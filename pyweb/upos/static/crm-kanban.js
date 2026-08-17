@@ -289,7 +289,7 @@
   }
 
   function cardMatchesMetric(card, filter) {
-    if (!filter) return true;
+    if (!filter || filter === "all") return true;
     if (filter === "active") {
       return !["done", "won", "lost", "archived"].includes(String(card.dataset.crmStatus || ""));
     }

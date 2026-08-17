@@ -6078,7 +6078,7 @@ a.messenger-message-attachment:focus-visible {
 
 .crm-service-metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(7.5rem, 1fr));
+  grid-template-columns: repeat(7, minmax(7.5rem, 1fr));
   gap: 0.7rem;
 }
 
@@ -6139,7 +6139,7 @@ a.messenger-message-attachment:focus-visible {
   line-height: 1.1;
 }
 
-.crm-service-metric:nth-child(2) strong,
+.crm-service-metric--pipeline strong,
 .crm-kanban-column-total,
 .crm-kanban-card-money strong {
   color: #2563eb !important;
