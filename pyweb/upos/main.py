@@ -14542,6 +14542,9 @@ def create_app() -> FastAPI:
                     supplier_card = full_supplier_cards_by_id.get(supplier_id) or supplier_card
                 return supplier_card
 
+            def purchase_supplier_card_json(supplier_card: dict[str, Any]) -> dict[str, Any]:
+                return json.loads(json.dumps(supplier_card, ensure_ascii=False, default=str))
+
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
             product_view_rows = [_product_data(row) for row in product_rows]
             product_names = [str(row.name) for row in product_rows]
@@ -14618,7 +14621,7 @@ def create_app() -> FastAPI:
                     item["supplier_card"] = supplier_card
                     item["supplier_balance"] = supplier_card["balance"]
                     item["supplier_balance_kind"] = supplier_card["balance_kind"]
-                    item["detail_json"]["supplier_card"] = supplier_card
+                    item["detail_json"]["supplier_card"] = purchase_supplier_card_json(supplier_card)
                 if str(row.id) == str(edit_purchase or ""):
                     warehouse_purchase_edit = item
                 line_products = " ".join(
@@ -14741,7 +14744,7 @@ def create_app() -> FastAPI:
                 item["supplier_card"] = supplier_card
                 item["supplier_balance"] = supplier_card["balance"]
                 item["supplier_balance_kind"] = supplier_card["balance_kind"]
-                item["detail_json"]["supplier_card"] = supplier_card
+                item["detail_json"]["supplier_card"] = purchase_supplier_card_json(supplier_card)
         price_types = _workspace_price_types(wid)
         purchase_price_types = [
             item
