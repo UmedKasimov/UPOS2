@@ -16429,6 +16429,7 @@ def create_app() -> FastAPI:
             "overdue_count": 0,
             "today_count": 0,
             "won_count": 0,
+            "sales_count": 0,
             "conversion_rate": "0%",
             "missing_next_step_count": 0,
         }
@@ -16832,9 +16833,9 @@ def create_app() -> FastAPI:
                         crm_summary["missing_next_step_count"] += 1
                     if isinstance(item["kanban_amount_value"], Decimal):
                         summary_pipeline_total += item["kanban_amount_value"]
-                if item["status"] == "won":
+                if item["item_type"] == "deal" and item["status"] == "won":
                     summary_won += 1
-                elif item["status"] == "lost":
+                elif item["item_type"] == "deal" and item["status"] == "lost":
                     summary_lost += 1
                 column = crm_stage_map.get(item["stage_id"]) or crm_stage_map[crm_stages[0]["id"]]
                 column["records"].append(item)
@@ -16871,10 +16872,11 @@ def create_app() -> FastAPI:
             column = crm_stage_map[stage["id"]]
             column["total"] = _sales_money_label(column["total_value"])
             crm_kanban_columns.append(column)
-        closed_count = summary_won + summary_lost
+        sales_count = crm_summary["open_deals"] + summary_won + summary_lost
         crm_summary["pipeline_total"] = _sales_money_label(summary_pipeline_total)
         crm_summary["won_count"] = summary_won
-        crm_summary["conversion_rate"] = f"{round(summary_won * 100 / closed_count)}%" if closed_count else "0%"
+        crm_summary["sales_count"] = sales_count
+        crm_summary["conversion_rate"] = f"{round(summary_won * 100 / sales_count)}%" if sales_count else "0%"
         action_rank = {"overdue": 0, "today": 1, "soon": 2, "planned": 3, "": 4}
         crm_next_actions = sorted(
             crm_next_actions,

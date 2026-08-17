@@ -6097,6 +6097,32 @@ a.messenger-message-attachment:focus-visible {
   padding: 0.58rem 0.7rem;
 }
 
+.crm-service-metric--filter {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.crm-service-metric--filter:hover {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--workbench-line, var(--border)));
+  transform: translateY(-1px);
+}
+
+.crm-service-metric--filter:focus-visible {
+  border-color: var(--primary);
+  outline: 3px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  outline-offset: 2px;
+}
+
+.crm-service-metric--filter.is-active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
 .crm-service-metric span,
 .crm-service-metric small,
 .crm-next-actions header span,

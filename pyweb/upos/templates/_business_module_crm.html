@@ -167,26 +167,26 @@
       <strong>{{ crm_summary.pipeline_total }}</strong>
       <small>UZS в работе</small>
     </div>
-    <div class="crm-service-metric{% if crm_summary.overdue_count %} is-alert{% endif %}">
+    <button class="crm-service-metric crm-service-metric--filter{% if crm_summary.overdue_count %} is-alert{% endif %}" type="button" data-crm-metric-filter="overdue" aria-pressed="false">
       <span>Просрочено</span>
       <strong>{{ crm_summary.overdue_count }}</strong>
       <small>нужна реакция</small>
-    </div>
+    </button>
     <div class="crm-service-metric">
       <span>Сегодня</span>
       <strong>{{ crm_summary.today_count }}</strong>
       <small>следующих шагов</small>
     </div>
     <div class="crm-service-metric">
-      <span>Конверсия</span>
+      <span>Конверсия продаж</span>
       <strong>{{ crm_summary.conversion_rate }}</strong>
-      <small>{{ crm_summary.won_count }} успешно</small>
+      <small>{{ crm_summary.won_count }} из {{ crm_summary.sales_count }} успешно</small>
     </div>
-    <div class="crm-service-metric{% if crm_summary.missing_next_step_count %} is-warning{% endif %}">
+    <button class="crm-service-metric crm-service-metric--filter{% if crm_summary.missing_next_step_count %} is-warning{% endif %}" type="button" data-crm-metric-filter="no_plan" aria-pressed="false">
       <span>Без плана</span>
       <strong>{{ crm_summary.missing_next_step_count }}</strong>
       <small>нужен следующий шаг</small>
-    </div>
+    </button>
   </div>
 </section>
 
@@ -275,6 +275,8 @@
               data-crm-detail-type="{{ row.item_type_label|e }}"
               data-crm-detail-source="{{ (row.lead_source or row.contact_type or 'Ручной ввод')|e }}"
               data-crm-detail-status="{{ row.status_label|e }}"
+              data-crm-status="{{ row.status|e }}"
+              data-crm-action-state="{{ action_state.id|e }}"
               data-crm-detail-stage="{{ row.stage|e }}"
               data-crm-detail-service="{{ row.service_type|e }}"
               data-crm-detail-priority="{{ row.priority_label|e }}"

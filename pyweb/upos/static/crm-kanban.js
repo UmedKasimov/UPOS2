@@ -140,7 +140,9 @@
     // При активном поиске шапка считает только найденные карточки: раньше
     // число и сумма оставались полными и противоречили экрану.
     const query = String(document.querySelector('.crm-kanban-filters input[name="q"]')?.value || "").trim();
-    const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !query || !card.hidden);
+    const metricFilter = String(column.closest("[data-crm-kanban]")?.dataset.crmMetricFilter || "");
+    const hasFilter = Boolean(query || metricFilter);
+    const cards = Array.from(column.querySelectorAll(".crm-kanban-card")).filter((card) => !hasFilter || !card.hidden);
     const count = column.querySelector("header strong");
     if (count) count.textContent = String(cards.length);
     const total = column.querySelector(".crm-kanban-column-total");
@@ -284,6 +286,19 @@
     if (haystack.includes(normalizeSearchText(query))) return true;
     const words = haystack.split(/\s+/).filter(Boolean);
     return tokens.every((token) => words.some((word) => tokenLooksLike(token, word)));
+  }
+
+  function cardMatchesMetric(card, filter) {
+    if (!filter) return true;
+    if (filter === "overdue") return card.dataset.crmActionState === "overdue";
+    if (filter === "no_plan") {
+      const status = String(card.dataset.crmStatus || "");
+      if (["done", "won", "lost", "archived"].includes(status)) return false;
+      const dueDate = String(card.dataset.crmDetailDueDate || "").trim();
+      const nextStep = String(card.dataset.crmDetailNextStep || "").trim();
+      return !dueDate || dueDate === "-" || !nextStep;
+    }
+    return true;
   }
 
   function highlightText(value, query) {
@@ -1103,10 +1118,12 @@
   function initKanban(root) {
     let dragged = null;
     let selectedCard = null;
+    let metricFilter = "";
     const archiveList = document.querySelector("[data-crm-archive-card-row]");
     const archiveCount = document.querySelector("[data-crm-archive-count]");
     const archiveSearch = document.querySelector("[data-crm-archive-search]");
     const searchInput = document.querySelector('.crm-kanban-filters input[name="q"]');
+    const metricButtons = Array.from(document.querySelectorAll("[data-crm-metric-filter]"));
     const trashDrop = document.querySelector("[data-crm-trash-drop]");
     const lostDialog = document.getElementById("crm-lost-reason-dialog");
 
@@ -1295,13 +1312,26 @@
 
     const applySearch = () => {
       const query = String(searchInput?.value || "").trim();
+      const hasFilter = Boolean(query || metricFilter);
       root.querySelectorAll(".crm-kanban-card").forEach((card) => {
-        const visible = cardMatchesSearch(card, query);
-        card.hidden = query ? !visible : card.dataset.crmDeferred === "true";
+        const visible = cardMatchesSearch(card, query) && cardMatchesMetric(card, metricFilter);
+        card.hidden = hasFilter ? !visible : card.dataset.crmDeferred === "true";
         renderSearchMatch(card, visible ? query : "");
         if (!visible && selectedCard === card) setSelectedCard(null);
       });
       root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
+    };
+
+    const setMetricFilter = (nextFilter) => {
+      metricFilter = metricFilter === nextFilter ? "" : nextFilter;
+      root.dataset.crmMetricFilter = metricFilter;
+      if (metricFilter && searchInput) searchInput.value = "";
+      metricButtons.forEach((button) => {
+        const isActive = button.dataset.crmMetricFilter === metricFilter;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", String(isActive));
+      });
+      applySearch();
     };
 
     root.querySelectorAll("[data-crm-show-more]").forEach((button) => {
@@ -1449,6 +1479,9 @@
     });
 
     root.querySelectorAll(".crm-kanban-column").forEach(updateColumnState);
+    metricButtons.forEach((button) => {
+      button.addEventListener("click", () => setMetricFilter(button.dataset.crmMetricFilter || ""));
+    });
     if (searchInput) {
       searchInput.addEventListener("input", applySearch);
       applySearch();
