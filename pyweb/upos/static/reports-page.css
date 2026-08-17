@@ -419,6 +419,110 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   max-width: min(100%, 58rem);
 }
 
+#report-sales-cost > .reports-panel-head {
+  display: grid;
+  grid-template-columns: minmax(9.5rem, 13rem) minmax(0, 1fr) minmax(18rem, 21rem);
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+}
+
+#report-sales-cost > .reports-panel-head > * {
+  min-width: 0;
+  min-height: 8.7rem;
+  padding: 1rem;
+  border-right: 1px solid color-mix(in srgb, var(--border), var(--primary) 14%);
+}
+
+#report-sales-cost > .reports-panel-head > *:last-child {
+  border-right: 0;
+}
+
+#report-sales-cost > .reports-panel-head > div:first-child {
+  display: grid;
+  align-content: start;
+  background: color-mix(in srgb, var(--primary) 3%, var(--card));
+}
+
+#report-sales-cost .reports-sales-cost-filters {
+  grid-template-columns: minmax(8rem, 9.5rem) minmax(9rem, 1fr) minmax(10rem, 1fr) minmax(10rem, 1fr) auto auto;
+  align-content: start;
+  max-width: none;
+}
+
+#report-sales-cost .reports-sales-cost-filters .btn {
+  min-width: 4.6rem;
+  white-space: nowrap;
+}
+
+#report-sales-cost .reports-stock-analysis-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  align-items: start;
+  justify-items: end;
+  gap: 0.5rem;
+}
+
+#report-sales-cost .reports-stock-analysis-tools > [data-sales-cost-export] {
+  grid-column: 1 / -1;
+}
+
+#report-sales-cost .reports-currency-switch {
+  grid-column: 2;
+}
+
+#report-sales-cost .reports-balance-total {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+  gap: 0.5rem;
+  justify-content: stretch;
+}
+
+#report-sales-cost .reports-balance-total span {
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#report-sales-cost [data-sales-cost-stages] {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 1.55rem 0 0;
+  border-top: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border), var(--primary) 14%);
+  background: color-mix(in srgb, var(--primary), var(--card) 95%);
+}
+
+#report-sales-cost [data-sales-cost-stages] .sales-document-tabs-title {
+  position: absolute;
+  margin: 0;
+  padding: 0 1rem;
+  transform: translateY(-1.1rem);
+}
+
+#report-sales-cost [data-sales-cost-stages] .sales-document-tab {
+  min-height: 2.85rem;
+  padding: 0.45rem 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--border), var(--primary) 14%);
+  border-right: 1px solid color-mix(in srgb, var(--border), var(--primary) 14%);
+  border-radius: 0;
+  background: var(--card);
+}
+
+#report-sales-cost [data-sales-cost-stages] .sales-document-tab:last-child {
+  border-right: 0;
+}
+
+#report-sales-cost [data-sales-cost-stages] .sales-document-tab::before {
+  border-radius: 0;
+}
+
 .reports-filter-field {
   display: grid;
   gap: 0.25rem;
@@ -1811,6 +1915,34 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
     max-width: none;
   }
 
+  #report-sales-cost > .reports-panel-head {
+    grid-template-columns: 1fr;
+  }
+
+  #report-sales-cost > .reports-panel-head > * {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border), var(--primary) 14%);
+  }
+
+  #report-sales-cost > .reports-panel-head > *:last-child {
+    border-bottom: 0;
+  }
+
+  #report-sales-cost .reports-sales-cost-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  #report-sales-cost .reports-stock-analysis-tools {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  #report-sales-cost .reports-currency-switch {
+    grid-column: 1;
+  }
+
   .reports-equation,
   .reports-balance-total {
     width: 100%;
@@ -1830,6 +1962,16 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
   .reports-sales-cost-filters {
     grid-template-columns: 1fr;
+  }
+
+  #report-sales-cost .reports-sales-cost-filters,
+  #report-sales-cost .reports-stock-analysis-tools,
+  #report-sales-cost [data-sales-cost-stages] {
+    grid-template-columns: 1fr;
+  }
+
+  #report-sales-cost [data-sales-cost-stages] .sales-document-tab {
+    border-right: 0;
   }
 
   .reports-sales-cost-detail-head {
