@@ -6444,6 +6444,9 @@ def create_app() -> FastAPI:
                 if imported_kind in {"service", "subscription"}:
                     barcode = ""
                     data["barcode_type"] = ""
+                elif row is not None and not barcode and str(row.barcode or "").strip():
+                    barcode = str(row.barcode or "").strip()
+                    data["barcode_type"] = str(_json_object(row.data).get("barcode_type") or data["barcode_type"] or "EAN13")
                 elif not barcode:
                     barcode = _product_auto_barcode(session, wid, product_id=product_id)
                     data["barcode_type"] = "EAN13"
