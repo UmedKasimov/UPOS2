@@ -1,8 +1,8 @@
 {
   "app.title_suffix": {
-    "ru": "UPOS FINANCE",
-    "en": "UPOS FINANCE",
-    "uz": "UPOS FINANCE"
+    "ru": "UPOS",
+    "en": "UPOS",
+    "uz": "UPOS"
   },
   "nav.aria": {
     "ru": "Основная навигация",
@@ -195,9 +195,9 @@
     "uz": "ulanmagan"
   },
   "general.organizations.title_page": {
-    "ru": "Панель организаций · UPOS FINANCE",
-    "en": "Organizations panel · UPOS FINANCE",
-    "uz": "Tashkilotlar paneli · UPOS FINANCE"
+    "ru": "Панель организаций · UPOS",
+    "en": "Organizations panel · UPOS",
+    "uz": "Tashkilotlar paneli · UPOS"
   },
   "general.organizations.title": {
     "ru": "Панель организаций",
@@ -370,9 +370,9 @@
     "uz": "Tahrirlash"
   },
   "general.kassa.title_page": {
-    "ru": "Общая касса · UPOS FINANCE",
-    "en": "General cash desk · UPOS FINANCE",
-    "uz": "Umumiy kassa · UPOS FINANCE"
+    "ru": "Общая касса · UPOS",
+    "en": "General cash desk · UPOS",
+    "uz": "Umumiy kassa · UPOS"
   },
   "general.kassa.desc": {
     "ru": "Консолидированный журнал операций по всем организациям. Создание операций — только в кассе конкретной организации.",
@@ -380,9 +380,9 @@
     "uz": "Barcha tashkilotlar bo‘yicha jamlangan operatsiyalar jurnali. Yangi operatsiyalar faqat aniq tashkilot kassasida yaratiladi."
   },
   "general.schet.title_page": {
-    "ru": "Общий счёт · UPOS FINANCE",
-    "en": "General account · UPOS FINANCE",
-    "uz": "Umumiy hisob · UPOS FINANCE"
+    "ru": "Общий счёт · UPOS",
+    "en": "General account · UPOS",
+    "uz": "Umumiy hisob · UPOS"
   },
   "general.schet.desc": {
     "ru": "Консолидированные остатки по всем организациям. Редактирование счетов — в режиме конкретной организации.",
@@ -390,9 +390,9 @@
     "uz": "Barcha tashkilotlar bo‘yicha jamlangan qoldiqlar. Hisoblar aniq tashkilot rejimida tahrirlanadi."
   },
   "general.reports.title_page": {
-    "ru": "Общие отчёты · UPOS FINANCE",
-    "en": "General reports · UPOS FINANCE",
-    "uz": "Umumiy hisobotlar · UPOS FINANCE"
+    "ru": "Общие отчёты · UPOS",
+    "en": "General reports · UPOS",
+    "uz": "Umumiy hisobotlar · UPOS"
   },
   "general.reports.desc": {
     "ru": "Обороты и остатки по всем организациям. Детальная разбивка по-прежнему в отчётах каждой организации.",
@@ -655,14 +655,14 @@
     "uz": "Chiqimlar"
   },
   "brand.admin": {
-    "ru": "UPOS Finance — админ-панель",
-    "en": "UPOS Finance — admin",
-    "uz": "UPOS Finance — admin panel"
+    "ru": "UPOS — админ-панель",
+    "en": "UPOS — admin",
+    "uz": "UPOS — admin panel"
   },
   "brand.user": {
-    "ru": "UPOS Finance — главная",
-    "en": "UPOS Finance — home",
-    "uz": "UPOS Finance — bosh sahifa"
+    "ru": "UPOS — главная",
+    "en": "UPOS — home",
+    "uz": "UPOS — bosh sahifa"
   },
   "mobile.open_nav": {
     "ru": "Открыть меню навигации",
@@ -700,9 +700,9 @@
     "uz": "Chiqish"
   },
   "auth.title_page": {
-    "ru": "Вход · UPOS FINANCE",
-    "en": "Sign in · UPOS FINANCE",
-    "uz": "Kirish · UPOS FINANCE"
+    "ru": "Вход · UPOS",
+    "en": "Sign in · UPOS",
+    "uz": "Kirish · UPOS"
   },
   "auth.title": {
     "ru": "Вход в систему",
@@ -785,9 +785,9 @@
     "uz": "Sozlamalarni yuklab bo‘lmadi. Keyinroq urinib ko‘ring."
   },
   "settings.title_page": {
-    "ru": "Настройки · UPOS FINANCE",
-    "en": "Settings · UPOS FINANCE",
-    "uz": "Sozlamalar · UPOS FINANCE"
+    "ru": "Настройки · UPOS",
+    "en": "Settings · UPOS",
+    "uz": "Sozlamalar · UPOS"
   },
   "settings.title": {
     "ru": "Настройки",
@@ -1775,9 +1775,9 @@
     "uz": "Token yashirilgan holda saqlanadi. Faqat tekshirish yoki almashtirish vaqtida ko‘rsating."
   },
   "admin.settings.title_page": {
-    "ru": "Админ — настройки · UPOS FINANCE",
-    "en": "Admin — settings · UPOS FINANCE",
-    "uz": "Admin — sozlamalar · UPOS FINANCE"
+    "ru": "Админ — настройки · UPOS",
+    "en": "Admin — settings · UPOS",
+    "uz": "Admin — sozlamalar · UPOS"
   },
   "admin.settings.title": {
     "ru": "Настройки (админ)",
@@ -1805,9 +1805,9 @@
     "uz": "Tilni saqlash"
   },
   "reports.title_page": {
-    "ru": "Отчёты · UPOS FINANCE",
-    "en": "Reports · UPOS FINANCE",
-    "uz": "Hisobotlar · UPOS FINANCE"
+    "ru": "Отчёты · UPOS",
+    "en": "Reports · UPOS",
+    "uz": "Hisobotlar · UPOS"
   },
   "reports.eyebrow": {
     "ru": "Финансовая аналитика",
@@ -2105,9 +2105,9 @@
     "uz": "Hisoblar hali yo‘q. «Hisob» sozlangach balans paydo bo‘ladi."
   },
   "employees.title_page": {
-    "ru": "Сотрудники · UPOS FINANCE",
-    "en": "Team · UPOS FINANCE",
-    "uz": "Xodimlar · UPOS FINANCE"
+    "ru": "Сотрудники · UPOS",
+    "en": "Team · UPOS",
+    "uz": "Xodimlar · UPOS"
   },
   "employees.title": {
     "ru": "Сотрудники",
@@ -2320,14 +2320,14 @@
     "uz": "Administrator"
   },
   "not_found.title": {
-    "ru": "Страница не найдена · UPOS FINANCE",
-    "en": "Not found · UPOS FINANCE",
-    "uz": "Topilmadi · UPOS FINANCE"
+    "ru": "Страница не найдена · UPOS",
+    "en": "Not found · UPOS",
+    "uz": "Topilmadi · UPOS"
   },
   "server_error.title": {
-    "ru": "Ошибка сервера · UPOS FINANCE",
-    "en": "Server error · UPOS FINANCE",
-    "uz": "Server xatosi · UPOS FINANCE"
+    "ru": "Ошибка сервера · UPOS",
+    "en": "Server error · UPOS",
+    "uz": "Server xatosi · UPOS"
   },
   "server_error.heading": {
     "ru": "Что-то пошло не так",
@@ -2345,14 +2345,14 @@
     "uz": "Bosh sahifa"
   },
   "forbidden.title": {
-    "ru": "Доступ запрещён · UPOS FINANCE",
-    "en": "Forbidden · UPOS FINANCE",
-    "uz": "Kirish taqiqlanadi · UPOS FINANCE"
+    "ru": "Доступ запрещён · UPOS",
+    "en": "Forbidden · UPOS",
+    "uz": "Kirish taqiqlanadi · UPOS"
   },
   "admin.home.title_page": {
-    "ru": "Админ — обзор · UPOS FINANCE",
-    "en": "Admin — overview · UPOS FINANCE",
-    "uz": "Admin — umumiy ko‘rinish · UPOS FINANCE"
+    "ru": "Админ — обзор · UPOS",
+    "en": "Admin — overview · UPOS",
+    "uz": "Admin — umumiy ko‘rinish · UPOS"
   },
   "admin.home.title": {
     "ru": "Обзор",
@@ -2520,9 +2520,9 @@
     "uz": "Oddiy foydalanuvchilar hozircha yo‘q."
   },
   "kassa.title_page": {
-    "ru": "Касса · UPOS FINANCE",
-    "en": "Cash desk · UPOS FINANCE",
-    "uz": "Kassa · UPOS FINANCE"
+    "ru": "Касса · UPOS",
+    "en": "Cash desk · UPOS",
+    "uz": "Kassa · UPOS"
   },
   "kassa.title": {
     "ru": "Касса",
@@ -3165,9 +3165,9 @@
     "uz": "Komissiya (o‘tkazma)"
   },
   "schet.title_page": {
-    "ru": "Счёт · UPOS FINANCE",
-    "en": "Account · UPOS FINANCE",
-    "uz": "Hisob · UPOS FINANCE"
+    "ru": "Счёт · UPOS",
+    "en": "Account · UPOS",
+    "uz": "Hisob · UPOS"
   },
   "schet.total_label": {
     "ru": "Всего (пересчёт)",
@@ -4055,9 +4055,9 @@
     "uz": "Admin panel"
   },
   "forbidden.page_title": {
-    "ru": "Доступ ограничен · UPOS FINANCE",
-    "en": "Access restricted · UPOS FINANCE",
-    "uz": "Kirish cheklangan · UPOS FINANCE"
+    "ru": "Доступ ограничен · UPOS",
+    "en": "Access restricted · UPOS",
+    "uz": "Kirish cheklangan · UPOS"
   },
   "forbidden.heading": {
     "ru": "Доступ ограничен",

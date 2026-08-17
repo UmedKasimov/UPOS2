@@ -178,7 +178,7 @@ def build_invoice_pdf(document: dict[str, Any]) -> bytes:
 
     page.setFont(FONT_REGULAR, 8)
     page.setFillColorRGB(0.55, 0.58, 0.62)
-    page.drawString(left, 14 * mm, "Документ сформирован в U-POS FINANCE")
+    page.drawString(left, 14 * mm, "Документ сформирован в U-POS")
 
     page.showPage()
     page.save()

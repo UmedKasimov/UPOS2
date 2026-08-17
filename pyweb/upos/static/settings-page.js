@@ -1938,6 +1938,123 @@
     });
   }
 
+  function initCrmStagesList() {
+    var root = document.querySelector("[data-crm-stages-list]");
+    if (!root) return;
+    var source = root.querySelector("[data-crm-stages-source]");
+    var list = root.querySelector("[data-crm-stage-list]");
+    var add = root.querySelector("[data-crm-stage-add]");
+    if (!source || !list) return;
+
+    function createRow(value) {
+      var row = document.createElement("div");
+      row.className = "settings-crm-stage-row";
+      row.setAttribute("data-crm-stage-row", "");
+      row.innerHTML =
+        '<span class="settings-crm-stage-check" aria-hidden="true">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+        "</span>" +
+        '<input class="settings-profile-input" type="text" data-crm-stage-input placeholder="Название этапа" />' +
+        '<button type="button" class="settings-crm-stage-remove" data-crm-stage-remove aria-label="Удалить этап">×</button>';
+      var input = row.querySelector("[data-crm-stage-input]");
+      if (input) input.value = value || "";
+      return row;
+    }
+
+    function syncStages() {
+      var lines = Array.from(list.querySelectorAll("[data-crm-stage-input]"))
+        .map(function (input) {
+          return (input.value || "").trim();
+        })
+        .filter(Boolean);
+      source.value = lines.join("\n");
+    }
+
+    if (!list.querySelector("[data-crm-stage-row]")) {
+      (source.value || "")
+        .split(/\r?\n/)
+        .map(function (line) { return line.trim(); })
+        .filter(Boolean)
+        .forEach(function (line) {
+          list.appendChild(createRow(line));
+        });
+    }
+    if (!list.querySelector("[data-crm-stage-row]")) {
+      list.appendChild(createRow(""));
+    }
+
+    if (add) {
+      add.addEventListener("click", function () {
+        var row = createRow("");
+        list.appendChild(row);
+        var input = row.querySelector("[data-crm-stage-input]");
+        if (input) input.focus();
+        syncStages();
+      });
+    }
+
+    root.addEventListener("input", function (event) {
+      if (event.target.closest("[data-crm-stage-input]")) syncStages();
+    });
+
+    root.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-crm-stage-remove]");
+      if (!button) return;
+      var row = button.closest("[data-crm-stage-row]");
+      if (row) row.remove();
+      if (!list.querySelector("[data-crm-stage-row]")) {
+        list.appendChild(createRow(""));
+      }
+      syncStages();
+    });
+
+    var form = root.closest("form");
+    if (form) form.addEventListener("submit", syncStages);
+    syncStages();
+  }
+
+  function initTaskTypesDictionary() {
+    var root = document.querySelector("[data-task-types-dictionary]");
+    if (!root) return;
+    var list = root.querySelector("[data-task-type-list]");
+    var add = root.querySelector("[data-task-type-add]");
+    if (!list) return;
+
+    function createRow(name, checklist) {
+      var row = document.createElement("div");
+      row.className = "settings-task-type-row";
+      row.setAttribute("data-task-type-row", "");
+      row.innerHTML =
+        '<label><span>Тип задачи</span><input class="settings-profile-input" name="crm_task_type_name" value="' +
+        escapeHtml(name || "") +
+        '" placeholder="Например: Позвонить" /></label>' +
+        '<label><span>Чеклист</span><textarea class="settings-profile-input" name="crm_task_type_checklist" rows="3" placeholder="Каждый пункт с новой строки">' +
+        escapeHtml(checklist || "") +
+        "</textarea></label>" +
+        '<button type="button" class="settings-task-type-remove" data-task-type-remove aria-label="Удалить тип">×</button>';
+      return row;
+    }
+
+    if (add) {
+      add.addEventListener("click", function () {
+        var row = createRow("", "");
+        list.appendChild(row);
+        var input = row.querySelector('input[name="crm_task_type_name"]');
+        if (input) input.focus();
+      });
+    }
+
+    root.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-task-type-remove]");
+      if (!button) return;
+      var row = button.closest("[data-task-type-row]");
+      if (row) row.remove();
+      if (!list.querySelector("[data-task-type-row]")) {
+        list.appendChild(createRow("", ""));
+      }
+    });
+  }
+
   function boot() {
     initTokenAntiAutofill(document.querySelector(".js-settings-bot-token"));
     document.querySelectorAll(".js-anti-autofill").forEach(initTokenAntiAutofill);
@@ -1951,6 +2068,8 @@
     initFxRateSettings();
     initRolePermissions();
     initCategoryManagement();
+    initCrmStagesList();
+    initTaskTypesDictionary();
   }
 
   if (document.readyState === "loading") {

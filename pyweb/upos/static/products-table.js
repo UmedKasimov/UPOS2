@@ -46,7 +46,7 @@
 
   function updateFilterAction(form) {
     const kind = form.elements.kind?.value || "product";
-    const hash = kind === "service" ? "#service" : "#catalog";
+    const hash = "#catalog";
     const base = form.dataset.productsFilterBaseAction || form.getAttribute("action") || location.pathname;
     const actionUrl = new URL(base, location.href);
     actionUrl.hash = hash;

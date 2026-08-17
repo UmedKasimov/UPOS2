@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#141d2e" />
     <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v=4" type="image/svg+xml" />
     <link rel="icon" href="{{ url_for('static', path='favicon.png') }}?v=4" type="image/png" sizes="48x48" />
-    <title>{% block title %}UPOS FINANCE{% endblock %}</title>
+    <title>{% block title %}UPOS{% endblock %}</title>
     {# Ключ формы нужен запросам, которые уходят без формы: загрузка аватара,
        сохранение настроек и прочие обращения из скриптов. #}
     {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}" />{% endif %}
@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=636" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=641" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -43,21 +43,17 @@
           <div class="sidebar-head-row">
             {% if variant == "admin" %}
               <a href="/admin" class="brand-lockup" aria-label="{{ _('brand.admin') }}">
-                {{ brand.octopus_svg("octSb", 48) }}
                 <div class="brand-lockup-text">
                   <div class="brand-lockup-title">
                     <span class="brand-lockup-upos">UPOS</span>
-                    <span class="brand-lockup-fin">FINANCE</span>
                   </div>
                 </div>
               </a>
             {% else %}
               <a href="/" class="brand-lockup" aria-label="{{ _('brand.user') }}">
-                {{ brand.octopus_svg("octSb", 48) }}
                 <div class="brand-lockup-text">
                   <div class="brand-lockup-title">
                     <span class="brand-lockup-upos">UPOS</span>
-                    <span class="brand-lockup-fin">FINANCE</span>
                   </div>
                 </div>
               </a>
@@ -182,7 +178,7 @@
               </a>
               {% endif %}
               {% if emp_can or emp_perms.get('products') %}
-              <a href="{{ url_for('products_get') }}#catalog" class="nav-link {{ 'active' if active == 'products' else '' }}">
+              <a href="{{ url_for('products_get') }}" class="nav-link {{ 'active' if active == 'products' else '' }}">
                 <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                 <span class="nav-label">Товары</span>
               </a>
@@ -321,7 +317,6 @@
           </button>
           <span class="mobile-topbar-brand">
             <span class="mobile-topbar-upos">UPOS</span>
-            <span class="mobile-topbar-fin">FINANCE</span>
           </span>
         </header>
         <header class="page-header"><div class="page-header-inner">{% block page_header %}{% endblock %}</div></header>
@@ -399,14 +394,14 @@
       window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
     </script>
     <script src="{{ url_for('static', path='theme.js') }}"></script>
-    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=10" defer></script>
+    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=11" defer></script>
     <script src="{{ url_for('static', path='layout-sidebar.js') }}?v=3" defer></script>
     <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=21" defer></script>
     <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=9" defer></script>
     <script src="{{ url_for('static', path='table-column-controls.js') }}?v=19" defer></script>
     <script src="{{ url_for('static', path='cell-title.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='uz-phone.js') }}?v=1" defer></script>
-    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=57" defer></script>
+    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=59" defer></script>
     <script src="{{ url_for('static', path='ajax-sections.js') }}?v=8" defer></script>
     <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>

@@ -847,7 +847,11 @@
                 <button type="button" class="warehouse-purchase-expense-type-add" data-purchase-expense-type-open aria-label="Добавить новый тип расхода" title="Добавить новый тип расхода">+</button>
               </div>
               <input name="extra_expense_amount" value="{{ expense.amount if expense else '' }}" placeholder="Сумма" inputmode="decimal" data-purchase-expense-amount />
-              <span data-purchase-expense-currency>{{ warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS' }}</span>
+              <select name="extra_expense_currency" data-purchase-expense-currency-select aria-label="Валюта расхода">
+                {% set expense_currency = (expense.currency if expense else (warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS')) %}
+                <option value="UZS" {{ 'selected' if expense_currency == 'UZS' else '' }}>UZS</option>
+                <option value="USD" {{ 'selected' if expense_currency == 'USD' else '' }}>USD</option>
+              </select>
               <button type="button" class="sales-line-remove" data-purchase-expense-remove aria-label="Удалить расход">×</button>
             </div>
           {% endfor %}
@@ -1323,7 +1327,10 @@
                 <button type="button" class="warehouse-purchase-expense-type-add" data-adjustment-expense-type-open aria-label="Добавить новый тип расхода" title="Добавить новый тип расхода">+</button>
               </div>
               <input name="extra_expense_amount" placeholder="Сумма" inputmode="decimal" data-adjustment-expense-amount />
-              <span data-purchase-expense-currency data-adjustment-expense-currency>UZS</span>
+              <select name="extra_expense_currency" data-adjustment-expense-currency-select aria-label="Валюта расхода">
+                <option value="UZS" selected>UZS</option>
+                <option value="USD">USD</option>
+              </select>
               <button type="button" class="sales-line-remove" data-adjustment-expense-remove aria-label="Удалить расход">×</button>
             </div>
           </div>

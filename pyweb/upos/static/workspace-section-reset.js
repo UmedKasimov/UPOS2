@@ -94,6 +94,10 @@
       const route = routeForHref(baseHref);
       if (!route) return;
       link.dataset.workspaceBaseHref = baseHref;
+      if (link.classList.contains("active") && routeAllowsPath(route, window.location.pathname)) {
+        link.setAttribute("href", baseHref);
+        return;
+      }
       const target = rememberedUrl(route);
       link.setAttribute("href", target || baseHref);
     });
@@ -108,6 +112,10 @@
       const route = routeForHref(baseHref);
       if (!route) return;
       link.dataset.workspaceBaseHref = baseHref;
+      if (link.classList.contains("active") && routeAllowsPath(route, window.location.pathname)) {
+        link.setAttribute("href", baseHref);
+        return;
+      }
       const target = rememberedUrl(route);
       if (target) link.setAttribute("href", target);
     },

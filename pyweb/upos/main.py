@@ -3740,6 +3740,20 @@ def create_app() -> FastAPI:
                 return row, "name"
         return None
 
+    def _next_product_sku(session: Any, workspace_owner_id: str, *, product_id: str = "") -> str:
+        next_number = 21000
+        rows = session.execute(
+            select(Product.id, Product.sku).where(Product.workspace_owner_id == workspace_owner_id)
+        ).all()
+        for row_id, raw_sku in rows:
+            if product_id and str(row_id) == str(product_id):
+                continue
+            sku = str(raw_sku or "").strip()
+            if not re.fullmatch(r"\d+", sku):
+                continue
+            next_number = max(next_number, int(sku) + 1)
+        return str(next_number)
+
     def _product_duplicate_message(match: tuple[Product, str]) -> str:
         row, field = match
         field_label = {
@@ -3803,7 +3817,7 @@ def create_app() -> FastAPI:
         if row is None:
             return False
         kind = str(_json_object(row.data).get("kind") or "product")
-        return kind != "service"
+        return kind == "product"
 
     def _product_stocks(row: Product) -> list[dict[str, Any]]:
         raw = _json_object(row.data).get("stocks")
@@ -4136,6 +4150,39 @@ def create_app() -> FastAPI:
         "urgent": "Срочный",
     }
 
+    CRM_DEFAULT_TASK_TYPES = (
+        {
+            "id": "call",
+            "name": "Звонок",
+            "checklist": ("Позвонить клиенту", "Зафиксировать результат"),
+        },
+        {
+            "id": "meeting",
+            "name": "Встреча",
+            "checklist": ("Согласовать время", "Подготовить материалы", "Записать итог"),
+        },
+        {
+            "id": "invoice",
+            "name": "Выставить счёт",
+            "checklist": ("Проверить сумму", "Отправить счёт", "Проверить оплату"),
+        },
+        {
+            "id": "delivery",
+            "name": "Доставка",
+            "checklist": ("Проверить адрес", "Назначить ответственного", "Подтвердить получение"),
+        },
+        {
+            "id": "installation",
+            "name": "Монтаж",
+            "checklist": ("Уточнить адрес", "Назначить мастера", "Проверить оборудование", "Закрыть задачу"),
+        },
+        {
+            "id": "payment",
+            "name": "Проверка оплаты",
+            "checklist": ("Проверить оплату", "Связать оплату с документом", "Сообщить клиенту"),
+        },
+    )
+
     def _crm_priority_label(priority: str) -> str:
         clean = str(priority or "normal").strip()
         return CRM_PRIORITY_LABELS.get(clean, CRM_PRIORITY_LABELS["normal"])
@@ -4175,6 +4222,60 @@ def create_app() -> FastAPI:
         base = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(value or "").strip())
         base = "-".join(part for part in base.split("-") if part)
         return (base or fallback)[:80]
+
+    def _crm_clean_task_types(raw: Any) -> list[dict[str, Any]]:
+        source = raw if isinstance(raw, list) and raw else CRM_DEFAULT_TASK_TYPES
+        result: list[dict[str, Any]] = []
+        used_names: set[str] = set()
+        used_ids: set[str] = set()
+        for index, item in enumerate(source, start=1):
+            if not isinstance(item, dict):
+                continue
+            name = re.sub(r"\s+", " ", str(item.get("name") or "")).strip()[:80]
+            if not name:
+                continue
+            name_key = name.casefold()
+            if name_key in used_names:
+                continue
+            checklist_raw = item.get("checklist")
+            if isinstance(checklist_raw, str):
+                checklist_source = checklist_raw.splitlines()
+            elif isinstance(checklist_raw, (list, tuple)):
+                checklist_source = checklist_raw
+            else:
+                checklist_source = []
+            checklist: list[str] = []
+            seen_checklist: set[str] = set()
+            for checklist_item in checklist_source:
+                text = re.sub(r"\s+", " ", str(checklist_item or "")).strip()[:160]
+                if not text:
+                    continue
+                text_key = text.casefold()
+                if text_key in seen_checklist:
+                    continue
+                checklist.append(text)
+                seen_checklist.add(text_key)
+                if len(checklist) >= 40:
+                    break
+            base_id = _crm_stage_slug(str(item.get("id") or name), f"task-type-{index}")
+            task_type_id = base_id
+            suffix = 2
+            while task_type_id in used_ids:
+                task_type_id = f"{base_id}-{suffix}"[:80]
+                suffix += 1
+            used_ids.add(task_type_id)
+            used_names.add(name_key)
+            result.append(
+                {
+                    "id": task_type_id,
+                    "name": name,
+                    "checklist": checklist,
+                    "checklist_text": "\n".join(checklist),
+                }
+            )
+        if result:
+            return result
+        return _crm_clean_task_types([dict(item) for item in CRM_DEFAULT_TASK_TYPES])
 
     def _crm_clean_stages(raw: Any, previous: list[dict[str, str]] | None = None) -> list[dict[str, str]]:
         source = raw if isinstance(raw, list) else []
@@ -5478,6 +5579,11 @@ def create_app() -> FastAPI:
             for item in settings_payload.get("product_categories", [])
             if str(item or "").strip()
         ]
+        stored_brands = [
+            str(item or "").strip()
+            for item in settings_payload.get("product_brands", [])
+            if str(item or "").strip()
+        ]
         category_counts: dict[str, int] = {}
         for product in all_items:
             category_name = str(product.get("category") or "").strip()
@@ -5491,7 +5597,7 @@ def create_app() -> FastAPI:
                 for name in category_names
             ],
             "groups": sorted({p["group"] for p in all_items if p["group"]}),
-            "brands": sorted({p["brand"] for p in all_items if p["brand"]}),
+            "brands": sorted({*stored_brands, *{p["brand"] for p in all_items if p["brand"]}}),
             "folders": sorted({p["folder"] for p in all_items if p["folder"]}),
             "price_types": sorted(
                 {
@@ -5577,6 +5683,12 @@ def create_app() -> FastAPI:
         data["product_categories"] = clean
         save_workspace_settings(workspace_owner_id, data)
 
+    def _save_product_brands(workspace_owner_id: str, names: list[str]) -> None:
+        clean = sorted({str(name or "").strip() for name in names if str(name or "").strip()})
+        data = load_workspace_settings(workspace_owner_id)
+        data["product_brands"] = clean
+        save_workspace_settings(workspace_owner_id, data)
+
     def _price_type_redirect(price_type_id: str = "", *, msg: str = "saved") -> RedirectResponse:
         suffix = f"?price_type={quote(str(price_type_id))}&msg={quote(msg)}" if price_type_id else f"?msg={quote(msg)}"
         anchor = "price-type-detail" if price_type_id else "price-types"
@@ -5633,6 +5745,9 @@ def create_app() -> FastAPI:
             "simple": "product",
             "service": "service",
             "услуга": "service",
+            "subscription": "subscription",
+            "подписка": "subscription",
+            "подписки": "subscription",
             "collection": "collection",
             "комплект": "collection",
             "коллекция": "collection",
@@ -5661,7 +5776,7 @@ def create_app() -> FastAPI:
         if error:
             query["error"] = error
         suffix = f"?{urlencode(query)}" if query else ""
-        target_hash = "#service" if clean_kind == "service" else "#catalog"
+        target_hash = "#catalog"
         return f"/products{suffix}{target_hash}"
 
     def _product_list_redirect_url(
@@ -5821,11 +5936,17 @@ def create_app() -> FastAPI:
                     .order_by(Product.name.asc())
                 ).scalars()
             ]
+            next_product_sku = (
+                str(edit_product.get("sku") or "")
+                if edit_product
+                else _next_product_sku(session, wid)
+            )
         # Счётчики для вкладок «Все / Товары / Услуги» — по всему справочнику.
         catalog_kind_counts = {
             "all": len(price_products),
-            "product": sum(1 for item in price_products if item.get("kind") != "service"),
+            "product": sum(1 for item in price_products if item.get("kind") == "product"),
             "service": sum(1 for item in price_products if item.get("kind") == "service"),
+            "subscription": sum(1 for item in price_products if item.get("kind") == "subscription"),
         }
         products_total = len(products)
         catalog_totals = _product_catalog_totals(products)
@@ -5861,8 +5982,10 @@ def create_app() -> FastAPI:
             price_rows = [row for row in price_rows if row.get("category") == price_category]
         if price_kind == "service":
             price_rows = [row for row in price_rows if row.get("kind") == "service"]
+        elif price_kind == "subscription":
+            price_rows = [row for row in price_rows if row.get("kind") == "subscription"]
         elif price_kind == "product":
-            price_rows = [row for row in price_rows if row.get("kind") != "service"]
+            price_rows = [row for row in price_rows if row.get("kind") == "product"]
         if price_group:
             price_rows = [row for row in price_rows if row.get("group") == price_group]
         if price_brand:
@@ -5940,6 +6063,7 @@ def create_app() -> FastAPI:
             product_page_urls={page_no: product_page_url(page_no) for page_no in product_pagination_pages},
             product_filters=filters,
             product_options=options,
+            next_product_sku=next_product_sku,
             catalog_totals=catalog_totals,
             price_type_state=price_type_state,
             edit_product=edit_product,
@@ -6577,6 +6701,14 @@ def create_app() -> FastAPI:
         sku = str(form.get("sku") or "").strip()
         barcode = str(form.get("barcode") or "").strip()
         data = _product_form_payload(form)
+        clean_kind = str(data.get("kind") or "product")
+        if clean_kind in {"service", "subscription"}:
+            barcode = ""
+            data["barcode_type"] = ""
+            data["stocks"] = []
+            data["unit"] = data.get("unit") or ("Подписка" if clean_kind == "subscription" else "Услуга")
+            if clean_kind == "subscription":
+                data["brand"] = ""
         try:
             uploaded_photo = await _prepare_product_photo_upload(form.get("photo_file"))
         except ValueError as exc:
@@ -6584,12 +6716,41 @@ def create_app() -> FastAPI:
                 url="/products?error=" + quote(str(exc)) + "#product-form",
                 status_code=302,
             )
+        if not product_id:
+            missing_fields: list[str] = []
+            if not str(data.get("category") or "").strip():
+                missing_fields.append("категория")
+            if str(data.get("kind") or "product") != "subscription" and not str(data.get("brand") or "").strip():
+                missing_fields.append("бренд")
+            if not uploaded_photo and not str(data.get("photo_url") or "").strip():
+                missing_fields.append("фото")
+            if str(data.get("kind") or "product") == "service":
+                sale_price_raw = str(form.get("service_sale_price") or "").strip()
+            else:
+                sale_price_raw = next(
+                    (
+                        str(item.get("price") or "").strip()
+                        for item in data.get("prices", [])
+                        if isinstance(item, dict) and str(item.get("price") or "").strip()
+                    ),
+                    "",
+                )
+            if _sales_decimal(sale_price_raw) <= 0:
+                missing_fields.append("продажная цена")
+            if missing_fields:
+                return RedirectResponse(
+                    url="/products?error=" + quote("Заполните обязательные поля: " + ", ".join(missing_fields)) + "#product-form",
+                    status_code=302,
+                )
         # Имена прайсов — для журнала изменений цен; берём до открытия сессии.
         price_type_names = {
             str(item.get("id") or ""): str(item.get("name") or "Прайс")
             for item in _workspace_price_types(wid)
         }
         with session_scope() as session:
+            if not sku:
+                sku = _next_product_sku(session, wid, product_id=product_id)
+                data["sku"] = sku
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
                 return RedirectResponse(url="/products?error=" + quote("Товар не найден"), status_code=302)
@@ -6700,6 +6861,24 @@ def create_app() -> FastAPI:
                     source="product_card",
                 )
             row.data = data
+        category_name = str(data.get("category") or "").strip()
+        brand_name = str(data.get("brand") or "").strip()
+        if category_name or brand_name:
+            settings_payload = load_workspace_settings(wid)
+            if category_name:
+                stored_categories = [
+                    str(item or "").strip()
+                    for item in settings_payload.get("product_categories", [])
+                    if str(item or "").strip()
+                ]
+                _save_product_categories(wid, [*stored_categories, category_name])
+            if brand_name:
+                stored_brands = [
+                    str(item or "").strip()
+                    for item in settings_payload.get("product_brands", [])
+                    if str(item or "").strip()
+                ]
+                _save_product_brands(wid, [*stored_brands, brand_name])
         service_bonus_raw = str(form.get("service_bonus_percent") or "").strip()
         if str(data.get("kind") or "product") == "service" and service_bonus_raw:
             rules = load_earning_rules(wid)
@@ -6707,6 +6886,42 @@ def create_app() -> FastAPI:
             by_service[product_id] = service_bonus_raw
             save_earning_rules(wid, rules.get("default"), rules.get("by_user"), by_service)
         return RedirectResponse(url="/products?msg=saved", status_code=302)
+
+    @app.post("/products/dictionaries/quick-save", name="products_dictionary_quick_save")
+    async def products_dictionary_quick_save(request: Request):
+        token = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token") or ""
+        if not csrf_matches_session(request, token):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
+        assert wid is not None
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        dictionary_type = str(payload.get("type") or "").strip()
+        name = " ".join(str(payload.get("name") or "").split())
+        if dictionary_type not in {"category", "brand"}:
+            return JSONResponse({"ok": False, "error": "type"}, status_code=400)
+        if not name:
+            return JSONResponse({"ok": False, "error": "name"}, status_code=400)
+        settings_payload = load_workspace_settings(wid)
+        if dictionary_type == "category":
+            stored = [
+                str(item or "").strip()
+                for item in settings_payload.get("product_categories", [])
+                if str(item or "").strip()
+            ]
+            _save_product_categories(wid, [*stored, name])
+        else:
+            stored = [
+                str(item or "").strip()
+                for item in settings_payload.get("product_brands", [])
+                if str(item or "").strip()
+            ]
+            _save_product_brands(wid, [*stored, name])
+        return JSONResponse({"ok": True, "type": dictionary_type, "name": name})
 
     @app.post("/products/categories/save", name="products_category_save")
     async def products_category_save(request: Request):
@@ -9948,18 +10163,6 @@ def create_app() -> FastAPI:
             not sales_embed
             and str(request.query_params.get("view") or "").strip() == "journal"
         )
-
-    @app.get("/installer/android.apk", name="installer_android_apk")
-    def installer_android_apk():
-        path = BASE_DIR / "static" / "downloads" / "upos-integrator.apk"
-        if not path.exists():
-            return Response("Android application is not available", status_code=404)
-        return FileResponse(
-            path,
-            media_type="application/vnd.android.package-archive",
-            filename="U-POS-Integrator.apk",
-            headers={"Cache-Control": "no-store, max-age=0"},
-        )
         sales: list[dict[str, Any]] = []
         filtered_sale_clients: list[str] = []
         filtered_sale_warehouses: list[str] = []
@@ -10657,6 +10860,18 @@ def create_app() -> FastAPI:
         # FinanceAccount, поэтому выдуманный счёт довёл бы пользователя до формы оплаты
         # и упал бы уже на сохранении.
         return render_sales_page()
+
+    @app.get("/installer/android.apk", name="installer_android_apk")
+    def installer_android_apk():
+        path = BASE_DIR / "static" / "downloads" / "upos-integrator.apk"
+        if not path.exists():
+            return Response("Android application is not available", status_code=404)
+        return FileResponse(
+            path,
+            media_type="application/vnd.android.package-archive",
+            filename="U-POS-Integrator.apk",
+            headers={"Cache-Control": "no-store, max-age=0"},
+        )
 
     @app.get("/api/sales/clients/{client_id}/card", name="sales_client_card_api")
     def sales_client_card_api(request: Request, client_id: str):
@@ -11983,6 +12198,8 @@ def create_app() -> FastAPI:
             {
                 "name": str(expense.get("name") or ""),
                 "amount": _decimal_plain_text(_sales_decimal(expense.get("amount"))),
+                "currency": str(expense.get("currency") or row.currency or "UZS").upper(),
+                "document_amount": _decimal_plain_text(_sales_decimal(expense.get("document_amount") or expense.get("amount"))),
             }
             for expense in (data.get("extra_expenses") if isinstance(data.get("extra_expenses"), list) else [])
             if isinstance(expense, dict) and _sales_decimal(expense.get("amount")) > 0
@@ -12047,8 +12264,9 @@ def create_app() -> FastAPI:
         }
         return item
 
-    def _purchase_document_payload(form: Any) -> tuple[dict[str, Any], Decimal, str]:
+    def _purchase_document_payload(form: Any, workspace_owner_id: str) -> tuple[dict[str, Any], Decimal, str]:
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+        usd_rate = _workspace_usd_uzs_rate(workspace_owner_id)
         products = list(form.getlist("line_product"))
         quantities = list(form.getlist("line_quantity"))
         prices = list(form.getlist("line_price"))
@@ -12085,25 +12303,30 @@ def create_app() -> FastAPI:
             )
         expense_names = list(form.getlist("extra_expense_name"))
         expense_amounts = list(form.getlist("extra_expense_amount"))
+        expense_currencies = list(form.getlist("extra_expense_currency"))
         extra_expenses: list[dict[str, str]] = []
         extra_expense_total = Decimal("0")
-        for idx in range(max(len(expense_names), len(expense_amounts), 0)):
+        for idx in range(max(len(expense_names), len(expense_amounts), len(expense_currencies), 0)):
             expense_name = str(expense_names[idx] if idx < len(expense_names) else "").strip()
             expense_amount = _sales_decimal_strict(
                 expense_amounts[idx] if idx < len(expense_amounts) else "",
                 "Дополнительный расход",
             )
+            expense_currency = str(expense_currencies[idx] if idx < len(expense_currencies) else currency).strip().upper()[:3] or currency
             if expense_amount < 0:
                 raise ValueError("Дополнительный расход не может быть отрицательным")
             if expense_amount <= 0:
                 continue
+            expense_document_amount = _convert_product_currency(expense_amount, expense_currency, currency, usd_rate)
             extra_expenses.append(
                 {
                     "name": expense_name or "Дополнительный расход",
                     "amount": _decimal_plain_text(expense_amount),
+                    "currency": expense_currency,
+                    "document_amount": _decimal_plain_text(expense_document_amount),
                 }
             )
-            extra_expense_total += expense_amount
+            extra_expense_total += expense_document_amount
 
         allocation_lines = [
             line for line in lines
@@ -12519,10 +12742,12 @@ def create_app() -> FastAPI:
         }
         return data, amount
 
-    def _warehouse_adjustment_lines_payload(form: Any) -> tuple[dict[str, Any], list[dict[str, Any]], Decimal, str]:
+    def _warehouse_adjustment_lines_payload(form: Any, workspace_owner_id: str) -> tuple[dict[str, Any], list[dict[str, Any]], Decimal, str]:
         operation_type = str(form.get("operation_type") or "out").strip()
         if operation_type not in {"in", "out"}:
             operation_type = "out"
+        currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
+        usd_rate = _workspace_usd_uzs_rate(workspace_owner_id)
         products = list(form.getlist("line_product"))
         quantities = list(form.getlist("line_quantity"))
         prices = list(form.getlist("line_price"))
@@ -12565,23 +12790,28 @@ def create_app() -> FastAPI:
         if operation_type == "in":
             expense_names = list(form.getlist("extra_expense_name"))
             expense_amounts = list(form.getlist("extra_expense_amount"))
-            for index in range(max(len(expense_names), len(expense_amounts), 0)):
+            expense_currencies = list(form.getlist("extra_expense_currency"))
+            for index in range(max(len(expense_names), len(expense_amounts), len(expense_currencies), 0)):
                 expense_name = str(expense_names[index] if index < len(expense_names) else "").strip()
                 expense_amount = _sales_decimal_strict(
                     expense_amounts[index] if index < len(expense_amounts) else "",
                     "Дополнительный расход",
                 )
+                expense_currency = str(expense_currencies[index] if index < len(expense_currencies) else currency).strip().upper()[:3] or currency
                 if expense_amount < 0:
                     raise ValueError("Дополнительный расход не может быть отрицательным")
                 if expense_amount <= 0:
                     continue
+                expense_document_amount = _convert_product_currency(expense_amount, expense_currency, currency, usd_rate)
                 extra_expenses.append(
                     {
                         "name": expense_name or "Дополнительный расход",
                         "amount": _decimal_plain_text(expense_amount),
+                        "currency": expense_currency,
+                        "document_amount": _decimal_plain_text(expense_document_amount),
                     }
                 )
-                extra_expense_total += expense_amount
+                extra_expense_total += expense_document_amount
 
             allocation_total = sum((_sales_decimal(line.get("total")) for line in lines), Decimal("0"))
             use_quantity_basis = allocation_total <= 0
@@ -12610,7 +12840,6 @@ def create_app() -> FastAPI:
                 line["cost_price"] = _decimal_plain_text(
                     cost_price.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
                 )
-        currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
         data = {
             "date": str(form.get("date") or "").strip(),
             "operation_type": operation_type,
@@ -12678,8 +12907,16 @@ def create_app() -> FastAPI:
                     break
             return tags
 
+        checklist = [
+            re.sub(r"\s+", " ", item).strip()[:160]
+            for item in str(form.get("checklist") or "").splitlines()
+            if re.sub(r"\s+", " ", item).strip()
+        ][:40]
+
         data = {
             "item_type": item_type,
+            "task_type": re.sub(r"\s+", " ", str(form.get("task_type") or "")).strip()[:80],
+            "checklist": checklist,
             "client": str(form.get("client") or "").strip(),
             "contact": str(form.get("contact") or "").strip(),
             "responsible": str(form.get("responsible") or "").strip(),
@@ -12709,6 +12946,11 @@ def create_app() -> FastAPI:
         priority = str(data.get("priority") or "normal")
         probability = _crm_probability_value(data.get("probability"))
         tags = [str(item or "").strip() for item in data.get("tags", []) if str(item or "").strip()] if isinstance(data.get("tags"), list) else []
+        checklist = [
+            str(item or "").strip()
+            for item in data.get("checklist", [])
+            if str(item or "").strip()
+        ] if isinstance(data.get("checklist"), list) else []
         amount_value = _sales_decimal(row.amount)
         amount_input = _decimal_plain_text(amount_value) if amount_value else ""
         activity_log = [item for item in data.get("activity_log", []) if isinstance(item, dict)] if isinstance(data.get("activity_log"), list) else []
@@ -12723,6 +12965,9 @@ def create_app() -> FastAPI:
             "status": row.status,
             "status_label": _crm_status_label(row.status),
             "client": str(data.get("client") or ""),
+            "task_type": str(data.get("task_type") or ""),
+            "checklist": checklist[:40],
+            "checklist_text": "\n".join(checklist[:40]),
             "contact": str(data.get("contact") or ""),
             "responsible": str(data.get("responsible") or ""),
             "date": str(data.get("date") or ""),
@@ -12757,6 +13002,8 @@ def create_app() -> FastAPI:
             "item_type",
             "title",
             "client",
+            "task_type",
+            "checklist_text",
             "contact",
             "responsible",
             "lead_source",
@@ -12781,6 +13028,9 @@ def create_app() -> FastAPI:
         for key in keys:
             if key == "tags":
                 payload[key] = str(item.get("tags_text") or "")
+                continue
+            if key == "checklist_text":
+                payload["checklist"] = str(item.get("checklist_text") or "")
                 continue
             value = item.get(key)
             payload[key] = "" if value is None else str(value)
@@ -13376,7 +13626,7 @@ def create_app() -> FastAPI:
         actor: dict[str, Any] | None = None,
     ) -> RedirectResponse:
         try:
-            data, amount, currency = _purchase_document_payload(form)
+            data, amount, currency = _purchase_document_payload(form, workspace_owner_id)
         except ValueError as exc:
             return RedirectResponse(url=f"{base_url}?error=" + quote(str(exc)) + "#purchases", status_code=302)
         if not data["supplier"]:
@@ -13474,7 +13724,7 @@ def create_app() -> FastAPI:
         actor: dict[str, Any] | None = None,
     ) -> RedirectResponse:
         try:
-            data, amount, currency = _purchase_document_payload(form)
+            data, amount, currency = _purchase_document_payload(form, workspace_owner_id)
             if not data["supplier"]:
                 raise ValueError("Поставщик обязателен")
             with session_scope() as session:
@@ -14162,7 +14412,7 @@ def create_app() -> FastAPI:
             requested_operation_type = str(form.get("operation_type") or "out").strip()
             requested_operation_type = requested_operation_type if requested_operation_type in {"in", "out"} else "out"
             try:
-                data, lines, _total, currency = _warehouse_adjustment_lines_payload(form)
+                data, lines, _total, currency = _warehouse_adjustment_lines_payload(form, wid)
             except ValueError as exc:
                 return RedirectResponse(
                     url=f"/warehouse?op={requested_operation_type}&error=" + quote(str(exc)) + "#adjustments",
@@ -16144,6 +16394,7 @@ def create_app() -> FastAPI:
         crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": []}
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
+        crm_task_types = _crm_clean_task_types(crm_workspace_settings.get("crm_task_types"))
         crm_activity_settings = _crm_activity_settings(crm_workspace_settings)
         crm_stage_map = {
             stage["id"]: {
@@ -16270,12 +16521,44 @@ def create_app() -> FastAPI:
                     .order_by(CrmRecord.updated_at.desc())
                 ).scalars()
             )
-            all_deal_options = [
-                {
+            def deal_option(row: CrmRecord) -> dict[str, str]:
+                data = _json_object(row.data)
+                linked_document_ids = {
+                    str(data.get("related_sale_id") or "").strip(),
+                    *(
+                        str(document_id).strip()
+                        for document_id in (
+                            data.get("sales_document_ids")
+                            if isinstance(data.get("sales_document_ids"), list)
+                            else []
+                        )
+                    ),
+                }
+                linked_document_ids.discard("")
+                shipment_total = sum(
+                    [
+                        _sales_decimal(document.get("amount_value"))
+                        * (
+                            crm_usd_rate
+                            if str(document.get("currency") or "UZS").strip().upper() == "USD"
+                            else Decimal("1")
+                        )
+                        for document_id in linked_document_ids
+                        for document in [sale_by_id.get(document_id)]
+                        if document and str(document.get("doc_type") or "") == "sale"
+                    ],
+                    Decimal("0"),
+                )
+                return {
                     "id": row.id,
                     "title": row.title,
-                    "client": str(_json_object(row.data).get("client") or ""),
+                    "client": str(data.get("client") or ""),
+                    "shipment_amount": _sales_money_label(shipment_total),
+                    "shipment_currency": "UZS",
                 }
+
+            all_deal_options = [
+                deal_option(row)
                 for row in rows
                 if row.item_type == "deal"
             ]
@@ -16500,6 +16783,10 @@ def create_app() -> FastAPI:
                 column = crm_stage_map.get(item["stage_id"]) or crm_stage_map[crm_stages[0]["id"]]
                 column["records"].append(item)
                 column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
+            employee_responsibles = {
+                str(emp.get("name") or emp.get("username") or "").strip()
+                for emp in list_employees_safe(wid)
+            }
             crm_options = {
                 "clients": sorted(
                     {row.name for row in counterparty_rows if row.name}
@@ -16517,6 +16804,7 @@ def create_app() -> FastAPI:
                 "responsibles": sorted(
                     {item["responsible"] for item in crm_records if item["responsible"]}
                     | {item["responsible"] for item in crm_task_records if item["responsible"]}
+                    | {name for name in employee_responsibles if name}
                     | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())
                 ),
                 "deals": deal_options,
@@ -16569,6 +16857,7 @@ def create_app() -> FastAPI:
             crm_lead_sources=list(CRM_LEAD_SOURCES),
             crm_lost_reasons=list(CRM_LOST_REASONS),
             crm_service_types=list(CRM_SERVICE_TYPES),
+            crm_task_types=crm_task_types,
             crm_priorities=CRM_PRIORITY_LABELS,
             today=today_iso,
             flash_ok=request.query_params.get("msg"),
@@ -22843,6 +23132,7 @@ def create_app() -> FastAPI:
                 settings_can_manage_config and (_is_director(u) or _is_employee_adminish(u)),
             )
             data["crm_activity"] = _crm_activity_settings(data)
+            data["crm_task_types"] = _crm_clean_task_types(data.get("crm_task_types"))
             crm_settings_stage_lines = _crm_stage_lines(_crm_clean_stages(data.get("crm_pipeline_stages")))
             allowed_tabs = set()
             default_allowed_tab = "general"
@@ -23471,6 +23761,7 @@ def create_app() -> FastAPI:
         usd_rate = _sales_decimal(data.get("usd_uzs_rate"))
         data["usd_uzs_rate"] = _decimal_plain_text(usd_rate if usd_rate > 0 else PRODUCT_USD_RATE)
         data["crm_activity"] = _crm_activity_settings(data)
+        data["crm_task_types"] = _crm_clean_task_types(data.get("crm_task_types"))
         crm_settings_stage_lines = _crm_stage_lines(_crm_clean_stages(data.get("crm_pipeline_stages")))
         tab_raw = (request.query_params.get("tab") or "").strip().lower()
         settings_can_manage_employees = _can_manage_employees(u)
@@ -23730,26 +24021,42 @@ def create_app() -> FastAPI:
             return RedirectResponse(url="/settings", status_code=302)
         wid = _settings_storage_owner_id(u)
         data = load_workspace_settings(wid)
-        try:
-            yellow_hours = max(1, min(int(str(form.get("crm_yellow_hours") or "24")), 720))
-        except (TypeError, ValueError):
-            yellow_hours = 24
-        try:
-            red_hours = max(yellow_hours + 1, min(int(str(form.get("crm_red_hours") or "48")), 1440))
-        except (TypeError, ValueError):
-            red_hours = 48
-        data["crm_activity"] = {"yellow_hours": yellow_hours, "red_hours": red_hours}
-        raw_lines = str(form.get("crm_pipeline_stages") or "").splitlines()
-        data["crm_pipeline_stages"] = _crm_clean_stages(
-            raw_lines,
-            _crm_clean_stages(data.get("crm_pipeline_stages")),
-        )
+        if "crm_yellow_hours" in form or "crm_red_hours" in form:
+            try:
+                yellow_hours = max(1, min(int(str(form.get("crm_yellow_hours") or "24")), 720))
+            except (TypeError, ValueError):
+                yellow_hours = 24
+            try:
+                red_hours = max(yellow_hours + 1, min(int(str(form.get("crm_red_hours") or "48")), 1440))
+            except (TypeError, ValueError):
+                red_hours = 48
+            data["crm_activity"] = {"yellow_hours": yellow_hours, "red_hours": red_hours}
+        if "crm_pipeline_stages" in form:
+            raw_lines = str(form.get("crm_pipeline_stages") or "").splitlines()
+            data["crm_pipeline_stages"] = _crm_clean_stages(
+                raw_lines,
+                _crm_clean_stages(data.get("crm_pipeline_stages")),
+            )
+        if "crm_task_type_name" in form or "crm_task_type_checklist" in form:
+            names = form.getlist("crm_task_type_name")
+            checklists = form.getlist("crm_task_type_checklist")
+            task_types: list[dict[str, Any]] = []
+            for index, name in enumerate(names):
+                checklist_text = checklists[index] if index < len(checklists) else ""
+                task_types.append(
+                    {
+                        "name": str(name or ""),
+                        "checklist": str(checklist_text or "").splitlines(),
+                    }
+                )
+            data["crm_task_types"] = _crm_clean_task_types(task_types)
         save_workspace_settings(wid, data)
         return_to = str(form.get("return_to") or "").strip()
         if not (return_to.startswith("/settings") or return_to.startswith("/organizations/settings")):
             return_to = "/settings"
         sep = "&" if "?" in return_to else "?"
-        return RedirectResponse(url=f"{return_to}{sep}saved=1&tab=crm", status_code=302)
+        tab_part = "" if "tab=" in return_to else "&tab=crm"
+        return RedirectResponse(url=f"{return_to}{sep}saved=1{tab_part}", status_code=302)
 
     @app.post("/settings/account", name="settings_account_post")
     def settings_account_post(

@@ -941,7 +941,10 @@
                     <p class="settings-ios-footnote">CRM</p>
                     <p class="settings-business-note">Настройте цветную шкалу карточек и этапы воронки.</p>
                   </div>
-                  <button class="btn" type="submit">Сохранить CRM</button>
+                  <div class="settings-crm-actions">
+                    <a class="btn btn-secondary" href="{{ url_for('crm_get') }}?crm_open=task#tasks">+ Создать задачу</a>
+                    <button class="btn" type="submit">Сохранить CRM</button>
+                  </div>
                 </div>
                 <div class="settings-crm-grid">
                   <label class="settings-profile-field">
@@ -952,11 +955,23 @@
                     <span class="settings-profile-field-label">Красная шкала через, часов</span>
                     <input class="settings-profile-input" type="number" name="crm_red_hours" min="2" max="1440" value="{{ settings.crm_activity.red_hours | default(48) }}" />
                   </label>
-                  <label class="settings-profile-field settings-profile-field--full">
+                  <div class="settings-profile-field settings-profile-field--full" data-crm-stages-list>
                     <span class="settings-profile-field-label">Этапы CRM</span>
-                    <textarea class="settings-profile-input settings-crm-stages-input" name="crm_pipeline_stages" rows="8">{{ crm_pipeline_stage_lines }}</textarea>
+                    <textarea class="settings-profile-input settings-crm-stages-input settings-crm-stages-source" name="crm_pipeline_stages" rows="8" data-crm-stages-source hidden>{{ crm_pipeline_stage_lines }}</textarea>
+                    <div class="settings-crm-stage-list" data-crm-stage-list>
+                      {% for line in crm_pipeline_stage_lines.splitlines() %}
+                      <div class="settings-crm-stage-row" data-crm-stage-row>
+                        <span class="settings-crm-stage-check" aria-hidden="true">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        </span>
+                        <input class="settings-profile-input" type="text" value="{{ line }}" data-crm-stage-input placeholder="Название этапа" />
+                        <button type="button" class="settings-crm-stage-remove" data-crm-stage-remove aria-label="Удалить этап">×</button>
+                      </div>
+                      {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm settings-crm-stage-add" data-crm-stage-add>+ Добавить этап</button>
                     <small>Каждый этап с новой строки. Порядок строк станет порядком колонок в CRM.</small>
-                  </label>
+                  </div>
                 </div>
               </section>
             </form>
@@ -2040,6 +2055,38 @@
               </div>
             </section>
 
+            <section class="settings-ios-group settings-dict-section" data-task-types-dictionary>
+              <div class="settings-dict-head">
+                <div>
+                  <p class="settings-ios-footnote">Типы задач</p>
+                  <p class="settings-business-note">Шаблоны для задач CRM. Чеклист подтянется при выборе типа задачи.</p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" data-task-type-add>+ Тип</button>
+              </div>
+              <form class="settings-task-types-form" method="post" action="{{ url_for('settings_crm_post') }}">
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="return_to" value="{{ settings_base_url }}?tab=dictionary" />
+                <div class="settings-task-types-list" data-task-type-list>
+                  {% for item in settings.crm_task_types %}
+                  <div class="settings-task-type-row" data-task-type-row>
+                    <label>
+                      <span>Тип задачи</span>
+                      <input class="settings-profile-input" name="crm_task_type_name" value="{{ item.name }}" placeholder="Например: Позвонить" />
+                    </label>
+                    <label>
+                      <span>Чеклист</span>
+                      <textarea class="settings-profile-input" name="crm_task_type_checklist" rows="3" placeholder="Каждый пункт с новой строки">{{ item.checklist_text }}</textarea>
+                    </label>
+                    <button type="button" class="settings-task-type-remove" data-task-type-remove aria-label="Удалить тип">×</button>
+                  </div>
+                  {% endfor %}
+                </div>
+                <div class="settings-task-types-actions">
+                  <button type="submit" class="btn">Сохранить типы задач</button>
+                </div>
+              </form>
+            </section>
+
             <section class="settings-ios-group settings-dict-section">
               <div class="settings-dict-head">
                 <p class="settings-ios-footnote">{{ _('settings.dict.cats') }}</p>
@@ -2238,6 +2285,6 @@
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
   <script src="{{ url_for('static', path='price-template-editor.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='price-tag.js') }}?v=6" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=31" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=33" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

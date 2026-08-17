@@ -316,6 +316,11 @@
     if (panel) panel.hidden = true;
   }
 
+  function closeExpenseTypePanel(picker) {
+    const panel = picker?.querySelector("[data-purchase-expense-type-panel]");
+    if (panel) panel.hidden = true;
+  }
+
   function positionFloatingPanel(input, panel, minWidth) {
     if (!input || !panel || panel.hidden) return;
     const rect = input.getBoundingClientRect();
@@ -344,6 +349,12 @@
   function positionSupplierPanel(picker) {
     const input = picker?.querySelector("[data-warehouse-supplier-input]");
     const panel = picker?.querySelector("[data-warehouse-supplier-panel]");
+    positionFloatingPanel(input, panel, 320);
+  }
+
+  function positionExpenseTypePanel(picker) {
+    const input = picker?.querySelector("[data-purchase-expense-type-input]");
+    const panel = picker?.querySelector("[data-purchase-expense-type-panel]");
     positionFloatingPanel(input, panel, 320);
   }
 
@@ -476,7 +487,135 @@
       }
       select.replaceChildren(...selectOptions);
       select.value = currentValue;
+      syncExpenseTypePicker(select);
+      const picker = select.closest(".warehouse-purchase-expense-type-field")?.querySelector("[data-purchase-expense-type-picker]");
+      if (picker && !picker.querySelector("[data-purchase-expense-type-panel]")?.hidden) {
+        renderExpenseTypePicker(picker, picker.querySelector("[data-purchase-expense-type-input]")?.value || "");
+      }
     });
+  }
+
+  function expenseTypeOptionRows(select) {
+    return Array.from(select?.options || []).map((option) => ({
+      value: String(option.value || ""),
+      label: String(option.textContent || option.value || "").trim(),
+    })).filter((item, index, rows) => {
+      if (!item.value) return index === 0;
+      return rows.findIndex((candidate) => candidate.value === item.value) === index;
+    });
+  }
+
+  function expenseTypeSelectedLabel(select) {
+    const selected = select?.selectedOptions?.[0];
+    return String(selected?.textContent || select?.value || "").trim();
+  }
+
+  function syncExpenseTypePicker(select) {
+    const picker = select?.closest(".warehouse-purchase-expense-type-field")?.querySelector("[data-purchase-expense-type-picker]");
+    const input = picker?.querySelector("[data-purchase-expense-type-input]");
+    if (!input) return;
+    input.value = select?.value ? expenseTypeSelectedLabel(select) : "";
+  }
+
+  function setExpenseTypeValue(select, value, label) {
+    if (!select) return;
+    const cleanValue = String(value || "").trim();
+    const cleanLabel = String(label || cleanValue).trim();
+    if (cleanValue && !Array.from(select.options || []).some((option) => String(option.value || "") === cleanValue)) {
+      select.add(new Option(cleanLabel, cleanValue));
+    }
+    select.value = cleanValue;
+    syncExpenseTypePicker(select);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function renderExpenseTypePicker(picker, query) {
+    const select = picker?.querySelector('select[name="extra_expense_name"]');
+    const panel = picker?.querySelector("[data-purchase-expense-type-panel]");
+    if (!select || !panel) return;
+    const q = normalize(query);
+    const rows = expenseTypeOptionRows(select)
+      .filter((item) => !q || normalize(item.label).includes(q))
+      .slice(0, 100);
+    panel.replaceChildren();
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "sales-combo-empty";
+      empty.textContent = "Ничего не найдено";
+      panel.append(empty);
+    } else {
+      rows.forEach((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "sales-combo-option";
+        button.dataset.expenseTypeValue = item.value;
+        button.dataset.expenseTypeLabel = item.label;
+        button.innerHTML = `<span class="sales-combo-main">${highlightText(item.label, query)}</span>`;
+        button.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          setExpenseTypeValue(select, item.value, item.label);
+          closeExpenseTypePanel(picker);
+        });
+        panel.append(button);
+      });
+    }
+    panel.hidden = false;
+    positionExpenseTypePanel(picker);
+  }
+
+  function enhanceExpenseTypePicker(row) {
+    const field = row?.querySelector(".warehouse-purchase-expense-type-field");
+    const select = field?.querySelector('select[name="extra_expense_name"]');
+    if (!field || !select) return null;
+    field.querySelectorAll("[data-purchase-expense-type-picker]").forEach((node) => node.remove());
+    select.hidden = true;
+    select.dataset.expenseTypeHidden = "1";
+    select.tabIndex = -1;
+    const picker = document.createElement("label");
+    picker.className = "sales-combobox warehouse-expense-type-picker";
+    picker.setAttribute("data-purchase-expense-type-picker", "");
+    picker.append(select);
+    picker.insertAdjacentHTML("beforeend", (
+      '<div class="sales-lock-field">' +
+      '<input type="text" autocomplete="off" placeholder="Выберите вид расхода" data-purchase-expense-type-input />' +
+      '<button type="button" class="sales-combo-edit" data-purchase-expense-type-toggle aria-label="Открыть список расходов" title="Открыть список">⌄</button>' +
+      "</div>" +
+      '<div class="sales-combo-panel" data-purchase-expense-type-panel hidden></div>'
+    ));
+    field.insertBefore(picker, field.querySelector("[data-purchase-expense-type-open], [data-adjustment-expense-type-open]") || null);
+    const input = picker.querySelector("[data-purchase-expense-type-input]");
+    const toggle = picker.querySelector("[data-purchase-expense-type-toggle]");
+    syncExpenseTypePicker(select);
+    input?.addEventListener("focus", () => renderExpenseTypePicker(picker, input.value));
+    input?.addEventListener("input", () => {
+      select.value = "";
+      renderExpenseTypePicker(picker, input.value);
+    });
+    input?.addEventListener("keydown", (event) => {
+      const first = picker.querySelector("[data-purchase-expense-type-panel] .sales-combo-option");
+      if (event.key === "Escape") {
+        closeExpenseTypePanel(picker);
+        syncExpenseTypePicker(select);
+      }
+      if (event.key === "Enter" && first) {
+        event.preventDefault();
+        first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      }
+    });
+    input?.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (!picker.querySelector("[data-purchase-expense-type-panel]")?.hidden) return;
+        syncExpenseTypePicker(select);
+      }, 120);
+    });
+    toggle?.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      input?.focus();
+      renderExpenseTypePicker(picker, input?.value || "");
+    });
+    return picker;
   }
 
   function closeExpenseTypeDialog(entryForm) {
@@ -507,8 +646,7 @@
       button.addEventListener("click", () => {
         const item = items.find((candidate) => String(candidate.id || "") === button.dataset.expenseTypeId);
         if (activeExpenseTypeInput && item) {
-          activeExpenseTypeInput.value = item.name || "";
-          activeExpenseTypeInput.dispatchEvent(new Event("input", { bubbles: true }));
+          setExpenseTypeValue(activeExpenseTypeInput, item.name || "", item.name || "");
         }
         closeExpenseTypeDialog(entryForm);
       });
@@ -552,7 +690,10 @@
     activeExpenseTypeInput = input || null;
     form.reset();
     const nameInput = form.querySelector("[data-purchase-expense-type-name]");
-    if (nameInput) nameInput.value = String(input?.value || "").trim();
+    const typedExpenseType = input?.matches?.("select")
+      ? input.closest(".warehouse-purchase-expense-type-field")?.querySelector("[data-purchase-expense-type-input]")?.value
+      : input?.value;
+    if (nameInput) nameInput.value = String(typedExpenseType || expenseTypeSelectedLabel(input) || "").trim();
     const status = form.querySelector("[data-purchase-expense-type-status]");
     if (status) {
       status.textContent = "";
@@ -607,8 +748,7 @@
         .then((body) => {
           writeExpenseTypes(body.expense_types);
           if (activeExpenseTypeInput) {
-            activeExpenseTypeInput.value = body.expense_type.name || "";
-            activeExpenseTypeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            setExpenseTypeValue(activeExpenseTypeInput, body.expense_type.name || "", body.expense_type.name || "");
           }
           closeExpenseTypeDialog(entryForm);
         })
@@ -1069,8 +1209,10 @@
       const saleCurrency = () => currency();
       form.dataset.purchaseEntryCurrency = currency();
       const expenseRows = () => Array.from(expenseLines?.querySelectorAll("[data-purchase-expense-row]") || []);
+      const expenseRowCurrency = (row) => row.querySelector("[data-purchase-expense-currency-select]")?.value || currency();
       const expenseTotal = () => expenseRows().reduce((sum, row) => {
-        return sum + purchaseEntryNumber(row.querySelector("[data-purchase-expense-amount]")?.value || "");
+        const amount = purchaseEntryNumber(row.querySelector("[data-purchase-expense-amount]")?.value || "");
+        return sum + convertPurchaseCurrency(amount, expenseRowCurrency(row), currency(), options);
       }, 0);
 
       const updateExpenseAllocation = (goodsTotal) => {
@@ -1097,9 +1239,6 @@
         if (expenseGoodsTotalOutput) expenseGoodsTotalOutput.textContent = purchaseEntryMoney(goodsTotal, currency());
         if (expenseTotalOutput) expenseTotalOutput.textContent = purchaseEntryMoney(extraTotal, currency());
         if (landedTotalOutput) landedTotalOutput.textContent = purchaseEntryMoney(goodsTotal + extraTotal, currency());
-        form.querySelectorAll("[data-purchase-expense-currency]").forEach((node) => {
-          node.textContent = currency();
-        });
       };
 
       const paymentRows = () => paymentDialog ? Array.from(paymentDialog.querySelectorAll("[data-purchase-payment-line]")) : [];
@@ -1439,19 +1578,28 @@
       const wireExpenseRow = (row) => {
         if (!row || row.dataset.purchaseExpenseReady === "1") return;
         row.dataset.purchaseExpenseReady = "1";
+        const typePicker = enhanceExpenseTypePicker(row);
+        const typeSelect = row.querySelector('select[name="extra_expense_name"]');
         const amount = row.querySelector("[data-purchase-expense-amount]");
+        const expenseCurrency = row.querySelector("[data-purchase-expense-currency-select]");
+        if (expenseCurrency && !expenseCurrency.value) expenseCurrency.value = currency();
         amount?.addEventListener("input", () => {
-          formatPurchasePriceInput(amount, currency());
+          formatPurchasePriceInput(amount, expenseRowCurrency(row));
           recalc();
         });
         amount?.addEventListener("blur", () => {
           const value = purchaseEntryNumber(amount.value);
-          amount.value = value ? purchaseEntryFormatCurrency(value, currency()) : "";
+          amount.value = value ? purchaseEntryFormatCurrency(value, expenseRowCurrency(row)) : "";
           recalc();
         });
-        row.querySelector('select[name="extra_expense_name"]')?.addEventListener("change", recalc);
+        typeSelect?.addEventListener("change", recalc);
+        expenseCurrency?.addEventListener("change", () => {
+          const value = purchaseEntryNumber(amount?.value || "");
+          if (amount) amount.value = value ? purchaseEntryFormatCurrency(value, expenseRowCurrency(row)) : "";
+          recalc();
+        });
         row.querySelector("[data-purchase-expense-type-open]")?.addEventListener("click", () => {
-          openExpenseTypeDialog(form, row.querySelector('select[name="extra_expense_name"]'));
+          openExpenseTypeDialog(form, typeSelect);
         });
         row.querySelector("[data-purchase-expense-remove]")?.addEventListener("click", () => {
           if (expenseRows().length > 1) {
@@ -1460,7 +1608,10 @@
             row.querySelectorAll("input, select").forEach((control) => {
               control.value = "";
             });
+            if (expenseCurrency) expenseCurrency.value = currency();
+            syncExpenseTypePicker(typeSelect);
           }
+          closeExpenseTypePanel(typePicker);
           recalc();
         });
       };
@@ -1473,6 +1624,8 @@
         row.querySelectorAll("input, select").forEach((control) => {
           control.value = "";
         });
+        const expenseCurrency = row.querySelector("[data-purchase-expense-currency-select]");
+        if (expenseCurrency) expenseCurrency.value = currency();
         expenseLines.append(row);
         wireExpenseRow(row);
         recalc();
@@ -1495,13 +1648,9 @@
           });
         });
         expenseRows().forEach((row) => {
-          const input = row.querySelector("[data-purchase-expense-amount]");
-          const value = purchaseEntryNumber(input?.value || "");
-          if (input) {
-            input.value = value
-              ? purchaseEntryFormatCurrency(convertPurchaseCurrency(value, previousCurrency, targetCurrency, options), targetCurrency)
-              : "";
-          }
+          const expenseCurrency = row.querySelector("[data-purchase-expense-currency-select]");
+          const value = purchaseEntryNumber(row.querySelector("[data-purchase-expense-amount]")?.value || "");
+          if (expenseCurrency && !value) expenseCurrency.value = targetCurrency;
         });
         form.dataset.purchaseEntryCurrency = targetCurrency;
         recalc();
@@ -1564,11 +1713,11 @@
       form.querySelector("[data-purchase-expense-open]")?.addEventListener("click", () => {
         const row = addExpenseRow();
         form.querySelector("[data-purchase-expenses]")?.scrollIntoView({ behavior: "smooth", block: "center" });
-        row?.querySelector('select[name="extra_expense_name"]')?.focus({ preventScroll: true });
+        row?.querySelector("[data-purchase-expense-type-input]")?.focus({ preventScroll: true });
       });
       form.querySelector("[data-purchase-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
-        row?.querySelector('select[name="extra_expense_name"]')?.focus();
+        row?.querySelector("[data-purchase-expense-type-input]")?.focus();
       });
       paymentRows().forEach(wirePurchasePaymentLine);
       form.querySelector("[data-purchase-payment-open]")?.addEventListener("click", openPurchasePaymentDialog);
@@ -1673,6 +1822,7 @@
       const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
       const directionSign = direction === "in" ? 1 : -1;
       const signLabel = direction === "in" ? "+" : "−";
+      const expenseRowCurrency = (row) => row.querySelector("[data-adjustment-expense-currency-select]")?.value || currency();
       const syncSupplier = () => {
         const supplierId = String(supplierInput?.value || "").trim();
         const supplier = (readPurchaseOptions().supplier_rows || []).find((item) => String(item.id || "").trim() === supplierId) || null;
@@ -1687,7 +1837,8 @@
       const rows = () => Array.from(body?.querySelectorAll("[data-adjustment-row]") || []);
       const expenseRows = () => Array.from(expenseLines?.querySelectorAll("[data-adjustment-expense-row]") || []);
       const expenseTotal = () => expenseRows().reduce((sum, row) => {
-        return sum + Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-expense-amount]")?.value || ""));
+        const amount = Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-expense-amount]")?.value || ""));
+        return sum + convertPurchaseCurrency(amount, expenseRowCurrency(row), currency(), readPurchaseOptions());
       }, 0);
       const productForRow = (row) => {
         const productId = String(row.querySelector("[data-adjustment-product]")?.value || "");
@@ -1825,9 +1976,6 @@
         if (productsQuantityOutput) productsQuantityOutput.textContent = quantityText(quantityTotal);
         if (expenseTotalOutput) expenseTotalOutput.textContent = purchaseEntryMoney(extraTotal, currency());
         if (landedTotalOutput) landedTotalOutput.textContent = purchaseEntryMoney(landedTotal, currency());
-        form.querySelectorAll("[data-adjustment-expense-currency]").forEach((node) => {
-          node.textContent = currency();
-        });
         if (errorOutput) {
           errorOutput.textContent = duplicateProduct
             ? "Один товар нельзя добавлять дважды."
@@ -2036,23 +2184,37 @@
       const wireExpenseRow = (row) => {
         if (!row || row.dataset.adjustmentExpenseReady === "1") return;
         row.dataset.adjustmentExpenseReady = "1";
+        const typePicker = enhanceExpenseTypePicker(row);
+        const typeSelect = row.querySelector('select[name="extra_expense_name"]');
         const amount = row.querySelector("[data-adjustment-expense-amount]");
+        const expenseCurrency = row.querySelector("[data-adjustment-expense-currency-select]");
+        if (expenseCurrency && !expenseCurrency.value) expenseCurrency.value = currency();
         amount?.addEventListener("input", () => {
-          formatPurchasePriceInput(amount, currency());
+          formatPurchasePriceInput(amount, expenseRowCurrency(row));
           recalc();
         });
         amount?.addEventListener("blur", () => {
           const value = purchaseEntryNumber(amount.value);
-          amount.value = value ? purchaseEntryFormatCurrency(value, currency()) : "";
+          amount.value = value ? purchaseEntryFormatCurrency(value, expenseRowCurrency(row)) : "";
           recalc();
         });
-        row.querySelector('select[name="extra_expense_name"]')?.addEventListener("change", recalc);
+        typeSelect?.addEventListener("change", recalc);
+        expenseCurrency?.addEventListener("change", () => {
+          const value = purchaseEntryNumber(amount?.value || "");
+          if (amount) amount.value = value ? purchaseEntryFormatCurrency(value, expenseRowCurrency(row)) : "";
+          recalc();
+        });
         row.querySelector("[data-adjustment-expense-type-open]")?.addEventListener("click", () => {
-          openExpenseTypeDialog(form, row.querySelector('select[name="extra_expense_name"]'));
+          openExpenseTypeDialog(form, typeSelect);
         });
         row.querySelector("[data-adjustment-expense-remove]")?.addEventListener("click", () => {
           if (expenseRows().length > 1) row.remove();
-          else row.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
+          else {
+            row.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
+            if (expenseCurrency) expenseCurrency.value = currency();
+            syncExpenseTypePicker(typeSelect);
+          }
+          closeExpenseTypePanel(typePicker);
           recalc();
         });
       };
@@ -2062,6 +2224,8 @@
         const clone = source.cloneNode(true);
         delete clone.dataset.adjustmentExpenseReady;
         clone.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
+        const expenseCurrency = clone.querySelector("[data-adjustment-expense-currency-select]");
+        if (expenseCurrency) expenseCurrency.value = currency();
         expenseLines.append(clone);
         wireExpenseRow(clone);
         recalc();
@@ -2073,7 +2237,7 @@
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
       form.querySelector("[data-adjustment-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
-        row?.querySelector('select[name="extra_expense_name"]')?.focus();
+        row?.querySelector("[data-purchase-expense-type-input]")?.focus();
       });
       form.querySelector("[data-adjustment-expense-open]")?.addEventListener("click", () => {
         if (expenseSection) expenseSection.hidden = false;
@@ -2083,7 +2247,7 @@
           return !name && !purchaseEntryNumber(amount);
         }) || addExpenseRow();
         expenseSection?.scrollIntoView({ behavior: "smooth", block: "center" });
-        row?.querySelector('select[name="extra_expense_name"]')?.focus({ preventScroll: true });
+        row?.querySelector("[data-purchase-expense-type-input]")?.focus({ preventScroll: true });
       });
       form.querySelector("[data-adjustment-expense-close]")?.addEventListener("click", () => {
         if (expenseSection) expenseSection.hidden = true;
@@ -2748,6 +2912,9 @@
         document.querySelectorAll("[data-warehouse-supplier-picker]").forEach((picker) => {
           if (!picker.contains(event.target)) closeSupplierPanel(picker);
         });
+        document.querySelectorAll("[data-purchase-expense-type-picker]").forEach((picker) => {
+          if (!picker.contains(event.target)) closeExpenseTypePanel(picker);
+        });
         document.querySelectorAll("[data-adjustment-product-picker]").forEach((picker) => {
           if (!picker.contains(event.target)) {
             const panel = picker.querySelector("[data-adjustment-product-panel]");
@@ -2758,12 +2925,14 @@
       window.addEventListener("resize", () => {
         document.querySelectorAll("[data-warehouse-product-picker]").forEach(positionProductPanel);
         document.querySelectorAll("[data-warehouse-supplier-picker]").forEach(positionSupplierPanel);
+        document.querySelectorAll("[data-purchase-expense-type-picker]").forEach(positionExpenseTypePanel);
       });
       window.addEventListener(
         "scroll",
         () => {
           document.querySelectorAll("[data-warehouse-product-picker]").forEach(positionProductPanel);
           document.querySelectorAll("[data-warehouse-supplier-picker]").forEach(positionSupplierPanel);
+          document.querySelectorAll("[data-purchase-expense-type-picker]").forEach(positionExpenseTypePanel);
         },
         true
       );

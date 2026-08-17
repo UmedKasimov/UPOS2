@@ -190,7 +190,9 @@
                   title="{{ client.name }}{% if client.route or client.territory %} · {{ client.route or client.territory }}{% endif %}"
                 >
                   <strong>{{ client.name }}</strong>
-                  <small>{{ client.route or client.territory or "Без маршрута" }}</small>
+                  {% if client.route or client.territory %}
+                    <small>{{ client.route or client.territory }}</small>
+                  {% endif %}
                 </a>
               </td>
               <td title="{{ client.official_name or '-' }}">{{ client.official_name or "-" }}</td>
