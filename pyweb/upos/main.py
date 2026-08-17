@@ -15672,7 +15672,7 @@ def create_app() -> FastAPI:
             clients_archive_mode=archive_mode,
             clients_archived_total=clients_archived_total,
             clients_map_filter=_clean_clients_map_filter(
-                (load_workspace_settings(wid) or {}).get("clients_map_filter")
+                (settings_payload or {}).get("clients_map_filter")
             ),
             clients_total=clients_total,
             clients_page=clients_page,
