@@ -380,7 +380,7 @@
             <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Прочие доходы</h3><p>Кассовые поступления вне продаж</p></div></div>
             <div class="reports-category-list">
               {% for row in profit.other_income %}
-                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong>{{ row.amount }}</strong></div></div>
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong data-profit-money data-money-uzs="{{ row.amount_uzs or 0 }}">{{ row.amount }}</strong></div></div>
               {% else %}
                 <div class="reports-empty-state">Прочих доходов за период нет.</div>
               {% endfor %}

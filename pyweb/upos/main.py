@@ -20939,13 +20939,20 @@ def create_app() -> FastAPI:
                         if external_key:
                             product_by_external.setdefault(external_key, product)
 
-                def report_product_unit_cost(line: dict[str, Any]) -> Decimal:
+                def report_product_for_line(line: dict[str, Any]) -> Product | None:
                     line_product_id = str(line.get("product_id") or "").strip()
                     product = product_by_id.get(line_product_id)
                     if product is None and line_product_id:
                         product = product_by_external.get(line_product_id)
                     if product is None:
+                        line_product = str(line.get("product") or "").strip()
+                        product = product_by_id.get(line_product) or product_by_external.get(line_product)
+                    if product is None:
                         product = product_by_name.get(str(line.get("product") or "").strip().casefold())
+                    return product
+
+                def report_product_unit_cost(line: dict[str, Any]) -> Decimal:
+                    product = report_product_for_line(line)
                     if product is None or not _product_uses_stock(product):
                         return Decimal("0")
                     product_data = _json_object(product.data)
@@ -20967,6 +20974,19 @@ def create_app() -> FastAPI:
                     if purchase_currency == "USD" and report_rate > 0:
                         unit_cost = unit_cost * report_rate
                     return unit_cost
+
+                def report_line_is_subscription(line: dict[str, Any]) -> bool:
+                    product = report_product_for_line(line)
+                    if product is None:
+                        return False
+                    product_data = _json_object(product.data)
+                    return str(product_data.get("kind") or "product").strip().lower() == "subscription"
+
+                def report_line_amount_primary(line: dict[str, Any], currency: str) -> Decimal:
+                    line_total = _sales_decimal(line.get("total"))
+                    if line_total <= 0:
+                        line_total = _sales_decimal(line.get("quantity")) * _sales_decimal(line.get("price"))
+                    return report_to_primary(line_total, currency)
 
                 report_rate = _workspace_usd_uzs_rate(wid)
                 reports_usd_rate = report_rate
@@ -20993,6 +21013,8 @@ def create_app() -> FastAPI:
                 debt_total = Decimal("0")
                 cost_total = Decimal("0")
                 profit_total = Decimal("0")
+                subscription_profit_total = Decimal("0")
+                subscription_profit_count = 0
                 sale_count = 0
                 return_count = 0
                 order_count = 0
@@ -21018,70 +21040,103 @@ def create_app() -> FastAPI:
                         Decimal("0"),
                     )
                     document_cost = report_to_primary(document_cost_uzs, "UZS")
+                    subscription_amount = Decimal("0")
+                    subscription_cost = Decimal("0")
+                    subscription_line_count = 0
+                    for line in lines:
+                        if not isinstance(line, dict) or not report_line_is_subscription(line):
+                            continue
+                        subscription_amount += report_line_amount_primary(line, currency)
+                        subscription_cost += report_to_primary(
+                            _sales_decimal(line.get("quantity")) * report_product_unit_cost(line),
+                            "UZS",
+                        )
+                        subscription_line_count += 1
+                    regular_amount_primary = max(Decimal("0"), amount_primary - subscription_amount)
+                    regular_document_cost = max(Decimal("0"), document_cost - subscription_cost)
+                    regular_share = (
+                        (regular_amount_primary / amount_primary)
+                        if amount_primary > 0 and regular_amount_primary < amount_primary
+                        else Decimal("1")
+                    )
+                    regular_paid_primary = report_to_primary(paid_amount, currency) * regular_share
+                    regular_debt_primary = report_to_primary(debt_amount, currency) * regular_share
                     sign = Decimal("-1") if doc_type == "return" else Decimal("1")
                     if doc_type == "sale":
                         sale_count += 1
                         if records_debt:
                             sale_docs.append(row)
-                            gross_sales_total += amount_primary
-                            paid_total += report_to_primary(paid_amount, currency)
-                            debt_total += report_to_primary(debt_amount, currency)
-                            top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
-                            day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
+                            gross_sales_total += regular_amount_primary
+                            paid_total += regular_paid_primary
+                            debt_total += regular_debt_primary
+                            top_clients[client] = top_clients.get(client, Decimal("0")) + regular_amount_primary
+                            day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + regular_amount_primary
                             # Себестоимость идёт вместе с выручкой. Раньше она
                             # считалась только у архивных документов: у продажи
                             # в работе выручка была, себестоимость нулевая, и вся
                             # сумма показывалась чистой прибылью.
-                            cost_total += document_cost
-                            profit_sales_rows.append({
-                                "date": doc_date,
-                                "number": str(row.number or ""),
-                                "client": client,
-                                "kind": "Продажа",
-                                # Прибыль программы считается только по архиву;
-                                # у остальных отгрузок она пока ожидаемая.
-                                "stage": "archive" if records_profit else "shipment",
-                                "amount_value": amount_primary,
-                                "cost_value": document_cost,
-                            })
+                            cost_total += regular_document_cost
+                            if regular_amount_primary or regular_document_cost:
+                                profit_sales_rows.append({
+                                    "date": doc_date,
+                                    "number": str(row.number or ""),
+                                    "client": client,
+                                    "kind": "Продажа",
+                                    # Прибыль программы считается только по архиву;
+                                    # у остальных отгрузок она пока ожидаемая.
+                                    "stage": "archive" if records_profit else "shipment",
+                                    "amount_value": regular_amount_primary,
+                                    "cost_value": regular_document_cost,
+                                })
+                            if subscription_line_count:
+                                subscription_profit_total += subscription_amount - subscription_cost
+                                subscription_profit_count += subscription_line_count
                         if records_profit:
-                            profit_total += amount_primary - document_cost
+                            profit_total += regular_amount_primary - regular_document_cost
                     elif doc_type == "return":
                         return_count += 1
-                        returns_total += amount_primary
-                        cost_total -= document_cost
-                        profit_sales_rows.append({
-                            "date": doc_date,
-                            "number": str(row.number or ""),
-                            "client": client,
-                            "kind": "Возврат",
-                            "stage": "archive",
-                            "amount_value": -amount_primary,
-                            "cost_value": -document_cost,
-                        })
-                        profit_total -= amount_primary - document_cost
-                        top_clients[client] = top_clients.get(client, Decimal("0")) - amount_primary
-                        day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) - amount_primary
-                    else:
-                        order_count += 1
-                        orders_total += amount_primary
-                        if records_debt:
-                            paid_total += report_to_primary(paid_amount, currency)
-                            debt_total += report_to_primary(debt_amount, currency)
-                            cost_total += document_cost
+                        returns_total += regular_amount_primary
+                        cost_total -= regular_document_cost
+                        if regular_amount_primary or regular_document_cost:
                             profit_sales_rows.append({
                                 "date": doc_date,
                                 "number": str(row.number or ""),
                                 "client": client,
-                                "kind": "Заказ",
-                                "stage": "archive" if records_profit else "shipment",
-                                "amount_value": amount_primary,
-                                "cost_value": document_cost,
+                                "kind": "Возврат",
+                                "stage": "archive",
+                                "amount_value": -regular_amount_primary,
+                                "cost_value": -regular_document_cost,
                             })
+                        profit_total -= regular_amount_primary - regular_document_cost
+                        top_clients[client] = top_clients.get(client, Decimal("0")) - regular_amount_primary
+                        day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) - regular_amount_primary
+                        if subscription_line_count:
+                            subscription_profit_total -= subscription_amount - subscription_cost
+                            subscription_profit_count += subscription_line_count
+                    else:
+                        order_count += 1
+                        orders_total += regular_amount_primary
+                        if records_debt:
+                            paid_total += regular_paid_primary
+                            debt_total += regular_debt_primary
+                            cost_total += regular_document_cost
+                            if regular_amount_primary or regular_document_cost:
+                                profit_sales_rows.append({
+                                    "date": doc_date,
+                                    "number": str(row.number or ""),
+                                    "client": client,
+                                    "kind": "Заказ",
+                                    "stage": "archive" if records_profit else "shipment",
+                                    "amount_value": regular_amount_primary,
+                                    "cost_value": regular_document_cost,
+                                })
+                            if subscription_line_count:
+                                subscription_profit_total += subscription_amount - subscription_cost
+                                subscription_profit_count += subscription_line_count
                         if records_profit:
-                            profit_total += amount_primary - document_cost
-                            top_clients[client] = top_clients.get(client, Decimal("0")) + amount_primary
-                            day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + amount_primary
+                            profit_total += regular_amount_primary - regular_document_cost
+                            top_clients[client] = top_clients.get(client, Decimal("0")) + regular_amount_primary
+                            day_totals[doc_date or "-"] = day_totals.get(doc_date or "-", Decimal("0")) + regular_amount_primary
                     for line in data.get("lines") if isinstance(data.get("lines"), list) else []:
                         product_name = str(line.get("product") or "Без товара").strip() or "Без товара"
                         if doc_type == "return" or inventory_applied:
@@ -21090,7 +21145,7 @@ def create_app() -> FastAPI:
                     # раньше в дебиторку попадали документы, у которых в таблице
                     # долг показан прочерком, а разные валюты складывались в одну
                     # цифру.
-                    if doc_type in {"sale", "order"} and records_debt and debt_amount > 0:
+                    if doc_type in {"sale", "order"} and records_debt and regular_debt_primary > 0:
                         rec = receivables.setdefault(
                             client,
                             {
@@ -21101,7 +21156,7 @@ def create_app() -> FastAPI:
                                 "last_sale_date": doc_date,
                             },
                         )
-                        rec["debt"] += report_to_primary(debt_amount, currency)
+                        rec["debt"] += regular_debt_primary
                         rec["last_sale_date"] = max(str(rec.get("last_sale_date") or ""), doc_date)
                     view = _sales_document_data(row)
                     sales_report_rows.append(
@@ -21182,6 +21237,16 @@ def create_app() -> FastAPI:
                             "count": int(entry.get("count") or 0),
                         }
                     )
+                if subscription_profit_total:
+                    other_income_primary += subscription_profit_total
+                    profit_other_income_rows.append(
+                        {
+                            "name": "Прибыль от подписок",
+                            "amount": _report_money(subscription_profit_total, primary_currency),
+                            "amount_primary": subscription_profit_total,
+                            "count": subscription_profit_count,
+                        }
+                    )
                 profit_expense_rows: list[dict[str, Any]] = []
                 expenses_primary = Decimal("0")
                 for entry in pnl.get("expense") or []:
@@ -21223,6 +21288,7 @@ def create_app() -> FastAPI:
                     )
                     expenses_primary += salary_primary
                 profit_expense_rows.sort(key=lambda item: item["amount_primary"], reverse=True)
+                profit_other_income_rows.sort(key=lambda item: item["amount_primary"], reverse=True)
                 max_expense = max((float(item["amount_primary"]) for item in profit_expense_rows), default=0.0)
                 for item in profit_expense_rows:
                     item["bar_width"] = 0 if max_expense <= 0 else max(4, round(float(item["amount_primary"]) / max_expense * 100))
