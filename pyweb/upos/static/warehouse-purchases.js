@@ -3504,7 +3504,12 @@
       .filter((line) => line && String(line.kind || "") !== "zero")
       .map((line) => `${line.label || "Баланс"}: ${line.amount || "0"} ${line.currency || doc.currency || "UZS"}`);
     if (parts.length) return parts.join(" · ");
-    if (card.balance && card.balance !== "Нет долга") return card.balance;
+    if (card.balance && card.balance !== "Нет долга") {
+      const balance = String(card.balance).trim();
+      if (/Мы должны|Аванс|Он должен|Баланс/u.test(balance)) return balance;
+      const hasCurrency = /\b[A-Z]{3}\b/.test(balance);
+      return `Мы должны: ${balance}${hasCurrency ? "" : ` ${doc.currency || "UZS"}`}`;
+    }
     const debt = String(doc?.debt_amount || "").trim();
     if (debt && debt !== "0") return `Мы должны: ${debt} ${doc.currency || "UZS"}`;
     return "Нет долга";
