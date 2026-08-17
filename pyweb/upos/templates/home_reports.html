@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=142" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=143" />
 {% endblock %}
 
 {% block page_header %}
@@ -1034,7 +1034,7 @@
         <button type="button" class="reports-success-dialog-close" data-sales-archive-confirm-cancel aria-label="Закрыть">×</button>
         <div class="reports-success-dialog-icon reports-success-dialog-icon--confirm" aria-hidden="true"><span></span></div>
         <h2 id="sales-archive-confirm-title">Подтвердите архивацию</h2>
-        <pre data-sales-archive-confirm-message></pre>
+        <div class="reports-archive-dialog-body" data-sales-archive-confirm-message></div>
         <div class="reports-archive-dialog-actions">
           <button type="button" class="btn btn-secondary" data-sales-archive-confirm-cancel>Отмена</button>
           <button type="button" class="btn btn-primary" data-sales-archive-confirm-ok>Архивировать</button>
@@ -1047,7 +1047,7 @@
         <button type="button" class="reports-success-dialog-close" data-sales-archive-error-close aria-label="Закрыть">×</button>
         <div class="reports-success-dialog-icon reports-success-dialog-icon--error" aria-hidden="true"><span></span></div>
         <h2 id="sales-archive-error-title">Архивация не выполнена</h2>
-        <pre data-sales-archive-error-message></pre>
+        <div class="reports-archive-dialog-body" data-sales-archive-error-message></div>
         <button type="button" class="btn btn-primary" data-sales-archive-error-close>Понятно</button>
       </section>
     </dialog>
@@ -1493,6 +1493,66 @@
   const archiveErrorMessage = document.querySelector('[data-sales-archive-error-message]');
   let archiveConfirmResolve = null;
 
+  const escapeArchiveHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+
+  function archiveRowsTable(rows, emptyText) {
+    const cleanRows = Array.isArray(rows) ? rows : [];
+    if (!cleanRows.length) {
+      return `<div class="reports-archive-dialog-empty">${escapeArchiveHtml(emptyText || '-')}</div>`;
+    }
+    return [
+      '<div class="reports-archive-dialog-table-wrap">',
+      '<table class="reports-archive-dialog-table">',
+      '<thead><tr><th>Дата</th><th>Операция</th><th>Сумма</th></tr></thead>',
+      '<tbody>',
+      cleanRows.map((row) => (
+        '<tr>' +
+        `<td>${escapeArchiveHtml(row.date || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.type || row.name || 'Оплата')}</td>` +
+        `<td><strong>${escapeArchiveHtml(row.amount || '-')}</strong></td>` +
+        '</tr>'
+      )).join(''),
+      '</tbody></table></div>',
+    ].join('');
+  }
+
+  function archiveDebtTable(rows) {
+    const cleanRows = Array.isArray(rows) ? rows : [];
+    if (!cleanRows.length) return '<div class="reports-archive-dialog-empty">Документы с долгом не найдены.</div>';
+    return [
+      '<div class="reports-archive-dialog-table-wrap">',
+      '<table class="reports-archive-dialog-table reports-archive-dialog-table--debt">',
+      '<thead><tr><th>Дата</th><th>№</th><th>Сумма</th><th>Оплачено</th><th>Долг</th></tr></thead>',
+      '<tbody>',
+      cleanRows.map((row) => (
+        '<tr>' +
+        `<td>${escapeArchiveHtml(row.date || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.number || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.amount || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.paid || '-')}</td>` +
+        `<td><strong>${escapeArchiveHtml(row.debt || '-')}</strong></td>` +
+        '</tr>'
+      )).join(''),
+      '</tbody></table></div>',
+    ].join('');
+  }
+
+  function archiveSummaryTable(rows) {
+    return [
+      '<table class="reports-archive-dialog-summary"><tbody>',
+      rows.map(([label, value]) => (
+        `<tr><th>${escapeArchiveHtml(label)}</th><td>${escapeArchiveHtml(value || '-')}</td></tr>`
+      )).join(''),
+      '</tbody></table>',
+    ].join('');
+  }
+
   function closeSalesArchiveConfirm(value) {
     if (archiveConfirmDialog?.open) archiveConfirmDialog.close();
     if (archiveConfirmResolve) {
@@ -1501,19 +1561,48 @@
     }
   }
 
-  function showSalesArchiveConfirm(message) {
+  function showSalesArchiveConfirm(data) {
     if (!archiveConfirmDialog || !archiveConfirmMessage) return Promise.resolve(true);
-    archiveConfirmMessage.textContent = message;
+    archiveConfirmMessage.innerHTML = [
+      '<p class="reports-archive-dialog-lead">Архивировать продажу и учесть прибыль как реальную?</p>',
+      archiveSummaryTable([
+        ['Документ', data.number],
+        ['Клиент', data.client],
+        ['Сумма продажи', data.total],
+        ['Оплачено', data.paid],
+        ['Не оплачено', data.outstanding],
+      ]),
+      '<h3>Оплаты</h3>',
+      archiveRowsTable(data.payments, 'Оплат нет'),
+    ].join('');
     archiveConfirmDialog.showModal();
     return new Promise((resolve) => {
       archiveConfirmResolve = resolve;
     });
   }
 
-  function showSalesArchiveError(message) {
+  function showSalesArchiveError(message, details = null) {
     const clean = String(message || 'Не удалось архивировать продажу.').trim();
     if (!archiveErrorDialog || !archiveErrorMessage) return;
-    archiveErrorMessage.textContent = clean;
+    if (details && Array.isArray(details.debts)) {
+      archiveErrorMessage.innerHTML = [
+        `<p class="reports-archive-dialog-lead">${escapeArchiveHtml(details.title || clean.split('\n')[0] || clean)}</p>`,
+        archiveSummaryTable([
+          ['Клиент', details.client || '-'],
+          ['Общий долг', details.total_debt || '-'],
+        ]),
+        '<h3>Документы с долгом</h3>',
+        archiveDebtTable(details.debts),
+        details.more ? `<p class="reports-archive-dialog-note">${escapeArchiveHtml(details.more)}</p>` : '',
+        `<p class="reports-archive-dialog-note">${escapeArchiveHtml(details.hint || 'Сначала закройте оплату, потом архивируйте продажу.')}</p>`,
+      ].join('');
+    } else {
+      const lines = clean.split('\n').filter(Boolean);
+      archiveErrorMessage.innerHTML = [
+        `<p class="reports-archive-dialog-lead">${escapeArchiveHtml(lines.shift() || clean)}</p>`,
+        lines.length ? `<div class="reports-archive-dialog-text">${lines.map(escapeArchiveHtml).join('<br>')}</div>` : '',
+      ].join('');
+    }
     archiveErrorDialog.showModal();
   }
 
@@ -1548,7 +1637,7 @@
     window.history.replaceState({}, '', cleanUrl);
   }
 
-  function salesCostArchiveMessage(form) {
+  function salesCostArchiveData(form) {
     let info = {};
     try {
       info = JSON.parse(form?.dataset?.archiveInfo || '{}') || {};
@@ -1558,26 +1647,14 @@
     const number = form?.dataset?.archiveNumber || '-';
     const client = form?.dataset?.archiveClient || '-';
     const payments = Array.isArray(info.payments) ? info.payments : [];
-    const paymentLines = payments.length
-      ? payments.map((payment, index) => {
-          const date = payment.date || '-';
-          const type = payment.type || 'Оплата';
-          const amount = payment.amount || '0 UZS';
-          return `${index + 1}. ${date} · ${type} · ${amount}`;
-        }).join('\n')
-      : 'Оплат нет';
-    return [
-      'Архивировать продажу и учесть прибыль как реальную?',
-      '',
-      `Документ: ${number}`,
-      `Клиент: ${client}`,
-      `Сумма продажи: ${info.total || '-'}`,
-      `Оплачено: ${info.paid || '0 UZS'}`,
-      `Не оплачено: ${info.outstanding || '0 UZS'}`,
-      '',
-      'Оплаты:',
-      paymentLines,
-    ].join('\n');
+    return {
+      number,
+      client,
+      total: info.total || '-',
+      paid: info.paid || '0 UZS',
+      outstanding: info.outstanding || '0 UZS',
+      payments,
+    };
   }
 
   const archiveSuccessDialog = document.querySelector('[data-sales-archive-success-dialog]');
@@ -1601,7 +1678,7 @@
     event.preventDefault();
     const button = event.submitter || form.querySelector('.reports-sales-cost-archive-button');
     if (button?.disabled) return;
-    const confirmed = await showSalesArchiveConfirm(salesCostArchiveMessage(form));
+    const confirmed = await showSalesArchiveConfirm(salesCostArchiveData(form));
     if (!confirmed) {
       return;
     }
@@ -1626,7 +1703,7 @@
         window.location.href = body.redirect || '/reports?open_report=sales-cost&profit_stage=archive&sales_archived=1';
         return;
       }
-      showSalesArchiveError(body?.error || `Сервер вернул ошибку HTTP ${response.status}. Обновите страницу и попробуйте ещё раз.`);
+      showSalesArchiveError(body?.error || `Сервер вернул ошибку HTTP ${response.status}. Обновите страницу и попробуйте ещё раз.`, body?.details || null);
     } catch (error) {
       showSalesArchiveError(`Не удалось отправить запрос на архивацию.\n${error?.message || error}`);
     } finally {

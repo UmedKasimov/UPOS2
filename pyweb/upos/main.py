@@ -11871,9 +11871,12 @@ def create_app() -> FastAPI:
                 return f"{base}{separator}sales_archive_error={quote(message)}{marker}{fragment}"
             return "/sales?error=" + quote(message) + "#sales-journal"
 
-        def sales_status_error_response(message: str, status_code: int = 400):
+        def sales_status_error_response(message: str, status_code: int = 400, details: dict[str, Any] | None = None):
             if wants_json:
-                return JSONResponse({"ok": False, "error": message}, status_code=status_code)
+                payload: dict[str, Any] = {"ok": False, "error": message}
+                if details:
+                    payload["details"] = details
+                return JSONResponse(payload, status_code=status_code)
             return RedirectResponse(url=sales_status_error_url(message), status_code=302)
 
         def sales_status_success_url() -> str:
@@ -11912,7 +11915,7 @@ def create_app() -> FastAPI:
                     client_name = str(data.get("client") or "").strip()
                     counterparty_id = str(row.counterparty_id or data.get("counterparty_id") or "").strip()
                     client_debt_total = Decimal("0")
-                    client_debt_rows: list[str] = []
+                    client_debt_rows: list[dict[str, str]] = []
                     client_docs = session.execute(
                         select(SaleDocument).where(SaleDocument.workspace_owner_id == wid)
                     ).scalars()
@@ -11945,37 +11948,59 @@ def create_app() -> FastAPI:
                         doc_date = str(client_data.get("date") or client_doc.created_at.date().isoformat()).strip()
                         doc_number = str(client_doc.number or client_data.get("number") or client_doc.id[:8]).strip() or "-"
                         client_debt_rows.append(
-                            " · ".join(
-                                [
-                                    f"{doc_date}",
-                                    f"№ {doc_number}",
-                                    f"сумма {_sales_money_label(doc_amount)} {doc_currency}",
-                                    f"оплачено {_sales_money_label(doc_paid)} {doc_currency}",
-                                    f"долг {_sales_money_label(doc_debt)} {doc_currency}",
-                                ]
-                            )
+                            {
+                                "date": doc_date,
+                                "number": doc_number,
+                                "amount": f"{_sales_money_label(doc_amount)} {doc_currency}",
+                                "paid": f"{_sales_money_label(doc_paid)} {doc_currency}",
+                                "debt": f"{_sales_money_label(doc_debt)} {doc_currency}",
+                            }
                         )
                     if client_debt_total > 0:
                         debt_currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
-                        details = "\n".join(client_debt_rows[:12])
+                        debt_lines = [
+                            " · ".join(
+                                [
+                                    item["date"],
+                                    f"№ {item['number']}",
+                                    f"сумма {item['amount']}",
+                                    f"оплачено {item['paid']}",
+                                    f"долг {item['debt']}",
+                                ]
+                            )
+                            for item in client_debt_rows[:12]
+                        ]
                         more = ""
                         if len(client_debt_rows) > 12:
                             more = f"\n… ещё документов с долгом: {len(client_debt_rows) - 12}"
+                        error_message = "\n".join(
+                            [
+                                "Нельзя архивировать: у клиента есть неоплаченный долг.",
+                                f"Клиент: {client_name or '-'}",
+                                f"Общий долг: {_sales_money_label(client_debt_total)} {debt_currency}",
+                                "",
+                                "Документы с долгом:",
+                                "\n".join(debt_lines) or "-",
+                                more,
+                                "",
+                                "Сначала закройте оплату, потом архивируйте продажу.",
+                            ]
+                        ).strip()
                         return sales_status_error_response(
-                            "\n".join(
-                                [
-                                    "Нельзя архивировать: у клиента есть неоплаченный долг.",
-                                    f"Клиент: {client_name or '-'}",
-                                    f"Общий долг: {_sales_money_label(client_debt_total)} {debt_currency}",
-                                    "",
-                                    "Документы с долгом:",
-                                    details or "-",
-                                    more,
-                                    "",
-                                    "Сначала закройте оплату, потом архивируйте продажу.",
-                                ]
-                            ).strip(),
+                            error_message,
                             409,
+                            {
+                                "title": "Нельзя архивировать: у клиента есть неоплаченный долг.",
+                                "client": client_name or "-",
+                                "total_debt": f"{_sales_money_label(client_debt_total)} {debt_currency}",
+                                "debts": client_debt_rows[:12],
+                                "more": (
+                                    f"Ещё документов с долгом: {len(client_debt_rows) - 12}"
+                                    if len(client_debt_rows) > 12
+                                    else ""
+                                ),
+                                "hint": "Сначала закройте оплату, потом архивируйте продажу.",
+                            },
                         )
                 inventory_was_applied = _sales_inventory_applied(data)
                 inventory_should_apply = _sales_status_requires_inventory(status, doc_type)

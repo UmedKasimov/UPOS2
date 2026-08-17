@@ -3085,20 +3085,116 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   text-align: center;
 }
 
-.reports-archive-dialog-surface pre {
+.reports-archive-dialog-body {
   width: 100%;
   max-height: min(48vh, 25rem);
-  margin: 0;
-  padding: 0.85rem;
   overflow: auto;
+}
+
+.reports-archive-dialog-lead,
+.reports-archive-dialog-note,
+.reports-archive-dialog-body h3 {
+  margin: 0 0 0.55rem;
+}
+
+.reports-archive-dialog-lead {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-align: center;
+}
+
+.reports-archive-dialog-body h3 {
+  margin-top: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.reports-archive-dialog-summary,
+.reports-archive-dialog-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 8px;
+  background: var(--card);
+  font-size: var(--text-sm);
+}
+
+.reports-archive-dialog-summary th,
+.reports-archive-dialog-summary td,
+.reports-archive-dialog-table th,
+.reports-archive-dialog-table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  border-right: 1px solid var(--workbench-line, var(--border));
+  vertical-align: middle;
+}
+
+.reports-archive-dialog-summary tr:last-child th,
+.reports-archive-dialog-summary tr:last-child td,
+.reports-archive-dialog-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.reports-archive-dialog-summary th,
+.reports-archive-dialog-table th {
+  background: color-mix(in srgb, var(--brand-accent, var(--primary)) 6%, var(--card));
+  color: var(--muted-foreground);
+  font-weight: 900;
+  text-align: left;
+}
+
+.reports-archive-dialog-summary th {
+  width: 38%;
+}
+
+.reports-archive-dialog-summary td,
+.reports-archive-dialog-table td {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.reports-archive-dialog-summary th:last-child,
+.reports-archive-dialog-summary td:last-child,
+.reports-archive-dialog-table th:last-child,
+.reports-archive-dialog-table td:last-child {
+  border-right: 0;
+}
+
+.reports-archive-dialog-table-wrap {
+  overflow: auto;
+  border-radius: 8px;
+}
+
+.reports-archive-dialog-table td:last-child,
+.reports-archive-dialog-table th:last-child {
+  text-align: right;
+}
+
+.reports-archive-dialog-table--debt {
+  min-width: 34rem;
+}
+
+.reports-archive-dialog-empty,
+.reports-archive-dialog-text {
+  padding: 0.75rem;
   border: 1px solid var(--workbench-line, var(--border));
   border-radius: 8px;
   background: color-mix(in srgb, var(--brand-accent, var(--primary)) 5%, var(--card));
-  color: var(--foreground);
-  font: inherit;
+  color: var(--muted-foreground);
   font-size: var(--text-sm);
-  line-height: 1.55;
-  white-space: pre-wrap;
+  font-weight: 700;
+}
+
+.reports-archive-dialog-note {
+  margin-top: 0.65rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
 }
 
 .reports-archive-dialog-actions {
