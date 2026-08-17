@@ -9041,26 +9041,55 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-detail-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 0;
+  overflow: hidden;
   margin: 0.95rem 1rem 0;
-  padding: 0.8rem;
   border: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 16%, var(--workbench-line, var(--border)));
-  border-radius: var(--workbench-radius-sm, 10px);
-  background: color-mix(in srgb, var(--products-table-blue) 5%, var(--card));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
 }
 
-.warehouse-purchase-detail-summary div,
+.warehouse-purchase-detail-summary-cell,
 .warehouse-purchase-detail-supplier-card {
   display: grid;
   gap: 0.2rem;
   min-width: 0;
 }
 
+.warehouse-purchase-detail-summary-cell {
+  min-height: 4.15rem;
+  padding: 0.68rem 0.8rem;
+  border-right: 1px solid color-mix(in srgb, var(--products-table-blue-strong) 16%, var(--workbench-line, var(--border)));
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--products-table-blue) 8%, var(--card)) 0,
+      color-mix(in srgb, var(--products-table-blue) 8%, var(--card)) 1.55rem,
+      var(--card) 1.55rem
+    );
+  align-content: start;
+}
+
+.warehouse-purchase-detail-summary-cell:last-child {
+  border-right: 0;
+}
+
+.warehouse-purchase-detail-summary-cell--supplier {
+  padding: 0;
+}
+
 .warehouse-purchase-detail-supplier-card {
   width: 100%;
-  padding: 0;
+  min-height: 4.15rem;
+  padding: 0.68rem 0.8rem;
   border: 0;
-  background: transparent;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--products-table-blue) 8%, var(--card)) 0,
+      color-mix(in srgb, var(--products-table-blue) 8%, var(--card)) 1.55rem,
+      transparent 1.55rem
+    );
   color: inherit;
   font: inherit;
   text-align: left;
