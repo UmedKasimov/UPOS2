@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=135" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=136" />
 {% endblock %}
 
 {% block page_header %}
@@ -418,34 +418,75 @@
               <input name="date_from" type="date" value="{{ reports.period_date_from or '' }}" onchange="this.form.submit()" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период продаж и себестоимости" />
               <input id="sales_cost_date_to" name="date_to" type="hidden" value="{{ reports.period_date_to or '' }}" />
             </label>
-            <label class="reports-filter-field">
+            <div class="reports-filter-field reports-select-filter" data-reports-select-filter>
               <span>Сотрудник</span>
-              <select name="sales_cost_employee" onchange="this.form.submit()">
-                <option value="">Все</option>
-                {% for employee in sc_filter_options.employees %}
-                  <option value="{{ employee }}" {% if sc_filters.employee == employee %}selected{% endif %}>{{ employee }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label class="reports-filter-field">
+              <details class="reports-select-filter-details">
+                <summary aria-label="Фильтр по сотруднику">
+                  <span data-reports-select-summary>{{ sc_filters.employee or 'Все' }}</span>
+                </summary>
+                <div class="reports-select-filter-menu">
+                  <label class="reports-select-filter-option">
+                    <input type="radio" name="sales_cost_employee" value="" {% if not sc_filters.employee %}checked{% endif %} />
+                    <span>Все</span>
+                  </label>
+                  {% for employee in sc_filter_options.employees %}
+                    <label class="reports-select-filter-option">
+                      <input type="radio" name="sales_cost_employee" value="{{ employee }}" {% if sc_filters.employee == employee %}checked{% endif %} />
+                      <span>{{ employee }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </details>
+            </div>
+            <div class="reports-filter-field reports-select-filter" data-reports-select-filter>
               <span>Клиент</span>
-              <input name="sales_cost_client" type="search" value="{{ sc_filters.client or '' }}" list="sales-cost-client-list" placeholder="Поиск клиента" />
-            </label>
-            <label class="reports-filter-field">
+              <details class="reports-select-filter-details">
+                <summary aria-label="Фильтр по клиенту">
+                  <span data-reports-select-summary>{{ sc_filters.client or 'Все клиенты' }}</span>
+                </summary>
+                <div class="reports-select-filter-menu">
+                  <input class="reports-select-filter-search" type="search" placeholder="Поиск клиента" data-reports-select-search />
+                  <label class="reports-select-filter-option">
+                    <input type="radio" name="sales_cost_client" value="" {% if not sc_filters.client %}checked{% endif %} />
+                    <span>Все клиенты</span>
+                  </label>
+                  {% for client in sc_filter_options.clients %}
+                    <label class="reports-select-filter-option">
+                      <input type="radio" name="sales_cost_client" value="{{ client }}" {% if sc_filters.client == client %}checked{% endif %} />
+                      <span>{{ client }}</span>
+                    </label>
+                  {% endfor %}
+                  <p class="reports-select-filter-empty" data-reports-select-empty hidden>Ничего не найдено</p>
+                </div>
+              </details>
+            </div>
+            <div class="reports-filter-field reports-select-filter" data-reports-select-filter>
               <span>Программа</span>
-              <input name="sales_cost_product" type="search" value="{{ sc_filters.product or '' }}" list="sales-cost-product-list" placeholder="Продукт" />
-            </label>
+              <details class="reports-select-filter-details">
+                <summary aria-label="Фильтр по программе">
+                  <span data-reports-select-summary>{{ sc_filters.product or 'Все программы' }}</span>
+                </summary>
+                <div class="reports-select-filter-menu">
+                  <input class="reports-select-filter-search" type="search" placeholder="Поиск программы" data-reports-select-search />
+                  <label class="reports-select-filter-option">
+                    <input type="radio" name="sales_cost_product" value="" {% if not sc_filters.product %}checked{% endif %} />
+                    <span>Все программы</span>
+                  </label>
+                  {% for product in sc_filter_options.products %}
+                    <label class="reports-select-filter-option">
+                      <input type="radio" name="sales_cost_product" value="{{ product }}" {% if sc_filters.product == product %}checked{% endif %} />
+                      <span>{{ product }}</span>
+                    </label>
+                  {% endfor %}
+                  <p class="reports-select-filter-empty" data-reports-select-empty hidden>Ничего не найдено</p>
+                </div>
+              </details>
+            </div>
             <button class="btn btn-secondary" type="submit">Найти</button>
             {% if sc_filters.employee or sc_filters.client or sc_filters.product %}
               <a class="btn btn-secondary" href="{{ url_for('home_reports') }}?period=custom&date_from={{ reports.period_date_from }}&date_to={{ reports.period_date_to }}&open_report=sales-cost&currency={{ report_currency }}">Сбросить</a>
             {% endif %}
           </form>
-          <datalist id="sales-cost-client-list">
-            {% for client in sc_filter_options.clients %}<option value="{{ client }}"></option>{% endfor %}
-          </datalist>
-          <datalist id="sales-cost-product-list">
-            {% for product in sc_filter_options.products %}<option value="{{ product }}"></option>{% endfor %}
-          </datalist>
           <div class="reports-stock-analysis-tools">
             <button type="button" class="btn btn-secondary" data-sales-cost-export>
               Скачать Excel
@@ -943,6 +984,66 @@
   const root = document.querySelector('[data-org-reports-root]');
   if (!tabsShell || !homeTab || !launcher || !root) return;
   const stockUsdRate = Number({{ reports_usd_rate|default('12000')|tojson }}) || 12000;
+
+  function bindReportsSelectFilters(scope = document) {
+    scope.querySelectorAll('[data-reports-select-filter]').forEach((filter) => {
+      if (filter.dataset.reportsSelectReady === '1') return;
+      filter.dataset.reportsSelectReady = '1';
+      const details = filter.querySelector('.reports-select-filter-details');
+      const summary = filter.querySelector('[data-reports-select-summary]');
+      const search = filter.querySelector('[data-reports-select-search]');
+      const empty = filter.querySelector('[data-reports-select-empty]');
+      const options = [...filter.querySelectorAll('.reports-select-filter-option')];
+
+      const syncSummary = () => {
+        const checked = filter.querySelector('.reports-select-filter-option input:checked');
+        const text = checked?.closest('.reports-select-filter-option')?.querySelector('span')?.textContent?.trim();
+        if (summary && text) summary.textContent = text;
+      };
+
+      const filterOptions = () => {
+        const query = String(search?.value || '').trim().toLocaleLowerCase();
+        let shown = 0;
+        options.forEach((option) => {
+          const input = option.querySelector('input');
+          const alwaysShow = !input?.value;
+          const text = option.textContent.toLocaleLowerCase();
+          const match = !query || alwaysShow || text.includes(query);
+          option.hidden = !match;
+          if (match && !alwaysShow) shown += 1;
+        });
+        if (empty) empty.hidden = shown > 0 || !query;
+      };
+
+      details?.addEventListener('toggle', () => {
+        if (!details.open) return;
+        scope.querySelectorAll('.reports-select-filter-details[open]').forEach((item) => {
+          if (item !== details) item.open = false;
+        });
+        search?.focus();
+      });
+      search?.addEventListener('input', filterOptions);
+      options.forEach((option) => {
+        option.querySelector('input')?.addEventListener('change', () => {
+          syncSummary();
+          details.open = false;
+          const form = filter.closest('form');
+          if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form?.submit();
+        });
+      });
+      syncSummary();
+      filterOptions();
+    });
+  }
+
+  bindReportsSelectFilters();
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-reports-select-filter]')) return;
+    document.querySelectorAll('.reports-select-filter-details[open]').forEach((details) => {
+      details.open = false;
+    });
+  });
 
   const reportMeta = {
     'courier-debts': 'Долги доставщиков',
