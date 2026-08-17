@@ -316,6 +316,204 @@
       .join("");
   }
 
+  function initSearchDropdowns() {
+    const inputs = Array.from(document.querySelectorAll("[data-crm-search-dropdown]"));
+    if (!inputs.length) return;
+    const dropdowns = [];
+
+    const uniqueOptions = (options) => {
+      const seen = new Set();
+      return options.filter((option) => {
+        const key = normalizeSearchText(option.value);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    const optionsFor = (input) => {
+      const source = input.dataset.crmSearchDropdown;
+      if (source === "datalist") {
+        const list = document.getElementById(input.dataset.crmSearchList || "");
+        return uniqueOptions(
+          Array.from(list?.querySelectorAll("option") || []).map((option) => ({
+            value: option.value,
+            main: option.value,
+            meta: input.dataset.crmSearchMeta || "Вариант",
+          })),
+        );
+      }
+      if (source === "tasks") {
+        return uniqueOptions(
+          Array.from(document.querySelectorAll("[data-crm-task-row]")).map((row) => ({
+            value: row.dataset.taskTitle || "",
+            main: row.dataset.taskTitle || "",
+            meta: [row.dataset.taskClient, row.dataset.taskResponsible].filter(Boolean).join(" · ") || "Задача",
+          })),
+        );
+      }
+      if (source === "archive") {
+        return uniqueOptions(
+          Array.from(document.querySelectorAll("[data-crm-archive-card]")).map((card) => ({
+            value: card.dataset.crmDetailTitle || "",
+            main: card.dataset.crmDetailTitle || "",
+            meta: card.dataset.crmDetailClient || "Архив",
+          })),
+        );
+      }
+      return uniqueOptions(
+        Array.from(document.querySelectorAll(".crm-kanban-card")).map((card) => ({
+          value: card.dataset.crmDetailTitle || "",
+          main: card.dataset.crmDetailTitle || "",
+          meta: [card.dataset.crmDetailClient, card.dataset.crmDetailResponsible].filter(Boolean).join(" · ") || "Сделка",
+        })),
+      );
+    };
+
+    const matchesQuery = (option, query) => {
+      const tokens = searchTokens(query);
+      if (!tokens.length) return true;
+      const words = normalizeSearchText(`${option.main} ${option.meta}`).split(/\s+/).filter(Boolean);
+      return tokens.every((token) => words.some((word) => tokenLooksLike(token, word)));
+    };
+
+    inputs.forEach((input, inputIndex) => {
+      const field = input.closest("label") || input.parentElement;
+      if (!field || field.dataset.crmSearchReady === "true") return;
+      field.dataset.crmSearchReady = "true";
+      field.classList.add("crm-search-combo");
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "crm-search-combo-toggle";
+      toggle.setAttribute("aria-label", "Открыть список");
+      toggle.setAttribute("title", "Открыть список");
+      toggle.textContent = "⌄";
+
+      const panel = document.createElement("div");
+      panel.className = "sales-combo-panel crm-search-combo-panel";
+      panel.id = `crm-search-options-${inputIndex}`;
+      panel.setAttribute("role", "listbox");
+      panel.hidden = true;
+      field.append(toggle, panel);
+
+      input.setAttribute("autocomplete", "off");
+      input.setAttribute("role", "combobox");
+      input.setAttribute("aria-autocomplete", "list");
+      input.setAttribute("aria-controls", panel.id);
+      input.setAttribute("aria-expanded", "false");
+
+      const close = () => {
+        panel.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        field.classList.remove("is-open");
+      };
+
+      const position = () => {
+        if (panel.hidden) return;
+        const rect = input.getBoundingClientRect();
+        const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 24);
+        const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+        const panelHeight = Math.min(panel.scrollHeight, 288);
+        const hasRoomBelow = window.innerHeight - rect.bottom >= Math.min(panelHeight + 8, 180);
+        const top = hasRoomBelow ? rect.bottom + 4 : Math.max(12, rect.top - panelHeight - 4);
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+        panel.style.width = `${width}px`;
+      };
+
+      const choose = (option) => {
+        input.value = option.value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        close();
+        input.focus();
+      };
+
+      const render = () => {
+        const query = input.value.trim();
+        const options = optionsFor(input).filter((option) => matchesQuery(option, query)).slice(0, 40);
+        panel.replaceChildren();
+        if (!options.length) {
+          const empty = document.createElement("div");
+          empty.className = "sales-combo-empty";
+          empty.textContent = "Ничего не найдено";
+          panel.append(empty);
+          return;
+        }
+        options.forEach((option) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "sales-combo-option crm-search-combo-option";
+          button.setAttribute("role", "option");
+          const main = document.createElement("span");
+          main.className = "sales-combo-main";
+          main.innerHTML = highlightText(option.main, query);
+          const meta = document.createElement("span");
+          meta.className = "sales-combo-meta";
+          meta.textContent = option.meta;
+          button.append(main, meta);
+          button.addEventListener("click", () => choose(option));
+          panel.append(button);
+        });
+      };
+
+      const open = () => {
+        render();
+        panel.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        field.classList.add("is-open");
+        position();
+      };
+
+      input.addEventListener("focus", open);
+      input.addEventListener("input", open);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          close();
+          return;
+        }
+        if (event.key !== "ArrowDown") return;
+        event.preventDefault();
+        if (panel.hidden) open();
+        panel.querySelector("button")?.focus();
+      });
+      toggle.addEventListener("click", () => {
+        if (panel.hidden) {
+          input.focus();
+          open();
+        } else {
+          close();
+          input.focus();
+        }
+      });
+      panel.addEventListener("keydown", (event) => {
+        const buttons = Array.from(panel.querySelectorAll("button"));
+        const current = buttons.indexOf(document.activeElement);
+        if (event.key === "Escape") {
+          event.preventDefault();
+          close();
+          input.focus();
+        } else if (event.key === "ArrowDown" && current >= 0) {
+          event.preventDefault();
+          buttons[(current + 1) % buttons.length]?.focus();
+        } else if (event.key === "ArrowUp" && current >= 0) {
+          event.preventDefault();
+          buttons[(current - 1 + buttons.length) % buttons.length]?.focus();
+        }
+      });
+      dropdowns.push({ field, panel, position, close });
+    });
+
+    document.addEventListener("click", (event) => {
+      dropdowns.forEach((dropdown) => {
+        if (!dropdown.field.contains(event.target)) dropdown.close();
+      });
+    });
+    window.addEventListener("resize", () => dropdowns.forEach((dropdown) => dropdown.position()));
+    window.addEventListener("scroll", () => dropdowns.forEach((dropdown) => dropdown.position()), true);
+  }
+
   function initCardDetails() {
     const dialog = document.getElementById("crm-card-detail-dialog");
     if (!dialog) return;
@@ -2396,6 +2594,7 @@
   }
 
   function init() {
+    initSearchDropdowns();
     document.querySelectorAll("[data-crm-kanban]").forEach(initKanban);
     initDialog();
     initCardDetails();

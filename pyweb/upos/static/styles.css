@@ -6286,6 +6286,75 @@ a.messenger-message-attachment:focus-visible {
   box-shadow: 0 1px 0 color-mix(in srgb, white, transparent 44%) inset;
 }
 
+.crm-search-combo {
+  position: relative;
+  min-width: 0;
+}
+
+.crm-search-combo > input {
+  width: 100%;
+  padding-inline-end: 2.45rem;
+}
+
+.crm-search-combo > input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
+.crm-search-combo-toggle {
+  position: absolute;
+  z-index: 2;
+  inset-inline-end: 0.32rem;
+  bottom: 0.3rem;
+  display: inline-grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--control-border, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.crm-search-combo-toggle:hover,
+.crm-search-combo-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--control-border, var(--border)));
+  background: color-mix(in srgb, var(--primary) 15%, var(--card));
+  outline: none;
+}
+
+.crm-search-combo.is-open .crm-search-combo-toggle {
+  transform: rotate(180deg);
+}
+
+.crm-search-combo-panel {
+  max-height: 18rem;
+  overscroll-behavior: contain;
+}
+
+.crm-search-combo-option {
+  min-height: 2.65rem;
+  border: 1px solid transparent;
+}
+
+.crm-search-combo-option:hover,
+.crm-search-combo-option:focus {
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+}
+
+.crm-search-combo-option .sales-combo-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .crm-stage-settings textarea {
   min-height: 2.65rem;
   resize: vertical;

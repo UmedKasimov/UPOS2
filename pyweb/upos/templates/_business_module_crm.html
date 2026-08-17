@@ -34,7 +34,7 @@
     </div>
     <label class="crm-task-filter-search">
       <span>Поиск</span>
-      <input type="search" data-crm-task-filter="search" placeholder="Задача или клиент" />
+      <input type="search" data-crm-task-filter="search" data-crm-search-dropdown="tasks" placeholder="Задача или клиент" autocomplete="off" />
     </label>
     <label>
       <span>Сотрудник</span>
@@ -193,9 +193,9 @@
 <section class="crm-pipeline-shell" data-workspace-view="deals" hidden>
   <header class="crm-pipeline-head crm-pipeline-head--filters">
     <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
-      <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" placeholder="Задача, клиент, ответственный" /></label>
-      <label><span>Клиент</span><input name="client" list="crm-client-list" value="{{ crm_filters.client }}" placeholder="Клиент" /></label>
-      <label><span>Ответственный</span><input name="responsible" list="crm-responsible-list" value="{{ crm_filters.responsible }}" placeholder="Ответственный" /></label>
+      <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" data-crm-search-dropdown="deals" placeholder="Задача, клиент, ответственный" autocomplete="off" /></label>
+      <label><span>Клиент</span><input name="client" value="{{ crm_filters.client }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-client-list" data-crm-search-meta="Клиент" placeholder="Клиент" autocomplete="off" /></label>
+      <label><span>Ответственный</span><input name="responsible" value="{{ crm_filters.responsible }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-responsible-list" data-crm-search-meta="Ответственный" placeholder="Ответственный" autocomplete="off" /></label>
       <label>
         <span>Статус</span>
         <select name="status">
@@ -494,7 +494,7 @@
     </div>
     <label>
       <span>Поиск</span>
-      <input type="search" data-crm-archive-search placeholder="Название или клиент" autocomplete="off" />
+      <input type="search" data-crm-archive-search data-crm-search-dropdown="archive" placeholder="Название или клиент" autocomplete="off" />
     </label>
   </header>
   <div class="crm-archive-card-row" data-crm-archive-card-row>
@@ -549,7 +549,7 @@
     <form class="business-module-filters crm-history-filters" method="get" action="{{ url_for('crm_get') }}#history">
       <label><span>Дата с</span><input name="date_from" type="date" value="{{ crm_filters.date_from }}" /></label>
       <label><span>Дата по</span><input name="date_to" type="date" value="{{ crm_filters.date_to }}" /></label>
-      <label><span>Клиент</span><input name="client" list="crm-client-list" value="{{ crm_filters.client }}" placeholder="Клиент" /></label>
+      <label><span>Клиент</span><input name="client" value="{{ crm_filters.client }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-client-list" data-crm-search-meta="Клиент" placeholder="Клиент" autocomplete="off" /></label>
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('crm_get') }}#history">Очистить</a>
     </form>
