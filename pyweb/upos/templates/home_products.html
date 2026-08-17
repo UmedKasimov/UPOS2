@@ -763,7 +763,7 @@
             </div>
             <div class="product-form-grid">
               <input type="hidden" name="price_name" value="{{ prices[0].name if prices else 'Продажная цена' }}" data-product-price-input />
-              <label><span>Продажная цена*</span><input name="price_value" inputmode="decimal" value="{{ prices[0].price if prices else '' }}" placeholder="0" data-product-price-input {% if not edit_product %}required{% endif %} /></label>
+              <label><span>Продажная цена*</span><input name="price_value" inputmode="decimal" value="{{ prices[0].price if prices else '' }}" placeholder="0" data-product-price-input data-upos-money-format data-upos-money-decimals="0" {% if not edit_product %}required{% endif %} /></label>
               <label>
                 <span>Валюта</span>
                 <select name="price_currency" data-product-price-input>
@@ -784,7 +784,7 @@
                 <div class="products-subscription-modifier-row" data-subscription-modifier-row>
                   <label><span>Функция*</span><input name="subscription_modifier_name" value="{{ modifier.name or '' }}" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
                   <label class="wide"><span>Описание</span><input name="subscription_modifier_description" value="{{ modifier.description or '' }}" placeholder="Что входит в подписку" /></label>
-                  <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" value="{{ modifier.amount or '' }}" placeholder="0" data-subscription-modifier-required /></label>
+                  <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" value="{{ modifier.amount or '' }}" placeholder="0" data-subscription-modifier-required data-upos-money-format data-upos-money-decimals="0" /></label>
                   <label>
                     <span>Валюта</span>
                     <select name="subscription_modifier_currency">
@@ -800,7 +800,7 @@
               <div class="products-subscription-modifier-row" data-subscription-modifier-row>
                 <label><span>Функция*</span><input name="subscription_modifier_name" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
                 <label class="wide"><span>Описание</span><input name="subscription_modifier_description" placeholder="Что входит в подписку" /></label>
-                <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" placeholder="0" data-subscription-modifier-required /></label>
+                <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" placeholder="0" data-subscription-modifier-required data-upos-money-format data-upos-money-decimals="0" /></label>
                 <label>
                   <span>Валюта</span>
                   <select name="subscription_modifier_currency">
@@ -818,7 +818,7 @@
               <h3>Услуга: цена и бонус</h3>
             </div>
             <div class="product-form-grid">
-              <label><span>Продажная цена*</span><input name="service_sale_price" inputmode="decimal" value="{{ current.sale_price or '' }}" placeholder="0" data-service-price-input /></label>
+              <label><span>Продажная цена*</span><input name="service_sale_price" inputmode="decimal" value="{{ current.sale_price or '' }}" placeholder="0" data-service-price-input data-upos-money-format data-upos-money-decimals="0" /></label>
               <label>
                 <span>Валюта</span>
                 <select name="service_sale_currency" data-service-price-input>
@@ -1180,7 +1180,7 @@
                       <td>{{ product.category or "-" }}<input type="hidden" name="product_id" value="{{ product.id }}" /></td>
                       <td>
                         {% if selected_price.pricing_method == "manual" %}
-                          <input class="price-type-price-input" name="price_value" value="{{ product.price_type_price }}" inputmode="decimal" />
+                          <input class="price-type-price-input" name="price_value" value="{{ product.price_type_price }}" inputmode="decimal" data-upos-money-format data-upos-money-decimals="0" />
                         {% else %}
                           <div class="price-type-dependent-control">
                             <input
@@ -1188,6 +1188,8 @@
                               name="price_value"
                               value="{{ product.price_type_price }}"
                               inputmode="decimal"
+                              data-upos-money-format
+                              data-upos-money-decimals="0"
                               data-dependent-price-input
                               {{ "readonly" if not product.price_type_override else "" }}
                             />
