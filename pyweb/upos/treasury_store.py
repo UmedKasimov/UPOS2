@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import re
+import time
 import uuid
+from copy import deepcopy
 from decimal import Decimal, InvalidOperation
+from threading import Lock
 from typing import Any
 
 from sqlalchemy import delete, or_, select
@@ -18,6 +21,9 @@ from upos.organizations_store import list_organization_ids, list_organizations
 from upos.storage import valid_workspace_owner_id
 
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
+_TREASURY_CACHE_TTL_SEC = 5.0
+_treasury_cache_lock = Lock()
+_treasury_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
 
 
 class TreasuryPostingError(ValueError):
@@ -32,10 +38,44 @@ def default_treasury() -> dict[str, Any]:
     }
 
 
+def _treasury_cache_key(workspace_owner_id: str, visible_employee_id: str | None = None) -> tuple[str, str]:
+    return ((workspace_owner_id or "").strip(), (visible_employee_id or "").strip())
+
+
+def _get_cached_treasury(workspace_owner_id: str, visible_employee_id: str | None = None) -> dict[str, Any] | None:
+    now = time.monotonic()
+    key = _treasury_cache_key(workspace_owner_id, visible_employee_id)
+    with _treasury_cache_lock:
+        entry = _treasury_cache.get(key)
+        if entry is None:
+            return None
+        cached_at, data = entry
+        if now - cached_at > _TREASURY_CACHE_TTL_SEC:
+            _treasury_cache.pop(key, None)
+            return None
+        return deepcopy(data)
+
+
+def _set_cached_treasury(workspace_owner_id: str, visible_employee_id: str | None, data: dict[str, Any]) -> None:
+    with _treasury_cache_lock:
+        _treasury_cache[_treasury_cache_key(workspace_owner_id, visible_employee_id)] = (time.monotonic(), deepcopy(data))
+
+
+def _invalidate_treasury_cache(workspace_owner_id: str) -> None:
+    oid = (workspace_owner_id or "").strip()
+    with _treasury_cache_lock:
+        for key in list(_treasury_cache):
+            if key[0] == oid:
+                _treasury_cache.pop(key, None)
+
+
 def load_treasury(workspace_owner_id: str, *, visible_employee_id: str | None = None) -> dict[str, Any]:
     oid = (workspace_owner_id or "").strip()
     if not valid_workspace_owner_id(oid):
         return default_treasury()
+    cached = _get_cached_treasury(oid, visible_employee_id)
+    if cached is not None:
+        return cached
     with session_scope() as session:
         display_currency = "USD"
         legacy = session.get(Treasury, oid)
@@ -72,7 +112,9 @@ def load_treasury(workspace_owner_id: str, *, visible_employee_id: str | None = 
                 account_stmt = account_stmt.where(FinanceAccount.owner_employee_id == emp_id)
         accounts = session.execute(account_stmt).scalars().all()
         if not accounts:
-            return {"version": 2, "display_currency": display_currency, "pockets": []}
+            result = {"version": 2, "display_currency": display_currency, "pockets": []}
+            _set_cached_treasury(oid, visible_employee_id, result)
+            return result
 
         balances = session.execute(
             select(AccountBalance).where(AccountBalance.account_id.in_([a.id for a in accounts]))
@@ -105,11 +147,13 @@ def load_treasury(workspace_owner_id: str, *, visible_employee_id: str | None = 
                     "name": str(name or username or employee_id),
                 }
             )
-        return {
+        result = {
             "version": 2,
             "display_currency": display_currency,
             "pockets": [_account_to_pocket(a, by_account.get(a.id, []), owner_names, access_names) for a in accounts],
         }
+        _set_cached_treasury(oid, visible_employee_id, result)
+        return result
 
 
 def patch_display_currency(workspace_owner_id: str, display_currency_raw: Any) -> None:
@@ -126,10 +170,11 @@ def patch_display_currency(workspace_owner_id: str, display_currency_raw: Any) -
             merged = dict(default_treasury())
             merged["display_currency"] = dc
             session.add(Treasury(workspace_owner_id=oid, data=merged))
-            return
-        merged = _normalize_treasury_data(row.data)
-        merged["display_currency"] = dc
-        row.data = merged
+        else:
+            merged = _normalize_treasury_data(row.data)
+            merged["display_currency"] = dc
+            row.data = merged
+    _invalidate_treasury_cache(oid)
 
 
 def save_treasury(workspace_owner_id: str, data: dict[str, Any]) -> None:
@@ -166,7 +211,9 @@ def save_treasury(workspace_owner_id: str, data: dict[str, Any]) -> None:
                 session.add(Treasury(workspace_owner_id=oid, data=to_save))
             else:
                 row.data = to_save
+        _invalidate_treasury_cache(oid)
     except IntegrityError as exc:
+        _invalidate_treasury_cache(oid)
         detail = str(getattr(exc, "orig", None) or exc).lower()
         if "uq_finance_accounts_workspace_name" in detail or (
             "finance_accounts" in detail and "name" in detail and "unique" in detail
@@ -242,6 +289,7 @@ def apply_transaction_posting(
 
     if row is not None:
         row.data = _normalize_treasury_data(row.data)
+    _invalidate_treasury_cache(oid)
 
 
 def _normalize_treasury_data(raw: Any) -> dict[str, Any]:
@@ -423,6 +471,7 @@ def delete_treasury(workspace_owner_id: str) -> None:
         return
     with session_scope() as session:
         session.execute(delete(Treasury).where(Treasury.workspace_owner_id == oid))
+    _invalidate_treasury_cache(oid)
 
 
 def _normalize_pocket(raw: dict[str, Any]) -> dict[str, Any]:

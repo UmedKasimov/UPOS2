@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
+from threading import Lock
 from typing import Any
 
 from sqlalchemy import delete
@@ -105,6 +107,9 @@ def _merge_workspace_payload(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 _PLACEHOLDER_BOT_TOKENS = frozenset({"test", "тест"})
+_WORKSPACE_SETTINGS_CACHE_TTL_SEC = 30.0
+_workspace_settings_cache_lock = Lock()
+_workspace_settings_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def _sanitize_placeholder_bot_token(data: dict[str, Any]) -> bool:
@@ -151,15 +156,42 @@ def valid_workspace_owner_id(owner_id: str) -> bool:
     return bool(owner_id and _OWNER_ID_RE.match(owner_id.strip()))
 
 
+def _get_cached_workspace_settings(workspace_owner_id: str) -> dict[str, Any] | None:
+    now = time.monotonic()
+    with _workspace_settings_cache_lock:
+        entry = _workspace_settings_cache.get(workspace_owner_id)
+        if entry is None:
+            return None
+        cached_at, data = entry
+        if now - cached_at > _WORKSPACE_SETTINGS_CACHE_TTL_SEC:
+            _workspace_settings_cache.pop(workspace_owner_id, None)
+            return None
+        return _copy_data(data)
+
+
+def _set_cached_workspace_settings(workspace_owner_id: str, data: dict[str, Any]) -> None:
+    with _workspace_settings_cache_lock:
+        _workspace_settings_cache[workspace_owner_id] = (time.monotonic(), _copy_data(data))
+
+
+def _invalidate_workspace_settings_cache(workspace_owner_id: str) -> None:
+    with _workspace_settings_cache_lock:
+        _workspace_settings_cache.pop(workspace_owner_id, None)
+
+
 def load_workspace_settings(workspace_owner_id: str) -> dict[str, Any]:
     """Настройки бизнеса: тема, интеграции и т.д. Привязаны к stable id владельца, не к логину."""
     oid = (workspace_owner_id or "").strip()
     if not valid_workspace_owner_id(oid):
         return _copy_data(_default())
+    cached = _get_cached_workspace_settings(oid)
+    if cached is not None:
+        return cached
     with session_scope() as session:
         row = session.get(WorkspaceSetting, oid)
         if row is None:
             base = _default()
+            _set_cached_workspace_settings(oid, base)
             return _copy_data(base)
         raw = row.data if isinstance(row.data, dict) else {}
         base = _merge_workspace_payload(raw)
@@ -171,6 +203,7 @@ def load_workspace_settings(workspace_owner_id: str) -> dict[str, Any]:
                     "[upos] save_workspace_settings after token sanitize failed; oid=%s",
                     oid,
                 )
+        _set_cached_workspace_settings(oid, base)
         return _copy_data(base)
 
 
@@ -186,7 +219,9 @@ def save_workspace_settings(workspace_owner_id: str, data: dict[str, Any]) -> No
                 session.add(WorkspaceSetting(workspace_owner_id=oid, data=payload))
             else:
                 row.data = payload
+        _set_cached_workspace_settings(oid, payload)
     except IntegrityError as exc:
+        _invalidate_workspace_settings_cache(oid)
         raise ValueError("workspace owner does not exist") from exc
 
 
@@ -198,6 +233,7 @@ def delete_workspace_settings(workspace_owner_id: str) -> None:
         session.execute(
             delete(WorkspaceSetting).where(WorkspaceSetting.workspace_owner_id == oid),
         )
+    _invalidate_workspace_settings_cache(oid)
 
 
 # Обратная совместимость имён для постепенного перехода.

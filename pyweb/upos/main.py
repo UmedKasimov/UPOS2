@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import calendar
+import hashlib
 import io
 import json
 import logging
@@ -6511,10 +6512,22 @@ def create_app() -> FastAPI:
             content_type = str(photo.content_type or "image/webp")
         if not content:
             return Response(status_code=404)
+        etag = '"' + hashlib.sha256(content).hexdigest()[:24] + '"'
+        if request.headers.get("if-none-match") == etag:
+            return Response(
+                status_code=304,
+                headers={
+                    "Cache-Control": "private, no-cache",
+                    "ETag": etag,
+                },
+            )
         return Response(
             content=content,
             media_type=content_type,
-            headers={"Cache-Control": "private, no-cache"},
+            headers={
+                "Cache-Control": "private, no-cache",
+                "ETag": etag,
+            },
         )
 
     def _product_price_log_entries(data: dict[str, Any]) -> list[dict[str, Any]]:
