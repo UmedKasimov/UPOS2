@@ -2672,6 +2672,38 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   gap: 0.55rem;
 }
 
+#report-sales-cost .reports-sales-cost-tools {
+  gap: 0.35rem;
+  font-size: var(--text-xs);
+}
+
+#report-sales-cost .reports-sales-cost-tools > .btn {
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  font-size: var(--text-xs);
+}
+
+#report-sales-cost .reports-sales-cost-tools .reports-currency-switch button {
+  min-width: 2.75rem;
+  min-height: 1.75rem;
+  font-size: var(--text-xs);
+}
+
+#report-sales-cost .reports-sales-cost-tools .reports-balance-total {
+  gap: 0.35rem;
+}
+
+#report-sales-cost .reports-sales-cost-tools .reports-balance-total span {
+  min-height: 1.9rem;
+  padding: 0.3rem 0.5rem;
+  font-size: var(--text-xs);
+}
+
+#report-sales-cost .reports-sales-cost-tools .reports-balance-total b {
+  font-size: var(--text-lg);
+  line-height: 1.1;
+}
+
 .reports-currency-switch {
   display: inline-flex;
   padding: 0.2rem;
