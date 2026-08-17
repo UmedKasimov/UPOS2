@@ -6590,7 +6590,7 @@ a.messenger-message-attachment:focus-visible {
   position: relative;
   display: grid;
   gap: 0.34rem;
-  height: 12.75rem;
+  min-height: 12.75rem;
   align-content: start;
   min-width: 0;
   padding: 0.82rem 0.75rem 0.7rem;
@@ -6730,6 +6730,8 @@ a.messenger-message-attachment:focus-visible {
 .crm-kanban-card-meta,
 .crm-kanban-card-money {
   justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .client-location-panel > .client-location-search {
@@ -6775,19 +6777,27 @@ a.messenger-message-attachment:focus-visible {
 .crm-kanban-chat,
 .crm-kanban-card-money small {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .crm-kanban-card-titleline {
   flex: 1 1 auto;
   min-width: 0;
   overflow: visible;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .crm-kanban-card-titleline strong {
-  flex: 0 1 auto;
+  flex: 1 1 8rem;
+}
+
+.crm-kanban-card-top > span,
+.crm-kanban-card-money small {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .crm-kanban-card-date {
