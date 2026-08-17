@@ -3277,7 +3277,10 @@
     var linesContainer = dialog.querySelector("[data-sales-subscription-lines]");
     var lineTemplate = dialog.querySelector("[data-sales-subscription-line-template]");
     var addRowButton = dialog.querySelector("[data-sales-subscription-add-row]");
+    var discountInput = dialog.querySelector("[data-sales-subscription-discount]");
+    var discountUnit = dialog.querySelector("[data-sales-subscription-discount-unit]");
     var total = dialog.querySelector("[data-sales-subscription-total]");
+    var totalLabel = dialog.querySelector("[data-sales-subscription-total-label]");
     var formula = dialog.querySelector("[data-sales-subscription-formula]");
     var empty = dialog.querySelector("[data-sales-subscription-empty]");
     var summary = dialog.querySelector("[data-sales-subscription-summary]");
@@ -3292,6 +3295,15 @@
       var planSelect = line ? line.querySelector("[data-sales-subscription-plan]") : null;
       var index = Number(planSelect ? planSelect.value : -1);
       return Number.isInteger(index) && index >= 0 ? catalog[index] || null : null;
+    }
+
+    function manualDiscount(grossTotal) {
+      var value = Math.max(0, numberValue(discountInput ? discountInput.value : 0));
+      var unit = discountUnit && discountUnit.value === "amount" ? "amount" : "percent";
+      if (unit === "percent") value = Math.min(100, value);
+      var amount = unit === "amount" ? value : grossTotal * value / 100;
+      amount = Math.min(grossTotal, Math.max(0, amount));
+      return { value: value, unit: unit, amount: amount, total: Math.max(0, grossTotal - amount) };
     }
 
     function renderSummary() {
@@ -3317,11 +3329,17 @@
           description.hidden = !choice.description;
         }
       });
-      if (total) total.textContent = formatMoney(grandTotal, currency) + " " + currency;
+      var discount = manualDiscount(grandTotal);
+      if (total) total.textContent = formatMoney(discount.total, currency) + " " + currency;
+      if (totalLabel) totalLabel.textContent = discount.amount ? "Итого со скидкой" : "Итого за период";
       if (formula) {
-        formula.textContent = selectedCount
-          ? selectedCount + " " + (selectedCount === 1 ? "подписка" : "подписки") + " по выбранному периоду"
-          : "";
+        if (!selectedCount) formula.textContent = "";
+        else if (discount.amount) {
+          formula.textContent = "До скидки " + formatMoney(grandTotal, currency) + " " + currency
+            + " · скидка " + formatMoney(discount.amount, currency) + " " + currency;
+        } else {
+          formula.textContent = selectedCount + " " + (selectedCount === 1 ? "подписка" : "подписки") + " по выбранному периоду";
+        }
       }
     }
 
@@ -3376,6 +3394,11 @@
         programSelect.disabled = !programs.length;
       }
       if (linesContainer) linesContainer.replaceChildren();
+      if (discountInput) {
+        discountInput.value = "0";
+        discountInput.max = "100";
+      }
+      if (discountUnit) discountUnit.value = "percent";
       if (catalog.length) addSubscriptionLine();
       if (empty) empty.hidden = !!catalog.length;
       if (summary) summary.hidden = !catalog.length;
@@ -3393,6 +3416,14 @@
 
     openButton.addEventListener("click", openDialog);
     programSelect?.addEventListener("change", renderAllPlans);
+    discountInput?.addEventListener("input", renderSummary);
+    discountUnit?.addEventListener("change", function () {
+      if (discountInput) {
+        if (discountUnit.value === "percent") discountInput.max = "100";
+        else discountInput.removeAttribute("max");
+      }
+      renderSummary();
+    });
     addRowButton?.addEventListener("click", function () {
       var line = addSubscriptionLine();
       line?.querySelector("[data-sales-subscription-plan]")?.focus();
@@ -3430,9 +3461,18 @@
         };
       }).filter(Boolean);
       if (!selections.length) return;
+      var currency = selectedCurrency(root);
+      var grossTotal = 0;
+      selections.forEach(function (selection) {
+        selection.monthly = convertPrice(selection.choice.amount, selection.choice.currency, currency, options);
+        selection.gross = selection.monthly * selection.quantity * selection.months;
+        grossTotal += selection.gross;
+      });
+      var discount = manualDiscount(grossTotal);
+      var allocatedDiscount = 0;
       var usedRows = new Set();
       var added = 0;
-      selections.forEach(function (selection) {
+      selections.forEach(function (selection, selectionIndex) {
         var choice = selection.choice;
         var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="subscription"]')).find(function (row) {
           var planField = row.querySelector('input[name="line_subscription_plan"]');
@@ -3448,17 +3488,31 @@
         var row = combo.closest(".sales-line-grid");
         if (!row) return;
         usedRows.add(row);
-        var monthly = convertPrice(choice.amount, choice.currency, selectedCurrency(root), options);
+        var monthly = selection.monthly;
         var quantityField = row.querySelector('input[name="line_quantity"]');
         var priceField = row.querySelector('input[name="line_price"]');
         var programField = row.querySelector('input[name="line_subscription_program"]');
         var planField = row.querySelector('input[name="line_subscription_plan"]');
         var monthsField = row.querySelector('input[name="line_subscription_months"]');
+        var rowDiscountValue = row.querySelector("[data-sales-discount-value]");
+        var rowDiscountUnit = row.querySelector("[data-sales-discount-unit]");
         if (quantityField) quantityField.value = String(selection.quantity);
         if (priceField) priceField.value = formatMoney(monthly * selection.months, selectedCurrency(root));
         if (programField) programField.value = choice.program;
         if (planField) planField.value = choice.planName;
         if (monthsField) monthsField.value = String(selection.months);
+        setDiscountMode(row, "discount");
+        if (discount.unit === "percent") {
+          if (rowDiscountValue) rowDiscountValue.value = String(discount.value);
+          if (rowDiscountUnit) rowDiscountUnit.value = "percent";
+        } else {
+          var lineDiscount = selectionIndex === selections.length - 1
+            ? Math.max(0, discount.amount - allocatedDiscount)
+            : (grossTotal ? discount.amount * selection.gross / grossTotal : 0);
+          allocatedDiscount += lineDiscount;
+          if (rowDiscountValue) rowDiscountValue.value = String(lineDiscount);
+          if (rowDiscountUnit) rowDiscountUnit.value = "amount";
+        }
         row.dataset.salesSubscriptionMonthly = String(choice.amount);
         row.dataset.salesSubscriptionCurrency = choice.currency;
         row.dataset.salesSubscriptionMonths = String(selection.months);

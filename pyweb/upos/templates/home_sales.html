@@ -1587,8 +1587,20 @@
                   <p class="sales-subscription-description" data-sales-subscription-description hidden></p>
                 </div>
               </template>
+              <div class="sales-subscription-discount">
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Ручная скидка</span>
+                  <div class="sales-subscription-discount-control">
+                    <input class="settings-profile-input" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal" data-sales-subscription-discount />
+                    <select class="settings-profile-input" data-sales-subscription-discount-unit aria-label="Тип скидки">
+                      <option value="percent">%</option>
+                      <option value="amount">Сумма</option>
+                    </select>
+                  </div>
+                </label>
+              </div>
               <div class="sales-subscription-summary" data-sales-subscription-summary>
-                <span>Итого за период</span>
+                <span data-sales-subscription-total-label>Итого за период</span>
                 <strong data-sales-subscription-total>0 UZS</strong>
                 <small data-sales-subscription-formula></small>
               </div>
