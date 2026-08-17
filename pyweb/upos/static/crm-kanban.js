@@ -1578,8 +1578,10 @@
       orderPanel.hidden = false;
       positionOrderPanel();
       orderPanel.querySelectorAll("[data-crm-order-choice]").forEach((button) => {
-        button.addEventListener("mousedown", (event) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", (event) => {
           event.preventDefault();
+          event.stopPropagation();
           const index = Number.parseInt(button.dataset.orderIndex || "-1", 10);
           chooseOrder(index >= 0 ? rows[index] : null);
         });
