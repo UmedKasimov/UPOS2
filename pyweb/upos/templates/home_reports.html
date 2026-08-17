@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=141" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=142" />
 {% endblock %}
 
 {% block page_header %}
@@ -1028,6 +1028,29 @@
         <button type="button" class="btn btn-primary" data-sales-archive-success-close>Готово</button>
       </section>
     </dialog>
+
+    <dialog class="reports-success-dialog reports-archive-dialog" data-sales-archive-confirm-dialog aria-labelledby="sales-archive-confirm-title">
+      <section class="reports-success-dialog-surface reports-archive-dialog-surface">
+        <button type="button" class="reports-success-dialog-close" data-sales-archive-confirm-cancel aria-label="Закрыть">×</button>
+        <div class="reports-success-dialog-icon reports-success-dialog-icon--confirm" aria-hidden="true"><span></span></div>
+        <h2 id="sales-archive-confirm-title">Подтвердите архивацию</h2>
+        <pre data-sales-archive-confirm-message></pre>
+        <div class="reports-archive-dialog-actions">
+          <button type="button" class="btn btn-secondary" data-sales-archive-confirm-cancel>Отмена</button>
+          <button type="button" class="btn btn-primary" data-sales-archive-confirm-ok>Архивировать</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog class="reports-success-dialog reports-archive-dialog reports-archive-dialog--error" data-sales-archive-error-dialog aria-labelledby="sales-archive-error-title">
+      <section class="reports-success-dialog-surface reports-archive-dialog-surface">
+        <button type="button" class="reports-success-dialog-close" data-sales-archive-error-close aria-label="Закрыть">×</button>
+        <div class="reports-success-dialog-icon reports-success-dialog-icon--error" aria-hidden="true"><span></span></div>
+        <h2 id="sales-archive-error-title">Архивация не выполнена</h2>
+        <pre data-sales-archive-error-message></pre>
+        <button type="button" class="btn btn-primary" data-sales-archive-error-close>Понятно</button>
+      </section>
+    </dialog>
   </div>
 {% endblock %}
 
@@ -1464,10 +1487,61 @@
     applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
   });
 
+  const archiveConfirmDialog = document.querySelector('[data-sales-archive-confirm-dialog]');
+  const archiveConfirmMessage = document.querySelector('[data-sales-archive-confirm-message]');
+  const archiveErrorDialog = document.querySelector('[data-sales-archive-error-dialog]');
+  const archiveErrorMessage = document.querySelector('[data-sales-archive-error-message]');
+  let archiveConfirmResolve = null;
+
+  function closeSalesArchiveConfirm(value) {
+    if (archiveConfirmDialog?.open) archiveConfirmDialog.close();
+    if (archiveConfirmResolve) {
+      archiveConfirmResolve(Boolean(value));
+      archiveConfirmResolve = null;
+    }
+  }
+
+  function showSalesArchiveConfirm(message) {
+    if (!archiveConfirmDialog || !archiveConfirmMessage) return Promise.resolve(true);
+    archiveConfirmMessage.textContent = message;
+    archiveConfirmDialog.showModal();
+    return new Promise((resolve) => {
+      archiveConfirmResolve = resolve;
+    });
+  }
+
+  function showSalesArchiveError(message) {
+    const clean = String(message || 'Не удалось архивировать продажу.').trim();
+    if (!archiveErrorDialog || !archiveErrorMessage) return;
+    archiveErrorMessage.textContent = clean;
+    archiveErrorDialog.showModal();
+  }
+
+  archiveConfirmDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeSalesArchiveConfirm(false);
+  });
+
+  archiveConfirmDialog?.addEventListener('click', (event) => {
+    if (event.target === archiveConfirmDialog || event.target.closest('[data-sales-archive-confirm-cancel]')) {
+      closeSalesArchiveConfirm(false);
+      return;
+    }
+    if (event.target.closest('[data-sales-archive-confirm-ok]')) {
+      closeSalesArchiveConfirm(true);
+    }
+  });
+
+  archiveErrorDialog?.addEventListener('click', (event) => {
+    if (event.target === archiveErrorDialog || event.target.closest('[data-sales-archive-error-close]')) {
+      archiveErrorDialog.close();
+    }
+  });
+
   const archiveErrorParams = new URLSearchParams(window.location.search);
   const archiveError = archiveErrorParams.get('sales_archive_error');
   if (archiveError) {
-    window.alert(archiveError);
+    showSalesArchiveError(archiveError);
     archiveErrorParams.delete('sales_archive_error');
     const cleanQuery = archiveErrorParams.toString();
     const cleanUrl = `${window.location.pathname}${cleanQuery ? '?' + cleanQuery : ''}${window.location.hash}`;
@@ -1521,36 +1595,43 @@
     }
   });
 
-  document.addEventListener('submit', (event) => {
+  document.addEventListener('submit', async (event) => {
     const form = event.target.closest('[data-sales-cost-archive-form]');
     if (!form) return;
-    if (!window.confirm(salesCostArchiveMessage(form))) {
-      event.preventDefault();
+    event.preventDefault();
+    const button = event.submitter || form.querySelector('.reports-sales-cost-archive-button');
+    if (button?.disabled) return;
+    const confirmed = await showSalesArchiveConfirm(salesCostArchiveMessage(form));
+    if (!confirmed) {
       return;
     }
     const returnTo = form.querySelector('input[name="return_to"]');
-    if (!returnTo) return;
-    const url = new URL(returnTo.value || '/reports', window.location.origin);
-    url.searchParams.set('profit_stage', 'archive');
-    returnTo.value = `${url.pathname}${url.search}`;
-  });
-
-  document.addEventListener('click', (event) => {
-    const archiveButton = event.target.closest('.reports-sales-cost-archive-button');
-    if (!archiveButton) return;
-    event.stopPropagation();
-    const form = archiveButton.closest('[data-sales-cost-archive-form]');
-    if (!form || archiveButton.dataset.requestedSubmit === '1') return;
-    archiveButton.dataset.requestedSubmit = '1';
-    event.preventDefault();
-    if (typeof form.requestSubmit === 'function') {
-      form.requestSubmit(archiveButton);
-    } else {
-      form.submit();
+    if (returnTo) {
+      const url = new URL(returnTo.value || '/reports', window.location.origin);
+      url.searchParams.set('profit_stage', 'archive');
+      returnTo.value = `${url.pathname}${url.search}`;
     }
-    setTimeout(() => {
-      archiveButton.dataset.requestedSubmit = '';
-    }, 0);
+    if (button) button.disabled = true;
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+      const body = await response.json().catch(() => null);
+      if (response.ok && body?.ok) {
+        window.location.href = body.redirect || '/reports?open_report=sales-cost&profit_stage=archive&sales_archived=1';
+        return;
+      }
+      showSalesArchiveError(body?.error || `Сервер вернул ошибку HTTP ${response.status}. Обновите страницу и попробуйте ещё раз.`);
+    } catch (error) {
+      showSalesArchiveError(`Не удалось отправить запрос на архивацию.\n${error?.message || error}`);
+    } finally {
+      if (button) button.disabled = false;
+    }
   });
 
   const initialProfitStage = new URLSearchParams(window.location.search).get('profit_stage');

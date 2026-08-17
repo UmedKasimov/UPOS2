@@ -11852,6 +11852,10 @@ def create_app() -> FastAPI:
     @app.post("/sales/{sale_id}/status", name="sales_status_update")
     async def sales_status_update(request: Request, sale_id: str):
         form = await request.form()
+        wants_json = (
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or "application/json" in (request.headers.get("Accept") or "")
+        )
         return_to = str(form.get("return_to") or "").strip()
         if not (
             return_to == "/reports"
@@ -11867,20 +11871,33 @@ def create_app() -> FastAPI:
                 return f"{base}{separator}sales_archive_error={quote(message)}{marker}{fragment}"
             return "/sales?error=" + quote(message) + "#sales-journal"
 
+        def sales_status_error_response(message: str, status_code: int = 400):
+            if wants_json:
+                return JSONResponse({"ok": False, "error": message}, status_code=status_code)
+            return RedirectResponse(url=sales_status_error_url(message), status_code=302)
+
         def sales_status_success_url() -> str:
             base, marker, fragment = return_to.partition("#")
             separator = "&" if "?" in base else "?"
             return f"{base}{separator}sales_archived=1{marker}{fragment}"
 
+        def sales_status_success_response():
+            url = sales_status_success_url() if return_to else (return_to or "/sales?msg=status#sales-journal")
+            if wants_json:
+                return JSONResponse({"ok": True, "redirect": url})
+            return RedirectResponse(url=url, status_code=302)
+
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
-            return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
+            return sales_status_error_response("Сессия формы устарела. Обновите страницу и попробуйте ещё раз.", 403)
         wid, redir = _product_workspace_owner(request)
         if redir:
+            if wants_json:
+                return JSONResponse({"ok": False, "error": "Требуется авторизация. Войдите в систему заново."}, status_code=401)
             return redir
         assert wid is not None
         status = str(form.get("status") or "").strip()
         if status not in {*_SALES_WORKFLOW_STATUSES, "return"}:
-            return RedirectResponse(url="/sales?error=" + quote("Неверный статус") + "#sales-journal", status_code=302)
+            return sales_status_error_response("Неверный статус документа")
         status_updated = False
         with session_scope() as session:
             row = session.get(SaleDocument, sale_id)
@@ -11888,19 +11905,14 @@ def create_app() -> FastAPI:
                 data = _json_object(row.data).copy()
                 doc_type = str(data.get("doc_type") or "sale").strip()
                 if status == "return" and str(data.get("doc_type") or "sale") != "return":
-                    return RedirectResponse(
-                        url="/sales?error=" + quote("Оформите возврат отдельным документом из продажи") + "#sales-journal",
-                        status_code=302,
-                    )
+                    return sales_status_error_response("Оформите возврат отдельным документом из продажи")
                 if doc_type == "return" and status != "return":
-                    return RedirectResponse(
-                        url="/sales?error=" + quote("Статус возврата меняется через документ возврата") + "#sales-journal",
-                        status_code=302,
-                    )
+                    return sales_status_error_response("Статус возврата меняется через документ возврата")
                 if status == "archived" and doc_type in {"sale", "order"}:
                     client_name = str(data.get("client") or "").strip()
                     counterparty_id = str(row.counterparty_id or data.get("counterparty_id") or "").strip()
                     client_debt_total = Decimal("0")
+                    client_debt_rows: list[str] = []
                     client_docs = session.execute(
                         select(SaleDocument).where(SaleDocument.workspace_owner_id == wid)
                     ).scalars()
@@ -11923,16 +11935,47 @@ def create_app() -> FastAPI:
                         )
                         if not same_client:
                             continue
-                        client_debt_total += max(
-                            Decimal("0"),
-                            _sales_decimal(client_doc.amount) - _sales_decimal(client_data.get("paid_amount")),
+                        doc_amount = _sales_decimal(client_doc.amount)
+                        doc_paid = min(doc_amount, _sales_decimal(client_data.get("paid_amount")))
+                        doc_debt = max(Decimal("0"), doc_amount - doc_paid)
+                        if doc_debt <= 0:
+                            continue
+                        client_debt_total += doc_debt
+                        doc_currency = str(client_doc.currency or client_data.get("currency") or "UZS").strip().upper() or "UZS"
+                        doc_date = str(client_data.get("date") or client_doc.created_at.date().isoformat()).strip()
+                        doc_number = str(client_doc.number or client_data.get("number") or client_doc.id[:8]).strip() or "-"
+                        client_debt_rows.append(
+                            " · ".join(
+                                [
+                                    f"{doc_date}",
+                                    f"№ {doc_number}",
+                                    f"сумма {_sales_money_label(doc_amount)} {doc_currency}",
+                                    f"оплачено {_sales_money_label(doc_paid)} {doc_currency}",
+                                    f"долг {_sales_money_label(doc_debt)} {doc_currency}",
+                                ]
+                            )
                         )
                     if client_debt_total > 0:
-                        return RedirectResponse(
-                            url=sales_status_error_url(
-                                "Нельзя архивировать: у клиента есть долг. Сначала закройте оплату."
-                            ),
-                            status_code=302,
+                        debt_currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
+                        details = "\n".join(client_debt_rows[:12])
+                        more = ""
+                        if len(client_debt_rows) > 12:
+                            more = f"\n… ещё документов с долгом: {len(client_debt_rows) - 12}"
+                        return sales_status_error_response(
+                            "\n".join(
+                                [
+                                    "Нельзя архивировать: у клиента есть неоплаченный долг.",
+                                    f"Клиент: {client_name or '-'}",
+                                    f"Общий долг: {_sales_money_label(client_debt_total)} {debt_currency}",
+                                    "",
+                                    "Документы с долгом:",
+                                    details or "-",
+                                    more,
+                                    "",
+                                    "Сначала закройте оплату, потом архивируйте продажу.",
+                                ]
+                            ).strip(),
+                            409,
                         )
                 inventory_was_applied = _sales_inventory_applied(data)
                 inventory_should_apply = _sales_status_requires_inventory(status, doc_type)
@@ -11952,10 +11995,7 @@ def create_app() -> FastAPI:
                             allow_negative_stock=False,
                         )
                     except ValueError as exc:
-                        return RedirectResponse(
-                            url="/sales?error=" + quote(str(exc)) + "#sales-journal",
-                            status_code=302,
-                        )
+                        return sales_status_error_response(str(exc))
                 data["status"] = status
                 data["workflow_version"] = _SALES_WORKFLOW_VERSION
                 data["inventory_applied"] = inventory_should_apply
@@ -11964,8 +12004,10 @@ def create_app() -> FastAPI:
                 flag_modified(row, "data")
                 session.add(row)
                 status_updated = True
-        if return_to and status == "archived" and status_updated:
-            return RedirectResponse(url=sales_status_success_url(), status_code=302)
+        if status == "archived" and status_updated:
+            return sales_status_success_response()
+        if wants_json:
+            return JSONResponse({"ok": False, "error": "Документ продажи не найден или статус не изменён."}, status_code=404)
         return RedirectResponse(url=return_to or "/sales?msg=status#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/crm-stage", name="sales_crm_stage_update")
