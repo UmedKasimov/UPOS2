@@ -5658,13 +5658,20 @@ def create_app() -> FastAPI:
             if str(item or "").strip()
         ]
         category_counts: dict[str, int] = {}
+        program_counts: dict[str, int] = {}
         for product in all_items:
             category_name = str(product.get("category") or "").strip()
             if category_name:
                 category_counts[category_name] = category_counts.get(category_name, 0) + 1
+            if str(product.get("kind") or "product") == "subscription":
+                program_name = str(product.get("name") or "").strip()
+                if program_name:
+                    program_counts[program_name] = program_counts.get(program_name, 0) + 1
         category_names = sorted({*stored_categories, *category_counts.keys()})
+        program_names = sorted(program_counts.keys())
         options = {
             "categories": category_names,
+            "programs": program_names,
             "category_rows": [
                 {"name": name, "product_count": category_counts.get(name, 0)}
                 for name in category_names
@@ -6967,9 +6974,10 @@ def create_app() -> FastAPI:
             row.data = data
         category_name = str(data.get("category") or "").strip()
         brand_name = str(data.get("brand") or "").strip()
-        if category_name or brand_name:
+        is_subscription = str(data.get("kind") or "product") == "subscription"
+        if (category_name and not is_subscription) or brand_name:
             settings_payload = load_workspace_settings(wid)
-            if category_name:
+            if category_name and not is_subscription:
                 stored_categories = [
                     str(item or "").strip()
                     for item in settings_payload.get("product_categories", [])
@@ -7006,10 +7014,12 @@ def create_app() -> FastAPI:
             payload = {}
         dictionary_type = str(payload.get("type") or "").strip()
         name = " ".join(str(payload.get("name") or "").split())
-        if dictionary_type not in {"category", "brand"}:
+        if dictionary_type not in {"category", "brand", "program"}:
             return JSONResponse({"ok": False, "error": "type"}, status_code=400)
         if not name:
             return JSONResponse({"ok": False, "error": "name"}, status_code=400)
+        if dictionary_type == "program":
+            return JSONResponse({"ok": True, "type": dictionary_type, "name": name})
         settings_payload = load_workspace_settings(wid)
         if dictionary_type == "category":
             stored = [

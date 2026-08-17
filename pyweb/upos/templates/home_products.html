@@ -2,6 +2,9 @@
 {% block title %}Товары{% endblock %}
 
 {% set current = edit_product or {} %}
+{% set product_form_kind = current.kind or product_filters.kind %}
+{% set product_program_options = product_options.programs or [] %}
+{% set product_category_selector_options = product_program_options if product_form_kind == 'subscription' else product_options.categories %}
 {% set prices = current.prices if current and current.prices else [{"name": "Продажная цена", "price": "", "currency": "UZS"}] %}
 {% set subscription_modifiers = current.subscription_modifiers if current and current.subscription_modifiers else [{"name": "", "description": "", "amount": "", "currency": "UZS"}] %}
 {% set stocks = current.stocks if current and current.stocks else [{"warehouse": "Основной склад", "quantity": "", "price": "", "date": ""}] %}
@@ -708,14 +711,14 @@
             <div class="product-form-grid product-form-grid--identity">
               <div class="product-dictionary-select">
                 <label>
-                  <span data-product-category-label>{{ "Название программы*" if (current.kind or product_filters.kind) == "subscription" else "Категория*" }}</span>
+                  <span data-product-category-label>{{ "Название программы*" if product_form_kind == "subscription" else "Категория*" }}</span>
                   <input type="hidden" name="category" value="{{ current.category or '' }}" data-product-dictionary-value="category" />
-                  <select data-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
-                    <option value="">{{ "Выберите название программы" if (current.kind or product_filters.kind) == "subscription" else "Выберите категорию" }}</option>
-                    {% if current.category and current.category not in product_options.categories %}
+                  <select data-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true" data-product-category-options="{{ product_options.categories|tojson|forceescape }}" data-product-program-options="{{ product_program_options|tojson|forceescape }}">
+                    <option value="">{{ "Выберите название программы" if product_form_kind == "subscription" else "Выберите категорию" }}</option>
+                    {% if current.category and current.category not in product_category_selector_options %}
                       <option value="{{ current.category }}" selected>{{ current.category }}</option>
                     {% endif %}
-                    {% for item in product_options.categories %}
+                    {% for item in product_category_selector_options %}
                       <option value="{{ item }}" {% if current.category == item %}selected{% endif %}>{{ item }}</option>
                     {% endfor %}
                   </select>
@@ -724,7 +727,7 @@
                       type="text"
                       autocomplete="off"
                       value="{{ current.category or '' }}"
-                      placeholder="{{ 'Выберите название программы' if (current.kind or product_filters.kind) == 'subscription' else 'Выберите категорию' }}"
+                      placeholder="{{ 'Выберите название программы' if product_form_kind == 'subscription' else 'Выберите категорию' }}"
                       data-product-dictionary-combo-input
                       {% if not edit_product %}required{% endif %}
                     />
@@ -847,6 +850,34 @@
               var brandSelect = form && form.querySelector('[data-product-dictionary-select="brand"]');
               var barcodeSection = form && form.querySelector('[data-product-barcode-section]');
               if (!form || !section) return;
+              var categoryPlaceholder = function (isSubscription) {
+                return isSubscription ? 'Выберите название программы' : 'Выберите категорию';
+              };
+              var parseSelectOptions = function (name) {
+                if (!categorySelect) return [];
+                try {
+                  var raw = categorySelect.getAttribute(name) || '[]';
+                  var parsed = JSON.parse(raw);
+                  return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+                } catch (error) {
+                  return [];
+                }
+              };
+              var rebuildCategorySelect = function (isSubscription) {
+                if (!categorySelect) return;
+                var value = ((categoryComboInput && categoryComboInput.value) || categorySelect.value || '').trim();
+                var options = parseSelectOptions(isSubscription ? 'data-product-program-options' : 'data-product-category-options');
+                var placeholder = categoryPlaceholder(isSubscription);
+                categorySelect.replaceChildren();
+                categorySelect.appendChild(new Option(placeholder, ''));
+                if (value && !options.includes(value)) {
+                  categorySelect.appendChild(new Option(value, value, true, true));
+                }
+                options.forEach(function (item) {
+                  categorySelect.appendChild(new Option(item, item, item === value, item === value));
+                });
+                categorySelect.value = value;
+              };
               var updateSubscriptionRows = function () {
                 if (!subscriptionList) return;
                 var rows = Array.prototype.slice.call(subscriptionList.querySelectorAll('[data-subscription-modifier-row]'));
@@ -910,11 +941,9 @@
                   input.required = isSubscription && isCreate;
                 });
                 if (categoryLabel) categoryLabel.textContent = isSubscription ? 'Название программы*' : 'Категория*';
-                if (categorySelect && categorySelect.options.length) {
-                  categorySelect.options[0].textContent = isSubscription ? 'Выберите название программы' : 'Выберите категорию';
-                }
+                rebuildCategorySelect(isSubscription);
                 if (categoryComboInput) {
-                  categoryComboInput.placeholder = isSubscription ? 'Выберите название программы' : 'Выберите категорию';
+                  categoryComboInput.placeholder = categoryPlaceholder(isSubscription);
                 }
                 if (brandField) {
                   brandField.hidden = isSubscription;
@@ -1442,6 +1471,7 @@
       const quickError = quickDialog?.querySelector('[data-product-dictionary-quick-error]');
       const quickSave = quickDialog?.querySelector('[data-product-dictionary-save]');
       let quickType = 'category';
+      let quickTargetType = 'category';
       const normalizeText = (value) => String(value || '').trim().toLowerCase();
       const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({
         '&': '&amp;',
@@ -1592,8 +1622,10 @@
         button.addEventListener('click', () => {
           if (!quickDialog || !quickInput) return;
           quickType = button.dataset.productDictionaryType || 'category';
+          quickTargetType = quickType;
           const isBrand = quickType === 'brand';
-          const isProgram = !isBrand && document.querySelector('input[name="kind"][value="subscription"]')?.checked;
+          const isProgram = quickType === 'category' && document.querySelector('input[name="kind"][value="subscription"]')?.checked;
+          if (isProgram) quickType = 'program';
           if (quickTitle) quickTitle.textContent = (isProgram && button.dataset.productProgramTitle) || button.dataset.productDictionaryTitle || (isBrand ? 'Новый бренд' : 'Новая категория');
           if (quickLabel) quickLabel.textContent = (isProgram && button.dataset.productProgramLabel) || (isBrand ? 'Название бренда*' : 'Название категории*');
           if (quickError) {
@@ -1632,7 +1664,7 @@
           });
           const body = await response.json().catch(() => ({}));
           if (!response.ok || !body.ok) throw new Error(body.error || 'save');
-          addSelectOption(quickType, body.name || name);
+          addSelectOption(quickTargetType, body.name || name);
           quickDialog?.close();
         } catch (error) {
           if (quickError) {
