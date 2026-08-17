@@ -432,12 +432,12 @@
         </header>
         {# Отгрузки дают ожидаемую прибыль, архив — реальную: разделы
            переключают и таблицу, и суммы наверху. #}
-        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы прибыли" data-sales-cost-stages>
-          <span class="sales-document-tabs-title">Разделы прибыли</span>
+        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Фильтр по учёту прибыли" data-sales-cost-stages>
+          <span class="sales-document-tabs-title">Прибыль учтена</span>
           {% for stage in [
             {'key': 'all', 'label': 'Все', 'logo': 'ВС', 'note': 'прибыль'},
-            {'key': 'shipment', 'label': 'Отгрузки', 'logo': 'ОТ', 'note': 'ожидаемая прибыль'},
-            {'key': 'archive', 'label': 'Архив', 'logo': 'АР', 'note': 'реальная прибыль'},
+            {'key': 'shipment', 'label': 'Ожидаемая', 'logo': 'ОЖ', 'note': 'ожидаемая прибыль'},
+            {'key': 'archive', 'label': 'Реальная', 'logo': 'РЕ', 'note': 'реальная прибыль'},
           ] %}
             {% set stage_data = sc_stages[stage.key] %}
             <button
