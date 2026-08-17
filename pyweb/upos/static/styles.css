@@ -10213,6 +10213,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   align-items: end;
   gap: 0.35rem;
   min-width: 0;
+  position: relative;
 }
 
 .product-dictionary-select > label {
@@ -10234,6 +10235,17 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   grid-template-columns: minmax(0, 1fr) 2.35rem;
   width: 100%;
   min-width: 0;
+}
+
+.product-dictionary-select:has(.product-dictionary-combo.is-open),
+.product-form-grid--identity:has(.product-dictionary-combo.is-open) {
+  position: relative;
+  z-index: 650;
+  overflow: visible;
+}
+
+.product-dictionary-combo.is-open {
+  z-index: 660;
 }
 
 .product-dictionary-combo input {
@@ -10267,7 +10279,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .product-dictionary-combo-panel {
   position: absolute;
-  z-index: 60;
+  z-index: 670;
   top: calc(100% + 0.3rem);
   left: 0;
   right: 0;
@@ -10436,6 +10448,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .product-form-hero {
+  position: relative;
   display: grid;
   gap: 0.8rem;
   padding: 0.85rem;
