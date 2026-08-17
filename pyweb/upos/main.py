@@ -11857,6 +11857,11 @@ def create_app() -> FastAPI:
                 return f"{base}{separator}sales_archive_error={quote(message)}{marker}{fragment}"
             return "/sales?error=" + quote(message) + "#sales-journal"
 
+        def sales_status_success_url() -> str:
+            base, marker, fragment = return_to.partition("#")
+            separator = "&" if "?" in base else "?"
+            return f"{base}{separator}sales_archived=1{marker}{fragment}"
+
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
         wid, redir = _product_workspace_owner(request)
@@ -11866,6 +11871,7 @@ def create_app() -> FastAPI:
         status = str(form.get("status") or "").strip()
         if status not in {*_SALES_WORKFLOW_STATUSES, "return"}:
             return RedirectResponse(url="/sales?error=" + quote("Неверный статус") + "#sales-journal", status_code=302)
+        status_updated = False
         with session_scope() as session:
             row = session.get(SaleDocument, sale_id)
             if row and row.workspace_owner_id == wid:
@@ -11947,6 +11953,9 @@ def create_app() -> FastAPI:
                 row.data = data
                 flag_modified(row, "data")
                 session.add(row)
+                status_updated = True
+        if return_to and status == "archived" and status_updated:
+            return RedirectResponse(url=sales_status_success_url(), status_code=302)
         return RedirectResponse(url=return_to or "/sales?msg=status#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/crm-stage", name="sales_crm_stage_update")

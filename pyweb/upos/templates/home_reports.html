@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=140" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=141" />
 {% endblock %}
 
 {% block page_header %}
@@ -1018,6 +1018,16 @@
     <script type="application/json" id="delivery-debts-report-data">{{ delivery_debts|tojson }}</script>
     <script type="application/json" id="delivery-debt-limits-data">{{ courier_debt_limits|tojson }}</script>
     <script type="application/json" id="stock-purchase-history-data">{{ business_reports.stock_analysis.history|default({})|tojson }}</script>
+
+    <dialog class="reports-success-dialog" data-sales-archive-success-dialog aria-labelledby="sales-archive-success-title">
+      <section class="reports-success-dialog-surface">
+        <button type="button" class="reports-success-dialog-close" data-sales-archive-success-close aria-label="Закрыть">×</button>
+        <div class="reports-success-dialog-icon" aria-hidden="true"><span></span></div>
+        <h2 id="sales-archive-success-title">Продажа архивирована</h2>
+        <p>Прибыль перенесена в раздел «Реальная».</p>
+        <button type="button" class="btn btn-primary" data-sales-archive-success-close>Готово</button>
+      </section>
+    </dialog>
   </div>
 {% endblock %}
 
@@ -1495,6 +1505,21 @@
       paymentLines,
     ].join('\n');
   }
+
+  const archiveSuccessDialog = document.querySelector('[data-sales-archive-success-dialog]');
+  if (archiveErrorParams.get('sales_archived') === '1' && archiveSuccessDialog) {
+    archiveSuccessDialog.showModal();
+    archiveErrorParams.delete('sales_archived');
+    const cleanQuery = archiveErrorParams.toString();
+    const cleanUrl = `${window.location.pathname}${cleanQuery ? '?' + cleanQuery : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
+  archiveSuccessDialog?.addEventListener('click', (event) => {
+    if (event.target === archiveSuccessDialog || event.target.closest('[data-sales-archive-success-close]')) {
+      archiveSuccessDialog.close();
+    }
+  });
 
   document.addEventListener('submit', (event) => {
     const form = event.target.closest('[data-sales-cost-archive-form]');

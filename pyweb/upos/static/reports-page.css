@@ -2988,3 +2988,85 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   justify-content: flex-end;
   padding: 0.85rem 0 0.15rem;
 }
+
+.reports-success-dialog {
+  width: min(26rem, calc(100vw - 2rem));
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.reports-success-dialog::backdrop {
+  background: rgb(15 23 42 / 42%);
+  backdrop-filter: blur(2px);
+}
+
+.reports-success-dialog-surface {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 1.5rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 20px 52px rgb(15 23 42 / 24%);
+  text-align: center;
+}
+
+.reports-success-dialog-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.reports-success-dialog-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+}
+
+.reports-success-dialog-icon span {
+  width: 1.15rem;
+  height: 0.65rem;
+  border-bottom: 0.18rem solid var(--primary);
+  border-left: 0.18rem solid var(--primary);
+  transform: translateY(-0.1rem) rotate(-45deg);
+}
+
+.reports-success-dialog h2,
+.reports-success-dialog p {
+  margin: 0;
+}
+
+.reports-success-dialog h2 {
+  font-size: var(--text-lg);
+}
+
+.reports-success-dialog p {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.reports-success-dialog .btn {
+  min-width: 7rem;
+  margin-top: 0.25rem;
+}
