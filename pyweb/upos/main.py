@@ -21252,6 +21252,46 @@ def create_app() -> FastAPI:
                         names.append(installer_name)
                     return list(dict.fromkeys(names))
 
+                def _sales_cost_archive_info(
+                    *,
+                    data: dict[str, Any],
+                    currency: str,
+                    amount: Decimal,
+                    paid_amount: Decimal,
+                ) -> dict[str, Any]:
+                    payments: list[dict[str, str]] = []
+                    payment_lines = data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []
+                    for payment in payment_lines:
+                        if not isinstance(payment, dict):
+                            continue
+                        payment_amount = _sales_decimal(payment.get("amount"))
+                        if payment_amount <= 0:
+                            continue
+                        payment_currency = str(payment.get("currency") or currency or "UZS").strip().upper() or "UZS"
+                        payment_type = str(payment.get("type") or payment.get("account") or "Оплата").strip() or "Оплата"
+                        payments.append(
+                            {
+                                "date": str(payment.get("date") or data.get("payment_date") or data.get("paid_at") or data.get("date") or "-").strip() or "-",
+                                "type": payment_type,
+                                "amount": _report_money(payment_amount, payment_currency),
+                            }
+                        )
+                    if not payments and paid_amount > 0:
+                        payments.append(
+                            {
+                                "date": str(data.get("payment_date") or data.get("paid_at") or data.get("date") or "-").strip() or "-",
+                                "type": str(data.get("payment_type") or "Оплата").strip() or "Оплата",
+                                "amount": _report_money(paid_amount, currency),
+                            }
+                        )
+                    outstanding_amount = max(Decimal("0"), amount - paid_amount)
+                    return {
+                        "total": _report_money(amount, currency),
+                        "paid": _report_money(paid_amount, currency),
+                        "outstanding": _report_money(outstanding_amount, currency),
+                        "payments": payments,
+                    }
+
                 def _sales_cost_row_payload(
                     *,
                     document_id: str,
@@ -21266,6 +21306,7 @@ def create_app() -> FastAPI:
                     line_names: list[str],
                     line_details: list[dict[str, Any]],
                     employee_names: list[str],
+                    archive_info: dict[str, Any] | None = None,
                 ) -> dict[str, Any]:
                     return {
                         "document_id": document_id,
@@ -21275,6 +21316,7 @@ def create_app() -> FastAPI:
                         "kind": kind,
                         "stage": stage,
                         "can_archive": can_archive,
+                        "archive_info": archive_info or {},
                         "amount_value": amount_value,
                         "cost_value": cost_value,
                         "line_details": line_details,
@@ -21375,6 +21417,12 @@ def create_app() -> FastAPI:
                                     line_names=sales_cost_line_names,
                                     line_details=sales_cost_line_details,
                                     employee_names=sales_cost_doc_employee_names,
+                                    archive_info=_sales_cost_archive_info(
+                                        data=data,
+                                        currency=currency,
+                                        amount=amount,
+                                        paid_amount=paid_amount,
+                                    ),
                                 ))
                             if subscription_line_count:
                                 subscription_profit_total += subscription_amount - subscription_cost

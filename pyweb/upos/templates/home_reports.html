@@ -571,7 +571,7 @@
                   </td>
                   <td class="reports-sales-cost-action-cell">
                     {% if row.can_archive and can_archive_sales %}
-                      <form class="reports-sales-cost-archive-form" method="post" action="{{ url_for('sales_status_update', sale_id=row.document_id) }}" data-sales-cost-archive-form>
+                      <form class="reports-sales-cost-archive-form" method="post" action="{{ url_for('sales_status_update', sale_id=row.document_id) }}" data-sales-cost-archive-form data-archive-info="{{ (row.archive_info or {})|tojson|forceescape }}" data-archive-number="{{ row.number or '-' }}" data-archive-client="{{ row.client }}">
                         {% include "_csrf_field.html" %}
                         <input type="hidden" name="status" value="archived" />
                         <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
@@ -1464,10 +1464,42 @@
     window.history.replaceState({}, '', cleanUrl);
   }
 
+  function salesCostArchiveMessage(form) {
+    let info = {};
+    try {
+      info = JSON.parse(form?.dataset?.archiveInfo || '{}') || {};
+    } catch (error) {
+      info = {};
+    }
+    const number = form?.dataset?.archiveNumber || '-';
+    const client = form?.dataset?.archiveClient || '-';
+    const payments = Array.isArray(info.payments) ? info.payments : [];
+    const paymentLines = payments.length
+      ? payments.map((payment, index) => {
+          const date = payment.date || '-';
+          const type = payment.type || 'Оплата';
+          const amount = payment.amount || '0 UZS';
+          return `${index + 1}. ${date} · ${type} · ${amount}`;
+        }).join('\n')
+      : 'Оплат нет';
+    return [
+      'Архивировать продажу и учесть прибыль как реальную?',
+      '',
+      `Документ: ${number}`,
+      `Клиент: ${client}`,
+      `Сумма продажи: ${info.total || '-'}`,
+      `Оплачено: ${info.paid || '0 UZS'}`,
+      `Не оплачено: ${info.outstanding || '0 UZS'}`,
+      '',
+      'Оплаты:',
+      paymentLines,
+    ].join('\n');
+  }
+
   document.addEventListener('submit', (event) => {
     const form = event.target.closest('[data-sales-cost-archive-form]');
     if (!form) return;
-    if (!window.confirm('Архивировать продажу и учесть её прибыль как реальную?')) {
+    if (!window.confirm(salesCostArchiveMessage(form))) {
       event.preventDefault();
       return;
     }
