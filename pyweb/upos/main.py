@@ -21166,6 +21166,28 @@ def create_app() -> FastAPI:
                             names.append(product_name)
                     return list(dict.fromkeys(names))
 
+                def _sales_cost_line_details(lines: Any, currency: str, sign: Decimal) -> list[dict[str, Any]]:
+                    details: list[dict[str, Any]] = []
+                    for line in lines if isinstance(lines, list) else []:
+                        if not isinstance(line, dict) or report_line_is_subscription(line):
+                            continue
+                        product_name = str(line.get("product") or "Без товара").strip() or "Без товара"
+                        product = report_product_for_line(line)
+                        if product is not None and product.name:
+                            product_name = str(product.name or "").strip() or product_name
+                        qty = _sales_decimal(line.get("quantity"))
+                        amount_value = report_line_amount_primary(line, currency) * sign
+                        cost_value = report_to_primary(qty * report_product_unit_cost(line), "UZS") * sign
+                        details.append(
+                            {
+                                "product": product_name,
+                                "qty": _sales_money_label(qty),
+                                "amount_value": amount_value,
+                                "cost_value": cost_value,
+                            }
+                        )
+                    return details
+
                 def _sales_cost_employee_names(data: dict[str, Any]) -> list[str]:
                     names: list[str] = []
                     for key in ("manager", "crm_responsible", "installer_name"):
@@ -21188,6 +21210,7 @@ def create_app() -> FastAPI:
                     amount_value: Decimal,
                     cost_value: Decimal,
                     line_names: list[str],
+                    line_details: list[dict[str, Any]],
                     employee_names: list[str],
                 ) -> dict[str, Any]:
                     return {
@@ -21198,6 +21221,7 @@ def create_app() -> FastAPI:
                         "stage": stage,
                         "amount_value": amount_value,
                         "cost_value": cost_value,
+                        "line_details": line_details,
                         "_product_filter": [_report_filter_text(name) for name in line_names],
                         "_employee_filter": [_report_filter_text(name) for name in employee_names],
                     }
@@ -21236,6 +21260,8 @@ def create_app() -> FastAPI:
                     sales_cost_product_names.update(sales_cost_line_names)
                     sales_cost_doc_employee_names = _sales_cost_employee_names(data)
                     sales_cost_employee_names.update(sales_cost_doc_employee_names)
+                    sales_cost_doc_sign = Decimal("-1") if doc_type == "return" else Decimal("1")
+                    sales_cost_line_details = _sales_cost_line_details(lines, currency, sales_cost_doc_sign)
                     document_cost_uzs = sum(
                         (_sales_decimal(line.get("quantity")) * report_product_unit_cost(line) for line in lines if isinstance(line, dict)),
                         Decimal("0"),
@@ -21289,6 +21315,7 @@ def create_app() -> FastAPI:
                                     amount_value=regular_amount_primary,
                                     cost_value=regular_document_cost,
                                     line_names=sales_cost_line_names,
+                                    line_details=sales_cost_line_details,
                                     employee_names=sales_cost_doc_employee_names,
                                 ))
                             if subscription_line_count:
@@ -21310,6 +21337,7 @@ def create_app() -> FastAPI:
                                 amount_value=-regular_amount_primary,
                                 cost_value=-regular_document_cost,
                                 line_names=sales_cost_line_names,
+                                line_details=sales_cost_line_details,
                                 employee_names=sales_cost_doc_employee_names,
                             ))
                         profit_total -= regular_amount_primary - regular_document_cost
@@ -21335,6 +21363,7 @@ def create_app() -> FastAPI:
                                     amount_value=regular_amount_primary,
                                     cost_value=regular_document_cost,
                                     line_names=sales_cost_line_names,
+                                    line_details=sales_cost_line_details,
                                     employee_names=sales_cost_doc_employee_names,
                                 ))
                             if subscription_line_count:
@@ -21550,6 +21579,17 @@ def create_app() -> FastAPI:
                     sales_row["cost_uzs"] = profit_to_uzs(row_cost)
                     sales_row["profit"] = _report_money(row_profit, primary_currency)
                     sales_row["profit_uzs"] = profit_to_uzs(row_profit)
+                    for line_detail in sales_row.get("line_details") or []:
+                        line_amount = line_detail.pop("amount_value", Decimal("0"))
+                        line_cost = line_detail.pop("cost_value", Decimal("0"))
+                        line_profit = line_amount - line_cost
+                        line_detail["amount"] = _report_money(line_amount, primary_currency)
+                        line_detail["amount_uzs"] = profit_to_uzs(line_amount)
+                        line_detail["cost"] = _report_money(line_cost, primary_currency)
+                        line_detail["cost_uzs"] = profit_to_uzs(line_cost)
+                        line_detail["profit"] = _report_money(line_profit, primary_currency)
+                        line_detail["profit_uzs"] = profit_to_uzs(line_profit)
+                        line_detail["profit_negative"] = line_profit < 0
                     sales_row["profit_negative"] = row_profit < 0
                     # Себестоимости нет или она мизерная против суммы продажи —
                     # это дыра в данных товара, ячейка подсвечивается красным.

@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=136" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=137" />
 {% endblock %}
 
 {% block page_header %}
@@ -545,8 +545,14 @@
             </thead>
             <tbody>
               {% for row in sc_rows %}
-                <tr data-sales-cost-row="{{ row.stage or 'shipment' }}">
-                  <td>{{ row.date }}</td>
+                {% set detail_id = 'sales-cost-detail-' ~ loop.index %}
+                <tr data-sales-cost-row="{{ row.stage or 'shipment' }}" data-sales-cost-row-id="{{ loop.index }}">
+                  <td>
+                    <button class="reports-row-toggle" type="button" data-sales-cost-toggle aria-expanded="false" aria-controls="{{ detail_id }}">
+                      <span>{{ row.date }}</span>
+                      <span class="reports-row-toggle-icon" aria-hidden="true"></span>
+                    </button>
+                  </td>
                   <td>{{ row.number or "-" }}</td>
                   <td>{{ row.kind }}</td>
                   <td>{{ row.client }}</td>
@@ -560,6 +566,38 @@
                     {% else %}
                       <span class="reports-stage-flag reports-stage-flag--expected">Ожидаемая</span>
                     {% endif %}
+                  </td>
+                </tr>
+                <tr class="reports-sales-cost-detail-row" data-sales-cost-detail-row="{{ row.stage or 'shipment' }}" data-sales-cost-detail-for="{{ loop.index }}" hidden>
+                  <td colspan="9">
+                    <div id="{{ detail_id }}" class="reports-sales-cost-detail" data-sales-cost-detail-panel>
+                      <div class="reports-sales-cost-detail-head">
+                        <strong>Товары</strong>
+                        <span>{{ row.client }} · № {{ row.number or "-" }}</span>
+                      </div>
+                      {% if row.line_details %}
+                        <div class="reports-sales-cost-lines">
+                          <div class="reports-sales-cost-line reports-sales-cost-line--head">
+                            <span>Товар</span>
+                            <span>Кол-во</span>
+                            <span>Продажная цена</span>
+                            <span>Себестоимость</span>
+                            <span>Прибыль</span>
+                          </div>
+                          {% for line in row.line_details %}
+                            <div class="reports-sales-cost-line">
+                              <span>{{ line.product }}</span>
+                              <span>{{ line.qty }}</span>
+                              <span data-profit-money data-money-uzs="{{ line.amount_uzs }}">{{ line.amount }}</span>
+                              <span data-profit-money data-money-uzs="{{ line.cost_uzs }}">{{ line.cost }}</span>
+                              <span{% if line.profit_negative %} class="is-negative"{% endif %} data-profit-money data-money-uzs="{{ line.profit_uzs }}">{{ line.profit }}</span>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <p class="reports-sales-cost-detail-empty">В документе нет товарных позиций.</p>
+                      {% endif %}
+                    </div>
                   </td>
                 </tr>
               {% else %}
@@ -1318,6 +1356,39 @@
 
   // Разделы прибыли: «Отгрузки» показывают ожидаемую прибыль, «Архив» —
   // реальную, потому что программа признаёт прибыль только после архива.
+  function closeSalesCostDetail(detailRow, toggle) {
+    if (!detailRow) return;
+    detailRow.classList.remove('is-open');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    window.setTimeout(() => {
+      if (!detailRow.classList.contains('is-open')) detailRow.hidden = true;
+    }, 260);
+  }
+
+  function toggleSalesCostDetail(toggle) {
+    const row = toggle.closest('[data-sales-cost-row]');
+    const rowId = row?.getAttribute('data-sales-cost-row-id');
+    const detailRow = rowId ? document.querySelector(`[data-sales-cost-detail-for="${rowId}"]`) : null;
+    if (!detailRow) return;
+    const open = !detailRow.classList.contains('is-open');
+    document.querySelectorAll('[data-sales-cost-detail-row].is-open').forEach((item) => {
+      if (item !== detailRow) {
+        const itemId = item.getAttribute('data-sales-cost-detail-for');
+        const itemToggle = itemId ? document.querySelector(`[data-sales-cost-row-id="${itemId}"] [data-sales-cost-toggle]`) : null;
+        closeSalesCostDetail(item, itemToggle);
+      }
+    });
+    if (!open) {
+      closeSalesCostDetail(detailRow, toggle);
+      return;
+    }
+    detailRow.hidden = false;
+    requestAnimationFrame(() => {
+      detailRow.classList.add('is-open');
+      toggle.setAttribute('aria-expanded', 'true');
+    });
+  }
+
   function applySalesCostStage(stage) {
     const tabs = document.querySelector('[data-sales-cost-stages]');
     if (!tabs) return;
@@ -1334,6 +1405,10 @@
     document.querySelectorAll('[data-sales-cost-row]').forEach((row) => {
       const show = active === 'all' || row.getAttribute('data-sales-cost-row') === active;
       row.hidden = !show;
+      const rowId = row.getAttribute('data-sales-cost-row-id');
+      const detailRow = rowId ? document.querySelector(`[data-sales-cost-detail-for="${rowId}"]`) : null;
+      const toggle = row.querySelector('[data-sales-cost-toggle]');
+      if (!show) closeSalesCostDetail(detailRow, toggle);
       if (show) visible += 1;
     });
     const emptyRow = document.querySelector('[data-sales-cost-empty]');
@@ -1362,6 +1437,12 @@
     const button = event.target.closest('[data-sales-cost-stage]');
     if (!button) return;
     applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
+  });
+
+  document.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-sales-cost-toggle]');
+    if (!toggle) return;
+    toggleSalesCostDetail(toggle);
   });
 
   document.querySelector('[data-sales-cost-export]')?.addEventListener('click', exportSalesCostXlsx);
