@@ -9289,17 +9289,18 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .purchase-document-detail-table {
   min-width: 54rem;
   table-layout: fixed;
+  border: 1px solid var(--border);
 }
 
 .warehouse-purchase-detail:not(.sales-document-detail) .warehouse-purchase-detail-table-wrap {
-  border-color: var(--products-table-blue-strong, var(--primary));
+  border-color: var(--border);
   border-radius: 0;
   box-shadow: none;
 }
 
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table th,
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table td {
-  border-color: color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 30%, var(--border));
+  border: 1px solid var(--border);
 }
 
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-detail-table thead th {
@@ -9431,7 +9432,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0.75rem 1rem 0;
-  border: 1px solid color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 34%, var(--border));
+  border: 1px solid var(--border);
   background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 8%, var(--card));
 }
 
@@ -9482,7 +9483,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .purchase-document-payment-summary-item + .purchase-document-payment-summary-item {
-  border-left: 1px solid color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 28%, var(--border));
+  border-left: 1px solid var(--border);
 }
 
 .purchase-document-payment-summary-item span {
