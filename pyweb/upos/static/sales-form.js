@@ -656,6 +656,22 @@
   }
 
   function refreshLineProductPrice(root, row, options) {
+    if (row && row.dataset.salesSubscriptionMonthly) {
+      var subscriptionPrice = convertPrice(
+        row.dataset.salesSubscriptionMonthly,
+        row.dataset.salesSubscriptionCurrency || selectedCurrency(root),
+        selectedCurrency(root),
+        options
+      );
+      var subscriptionMonths = Math.max(1, Math.floor(numberValue(row.dataset.salesSubscriptionMonths) || 1));
+      var subscriptionPriceInput = row.querySelector('input[name="line_price"]');
+      if (subscriptionPriceInput) {
+        subscriptionPriceInput.value = formatMoney(subscriptionPrice * subscriptionMonths, selectedCurrency(root));
+      }
+      row.dataset.salesBasePrice = String(numberValue(row.dataset.salesSubscriptionMonthly) * subscriptionMonths);
+      row.dataset.salesBaseCurrency = row.dataset.salesSubscriptionCurrency || selectedCurrency(root);
+      return;
+    }
     var productName = rowProductValue(row);
     if (!productName) return;
     var product = (options.product_rows || []).find(function (item) {
@@ -757,6 +773,8 @@
         if (input.name === "line_price") {
           row.removeAttribute("data-sales-base-price");
           row.removeAttribute("data-sales-base-currency");
+          delete row.dataset.salesSubscriptionMonthly;
+          delete row.dataset.salesSubscriptionCurrency;
         }
         syncRowState(row);
         updateTotal(root);
@@ -802,7 +820,24 @@
     row.querySelectorAll(".sales-price-cell-adjusted").forEach(function (cell) {
       cell.classList.remove("sales-price-cell-adjusted");
     });
+    clearSubscriptionLine(row);
     syncRowState(row);
+  }
+
+  function clearSubscriptionLine(row) {
+    if (!row) return;
+    ["line_subscription_program", "line_subscription_plan", "line_subscription_months"].forEach(function (name) {
+      var input = row.querySelector('input[name="' + name + '"]');
+      if (input) input.value = "";
+    });
+    delete row.dataset.salesSubscriptionMonthly;
+    delete row.dataset.salesSubscriptionCurrency;
+    delete row.dataset.salesSubscriptionMonths;
+    var meta = row.querySelector("[data-sales-subscription-line-meta]");
+    if (meta) {
+      meta.textContent = "";
+      meta.hidden = true;
+    }
   }
 
   function removeLine(root, row, options) {
@@ -847,6 +882,7 @@
     if (discountUnit) discountUnit.value = "percent";
     var discountValue = row.querySelector("[data-sales-discount-value]");
     if (discountValue) discountValue.value = "0";
+    clearSubscriptionLine(row);
     sourceRow.parentNode.insertBefore(row, sourceRow.nextSibling);
     wireLine(root, row, options);
     return row;
@@ -1018,6 +1054,9 @@
     var discountValue = row.querySelector("[data-sales-discount-value]");
     var discountUnit = row.querySelector("[data-sales-discount-unit]");
     var category = row.querySelector("[data-sales-line-category]");
+    var subscriptionProgram = row.querySelector('input[name="line_subscription_program"]');
+    var subscriptionPlan = row.querySelector('input[name="line_subscription_plan"]');
+    var subscriptionMonths = row.querySelector('input[name="line_subscription_months"]');
     return {
       kind: rowKind(row),
       product: input ? input.value || "" : "",
@@ -1030,7 +1069,12 @@
       category: category ? category.textContent || "" : "",
       basePrice: row.dataset.salesBasePrice || "",
       baseCurrency: row.dataset.salesBaseCurrency || "",
-      priceTypeId: row.dataset.salesPriceTypeId || ""
+      priceTypeId: row.dataset.salesPriceTypeId || "",
+      subscriptionProgram: subscriptionProgram ? subscriptionProgram.value || "" : "",
+      subscriptionPlan: subscriptionPlan ? subscriptionPlan.value || "" : "",
+      subscriptionMonths: subscriptionMonths ? subscriptionMonths.value || "" : "",
+      subscriptionMonthly: row.dataset.salesSubscriptionMonthly || "",
+      subscriptionCurrency: row.dataset.salesSubscriptionCurrency || ""
     };
   }
 
@@ -1133,6 +1177,20 @@
     else row.removeAttribute("data-sales-base-currency");
     if (line.priceTypeId) row.dataset.salesPriceTypeId = line.priceTypeId;
     else row.removeAttribute("data-sales-price-type-id");
+    var subscriptionProgram = row.querySelector('input[name="line_subscription_program"]');
+    var subscriptionPlan = row.querySelector('input[name="line_subscription_plan"]');
+    var subscriptionMonths = row.querySelector('input[name="line_subscription_months"]');
+    if (subscriptionProgram) subscriptionProgram.value = line.subscriptionProgram || "";
+    if (subscriptionPlan) subscriptionPlan.value = line.subscriptionPlan || "";
+    if (subscriptionMonths) subscriptionMonths.value = line.subscriptionMonths || "";
+    if (line.subscriptionMonthly) row.dataset.salesSubscriptionMonthly = line.subscriptionMonthly;
+    if (line.subscriptionCurrency) row.dataset.salesSubscriptionCurrency = line.subscriptionCurrency;
+    if (line.subscriptionMonths) row.dataset.salesSubscriptionMonths = line.subscriptionMonths;
+    var subscriptionMeta = row.querySelector("[data-sales-subscription-line-meta]");
+    if (subscriptionMeta && (line.subscriptionProgram || line.subscriptionPlan)) {
+      subscriptionMeta.textContent = [line.subscriptionProgram, line.subscriptionPlan, line.subscriptionMonths ? line.subscriptionMonths + " мес." : ""].filter(Boolean).join(" · ");
+      subscriptionMeta.hidden = false;
+    }
     syncRowState(row);
   }
 
@@ -3103,6 +3161,175 @@
     });
   }
 
+  function salesSubscriptionCatalog(root, options) {
+    var rows = (options.product_rows || []).filter(function (item) {
+      return String(item.kind || "").toLowerCase() === "subscription";
+    });
+    var catalog = [];
+    rows.forEach(function (item) {
+      var modifiers = Array.isArray(item.subscription_modifiers) ? item.subscription_modifiers : [];
+      if (!modifiers.length) {
+        var fallback = productPrice(item, selectedPriceTypeId(root));
+        modifiers = [{
+          name: item.name || "Подписка",
+          description: "",
+          amount: fallback.price || "",
+          currency: fallback.currency || selectedCurrency(root)
+        }];
+      }
+      modifiers.forEach(function (modifier) {
+        var amount = numberValue(modifier.amount);
+        if (!amount) return;
+        var planName = String(modifier.name || item.name || "Подписка").trim();
+        var productName = String(item.name || "").trim();
+        catalog.push({
+          item: item,
+          program: String(item.category || "Без программы").trim() || "Без программы",
+          productName: productName,
+          planName: planName,
+          label: normalize(productName) === normalize(planName) ? productName : productName + " · " + planName,
+          description: String(modifier.description || "").trim(),
+          amount: amount,
+          currency: String(modifier.currency || selectedCurrency(root)).toUpperCase()
+        });
+      });
+    });
+    return catalog;
+  }
+
+  function wireSubscriptionDialog(root, options) {
+    var dialog = document.querySelector("[data-sales-subscription-dialog]");
+    var form = dialog ? dialog.querySelector("[data-sales-subscription-form]") : null;
+    var openButton = root.querySelector("[data-sales-subscription-open]");
+    if (!dialog || !form || !openButton) return;
+    var programSelect = dialog.querySelector("[data-sales-subscription-program]");
+    var planSelect = dialog.querySelector("[data-sales-subscription-plan]");
+    var quantityInput = dialog.querySelector("[data-sales-subscription-quantity]");
+    var monthsInput = dialog.querySelector("[data-sales-subscription-months]");
+    var description = dialog.querySelector("[data-sales-subscription-description]");
+    var total = dialog.querySelector("[data-sales-subscription-total]");
+    var formula = dialog.querySelector("[data-sales-subscription-formula]");
+    var empty = dialog.querySelector("[data-sales-subscription-empty]");
+    var summary = dialog.querySelector("[data-sales-subscription-summary]");
+    var addButton = dialog.querySelector("[data-sales-subscription-add]");
+    var catalog = [];
+
+    function selectedChoice() {
+      var index = Number(planSelect ? planSelect.value : -1);
+      return Number.isInteger(index) && index >= 0 ? catalog[index] || null : null;
+    }
+
+    function renderSummary() {
+      var choice = selectedChoice();
+      var quantity = Math.max(1, Math.floor(numberValue(quantityInput ? quantityInput.value : 1) || 1));
+      var months = Math.max(1, Math.floor(numberValue(monthsInput ? monthsInput.value : 1) || 1));
+      if (!choice) {
+        if (total) total.textContent = "0 " + selectedCurrency(root);
+        if (formula) formula.textContent = "";
+        if (description) description.hidden = true;
+        return;
+      }
+      var monthly = convertPrice(choice.amount, choice.currency, selectedCurrency(root), options);
+      if (total) total.textContent = formatMoney(monthly * quantity * months, selectedCurrency(root)) + " " + selectedCurrency(root);
+      if (formula) formula.textContent = formatMoney(monthly, selectedCurrency(root)) + " " + selectedCurrency(root) + " × " + quantity + " × " + months + " мес.";
+      if (description) {
+        description.textContent = choice.description;
+        description.hidden = !choice.description;
+      }
+    }
+
+    function renderPlans() {
+      if (!planSelect) return;
+      var program = programSelect ? programSelect.value : "";
+      planSelect.replaceChildren();
+      catalog.forEach(function (choice, index) {
+        if (choice.program !== program) return;
+        planSelect.add(new Option(choice.label, String(index)));
+      });
+      planSelect.disabled = !planSelect.options.length;
+      renderSummary();
+    }
+
+    function openDialog() {
+      catalog = salesSubscriptionCatalog(root, options);
+      var programs = Array.from(new Set(catalog.map(function (choice) { return choice.program; }))).sort(function (a, b) {
+        return a.localeCompare(b, "ru");
+      });
+      if (programSelect) {
+        programSelect.replaceChildren();
+        programs.forEach(function (program) { programSelect.add(new Option(program, program)); });
+        programSelect.disabled = !programs.length;
+      }
+      if (quantityInput) quantityInput.value = "1";
+      if (monthsInput) monthsInput.value = "1";
+      if (empty) empty.hidden = !!catalog.length;
+      if (summary) summary.hidden = !catalog.length;
+      if (addButton) addButton.disabled = !catalog.length;
+      renderPlans();
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    }
+
+    function closeDialog() {
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+
+    openButton.addEventListener("click", openDialog);
+    programSelect?.addEventListener("change", renderPlans);
+    planSelect?.addEventListener("change", renderSummary);
+    quantityInput?.addEventListener("input", renderSummary);
+    monthsInput?.addEventListener("input", renderSummary);
+    dialog.querySelectorAll("[data-sales-subscription-close]").forEach(function (button) {
+      button.addEventListener("click", closeDialog);
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) closeDialog();
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var choice = selectedChoice();
+      if (!choice) return;
+      var quantity = Math.max(1, Math.floor(numberValue(quantityInput ? quantityInput.value : 1) || 1));
+      var months = Math.max(1, Math.floor(numberValue(monthsInput ? monthsInput.value : 1) || 1));
+      var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).find(function (row) {
+        return normalize(rowProductValue(row)) === normalize(choice.productName);
+      });
+      var combo = existingRow
+        ? existingRow.querySelector('[data-sales-combobox="product"]')
+        : firstAvailableCombo(root, "product", options);
+      if (!combo) return;
+      if (!existingRow) applyProductSelection(root, combo, options, choice.item);
+      var row = combo.closest(".sales-line-grid");
+      if (!row) return;
+      var monthly = convertPrice(choice.amount, choice.currency, selectedCurrency(root), options);
+      var quantityField = row.querySelector('input[name="line_quantity"]');
+      var priceField = row.querySelector('input[name="line_price"]');
+      var programField = row.querySelector('input[name="line_subscription_program"]');
+      var planField = row.querySelector('input[name="line_subscription_plan"]');
+      var monthsField = row.querySelector('input[name="line_subscription_months"]');
+      if (quantityField) quantityField.value = String(quantity);
+      if (priceField) priceField.value = formatMoney(monthly * months, selectedCurrency(root));
+      if (programField) programField.value = choice.program;
+      if (planField) planField.value = choice.planName;
+      if (monthsField) monthsField.value = String(months);
+      row.dataset.salesSubscriptionMonthly = String(choice.amount);
+      row.dataset.salesSubscriptionCurrency = choice.currency;
+      row.dataset.salesSubscriptionMonths = String(months);
+      row.dataset.salesBasePrice = String(choice.amount * months);
+      row.dataset.salesBaseCurrency = choice.currency;
+      var meta = row.querySelector("[data-sales-subscription-line-meta]");
+      if (meta) {
+        meta.textContent = choice.program + " · " + choice.planName + " · " + months + " мес.";
+        meta.hidden = false;
+      }
+      syncRowState(row);
+      updateTotal(root);
+      scheduleSalesDraft(root);
+      closeDialog();
+    });
+  }
+
   function init() {
     var root = document.querySelector(".sales-form");
     if (!root) return;
@@ -3176,6 +3403,7 @@
     syncInstallationSection(root);
     wireInstallationCalendar(root);
     wireInstallment(root);
+    wireSubscriptionDialog(root, options);
     hydratePaymentRows(root, parsePaymentLines(root));
     updatePaymentBreakdown(root);
     root.addEventListener("input", function () {

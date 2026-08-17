@@ -8132,6 +8132,21 @@ def create_app() -> FastAPI:
             "unit": str(row_data.get("unit") or "Штука"),
             "stocks": _product_stocks(row),
             "prices": row_data.get("prices") if isinstance(row_data.get("prices"), list) else [],
+            "subscription_modifiers": [
+                {
+                    "name": str(item.get("name") or "").strip(),
+                    "description": str(item.get("description") or "").strip(),
+                    "amount": str(item.get("amount") or "").strip(),
+                    "currency": str(item.get("currency") or "UZS").strip().upper(),
+                }
+                for item in (
+                    row_data.get("subscription_modifiers")
+                    if isinstance(row_data.get("subscription_modifiers"), list)
+                    else []
+                )
+                if isinstance(item, dict)
+                and (str(item.get("name") or "").strip() or str(item.get("amount") or "").strip())
+            ],
             "price_by_type": {},
         }
         for price_type in active_sales_price_types:
@@ -8151,7 +8166,10 @@ def create_app() -> FastAPI:
         warehouses = list(form.getlist("line_warehouse"))
         quantities = list(form.getlist("line_quantity"))
         prices = list(form.getlist("line_price"))
-        lines: list[dict[str, str]] = []
+        subscription_programs = list(form.getlist("line_subscription_program"))
+        subscription_plans = list(form.getlist("line_subscription_plan"))
+        subscription_months = list(form.getlist("line_subscription_months"))
+        lines: list[dict[str, Any]] = []
         total = Decimal("0")
         first_warehouse = str(form.get("warehouse") or "").strip()
         for idx in range(max(len(products), len(warehouses), len(quantities), len(prices), 1)):
@@ -8173,15 +8191,36 @@ def create_app() -> FastAPI:
             if not first_warehouse:
                 first_warehouse = warehouse
             total += line_total
-            lines.append(
-                {
-                    "product": product,
-                    "warehouse": warehouse,
-                    "quantity": _decimal_plain_text(quantity),
-                    "price": _decimal_plain_text(price),
-                    "total": (_decimal_plain_text(line_total) or "0"),
-                }
+            line = {
+                "product": product,
+                "warehouse": warehouse,
+                "quantity": _decimal_plain_text(quantity),
+                "price": _decimal_plain_text(price),
+                "total": (_decimal_plain_text(line_total) or "0"),
+            }
+            subscription_program = str(
+                subscription_programs[idx] if idx < len(subscription_programs) else ""
+            ).strip()
+            subscription_plan = str(
+                subscription_plans[idx] if idx < len(subscription_plans) else ""
+            ).strip()
+            months = max(
+                0,
+                int(
+                    _sales_decimal(
+                        subscription_months[idx] if idx < len(subscription_months) else ""
+                    )
+                ),
             )
+            if subscription_program or subscription_plan or months:
+                months = max(1, months)
+                line["subscription"] = {
+                    "program": subscription_program,
+                    "plan": subscription_plan,
+                    "months": months,
+                    "monthly_price": _decimal_plain_text(price / Decimal(months)),
+                }
+            lines.append(line)
         if not lines:
             raise ValueError("Добавьте хотя бы один товар или услугу")
         if total <= 0:

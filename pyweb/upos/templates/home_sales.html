@@ -1121,6 +1121,7 @@
                   </select>
                 </label>
                 <input type="hidden" name="price_type_name" data-sales-price-type-name />
+                <button type="button" class="btn btn-secondary btn-sm sales-add-subscription-btn" data-sales-subscription-open>+ Подписка</button>
                 <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
                 <button type="button" class="btn btn-secondary btn-sm sales-add-installment-btn" data-sales-installment-add>+ Рассрочка</button>
               </div>
@@ -1149,7 +1150,11 @@
                           <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
                         </div>
                         <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                        <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
                       </label>
+                      <input type="hidden" name="line_subscription_program" />
+                      <input type="hidden" name="line_subscription_plan" />
+                      <input type="hidden" name="line_subscription_months" />
                     </td>
                     <td>
                       <label class="sales-combobox sales-warehouse-picker" data-sales-combobox="warehouse">
@@ -1234,8 +1239,12 @@
                       <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить услугу" title="Сменить услугу" hidden>✎</button>
                     </div>
                     <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                    <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
                   </label>
                   <input type="hidden" name="line_warehouse" value="Услуги" />
+                  <input type="hidden" name="line_subscription_program" />
+                  <input type="hidden" name="line_subscription_plan" />
+                  <input type="hidden" name="line_subscription_months" />
                 </td>
                 <td class="sales-line-category" data-sales-line-category></td>
                 <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
@@ -1464,6 +1473,51 @@
               <button type="button" class="btn" data-sales-installment-save>Сохранить</button>
             </div>
           </div>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-subscription-dialog" data-sales-subscription-dialog>
+          <form class="settings-profile-modal-surface sales-subscription-dialog-surface" data-sales-subscription-form>
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Добавить подписку</h2>
+                <p class="settings-profile-modal-sub">Выберите программу, подписку, количество и срок.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-subscription-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-subscription-grid">
+                <label class="settings-profile-field sales-subscription-grid-wide">
+                  <span class="settings-profile-field-label">Программа</span>
+                  <select class="settings-profile-input" data-sales-subscription-program required></select>
+                </label>
+                <label class="settings-profile-field sales-subscription-grid-wide">
+                  <span class="settings-profile-field-label">Подписка</span>
+                  <select class="settings-profile-input" data-sales-subscription-plan required></select>
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Количество</span>
+                  <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-quantity required />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Месяцы</span>
+                  <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-months required />
+                </label>
+              </div>
+              <p class="sales-subscription-description" data-sales-subscription-description hidden></p>
+              <div class="sales-subscription-summary" data-sales-subscription-summary>
+                <span>Итого за период</span>
+                <strong data-sales-subscription-total>0 UZS</strong>
+                <small data-sales-subscription-formula></small>
+              </div>
+              <div class="sales-subscription-empty" data-sales-subscription-empty hidden>
+                В разделе «Товары» пока нет доступных подписок.
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-subscription-close>Отмена</button>
+              <button type="submit" class="btn" data-sales-subscription-add>Добавить</button>
+            </div>
+          </form>
         </dialog>
 
         <dialog class="settings-profile-modal sales-payment-dialog" data-sales-payment-dialog>
@@ -1852,7 +1906,7 @@
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=38" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=4" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=70" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=71" defer></script>
   {% if sales_embed %}
     <script>
       (() => {
