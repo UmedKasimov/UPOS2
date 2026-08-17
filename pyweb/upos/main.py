@@ -14518,6 +14518,13 @@ def create_app() -> FastAPI:
                         ),
                     }
                 )
+
+            def purchase_supplier_card(item: dict[str, Any]) -> dict[str, Any] | None:
+                supplier_card = warehouse_supplier_cards_by_id.get(str(item.get("counterparty_id") or ""))
+                if supplier_card is None:
+                    supplier_card = warehouse_supplier_cards_by_name.get(str(item.get("supplier") or "").strip().lower())
+                return supplier_card
+
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
             product_view_rows = [_product_data(row) for row in product_rows]
             product_names = [str(row.name) for row in product_rows]
@@ -14589,11 +14596,11 @@ def create_app() -> FastAPI:
             purchase_product_meta = _purchase_line_product_meta(session, wid)
             for row in purchase_rows:
                 item = _purchase_document_data(row, purchase_product_meta)
-                supplier_card = warehouse_supplier_cards_by_id.get(str(item.get("counterparty_id") or ""))
-                if supplier_card is None:
-                    supplier_card = warehouse_supplier_cards_by_name.get(str(item.get("supplier") or "").strip().lower())
+                supplier_card = purchase_supplier_card(item)
                 if supplier_card:
                     item["supplier_card"] = supplier_card
+                    item["supplier_balance"] = supplier_card["balance"]
+                    item["supplier_balance_kind"] = supplier_card["balance_kind"]
                     item["detail_json"]["supplier_card"] = supplier_card
                 if str(row.id) == str(edit_purchase or ""):
                     warehouse_purchase_edit = item

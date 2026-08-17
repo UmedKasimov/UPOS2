@@ -33161,6 +33161,23 @@ html.dark .crm-task-calendar-event {
   font-weight: 700;
 }
 
+.warehouse-purchase-supplier-balance-cell {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.warehouse-purchase-supplier-balance-cell[data-balance-kind="debt"],
+.warehouse-purchase-supplier-balance-cell[data-balance-kind="mixed"] {
+  color: #b45309;
+}
+
+.warehouse-purchase-supplier-balance-cell[data-balance-kind="advance"] {
+  color: #047857;
+}
+
 .warehouse-purchases-table .warehouse-purchase-paid-chip {
   display: inline-block;
   padding: 0.1rem 0.45rem;
