@@ -14183,11 +14183,11 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[purchases] failed to sync purchase %s with kassa", saved_purchase_id)
             return RedirectResponse(
-                url=f"{base_url}?msg=saved&purchase_number={quote(saved_purchase_number)}&cash_warning=1#purchases",
+                url=f"{base_url}?msg=saved&purchase_id={quote(saved_purchase_id)}&purchase_number={quote(saved_purchase_number)}&cash_warning=1#purchases",
                 status_code=302,
             )
         return RedirectResponse(
-            url=f"{base_url}?msg=saved&purchase_number={quote(saved_purchase_number)}#purchases",
+            url=f"{base_url}?msg=saved&purchase_id={quote(saved_purchase_id)}&purchase_number={quote(saved_purchase_number)}#purchases",
             status_code=302,
         )
 
@@ -14294,11 +14294,11 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[purchases] failed to resync purchase %s with kassa", purchase_id)
             return RedirectResponse(
-                url=f"{base_url}?msg=updated&purchase_number={quote(saved_purchase_number)}&cash_warning=1#purchases",
+                url=f"{base_url}?msg=updated&purchase_id={quote(purchase_id)}&purchase_number={quote(saved_purchase_number)}&cash_warning=1#purchases",
                 status_code=302,
             )
         return RedirectResponse(
-            url=f"{base_url}?msg=updated&purchase_number={quote(saved_purchase_number)}#purchases",
+            url=f"{base_url}?msg=updated&purchase_id={quote(purchase_id)}&purchase_number={quote(saved_purchase_number)}#purchases",
             status_code=302,
         )
 
@@ -14407,7 +14407,7 @@ def create_app() -> FastAPI:
             paid_amount = _sales_decimal(data.get("paid_amount"))
             debt_amount = amount - paid_amount
             if debt_amount <= 0:
-                return RedirectResponse(url=f"{base_url}?msg=paid#purchases", status_code=302)
+                return RedirectResponse(url=f"{base_url}?msg=paid&purchase_id={quote(purchase_id)}&purchase_number={quote(row.number)}#purchases", status_code=302)
             currency = str(row.currency or data.get("currency") or "UZS").strip().upper() or "UZS"
             raw_payment_lines = data.get("payment_lines") if isinstance(data.get("payment_lines"), list) else []
             payment_lines = [dict(item) for item in raw_payment_lines if isinstance(item, dict)]
@@ -14440,6 +14440,7 @@ def create_app() -> FastAPI:
             saved_purchase_number = row.number
         paid_redirect_url = (
             f"{base_url}?msg=paid"
+            f"&purchase_id={quote(purchase_id)}"
             f"&purchase_number={quote(saved_purchase_number)}"
             f"&paid_now={quote(_sales_money_label(payment_amount))}"
             f"&currency={quote(currency)}#purchases"

@@ -3482,6 +3482,81 @@
     document.body.append(overlay);
   }
 
+  function purchaseDoneDocument(purchaseId, number) {
+    const id = String(purchaseId || "").trim();
+    const byId = id ? document.getElementById(`warehouse-purchase-data-${id}`) : null;
+    const nodes = byId ? [byId] : Array.from(document.querySelectorAll('script[id^="warehouse-purchase-data-"]'));
+    for (const node of nodes) {
+      try {
+        const data = JSON.parse(node.textContent || "{}");
+        if (byId || String(data.number || "").trim() === String(number || "").trim()) return data;
+      } catch (error) {
+        // Ignore malformed embedded JSON and keep the success dialog usable.
+      }
+    }
+    return {};
+  }
+
+  function purchaseDoneBalanceText(doc) {
+    const card = doc && doc.supplier_card ? doc.supplier_card : {};
+    if (card.balance && card.balance !== "Нет долга") return card.balance;
+    const debt = String(doc?.debt_amount || "").trim();
+    if (debt && debt !== "0") return `Мы должны: ${debt} ${doc.currency || "UZS"}`;
+    return "Нет долга";
+  }
+
+  function renderPurchaseDoneSummary(dialog, doc) {
+    const node = dialog.querySelector("[data-purchase-done-summary]");
+    if (!node) return;
+    const lines = Array.isArray(doc?.lines) ? doc.lines.filter((line) => line && (line.product || line.total)) : [];
+    const currency = doc?.currency || "UZS";
+    const itemRows = lines
+      .map((line) => {
+        const quantity = quantityText(line.quantity || 0);
+        const price = moneyWithCurrency(line.price || 0, currency);
+        const total = moneyWithCurrency(line.total || 0, currency);
+        return `<tr>
+          <td>${escapeHtml(line.product || "-")}</td>
+          <td class="sale-done-num">${escapeHtml(quantity)}</td>
+          <td class="sale-done-num">${escapeHtml(price)}</td>
+          <td class="sale-done-num"><strong>${escapeHtml(total)}</strong></td>
+        </tr>`;
+      })
+      .join("");
+    const supplier = doc?.supplier || doc?.supplier_card?.name || "";
+    const balance = purchaseDoneBalanceText(doc || {});
+    const amount = doc?.amount ? `${doc.amount} ${currency}` : "";
+    const paid = doc?.paid_amount ? `${doc.paid_amount} ${currency}` : "";
+    const debt = doc?.debt_amount ? `${doc.debt_amount} ${currency}` : "";
+    node.innerHTML = `
+      <section class="sale-done-section sale-done-client">
+        <span>Поставщик</span>
+        <table class="sale-done-table">
+          <tbody>
+            <tr><th>У кого</th><td>${escapeHtml(supplier || "-")}</td></tr>
+            <tr><th>Баланс сейчас</th><td><strong>${escapeHtml(balance)}</strong></td></tr>
+          </tbody>
+        </table>
+      </section>
+      ${lines.length ? `<section class="sale-done-section">
+        <span>Закупили</span>
+        <table class="sale-done-table">
+          <thead><tr><th>Товар</th><th class="sale-done-num">К-во</th><th class="sale-done-num">Цена</th><th class="sale-done-num">Сумма</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+      </section>` : ""}
+      <section class="sale-done-section">
+        <span>Итог</span>
+        <table class="sale-done-table">
+          <tbody>
+            <tr><th>Сумма закупки</th><td class="sale-done-num"><strong>${escapeHtml(amount || "-")}</strong></td></tr>
+            <tr><th>Оплачено</th><td class="sale-done-num">${escapeHtml(paid || "-")}</td></tr>
+            <tr><th>Долг по закупке</th><td class="sale-done-num"><strong>${escapeHtml(debt || "-")}</strong></td></tr>
+          </tbody>
+        </table>
+      </section>`;
+  }
+
   function initPurchaseDoneDialog() {
     const dialog = document.querySelector("[data-purchase-done-dialog]");
     if (!dialog || dialog.dataset.purchaseDoneReady === "1") return;
@@ -3501,10 +3576,12 @@
       paid: "Оплата внесена",
     };
     if (!(message in titles)) return;
+    const purchaseId = String(params.get("purchase_id") || "").trim();
     const paidNow = String(params.get("paid_now") || "").trim();
     const currency = String(params.get("currency") || "").trim();
     const number = String(params.get("purchase_number") || "").trim();
     const cashWarning = params.get("cash_warning") === "1";
+    const doc = purchaseDoneDocument(purchaseId, number);
 
     const title = dialog.querySelector("[data-purchase-done-title]");
     const sum = dialog.querySelector("[data-purchase-done-sum]");
@@ -3517,12 +3594,14 @@
       metaParts.push(message === "paid" ? "Операция кассы не записалась" : "Операции кассы не записались");
     }
     if (meta) meta.textContent = metaParts.join(" · ");
+    renderPurchaseDoneSummary(dialog, doc);
 
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
 
     const url = new URL(window.location.href);
     url.searchParams.delete("msg");
+    url.searchParams.delete("purchase_id");
     url.searchParams.delete("purchase_number");
     url.searchParams.delete("paid_now");
     url.searchParams.delete("currency");
