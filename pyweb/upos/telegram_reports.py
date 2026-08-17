@@ -176,6 +176,16 @@ def _organization_title(workspace_owner_id: str, tx: dict[str, Any]) -> str:
     return workspace_display_name(workspace_owner_id)
 
 
+def _org_label(workspace_owner_id: str) -> str:
+    wid = (workspace_owner_id or "").strip()
+    if wid:
+        with session_scope() as session:
+            org = session.get(Organization, wid)
+            if org and (org.name or "").strip():
+                return org.name.strip()
+    return workspace_display_name(workspace_owner_id)
+
+
 def _transaction_actor_name(tx: dict[str, Any]) -> str:
     data = tx.get("data") if isinstance(tx.get("data"), dict) else {}
     raw = (

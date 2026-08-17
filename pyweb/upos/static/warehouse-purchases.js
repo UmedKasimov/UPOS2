@@ -2651,6 +2651,13 @@
     );
   }
 
+  function supplierStatusLabel(value) {
+    const clean = String(value || "").trim().toLowerCase();
+    if (clean === "active") return "Активный";
+    if (clean === "inactive") return "Неактивный";
+    return value || "-";
+  }
+
   function supplierCardInfo(supplier) {
     const rows = [
       ["Телефон", supplier.phone || "-"],
@@ -2658,7 +2665,7 @@
       ["ИНН", supplier.inn || supplier.tax_id || "-"],
       ["Категория", supplier.category || "-"],
       ["Последняя закупка", supplier.last_date || "-"],
-      ["Статус", supplier.status || "-"],
+      ["Статус", supplierStatusLabel(supplier.status)],
       ["Адрес", supplier.address || "-"],
     ];
     return (
