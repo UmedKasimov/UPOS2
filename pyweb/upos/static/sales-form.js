@@ -1187,7 +1187,12 @@
     var cleanKind = rowKind(row);
     var comboType = cleanKind === "service" || cleanKind === "subscription" ? cleanKind : "product";
     var combo = row.querySelector('[data-sales-combobox="' + comboType + '"]');
-    if (combo) commitCombo(combo, line.product || "");
+    var displayProduct = String(line.product || "").trim();
+    var draftPlan = String(line.subscriptionPlan || "").trim();
+    if (cleanKind === "subscription" && displayProduct && draftPlan && normalize(displayProduct).indexOf(normalize(draftPlan)) === -1) {
+      displayProduct += " · " + draftPlan;
+    }
+    if (combo) commitCombo(combo, displayProduct);
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     if (warehouse && line.warehouse !== undefined) warehouse.value = line.warehouse || warehouse.value || "";
     var quantity = row.querySelector('input[name="line_quantity"]');
