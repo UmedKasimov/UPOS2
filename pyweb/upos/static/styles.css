@@ -6703,6 +6703,10 @@ a.messenger-message-attachment:focus-visible {
   will-change: transform;
 }
 
+.crm-kanban-card[hidden] {
+  display: none;
+}
+
 .crm-card-activity {
   position: absolute;
   top: 0;
