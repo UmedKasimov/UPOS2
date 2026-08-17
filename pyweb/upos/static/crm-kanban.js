@@ -2067,6 +2067,13 @@
     const dayDialogSubtitle = dayDialog?.querySelector("[data-crm-task-day-subtitle]");
     const dayDialogList = dayDialog?.querySelector("[data-crm-task-day-list]");
     const dayDialogAdd = dayDialog?.querySelector("[data-crm-task-day-add]");
+    const taskInfoDialog = document.querySelector("#crm-task-info-dialog");
+    const taskInfoTitle = taskInfoDialog?.querySelector("[data-crm-task-info-title]");
+    const taskInfoSubtitle = taskInfoDialog?.querySelector("[data-crm-task-info-subtitle]");
+    const taskInfoChecklistWrap = taskInfoDialog?.querySelector("[data-crm-task-info-checklist-wrap]");
+    const taskInfoChecklist = taskInfoDialog?.querySelector("[data-crm-task-info-checklist]");
+    const taskInfoEdit = taskInfoDialog?.querySelector("[data-crm-task-info-edit]");
+    let activeTaskRow = null;
     let currentView = "list";
     let calendarMonth = new Date();
     calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
@@ -2107,6 +2114,69 @@
 
     const openTask = (row) => {
       row.querySelector("[data-crm-edit]")?.click();
+    };
+
+    const taskEditPayload = (row) => {
+      try {
+        return JSON.parse(row.querySelector("[data-crm-edit]")?.getAttribute("data-crm-edit") || "{}");
+      } catch {
+        return {};
+      }
+    };
+
+    const closeTaskInfoDialog = () => {
+      if (!taskInfoDialog) return;
+      if (taskInfoDialog.open && typeof taskInfoDialog.close === "function") {
+        taskInfoDialog.close();
+      } else {
+        taskInfoDialog.removeAttribute("open");
+      }
+    };
+
+    const openTaskInfoDialog = (row) => {
+      if (!taskInfoDialog || !row) return;
+      activeTaskRow = row;
+      const payload = taskEditPayload(row);
+      if (taskInfoTitle) taskInfoTitle.textContent = row.dataset.taskTitle || payload.title || "Задача";
+      if (taskInfoSubtitle) {
+        taskInfoSubtitle.textContent = [row.dataset.taskClient, row.dataset.taskResponsible]
+          .filter(Boolean)
+          .join(" · ") || "Информация о задаче";
+      }
+      const values = {
+        client: row.dataset.taskClient || payload.client,
+        order: row.dataset.taskOrder ? `№ ${row.dataset.taskOrder}` : "",
+        responsible: row.dataset.taskResponsible || payload.responsible,
+        taskType: payload.task_type,
+        priority: row.querySelector(".crm-task-priority")?.textContent?.trim() || payload.priority,
+        status: row.querySelector(".crm-task-state")?.textContent?.trim() || payload.status,
+        date: payload.date,
+        dueDate: row.dataset.taskDueDate || payload.due_date,
+        nextStep: payload.next_step,
+        note: payload.note,
+      };
+      Object.entries(values).forEach(([name, value]) => {
+        const field = taskInfoDialog.querySelector(`[data-crm-task-info-field="${name}"]`);
+        if (field) field.textContent = String(value || "—");
+      });
+      const checklist = String(payload.checklist || "")
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (taskInfoChecklist && taskInfoChecklistWrap) {
+        taskInfoChecklist.replaceChildren();
+        checklist.forEach((text) => {
+          const item = document.createElement("li");
+          item.textContent = text;
+          taskInfoChecklist.append(item);
+        });
+        taskInfoChecklistWrap.hidden = checklist.length === 0;
+      }
+      if (typeof taskInfoDialog.showModal === "function") {
+        taskInfoDialog.showModal();
+      } else {
+        taskInfoDialog.setAttribute("open", "");
+      }
     };
 
     const closeDayDialog = () => {
@@ -2161,8 +2231,7 @@
           state.textContent = row.querySelector(".crm-task-state")?.textContent?.trim() || "Открыта";
           item.append(main, state);
           item.addEventListener("click", () => {
-            closeDayDialog();
-            openTask(row);
+            openTaskInfoDialog(row);
           });
           dayDialogList.append(item);
         });
@@ -2309,6 +2378,18 @@
       const dueDate = String(dayDialogAdd.dataset.dueDate || isoDate(new Date()));
       closeDayDialog();
       document.dispatchEvent(new CustomEvent("crm:create-task", { detail: { dueDate } }));
+    });
+    taskInfoDialog?.querySelectorAll("[data-crm-task-info-close]").forEach((button) => {
+      button.addEventListener("click", closeTaskInfoDialog);
+    });
+    taskInfoDialog?.addEventListener("click", (event) => {
+      if (event.target === taskInfoDialog) closeTaskInfoDialog();
+    });
+    taskInfoEdit?.addEventListener("click", () => {
+      const row = activeTaskRow;
+      closeTaskInfoDialog();
+      closeDayDialog();
+      if (row) openTask(row);
     });
 
     setView("list");

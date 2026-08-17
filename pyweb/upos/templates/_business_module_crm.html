@@ -605,6 +605,40 @@
   </div>
 </dialog>
 
+<dialog class="settings-profile-modal crm-task-info-dialog" id="crm-task-info-dialog" aria-labelledby="crm-task-info-dialog-title">
+  <div class="settings-profile-modal-surface crm-task-info-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div>
+        <h2 id="crm-task-info-dialog-title" class="settings-profile-modal-title" data-crm-task-info-title>Задача</h2>
+        <p class="settings-profile-modal-sub" data-crm-task-info-subtitle>Информация о задаче</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-task-info-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-scroll crm-task-info-body">
+      <dl class="crm-task-info-grid">
+        <div><dt>Клиент</dt><dd data-crm-task-info-field="client">—</dd></div>
+        <div><dt>Заказ</dt><dd data-crm-task-info-field="order">—</dd></div>
+        <div><dt>Ответственный</dt><dd data-crm-task-info-field="responsible">—</dd></div>
+        <div><dt>Тип задачи</dt><dd data-crm-task-info-field="taskType">—</dd></div>
+        <div><dt>Приоритет</dt><dd data-crm-task-info-field="priority">—</dd></div>
+        <div><dt>Статус</dt><dd data-crm-task-info-field="status">—</dd></div>
+        <div><dt>Дата</dt><dd data-crm-task-info-field="date">—</dd></div>
+        <div><dt>Срок</dt><dd data-crm-task-info-field="dueDate">—</dd></div>
+        <div class="wide"><dt>Следующий шаг</dt><dd data-crm-task-info-field="nextStep">—</dd></div>
+        <div class="wide"><dt>Комментарий</dt><dd data-crm-task-info-field="note">—</dd></div>
+      </dl>
+      <section class="crm-task-info-checklist" data-crm-task-info-checklist-wrap hidden>
+        <h3>Чеклист</h3>
+        <ul data-crm-task-info-checklist></ul>
+      </section>
+    </div>
+    <footer class="crm-task-info-actions">
+      <button class="btn btn-secondary" type="button" data-crm-task-info-close>Закрыть</button>
+      <button class="btn" type="button" data-crm-task-info-edit>Редактировать</button>
+    </footer>
+  </div>
+</dialog>
+
 <dialog class="settings-profile-modal crm-client-create-dialog" id="crm-client-create-dialog" aria-labelledby="crm-client-create-dialog-title">
   <form class="settings-profile-modal-surface sales-client-create-surface" data-crm-client-create-form>
     {% include "_csrf_field.html" %}
