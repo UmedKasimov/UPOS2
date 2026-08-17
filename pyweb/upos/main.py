@@ -3755,6 +3755,33 @@ def create_app() -> FastAPI:
             next_number = max(next_number, int(sku) + 1)
         return str(next_number)
 
+    def _ean13_check_digit(payload: str) -> str:
+        digits = [int(char) for char in payload]
+        checksum = sum(digits[::2]) + sum(digit * 3 for digit in digits[1::2])
+        return str((10 - checksum % 10) % 10)
+
+    def _product_auto_barcode(session: Any, workspace_owner_id: str, *, product_id: str = "") -> str:
+        used_barcodes: set[str] = set()
+        next_serial = 1
+        rows = session.execute(
+            select(Product.id, Product.barcode).where(Product.workspace_owner_id == workspace_owner_id)
+        ).all()
+        for row_id, raw_barcode in rows:
+            if product_id and str(row_id) == str(product_id):
+                continue
+            barcode = re.sub(r"[\s-]+", "", str(raw_barcode or ""))
+            if not barcode:
+                continue
+            used_barcodes.add(barcode.casefold())
+            if re.fullmatch(r"200\d{10}", barcode):
+                next_serial = max(next_serial, int(barcode[3:12]) + 1)
+        for serial in range(next_serial, 1_000_000_000):
+            payload = f"200{serial:09d}"
+            barcode = f"{payload}{_ean13_check_digit(payload)}"
+            if barcode.casefold() not in used_barcodes:
+                return barcode
+        raise ValueError("Не удалось сгенерировать свободный штрихкод")
+
     def _product_duplicate_message(match: tuple[Product, str]) -> str:
         row, field = match
         field_label = {
@@ -6414,6 +6441,12 @@ def create_app() -> FastAPI:
                     "stocks": stocks,
                     "purchase_history": purchase_history,
                 }
+                if imported_kind in {"service", "subscription"}:
+                    barcode = ""
+                    data["barcode_type"] = ""
+                elif not barcode:
+                    barcode = _product_auto_barcode(session, wid, product_id=product_id)
+                    data["barcode_type"] = "EAN13"
 
                 if row is None:
                     next_id = product_id or str(uuid.uuid4())
@@ -6875,6 +6908,9 @@ def create_app() -> FastAPI:
             if not sku:
                 sku = _next_product_sku(session, wid, product_id=product_id)
                 data["sku"] = sku
+            if clean_kind not in {"service", "subscription"} and not barcode:
+                barcode = _product_auto_barcode(session, wid, product_id=product_id)
+                data["barcode_type"] = "EAN13"
             row = session.get(Product, product_id) if product_id else None
             if row and row.workspace_owner_id != wid:
                 return RedirectResponse(url="/products?error=" + quote("Товар не найден"), status_code=302)
@@ -11157,6 +11193,12 @@ def create_app() -> FastAPI:
             if not sku:
                 sku = _next_product_sku(session, wid)
                 data["sku"] = sku
+            if kind == "service":
+                barcode = ""
+                data["barcode_type"] = ""
+            elif not barcode:
+                barcode = _product_auto_barcode(session, wid)
+                data["barcode_type"] = "EAN13"
             normalized_duplicate = _product_duplicate(session, wid, name=name, sku=sku, barcode=barcode)
             if normalized_duplicate:
                 return JSONResponse(
