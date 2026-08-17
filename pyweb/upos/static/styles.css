@@ -10309,6 +10309,89 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   font-weight: 700;
 }
 
+.products-subscription-modifiers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.products-subscription-modifier-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.products-subscription-modifier-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.4fr) minmax(8rem, 0.8fr) minmax(7rem, 0.65fr) 2.35rem;
+  gap: 0;
+  align-items: stretch;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 16%, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  overflow: hidden;
+  background: var(--card);
+}
+
+.products-subscription-modifier-row label {
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 12%, var(--border));
+  border-radius: 0;
+  background: color-mix(in srgb, var(--card), white 6%);
+}
+
+.products-subscription-modifier-row label > span {
+  min-height: 1.65rem;
+}
+
+.products-subscription-modifier-row input,
+.products-subscription-modifier-row select {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 10%, var(--border));
+  border-radius: 0;
+  min-height: 2.35rem;
+}
+
+.products-subscription-modifier-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  min-width: 2.35rem;
+  border: 0;
+  background: color-mix(in srgb, var(--danger, #dc2626) 8%, var(--card));
+  color: var(--danger, #dc2626);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.products-subscription-modifier-remove:hover,
+.products-subscription-modifier-remove:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--danger, #dc2626) 15%, var(--card));
+}
+
+@media (max-width: 760px) {
+  .products-subscription-modifiers-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .products-subscription-modifier-row {
+    grid-template-columns: 1fr;
+  }
+
+  .products-subscription-modifier-row label {
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 12%, var(--border));
+  }
+
+  .products-subscription-modifier-remove {
+    width: 100%;
+  }
+}
+
 .products-inline-add-btn {
   display: inline-flex;
   align-items: center;

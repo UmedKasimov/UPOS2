@@ -4650,6 +4650,43 @@ def create_app() -> FastAPI:
         stocks = data.get("stocks") if isinstance(data.get("stocks"), list) else []
         purchase_history = data.get("purchase_history") if isinstance(data.get("purchase_history"), list) else []
         raw_variations = data.get("variations") if isinstance(data.get("variations"), list) else []
+        raw_subscription_modifiers = (
+            data.get("subscription_modifiers")
+            if isinstance(data.get("subscription_modifiers"), list)
+            else []
+        )
+        subscription_modifiers: list[dict[str, str]] = []
+        for item in raw_subscription_modifiers:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            description = str(item.get("description") or "").strip()
+            amount = str(item.get("amount") or "").strip()
+            currency = str(item.get("currency") or "UZS").strip().upper()
+            if currency not in {"UZS", "USD"}:
+                currency = "UZS"
+            if name or description or amount:
+                subscription_modifiers.append(
+                    {
+                        "name": name,
+                        "description": description,
+                        "amount": amount,
+                        "currency": currency,
+                    }
+                )
+        if not subscription_modifiers and str(data.get("kind") or "") == "subscription" and prices:
+            for price in prices:
+                if not isinstance(price, dict) or not str(price.get("price") or "").strip():
+                    continue
+                subscription_modifiers.append(
+                    {
+                        "name": str(price.get("name") or "Подписка").strip(),
+                        "description": "",
+                        "amount": str(price.get("price") or "").strip(),
+                        "currency": str(price.get("currency") or "UZS").strip().upper(),
+                    }
+                )
+                break
         variations: list[dict[str, Any]] = []
         for item in raw_variations:
             if not isinstance(item, dict):
@@ -4717,6 +4754,7 @@ def create_app() -> FastAPI:
             "owner": str(data.get("owner") or ""),
             "photo_url": str(data.get("photo_url") or ""),
             "prices": prices,
+            "subscription_modifiers": subscription_modifiers,
             "stocks": stocks,
             "purchase_history": purchase_history,
             "purchase_history_json": json.dumps(purchase_history, ensure_ascii=False, indent=2) if purchase_history else "",
@@ -4814,6 +4852,40 @@ def create_app() -> FastAPI:
             if attribute or values:
                 variations.append({"attribute": attribute, "values": values})
 
+        subscription_modifiers: list[dict[str, str]] = []
+        modifier_names = list(form.getlist("subscription_modifier_name"))
+        modifier_descriptions = list(form.getlist("subscription_modifier_description"))
+        modifier_amounts = list(form.getlist("subscription_modifier_amount"))
+        modifier_currencies = list(form.getlist("subscription_modifier_currency"))
+        for idx in range(
+            max(
+                len(modifier_names),
+                len(modifier_descriptions),
+                len(modifier_amounts),
+                len(modifier_currencies),
+                0,
+            )
+        ):
+            modifier_name = str(modifier_names[idx] if idx < len(modifier_names) else "").strip()
+            modifier_description = str(modifier_descriptions[idx] if idx < len(modifier_descriptions) else "").strip()
+            modifier_amount = _decimal_plain_text(
+                _sales_decimal(modifier_amounts[idx] if idx < len(modifier_amounts) else "")
+            )
+            modifier_currency = str(
+                modifier_currencies[idx] if idx < len(modifier_currencies) else "UZS"
+            ).strip().upper()
+            if modifier_currency not in {"UZS", "USD"}:
+                modifier_currency = "UZS"
+            if modifier_name or modifier_description or modifier_amount:
+                subscription_modifiers.append(
+                    {
+                        "name": modifier_name,
+                        "description": modifier_description,
+                        "amount": modifier_amount,
+                        "currency": modifier_currency,
+                    }
+                )
+
         data = {
             "kind": val("kind", "product"),
             "category": val("category"),
@@ -4832,6 +4904,7 @@ def create_app() -> FastAPI:
             "owner": val("owner"),
             "photo_url": val("photo_url"),
             "prices": prices,
+            "subscription_modifiers": subscription_modifiers,
             "stocks": stocks,
             "purchase_history": purchase_history,
             "variations": variations,
@@ -6709,6 +6782,26 @@ def create_app() -> FastAPI:
             data["unit"] = data.get("unit") or ("Подписка" if clean_kind == "subscription" else "Услуга")
             if clean_kind == "subscription":
                 data["brand"] = ""
+                modifier_prices: list[dict[str, str]] = []
+                for modifier in data.get("subscription_modifiers", []):
+                    if not isinstance(modifier, dict):
+                        continue
+                    amount = _decimal_plain_text(_sales_decimal(modifier.get("amount")))
+                    if not amount:
+                        continue
+                    currency = str(modifier.get("currency") or "UZS").strip().upper()
+                    if currency not in {"UZS", "USD"}:
+                        currency = "UZS"
+                    modifier["amount"] = amount
+                    modifier["currency"] = currency
+                    modifier_prices.append(
+                        {
+                            "name": str(modifier.get("name") or "Подписка").strip() or "Подписка",
+                            "price": amount,
+                            "currency": currency,
+                        }
+                    )
+                data["prices"] = modifier_prices
         try:
             uploaded_photo = await _prepare_product_photo_upload(form.get("photo_file"))
         except ValueError as exc:
@@ -6726,6 +6819,15 @@ def create_app() -> FastAPI:
                 missing_fields.append("фото")
             if str(data.get("kind") or "product") == "service":
                 sale_price_raw = str(form.get("service_sale_price") or "").strip()
+            elif str(data.get("kind") or "product") == "subscription":
+                sale_price_raw = next(
+                    (
+                        str(item.get("amount") or "").strip()
+                        for item in data.get("subscription_modifiers", [])
+                        if isinstance(item, dict) and str(item.get("amount") or "").strip()
+                    ),
+                    "",
+                )
             else:
                 sale_price_raw = next(
                     (
@@ -6736,7 +6838,9 @@ def create_app() -> FastAPI:
                     "",
                 )
             if _sales_decimal(sale_price_raw) <= 0:
-                missing_fields.append("продажная цена")
+                missing_fields.append(
+                    "модификатор подписки" if str(data.get("kind") or "product") == "subscription" else "продажная цена"
+                )
             if missing_fields:
                 return RedirectResponse(
                     url="/products?error=" + quote("Заполните обязательные поля: " + ", ".join(missing_fields)) + "#product-form",

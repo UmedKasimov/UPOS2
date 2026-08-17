@@ -3,6 +3,7 @@
 
 {% set current = edit_product or {} %}
 {% set prices = current.prices if current and current.prices else [{"name": "Продажная цена", "price": "", "currency": "UZS"}] %}
+{% set subscription_modifiers = current.subscription_modifiers if current and current.subscription_modifiers else [{"name": "", "description": "", "amount": "", "currency": "UZS"}] %}
 {% set stocks = current.stocks if current and current.stocks else [{"warehouse": "Основной склад", "quantity": "", "price": "", "date": ""}] %}
 {% set purchase_history = current.purchase_history if current and current.purchase_history else [{"date": "", "warehouse": "Основной склад", "quantity": "", "price": "", "supplier": ""}] %}
 {% set variations = current.variations if current and current.variations else [{"attribute": "Размер", "values": []}, {"attribute": "Цвет", "values": []}] %}
@@ -756,7 +757,7 @@
             </div>
           </section>
 
-          <section class="product-form-section product-form-section--primary" data-product-price-extra {% if (current.kind or product_filters.kind) == 'service' %}hidden{% endif %}>
+          <section class="product-form-section product-form-section--primary" data-product-price-extra {% if (current.kind or product_filters.kind) in ['service', 'subscription'] %}hidden{% endif %}>
             <div class="product-form-section-head">
               <h3>Продажная цена</h3>
             </div>
@@ -771,6 +772,45 @@
                 </select>
               </label>
             </div>
+          </section>
+
+          <section class="product-form-section product-form-section--primary products-subscription-modifiers" data-subscription-modifiers {% if (current.kind or product_filters.kind) != 'subscription' %}hidden{% endif %}>
+            <div class="product-form-section-head products-subscription-modifiers-head">
+              <h3>Модификаторы подписки</h3>
+              <button class="btn btn-secondary btn-sm" type="button" data-subscription-modifier-add>+ Модификатор</button>
+            </div>
+            <div class="products-subscription-modifier-list" data-subscription-modifier-list>
+              {% for modifier in subscription_modifiers %}
+                <div class="products-subscription-modifier-row" data-subscription-modifier-row>
+                  <label><span>Название*</span><input name="subscription_modifier_name" value="{{ modifier.name or '' }}" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
+                  <label class="wide"><span>Описание</span><input name="subscription_modifier_description" value="{{ modifier.description or '' }}" placeholder="Что входит в подписку" /></label>
+                  <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" value="{{ modifier.amount or '' }}" placeholder="0" data-subscription-modifier-required /></label>
+                  <label>
+                    <span>Валюта</span>
+                    <select name="subscription_modifier_currency">
+                      <option value="UZS" {% if (modifier.currency or 'UZS') == 'UZS' %}selected{% endif %}>UZS</option>
+                      <option value="USD" {% if modifier.currency == 'USD' %}selected{% endif %}>USD</option>
+                    </select>
+                  </label>
+                  <button type="button" class="products-subscription-modifier-remove" data-subscription-modifier-remove aria-label="Удалить модификатор" title="Удалить модификатор">×</button>
+                </div>
+              {% endfor %}
+            </div>
+            <template data-subscription-modifier-template>
+              <div class="products-subscription-modifier-row" data-subscription-modifier-row>
+                <label><span>Название*</span><input name="subscription_modifier_name" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
+                <label class="wide"><span>Описание</span><input name="subscription_modifier_description" placeholder="Что входит в подписку" /></label>
+                <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" placeholder="0" data-subscription-modifier-required /></label>
+                <label>
+                  <span>Валюта</span>
+                  <select name="subscription_modifier_currency">
+                    <option value="UZS" selected>UZS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+                <button type="button" class="products-subscription-modifier-remove" data-subscription-modifier-remove aria-label="Удалить модификатор" title="Удалить модификатор">×</button>
+              </div>
+            </template>
           </section>
 
           <section class="product-form-section product-form-section--primary" data-service-extra {% if current.kind != 'service' %}hidden{% endif %}>
@@ -795,6 +835,10 @@
               var form = document.currentScript.closest('form');
               var section = form && form.querySelector('[data-service-extra]');
               var productPriceSection = form && form.querySelector('[data-product-price-extra]');
+              var subscriptionSection = form && form.querySelector('[data-subscription-modifiers]');
+              var subscriptionList = form && form.querySelector('[data-subscription-modifier-list]');
+              var subscriptionTemplate = form && form.querySelector('[data-subscription-modifier-template]');
+              var subscriptionAdd = form && form.querySelector('[data-subscription-modifier-add]');
               var productId = form && form.querySelector('input[name="product_id"]');
               var categoryLabel = form && form.querySelector('[data-product-category-label]');
               var categorySelect = form && form.querySelector('[data-product-dictionary-select="category"]');
@@ -803,6 +847,34 @@
               var brandSelect = form && form.querySelector('[data-product-dictionary-select="brand"]');
               var barcodeSection = form && form.querySelector('[data-product-barcode-section]');
               if (!form || !section) return;
+              var updateSubscriptionRows = function () {
+                if (!subscriptionList) return;
+                var rows = Array.prototype.slice.call(subscriptionList.querySelectorAll('[data-subscription-modifier-row]'));
+                rows.forEach(function (row) {
+                  var remove = row.querySelector('[data-subscription-modifier-remove]');
+                  if (remove) remove.hidden = rows.length <= 1;
+                });
+              };
+              var addSubscriptionModifier = function () {
+                if (!subscriptionList || !subscriptionTemplate) return null;
+                var node = subscriptionTemplate.content.firstElementChild.cloneNode(true);
+                subscriptionList.appendChild(node);
+                updateSubscriptionRows();
+                return node;
+              };
+              subscriptionAdd?.addEventListener('click', function () {
+                var row = addSubscriptionModifier();
+                row?.querySelector('input')?.focus();
+              });
+              subscriptionList?.addEventListener('click', function (event) {
+                var button = event.target.closest('[data-subscription-modifier-remove]');
+                if (!button) return;
+                var row = button.closest('[data-subscription-modifier-row]');
+                var rows = subscriptionList.querySelectorAll('[data-subscription-modifier-row]');
+                if (row && rows.length > 1) row.remove();
+                updateSubscriptionRows();
+              });
+              updateSubscriptionRows();
               var sync = function () {
                 var service = form.querySelector('input[name="kind"][value="service"]');
                 var subscription = form.querySelector('input[name="kind"][value="subscription"]');
@@ -813,16 +885,29 @@
                 section.hidden = !isService;
                 section.style.display = isService ? '' : 'none';
                 if (productPriceSection) {
-                  productPriceSection.hidden = isService;
-                  productPriceSection.style.display = isService ? 'none' : '';
+                  productPriceSection.hidden = isService || isSubscription;
+                  productPriceSection.style.display = (isService || isSubscription) ? 'none' : '';
                 }
                 form.querySelectorAll('[data-product-price-input]').forEach(function (input) {
-                  input.disabled = isService;
-                  if (input.name === 'price_value') input.required = !isService && isCreate;
+                  input.disabled = isService || isSubscription;
+                  if (input.name === 'price_value') input.required = !isService && !isSubscription && isCreate;
                 });
                 form.querySelectorAll('[data-service-price-input]').forEach(function (input) {
                   input.disabled = !isService;
                   if (input.name === 'service_sale_price') input.required = isService && isCreate;
+                });
+                if (subscriptionSection) {
+                  subscriptionSection.hidden = !isSubscription;
+                  subscriptionSection.style.display = isSubscription ? '' : 'none';
+                  if (isSubscription && subscriptionList && !subscriptionList.querySelector('[data-subscription-modifier-row]')) {
+                    addSubscriptionModifier();
+                  }
+                }
+                form.querySelectorAll('[data-subscription-modifiers] input, [data-subscription-modifiers] select').forEach(function (input) {
+                  input.disabled = !isSubscription;
+                });
+                form.querySelectorAll('[data-subscription-modifier-required]').forEach(function (input) {
+                  input.required = isSubscription && isCreate;
                 });
                 if (categoryLabel) categoryLabel.textContent = isSubscription ? 'Программа*' : 'Категория*';
                 if (categorySelect && categorySelect.options.length) {
