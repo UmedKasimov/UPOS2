@@ -2700,7 +2700,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 }
 
 #report-sales-cost .reports-sales-cost-tools .reports-balance-total b {
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   line-height: 1.1;
 }
 
