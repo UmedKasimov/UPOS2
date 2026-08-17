@@ -3323,7 +3323,7 @@
           if (description) description.hidden = true;
           return;
         }
-        var monthly = convertPrice(choice.amount, choice.currency, currency, options);
+        var monthly = roundCurrency(convertPrice(choice.amount, choice.currency, currency, options), currency);
         grandTotal += monthly * quantity * months;
         selectedCount += 1;
         if (description) {
@@ -3386,6 +3386,11 @@
     }
 
     function openDialog() {
+      monthsInput = dialog.querySelector("[data-sales-subscription-months]");
+      discountInput = dialog.querySelector("[data-sales-subscription-discount]");
+      discountUnit = dialog.querySelector("[data-sales-subscription-discount-unit]");
+      discountPanel = dialog.querySelector("[data-sales-subscription-discount-panel]");
+      discountToggle = dialog.querySelector("[data-sales-subscription-discount-toggle]");
       catalog = salesSubscriptionCatalog(root, options);
       var programs = Array.from(new Set(catalog.map(function (choice) { return choice.program; }))).sort(function (a, b) {
         return a.localeCompare(b, "ru");
@@ -3432,11 +3437,14 @@
       }
       renderSummary();
     });
-    discountToggle?.addEventListener("click", function () {
-      if (!discountPanel) return;
-      discountPanel.hidden = !discountPanel.hidden;
-      discountToggle.setAttribute("aria-expanded", discountPanel.hidden ? "false" : "true");
-      if (!discountPanel.hidden) discountInput?.focus();
+    form.addEventListener("click", function (event) {
+      var toggle = event.target.closest("[data-sales-subscription-discount-toggle]");
+      if (!toggle) return;
+      var panel = form.querySelector("[data-sales-subscription-discount-panel]");
+      if (!panel) return;
+      panel.hidden = !panel.hidden;
+      toggle.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+      if (!panel.hidden) form.querySelector("[data-sales-subscription-discount]")?.focus();
     });
     addRowButton?.addEventListener("click", function () {
       var line = addSubscriptionLine();
@@ -3478,7 +3486,7 @@
       var currency = selectedCurrency(root);
       var grossTotal = 0;
       selections.forEach(function (selection) {
-        selection.monthly = convertPrice(selection.choice.amount, selection.choice.currency, currency, options);
+        selection.monthly = roundCurrency(convertPrice(selection.choice.amount, selection.choice.currency, currency, options), currency);
         selection.gross = selection.monthly * selection.quantity * selection.months;
         grossTotal += selection.gross;
       });
