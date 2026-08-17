@@ -11882,13 +11882,39 @@ def create_app() -> FastAPI:
                         status_code=302,
                     )
                 if status == "archived" and doc_type in {"sale", "order"}:
-                    amount = _sales_decimal(row.amount)
-                    paid_amount = _sales_decimal(data.get("paid_amount"))
-                    outstanding_amount = max(Decimal("0"), amount - paid_amount)
-                    if outstanding_amount > 0:
+                    client_name = str(data.get("client") or "").strip()
+                    counterparty_id = str(row.counterparty_id or data.get("counterparty_id") or "").strip()
+                    client_debt_total = Decimal("0")
+                    client_docs = session.execute(
+                        select(SaleDocument).where(SaleDocument.workspace_owner_id == wid)
+                    ).scalars()
+                    for client_doc in client_docs:
+                        client_data = _json_object(client_doc.data)
+                        client_doc_type = str(client_data.get("doc_type") or "sale").strip()
+                        if client_doc_type not in {"sale", "order"}:
+                            continue
+                        candidate_counterparty_id = str(
+                            client_doc.counterparty_id or client_data.get("counterparty_id") or ""
+                        ).strip()
+                        candidate_client_name = str(client_data.get("client") or "").strip()
+                        same_client = (
+                            bool(counterparty_id and candidate_counterparty_id == counterparty_id)
+                            or bool(
+                                not counterparty_id
+                                and client_name
+                                and candidate_client_name.casefold() == client_name.casefold()
+                            )
+                        )
+                        if not same_client:
+                            continue
+                        client_debt_total += max(
+                            Decimal("0"),
+                            _sales_decimal(client_doc.amount) - _sales_decimal(client_data.get("paid_amount")),
+                        )
+                    if client_debt_total > 0:
                         return RedirectResponse(
                             url=sales_status_error_url(
-                                "Нельзя архивировать продажу с долгом клиента. Сначала закройте оплату."
+                                "Нельзя архивировать: у клиента есть долг. Сначала закройте оплату."
                             ),
                             status_code=302,
                         )
