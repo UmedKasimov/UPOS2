@@ -91,10 +91,29 @@
           <span>Категория</span>
           <input name="category" list="client-category-list" value="{{ client_filters.category }}" placeholder="Категория" />
         </label>
-        <label>
+        <div class="client-program-picker clients-filter-program-picker">
           <span>Программа</span>
-          <input name="program" list="client-program-list" value="{{ client_filters.program }}" placeholder="Программа" />
-        </label>
+          <details class="client-program-dropdown clients-filter-program-dropdown" data-client-program-dropdown data-empty-label="Все программы">
+            <summary>
+              <span data-client-program-summary>{{ client_filters.program or "Все программы" }}</span>
+            </summary>
+            <div class="client-program-menu">
+              <input type="search" placeholder="Поиск программы" data-client-program-search data-client-filter-program-search />
+              <div class="client-program-options">
+                <label data-client-program-option-row>
+                  <input type="radio" name="program" value="" {% if not client_filters.program %}checked{% endif %} />
+                  <span>Все программы</span>
+                </label>
+                {% for item in client_options.programs %}
+                  <label data-client-program-option-row>
+                    <input type="radio" name="program" value="{{ item }}" {% if client_filters.program == item %}checked{% endif %} />
+                    <span>{{ item }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </details>
+        </div>
         <label>
           <span>Маршрут</span>
           <input name="route" list="client-route-list" value="{{ client_filters.route }}" placeholder="Маршрут" />
@@ -125,12 +144,16 @@
           let timer = 0;
           form.addEventListener('input', (event) => {
             if (!(event.target instanceof HTMLInputElement)) return;
+            if (event.target.matches('[data-client-filter-program-search]')) return;
+            if (event.target.type === 'radio' || event.target.type === 'checkbox') return;
             window.clearTimeout(timer);
             timer = window.setTimeout(() => form.submit(), 500);
           });
           form.addEventListener('change', (event) => {
-            if (!(event.target instanceof HTMLSelectElement)) return;
+            const target = event.target;
+            if (!(target instanceof HTMLSelectElement) && !(target instanceof HTMLInputElement && target.type === 'radio')) return;
             window.clearTimeout(timer);
+            target.closest('details')?.removeAttribute('open');
             form.submit();
           });
         })();

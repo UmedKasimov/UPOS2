@@ -4194,7 +4194,8 @@ a.messenger-message-attachment:focus-visible {
   border-bottom: 0;
 }
 
-.client-program-dropdown .client-program-options input[type="checkbox"] {
+.client-program-dropdown .client-program-options input[type="checkbox"],
+.client-program-dropdown .client-program-options input[type="radio"] {
   width: 1rem;
   min-height: 1rem;
   height: 1rem;
@@ -4214,6 +4215,10 @@ a.messenger-message-attachment:focus-visible {
 
 .client-program-dropdown .client-program-options [hidden] {
   display: none;
+}
+
+.clients-filter-program-picker {
+  min-width: 0;
 }
 
 .client-segment-dropdown {
