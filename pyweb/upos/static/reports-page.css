@@ -1744,6 +1744,91 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   padding: 0 0.85rem;
 }
 
+.reports-stock-search-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 2.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-sm, 10px);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.reports-stock-search-field:focus-within,
+.reports-stock-search-field.is-active {
+  border-color: color-mix(in srgb, var(--primary) 78%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.reports-stock-search-field > span {
+  position: absolute;
+  top: -0.45rem;
+  left: 0.7rem;
+  padding: 0 0.25rem;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.reports-stock-search-field input {
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 800;
+  outline: none;
+  padding: 0.1rem 2.2rem 0 0.85rem;
+}
+
+.reports-stock-search-field input::placeholder {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
+.reports-stock-search-field [data-stock-product-search-clear] {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+}
+
+.reports-stock-search-field small {
+  position: absolute;
+  right: 2.2rem;
+  top: -0.48rem;
+  padding: 0 0.25rem;
+  background: var(--card);
+  color: var(--primary);
+  font-size: 0.64rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.reports-stock-product mark {
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, #facc15 62%, transparent);
+  color: inherit;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #ca8a04 28%, transparent);
+  font-weight: 950;
+  padding: 0 0.03rem;
+}
+
 .reports-stock-analysis-wrap {
   padding: 0.7rem 1rem 1rem;
 }

@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=143" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=144" />
 {% endblock %}
 
 {% block page_header %}
@@ -737,7 +737,12 @@
         </header>
         <div class="reports-stock-filterbar">
           <button type="button">На дату</button>
-          <button type="button">Товар</button>
+          <label class="reports-stock-search-field">
+            <span>Товар</span>
+            <input type="search" autocomplete="off" placeholder="Название, буквы, склад" data-stock-product-search />
+            <button type="button" data-stock-product-search-clear aria-label="Очистить поиск" title="Очистить поиск" hidden>×</button>
+            <small data-stock-product-search-count></small>
+          </label>
           <button type="button">Категория товара</button>
           <button type="button">Группа товара</button>
           <button type="button">Бренд</button>
@@ -763,7 +768,7 @@
             </thead>
             <tbody>
               {% for row in business_reports.stock_analysis.rows %}
-                <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %}>
+                <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %} data-stock-analysis-row data-stock-search-text="{{ (row.product ~ ' ' ~ row.warehouse)|e }}">
                   <td class="reports-history-col" data-sort-value="{{ loop.index }}">
                     <div class="product-history-actions">
                       <span class="product-history-index"></span>
@@ -785,7 +790,7 @@
                         {% endif %}
                       </span>
                       <span>
-                        <strong>{{ row.product }}</strong>
+                        <strong data-stock-product-name>{{ row.product }}</strong>
                         <small>{{ row.warehouse }}</small>
                       </span>
                     </button>
@@ -799,6 +804,7 @@
               {% else %}
                 <tr><td colspan="6" class="reports-empty-cell">Остатков пока нет.</td></tr>
               {% endfor %}
+              <tr data-stock-search-empty hidden><td colspan="6" class="reports-empty-cell">По этому поиску товары не найдены.</td></tr>
             </tbody>
             <tfoot>
               <tr>
@@ -1737,6 +1743,84 @@
     });
   }
 
+  function stockSearchFold(value) {
+    return String(value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+  }
+
+  function stockSearchTokens(value) {
+    return stockSearchFold(value).trim().split(/\s+/).filter(Boolean);
+  }
+
+  function stockSearchMatchIndexes(text, query) {
+    const tokens = stockSearchTokens(query);
+    if (!tokens.length) return { matched: true, indexes: new Set() };
+    const chars = Array.from(String(text || ''));
+    const folded = chars.map((char) => stockSearchFold(char)).join('');
+    const indexes = new Set();
+    const markRange = (start, length) => {
+      for (let index = start; index < start + length; index += 1) indexes.add(index);
+    };
+    for (const token of tokens) {
+      const directIndex = folded.indexOf(token);
+      if (directIndex >= 0) {
+        markRange(directIndex, token.length);
+        continue;
+      }
+      let cursor = 0;
+      const fuzzyIndexes = [];
+      for (const char of Array.from(token)) {
+        const foundAt = folded.indexOf(char, cursor);
+        if (foundAt < 0) return { matched: false, indexes };
+        fuzzyIndexes.push(foundAt);
+        cursor = foundAt + 1;
+      }
+      fuzzyIndexes.forEach((index) => indexes.add(index));
+    }
+    return { matched: true, indexes };
+  }
+
+  function renderStockSearchHighlight(node, indexes) {
+    if (!node) return;
+    const original = node.dataset.stockOriginalText || node.textContent || '';
+    node.dataset.stockOriginalText = original;
+    node.textContent = '';
+    Array.from(original).forEach((char, index) => {
+      if (indexes?.has(index)) {
+        const mark = document.createElement('mark');
+        mark.textContent = char;
+        node.append(mark);
+      } else {
+        node.append(document.createTextNode(char));
+      }
+    });
+  }
+
+  function applyStockProductSearch() {
+    const panel = document.getElementById('report-stock-analysis');
+    const input = panel?.querySelector('[data-stock-product-search]');
+    if (!panel || !input) return;
+    const query = input.value || '';
+    const rows = [...panel.querySelectorAll('[data-stock-analysis-row]')];
+    const empty = panel.querySelector('[data-stock-search-empty]');
+    const count = panel.querySelector('[data-stock-product-search-count]');
+    const clear = panel.querySelector('[data-stock-product-search-clear]');
+    let shown = 0;
+    rows.forEach((row) => {
+      const nameNode = row.querySelector('[data-stock-product-name]');
+      const productName = nameNode?.dataset.stockOriginalText || nameNode?.textContent || '';
+      const haystack = row.getAttribute('data-stock-search-text') || row.textContent || '';
+      const productMatch = stockSearchMatchIndexes(productName, query);
+      const fullMatch = productMatch.matched || stockSearchMatchIndexes(haystack, query).matched;
+      row.hidden = !fullMatch;
+      if (fullMatch) shown += 1;
+      renderStockSearchHighlight(nameNode, query && fullMatch ? productMatch.indexes : new Set());
+    });
+    if (empty) empty.hidden = !query || shown > 0;
+    if (count) count.textContent = query ? `${shown} из ${rows.length}` : '';
+    if (clear) clear.hidden = !query;
+    input.closest('.reports-stock-search-field')?.classList.toggle('is-active', Boolean(query));
+  }
+
   function closeStockHistory() {
     const drawer = document.querySelector('[data-stock-history-drawer]');
     const backdrop = document.querySelector('.reports-stock-history-backdrop');
@@ -2544,6 +2628,7 @@
     if (activeTab === 'courier-balance') renderCourierBalancePanel();
     enhanceSortableTables();
     renderStockCurrency();
+    applyStockProductSearch();
     saveState();
   }
 
@@ -2584,6 +2669,17 @@
     if (currencyButton) {
       stockCurrency = currencyButton.getAttribute('data-stock-currency') === 'USD' ? 'USD' : 'UZS';
       renderStockCurrency();
+      return;
+    }
+    const stockSearchClear = event.target.closest('[data-stock-product-search-clear]');
+    if (stockSearchClear) {
+      const field = stockSearchClear.closest('.reports-stock-search-field');
+      const input = field?.querySelector('[data-stock-product-search]');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      applyStockProductSearch();
       return;
     }
     const profitCurrencyButton = event.target.closest('[data-profit-currency]');
@@ -2646,6 +2742,11 @@
   });
 
   document.addEventListener('input', (event) => {
+    const stockProductSearch = event.target.closest('[data-stock-product-search]');
+    if (stockProductSearch) {
+      applyStockProductSearch();
+      return;
+    }
     const limitInput = event.target.closest('[data-courier-limit-input]');
     if (limitInput) {
       formatLimitInput(limitInput);
