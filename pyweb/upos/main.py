@@ -21519,17 +21519,19 @@ def create_app() -> FastAPI:
                 # нет (закупка меняет только paid_amount документа), поэтому
                 # операционные расходы с себестоимостью не пересекаются.
                 _sales_income_categories = {"продажа", "возврат продажи"}
+                _other_income_aliases = {"оплата от клиента"}
                 profit_other_income_rows: list[dict[str, Any]] = []
                 other_income_primary = Decimal("0")
                 for entry in pnl.get("income") or []:
                     name = str(entry.get("name") or "Без категории")
-                    if name.strip().lower() in _sales_income_categories:
+                    normalized_name = name.strip().lower()
+                    if normalized_name in _sales_income_categories:
                         continue
                     amount_primary = report_to_primary(entry.get("amount"), str(entry.get("currency") or ""))
                     other_income_primary += amount_primary
                     profit_other_income_rows.append(
                         {
-                            "name": name,
+                            "name": "Прочие доходы" if normalized_name in _other_income_aliases else name,
                             "amount": _report_money(entry.get("amount"), entry.get("currency")),
                             "amount_primary": amount_primary,
                             "count": int(entry.get("count") or 0),
@@ -21539,12 +21541,24 @@ def create_app() -> FastAPI:
                     other_income_primary += subscription_profit_total
                     profit_other_income_rows.append(
                         {
-                            "name": "Прибыль от подписок",
+                            "name": "Подписки",
                             "amount": _report_money(subscription_profit_total, primary_currency),
                             "amount_primary": subscription_profit_total,
                             "count": subscription_profit_count,
                         }
                     )
+                merged_other_income_rows: dict[str, dict[str, Any]] = {}
+                for row in profit_other_income_rows:
+                    name = str(row.get("name") or "Прочие доходы")
+                    target = merged_other_income_rows.setdefault(
+                        name,
+                        {"name": name, "amount_primary": Decimal("0"), "count": 0},
+                    )
+                    target["amount_primary"] += _sales_decimal(row.get("amount_primary"))
+                    target["count"] += int(row.get("count") or 0)
+                profit_other_income_rows = list(merged_other_income_rows.values())
+                for row in profit_other_income_rows:
+                    row["amount"] = _report_money(row.get("amount_primary") or Decimal("0"), primary_currency)
                 profit_expense_rows: list[dict[str, Any]] = []
                 expenses_primary = Decimal("0")
                 for entry in pnl.get("expense") or []:
