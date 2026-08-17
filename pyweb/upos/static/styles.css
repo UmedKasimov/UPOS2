@@ -10924,7 +10924,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-subscription-discount-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 5.5rem;
+  grid-template-columns: minmax(0, 1fr) 7rem;
   gap: 0.4rem;
 }
 
