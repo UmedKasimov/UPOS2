@@ -1403,6 +1403,7 @@
         return Array.from(source?.options || []).map((option) => ({
           value: option.value || "",
           label: option.getAttribute("data-label") || option.textContent.trim() || option.value || "",
+          displayLabel: option.textContent.trim() || option.getAttribute("data-label") || option.value || "",
           disabled: option.disabled,
         }));
       };
@@ -1643,7 +1644,7 @@
           accounts.forEach((account) => {
             const option = document.createElement("option");
             option.value = account.value;
-            option.textContent = account.label;
+            option.textContent = account.displayLabel || account.label;
             option.dataset.label = account.label;
             option.disabled = account.disabled;
             select.append(option);
