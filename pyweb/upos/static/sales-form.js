@@ -3416,10 +3416,13 @@
 
     openButton.addEventListener("click", openDialog);
     programSelect?.addEventListener("change", renderAllPlans);
-    discountInput?.addEventListener("input", renderSummary);
-    discountUnit?.addEventListener("change", function () {
+    form.addEventListener("input", function (event) {
+      if (event.target.matches("[data-sales-subscription-discount]")) renderSummary();
+    });
+    form.addEventListener("change", function (event) {
+      if (!event.target.matches("[data-sales-subscription-discount-unit]")) return;
       if (discountInput) {
-        if (discountUnit.value === "percent") discountInput.max = "100";
+        if (event.target.value === "percent") discountInput.max = "100";
         else discountInput.removeAttribute("max");
       }
       renderSummary();
