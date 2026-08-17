@@ -21596,9 +21596,10 @@ def create_app() -> FastAPI:
                     sales_row["cost_missing"] = bool(
                         row_amount > 0 and row_cost < row_amount * Decimal("0.001")
                     )
+                    margin_base = abs(row_amount)
                     sales_row["margin"] = (
-                        f"{(row_profit / row_amount * Decimal('100')).quantize(Decimal('0.1'))}%"
-                        if row_amount > 0
+                        f"{(row_profit / margin_base * Decimal('100')).quantize(Decimal('0.1'))}%"
+                        if margin_base > 0
                         else "-"
                     )
 
