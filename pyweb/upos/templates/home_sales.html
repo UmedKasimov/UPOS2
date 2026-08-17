@@ -2011,7 +2011,7 @@
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=39" defer></script>
-  <script src="{{ url_for('static', path='sale-done.js') }}?v=5" defer></script>
+  <script src="{{ url_for('static', path='sale-done.js') }}?v=6" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=79" defer></script>
   {% if sales_embed %}
     <script>

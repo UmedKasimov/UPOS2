@@ -54,12 +54,28 @@
     return item.total || item.sum || "";
   }
 
+  function formatAmountText(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const match = raw.match(/^([+-]?\d[\d\s.,]*)(.*)$/);
+    if (!match) return raw;
+    const compact = match[1].replace(/\s+/g, "").replace(",", ".");
+    const amount = Number(compact);
+    if (!Number.isFinite(amount)) return raw;
+    const hasDecimal = /[.,]\d/.test(match[1]);
+    const formatted = amount.toLocaleString("ru-RU", {
+      maximumFractionDigits: hasDecimal ? 2 : 0,
+    });
+    return `${formatted}${match[2] || ""}`.trim();
+  }
+
   function moneyWithCurrency(amount, currency) {
     const text = String(amount || "").trim();
     const code = String(currency || "").trim();
     if (!text) return "";
-    if (!code || text.toUpperCase().endsWith(` ${code.toUpperCase()}`)) return text;
-    return `${text} ${code}`;
+    const formatted = formatAmountText(text);
+    if (!code || formatted.toUpperCase().endsWith(` ${code.toUpperCase()}`)) return formatted;
+    return `${formatted} ${code}`;
   }
 
   function printWindow(title, body, pageCss) {
@@ -88,7 +104,7 @@
     const rows = (doc.items || [])
       .map(
         (item) => `<tr><td>${escapeHtml(lineName(item))}</td><td class="num">${escapeHtml(lineQuantity(item))}</td>`
-          + `<td class="num">${escapeHtml(linePrice(item))}</td><td class="num">${escapeHtml(lineTotal(item))}</td></tr>`,
+          + `<td class="num">${escapeHtml(moneyWithCurrency(linePrice(item), doc.currency))}</td><td class="num">${escapeHtml(moneyWithCurrency(lineTotal(item), doc.currency))}</td></tr>`,
       )
       .join("");
     return `<div class="sale-receipt">
