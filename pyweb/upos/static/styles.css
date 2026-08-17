@@ -9427,11 +9427,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .purchase-document-payment-table .document-detail-payment-actions {
   margin: 0;
-  width: 100%;
+  width: auto;
+  justify-content: flex-start;
 }
 
 .purchase-document-payment-table .document-detail-payment-pay-btn {
-  width: 100%;
+  width: auto;
+  min-width: 8.5rem;
+  padding-inline: 0.85rem;
+  min-height: 2.1rem;
 }
 
 .purchase-document-payment-summary {
