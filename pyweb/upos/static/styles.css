@@ -9324,7 +9324,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table th,
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table td {
   padding: 0.62rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 54%, var(--border));
+  border: 1px solid var(--border);
   background: var(--card);
   vertical-align: middle;
 }
@@ -9382,7 +9382,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-purchase-detail:not(.sales-document-detail) .purchase-document-items-table tfoot td {
-  border-color: color-mix(in srgb, var(--products-table-blue-strong, var(--primary)) 54%, var(--border));
+  border-color: var(--border);
   background: color-mix(in srgb, var(--products-table-blue, var(--primary)) 12%, var(--card));
 }
 
@@ -9401,6 +9401,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .purchase-document-payment-table th,
 .purchase-document-payment-table td {
+  border: 1px solid var(--border);
   text-align: left;
 }
 
