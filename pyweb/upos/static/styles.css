@@ -9413,6 +9413,20 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   color: var(--primary);
 }
 
+.purchase-document-payment-table .purchase-document-payment-action-cell {
+  padding: 0.65rem;
+  text-align: left;
+}
+
+.purchase-document-payment-table .document-detail-payment-actions {
+  margin: 0;
+  width: 100%;
+}
+
+.purchase-document-payment-table .document-detail-payment-pay-btn {
+  width: 100%;
+}
+
 .purchase-document-payment-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

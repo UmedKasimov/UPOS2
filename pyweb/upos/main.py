@@ -13755,10 +13755,13 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[purchases] failed to sync purchase %s with kassa", saved_purchase_id)
             return RedirectResponse(
-                url=f"{base_url}?error=" + quote("Закупка сохранена, но операции кассы не записались") + "#purchases",
+                url=f"{base_url}?msg=saved&purchase_number={quote(saved_purchase_number)}&cash_warning=1#purchases",
                 status_code=302,
             )
-        return RedirectResponse(url=f"{base_url}?msg=saved#purchases", status_code=302)
+        return RedirectResponse(
+            url=f"{base_url}?msg=saved&purchase_number={quote(saved_purchase_number)}#purchases",
+            status_code=302,
+        )
 
     def _purchase_update_redirect(
         form: Any,
@@ -13863,10 +13866,13 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[purchases] failed to resync purchase %s with kassa", purchase_id)
             return RedirectResponse(
-                url=f"{base_url}?error=" + quote("Закупка изменена, но операции кассы не обновились") + "#purchases",
+                url=f"{base_url}?msg=updated&purchase_number={quote(saved_purchase_number)}&cash_warning=1#purchases",
                 status_code=302,
             )
-        return RedirectResponse(url=f"{base_url}?msg=updated#purchases", status_code=302)
+        return RedirectResponse(
+            url=f"{base_url}?msg=updated&purchase_number={quote(saved_purchase_number)}#purchases",
+            status_code=302,
+        )
 
     def _purchase_status_redirect(
         purchase_id: str,
@@ -14004,6 +14010,12 @@ def create_app() -> FastAPI:
             flag_modified(row, "data")
             session.add(row)
             saved_purchase_number = row.number
+        paid_redirect_url = (
+            f"{base_url}?msg=paid"
+            f"&purchase_number={quote(saved_purchase_number)}"
+            f"&paid_now={quote(_sales_money_label(payment_amount))}"
+            f"&currency={quote(currency)}#purchases"
+        )
         try:
             _sync_purchase_cash_transactions(
                 workspace_owner_id,
@@ -14016,10 +14028,10 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[purchases] failed to sync payment for purchase %s", purchase_id)
             return RedirectResponse(
-                url=f"{base_url}?error=" + quote("Оплата внесена, но операция кассы не записалась") + "#purchases",
+                url=paid_redirect_url.replace("#purchases", "&cash_warning=1#purchases"),
                 status_code=302,
             )
-        return RedirectResponse(url=f"{base_url}?msg=paid#purchases", status_code=302)
+        return RedirectResponse(url=paid_redirect_url, status_code=302)
 
     @app.get("/warehouse", response_class=HTMLResponse, name="warehouse_get")
     def warehouse_get(

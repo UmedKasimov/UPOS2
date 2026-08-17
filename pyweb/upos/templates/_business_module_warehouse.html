@@ -383,15 +383,6 @@
               </td>
               <td class="warehouse-purchase-row-actions">
                 <div class="warehouse-purchase-row-actions-inner">
-                  {% if doc.debt_amount and doc.debt_amount != '0' %}
-                    <button
-                      class="btn btn-secondary warehouse-purchase-row-pay"
-                      type="button"
-                      data-purchase-row-pay
-                      data-purchase-id="{{ doc.id }}"
-                      title="Оплатить закупку {{ doc.number }}"
-                    >Оплатить</button>
-                  {% endif %}
                   <a
                     class="products-action-icon products-action-icon--edit"
                     href="{{ url_for('warehouse_get') }}?purchase_id={{ doc.id }}#purchases"
@@ -565,6 +556,16 @@
               </tr>
             </thead>
             <tbody data-purchase-payment-lines></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" class="purchase-document-payment-action-cell">
+                  <form class="document-detail-payment-actions" method="post" action="" data-purchase-payment-form data-purchase-payment-url-template="{{ url_for('warehouse_purchase_pay', purchase_id='__purchase_id__') }}" hidden>
+                    {% include "_csrf_field.html" %}
+                    <button class="btn document-detail-payment-pay-btn" type="button" data-purchase-payment-pay>Оплатить</button>
+                  </form>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <section class="purchase-document-payment-summary" data-purchase-payment-summary aria-label="Сводка по оплате">
@@ -581,10 +582,6 @@
             <strong data-purchase-payment-debt>0 UZS</strong>
           </div>
         </section>
-        <form class="document-detail-payment-actions" method="post" action="" data-purchase-payment-form data-purchase-payment-url-template="{{ url_for('warehouse_purchase_pay', purchase_id='__purchase_id__') }}" hidden>
-          {% include "_csrf_field.html" %}
-          <button class="btn document-detail-payment-pay-btn" type="button" data-purchase-payment-pay>Оплатить</button>
-        </form>
       </section>
       <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-purchase-detail-pane="note" hidden>
         <div class="warehouse-purchase-detail-table-wrap">
@@ -666,6 +663,17 @@
           <button type="submit" class="btn sales-payment-submit" data-detail-payment-submit>Применить оплату</button>
         </div>
       </form>
+    </dialog>
+    <dialog class="sale-done-dialog purchase-done-dialog" data-purchase-done-dialog>
+      <div class="sale-done-card">
+        <span class="sale-done-icon" aria-hidden="true">✓</span>
+        <h2 data-purchase-done-title>Оплата внесена</h2>
+        <p class="sale-done-sum" data-purchase-done-sum></p>
+        <p class="sale-done-meta" data-purchase-done-meta></p>
+        <div class="sale-done-actions">
+          <button class="btn btn-secondary" type="button" data-purchase-done-close>Закрыть</button>
+        </div>
+      </div>
     </dialog>
   </article>
 

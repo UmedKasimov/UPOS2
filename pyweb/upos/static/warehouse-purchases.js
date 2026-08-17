@@ -2485,6 +2485,8 @@
     form.dataset.paymentCurrency = String(purchase.currency || "UZS").toUpperCase();
     const canPay = Boolean(purchaseId && debt > 0);
     form.hidden = !canPay;
+    const actionRow = form.closest("tr");
+    if (actionRow) actionRow.hidden = !canPay;
     button.disabled = !canPay;
     button.textContent = canPay ? `Оплатить ${moneyWithCurrency(debt, purchase.currency || "UZS")}` : "Оплачено";
   }
@@ -2517,7 +2519,7 @@
     }
 
     paymentLinesRoot.replaceChildren();
-    paymentList.hidden = paymentLines.length === 0;
+    paymentList.hidden = paymentLines.length === 0 && purchaseEntryNumber(purchase.debt_amount) <= 0;
     paymentLines.forEach((payment, index) => {
       const row = document.createElement("tr");
       [index + 1, payment.date || "—", payment.account, payment.type].forEach((value) => {
@@ -2966,6 +2968,54 @@
     document.body.append(overlay);
   }
 
+  function initPurchaseDoneDialog() {
+    const dialog = document.querySelector("[data-purchase-done-dialog]");
+    if (!dialog || dialog.dataset.purchaseDoneReady === "1") return;
+    dialog.dataset.purchaseDoneReady = "1";
+
+    const close = () => {
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    };
+    dialog.querySelector("[data-purchase-done-close]")?.addEventListener("click", close);
+
+    const params = new URLSearchParams(window.location.search);
+    const message = String(params.get("msg") || "").trim();
+    const titles = {
+      saved: "Закупка сохранена",
+      updated: "Закупка обновлена",
+      paid: "Оплата внесена",
+    };
+    if (!(message in titles)) return;
+    const paidNow = String(params.get("paid_now") || "").trim();
+    const currency = String(params.get("currency") || "").trim();
+    const number = String(params.get("purchase_number") || "").trim();
+    const cashWarning = params.get("cash_warning") === "1";
+
+    const title = dialog.querySelector("[data-purchase-done-title]");
+    const sum = dialog.querySelector("[data-purchase-done-sum]");
+    const meta = dialog.querySelector("[data-purchase-done-meta]");
+    if (title) title.textContent = titles[message];
+    if (sum) sum.textContent = message === "paid" && paidNow ? `${paidNow}${currency ? " " + currency : ""}` : "";
+    const metaParts = [];
+    if (number) metaParts.push(`Закупка ${number}`);
+    if (cashWarning) {
+      metaParts.push(message === "paid" ? "Операция кассы не записалась" : "Операции кассы не записались");
+    }
+    if (meta) meta.textContent = metaParts.join(" · ");
+
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("msg");
+    url.searchParams.delete("purchase_number");
+    url.searchParams.delete("paid_now");
+    url.searchParams.delete("currency");
+    url.searchParams.delete("cash_warning");
+    window.history.replaceState(null, "", url.toString());
+  }
+
   document.addEventListener("click", (event) => {
     const media = event.target.closest("[data-photo-zoom]");
     if (!media) return;
@@ -2979,8 +3029,12 @@
   window.WarehousePurchasesInit = init;
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => init());
+    document.addEventListener("DOMContentLoaded", () => {
+      init();
+      initPurchaseDoneDialog();
+    });
   } else {
     init();
+    initPurchaseDoneDialog();
   }
 })();
