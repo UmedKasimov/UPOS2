@@ -1961,6 +1961,11 @@
     const serverEmpty = workspace.querySelector("[data-crm-task-server-empty]");
     const calendar = workspace.querySelector("[data-crm-task-calendar]");
     const calendarTitle = workspace.querySelector("[data-crm-calendar-title]");
+    const dayDialog = document.querySelector("#crm-task-day-dialog");
+    const dayDialogTitle = dayDialog?.querySelector("[data-crm-task-day-title]");
+    const dayDialogSubtitle = dayDialog?.querySelector("[data-crm-task-day-subtitle]");
+    const dayDialogList = dayDialog?.querySelector("[data-crm-task-day-list]");
+    const dayDialogAdd = dayDialog?.querySelector("[data-crm-task-day-add]");
     let currentView = "list";
     let calendarMonth = new Date();
     calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
@@ -2003,6 +2008,71 @@
       row.querySelector("[data-crm-edit]")?.click();
     };
 
+    const closeDayDialog = () => {
+      if (!dayDialog) return;
+      if (dayDialog.open && typeof dayDialog.close === "function") {
+        dayDialog.close();
+      } else {
+        dayDialog.removeAttribute("open");
+      }
+    };
+
+    const openDayDialog = (dateKey, dayTasks) => {
+      if (!dayDialog || !dayDialogList) return;
+      const selectedDate = new Date(`${dateKey}T00:00:00`);
+      if (dayDialogTitle) {
+        dayDialogTitle.textContent = new Intl.DateTimeFormat("ru-RU", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(selectedDate);
+      }
+      if (dayDialogSubtitle) dayDialogSubtitle.textContent = `Задач: ${dayTasks.length}`;
+      if (dayDialogAdd) dayDialogAdd.dataset.dueDate = dateKey;
+      dayDialogList.replaceChildren();
+      if (!dayTasks.length) {
+        const emptyState = document.createElement("p");
+        emptyState.className = "crm-task-day-empty";
+        emptyState.textContent = "На этот день задач пока нет.";
+        dayDialogList.append(emptyState);
+      } else {
+        dayTasks.forEach((row) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "crm-task-day-item";
+          if (row.dataset.taskComplete === "true") item.classList.add("is-complete");
+          if (row.dataset.taskActionState === "overdue") item.classList.add("is-overdue");
+
+          const main = document.createElement("span");
+          main.className = "crm-task-day-item-main";
+          const taskTitle = document.createElement("strong");
+          taskTitle.textContent = row.dataset.taskTitle || "Задача";
+          const meta = document.createElement("small");
+          meta.textContent = [
+            row.dataset.taskClient,
+            row.dataset.taskResponsible,
+            row.dataset.taskOrder ? `Заказ № ${row.dataset.taskOrder}` : "",
+          ].filter(Boolean).join(" · ") || "Без клиента и ответственного";
+          main.append(taskTitle, meta);
+
+          const state = document.createElement("span");
+          state.className = "crm-task-day-item-state";
+          state.textContent = row.querySelector(".crm-task-state")?.textContent?.trim() || "Открыта";
+          item.append(main, state);
+          item.addEventListener("click", () => {
+            closeDayDialog();
+            openTask(row);
+          });
+          dayDialogList.append(item);
+        });
+      }
+      if (typeof dayDialog.showModal === "function") {
+        dayDialog.showModal();
+      } else {
+        dayDialog.setAttribute("open", "");
+      }
+    };
+
     const renderCalendar = (visibleRows) => {
       if (!calendar) return;
       calendar.replaceChildren();
@@ -2037,7 +2107,7 @@
         if (date.getDay() === 0 || date.getDay() === 6) day.classList.add("is-weekend");
         day.dataset.date = dateKey;
         day.tabIndex = 0;
-        day.title = `Добавить задачу на ${dateKey}`;
+        day.title = `Открыть задачи на ${dateKey}`;
 
         const number = document.createElement("span");
         number.className = "crm-task-calendar-date";
@@ -2057,7 +2127,7 @@
             .join(" · ");
           task.addEventListener("click", (event) => {
             event.stopPropagation();
-            openTask(row);
+            openDayDialog(dateKey, dayTasks);
           });
           day.append(task);
         });
@@ -2067,14 +2137,12 @@
           more.textContent = `Ещё ${dayTasks.length - 4}`;
           day.append(more);
         }
-        const createTask = () => {
-          document.dispatchEvent(new CustomEvent("crm:create-task", { detail: { dueDate: dateKey } }));
-        };
-        day.addEventListener("click", createTask);
+        const showDayTasks = () => openDayDialog(dateKey, dayTasks);
+        day.addEventListener("click", showDayTasks);
         day.addEventListener("keydown", (event) => {
           if (event.target !== day || !["Enter", " "].includes(event.key)) return;
           event.preventDefault();
-          createTask();
+          showDayTasks();
         });
         calendar.append(day);
       }
@@ -2129,6 +2197,17 @@
       const today = new Date();
       calendarMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       applyFilters();
+    });
+    dayDialog?.querySelectorAll("[data-crm-task-day-close]").forEach((button) => {
+      button.addEventListener("click", closeDayDialog);
+    });
+    dayDialog?.addEventListener("click", (event) => {
+      if (event.target === dayDialog) closeDayDialog();
+    });
+    dayDialogAdd?.addEventListener("click", () => {
+      const dueDate = String(dayDialogAdd.dataset.dueDate || isoDate(new Date()));
+      closeDayDialog();
+      document.dispatchEvent(new CustomEvent("crm:create-task", { detail: { dueDate } }));
     });
 
     setView("list");

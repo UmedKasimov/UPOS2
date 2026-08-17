@@ -31522,6 +31522,108 @@ html.dark .sales-installation-calendar-order.is-completed {
   font-weight: 700;
 }
 
+.settings-profile-modal.crm-task-day-dialog {
+  width: min(38rem, 94vw);
+  max-width: min(38rem, 94vw);
+}
+
+.crm-task-day-dialog-surface {
+  max-height: min(78vh, 40rem);
+}
+
+.crm-task-day-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.crm-task-day-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.crm-task-day-item:hover,
+.crm-task-day-item:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 5%, var(--card));
+  outline: none;
+}
+
+.crm-task-day-item-main {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.crm-task-day-item-main strong,
+.crm-task-day-item-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-task-day-item-main small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.crm-task-day-item-state {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.crm-task-day-item.is-overdue .crm-task-day-item-state {
+  background: #f1f5f9;
+  color: #2563eb;
+}
+
+.crm-task-day-item.is-complete {
+  opacity: 0.72;
+}
+
+.crm-task-day-empty {
+  margin: 0;
+  padding: 28px 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.crm-task-day-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 560px) {
+  .crm-task-day-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .crm-task-day-actions .btn {
+    flex: 1;
+  }
+}
+
 html.dark .crm-task-complete-cell button:hover,
 html.dark .crm-task-complete-mark,
 html.dark .crm-task-state--done,
