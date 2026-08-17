@@ -16747,6 +16747,11 @@ html.dark .employees-page-wrap {
   animation: settingsProfileModalIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.settings-profile-modal.warehouse-product-dialog {
+  width: min(72rem, 96vw);
+  max-width: min(72rem, 96vw);
+}
+
 @keyframes settingsProfileModalIn {
   from {
     opacity: 0;
