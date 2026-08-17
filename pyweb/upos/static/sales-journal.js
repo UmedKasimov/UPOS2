@@ -828,7 +828,9 @@
           badge.className =
             "sales-schedule-status sales-schedule-status--" +
             (paid ? "paid" : entry.partial ? "partial" : "pending");
-          badge.textContent = value;
+          badge.textContent = paid ? "✓" : entry.partial ? value : "×";
+          badge.setAttribute("aria-label", value);
+          badge.title = value;
           cell.append(badge);
         } else {
           cell.textContent = value;

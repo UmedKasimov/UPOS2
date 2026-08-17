@@ -9467,8 +9467,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-schedule-status--paid {
+  display: inline-grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  place-items: center;
   background: color-mix(in srgb, #16a34a, transparent 84%);
   color: #14663a;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .sales-schedule-status--partial {
@@ -9477,8 +9484,15 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-schedule-status--pending {
-  background: color-mix(in srgb, var(--muted-foreground), transparent 82%);
-  color: var(--muted-foreground);
+  display: inline-grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  place-items: center;
+  background: color-mix(in srgb, #dc2626, transparent 86%);
+  color: #b91c1c;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .purchase-document-payment-summary-item {
