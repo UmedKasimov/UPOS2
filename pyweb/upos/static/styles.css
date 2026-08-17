@@ -32916,6 +32916,10 @@ html.dark .crm-task-calendar-event {
   background: color-mix(in srgb, var(--primary) 5%, var(--card)) !important;
 }
 
+.products-catalog-table.is-subscription-kind .products-subscription-price-column {
+  display: none !important;
+}
+
 /* 2. Кнопка настройки столбцов — та же форма, что у остальных иконок. */
 .upos-table-column-btn {
   border-radius: var(--workbench-radius-sm, 10px);

@@ -78,6 +78,7 @@
         if (active) tab.setAttribute("aria-current", "page");
         else tab.removeAttribute("aria-current");
       });
+      table.classList.toggle("is-subscription-kind", kind === "subscription");
     }
 
     // Пересчёт итоговой строки под видимые строки: число позиций и суммы

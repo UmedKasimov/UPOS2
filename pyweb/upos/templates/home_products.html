@@ -22,7 +22,7 @@
 {% block scripts %}
   {{ super() }}
   <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
-  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=4" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=5" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
@@ -347,7 +347,7 @@
           {% endfor %}
         </nav>
         <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
-          <table class="products-table products-catalog-table" id="products-catalog-table" data-upos-column-controls data-products-table>
+          <table class="products-table products-catalog-table{% if product_filters.kind == 'subscription' %} is-subscription-kind{% endif %}" id="products-catalog-table" data-upos-column-controls data-products-table>
             <thead>
               <tr>
                 <th data-column-label="№" class="products-history-col">№</th>
@@ -385,12 +385,12 @@
                     <span>Приходная цена</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
-                <th data-column-label="Прайс-лист" aria-sort="none">
+                <th class="products-subscription-price-column" data-column-label="Прайс-лист" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price-list">
                     <span>Прайс-лист</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
-                <th data-column-label="Цена" aria-sort="none">
+                <th class="products-subscription-price-column" data-column-label="Цена" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price">
                     <span>Цена</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
@@ -521,7 +521,7 @@
                       {% endfor %}
                     </div>
                   </td>
-                  <td class="products-price-list-cell products-price-list-name-cell">
+                  <td class="products-price-list-cell products-price-list-name-cell products-subscription-price-column">
                     <div class="products-price-list-values">
                       {% for price in product.display_prices %}
                         <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
@@ -532,7 +532,7 @@
                       {% endfor %}
                     </div>
                   </td>
-                  <td class="products-price-list-cell products-price-value-cell">
+                  <td class="products-price-list-cell products-price-value-cell products-subscription-price-column">
                     <div class="products-price-list-values">
                       {# Администратор правит цену прямо здесь: расчётные прайсы
                          не трогаем — их значение пересчитается заново. #}
@@ -635,8 +635,8 @@
                   <td class="products-price-list-cell products-purchase-price-cell"></td>
                   {# Сумма продажных цен из итога убрана по просьбе владельца —
                      ячейки остаются пустыми, чтобы колонки не съезжали. #}
-                  <td class="products-price-list-cell products-price-list-name-cell"></td>
-                  <td class="products-price-list-cell products-price-value-cell"></td>
+                  <td class="products-price-list-cell products-price-list-name-cell products-subscription-price-column"></td>
+                  <td class="products-price-list-cell products-price-value-cell products-subscription-price-column"></td>
                   <td></td>
                   <td></td>
                   <td></td>
@@ -779,13 +779,13 @@
 
           <section class="product-form-section product-form-section--primary products-subscription-modifiers" data-subscription-modifiers {% if (current.kind or product_filters.kind) != 'subscription' %}hidden{% endif %}>
             <div class="product-form-section-head products-subscription-modifiers-head">
-              <h3>Модификаторы подписки</h3>
-              <button class="btn btn-secondary btn-sm" type="button" data-subscription-modifier-add>+ Модификатор</button>
+              <h3>Функции подписки</h3>
+              <button class="btn btn-secondary btn-sm" type="button" data-subscription-modifier-add>+ Функция</button>
             </div>
             <div class="products-subscription-modifier-list" data-subscription-modifier-list>
               {% for modifier in subscription_modifiers %}
                 <div class="products-subscription-modifier-row" data-subscription-modifier-row>
-                  <label><span>Название*</span><input name="subscription_modifier_name" value="{{ modifier.name or '' }}" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
+                  <label><span>Функция*</span><input name="subscription_modifier_name" value="{{ modifier.name or '' }}" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
                   <label class="wide"><span>Описание</span><input name="subscription_modifier_description" value="{{ modifier.description or '' }}" placeholder="Что входит в подписку" /></label>
                   <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" value="{{ modifier.amount or '' }}" placeholder="0" data-subscription-modifier-required /></label>
                   <label>
@@ -801,7 +801,7 @@
             </div>
             <template data-subscription-modifier-template>
               <div class="products-subscription-modifier-row" data-subscription-modifier-row>
-                <label><span>Название*</span><input name="subscription_modifier_name" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
+                <label><span>Функция*</span><input name="subscription_modifier_name" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
                 <label class="wide"><span>Описание</span><input name="subscription_modifier_description" placeholder="Что входит в подписку" /></label>
                 <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" placeholder="0" data-subscription-modifier-required /></label>
                 <label>
