@@ -15623,6 +15623,12 @@ def create_app() -> FastAPI:
         # Карта не пагинируется и не зависит от фильтров списка: в правой
         # таблице нужны все клиенты, включая тех, у кого координат ещё нет.
         clients_map_records = map_source_records
+        clients_map_counts = {
+            "total": len(clients_map_records),
+            "coords": sum(1 for item in clients_map_records if item.get("latitude") and item.get("longitude")),
+            "address": sum(1 for item in clients_map_records if not item.get("latitude") and item.get("address")),
+            "missing": sum(1 for item in clients_map_records if not item.get("latitude") and not item.get("address")),
+        }
 
         client_balances_total = len(client_balances)
         client_balances_total_pages = max(1, math.ceil(client_balances_total / clients_page_size))
@@ -15661,6 +15667,7 @@ def create_app() -> FastAPI:
             clients_sort_key=clients_sort_key,
             clients_sort_direction=clients_sort_direction,
             clients_map_records=clients_map_records,
+            clients_map_counts=clients_map_counts,
             client_ownership=filters["ownership"],
             clients_archive_mode=archive_mode,
             clients_archived_total=clients_archived_total,

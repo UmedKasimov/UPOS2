@@ -681,14 +681,11 @@
           <tfoot>
             <tr>
               <td colspan="5">
-                {% set map_clients_with_coords = map_clients | selectattr("latitude") | selectattr("longitude") | list %}
-                {% set map_clients_address_only = map_clients | rejectattr("latitude") | selectattr("address") | list %}
-                {% set map_clients_without_location = map_clients | rejectattr("latitude") | rejectattr("address") | list %}
                 <div class="clients-map-location-filters" aria-label="Фильтр по наличию локации">
-                  <button type="button" class="is-active" data-clients-map-location-filter="" aria-pressed="true">Итого: {{ map_clients|length }}</button>
-                  <button type="button" data-clients-map-location-filter="coords" aria-pressed="false">С координатами: {{ map_clients_with_coords|length }}</button>
-                  <button type="button" data-clients-map-location-filter="address" aria-pressed="false">Только адрес: {{ map_clients_address_only|length }}</button>
-                  <button type="button" data-clients-map-location-filter="missing" aria-pressed="false">Без локации: {{ map_clients_without_location|length }}</button>
+                  <button type="button" class="is-active" data-clients-map-location-filter="" aria-pressed="true">Итого: {{ clients_map_counts.total }}</button>
+                  <button type="button" data-clients-map-location-filter="coords" aria-pressed="false">С координатами: {{ clients_map_counts.coords }}</button>
+                  <button type="button" data-clients-map-location-filter="address" aria-pressed="false">Только адрес: {{ clients_map_counts.address }}</button>
+                  <button type="button" data-clients-map-location-filter="missing" aria-pressed="false">Без локации: {{ clients_map_counts.missing }}</button>
                 </div>
               </td>
             </tr>
@@ -701,8 +698,8 @@
           <nav class="products-pagination" aria-label="Страницы списка клиентов" data-clients-map-pages></nav>
           <div class="products-catalog-footer-meta">
             <div class="products-panel-stats" aria-label="Информация по списку клиентов">
-              <span data-clients-map-total>Всего: {{ map_clients|length }}</span>
-              <span data-clients-map-shown>Показано: {{ map_clients|length }}</span>
+              <span data-clients-map-total>Всего: {{ clients_map_counts.total }}</span>
+              <span data-clients-map-shown>Показано: {{ clients_map_counts.total }}</span>
               {# Сохранённый шаблон фильтра применялся молча: человек видел
                  часть базы и не понимал, почему клиентов мало. #}
               <button type="button" class="clients-map-filter-reset" data-clients-map-filter-reset hidden>
