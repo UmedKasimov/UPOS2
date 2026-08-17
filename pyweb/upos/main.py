@@ -11849,6 +11849,14 @@ def create_app() -> FastAPI:
             or return_to.startswith("/reports#")
         ):
             return_to = ""
+
+        def sales_status_error_url(message: str) -> str:
+            if return_to:
+                base, marker, fragment = return_to.partition("#")
+                separator = "&" if "?" in base else "?"
+                return f"{base}{separator}sales_archive_error={quote(message)}{marker}{fragment}"
+            return "/sales?error=" + quote(message) + "#sales-journal"
+
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
         wid, redir = _product_workspace_owner(request)
@@ -11873,6 +11881,17 @@ def create_app() -> FastAPI:
                         url="/sales?error=" + quote("Статус возврата меняется через документ возврата") + "#sales-journal",
                         status_code=302,
                     )
+                if status == "archived" and doc_type in {"sale", "order"}:
+                    amount = _sales_decimal(row.amount)
+                    paid_amount = _sales_decimal(data.get("paid_amount"))
+                    outstanding_amount = max(Decimal("0"), amount - paid_amount)
+                    if outstanding_amount > 0:
+                        return RedirectResponse(
+                            url=sales_status_error_url(
+                                "Нельзя архивировать продажу с долгом клиента. Сначала закройте оплату."
+                            ),
+                            status_code=302,
+                        )
                 inventory_was_applied = _sales_inventory_applied(data)
                 inventory_should_apply = _sales_status_requires_inventory(status, doc_type)
                 if inventory_was_applied != inventory_should_apply:
@@ -21624,6 +21643,10 @@ def create_app() -> FastAPI:
                 shipment_totals_row = stage_totals["shipment"]
                 archive_profit = archive_totals["revenue"] - archive_totals["cost"]
                 shipment_profit = shipment_totals_row["revenue"] - shipment_totals_row["cost"]
+                real_sales_total = archive_totals["revenue"]
+                real_cost_total = archive_totals["cost"]
+                real_gross_profit_total = archive_profit
+                real_net_profit_total = real_gross_profit_total + other_income_primary - expenses_primary
 
                 business_reports["profit"] = {
                     "stages": {
@@ -21657,19 +21680,19 @@ def create_app() -> FastAPI:
                     },
                     "summary": {
                         "period": report_data["period_label"],
-                        "revenue": _report_money(net_sales_total, primary_currency),
-                        "revenue_uzs": profit_to_uzs(net_sales_total),
-                        "cost": _report_money(cost_total, primary_currency),
-                        "cost_uzs": profit_to_uzs(cost_total),
-                        "gross": _report_money(gross_profit_total, primary_currency),
-                        "gross_uzs": profit_to_uzs(gross_profit_total),
+                        "revenue": _report_money(real_sales_total, primary_currency),
+                        "revenue_uzs": profit_to_uzs(real_sales_total),
+                        "cost": _report_money(real_cost_total, primary_currency),
+                        "cost_uzs": profit_to_uzs(real_cost_total),
+                        "gross": _report_money(real_gross_profit_total, primary_currency),
+                        "gross_uzs": profit_to_uzs(real_gross_profit_total),
                         "other_income": _report_money(other_income_primary, primary_currency),
                         "other_income_uzs": profit_to_uzs(other_income_primary),
                         "expenses": _report_money(expenses_primary, primary_currency),
                         "expenses_uzs": profit_to_uzs(expenses_primary),
-                        "net": _report_money(net_profit_total, primary_currency),
-                        "net_uzs": profit_to_uzs(net_profit_total),
-                        "net_negative": net_profit_total < 0,
+                        "net": _report_money(real_net_profit_total, primary_currency),
+                        "net_uzs": profit_to_uzs(real_net_profit_total),
+                        "net_negative": real_net_profit_total < 0,
                         "expense_count": len(profit_expense_rows),
                     },
                     "expenses": profit_expense_rows[:100],

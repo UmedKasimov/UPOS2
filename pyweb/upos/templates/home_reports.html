@@ -1454,6 +1454,16 @@
     applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
   });
 
+  const archiveErrorParams = new URLSearchParams(window.location.search);
+  const archiveError = archiveErrorParams.get('sales_archive_error');
+  if (archiveError) {
+    window.alert(archiveError);
+    archiveErrorParams.delete('sales_archive_error');
+    const cleanQuery = archiveErrorParams.toString();
+    const cleanUrl = `${window.location.pathname}${cleanQuery ? '?' + cleanQuery : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
   document.addEventListener('submit', (event) => {
     const form = event.target.closest('[data-sales-cost-archive-form]');
     if (!form) return;
