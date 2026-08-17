@@ -1379,6 +1379,45 @@
         const amount = purchaseEntryNumber(row.querySelector("[data-purchase-expense-amount]")?.value || "");
         return sum + convertPurchaseCurrency(amount, expenseRowCurrency(row), currency(), options);
       }, 0);
+      const expenseRowLabel = (row) => {
+        const select = row?.querySelector('select[name="extra_expense_name"]');
+        const selected = select?.selectedOptions ? select.selectedOptions[0] : null;
+        return String(selected?.textContent || select?.value || "Дополнительный расход").trim() || "Дополнительный расход";
+      };
+      const paymentAccountOptions = () => {
+        const source = paymentDialog?.querySelector("[data-purchase-payment-account]");
+        return Array.from(source?.options || []).map((option) => ({
+          value: option.value || "",
+          label: option.getAttribute("data-label") || option.textContent.trim() || option.value || "",
+          disabled: option.disabled,
+        }));
+      };
+      const ensureExpensePaymentFields = (row) => {
+        if (!row) return {};
+        let id = row.querySelector("[data-purchase-expense-account-id]");
+        let label = row.querySelector("[data-purchase-expense-account]");
+        if (!id) {
+          id = document.createElement("input");
+          id.type = "hidden";
+          id.name = "extra_expense_account_id";
+          id.setAttribute("data-purchase-expense-account-id", "");
+          row.append(id);
+        }
+        if (!label) {
+          label = document.createElement("input");
+          label.type = "hidden";
+          label.name = "extra_expense_account";
+          label.setAttribute("data-purchase-expense-account", "");
+          row.append(label);
+        }
+        return { id, label };
+      };
+      const syncExpensePaymentSelect = (expenseRow, select) => {
+        const fields = ensureExpensePaymentFields(expenseRow);
+        const selected = select?.selectedOptions ? select.selectedOptions[0] : null;
+        if (fields.id) fields.id.value = select?.value || "";
+        if (fields.label) fields.label.value = selected?.getAttribute("data-label") || selected?.textContent.trim() || "";
+      };
 
       const updateExpenseAllocation = (goodsTotal) => {
         const extraTotal = expenseTotal();
@@ -1523,6 +1562,91 @@
           submit.title = overpaid > 0 ? `Оплата больше суммы на ${purchaseEntryMoney(overpaid, currency())}` : "";
         }
       };
+      const renderPurchasePaymentProductInfo = () => {
+        if (!paymentDialog) return;
+        const productBody = paymentDialog.querySelector("[data-purchase-payment-product-lines]");
+        const productTotalNode = paymentDialog.querySelector("[data-purchase-payment-goods-total]");
+        if (productTotalNode) productTotalNode.textContent = purchaseEntryMoney(currentPurchaseTotal(), currency());
+        if (!productBody) return;
+        productBody.innerHTML = "";
+        const productRows = rows().filter(rowHasProduct);
+        if (!productRows.length) {
+          const row = document.createElement("tr");
+          row.innerHTML = '<td colspan="5">Товары пока не выбраны</td>';
+          productBody.append(row);
+          return;
+        }
+        productRows.forEach((entryRow, index) => {
+          const quantity = purchaseEntryNumber(entryRow.querySelector('input[name="line_quantity"]')?.value || "1") || 0;
+          const price = purchaseEntryNumber(entryRow.querySelector('input[name="line_price"]')?.value || "");
+          const row = document.createElement("tr");
+          const values = [
+            String(index + 1),
+            entryRow.querySelector('input[name="line_product"]')?.value.trim() || "Товар",
+            purchaseEntryFormat(quantity || 0),
+            purchaseEntryMoney(price, currency()),
+            purchaseEntryMoney(rowTotal(entryRow), currency()),
+          ];
+          values.forEach((value, cellIndex) => {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            if (cellIndex > 1) cell.className = "warehouse-payment-number-cell";
+            row.append(cell);
+          });
+          productBody.append(row);
+        });
+      };
+      const renderPurchaseExpensePaymentInfo = () => {
+        if (!paymentDialog) return;
+        const expenseBody = paymentDialog.querySelector("[data-purchase-payment-expense-lines]");
+        const expenseTotalNode = paymentDialog.querySelector("[data-purchase-payment-expense-total]");
+        if (expenseTotalNode) expenseTotalNode.textContent = purchaseEntryMoney(expenseTotal(), currency());
+        if (!expenseBody) return;
+        expenseBody.innerHTML = "";
+        const accounts = paymentAccountOptions();
+        const filledExpenses = expenseRows().filter((row) => purchaseEntryNumber(row.querySelector("[data-purchase-expense-amount]")?.value || "") > 0);
+        if (!filledExpenses.length) {
+          const row = document.createElement("tr");
+          row.innerHTML = '<td colspan="4">Дополнительных расходов нет</td>';
+          expenseBody.append(row);
+          return;
+        }
+        filledExpenses.forEach((expenseRow, index) => {
+          const amount = purchaseEntryNumber(expenseRow.querySelector("[data-purchase-expense-amount]")?.value || "");
+          const row = document.createElement("tr");
+          const numberCell = document.createElement("td");
+          numberCell.textContent = String(index + 1);
+          const nameCell = document.createElement("td");
+          nameCell.textContent = expenseRowLabel(expenseRow);
+          const amountCell = document.createElement("td");
+          amountCell.className = "warehouse-payment-number-cell";
+          amountCell.textContent = purchaseEntryMoney(amount, expenseRowCurrency(expenseRow));
+          const accountCell = document.createElement("td");
+          const select = document.createElement("select");
+          select.className = "settings-profile-input warehouse-payment-expense-account";
+          select.setAttribute("aria-label", `Счёт оплаты расхода ${index + 1}`);
+          const fields = ensureExpensePaymentFields(expenseRow);
+          accounts.forEach((account) => {
+            const option = document.createElement("option");
+            option.value = account.value;
+            option.textContent = account.label;
+            option.dataset.label = account.label;
+            option.disabled = account.disabled;
+            select.append(option);
+          });
+          if (fields.id?.value) setPaymentSelect(select, fields.id.value);
+          if (!select.value && accounts.length) setPaymentSelect(select, accounts.find((item) => !item.disabled)?.value || accounts[0].value);
+          syncExpensePaymentSelect(expenseRow, select);
+          select.addEventListener("change", () => syncExpensePaymentSelect(expenseRow, select));
+          accountCell.append(select);
+          row.append(numberCell, nameCell, amountCell, accountCell);
+          expenseBody.append(row);
+        });
+      };
+      const renderPurchasePaymentDialogInfo = () => {
+        renderPurchasePaymentProductInfo();
+        renderPurchaseExpensePaymentInfo();
+      };
       const syncPurchasePaymentHidden = () => {
         const payments = collectPurchasePayments();
         const paid = paymentTotalInCurrency(payments, currency());
@@ -1652,6 +1776,7 @@
           }
         }
         updatePurchasePaymentSummary();
+        renderPurchasePaymentDialogInfo();
         if (typeof paymentDialog.showModal === "function") {
           try {
             paymentDialog.showModal();
@@ -1896,6 +2021,7 @@
       paymentDialog?.querySelector("[data-purchase-payment-form]")?.addEventListener("submit", (event) => {
         event.preventDefault();
         updatePurchasePaymentSummary();
+        renderPurchaseExpensePaymentInfo();
         const paid = paymentTotalInCurrency(collectPurchasePayments(), currency());
         const total = currentPurchaseTotal();
         if (paid <= 0 || paid > total) return;

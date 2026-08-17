@@ -893,6 +893,8 @@
                 <option value="UZS" {{ 'selected' if expense_currency == 'UZS' else '' }}>UZS</option>
                 <option value="USD" {{ 'selected' if expense_currency == 'USD' else '' }}>USD</option>
               </select>
+              <input type="hidden" name="extra_expense_account_id" value="{{ expense.account_id if expense else '' }}" data-purchase-expense-account-id />
+              <input type="hidden" name="extra_expense_account" value="{{ expense.account if expense else '' }}" data-purchase-expense-account />
               <button type="button" class="sales-line-remove" data-purchase-expense-remove aria-label="Удалить расход">×</button>
             </div>
           {% endfor %}
@@ -1050,33 +1052,95 @@
           </div>
           <button type="button" class="settings-profile-modal-close" data-purchase-payment-close aria-label="Закрыть">×</button>
         </div>
-        <div class="settings-profile-modal-body">
-          <div class="sales-payment-lines" data-purchase-payment-lines-ui>
-            <div class="sales-payment-line" data-purchase-payment-line>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Счёт</span>
-                <select class="settings-profile-input" data-purchase-payment-account>
-                  {% for account in warehouse_options.payment_accounts %}
-                    <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
-                  {% else %}
-                    <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Валюта</span>
-                <select class="settings-profile-input" data-purchase-payment-currency>
-                  <option value="UZS">UZS</option>
-                  <option value="USD">USD</option>
-                </select>
-              </label>
-              <label class="settings-profile-field">
-                <span class="settings-profile-field-label">Сумма</span>
-                <input class="settings-profile-input" inputmode="decimal" data-purchase-payment-amount />
-              </label>
-              <button type="button" class="sales-payment-remove" data-purchase-payment-remove aria-label="Удалить оплату">×</button>
-            </div>
+        <div class="settings-profile-modal-body warehouse-payment-dialog-body">
+          <div class="warehouse-payment-overview">
+            <section class="warehouse-payment-overview-card">
+              <div class="warehouse-payment-overview-head">
+                <h3>Товары закупки</h3>
+                <strong data-purchase-payment-goods-total>0 UZS</strong>
+              </div>
+              <div class="warehouse-payment-table-wrap">
+                <table class="warehouse-payment-info-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Товар</th>
+                      <th>К-во</th>
+                      <th>Цена</th>
+                      <th>Сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody data-purchase-payment-product-lines>
+                    <tr><td colspan="5">Товары пока не выбраны</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section class="warehouse-payment-overview-card">
+              <div class="warehouse-payment-overview-head">
+                <h3>Доп. расходы</h3>
+                <strong data-purchase-payment-expense-total>0 UZS</strong>
+              </div>
+              <div class="warehouse-payment-table-wrap">
+                <table class="warehouse-payment-info-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Расход</th>
+                      <th>Сумма</th>
+                      <th>Счёт оплаты</th>
+                    </tr>
+                  </thead>
+                  <tbody data-purchase-payment-expense-lines>
+                    <tr><td colspan="4">Дополнительных расходов нет</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
+
+          <section class="warehouse-payment-overview-card warehouse-payment-lines-card">
+            <div class="warehouse-payment-overview-head">
+              <h3>Оплата товаров</h3>
+            </div>
+            <div class="warehouse-payment-table-wrap">
+              <table class="warehouse-payment-info-table warehouse-payment-entry-table">
+                <thead>
+                  <tr>
+                    <th>Счёт</th>
+                    <th>Валюта</th>
+                    <th>Сумма</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody class="sales-payment-lines" data-purchase-payment-lines-ui>
+                  <tr class="sales-payment-line" data-purchase-payment-line>
+                    <td>
+                      <select class="settings-profile-input" aria-label="Счёт оплаты товаров" data-purchase-payment-account>
+                        {% for account in warehouse_options.payment_accounts %}
+                          <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                        {% else %}
+                          <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
+                        {% endfor %}
+                      </select>
+                    </td>
+                    <td>
+                      <select class="settings-profile-input" aria-label="Валюта оплаты товаров" data-purchase-payment-currency>
+                        <option value="UZS">UZS</option>
+                        <option value="USD">USD</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input class="settings-profile-input" inputmode="decimal" aria-label="Сумма оплаты товаров" data-purchase-payment-amount />
+                    </td>
+                    <td class="warehouse-payment-action-cell">
+                      <button type="button" class="sales-payment-remove" data-purchase-payment-remove aria-label="Удалить оплату">×</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <button type="button" class="btn btn-secondary sales-payment-add-line" data-purchase-payment-add-line>+ Ещё счёт</button>
           <div class="sales-payment-summary-card" data-purchase-payment-summary>
             <div class="sales-payment-summary-row">

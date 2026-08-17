@@ -12606,6 +12606,8 @@ def create_app() -> FastAPI:
         expense_names = list(form.getlist("extra_expense_name"))
         expense_amounts = list(form.getlist("extra_expense_amount"))
         expense_currencies = list(form.getlist("extra_expense_currency"))
+        expense_account_ids = list(form.getlist("extra_expense_account_id"))
+        expense_accounts = list(form.getlist("extra_expense_account"))
         extra_expenses: list[dict[str, str]] = []
         extra_expense_total = Decimal("0")
         for idx in range(max(len(expense_names), len(expense_amounts), len(expense_currencies), 0)):
@@ -12626,6 +12628,8 @@ def create_app() -> FastAPI:
                     "amount": _decimal_plain_text(expense_amount),
                     "currency": expense_currency,
                     "document_amount": _decimal_plain_text(expense_document_amount),
+                    "account_id": str(expense_account_ids[idx] if idx < len(expense_account_ids) else "").strip(),
+                    "account": str(expense_accounts[idx] if idx < len(expense_accounts) else "").strip(),
                 }
             )
             extra_expense_total += expense_document_amount
