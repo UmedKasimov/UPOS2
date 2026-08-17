@@ -1282,6 +1282,9 @@
     const responsiblePanel = dialog.querySelector("[data-crm-responsible-panel]");
     const dealPanel = dialog.querySelector("[data-crm-deal-panel]");
     const orderPanel = dialog.querySelector("[data-crm-order-panel]");
+    const clientCreateDialog = document.querySelector("#crm-client-create-dialog");
+    const clientCreateForm = clientCreateDialog?.querySelector("[data-crm-client-create-form]");
+    const clientCreateStatus = clientCreateDialog?.querySelector("[data-crm-client-create-status]");
     const taskTypeSelect = form?.querySelector("[data-crm-task-type-select]");
     const taskChecklist = form?.querySelector("[data-crm-task-checklist]");
     const clientRows = Array.from(document.querySelectorAll("#crm-client-list option"))
@@ -1353,6 +1356,37 @@
       clientPanel.innerHTML = "";
     };
 
+    const closeClientCreateDialog = () => {
+      if (!clientCreateDialog) return;
+      if (clientCreateDialog.open && typeof clientCreateDialog.close === "function") {
+        clientCreateDialog.close();
+      } else {
+        clientCreateDialog.removeAttribute("open");
+      }
+    };
+
+    const openClientCreateDialog = () => {
+      if (!clientCreateDialog || !clientCreateForm) return;
+      const suggestedName = String(clientInput?.value || "").trim();
+      clientCreateForm.reset();
+      const nameInput = clientCreateForm.querySelector("[data-crm-client-create-name]");
+      if (nameInput) nameInput.value = suggestedName;
+      if (clientCreateStatus) {
+        clientCreateStatus.textContent = "";
+        clientCreateStatus.dataset.status = "";
+      }
+      closeClientPanel();
+      if (typeof clientCreateDialog.showModal === "function") {
+        clientCreateDialog.showModal();
+      } else {
+        clientCreateDialog.setAttribute("open", "");
+      }
+      setTimeout(() => {
+        nameInput?.focus();
+        nameInput?.select();
+      }, 0);
+    };
+
     const renderClientPanel = () => {
       if (!clientInput || !clientPanel) return;
       const query = String(clientInput.value || "").trim().toLocaleLowerCase();
@@ -1362,7 +1396,12 @@
           return !query || hay.includes(query);
         })
         .slice(0, 80);
-      clientPanel.innerHTML = rows.length
+      clientPanel.innerHTML =
+        '<button type="button" class="sales-combo-option crm-client-create-option" data-crm-client-create-open>' +
+        '<span class="sales-combo-main">+ Добавить клиента</span>' +
+        '<span class="sales-combo-meta"><span>Создать новую карточку</span><strong></strong></span>' +
+        "</button>" +
+        (rows.length
         ? rows
             .map((item) => {
               const meta = item.meta && item.meta !== item.name ? item.meta : "Клиент";
@@ -1374,9 +1413,16 @@
               );
             })
             .join("")
-        : '<div class="sales-combo-empty">Ничего не найдено</div>';
+        : '<div class="sales-combo-empty">Ничего не найдено</div>');
       clientPanel.hidden = false;
       positionClientPanel();
+      const createButton = clientPanel.querySelector("[data-crm-client-create-open]");
+      createButton?.addEventListener("mousedown", (event) => event.preventDefault());
+      createButton?.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openClientCreateDialog();
+      });
       clientPanel.querySelectorAll("[data-crm-client-choice]").forEach((button, index) => {
         button.addEventListener("mousedown", (event) => {
           event.preventDefault();
@@ -1829,6 +1875,61 @@
       closeOrderPanel();
     });
     contactInput?.addEventListener("input", syncContactMatch);
+    clientCreateDialog?.querySelectorAll("[data-crm-client-create-close]").forEach((button) => {
+      button.addEventListener("click", closeClientCreateDialog);
+    });
+    clientCreateDialog?.addEventListener("click", (event) => {
+      if (event.target === clientCreateDialog) closeClientCreateDialog();
+    });
+    clientCreateForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!clientCreateForm.checkValidity()) {
+        clientCreateForm.reportValidity();
+        return;
+      }
+      const submitButton = clientCreateForm.querySelector("[data-crm-client-create-submit]");
+      if (submitButton) submitButton.disabled = true;
+      if (clientCreateStatus) {
+        clientCreateStatus.textContent = "Сохраняю...";
+        clientCreateStatus.dataset.status = "";
+      }
+      fetch("/clients/save", {
+        method: "POST",
+        body: new FormData(clientCreateForm),
+        headers: { Accept: "application/json" },
+      })
+        .then((response) => response.json().catch(() => ({})).then((body) => {
+          if (!response.ok || !body.client) throw new Error(body.error || "Не удалось сохранить клиента");
+          return body.client;
+        }))
+        .then((client) => {
+          const name = String(client.name || "").trim();
+          const phone = String(client.phone || "").trim();
+          if (name && !clientRows.some((item) => item.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+            clientRows.push({ name, meta: phone || "Клиент" });
+            clientRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+          }
+          if (name) existingClients.add(name.toLocaleLowerCase());
+          const phoneKey = normalizePhone(phone);
+          if (phoneKey && name) clientsByPhone.set(phoneKey, { name, phone });
+          if (clientInput) {
+            clientInput.value = name;
+            clientInput.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          syncDuplicateNotice();
+          closeClientCreateDialog();
+          clientInput?.focus();
+        })
+        .catch((error) => {
+          if (clientCreateStatus) {
+            clientCreateStatus.textContent = error.message || "Не удалось сохранить клиента";
+            clientCreateStatus.dataset.status = "err";
+          }
+        })
+        .finally(() => {
+          if (submitButton) submitButton.disabled = false;
+        });
+    });
     document.addEventListener("crm:edit-record", (event) => {
       const payload = parsePayload(event.detail?.payload);
       if (!payload?.id) return;

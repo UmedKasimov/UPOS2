@@ -31613,6 +31613,17 @@ html.dark .sales-installation-calendar-order.is-completed {
   border-top: 1px solid var(--border);
 }
 
+.crm-client-create-option {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--primary) 7%, var(--card));
+  color: var(--primary);
+}
+
+.crm-client-create-option:hover,
+.crm-client-create-option:focus-visible {
+  background: color-mix(in srgb, var(--primary) 13%, var(--card));
+}
+
 @media (max-width: 560px) {
   .crm-task-day-item {
     align-items: flex-start;

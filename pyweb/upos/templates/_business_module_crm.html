@@ -605,6 +605,41 @@
   </div>
 </dialog>
 
+<dialog class="settings-profile-modal crm-client-create-dialog" id="crm-client-create-dialog" aria-labelledby="crm-client-create-dialog-title">
+  <form class="settings-profile-modal-surface sales-client-create-surface" data-crm-client-create-form>
+    {% include "_csrf_field.html" %}
+    <input type="hidden" name="response" value="json" />
+    <header class="settings-profile-modal-head">
+      <div>
+        <h2 id="crm-client-create-dialog-title" class="settings-profile-modal-title">Новый клиент</h2>
+        <p class="settings-profile-modal-sub">Клиент сохранится и сразу подставится в задачу.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-client-create-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-body">
+      <div class="settings-profile-form-grid sales-client-create-grid">
+        <label class="settings-profile-field settings-profile-field--full">
+          <span class="settings-profile-field-label">Название клиента*</span>
+          <input class="settings-profile-input" name="name" required maxlength="255" data-crm-client-create-name />
+        </label>
+        <label class="settings-profile-field">
+          <span class="settings-profile-field-label">Телефон</span>
+          <input class="settings-profile-input" name="phone" inputmode="tel" autocomplete="tel" />
+        </label>
+        <label class="settings-profile-field">
+          <span class="settings-profile-field-label">Email</span>
+          <input class="settings-profile-input" name="email" type="email" autocomplete="email" />
+        </label>
+      </div>
+      <p class="sales-product-dialog-status" data-crm-client-create-status aria-live="polite"></p>
+    </div>
+    <footer class="settings-profile-modal-foot">
+      <button type="button" class="btn btn-secondary" data-crm-client-create-close>Отмена</button>
+      <button type="submit" class="btn" data-crm-client-create-submit>Добавить клиента</button>
+    </footer>
+  </form>
+</dialog>
+
 <dialog class="settings-profile-modal crm-record-dialog" id="crm-record-dialog" aria-labelledby="crm-record-dialog-title">
   <div class="settings-profile-modal-surface crm-record-dialog-surface">
     <header class="settings-profile-modal-head">
