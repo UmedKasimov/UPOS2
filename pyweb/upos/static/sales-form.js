@@ -1768,12 +1768,12 @@
     return row ? row.querySelector('[data-sales-combobox="' + comboType + '"]') : null;
   }
 
-  function applyProductSelection(root, combo, options, item) {
+  function applyProductSelection(root, combo, options, item, allowDuplicate) {
     if (!combo || !item) return;
     if (root.dataset.salesApplyingTotal !== "1") clearManualTotal(root, false);
     var comboType = combo.getAttribute("data-sales-combobox") === "service" ? "service" : "product";
     var line = combo.closest(".sales-line-grid");
-    if (selectedLineNames(root, comboType, line).indexOf(normalize(item.name)) !== -1) {
+    if (!allowDuplicate && selectedLineNames(root, comboType, line).indexOf(normalize(item.name)) !== -1) {
       closePanel(combo);
       return;
     }
@@ -3203,10 +3203,9 @@
     var openButton = root.querySelector("[data-sales-subscription-open]");
     if (!dialog || !form || !openButton) return;
     var programSelect = dialog.querySelector("[data-sales-subscription-program]");
-    var planSelect = dialog.querySelector("[data-sales-subscription-plan]");
-    var quantityInput = dialog.querySelector("[data-sales-subscription-quantity]");
-    var monthsInput = dialog.querySelector("[data-sales-subscription-months]");
-    var description = dialog.querySelector("[data-sales-subscription-description]");
+    var linesContainer = dialog.querySelector("[data-sales-subscription-lines]");
+    var lineTemplate = dialog.querySelector("[data-sales-subscription-line-template]");
+    var addRowButton = dialog.querySelector("[data-sales-subscription-add-row]");
     var total = dialog.querySelector("[data-sales-subscription-total]");
     var formula = dialog.querySelector("[data-sales-subscription-formula]");
     var empty = dialog.querySelector("[data-sales-subscription-empty]");
@@ -3214,39 +3213,84 @@
     var addButton = dialog.querySelector("[data-sales-subscription-add]");
     var catalog = [];
 
-    function selectedChoice() {
+    function subscriptionLines() {
+      return linesContainer ? Array.from(linesContainer.querySelectorAll("[data-sales-subscription-line]")) : [];
+    }
+
+    function selectedChoice(line) {
+      var planSelect = line ? line.querySelector("[data-sales-subscription-plan]") : null;
       var index = Number(planSelect ? planSelect.value : -1);
       return Number.isInteger(index) && index >= 0 ? catalog[index] || null : null;
     }
 
     function renderSummary() {
-      var choice = selectedChoice();
-      var quantity = Math.max(1, Math.floor(numberValue(quantityInput ? quantityInput.value : 1) || 1));
-      var months = Math.max(1, Math.floor(numberValue(monthsInput ? monthsInput.value : 1) || 1));
-      if (!choice) {
-        if (total) total.textContent = "0 " + selectedCurrency(root);
-        if (formula) formula.textContent = "";
-        if (description) description.hidden = true;
-        return;
-      }
-      var monthly = convertPrice(choice.amount, choice.currency, selectedCurrency(root), options);
-      if (total) total.textContent = formatMoney(monthly * quantity * months, selectedCurrency(root)) + " " + selectedCurrency(root);
-      if (formula) formula.textContent = formatMoney(monthly, selectedCurrency(root)) + " " + selectedCurrency(root) + " × " + quantity + " × " + months + " мес.";
-      if (description) {
-        description.textContent = choice.description;
-        description.hidden = !choice.description;
+      var currency = selectedCurrency(root);
+      var grandTotal = 0;
+      var selectedCount = 0;
+      subscriptionLines().forEach(function (line) {
+        var choice = selectedChoice(line);
+        var quantityInput = line.querySelector("[data-sales-subscription-quantity]");
+        var monthsInput = line.querySelector("[data-sales-subscription-months]");
+        var description = line.querySelector("[data-sales-subscription-description]");
+        var quantity = Math.max(1, Math.floor(numberValue(quantityInput ? quantityInput.value : 1) || 1));
+        var months = Math.max(1, Math.floor(numberValue(monthsInput ? monthsInput.value : 1) || 1));
+        if (!choice) {
+          if (description) description.hidden = true;
+          return;
+        }
+        var monthly = convertPrice(choice.amount, choice.currency, currency, options);
+        grandTotal += monthly * quantity * months;
+        selectedCount += 1;
+        if (description) {
+          description.textContent = choice.description;
+          description.hidden = !choice.description;
+        }
+      });
+      if (total) total.textContent = formatMoney(grandTotal, currency) + " " + currency;
+      if (formula) {
+        formula.textContent = selectedCount
+          ? selectedCount + " " + (selectedCount === 1 ? "подписка" : "подписки") + " по выбранному периоду"
+          : "";
       }
     }
 
-    function renderPlans() {
+    function renderPlans(line) {
+      var planSelect = line ? line.querySelector("[data-sales-subscription-plan]") : null;
       if (!planSelect) return;
+      var previous = planSelect.value;
       var program = programSelect ? programSelect.value : "";
       planSelect.replaceChildren();
       catalog.forEach(function (choice, index) {
         if (choice.program !== program) return;
         planSelect.add(new Option(choice.label, String(index)));
       });
+      if (Array.from(planSelect.options).some(function (option) { return option.value === previous; })) {
+        planSelect.value = previous;
+      }
       planSelect.disabled = !planSelect.options.length;
+    }
+
+    function syncRemoveButtons() {
+      var lines = subscriptionLines();
+      lines.forEach(function (line) {
+        var removeButton = line.querySelector("[data-sales-subscription-remove-row]");
+        if (removeButton) removeButton.hidden = lines.length === 1;
+      });
+    }
+
+    function addSubscriptionLine() {
+      if (!linesContainer || !lineTemplate) return null;
+      var fragment = lineTemplate.content.cloneNode(true);
+      var line = fragment.querySelector("[data-sales-subscription-line]");
+      linesContainer.appendChild(fragment);
+      renderPlans(line);
+      syncRemoveButtons();
+      renderSummary();
+      return line;
+    }
+
+    function renderAllPlans() {
+      subscriptionLines().forEach(renderPlans);
       renderSummary();
     }
 
@@ -3260,12 +3304,13 @@
         programs.forEach(function (program) { programSelect.add(new Option(program, program)); });
         programSelect.disabled = !programs.length;
       }
-      if (quantityInput) quantityInput.value = "1";
-      if (monthsInput) monthsInput.value = "1";
+      if (linesContainer) linesContainer.replaceChildren();
+      if (catalog.length) addSubscriptionLine();
       if (empty) empty.hidden = !!catalog.length;
       if (summary) summary.hidden = !catalog.length;
       if (addButton) addButton.disabled = !catalog.length;
-      renderPlans();
+      if (addRowButton) addRowButton.disabled = !catalog.length;
+      renderSummary();
       if (typeof dialog.showModal === "function") dialog.showModal();
       else dialog.setAttribute("open", "");
     }
@@ -3276,10 +3321,24 @@
     }
 
     openButton.addEventListener("click", openDialog);
-    programSelect?.addEventListener("change", renderPlans);
-    planSelect?.addEventListener("change", renderSummary);
-    quantityInput?.addEventListener("input", renderSummary);
-    monthsInput?.addEventListener("input", renderSummary);
+    programSelect?.addEventListener("change", renderAllPlans);
+    addRowButton?.addEventListener("click", function () {
+      var line = addSubscriptionLine();
+      line?.querySelector("[data-sales-subscription-plan]")?.focus();
+    });
+    linesContainer?.addEventListener("change", function (event) {
+      if (event.target.matches("[data-sales-subscription-plan]")) renderSummary();
+    });
+    linesContainer?.addEventListener("input", function (event) {
+      if (event.target.matches("[data-sales-subscription-quantity], [data-sales-subscription-months]")) renderSummary();
+    });
+    linesContainer?.addEventListener("click", function (event) {
+      var removeButton = event.target.closest("[data-sales-subscription-remove-row]");
+      if (!removeButton) return;
+      removeButton.closest("[data-sales-subscription-line]")?.remove();
+      syncRemoveButtons();
+      renderSummary();
+    });
     dialog.querySelectorAll("[data-sales-subscription-close]").forEach(function (button) {
       button.addEventListener("click", closeDialog);
     });
@@ -3288,42 +3347,61 @@
     });
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      var choice = selectedChoice();
-      if (!choice) return;
-      var quantity = Math.max(1, Math.floor(numberValue(quantityInput ? quantityInput.value : 1) || 1));
-      var months = Math.max(1, Math.floor(numberValue(monthsInput ? monthsInput.value : 1) || 1));
-      var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).find(function (row) {
-        return normalize(rowProductValue(row)) === normalize(choice.productName);
+      var selections = subscriptionLines().map(function (line) {
+        var choice = selectedChoice(line);
+        if (!choice) return null;
+        var quantityInput = line.querySelector("[data-sales-subscription-quantity]");
+        var monthsInput = line.querySelector("[data-sales-subscription-months]");
+        return {
+          choice: choice,
+          quantity: Math.max(1, Math.floor(numberValue(quantityInput ? quantityInput.value : 1) || 1)),
+          months: Math.max(1, Math.floor(numberValue(monthsInput ? monthsInput.value : 1) || 1))
+        };
+      }).filter(Boolean);
+      if (!selections.length) return;
+      var usedRows = new Set();
+      var added = 0;
+      selections.forEach(function (selection) {
+        var choice = selection.choice;
+        var existingRow = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="product"]')).find(function (row) {
+          var planField = row.querySelector('input[name="line_subscription_plan"]');
+          return !usedRows.has(row)
+            && normalize(rowProductValue(row)) === normalize(choice.productName)
+            && normalize(planField ? planField.value : "") === normalize(choice.planName);
+        });
+        var combo = existingRow
+          ? existingRow.querySelector('[data-sales-combobox="product"]')
+          : firstAvailableCombo(root, "product", options);
+        if (!combo) return;
+        if (!existingRow) applyProductSelection(root, combo, options, choice.item, true);
+        var row = combo.closest(".sales-line-grid");
+        if (!row) return;
+        usedRows.add(row);
+        var monthly = convertPrice(choice.amount, choice.currency, selectedCurrency(root), options);
+        var quantityField = row.querySelector('input[name="line_quantity"]');
+        var priceField = row.querySelector('input[name="line_price"]');
+        var programField = row.querySelector('input[name="line_subscription_program"]');
+        var planField = row.querySelector('input[name="line_subscription_plan"]');
+        var monthsField = row.querySelector('input[name="line_subscription_months"]');
+        if (quantityField) quantityField.value = String(selection.quantity);
+        if (priceField) priceField.value = formatMoney(monthly * selection.months, selectedCurrency(root));
+        if (programField) programField.value = choice.program;
+        if (planField) planField.value = choice.planName;
+        if (monthsField) monthsField.value = String(selection.months);
+        row.dataset.salesSubscriptionMonthly = String(choice.amount);
+        row.dataset.salesSubscriptionCurrency = choice.currency;
+        row.dataset.salesSubscriptionMonths = String(selection.months);
+        row.dataset.salesBasePrice = String(choice.amount * selection.months);
+        row.dataset.salesBaseCurrency = choice.currency;
+        var meta = row.querySelector("[data-sales-subscription-line-meta]");
+        if (meta) {
+          meta.textContent = choice.program + " · " + choice.planName + " · " + selection.months + " мес.";
+          meta.hidden = false;
+        }
+        syncRowState(row);
+        added += 1;
       });
-      var combo = existingRow
-        ? existingRow.querySelector('[data-sales-combobox="product"]')
-        : firstAvailableCombo(root, "product", options);
-      if (!combo) return;
-      if (!existingRow) applyProductSelection(root, combo, options, choice.item);
-      var row = combo.closest(".sales-line-grid");
-      if (!row) return;
-      var monthly = convertPrice(choice.amount, choice.currency, selectedCurrency(root), options);
-      var quantityField = row.querySelector('input[name="line_quantity"]');
-      var priceField = row.querySelector('input[name="line_price"]');
-      var programField = row.querySelector('input[name="line_subscription_program"]');
-      var planField = row.querySelector('input[name="line_subscription_plan"]');
-      var monthsField = row.querySelector('input[name="line_subscription_months"]');
-      if (quantityField) quantityField.value = String(quantity);
-      if (priceField) priceField.value = formatMoney(monthly * months, selectedCurrency(root));
-      if (programField) programField.value = choice.program;
-      if (planField) planField.value = choice.planName;
-      if (monthsField) monthsField.value = String(months);
-      row.dataset.salesSubscriptionMonthly = String(choice.amount);
-      row.dataset.salesSubscriptionCurrency = choice.currency;
-      row.dataset.salesSubscriptionMonths = String(months);
-      row.dataset.salesBasePrice = String(choice.amount * months);
-      row.dataset.salesBaseCurrency = choice.currency;
-      var meta = row.querySelector("[data-sales-subscription-line-meta]");
-      if (meta) {
-        meta.textContent = choice.program + " · " + choice.planName + " · " + months + " мес.";
-        meta.hidden = false;
-      }
-      syncRowState(row);
+      if (!added) return;
       updateTotal(root);
       scheduleSalesDraft(root);
       closeDialog();

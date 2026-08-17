@@ -1490,20 +1490,30 @@
                   <span class="settings-profile-field-label">Программа</span>
                   <select class="settings-profile-input" data-sales-subscription-program required></select>
                 </label>
-                <label class="settings-profile-field sales-subscription-grid-wide">
-                  <span class="settings-profile-field-label">Подписка</span>
-                  <select class="settings-profile-input" data-sales-subscription-plan required></select>
-                </label>
-                <label class="settings-profile-field">
-                  <span class="settings-profile-field-label">Количество</span>
-                  <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-quantity required />
-                </label>
-                <label class="settings-profile-field">
-                  <span class="settings-profile-field-label">Месяцы</span>
-                  <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-months required />
-                </label>
               </div>
-              <p class="sales-subscription-description" data-sales-subscription-description hidden></p>
+              <div class="sales-subscription-list-head">
+                <span class="settings-profile-field-label">Подписки</span>
+                <button type="button" class="sales-subscription-add-row" data-sales-subscription-add-row aria-label="Добавить ещё подписку" title="Добавить ещё подписку">+</button>
+              </div>
+              <div class="sales-subscription-lines" data-sales-subscription-lines></div>
+              <template data-sales-subscription-line-template>
+                <div class="sales-subscription-line" data-sales-subscription-line>
+                  <label class="settings-profile-field sales-subscription-plan-field">
+                    <span class="settings-profile-field-label">Подписка</span>
+                    <select class="settings-profile-input" data-sales-subscription-plan required></select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Количество</span>
+                    <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-quantity required />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Месяцы</span>
+                    <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-months required />
+                  </label>
+                  <button type="button" class="sales-subscription-remove-row" data-sales-subscription-remove-row aria-label="Удалить подписку" title="Удалить подписку">×</button>
+                  <p class="sales-subscription-description" data-sales-subscription-description hidden></p>
+                </div>
+              </template>
               <div class="sales-subscription-summary" data-sales-subscription-summary>
                 <span>Итого за период</span>
                 <strong data-sales-subscription-total>0 UZS</strong>
@@ -1906,7 +1916,7 @@
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=38" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=4" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=71" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=72" defer></script>
   {% if sales_embed %}
     <script>
       (() => {
