@@ -3499,6 +3499,11 @@
 
   function purchaseDoneBalanceText(doc) {
     const card = doc && doc.supplier_card ? doc.supplier_card : {};
+    const balanceLines = Array.isArray(card.balance_lines) ? card.balance_lines : [];
+    const parts = balanceLines
+      .filter((line) => line && String(line.kind || "") !== "zero")
+      .map((line) => `${line.label || "Баланс"}: ${line.amount || "0"} ${line.currency || doc.currency || "UZS"}`);
+    if (parts.length) return parts.join(" · ");
     if (card.balance && card.balance !== "Нет долга") return card.balance;
     const debt = String(doc?.debt_amount || "").trim();
     if (debt && debt !== "0") return `Мы должны: ${debt} ${doc.currency || "UZS"}`;
