@@ -577,6 +577,37 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   font-weight: 800;
 }
 
+[data-sales-cost-stages] {
+  gap: 0.5rem;
+}
+
+[data-sales-cost-stages] .sales-document-tab::before,
+[data-sales-cost-stages] .sales-document-tab:first-of-type::before,
+[data-sales-cost-stages] .sales-document-tab:last-of-type::before {
+  border-radius: var(--workbench-radius-xs, 6px);
+}
+
+.reports-sales-cost-action-cell {
+  min-width: 8.75rem;
+}
+
+.reports-sales-cost-archive-form {
+  margin: 0;
+}
+
+.reports-sales-cost-archive-button {
+  width: 100%;
+  min-height: 2rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 38%, var(--border));
+  border-radius: var(--workbench-radius-xs, 6px);
+  padding: 0.35rem 0.65rem;
+  white-space: nowrap;
+}
+
+.reports-sales-cost-action-empty {
+  color: var(--muted-foreground);
+}
+
 .reports-row-toggle {
   display: inline-flex;
   align-items: center;

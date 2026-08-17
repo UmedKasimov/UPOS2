@@ -11842,6 +11842,13 @@ def create_app() -> FastAPI:
     @app.post("/sales/{sale_id}/status", name="sales_status_update")
     async def sales_status_update(request: Request, sale_id: str):
         form = await request.form()
+        return_to = str(form.get("return_to") or "").strip()
+        if not (
+            return_to == "/reports"
+            or return_to.startswith("/reports?")
+            or return_to.startswith("/reports#")
+        ):
+            return_to = ""
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
             return RedirectResponse(url="/sales?err=csrf#sales-journal", status_code=302)
         wid, redir = _product_workspace_owner(request)
@@ -11895,7 +11902,7 @@ def create_app() -> FastAPI:
                 row.data = data
                 flag_modified(row, "data")
                 session.add(row)
-        return RedirectResponse(url="/sales?msg=status#sales-journal", status_code=302)
+        return RedirectResponse(url=return_to or "/sales?msg=status#sales-journal", status_code=302)
 
     @app.post("/sales/{sale_id}/crm-stage", name="sales_crm_stage_update")
     async def sales_crm_stage_update(request: Request, sale_id: str):
@@ -21202,11 +21209,13 @@ def create_app() -> FastAPI:
 
                 def _sales_cost_row_payload(
                     *,
+                    document_id: str,
                     doc_date: str,
                     number: str,
                     client: str,
                     kind: str,
                     stage: str,
+                    can_archive: bool,
                     amount_value: Decimal,
                     cost_value: Decimal,
                     line_names: list[str],
@@ -21214,11 +21223,13 @@ def create_app() -> FastAPI:
                     employee_names: list[str],
                 ) -> dict[str, Any]:
                     return {
+                        "document_id": document_id,
                         "date": doc_date,
                         "number": number,
                         "client": client,
                         "kind": kind,
                         "stage": stage,
+                        "can_archive": can_archive,
                         "amount_value": amount_value,
                         "cost_value": cost_value,
                         "line_details": line_details,
@@ -21305,6 +21316,7 @@ def create_app() -> FastAPI:
                             cost_total += regular_document_cost
                             if regular_amount_primary or regular_document_cost:
                                 profit_sales_rows.append(_sales_cost_row_payload(
+                                    document_id=str(row.id),
                                     doc_date=doc_date,
                                     number=str(row.number or ""),
                                     client=client,
@@ -21312,6 +21324,7 @@ def create_app() -> FastAPI:
                                     # Прибыль программы считается только по архиву;
                                     # у остальных отгрузок она пока ожидаемая.
                                     stage="archive" if records_profit else "shipment",
+                                    can_archive=not records_profit,
                                     amount_value=regular_amount_primary,
                                     cost_value=regular_document_cost,
                                     line_names=sales_cost_line_names,
@@ -21329,11 +21342,13 @@ def create_app() -> FastAPI:
                         cost_total -= regular_document_cost
                         if regular_amount_primary or regular_document_cost:
                             profit_sales_rows.append(_sales_cost_row_payload(
+                                document_id=str(row.id),
                                 doc_date=doc_date,
                                 number=str(row.number or ""),
                                 client=client,
                                 kind="Возврат",
                                 stage="archive",
+                                can_archive=False,
                                 amount_value=-regular_amount_primary,
                                 cost_value=-regular_document_cost,
                                 line_names=sales_cost_line_names,
@@ -21355,11 +21370,13 @@ def create_app() -> FastAPI:
                             cost_total += regular_document_cost
                             if regular_amount_primary or regular_document_cost:
                                 profit_sales_rows.append(_sales_cost_row_payload(
+                                    document_id=str(row.id),
                                     doc_date=doc_date,
                                     number=str(row.number or ""),
                                     client=client,
                                     kind="Заказ",
                                     stage="archive" if records_profit else "shipment",
+                                    can_archive=False,
                                     amount_value=regular_amount_primary,
                                     cost_value=regular_document_cost,
                                     line_names=sales_cost_line_names,

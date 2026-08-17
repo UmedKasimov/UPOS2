@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=137" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=138" />
 {% endblock %}
 
 {% block page_header %}
@@ -403,6 +403,7 @@
         {% set sc_stages = (business_reports.profit or {}).stages or {'all': {}, 'shipment': {}, 'archive': {}} %}
         {% set sc_filters = (business_reports.profit or {}).filters or {} %}
         {% set sc_filter_options = (business_reports.profit or {}).filter_options or {'employees': [], 'clients': [], 'products': []} %}
+        {% set can_archive_sales = not user.get('is_employee') or emp_perms.get('sales') %}
         <header class="reports-panel-head">
           <div>
             <p class="reports-section-kicker">Прибыль</p>
@@ -541,6 +542,7 @@
                 <th>Прибыль</th>
                 <th>Маржа</th>
                 <th>Прибыль учтена</th>
+                <th>Действие</th>
               </tr>
             </thead>
             <tbody>
@@ -567,9 +569,21 @@
                       <span class="reports-stage-flag reports-stage-flag--expected">Ожидаемая</span>
                     {% endif %}
                   </td>
+                  <td class="reports-sales-cost-action-cell">
+                    {% if row.can_archive and can_archive_sales %}
+                      <form class="reports-sales-cost-archive-form" method="post" action="{{ url_for('sales_status_update', sale_id=row.document_id) }}" data-sales-cost-archive-form>
+                        {% include "_csrf_field.html" %}
+                        <input type="hidden" name="status" value="archived" />
+                        <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
+                        <button class="btn btn-secondary reports-sales-cost-archive-button" type="submit">Архивировать</button>
+                      </form>
+                    {% else %}
+                      <span class="reports-sales-cost-action-empty">-</span>
+                    {% endif %}
+                  </td>
                 </tr>
                 <tr class="reports-sales-cost-detail-row" data-sales-cost-detail-row="{{ row.stage or 'shipment' }}" data-sales-cost-detail-for="{{ loop.index }}" hidden>
-                  <td colspan="9">
+                  <td colspan="10">
                     <div id="{{ detail_id }}" class="reports-sales-cost-detail" data-sales-cost-detail-panel>
                       <div class="reports-sales-cost-detail-head">
                         <strong>Товары</strong>
@@ -601,9 +615,9 @@
                   </td>
                 </tr>
               {% else %}
-                <tr><td colspan="9" class="reports-empty-state">Продаж за период нет.</td></tr>
+                <tr><td colspan="10" class="reports-empty-state">Продаж за период нет.</td></tr>
               {% endfor %}
-              <tr hidden data-sales-cost-empty><td colspan="9" class="reports-empty-state">В этом разделе документов нет.</td></tr>
+              <tr hidden data-sales-cost-empty><td colspan="10" class="reports-empty-state">В этом разделе документов нет.</td></tr>
             </tbody>
             {% if sc_rows %}
               <tfoot>
@@ -612,6 +626,7 @@
                   <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.revenue_uzs or 0 }}" data-sales-cost-foot-revenue>{{ sc_stages.all.revenue or "0 UZS" }}</strong></td>
                   <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.cost_uzs or 0 }}" data-sales-cost-foot-cost>{{ sc_stages.all.cost or "0 UZS" }}</strong></td>
                   <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.profit_uzs or 0 }}" data-sales-cost-foot-profit>{{ sc_stages.all.profit or "0 UZS" }}</strong></td>
+                  <td></td>
                   <td></td>
                   <td></td>
                 </tr>
@@ -1438,6 +1453,25 @@
     if (!button) return;
     applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
   });
+
+  document.addEventListener('submit', (event) => {
+    const form = event.target.closest('[data-sales-cost-archive-form]');
+    if (!form) return;
+    if (!window.confirm('Архивировать продажу и учесть её прибыль как реальную?')) {
+      event.preventDefault();
+      return;
+    }
+    const returnTo = form.querySelector('input[name="return_to"]');
+    if (!returnTo) return;
+    const url = new URL(returnTo.value || '/reports', window.location.origin);
+    url.searchParams.set('profit_stage', 'archive');
+    returnTo.value = `${url.pathname}${url.search}`;
+  });
+
+  const initialProfitStage = new URLSearchParams(window.location.search).get('profit_stage');
+  if (['all', 'shipment', 'archive'].includes(initialProfitStage)) {
+    applySalesCostStage(initialProfitStage);
+  }
 
   document.addEventListener('click', (event) => {
     const toggle = event.target.closest('[data-sales-cost-toggle]');
