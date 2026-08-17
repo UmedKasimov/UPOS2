@@ -37,42 +37,20 @@
     }
   }
 
-  function rememberedUrl(route) {
-    try {
-      if (route.lastUrlKey) {
-        const stored = normalizeTabId(localStorage.getItem(route.lastUrlKey));
-        if (stored) {
-          const url = new URL(stored, window.location.origin);
-          if (url.origin === window.location.origin && routeAllowsPath(route, url.pathname)) {
-            return `${url.pathname}${url.search}${url.hash}`;
-          }
-        }
-      }
-      for (const key of route.keys) {
-        const saved = JSON.parse(localStorage.getItem(key) || "{}");
-        const tabId = normalizeTabId(saved.activeTab || saved.lastActiveTab);
-        if (!tabId) continue;
-        const storedUrl = normalizeTabId(saved.tabState?.[tabId]?.url);
-        const meta = saved.meta?.[tabId];
-        const fallback = normalizeTabId(meta?.href) || (meta?.hash ? `${route.path}#${meta.hash}` : "");
-        const url = new URL(storedUrl || fallback, window.location.origin);
-        if (route.path === "/sales" && tabId === "journal" && !url.searchParams.has("view")) {
-          url.searchParams.set("view", "journal");
-        }
-        if (url.origin === window.location.origin && routeAllowsPath(route, url.pathname)) {
-          return `${url.pathname}${url.search}${url.hash}`;
-        }
-      }
-    } catch {}
-    return "";
-  }
-
   function normalizeTabId(value) {
     return String(value || "").trim();
   }
 
   function routeAllowsPath(route, pathname) {
     return (route.allowedPaths || [route.path]).includes(pathname);
+  }
+
+  function moduleHomeHref(route, href) {
+    const url = new URL(href, window.location.href);
+    if (route.path === "/finance") url.searchParams.set("finance_home", "1");
+    else url.searchParams.set("module_home", "1");
+    url.hash = "";
+    return `${url.pathname}${url.search}`;
   }
 
   function rememberCurrentSection() {
@@ -94,12 +72,7 @@
       const route = routeForHref(baseHref);
       if (!route) return;
       link.dataset.workspaceBaseHref = baseHref;
-      if (link.classList.contains("active") && routeAllowsPath(route, window.location.pathname)) {
-        link.setAttribute("href", baseHref);
-        return;
-      }
-      const target = rememberedUrl(route);
-      link.setAttribute("href", target || baseHref);
+      link.setAttribute("href", moduleHomeHref(route, baseHref));
     });
   }
 
@@ -112,12 +85,7 @@
       const route = routeForHref(baseHref);
       if (!route) return;
       link.dataset.workspaceBaseHref = baseHref;
-      if (link.classList.contains("active") && routeAllowsPath(route, window.location.pathname)) {
-        link.setAttribute("href", baseHref);
-        return;
-      }
-      const target = rememberedUrl(route);
-      if (target) link.setAttribute("href", target);
+      link.setAttribute("href", moduleHomeHref(route, baseHref));
     },
     true
   );

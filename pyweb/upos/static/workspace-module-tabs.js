@@ -74,6 +74,7 @@
     root.dataset.workspaceTabsReady = "1";
 
     const storageKey = `upos.${key}.openTabs`;
+    const moduleHomeRequested = new URLSearchParams(window.location.search).get("module_home") === "1";
     const tabMeta = new Map();
     let openTabs = [];
     let activeTab = "";
@@ -251,7 +252,9 @@
       if (closeTabsOnLoad.length) {
         openTabs = openTabs.filter((tabId) => !closeTabsOnLoad.includes(tabId));
       }
-      if (forceTab && tabMeta.has(forceTab)) {
+      if (moduleHomeRequested) {
+        activeTab = "";
+      } else if (forceTab && tabMeta.has(forceTab)) {
         activeTab = forceTab;
       } else if (hashTab) {
         activeTab = hashTab;

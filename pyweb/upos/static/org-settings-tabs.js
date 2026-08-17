@@ -9,6 +9,7 @@
   const homeUrl = config.homeUrl || '/organizations/settings';
   const storageKey = 'upos.orgSettings.openTabs';
   const currentUrl = new URL(window.location.href);
+  const moduleHomeRequested = currentUrl.searchParams.get('module_home') === '1';
   const currentTab = labels[config.currentTab]
     ? config.currentTab
     : (labels[currentUrl.searchParams.get('tab')] ? currentUrl.searchParams.get('tab') : '');
@@ -111,7 +112,7 @@
 
   if (currentTab) {
     rememberActiveTab(currentTab);
-  } else if (config.restoreActive !== false) {
+  } else if (!moduleHomeRequested && config.restoreActive !== false) {
     const state = readState();
     if (state.activeTab) {
       window.location.replace(tabUrl(state.activeTab));

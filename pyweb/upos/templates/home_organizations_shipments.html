@@ -351,6 +351,7 @@
       const storageKey = 'upos.shipments.openTabs';
       const openTabs = [];
       let activeTab = '';
+      const moduleHomeRequested = new URLSearchParams(window.location.search).get('module_home') === '1';
 
       function normalize(tab) {
         if (Object.prototype.hasOwnProperty.call(meta, tab)) return tab;
@@ -763,7 +764,9 @@
       const shipmentHash = location.hash.startsWith('#shipment-') ? location.hash.slice(10) : '';
       const hashTab = dayHash ? `day:${dayHash}` : shipmentHash ? `shipment:${shipmentHash}` : location.hash === '#journal' ? 'journal' : location.hash === '#new' ? 'new' : '';
       restoreState();
-      if (hashTab) {
+      if (moduleHomeRequested) {
+        activeTab = '';
+      } else if (hashTab) {
         ensureOpen(hashTab);
         activeTab = hashTab;
       }

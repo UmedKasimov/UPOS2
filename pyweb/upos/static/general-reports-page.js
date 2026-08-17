@@ -50,6 +50,7 @@
   };
   const openReportTabs = [];
   const reportsStorageKey = 'upos.generalReports.openTabs';
+  const moduleHomeRequested = new URLSearchParams(window.location.search).get('module_home') === '1';
 
   function reportTitle(tab) {
     return reportTabMeta[tab]?.title || reportTabMeta.pnl.title;
@@ -73,7 +74,7 @@
       const saved = JSON.parse(localStorage.getItem(reportsStorageKey) || '{}');
       const tabs = Array.isArray(saved.openTabs) ? saved.openTabs.filter((tab) => reportTabMeta[tab]) : [];
       tabs.forEach(ensureOpenReportTab);
-      state.tab = reportTabMeta[saved.activeTab] ? saved.activeTab : '';
+      state.tab = !moduleHomeRequested && reportTabMeta[saved.activeTab] ? saved.activeTab : '';
       if (state.tab) ensureOpenReportTab(state.tab);
     } catch {
       state.tab = '';
