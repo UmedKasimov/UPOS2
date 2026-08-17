@@ -382,6 +382,35 @@
     return normalize(name).includes(q);
   }
 
+  function supplierByName(name) {
+    const cleanName = normalize(name);
+    if (!cleanName) return null;
+    const options = readPurchaseOptions();
+    const supplierRows = Array.isArray(options.supplier_rows) ? options.supplier_rows : [];
+    return supplierRows.find((supplier) => normalize(supplier?.name) === cleanName) || null;
+  }
+
+  function updatePurchaseSupplierBalance(picker, supplier) {
+    if (!picker || picker.matches("[data-adjustment-supplier-picker]")) return;
+    const entry = picker.closest(".warehouse-purchase-entry");
+    const balanceBox = entry?.querySelector("[data-warehouse-purchase-supplier-balance]");
+    if (!balanceBox) return;
+    const input = picker.querySelector("[data-warehouse-supplier-input]");
+    const supplierName = String(supplier?.name || input?.value || "").trim();
+    const knownSupplier = supplier && typeof supplier === "object" ? supplier : supplierByName(supplierName);
+    const nameNode = balanceBox.querySelector("[data-warehouse-purchase-supplier-balance-name]");
+    const valueNode = balanceBox.querySelector("[data-warehouse-purchase-supplier-balance-value]");
+    const balanceKind = String(knownSupplier?.balance_kind || (supplierName ? "zero" : "empty")).trim() || "zero";
+    balanceBox.dataset.balanceKind = balanceKind;
+    if (nameNode) nameNode.textContent = supplierName || "Поставщик не выбран";
+    if (valueNode) {
+      const balanceText = supplierName
+        ? String(knownSupplier?.balance || "Нет долга").trim() || "Нет долга"
+        : "-";
+      valueNode.textContent = `Баланс: ${balanceText}`;
+    }
+  }
+
   function commitSupplier(picker, value) {
     const input = picker?.querySelector("[data-warehouse-supplier-input]");
     if (!input) return;
@@ -402,6 +431,7 @@
       }
       supplierIdInput?.dispatchEvent(new Event("change", { bubbles: true }));
     }
+    updatePurchaseSupplierBalance(picker, supplier);
     setSupplierLocked(picker, Boolean(supplierName));
   }
 
@@ -1014,6 +1044,10 @@
     });
     input.addEventListener("input", () => {
       if (!input.readOnly) renderSupplierPicker(picker, input.value);
+      updatePurchaseSupplierBalance(picker, supplierByName(input.value));
+    });
+    input.addEventListener("change", () => {
+      updatePurchaseSupplierBalance(picker, supplierByName(input.value));
     });
     input.addEventListener("keydown", (event) => {
       const panel = picker.querySelector("[data-warehouse-supplier-panel]");
@@ -1039,6 +1073,7 @@
       event.stopPropagation();
       openSupplierDialog(form, picker, input.value);
     });
+    updatePurchaseSupplierBalance(picker, supplierByName(input.value));
   }
 
   function renderProductPicker(form, picker, query) {

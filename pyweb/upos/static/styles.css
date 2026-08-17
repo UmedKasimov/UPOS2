@@ -11794,6 +11794,54 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   gap: 1rem;
 }
 
+.warehouse-purchase-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.warehouse-purchase-entry-head > div:first-child {
+  min-width: 0;
+}
+
+.warehouse-purchase-supplier-balance {
+  display: grid;
+  min-width: min(22rem, 42vw);
+  padding: 0.65rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 28%, var(--border));
+  border-radius: var(--workbench-radius-sm, 10px);
+  background: color-mix(in srgb, var(--brand-box, #2563eb) 7%, var(--card));
+  box-shadow: 0 0.5rem 1.25rem color-mix(in srgb, var(--brand-box, #2563eb) 8%, transparent);
+}
+
+.warehouse-purchase-supplier-balance span {
+  overflow: hidden;
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warehouse-purchase-supplier-balance strong {
+  margin-top: 0.2rem;
+  color: var(--brand-box, #2563eb);
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.warehouse-purchase-supplier-balance[data-balance-kind="debt"] strong,
+.warehouse-purchase-supplier-balance[data-balance-kind="mixed"] strong {
+  color: #dc2626;
+}
+
+.warehouse-purchase-supplier-balance[data-balance-kind="advance"] strong {
+  color: #059669;
+}
+
 .warehouse-purchase-entry-grid {
   grid-template-columns: minmax(8rem, 0.65fr) minmax(9rem, 0.65fr) minmax(13rem, 1fr) minmax(11rem, 0.85fr) minmax(7rem, 0.5fr) minmax(11rem, 0.75fr) minmax(9rem, 0.55fr);
   align-items: end;

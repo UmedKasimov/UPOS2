@@ -694,6 +694,10 @@
         <h2>{{ 'Редактирование закупки ' ~ warehouse_purchase_edit.number if warehouse_purchase_edit else 'Новая закупка' }}</h2>
         <span>{{ 'Изменения заменят текущие позиции документа и пересчитают остатки.' if warehouse_purchase_edit else 'Закупка сразу попадет в остатки склада.' }}</span>
       </div>
+      <div class="warehouse-purchase-supplier-balance" data-warehouse-purchase-supplier-balance data-balance-kind="zero" aria-live="polite">
+        <span data-warehouse-purchase-supplier-balance-name>Поставщик не выбран</span>
+        <strong data-warehouse-purchase-supplier-balance-value>Баланс: -</strong>
+      </div>
     </header>
     <form method="post" action="{{ url_for('warehouse_purchase_update', purchase_id=warehouse_purchase_edit.id) if warehouse_purchase_edit else url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-purchase-edit-id="{{ warehouse_purchase_edit.id if warehouse_purchase_edit else '' }}" data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}" data-purchase-expense-type-save-url="{{ url_for('warehouse_purchase_expense_type_save') }}" data-purchase-expense-type-delete-url="{{ url_for('warehouse_purchase_expense_type_delete') }}">
       {% include "_csrf_field.html" %}
