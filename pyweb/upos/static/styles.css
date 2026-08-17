@@ -28491,9 +28491,9 @@ table.upos-table-resizable-columns {
   font-size: var(--text-xs);
 }
 
-/* Подтверждение после продажи с печатью чека и ценников. */
+/* Подтверждение после продажи с печатью чека. */
 .sale-done-dialog {
-  width: min(28rem, calc(100vw - 2rem));
+  width: min(38rem, calc(100vw - 2rem));
   padding: 0;
   border: 0;
   border-radius: var(--radius-xl);
@@ -28544,6 +28544,60 @@ table.upos-table-resizable-columns {
   margin: 0;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
+}
+
+.sale-done-summary {
+  display: grid;
+  gap: 0.65rem;
+  width: 100%;
+  margin-top: 0.65rem;
+  text-align: left;
+}
+
+.sale-done-section {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--card) 88%, var(--muted));
+}
+
+.sale-done-section > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.sale-done-client strong {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.sale-done-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.65rem;
+  align-items: baseline;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.sale-done-row-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sale-done-row strong {
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.sale-done-row--muted {
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: var(--muted-foreground);
 }
 
 .sale-done-actions {

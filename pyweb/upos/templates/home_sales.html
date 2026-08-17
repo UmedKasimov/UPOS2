@@ -667,16 +667,16 @@
           <script type="application/json" id="sales-journal-data-{{ sale.id }}">{{ sale.detail_json|tojson }}</script>
         {% endfor %}
         {# Подтверждение после сохранения: показываем итог и даём сразу
-           напечатать чек или ценники на проданные позиции. #}
+           напечатать чек. #}
         <dialog class="sale-done-dialog" data-sale-done-dialog>
           <div class="sale-done-card">
             <span class="sale-done-icon" aria-hidden="true">✓</span>
             <h2 data-sale-done-title>Продажа проведена</h2>
             <p class="sale-done-sum" data-sale-done-sum></p>
             <p class="sale-done-meta" data-sale-done-meta></p>
+            <div class="sale-done-summary" data-sale-done-summary></div>
             <div class="sale-done-actions">
               <button class="btn" type="button" data-sale-done-print-receipt>Печать чека</button>
-              <button class="btn btn-secondary" type="button" data-sale-done-print-tags>Печать ценников</button>
               <button class="btn btn-secondary" type="button" data-sale-done-close>Закрыть</button>
             </div>
           </div>
@@ -1851,7 +1851,7 @@
   {{ super() }}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=38" defer></script>
-  <script src="{{ url_for('static', path='sale-done.js') }}?v=3" defer></script>
+  <script src="{{ url_for('static', path='sale-done.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='sales-form.js') }}?v=70" defer></script>
   {% if sales_embed %}
     <script>

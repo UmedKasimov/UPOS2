@@ -1,5 +1,5 @@
 /* Подтверждение после продажи, заказа, возврата или оплаты: показываем
-   итог документа и даём напечатать чек или ценники на его позиции. */
+   итог документа и даём напечатать чек. */
 (() => {
   const TITLES = {
     saved: "Продажа проведена",
@@ -29,6 +29,39 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function lineName(item) {
+    return item.name || item.product || item.title || "";
+  }
+
+  function lineQuantity(item) {
+    return item.quantity || item.qty || "";
+  }
+
+  function linePrice(item) {
+    return item.price || "";
+  }
+
+  function lineTotal(item) {
+    return item.total || item.sum || "";
+  }
+
+  function moneyWithCurrency(amount, currency) {
+    const text = String(amount || "").trim();
+    const code = String(currency || "").trim();
+    if (!text) return "";
+    if (!code || text.toUpperCase().endsWith(` ${code.toUpperCase()}`)) return text;
+    return `${text} ${code}`;
+  }
+
   function printWindow(title, body, pageCss) {
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
@@ -54,20 +87,20 @@
   function receiptHtml(doc) {
     const rows = (doc.items || [])
       .map(
-        (item) => `<tr><td>${item.name || ""}</td><td class="num">${item.quantity || ""}</td>`
-          + `<td class="num">${item.price || ""}</td><td class="num">${item.total || item.sum || ""}</td></tr>`,
+        (item) => `<tr><td>${escapeHtml(lineName(item))}</td><td class="num">${escapeHtml(lineQuantity(item))}</td>`
+          + `<td class="num">${escapeHtml(linePrice(item))}</td><td class="num">${escapeHtml(lineTotal(item))}</td></tr>`,
       )
       .join("");
     return `<div class="sale-receipt">
-      <h1>${doc.number ? `Чек ${doc.number}` : "Чек"}</h1>
-      <p>${doc.date || ""}${doc.client ? ` · ${doc.client}` : ""}</p>
+      <h1>${doc.number ? `Чек ${escapeHtml(doc.number)}` : "Чек"}</h1>
+      <p>${escapeHtml(doc.date || "")}${doc.client ? ` · ${escapeHtml(doc.client)}` : ""}</p>
       <table>
         <thead><tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="sale-receipt-total">Итого: ${doc.amount || ""}</p>
-      ${doc.paid_amount ? `<p>Оплачено: ${doc.paid_amount}</p>` : ""}
-      ${doc.debt_amount && doc.debt_amount !== "0" ? `<p>Долг: ${doc.debt_amount}</p>` : ""}
+      <p class="sale-receipt-total">Итого: ${escapeHtml(moneyWithCurrency(doc.amount, doc.currency))}</p>
+      ${doc.paid_amount ? `<p>Оплачено: ${escapeHtml(moneyWithCurrency(doc.paid_amount, doc.currency))}</p>` : ""}
+      ${doc.debt_amount && doc.debt_amount !== "0" ? `<p>Долг: ${escapeHtml(moneyWithCurrency(doc.debt_amount, doc.currency))}</p>` : ""}
     </div>`;
   }
 
@@ -80,9 +113,9 @@
     const cards = (doc.items || [])
       .map((item) => {
         const parts = [];
-        if (fields.name !== false) parts.push(`<div class="price-tag-name">${item.name || ""}</div>`);
-        parts.push(`<div class="price-tag-price"><b>${item.price || ""}</b><span>${suffix}</span></div>`);
-        if (item.sku) parts.push(`<div class="price-tag-sku">${item.sku}</div>`);
+        if (fields.name !== false) parts.push(`<div class="price-tag-name">${escapeHtml(lineName(item))}</div>`);
+        parts.push(`<div class="price-tag-price"><b>${escapeHtml(linePrice(item))}</b><span>${escapeHtml(suffix)}</span></div>`);
+        if (item.sku) parts.push(`<div class="price-tag-sku">${escapeHtml(item.sku)}</div>`);
         return `<div class="price-tag-preview" style="--price-tag-width:${width}mm;--price-tag-height:${height}mm">`
           + `<div class="price-tag-card"><div class="price-tag-body">${parts.join("")}</div></div></div>`;
       })
@@ -90,8 +123,46 @@
     return `<div class="sale-tags-sheet">${cards}</div>`;
   }
 
+  function normalizedItems(doc) {
+    const items = Array.isArray(doc.items) && doc.items.length ? doc.items : doc.lines;
+    return (Array.isArray(items) ? items : []).filter((item) => item && lineName(item));
+  }
+
+  function renderSummary(dialog, doc) {
+    const node = dialog.querySelector("[data-sale-done-summary]");
+    if (!node) return;
+    const items = normalizedItems(doc);
+    const payments = Array.isArray(doc.payment_lines) ? doc.payment_lines : [];
+    const clientHtml = doc.client
+      ? `<section class="sale-done-section sale-done-client"><span>Клиент</span><strong>${escapeHtml(doc.client)}</strong></section>`
+      : "";
+    const itemRows = items.map((item) => {
+      const qty = lineQuantity(item);
+      const price = moneyWithCurrency(linePrice(item), doc.currency);
+      const total = moneyWithCurrency(lineTotal(item), doc.currency);
+      return `<div class="sale-done-row">
+        <span class="sale-done-row-main">${escapeHtml(lineName(item))}</span>
+        <span>${escapeHtml(qty)}</span>
+        <strong>${escapeHtml(total || price)}</strong>
+      </div>`;
+    }).join("");
+    const paymentRows = payments.length
+      ? payments.map((payment, index) => {
+          const label = payment.account || payment.type || `Оплата ${index + 1}`;
+          return `<div class="sale-done-row">
+            <span class="sale-done-row-main">${escapeHtml(label)}</span>
+            <strong>${escapeHtml(moneyWithCurrency(payment.amount, payment.currency || doc.currency))}</strong>
+          </div>`;
+        }).join("")
+      : `<div class="sale-done-row sale-done-row--muted"><span>Оплата не внесена</span><strong>${escapeHtml(moneyWithCurrency(doc.outstanding_amount || doc.amount, doc.currency))}</strong></div>`;
+    node.innerHTML = `${clientHtml}
+      ${items.length ? `<section class="sale-done-section"><span>Заказ</span>${itemRows}</section>` : ""}
+      <section class="sale-done-section"><span>Оплата</span>${paymentRows}</section>`;
+  }
+
   function open(dialog, message, saleId) {
     const doc = docData(saleId) || {};
+    doc.items = normalizedItems(doc);
     const params = new URLSearchParams(window.location.search);
     const paidNow = String(params.get("paid_now") || "").trim();
     const currency = String(params.get("currency") || "").trim();
@@ -108,6 +179,7 @@
       metaParts.push(`Остаток: ${remaining}${currency ? " " + currency : ""}`);
     }
     dialog.querySelector("[data-sale-done-meta]").textContent = metaParts.filter(Boolean).join(" · ");
+    renderSummary(dialog, doc);
     dialog._saleDoneDoc = doc;
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
@@ -125,16 +197,6 @@
         + ".sale-receipt th,.sale-receipt td{padding:2mm 1mm;border-bottom:1px solid #cbd5e1;font-size:10pt}"
         + ".sale-receipt .num{text-align:right}.sale-receipt-total{font-weight:800;font-size:12pt}");
     });
-    dialog.querySelector("[data-sale-done-print-tags]")?.addEventListener("click", () => {
-      const settings = tagSettings();
-      printWindow(
-        "Ценники",
-        tagsHtml(dialog._saleDoneDoc || {}),
-        `@page{size:${Number(settings.width) || 58}mm ${Number(settings.height) || 40}mm;margin:0}`
-          + "body{margin:0}.sale-tags-sheet{display:flex;flex-wrap:wrap}",
-      );
-    });
-
     const params = new URLSearchParams(window.location.search);
     const message = params.get("msg") || "";
     const saleId = params.get("saved_id") || "";
