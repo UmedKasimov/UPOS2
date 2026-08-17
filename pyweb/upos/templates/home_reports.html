@@ -417,6 +417,9 @@
             </label>
           </form>
           <div class="reports-stock-analysis-tools">
+            <button type="button" class="btn btn-secondary" data-sales-cost-export>
+              Скачать Excel
+            </button>
             <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
               <button type="button" data-profit-currency="UZS" {% if report_currency == 'UZS' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>UZS</button>
               <button type="button" data-profit-currency="USD" {% if report_currency == 'USD' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>USD</button>
@@ -976,6 +979,197 @@
     return `${numberFormatter.format(amount)} ${currency || 'UZS'}`;
   }
 
+  function reportsXmlEscape(value) {
+    return String(value ?? '')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function reportsColumnLetter(index) {
+    let n = index + 1;
+    let name = '';
+    while (n > 0) {
+      const mod = (n - 1) % 26;
+      name = String.fromCharCode(65 + mod) + name;
+      n = Math.floor((n - mod) / 26);
+    }
+    return name;
+  }
+
+  function reportsCrc32(bytes) {
+    if (!reportsCrc32.table) {
+      reportsCrc32.table = Array.from({ length: 256 }, (_, n) => {
+        let c = n;
+        for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        return c >>> 0;
+      });
+    }
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i += 1) c = reportsCrc32.table[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function reportsWriteUint16LE(target, value) {
+    target.push(value & 0xff, (value >>> 8) & 0xff);
+  }
+
+  function reportsWriteUint32LE(target, value) {
+    target.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+  }
+
+  function reportsDosDateTime(date) {
+    const year = Math.max(1980, date.getFullYear());
+    return {
+      time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+      date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+    };
+  }
+
+  function reportsCreateZip(files) {
+    const encoder = new TextEncoder();
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+    const stamp = reportsDosDateTime(new Date());
+    files.forEach((file) => {
+      const nameBytes = encoder.encode(file.name);
+      const dataBytes = typeof file.content === 'string' ? encoder.encode(file.content) : file.content;
+      const crc = reportsCrc32(dataBytes);
+      const local = [];
+      reportsWriteUint32LE(local, 0x04034b50);
+      reportsWriteUint16LE(local, 20);
+      reportsWriteUint16LE(local, 0x0800);
+      reportsWriteUint16LE(local, 0);
+      reportsWriteUint16LE(local, stamp.time);
+      reportsWriteUint16LE(local, stamp.date);
+      reportsWriteUint32LE(local, crc);
+      reportsWriteUint32LE(local, dataBytes.length);
+      reportsWriteUint32LE(local, dataBytes.length);
+      reportsWriteUint16LE(local, nameBytes.length);
+      reportsWriteUint16LE(local, 0);
+      chunks.push(Uint8Array.from(local), nameBytes, dataBytes);
+
+      const entry = [];
+      reportsWriteUint32LE(entry, 0x02014b50);
+      reportsWriteUint16LE(entry, 20);
+      reportsWriteUint16LE(entry, 20);
+      reportsWriteUint16LE(entry, 0x0800);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, stamp.time);
+      reportsWriteUint16LE(entry, stamp.date);
+      reportsWriteUint32LE(entry, crc);
+      reportsWriteUint32LE(entry, dataBytes.length);
+      reportsWriteUint32LE(entry, dataBytes.length);
+      reportsWriteUint16LE(entry, nameBytes.length);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint32LE(entry, 0);
+      reportsWriteUint32LE(entry, offset);
+      central.push(Uint8Array.from(entry), nameBytes);
+      offset += local.length + nameBytes.length + dataBytes.length;
+    });
+    const centralSize = central.reduce((sum, part) => sum + part.length, 0);
+    const end = [];
+    reportsWriteUint32LE(end, 0x06054b50);
+    reportsWriteUint16LE(end, 0);
+    reportsWriteUint16LE(end, 0);
+    reportsWriteUint16LE(end, files.length);
+    reportsWriteUint16LE(end, files.length);
+    reportsWriteUint32LE(end, centralSize);
+    reportsWriteUint32LE(end, offset);
+    reportsWriteUint16LE(end, 0);
+    return new Blob([...chunks, ...central, Uint8Array.from(end)], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+  }
+
+  function reportsXlsxCell(value, rowNumber, colIndex, isHeader) {
+    const ref = `${reportsColumnLetter(colIndex)}${rowNumber}`;
+    const style = isHeader ? ' s="1"' : '';
+    return `<c r="${ref}" t="inlineStr"${style}><is><t>${reportsXmlEscape(value)}</t></is></c>`;
+  }
+
+  function reportsBuildXlsx(sheetName, rows) {
+    const maxColumns = Math.max(...rows.map((row) => row.length), 1);
+    const normalized = rows.map((row) => Array.from({ length: maxColumns }, (_, index) => row[index] ?? ''));
+    const widths = Array.from({ length: maxColumns }, (_, index) => {
+      const maxLen = normalized.reduce((max, row) => Math.max(max, String(row[index] ?? '').length), 0);
+      return Math.max(10, Math.min(46, maxLen + 2));
+    });
+    const lastCell = `${reportsColumnLetter(maxColumns - 1)}${normalized.length}`;
+    const colsXml = widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join('');
+    const rowsXml = normalized.map((row, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      const isHeader = rowIndex === 4;
+      const cells = row.map((value, colIndex) => reportsXlsxCell(value, rowNumber, colIndex, isHeader)).join('');
+      return `<row r="${rowNumber}">${cells}</row>`;
+    }).join('');
+    const safeSheetName = reportsXmlEscape(String(sheetName || 'Report').slice(0, 31));
+    const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="5" topLeftCell="A6" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${colsXml}</cols><sheetData>${rowsXml}</sheetData><autoFilter ref="A5:${lastCell}"/></worksheet>`;
+    return reportsCreateZip([
+      { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+      { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+      { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${safeSheetName}" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+      { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+      { name: 'xl/styles.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>` },
+      { name: 'xl/worksheets/sheet1.xml', content: sheetXml },
+    ]);
+  }
+
+  function reportsDownloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportSalesCostXlsx() {
+    const panel = document.getElementById('report-sales-cost');
+    const table = panel?.querySelector('.reports-data-table');
+    if (!panel || !table) return;
+    const activeStage = panel.querySelector('[data-sales-cost-stage].active');
+    const stageLabel = activeStage?.querySelector('.messenger-channel-label')?.textContent?.trim() || 'Все';
+    const periodLabel = panel.querySelector('.reports-panel-head p:last-child')?.textContent?.trim() || '';
+    const headers = [...table.querySelectorAll('thead th')].map((cell) => cell.textContent.trim());
+    const rows = [...table.querySelectorAll('tbody tr[data-sales-cost-row]')]
+      .filter((row) => !row.hidden)
+      .map((row) => [...row.cells].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()));
+    const footer = [...table.querySelectorAll('tfoot tr')]
+      .map((row) => [...row.cells].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()));
+    if (!rows.length) {
+      alert('Нет данных для экспорта');
+      return;
+    }
+    const exportRows = [
+      ['Продажи и себестоимость'],
+      ['Период', periodLabel],
+      ['Раздел', stageLabel],
+      [],
+      headers,
+      ...rows,
+      ...footer,
+    ];
+    const date = new Date().toISOString().slice(0, 10);
+    const stageKey = activeStage?.getAttribute('data-sales-cost-stage') || 'all';
+    reportsDownloadBlob(reportsBuildXlsx('Sales cost', exportRows), `sales-cost-${stageKey}-${date}.xlsx`);
+  }
+
   let profitCurrency = document.querySelector('[data-profit-currency-switch]')?.getAttribute('data-initial-currency') === 'UZS' ? 'UZS' : 'USD';
 
   function renderProfitCurrency() {
@@ -1038,6 +1232,8 @@
     if (!button) return;
     applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
   });
+
+  document.querySelector('[data-sales-cost-export]')?.addEventListener('click', exportSalesCostXlsx);
 
   function renderStockCurrency() {
     document.querySelectorAll('[data-stock-money]').forEach((node) => {
