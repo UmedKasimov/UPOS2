@@ -407,6 +407,15 @@
             <h2>Продажи и себестоимость</h2>
             <p>{{ sc_summary.period }} · документов: {{ sc_rows | length }}</p>
           </div>
+          <form class="reports-profit-period" method="get" action="{{ url_for('home_reports') }}" data-reports-period-form>
+            <input type="hidden" name="period" value="custom" />
+            <input type="hidden" name="open_report" value="sales-cost" />
+            <label class="sales-journal-filter-field sales-journal-filter-date">
+              <span>Период</span>
+              <input name="date_from" type="date" value="{{ reports.period_date_from or '' }}" onchange="this.form.submit()" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период продаж и себестоимости" />
+              <input id="sales_cost_date_to" name="date_to" type="hidden" value="{{ reports.period_date_to or '' }}" />
+            </label>
+          </form>
           <div class="reports-stock-analysis-tools">
             <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
               <button type="button" data-profit-currency="UZS" {% if report_currency == 'UZS' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>UZS</button>
@@ -1756,6 +1765,7 @@
 
   const storageKey = 'upos.homeReports.openTabs';
   const moduleHomeRequested = new URLSearchParams(window.location.search).get('module_home') === '1';
+  const requestedReport = new URLSearchParams(window.location.search).get('open_report') || '';
 
   function saveState() {
     try {
@@ -1772,7 +1782,11 @@
         ? saved.openTabs.filter((tab) => reportMeta[tab])
         : [];
       savedTabs.forEach(ensureOpen);
-      activeTab = !moduleHomeRequested && reportMeta[saved.activeTab] ? saved.activeTab : '';
+      activeTab = !moduleHomeRequested && reportMeta[requestedReport]
+        ? requestedReport
+        : !moduleHomeRequested && reportMeta[saved.activeTab]
+          ? saved.activeTab
+          : '';
       if (activeTab) ensureOpen(activeTab);
     } catch (err) {
       activeTab = '';
