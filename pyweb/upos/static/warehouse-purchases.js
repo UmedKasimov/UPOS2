@@ -2343,6 +2343,51 @@
     if (node) node.textContent = value == null || value === "" ? "-" : String(value);
   }
 
+  function renderSupplierBalanceLines(root, supplier) {
+    const container = root.querySelector("[data-purchase-supplier-card-balance]");
+    if (!container) return;
+    container.replaceChildren();
+    const lines = Array.isArray(supplier?.balance_lines) ? supplier.balance_lines : [];
+    if (!lines.length) {
+      const item = document.createElement("div");
+      item.className = "warehouse-supplier-card-balance-item";
+      item.dataset.balanceKind = "zero";
+      item.innerHTML = "<span>Баланс</span><strong>Нет долга</strong>";
+      container.append(item);
+      return;
+    }
+    lines.forEach((line) => {
+      const item = document.createElement("div");
+      item.className = "warehouse-supplier-card-balance-item";
+      item.dataset.balanceKind = String(line.kind || "zero");
+      const label = document.createElement("span");
+      label.textContent = String(line.label || "Баланс");
+      const value = document.createElement("strong");
+      const amount = String(line.amount || "0");
+      const currency = String(line.currency || "UZS").toUpperCase();
+      value.textContent = line.kind === "zero" ? "Нет долга" : `${amount} ${currency}`;
+      item.append(label, value);
+      container.append(item);
+    });
+  }
+
+  function openPurchaseSupplierCard(panel, purchase) {
+    const dialog = panel.querySelector("[data-purchase-supplier-card-dialog]");
+    const supplier = purchase?.supplier_card || null;
+    if (!dialog || !supplier) return;
+    setText(dialog, "[data-purchase-supplier-card-name]", supplier.name || purchase.supplier || "Поставщик");
+    setText(dialog, "[data-purchase-supplier-card-sub]", supplier.official_name || supplier.balance || "Баланс и контакты");
+    setText(dialog, "[data-purchase-supplier-card-phone]", supplier.phone || "-");
+    setText(dialog, "[data-purchase-supplier-card-email]", supplier.email || "-");
+    setText(dialog, "[data-purchase-supplier-card-inn]", supplier.inn || "-");
+    setText(dialog, "[data-purchase-supplier-card-category]", supplier.category || "-");
+    setText(dialog, "[data-purchase-supplier-card-address]", supplier.address || "-");
+    setText(dialog, "[data-purchase-supplier-card-status]", supplier.status || "-");
+    setText(dialog, "[data-purchase-supplier-card-comment]", supplier.comment || "-");
+    renderSupplierBalanceLines(dialog, supplier);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+  }
+
   function detailPaymentDialog(root = document) {
     return root.querySelector("[data-purchase-detail-payment-dialog]");
   }
@@ -2592,6 +2637,13 @@
     setText(panel, "[data-purchase-detail-title]", `Закупка: ${purchase.number || "-"}`);
     setText(panel, "[data-purchase-detail-date]", purchase.date ? `${purchase.date} · ${purchase.status_label || "Заказ"}` : purchase.status_label || "Заказ");
     setText(panel, "[data-purchase-detail-supplier]", purchase.supplier || "Поставщик не указан");
+    setText(panel, "[data-purchase-detail-supplier-balance]", purchase.supplier_card?.balance || "Баланс не найден");
+    const supplierOpen = panel.querySelector("[data-purchase-detail-supplier-open]");
+    if (supplierOpen) {
+      supplierOpen.disabled = !purchase.supplier_card;
+      supplierOpen.dataset.balanceKind = purchase.supplier_card?.balance_kind || "zero";
+      supplierOpen.title = purchase.supplier_card ? "Открыть карточку поставщика" : "Карточка поставщика не найдена";
+    }
     setText(panel, "[data-purchase-detail-warehouse]", purchase.warehouse || "Основной склад");
     setText(panel, "[data-purchase-detail-status]", purchase.status_label || "Заказ");
     setText(panel, "[data-purchase-detail-paid]", moneyWithCurrency(purchase.paid_amount, currency));
@@ -2887,6 +2939,19 @@
         target.searchParams.set("edit_purchase", purchaseId);
         target.hash = "purchase-edit";
         window.location.assign(target.toString());
+      });
+      panel.querySelector("[data-purchase-detail-supplier-open]")?.addEventListener("click", () => {
+        const purchase = readPurchase(panel.dataset.purchaseId || "");
+        if (!purchase?.supplier_card) return;
+        openPurchaseSupplierCard(panel, purchase);
+      });
+      panel.querySelectorAll("[data-purchase-supplier-card-close]").forEach((button) => {
+        button.addEventListener("click", () => {
+          panel.querySelector("[data-purchase-supplier-card-dialog]")?.close();
+        });
+      });
+      panel.querySelector("[data-purchase-supplier-card-dialog]")?.addEventListener("click", (event) => {
+        if (event.target === event.currentTarget) event.currentTarget.close();
       });
     });
     const paymentDialog = detailPaymentDialog(root);

@@ -12491,6 +12491,7 @@ def create_app() -> FastAPI:
             "id": row.id,
             "number": row.number,
             "date": str(data.get("date") or ""),
+            "counterparty_id": str(data.get("counterparty_id") or row.counterparty_id or ""),
             "supplier": str(data.get("supplier") or ""),
             "warehouse": str(data.get("warehouse") or ""),
             "amount": _sales_money_label(row.amount),
@@ -12522,6 +12523,7 @@ def create_app() -> FastAPI:
             "id": str(item["id"] or ""),
             "number": str(item["number"] or ""),
             "date": str(item["date"] or ""),
+            "counterparty_id": str(item["counterparty_id"] or ""),
             "supplier": str(item["supplier"] or ""),
             "warehouse": str(item["warehouse"] or ""),
             "amount": str(item["amount"] or "0"),
@@ -14364,6 +14366,8 @@ def create_app() -> FastAPI:
         product_names: list[str] = []
         supplier_names: list[str] = []
         warehouse_supplier_options: list[dict[str, str]] = []
+        warehouse_supplier_cards_by_id: dict[str, dict[str, Any]] = {}
+        warehouse_supplier_cards_by_name: dict[str, dict[str, Any]] = {}
         warehouse_stock_total = Decimal("0")
         purchase_status_counts: dict[str, int] = {"all": 0}
         warehouse_purchase_totals: dict[str, Decimal] = {}
@@ -14430,17 +14434,55 @@ def create_app() -> FastAPI:
                 )
                 balance_parts: list[str] = []
                 balance_kinds: set[str] = set()
+                modal_balance_lines: list[dict[str, str]] = []
                 for balance_line in supplier_item.get("balance_lines") or []:
                     balance_value = _sales_decimal(balance_line.get("value"))
                     if not balance_value:
                         continue
                     balance_kind = "debt" if balance_value > 0 else "advance"
+                    balance_currency = str(balance_line.get("currency") or "UZS").upper()
                     balance_kinds.add(balance_kind)
+                    modal_balance_lines.append(
+                        {
+                            "label": "Мы должны" if balance_value > 0 else "Аванс поставщику",
+                            "amount": _sales_money_label(abs(balance_value)),
+                            "currency": balance_currency,
+                            "kind": balance_kind,
+                        }
+                    )
                     balance_parts.append(
                         f"{'Мы должны' if balance_value > 0 else 'Он должен'}: "
                         f"{_sales_money_label(abs(balance_value))} "
-                        f"{str(balance_line.get('currency') or 'UZS').upper()}"
+                        f"{balance_currency}"
                     )
+                if not modal_balance_lines:
+                    modal_balance_lines.append(
+                        {"label": "Баланс", "amount": "0", "currency": "UZS", "kind": "zero"}
+                    )
+                supplier_card = {
+                    "id": str(supplier_item.get("id") or ""),
+                    "name": str(supplier_item.get("name") or ""),
+                    "official_name": str(supplier_item.get("official_name") or ""),
+                    "phone": str(supplier_item.get("phone") or ""),
+                    "email": str(supplier_item.get("email") or ""),
+                    "inn": str(supplier_item.get("inn") or supplier_item.get("tax_id") or ""),
+                    "category": str(supplier_item.get("category") or ""),
+                    "address": str(supplier_item.get("address") or ""),
+                    "comment": str(supplier_item.get("comment") or supplier_item.get("note") or ""),
+                    "status": "Активный" if str(supplier_item.get("status") or "active") == "active" else "Неактивный",
+                    "last_date": str(supplier_item.get("last_date") or ""),
+                    "balance": " · ".join(balance_parts) or "Нет долга",
+                    "balance_kind": (
+                        "mixed"
+                        if len(balance_kinds) > 1
+                        else next(iter(balance_kinds), "zero")
+                    ),
+                    "balance_lines": modal_balance_lines,
+                }
+                if supplier_card["id"]:
+                    warehouse_supplier_cards_by_id[supplier_card["id"]] = supplier_card
+                if supplier_card["name"]:
+                    warehouse_supplier_cards_by_name[supplier_card["name"].lower()] = supplier_card
                 warehouse_supplier_options.append(
                     {
                         "id": str(supplier_item.get("id") or ""),
@@ -14504,6 +14546,12 @@ def create_app() -> FastAPI:
             purchase_product_meta = _purchase_line_product_meta(session, wid)
             for row in purchase_rows:
                 item = _purchase_document_data(row, purchase_product_meta)
+                supplier_card = warehouse_supplier_cards_by_id.get(str(item.get("counterparty_id") or ""))
+                if supplier_card is None:
+                    supplier_card = warehouse_supplier_cards_by_name.get(str(item.get("supplier") or "").strip().lower())
+                if supplier_card:
+                    item["supplier_card"] = supplier_card
+                    item["detail_json"]["supplier_card"] = supplier_card
                 if str(row.id) == str(edit_purchase or ""):
                     warehouse_purchase_edit = item
                 line_products = " ".join(

@@ -486,10 +486,11 @@
         </div>
       </header>
       <section class="warehouse-purchase-detail-summary">
-        <div>
+        <button type="button" class="warehouse-purchase-detail-supplier-card" data-purchase-detail-supplier-open>
           <span>Поставщик</span>
           <strong data-purchase-detail-supplier></strong>
-        </div>
+          <small data-purchase-detail-supplier-balance></small>
+        </button>
         <div>
           <span>Склад</span>
           <strong data-purchase-detail-warehouse></strong>
@@ -499,6 +500,34 @@
           <strong data-purchase-detail-status></strong>
         </div>
       </section>
+      <dialog class="settings-profile-modal warehouse-supplier-card-dialog" data-purchase-supplier-card-dialog>
+        <section class="settings-profile-modal-surface warehouse-supplier-card-dialog-surface">
+          <div class="settings-profile-modal-head">
+            <div>
+              <h2 class="settings-profile-modal-title" data-purchase-supplier-card-name>Поставщик</h2>
+              <p class="settings-profile-modal-sub" data-purchase-supplier-card-sub>Баланс и контакты</p>
+            </div>
+            <button type="button" class="settings-profile-modal-close" data-purchase-supplier-card-close aria-label="Закрыть">×</button>
+          </div>
+          <div class="settings-profile-modal-scroll">
+            <div class="settings-profile-modal-body warehouse-supplier-card-body">
+              <div class="warehouse-supplier-card-balance" data-purchase-supplier-card-balance></div>
+              <dl class="warehouse-supplier-card-info">
+                <div><dt>Телефон</dt><dd data-purchase-supplier-card-phone>-</dd></div>
+                <div><dt>Email</dt><dd data-purchase-supplier-card-email>-</dd></div>
+                <div><dt>ИНН</dt><dd data-purchase-supplier-card-inn>-</dd></div>
+                <div><dt>Категория</dt><dd data-purchase-supplier-card-category>-</dd></div>
+                <div><dt>Адрес</dt><dd data-purchase-supplier-card-address>-</dd></div>
+                <div><dt>Статус</dt><dd data-purchase-supplier-card-status>-</dd></div>
+                <div class="wide"><dt>Комментарий</dt><dd data-purchase-supplier-card-comment>-</dd></div>
+              </dl>
+            </div>
+          </div>
+          <div class="settings-profile-modal-foot">
+            <button type="button" class="btn btn-secondary" data-purchase-supplier-card-close>Закрыть</button>
+          </div>
+        </section>
+      </dialog>
       <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы закупки">
         <button type="button" class="active" data-purchase-detail-tab="items" aria-selected="true">Товары</button>
         <button type="button" data-purchase-detail-tab="payment" aria-selected="false">Оплата</button>
