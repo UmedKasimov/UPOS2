@@ -1129,6 +1129,7 @@
                   </select>
                 </label>
                 <input type="hidden" name="price_type_name" data-sales-price-type-name />
+                <button type="button" class="btn btn-secondary btn-sm sales-catalog-pick-btn" data-sales-catalog-pick>Подбор</button>
                 <button type="button" class="btn btn-secondary btn-sm sales-add-subscription-btn" data-sales-subscription-open>+ Подписка</button>
                 <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
                 <button type="button" class="btn btn-secondary btn-sm sales-add-installment-btn" data-sales-installment-add>+ Рассрочка</button>
@@ -2011,7 +2012,7 @@
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
   <script src="{{ url_for('static', path='sales-journal.js') }}?v=39" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=5" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=78" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=79" defer></script>
   {% if sales_embed %}
     <script>
       (() => {

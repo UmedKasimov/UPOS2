@@ -306,6 +306,205 @@
     }) || null;
   }
 
+  function catalogProductCategory(item) {
+    return String(item?.category || "Без категории").trim() || "Без категории";
+  }
+
+  function catalogProductSearchText(item) {
+    return [
+      item?.name,
+      item?.sku,
+      item?.barcode,
+      item?.category,
+      item?.brand,
+    ].filter(Boolean).join(" ");
+  }
+
+  function highlightCatalogText(value, query) {
+    const text = String(value || "");
+    const terms = String(query || "").trim().split(/\s+/).filter(Boolean).slice(0, 4);
+    if (!terms.length) return escapeHtml(text);
+    const pattern = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    return escapeHtml(text).replace(new RegExp(`(${pattern})`, "gi"), '<mark class="sales-search-mark">$1</mark>');
+  }
+
+  function ensurePurchaseCatalogDialog() {
+    let dialog = document.querySelector("[data-purchase-catalog-dialog]");
+    if (dialog) return dialog;
+    dialog = document.createElement("dialog");
+    dialog.className = "upos-catalog-picker-dialog";
+    dialog.setAttribute("data-purchase-catalog-dialog", "");
+    dialog.innerHTML = `
+      <form method="dialog" class="upos-catalog-picker">
+        <header class="upos-catalog-picker-head">
+          <div>
+            <h2>Подбор товаров</h2>
+            <p>Выберите товары из каталога и массово добавьте в приход.</p>
+          </div>
+          <button type="button" class="upos-catalog-picker-close" data-purchase-catalog-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="upos-catalog-picker-tools">
+          <label class="upos-catalog-picker-search">
+            <span>Поиск</span>
+            <input type="search" autocomplete="off" placeholder="Название, артикул, штрихкод" data-purchase-catalog-search />
+          </label>
+          <label class="upos-catalog-picker-check">
+            <input type="checkbox" data-purchase-catalog-only-stock />
+            <span>Только с остатком</span>
+          </label>
+        </div>
+        <div class="upos-catalog-picker-body">
+          <aside class="upos-catalog-picker-sidebar" data-purchase-catalog-categories></aside>
+          <div class="upos-catalog-picker-table-wrap">
+            <table class="upos-catalog-picker-table">
+              <thead><tr><th>Название</th><th>Последняя закупка</th><th>Остаток</th><th>Количество</th><th>Ед.</th></tr></thead>
+              <tbody data-purchase-catalog-rows></tbody>
+            </table>
+          </div>
+        </div>
+        <footer class="upos-catalog-picker-footer">
+          <span data-purchase-catalog-total>Выбрано: 0</span>
+          <div>
+            <button type="button" class="btn btn-secondary" data-purchase-catalog-close>Отмена</button>
+            <button type="button" class="btn" data-purchase-catalog-apply>Добавить</button>
+            <button type="button" class="btn" data-purchase-catalog-apply-close>Добавить и закрыть</button>
+          </div>
+        </footer>
+      </form>`;
+    document.body.append(dialog);
+    return dialog;
+  }
+
+  function purchaseCatalogCategories(items) {
+    const counts = new Map();
+    items.forEach((item) => {
+      const category = catalogProductCategory(item);
+      counts.set(category, (counts.get(category) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "ru"));
+  }
+
+  function setPurchaseCatalogQty(dialog, key, value) {
+    const quantity = Math.max(0, purchaseEntryNumber(value));
+    if (!dialog._uposPurchaseCatalogQuantities) dialog._uposPurchaseCatalogQuantities = new Map();
+    if (quantity > 0) dialog._uposPurchaseCatalogQuantities.set(key, quantity);
+    else dialog._uposPurchaseCatalogQuantities.delete(key);
+  }
+
+  function updatePurchaseCatalogTotal(dialog) {
+    const total = dialog.querySelector("[data-purchase-catalog-total]");
+    if (!total) return;
+    const quantities = dialog._uposPurchaseCatalogQuantities || new Map();
+    const count = quantities.size;
+    const amount = Array.from(quantities.values()).reduce((sum, value) => sum + value, 0);
+    total.textContent = `Выбрано: ${count} · Кол-во: ${quantityText(amount)}`;
+  }
+
+  function renderPurchaseCatalogPicker(dialog) {
+    const state = dialog._uposPurchaseCatalogState || {};
+    const options = readPurchaseOptions();
+    const allRows = (options.product_rows || []).filter((item) => productKind(item) === "product");
+    const query = dialog.querySelector("[data-purchase-catalog-search]")?.value || "";
+    const onlyStock = Boolean(dialog.querySelector("[data-purchase-catalog-only-stock]")?.checked);
+    const activeCategory = state.category || "";
+    const byCategory = allRows.filter((item) => !activeCategory || catalogProductCategory(item) === activeCategory);
+    const rows = byCategory.filter((item) => {
+      if (onlyStock && !purchaseEntryNumber(productStockLabel(item))) return false;
+      return normalize(catalogProductSearchText(item)).includes(normalize(query));
+    });
+    const categoriesNode = dialog.querySelector("[data-purchase-catalog-categories]");
+    if (categoriesNode) {
+      const categories = purchaseCatalogCategories(allRows);
+      categoriesNode.innerHTML =
+        `<button type="button" class="${!activeCategory ? "active" : ""}" data-purchase-catalog-category="">Все категории<span>${allRows.length}</span></button>` +
+        categories.map(([category, count]) => (
+          `<button type="button" class="${activeCategory === category ? "active" : ""}" data-purchase-catalog-category="${escapeHtml(category)}"><span>${escapeHtml(category)}</span><strong>${count}</strong></button>`
+        )).join("");
+    }
+    const quantities = dialog._uposPurchaseCatalogQuantities || new Map();
+    const body = dialog.querySelector("[data-purchase-catalog-rows]");
+    const currency = state.form?.querySelector("[data-purchase-entry-currency]")?.value || "UZS";
+    if (body) {
+      body.innerHTML = rows.length ? rows.map((item) => {
+        const key = purchaseProductKey(item);
+        const purchasePrice = purchaseEntryNumber(latestPurchasePrice(item));
+        const quantity = quantities.get(key) || "";
+        return `
+          <tr data-purchase-catalog-key="${escapeHtml(key)}">
+            <td><strong>${highlightCatalogText(item.name, query)}</strong><small>${escapeHtml([item.category || "", item.sku || item.barcode || ""].filter(Boolean).join(" · "))}</small></td>
+            <td>${escapeHtml(purchasePrice ? `${purchaseEntryFormatCurrency(purchasePrice, currency)} ${currency}` : "Без цены")}</td>
+            <td>${escapeHtml(productStockLabel(item))}</td>
+            <td><div class="upos-catalog-qty"><button type="button" data-purchase-catalog-step="-1">−</button><input inputmode="decimal" value="${escapeHtml(quantity)}" data-purchase-catalog-qty /><button type="button" data-purchase-catalog-step="1">+</button></div></td>
+            <td>${escapeHtml(item.unit || "шт")}</td>
+          </tr>`;
+      }).join("") : '<tr><td colspan="5" class="upos-catalog-picker-empty">Товары не найдены.</td></tr>';
+    }
+    updatePurchaseCatalogTotal(dialog);
+  }
+
+  function openPurchaseCatalogPicker(form, onApply) {
+    const dialog = ensurePurchaseCatalogDialog();
+    dialog._uposPurchaseCatalogState = { form, category: "", onApply };
+    dialog._uposPurchaseCatalogQuantities = new Map();
+    renderPurchaseCatalogPicker(dialog);
+    if (dialog.dataset.purchaseCatalogReady !== "1") {
+      dialog.dataset.purchaseCatalogReady = "1";
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog || event.target.closest("[data-purchase-catalog-close]")) {
+          if (typeof dialog.close === "function") dialog.close();
+          dialog.removeAttribute("open");
+        }
+        const category = event.target.closest("[data-purchase-catalog-category]");
+        if (category) {
+          dialog._uposPurchaseCatalogState.category = category.getAttribute("data-purchase-catalog-category") || "";
+          renderPurchaseCatalogPicker(dialog);
+        }
+        const step = event.target.closest("[data-purchase-catalog-step]");
+        if (step) {
+          const row = step.closest("[data-purchase-catalog-key]");
+          const input = row?.querySelector("[data-purchase-catalog-qty]");
+          const next = Math.max(0, purchaseEntryNumber(input?.value || "") + purchaseEntryNumber(step.getAttribute("data-purchase-catalog-step")));
+          if (input) input.value = next ? quantityText(next) : "";
+          if (row) setPurchaseCatalogQty(dialog, row.getAttribute("data-purchase-catalog-key"), next);
+          renderPurchaseCatalogPicker(dialog);
+        }
+        const apply = event.target.closest("[data-purchase-catalog-apply], [data-purchase-catalog-apply-close]");
+        if (apply) {
+          const options = readPurchaseOptions();
+          const products = options.product_rows || [];
+          const quantities = dialog._uposPurchaseCatalogQuantities || new Map();
+          quantities.forEach((quantity, key) => {
+            const item = products.find((product) => purchaseProductKey(product) === key);
+            if (item) dialog._uposPurchaseCatalogState.onApply?.(item, quantity);
+          });
+          quantities.clear();
+          renderPurchaseCatalogPicker(dialog);
+          if (apply.matches("[data-purchase-catalog-apply-close]")) {
+            if (typeof dialog.close === "function") dialog.close();
+            dialog.removeAttribute("open");
+          }
+        }
+      });
+      dialog.addEventListener("input", (event) => {
+        if (event.target.matches("[data-purchase-catalog-search], [data-purchase-catalog-only-stock]")) renderPurchaseCatalogPicker(dialog);
+        if (event.target.matches("[data-purchase-catalog-qty]")) {
+          const row = event.target.closest("[data-purchase-catalog-key]");
+          if (row) setPurchaseCatalogQty(dialog, row.getAttribute("data-purchase-catalog-key"), event.target.value);
+          updatePurchaseCatalogTotal(dialog);
+        }
+      });
+      dialog.addEventListener("change", (event) => {
+        if (event.target.matches("[data-purchase-catalog-only-stock]")) renderPurchaseCatalogPicker(dialog);
+      });
+    }
+    if (typeof dialog.showModal === "function") {
+      try { dialog.showModal(); } catch (_) { dialog.setAttribute("open", ""); }
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    window.setTimeout(() => dialog.querySelector("[data-purchase-catalog-search]")?.focus(), 0);
+  }
+
   function closeProductPanel(picker) {
     const panel = picker?.querySelector("[data-warehouse-product-panel]");
     if (panel) panel.hidden = true;
@@ -2008,8 +2207,39 @@
         });
       };
 
+      const addCatalogProductToPurchase = (item, quantity) => {
+        if (!item || !quantity) return;
+        const existing = Array.from(form.querySelectorAll("[data-purchase-entry-row]")).find((row) => {
+          const picker = row.querySelector("[data-warehouse-product-picker]");
+          const input = row.querySelector('input[name="line_product"]');
+          const id = String(picker?.dataset?.productId || "").trim();
+          const name = String(input?.value || "").trim();
+          return (item.id && id === String(item.id)) || (!item.id && normalize(name) === normalize(item.name));
+        });
+        if (existing) {
+          const quantityInput = existing.querySelector('input[name="line_quantity"]');
+          if (quantityInput) {
+            quantityInput.value = purchaseEntryFormat((purchaseEntryNumber(quantityInput.value || "0") || 0) + quantity);
+          }
+          recalc();
+          return;
+        }
+        ensureBlankLine();
+        const row = rows().find((entryRow) => !rowHasProduct(entryRow)) || rows()[rows().length - 1];
+        const picker = row?.querySelector("[data-warehouse-product-picker]");
+        if (!picker) return;
+        applyProductSelection(form, picker, item);
+        const quantityInput = row.querySelector('input[name="line_quantity"]');
+        if (quantityInput) quantityInput.value = purchaseEntryFormat(quantity);
+        recalc();
+        ensureBlankLine();
+      };
+
       rows().forEach(wireRow);
       expenseRows().forEach(wireExpenseRow);
+      form.querySelector("[data-purchase-catalog-pick]")?.addEventListener("click", () => {
+        openPurchaseCatalogPicker(form, addCatalogProductToPurchase);
+      });
       form.querySelector("[data-purchase-entry-add-product]")?.addEventListener("click", () => {
         ensureBlankLine();
         const blankRow = rows().find((row) => !rowHasProduct(row)) || rows()[rows().length - 1];

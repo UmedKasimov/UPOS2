@@ -227,6 +227,267 @@
     });
   }
 
+  function catalogSearchText(item) {
+    return [
+      item && item.name,
+      item && item.sku,
+      item && item.barcode,
+      item && item.category,
+      item && item.brand
+    ].filter(Boolean).join(" ");
+  }
+
+  function catalogItemKey(item) {
+    var id = String(item && item.id || "").trim();
+    return id ? "id:" + id : "name:" + normalize(item && item.name);
+  }
+
+  function catalogKindLabel(kind) {
+    if (kind === "service") return "Услуга";
+    if (kind === "subscription") return "Подписка";
+    return "Товар";
+  }
+
+  function highlightCatalogText(value, query) {
+    var text = String(value || "");
+    var q = String(query || "").trim();
+    if (!q) return escapeHtml(text);
+    var terms = q.split(/\s+/).filter(Boolean).slice(0, 4);
+    var pattern = terms.map(function (term) {
+      return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }).join("|");
+    if (!pattern) return escapeHtml(text);
+    return escapeHtml(text).replace(new RegExp("(" + pattern + ")", "gi"), '<mark class="sales-search-mark">$1</mark>');
+  }
+
+  function ensureCatalogDialog() {
+    var dialog = document.querySelector("[data-sales-catalog-dialog]");
+    if (dialog) return dialog;
+    dialog = document.createElement("dialog");
+    dialog.className = "upos-catalog-picker-dialog";
+    dialog.setAttribute("data-sales-catalog-dialog", "");
+    dialog.innerHTML =
+      '<form method="dialog" class="upos-catalog-picker">' +
+        '<header class="upos-catalog-picker-head">' +
+          '<div><h2>Подбор товаров</h2><p data-catalog-picker-subtitle>Выберите позиции из каталога и добавьте в документ.</p></div>' +
+          '<button type="button" class="upos-catalog-picker-close" data-catalog-picker-close aria-label="Закрыть">×</button>' +
+        '</header>' +
+        '<div class="upos-catalog-picker-tools">' +
+          '<label class="upos-catalog-picker-search"><span>Поиск</span><input type="search" autocomplete="off" placeholder="Название, артикул, штрихкод" data-catalog-picker-search /></label>' +
+          '<div class="upos-catalog-picker-tabs" data-catalog-picker-kinds></div>' +
+        '</div>' +
+        '<div class="upos-catalog-picker-body">' +
+          '<aside class="upos-catalog-picker-sidebar" data-catalog-picker-categories></aside>' +
+          '<div class="upos-catalog-picker-table-wrap">' +
+            '<table class="upos-catalog-picker-table">' +
+              '<thead><tr><th>Название</th><th>Цена</th><th>Остаток</th><th>Количество</th><th>Ед.</th></tr></thead>' +
+              '<tbody data-catalog-picker-rows></tbody>' +
+            '</table>' +
+          '</div>' +
+        '</div>' +
+        '<footer class="upos-catalog-picker-footer">' +
+          '<span data-catalog-picker-total>Выбрано: 0</span>' +
+          '<div>' +
+            '<button type="button" class="btn btn-secondary" data-catalog-picker-close>Отмена</button>' +
+            '<button type="button" class="btn" data-catalog-picker-apply>Добавить</button>' +
+            '<button type="button" class="btn" data-catalog-picker-apply-close>Добавить и закрыть</button>' +
+          '</div>' +
+        '</footer>' +
+      '</form>';
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  function catalogCategories(items) {
+    var counts = new Map();
+    items.forEach(function (item) {
+      var category = String(item.category || "Без категории").trim() || "Без категории";
+      counts.set(category, (counts.get(category) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort(function (a, b) {
+      return a[0].localeCompare(b[0], "ru");
+    });
+  }
+
+  function setCatalogQty(dialog, key, value) {
+    var qty = Math.max(0, numberValue(value));
+    if (!dialog._uposCatalogQuantities) dialog._uposCatalogQuantities = new Map();
+    if (qty > 0) dialog._uposCatalogQuantities.set(key, qty);
+    else dialog._uposCatalogQuantities.delete(key);
+  }
+
+  function updateCatalogPickerTotal(dialog) {
+    var totalNode = dialog.querySelector("[data-catalog-picker-total]");
+    if (!totalNode) return;
+    var quantities = dialog._uposCatalogQuantities || new Map();
+    var count = quantities.size;
+    var amount = Array.from(quantities.values()).reduce(function (sum, qty) { return sum + qty; }, 0);
+    totalNode.textContent = "Выбрано: " + count + " · Кол-во: " + formatQty(amount);
+  }
+
+  function renderCatalogPicker(dialog) {
+    var state = dialog._uposCatalogState || {};
+    var root = state.root;
+    var options = state.options || {};
+    var allRows = (options.product_rows || []).filter(function (item) {
+      var kind = productKind(item);
+      if (state.mode === "products" && kind !== "product") return false;
+      return kind === "product" || kind === "service" || kind === "subscription";
+    });
+    var query = dialog.querySelector("[data-catalog-picker-search]")?.value || "";
+    var activeKind = state.kind || (state.mode === "products" ? "product" : "all");
+    var activeCategory = state.category || "";
+    var byKind = allRows.filter(function (item) {
+      return activeKind === "all" || productKind(item) === activeKind;
+    });
+    var filtered = byKind.filter(function (item) {
+      var category = String(item.category || "Без категории").trim() || "Без категории";
+      return (!activeCategory || category === activeCategory) && normalize(catalogSearchText(item)).indexOf(normalize(query)) >= 0;
+    });
+    var kinds = state.mode === "products"
+      ? [["product", "Товары"]]
+      : [["all", "Все"], ["product", "Товары"], ["service", "Услуги"], ["subscription", "Подписки"]];
+    var kindsNode = dialog.querySelector("[data-catalog-picker-kinds]");
+    if (kindsNode) {
+      kindsNode.innerHTML = kinds.map(function (item) {
+        var count = item[0] === "all" ? allRows.length : allRows.filter(function (row) { return productKind(row) === item[0]; }).length;
+        return '<button type="button" class="' + (activeKind === item[0] ? "active" : "") + '" data-catalog-kind="' + escapeHtml(item[0]) + '">' + escapeHtml(item[1]) + '<span>' + count + '</span></button>';
+      }).join("");
+    }
+    var categoriesNode = dialog.querySelector("[data-catalog-picker-categories]");
+    if (categoriesNode) {
+      var categories = catalogCategories(byKind);
+      categoriesNode.innerHTML =
+        '<button type="button" class="' + (!activeCategory ? "active" : "") + '" data-catalog-category="">Все категории<span>' + byKind.length + '</span></button>' +
+        categories.map(function (entry) {
+          return '<button type="button" class="' + (activeCategory === entry[0] ? "active" : "") + '" data-catalog-category="' + escapeHtml(entry[0]) + '"><span>' + escapeHtml(entry[0]) + '</span><strong>' + entry[1] + '</strong></button>';
+        }).join("");
+    }
+    var body = dialog.querySelector("[data-catalog-picker-rows]");
+    var warehouseInput = root ? root.querySelector('.sales-line-grid[data-sales-line-kind="product"] input[name="line_warehouse"]') : null;
+    var warehouse = warehouseInput ? warehouseInput.value : "";
+    var priceTypeId = root ? selectedPriceTypeId(root) : "";
+    var currency = root ? selectedCurrency(root) : "UZS";
+    var quantities = dialog._uposCatalogQuantities || new Map();
+    if (body) {
+      body.innerHTML = filtered.length ? filtered.map(function (item) {
+        var key = catalogItemKey(item);
+        var kind = productKind(item);
+        var price = salesPrice(item, priceTypeId, currency, options);
+        var stock = kind === "product" ? stockLabel(item, warehouse) : "—";
+        var qty = quantities.get(key) || "";
+        return (
+          '<tr data-catalog-key="' + escapeHtml(key) + '">' +
+            '<td><strong>' + highlightCatalogText(item.name, query) + '</strong><small>' + escapeHtml([catalogKindLabel(kind), item.category || "", item.sku || item.barcode || ""].filter(Boolean).join(" · ")) + '</small></td>' +
+            '<td>' + escapeHtml(price.price ? price.price + " " + price.currency : "Без цены") + '</td>' +
+            '<td>' + escapeHtml(stock) + '</td>' +
+            '<td><div class="upos-catalog-qty"><button type="button" data-catalog-qty-step="-1">−</button><input inputmode="decimal" value="' + escapeHtml(qty) + '" data-catalog-qty /><button type="button" data-catalog-qty-step="1">+</button></div></td>' +
+            '<td>' + escapeHtml(item.unit || "шт") + '</td>' +
+          '</tr>'
+        );
+      }).join("") : '<tr><td colspan="5" class="upos-catalog-picker-empty">Товары не найдены.</td></tr>';
+    }
+    updateCatalogPickerTotal(dialog);
+  }
+
+  function addCatalogItemToSales(root, options, item, quantity) {
+    if (!root || !item || !quantity) return;
+    var kind = productKind(item);
+    var existing = Array.from(root.querySelectorAll('.sales-line-grid[data-sales-line-kind="' + kind + '"]')).find(function (row) {
+      return normalize(rowProductValue(row)) === normalize(item.name);
+    });
+    if (existing) {
+      var existingQty = existing.querySelector('input[name="line_quantity"]');
+      if (existingQty) existingQty.value = formatQty(numberValue(existingQty.value || "0") + quantity);
+      syncRowState(existing);
+      updateTotal(root);
+      return;
+    }
+    var combo = firstAvailableCombo(root, kind, options);
+    var row = combo ? combo.closest(".sales-line-grid") : null;
+    applyProductSelection(root, combo, options, item, true);
+    if (row) {
+      var quantityInput = row.querySelector('input[name="line_quantity"]');
+      if (quantityInput) quantityInput.value = formatQty(quantity);
+      syncRowState(row);
+    }
+    updateTotal(root);
+  }
+
+  function applyCatalogSelection(dialog, closeAfter) {
+    var state = dialog._uposCatalogState || {};
+    var options = state.options || {};
+    var products = options.product_rows || [];
+    var quantities = dialog._uposCatalogQuantities || new Map();
+    quantities.forEach(function (quantity, key) {
+      var item = products.find(function (row) { return catalogItemKey(row) === key; });
+      addCatalogItemToSales(state.root, options, item, quantity);
+    });
+    quantities.clear();
+    renderCatalogPicker(dialog);
+    scheduleSalesDraft(state.root);
+    if (closeAfter) closeCatalogPicker(dialog);
+  }
+
+  function closeCatalogPicker(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    dialog.removeAttribute("open");
+  }
+
+  function openSalesCatalogPicker(root, options) {
+    var dialog = ensureCatalogDialog();
+    dialog._uposCatalogState = { root: root, options: options, mode: "all", kind: "all", category: "" };
+    dialog._uposCatalogQuantities = new Map();
+    renderCatalogPicker(dialog);
+    if (dialog.dataset.catalogPickerReady !== "1") {
+      dialog.dataset.catalogPickerReady = "1";
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) closeCatalogPicker(dialog);
+        var close = event.target.closest("[data-catalog-picker-close]");
+        if (close) closeCatalogPicker(dialog);
+        var kind = event.target.closest("[data-catalog-kind]");
+        if (kind) {
+          dialog._uposCatalogState.kind = kind.getAttribute("data-catalog-kind") || "all";
+          dialog._uposCatalogState.category = "";
+          renderCatalogPicker(dialog);
+        }
+        var category = event.target.closest("[data-catalog-category]");
+        if (category) {
+          dialog._uposCatalogState.category = category.getAttribute("data-catalog-category") || "";
+          renderCatalogPicker(dialog);
+        }
+        var step = event.target.closest("[data-catalog-qty-step]");
+        if (step) {
+          var row = step.closest("[data-catalog-key]");
+          var input = row ? row.querySelector("[data-catalog-qty]") : null;
+          var next = Math.max(0, numberValue(input ? input.value : "") + numberValue(step.getAttribute("data-catalog-qty-step")));
+          if (input) input.value = next ? formatQty(next) : "";
+          if (row) setCatalogQty(dialog, row.getAttribute("data-catalog-key"), next);
+          renderCatalogPicker(dialog);
+        }
+        if (event.target.closest("[data-catalog-picker-apply]")) applyCatalogSelection(dialog, false);
+        if (event.target.closest("[data-catalog-picker-apply-close]")) applyCatalogSelection(dialog, true);
+      });
+      dialog.addEventListener("input", function (event) {
+        if (event.target.matches("[data-catalog-picker-search]")) renderCatalogPicker(dialog);
+        if (event.target.matches("[data-catalog-qty]")) {
+          var row = event.target.closest("[data-catalog-key]");
+          if (row) setCatalogQty(dialog, row.getAttribute("data-catalog-key"), event.target.value);
+          updateCatalogPickerTotal(dialog);
+        }
+      });
+    }
+    if (typeof dialog.showModal === "function") {
+      try { dialog.showModal(); } catch (_) { dialog.setAttribute("open", ""); }
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    setTimeout(function () {
+      dialog.querySelector("[data-catalog-picker-search]")?.focus();
+    }, 0);
+  }
+
   function closePanel(combo) {
     var panel = combo.querySelector("[data-sales-combo-panel]");
     if (panel) panel.hidden = true;
@@ -3620,6 +3881,9 @@
         addServiceLine(root, options);
       });
     }
+    root.querySelector("[data-sales-catalog-pick]")?.addEventListener("click", function () {
+      openSalesCatalogPicker(root, options);
+    });
     var prefillClient = String(root.dataset.salesPrefillClient || "").trim();
     if (prefillClient) {
       clearSalesDraft();
