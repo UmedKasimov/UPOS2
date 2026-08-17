@@ -157,11 +157,11 @@
 
 <section class="crm-service-dashboard" data-workspace-view="deals" hidden>
   <div class="crm-service-metrics" aria-label="Сводка CRM">
-    <div class="crm-service-metric">
+    <button class="crm-service-metric crm-service-metric--filter" type="button" data-crm-metric-filter="active" aria-pressed="false">
       <span>Активные</span>
       <strong>{{ crm_summary.active_count }}</strong>
-      <small>задачи и сделки</small>
-    </div>
+      <small>клиенты в работе</small>
+    </button>
     <div class="crm-service-metric">
       <span>Воронка</span>
       <strong>{{ crm_summary.pipeline_total }}</strong>

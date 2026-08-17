@@ -290,6 +290,9 @@
 
   function cardMatchesMetric(card, filter) {
     if (!filter) return true;
+    if (filter === "active") {
+      return !["done", "won", "lost", "archived"].includes(String(card.dataset.crmStatus || ""));
+    }
     if (filter === "overdue") return card.dataset.crmActionState === "overdue";
     if (filter === "no_plan") {
       const status = String(card.dataset.crmStatus || "");
