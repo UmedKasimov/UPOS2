@@ -8002,7 +8002,7 @@ def create_app() -> FastAPI:
             "sort_date": clean_due_date,
         }
 
-    def _sales_document_age_label(document_date: Any, today: date) -> str:
+    def _sales_document_age_days(document_date: Any, today: date) -> int | None:
         clean_document_date = str(document_date or "").strip()
         try:
             parsed_date = (
@@ -8013,8 +8013,13 @@ def create_app() -> FastAPI:
         except ValueError:
             parsed_date = None
         if not parsed_date:
+            return None
+        return max(0, (today - parsed_date).days)
+
+    def _sales_document_age_label(document_date: Any, today: date) -> str:
+        days = _sales_document_age_days(document_date, today)
+        if days is None:
             return ""
-        days = max(0, (today - parsed_date).days)
         remainder_100 = days % 100
         remainder_10 = days % 10
         if remainder_10 == 1 and remainder_100 != 11:
@@ -10528,6 +10533,10 @@ def create_app() -> FastAPI:
 
             for row in rows:
                 item = _sales_document_data(row)
+                item["document_age_days"] = _sales_document_age_days(
+                    item.get("date"),
+                    today_date,
+                )
                 item["document_age_label"] = _sales_document_age_label(
                     item.get("date"),
                     today_date,
@@ -10800,6 +10809,10 @@ def create_app() -> FastAPI:
                 )
                 if requested_row is not None:
                     extra_item = _sales_document_data(requested_row)
+                    extra_item["document_age_days"] = _sales_document_age_days(
+                        extra_item.get("date"),
+                        today_date,
+                    )
                     extra_item["document_age_label"] = _sales_document_age_label(
                         extra_item.get("date"),
                         today_date,
@@ -12414,15 +12427,20 @@ def create_app() -> FastAPI:
             return str(int(quantity))
         return _decimal_plain_text(quantity)
 
-    def _purchase_elapsed_days_label(value: Any) -> str:
+    def _purchase_elapsed_days(value: Any) -> int | None:
         raw_date = str(value or "").strip()[:10]
         if not raw_date:
-            return ""
+            return None
         try:
             purchase_date = date.fromisoformat(raw_date)
         except ValueError:
+            return None
+        return max(0, (datetime.now(ZoneInfo("Asia/Tashkent")).date() - purchase_date).days)
+
+    def _purchase_elapsed_days_label(value: Any) -> str:
+        days = _purchase_elapsed_days(value)
+        if days is None:
             return ""
-        days = max(0, (datetime.now(ZoneInfo("Asia/Tashkent")).date() - purchase_date).days)
         remainder_100 = days % 100
         remainder_10 = days % 10
         if 11 <= remainder_100 <= 14:
@@ -12507,9 +12525,11 @@ def create_app() -> FastAPI:
                 ((paid_for_progress / amount_value) * Decimal("100")).quantize(
                     Decimal("1"), rounding=ROUND_HALF_UP
                 )
-            )
+        )
         payment_age_label = ""
+        payment_age_days = None
         if amount_value > 0 and Decimal("0") < paid_amount < amount_value:
+            payment_age_days = _purchase_elapsed_days(data.get("date"))
             payment_age_label = _purchase_elapsed_days_label(data.get("date"))
         raw_lines = data.get("lines") if isinstance(data.get("lines"), list) else []
         safe_lines: list[dict[str, str]] = []
@@ -12565,6 +12585,7 @@ def create_app() -> FastAPI:
             "debt_amount": _sales_money_label(debt_amount if debt_amount > 0 else 0),
             "payment_progress": payment_progress,
             "payment_age_label": payment_age_label,
+            "payment_age_days": payment_age_days,
             "status": _purchase_workflow_status(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "status_label": _purchase_status_label(str(data.get("workflow_status") or data.get("status") or "ordered")),
             "payment_status": str(data.get("payment_status") or ("paid" if paid_amount >= _sales_decimal(row.amount) and _sales_decimal(row.amount) > 0 else "partial" if paid_amount > 0 else "unpaid")),

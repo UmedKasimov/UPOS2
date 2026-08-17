@@ -438,6 +438,11 @@
                     <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
+                <th data-column-label="Срок" data-sort-kind="number" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Срок</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="Тип" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
                     <span>Тип</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -468,6 +473,11 @@
                     <span>Долг</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
                 </th>
+                <th data-column-label="Дней долга" data-sort-kind="number" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Дней долга</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
                 <th data-column-label="Задачи" data-sort-kind="number" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
                     <span>Задачи</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -493,11 +503,9 @@
                   <td class="sales-journal-id-cell" data-sort-value="{{ sale.number }}" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0">
                     <strong>{{ sale.number }}</strong>
                     <small>{{ sale.manager or "Без ответственного" }}</small>
-                    {% if sale.document_age_label %}
-                      <small class="sales-journal-id-age">{{ sale.document_age_label }}</small>
-                    {% endif %}
                   </td>
                   <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
+                  <td class="sales-journal-age-cell" data-sort-value="{{ sale.document_age_days if sale.document_age_days is not none else '' }}">{{ sale.document_age_label or "-" }}</td>
                   <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
                   <td class="sales-journal-client-cell" title="{{ sale.client or '-' }}">
                     <span class="sales-journal-client-name">{{ sale.client or "-" }}</span>
@@ -523,13 +531,13 @@
                     {% if sale.has_debt %}
                       <span class="sales-journal-debt-badge">
                         <span class="sales-journal-debt-amount">-{{ sale.debt_amount }} {{ sale.currency }}</span>
-                        {% if sale.debt_age_days is not none %}
-                          <small>{{ sale.debt_age_days }} дн.</small>
-                        {% endif %}
                       </span>
                     {% else %}
                       <span class="sales-journal-no-debt">-</span>
                     {% endif %}
+                  </td>
+                  <td class="sales-journal-debt-age-cell" data-sort-value="{{ sale.debt_age_days if sale.debt_age_days is not none else '' }}">
+                    {% if sale.debt_age_days is not none %}{{ sale.debt_age_days }} дн.{% else %}-{% endif %}
                   </td>
                   <td class="sales-journal-tasks-cell" data-sort-value="{{ sale.task_total_count }}">
                     {% if sale.task_total_count %}
@@ -608,14 +616,14 @@
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="13">Пока нет продаж. Создайте первую продажу справа.</td>
+                  <td colspan="15">Пока нет продаж. Создайте первую продажу справа.</td>
                 </tr>
               {% endfor %}
             </tbody>
             {% if sales %}
               <tfoot>
                 <tr class="sales-journal-total-row">
-                  <td colspan="6">ИТОГО</td>
+                  <td colspan="7">ИТОГО</td>
                   <td>
                     {% for total in sales_journal_totals %}
                       <span>{{ total.amount }} {{ total.currency }}</span>
@@ -633,7 +641,7 @@
                       {% endif %}
                     {% endfor %}
                   </td>
-                  <td colspan="4"></td>
+                  <td colspan="5"></td>
                 </tr>
               </tfoot>
             {% endif %}

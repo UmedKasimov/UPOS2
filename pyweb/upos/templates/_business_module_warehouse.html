@@ -297,6 +297,11 @@
                 <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
               </button>
             </th>
+            <th data-column-label="Дней" data-sort-kind="number" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Дней</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
             <th data-column-label="Поставщик" data-sort-kind="text" aria-sort="none">
               <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
                 <span>Поставщик</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
@@ -352,8 +357,8 @@
               </td>
               <td class="sales-journal-date-cell" data-warehouse-purchase-highlight>
                 {{ doc.date or "-" }}
-                {% if doc.payment_age_label %}<small>{{ doc.payment_age_label }}</small>{% endif %}
               </td>
+              <td class="warehouse-purchase-age-cell" data-sort-value="{{ doc.payment_age_days if doc.payment_age_days is not none else '' }}">{{ doc.payment_age_label or "-" }}</td>
               <td><a class="warehouse-purchase-supplier sales-journal-client-cell" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
               <td class="warehouse-purchase-supplier-balance-cell" data-balance-kind="{{ doc.supplier_balance_kind or 'zero' }}" data-warehouse-purchase-highlight>
                 {{ doc.supplier_balance or "Нет долга" }}
@@ -420,11 +425,11 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="11" class="sales-journal-empty">Документов закупки пока нет.</td></tr>
+            <tr><td colspan="12" class="sales-journal-empty">Документов закупки пока нет.</td></tr>
           {% endfor %}
           {% if warehouse_purchase_totals %}
             <tr class="sales-journal-total-row">
-              <td colspan="6">ИТОГО</td>
+              <td colspan="7">ИТОГО</td>
               <td class="num warehouse-purchase-total">
                 {% for total in warehouse_purchase_totals %}
                   <div>{{ total.amount }} {{ total.currency }}</div>
