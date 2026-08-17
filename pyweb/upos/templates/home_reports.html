@@ -5,7 +5,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
   <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
-  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=138" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=139" />
 {% endblock %}
 
 {% block page_header %}
@@ -585,29 +585,29 @@
                 <tr class="reports-sales-cost-detail-row" data-sales-cost-detail-row="{{ row.stage or 'shipment' }}" data-sales-cost-detail-for="{{ loop.index }}" hidden>
                   <td colspan="10">
                     <div id="{{ detail_id }}" class="reports-sales-cost-detail" data-sales-cost-detail-panel>
-                      <div class="reports-sales-cost-detail-head">
-                        <strong>Товары</strong>
-                        <span>{{ row.client }} · № {{ row.number or "-" }}</span>
-                      </div>
                       {% if row.line_details %}
-                        <div class="reports-sales-cost-lines">
-                          <div class="reports-sales-cost-line reports-sales-cost-line--head">
-                            <span>Товар</span>
-                            <span>Кол-во</span>
-                            <span>Продажная цена</span>
-                            <span>Себестоимость</span>
-                            <span>Прибыль</span>
-                          </div>
-                          {% for line in row.line_details %}
-                            <div class="reports-sales-cost-line">
-                              <span>{{ line.product }}</span>
-                              <span>{{ line.qty }}</span>
-                              <span data-profit-money data-money-uzs="{{ line.amount_uzs }}">{{ line.amount }}</span>
-                              <span data-profit-money data-money-uzs="{{ line.cost_uzs }}">{{ line.cost }}</span>
-                              <span{% if line.profit_negative %} class="is-negative"{% endif %} data-profit-money data-money-uzs="{{ line.profit_uzs }}">{{ line.profit }}</span>
-                            </div>
-                          {% endfor %}
-                        </div>
+                        <table class="reports-data-table reports-sales-cost-detail-table" aria-label="Товары документа № {{ row.number or '-' }}">
+                          <thead>
+                            <tr>
+                              <th>Товар</th>
+                              <th>Кол-во</th>
+                              <th>Продажная цена</th>
+                              <th>Себестоимость</th>
+                              <th>Прибыль</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for line in row.line_details %}
+                              <tr>
+                                <td>{{ line.product }}</td>
+                                <td>{{ line.qty }}</td>
+                                <td><span data-profit-money data-money-uzs="{{ line.amount_uzs }}">{{ line.amount }}</span></td>
+                                <td><span data-profit-money data-money-uzs="{{ line.cost_uzs }}">{{ line.cost }}</span></td>
+                                <td{% if line.profit_negative %} class="is-negative"{% endif %}><span data-profit-money data-money-uzs="{{ line.profit_uzs }}">{{ line.profit }}</span></td>
+                              </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
                       {% else %}
                         <p class="reports-sales-cost-detail-empty">В документе нет товарных позиций.</p>
                       {% endif %}

@@ -765,7 +765,7 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 .reports-sales-cost-detail-row > td {
   padding: 0;
   border-top: 0;
-  background: color-mix(in srgb, var(--primary) 4%, var(--card));
+  background: var(--card);
 }
 
 .reports-sales-cost-detail {
@@ -782,50 +782,41 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
   transform: translateY(0);
 }
 
-.reports-sales-cost-detail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 0.95rem 0.45rem;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 800;
+.reports-sales-cost-detail-table {
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.reports-sales-cost-detail-head strong {
-  color: var(--foreground);
-  font-size: var(--text-sm);
+.reports-sales-cost-detail-table th {
+  position: static;
 }
 
-.reports-sales-cost-lines {
-  display: grid;
-  padding: 0 0.95rem 0.85rem;
+.reports-sales-cost-detail-table th:first-child,
+.reports-sales-cost-detail-table td:first-child {
+  padding-left: 1.35rem;
 }
 
-.reports-sales-cost-line {
-  display: grid;
-  grid-template-columns: minmax(14rem, 1fr) minmax(4.5rem, 0.35fr) repeat(3, minmax(8rem, 0.6fr));
-  gap: 0.75rem;
-  align-items: center;
-  min-height: 2.35rem;
-  padding: 0.45rem 0;
-  border-top: 1px solid var(--border);
-  color: var(--foreground);
-  font-size: var(--text-sm);
-  font-weight: 700;
+.reports-sales-cost-detail-table th:nth-child(2),
+.reports-sales-cost-detail-table td:nth-child(2),
+.reports-sales-cost-detail-table th:nth-child(3),
+.reports-sales-cost-detail-table td:nth-child(3),
+.reports-sales-cost-detail-table th:nth-child(4),
+.reports-sales-cost-detail-table td:nth-child(4),
+.reports-sales-cost-detail-table th:nth-child(5),
+.reports-sales-cost-detail-table td:nth-child(5) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.reports-sales-cost-line--head {
-  min-height: 1.8rem;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 850;
+.reports-sales-cost-detail-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border);
 }
 
 .reports-sales-cost-detail-empty {
   margin: 0;
-  padding: 0.2rem 0.95rem 0.85rem;
+  padding: 0.85rem 1.35rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-weight: 750;
@@ -1972,22 +1963,6 @@ body:has(.org-reports-page .org-report-launcher:not([hidden])) {
 
   #report-sales-cost [data-sales-cost-stages] .sales-document-tab {
     border-right: 0;
-  }
-
-  .reports-sales-cost-detail-head {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .reports-sales-cost-line {
-    grid-template-columns: 1fr;
-    gap: 0.2rem;
-    padding: 0.65rem 0;
-  }
-
-  .reports-sales-cost-line--head {
-    display: none;
   }
 
   .reports-tab {
