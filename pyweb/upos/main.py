@@ -14519,10 +14519,27 @@ def create_app() -> FastAPI:
                     }
                 )
 
-            def purchase_supplier_card(item: dict[str, Any]) -> dict[str, Any] | None:
+            full_supplier_cards_by_id: dict[str, dict[str, Any]] = {}
+
+            def purchase_supplier_card(item: dict[str, Any], *, full: bool = False) -> dict[str, Any] | None:
                 supplier_card = warehouse_supplier_cards_by_id.get(str(item.get("counterparty_id") or ""))
                 if supplier_card is None:
                     supplier_card = warehouse_supplier_cards_by_name.get(str(item.get("supplier") or "").strip().lower())
+                supplier_id = str((supplier_card or {}).get("id") or item.get("counterparty_id") or "").strip()
+                if full and supplier_id:
+                    if supplier_id not in full_supplier_cards_by_id:
+                        full_supplier_cards_by_id[supplier_id] = _supplier_card_context(
+                            session,
+                            wid,
+                            supplier_id,
+                            balance_by_id=supplier_balance_by_id,
+                            balance_by_name=supplier_balance_by_name,
+                            last_date_by_id=supplier_last_date_by_id,
+                            last_date_by_name=supplier_last_date_by_name,
+                            balance_currency_by_id=supplier_currency_by_id,
+                            balance_currency_by_name=supplier_currency_by_name,
+                        ) or supplier_card
+                    supplier_card = full_supplier_cards_by_id.get(supplier_id) or supplier_card
                 return supplier_card
 
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
@@ -14718,6 +14735,13 @@ def create_app() -> FastAPI:
         warehouse_purchases = warehouse_purchases[
             warehouse_purchases_start:warehouse_purchases_end
         ]
+        for item in warehouse_purchases:
+            supplier_card = purchase_supplier_card(item, full=True)
+            if supplier_card:
+                item["supplier_card"] = supplier_card
+                item["supplier_balance"] = supplier_card["balance"]
+                item["supplier_balance_kind"] = supplier_card["balance_kind"]
+                item["detail_json"]["supplier_card"] = supplier_card
         price_types = _workspace_price_types(wid)
         purchase_price_types = [
             item

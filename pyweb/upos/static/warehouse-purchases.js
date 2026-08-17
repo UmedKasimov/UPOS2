@@ -2631,13 +2631,99 @@
       item.className = "warehouse-supplier-card-balance-item";
       item.dataset.balanceKind = String(line.kind || "zero");
       const label = document.createElement("span");
-      label.textContent = String(line.label || "Баланс");
+      label.textContent = String(line.label || (line.kind === "debt" ? "Мы должны" : line.kind === "advance" ? "Аванс поставщику" : "Баланс"));
       const value = document.createElement("strong");
-      const amount = String(line.amount || "0");
+      const amount = String(line.amount_abs || line.amount || "0");
       const currency = String(line.currency || "UZS").toUpperCase();
       value.textContent = line.kind === "zero" ? "Нет долга" : `${amount} ${currency}`;
       item.append(label, value);
       container.append(item);
+    });
+  }
+
+  function supplierCardTable(headers, rows, emptyText) {
+    return (
+      '<div class="warehouse-supplier-card-table-wrap"><table class="warehouse-supplier-card-table"><thead><tr>' +
+      headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("") +
+      "</tr></thead><tbody>" +
+      (rows.length ? rows.join("") : `<tr><td colspan="${headers.length}" class="warehouse-supplier-card-empty">${escapeHtml(emptyText)}</td></tr>`) +
+      "</tbody></table></div>"
+    );
+  }
+
+  function supplierCardInfo(supplier) {
+    const rows = [
+      ["Телефон", supplier.phone || "-"],
+      ["Email", supplier.email || "-"],
+      ["ИНН", supplier.inn || supplier.tax_id || "-"],
+      ["Категория", supplier.category || "-"],
+      ["Последняя закупка", supplier.last_date || "-"],
+      ["Статус", supplier.status || "-"],
+      ["Адрес", supplier.address || "-"],
+    ];
+    return (
+      '<dl class="warehouse-supplier-card-info">' +
+      rows.map(([label, value], index) => (
+        `<div${index === rows.length - 1 ? ' class="wide"' : ""}><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
+      )).join("") +
+      "</dl>"
+    );
+  }
+
+  function renderSupplierCardDetails(dialog, supplier) {
+    const metrics = dialog.querySelector("[data-purchase-supplier-card-metrics]");
+    const tabs = dialog.querySelector("[data-purchase-supplier-card-tabs]");
+    const panels = dialog.querySelector("[data-purchase-supplier-card-panels]");
+    const summary = supplier.summary || {};
+    const currency = String(supplier.reconciliation_totals?.currency || "UZS").toUpperCase();
+    if (metrics) {
+      metrics.innerHTML = [
+        ["Баланс", supplier.balance || summary.payable || "0", currency],
+        ["Закупки", summary.purchases || "0", `${summary.purchase_count || 0} документов`],
+        ["Оплачено", summary.paid || "0", currency],
+        ["Долг", summary.payable || supplier.balance || "0", currency],
+      ].map((item) => (
+        `<div><span>${escapeHtml(item[0])}</span><strong>${escapeHtml(item[1])}</strong><small>${escapeHtml(item[2])}</small></div>`
+      )).join("");
+    }
+
+    const purchaseRows = (supplier.purchases || []).map((row) => (
+      `<tr><td><strong>${escapeHtml(row.number || "-")}</strong></td><td>${escapeHtml(row.date || "-")}</td><td>${escapeHtml(row.amount || "0")} ${escapeHtml(row.currency || currency)}</td><td>${escapeHtml(row.paid_amount || "0")} ${escapeHtml(row.currency || currency)}</td><td>${escapeHtml(row.debt_amount || "0")} ${escapeHtml(row.currency || currency)}</td><td>${escapeHtml(row.status_label || "-")}</td></tr>`
+    ));
+    const payableRows = (supplier.payables || []).map((row) => (
+      `<tr><td><strong>${escapeHtml(row.number || "-")}</strong></td><td>${escapeHtml(row.date || "-")}</td><td>${escapeHtml(row.amount || "0")} ${escapeHtml(row.currency || currency)}</td><td>${escapeHtml(row.paid_amount || "0")} ${escapeHtml(row.currency || currency)}</td><td><strong>${escapeHtml(row.debt_amount || "0")} ${escapeHtml(row.currency || currency)}</strong></td></tr>`
+    ));
+    const reconciliationRows = (supplier.reconciliation || []).map((row) => (
+      `<tr><td>${escapeHtml(row.date || "-")}</td><td><strong>${escapeHtml(row.document || "-")}</strong></td><td>${escapeHtml(row.purchase || "0")} ${escapeHtml(row.currency || currency)}</td><td>${escapeHtml(row.payment || "0")} ${escapeHtml(row.currency || currency)}</td><td>${escapeHtml(row.balance || "0")} ${escapeHtml(row.currency || currency)}</td></tr>`
+    ));
+    const noteHtml = `<div class="warehouse-supplier-card-note">${escapeHtml(supplier.comment || supplier.note || "Комментарий не указан.")}</div>`;
+    const sections = [
+      ["info", "Информация", supplierCardInfo(supplier)],
+      ["purchases", "Закупки", supplierCardTable(["№", "Дата", "Сумма", "Оплачено", "Долг", "Статус"], purchaseRows, "Закупок пока нет.")],
+      ["payables", "Долги", supplierCardTable(["№", "Дата", "Сумма", "Оплачено", "Долг"], payableRows, "Непогашенных долгов нет.")],
+      ["reconciliation", "Акт сверки", supplierCardTable(["Дата", "Документ", "Закупка", "Оплата", "Баланс"], reconciliationRows, "Операций пока нет.")],
+      ["note", "Комментарий", noteHtml],
+    ];
+    if (tabs) {
+      tabs.innerHTML = sections.map((section, index) => (
+        `<button type="button" data-purchase-supplier-card-tab="${section[0]}" class="${index === 0 ? "active" : ""}" aria-selected="${index === 0 ? "true" : "false"}">${escapeHtml(section[1])}</button>`
+      )).join("");
+    }
+    if (panels) {
+      panels.innerHTML = sections.map((section, index) => (
+        `<section data-purchase-supplier-card-panel="${section[0]}"${index === 0 ? "" : " hidden"}>${section[2]}</section>`
+      )).join("");
+    }
+  }
+
+  function activateSupplierCardTab(dialog, tabName) {
+    dialog.querySelectorAll("[data-purchase-supplier-card-tab]").forEach((button) => {
+      const active = button.getAttribute("data-purchase-supplier-card-tab") === tabName;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    dialog.querySelectorAll("[data-purchase-supplier-card-panel]").forEach((panel) => {
+      panel.hidden = panel.getAttribute("data-purchase-supplier-card-panel") !== tabName;
     });
   }
 
@@ -2647,14 +2733,8 @@
     if (!dialog || !supplier) return;
     setText(dialog, "[data-purchase-supplier-card-name]", supplier.name || purchase.supplier || "Поставщик");
     setText(dialog, "[data-purchase-supplier-card-sub]", supplier.official_name || supplier.balance || "Баланс и контакты");
-    setText(dialog, "[data-purchase-supplier-card-phone]", supplier.phone || "-");
-    setText(dialog, "[data-purchase-supplier-card-email]", supplier.email || "-");
-    setText(dialog, "[data-purchase-supplier-card-inn]", supplier.inn || "-");
-    setText(dialog, "[data-purchase-supplier-card-category]", supplier.category || "-");
-    setText(dialog, "[data-purchase-supplier-card-address]", supplier.address || "-");
-    setText(dialog, "[data-purchase-supplier-card-status]", supplier.status || "-");
-    setText(dialog, "[data-purchase-supplier-card-comment]", supplier.comment || "-");
     renderSupplierBalanceLines(dialog, supplier);
+    renderSupplierCardDetails(dialog, supplier);
     if (typeof dialog.showModal === "function") dialog.showModal();
   }
 
@@ -3222,6 +3302,11 @@
       });
       panel.querySelector("[data-purchase-supplier-card-dialog]")?.addEventListener("click", (event) => {
         if (event.target === event.currentTarget) event.currentTarget.close();
+      });
+      panel.querySelector("[data-purchase-supplier-card-dialog]")?.addEventListener("click", (event) => {
+        const tab = event.target.closest("[data-purchase-supplier-card-tab]");
+        if (!tab) return;
+        activateSupplierCardTab(event.currentTarget, tab.getAttribute("data-purchase-supplier-card-tab") || "info");
       });
     });
     const paymentDialog = detailPaymentDialog(root);
