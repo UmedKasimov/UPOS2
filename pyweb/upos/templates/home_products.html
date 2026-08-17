@@ -708,7 +708,8 @@
               <div class="product-dictionary-select">
                 <label>
                   <span data-product-category-label>{{ "Программа*" if (current.kind or product_filters.kind) == "subscription" else "Категория*" }}</span>
-                  <select name="category" data-product-dictionary-select="category" {% if not edit_product %}required{% endif %}>
+                  <input type="hidden" name="category" value="{{ current.category or '' }}" data-product-dictionary-value="category" />
+                  <select data-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
                     <option value="">{{ "Выберите программу" if (current.kind or product_filters.kind) == "subscription" else "Выберите категорию" }}</option>
                     {% if current.category and current.category not in product_options.categories %}
                       <option value="{{ current.category }}" selected>{{ current.category }}</option>
@@ -717,6 +718,20 @@
                       <option value="{{ item }}" {% if current.category == item %}selected{% endif %}>{{ item }}</option>
                     {% endfor %}
                   </select>
+                  <div class="product-dictionary-combo" data-product-dictionary-combo="category">
+                    <input
+                      type="text"
+                      autocomplete="off"
+                      value="{{ current.category or '' }}"
+                      placeholder="{{ 'Выберите программу' if (current.kind or product_filters.kind) == 'subscription' else 'Выберите категорию' }}"
+                      data-product-dictionary-combo-input
+                      {% if not edit_product %}required{% endif %}
+                    />
+                    <button type="button" data-product-dictionary-combo-toggle aria-label="Открыть список" title="Открыть список">
+                      <span aria-hidden="true">⌄</span>
+                    </button>
+                    <div class="product-dictionary-combo-panel" data-product-dictionary-combo-panel hidden></div>
+                  </div>
                 </label>
                 <button class="products-inline-add-btn" type="button" data-product-dictionary-open data-product-dictionary-type="category" data-product-dictionary-title="Новая категория" aria-label="Создать категорию">+</button>
               </div>
@@ -783,6 +798,7 @@
               var productId = form && form.querySelector('input[name="product_id"]');
               var categoryLabel = form && form.querySelector('[data-product-category-label]');
               var categorySelect = form && form.querySelector('[data-product-dictionary-select="category"]');
+              var categoryComboInput = form && form.querySelector('[data-product-dictionary-combo="category"] [data-product-dictionary-combo-input]');
               var brandField = form && form.querySelector('[data-product-brand-field]');
               var brandSelect = form && form.querySelector('[data-product-dictionary-select="brand"]');
               var barcodeSection = form && form.querySelector('[data-product-barcode-section]');
@@ -811,6 +827,9 @@
                 if (categoryLabel) categoryLabel.textContent = isSubscription ? 'Программа*' : 'Категория*';
                 if (categorySelect && categorySelect.options.length) {
                   categorySelect.options[0].textContent = isSubscription ? 'Выберите программу' : 'Выберите категорию';
+                }
+                if (categoryComboInput) {
+                  categoryComboInput.placeholder = isSubscription ? 'Выберите программу' : 'Выберите категорию';
                 }
                 if (brandField) {
                   brandField.hidden = isSubscription;
@@ -1338,11 +1357,139 @@
       const quickError = quickDialog?.querySelector('[data-product-dictionary-quick-error]');
       const quickSave = quickDialog?.querySelector('[data-product-dictionary-save]');
       let quickType = 'category';
+      const normalizeText = (value) => String(value || '').trim().toLowerCase();
+      const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[ch]));
       const csrfToken = () => (
         document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
         || document.querySelector('input[name="csrf_token"]')?.value
         || ''
       );
+      const dictionaryCombos = Array.from(document.querySelectorAll('[data-product-dictionary-combo]'));
+      const optionValues = (select) => Array.from(select?.options || [])
+        .map((option) => option.value)
+        .filter(Boolean);
+      const closeDictionaryCombo = (combo) => {
+        const panel = combo?.querySelector('[data-product-dictionary-combo-panel]');
+        const toggle = combo?.querySelector('[data-product-dictionary-combo-toggle]');
+        if (panel) panel.hidden = true;
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        combo?.classList.remove('is-open');
+      };
+      const syncDictionaryComboValue = (combo, value) => {
+        const type = combo?.dataset.productDictionaryCombo || '';
+        const input = combo?.querySelector('[data-product-dictionary-combo-input]');
+        const select = document.querySelector(`[data-product-dictionary-select="${type}"]`);
+        const hidden = document.querySelector(`[data-product-dictionary-value="${type}"]`);
+        const clean = String(value || '').trim();
+        if (input) input.value = clean;
+        if (hidden) hidden.value = clean;
+        if (select) select.value = clean;
+      };
+      const renderDictionaryCombo = (combo, query = '') => {
+        const type = combo?.dataset.productDictionaryCombo || '';
+        const panel = combo?.querySelector('[data-product-dictionary-combo-panel]');
+        const toggle = combo?.querySelector('[data-product-dictionary-combo-toggle]');
+        const select = document.querySelector(`[data-product-dictionary-select="${type}"]`);
+        if (!combo || !panel || !select) return;
+        const needle = normalizeText(query);
+        const values = optionValues(select)
+          .filter((value) => !needle || normalizeText(value).includes(needle));
+        panel.innerHTML = values.length
+          ? values.map((value) => (
+              `<button type="button" class="product-dictionary-combo-option" data-value="${escapeHtml(value)}">` +
+              `<span>${escapeHtml(value)}</span>` +
+              `</button>`
+            )).join('')
+          : '<div class="product-dictionary-combo-empty">Ничего не найдено</div>';
+        panel.hidden = false;
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+        combo.classList.add('is-open');
+      };
+      const initDictionaryCombos = () => {
+        dictionaryCombos.forEach((combo) => {
+          if (combo.dataset.dictionaryComboReady === '1') return;
+          combo.dataset.dictionaryComboReady = '1';
+          const type = combo.dataset.productDictionaryCombo || '';
+          const input = combo.querySelector('[data-product-dictionary-combo-input]');
+          const panel = combo.querySelector('[data-product-dictionary-combo-panel]');
+          const toggle = combo.querySelector('[data-product-dictionary-combo-toggle]');
+          const select = document.querySelector(`[data-product-dictionary-select="${type}"]`);
+          const hidden = document.querySelector(`[data-product-dictionary-value="${type}"]`);
+          if (!input || !panel || !select || !hidden) return;
+          syncDictionaryComboValue(combo, hidden.value || select.value || input.value);
+          input.addEventListener('focus', () => renderDictionaryCombo(combo, input.value));
+          input.addEventListener('input', () => {
+            hidden.value = input.value.trim();
+            select.value = optionValues(select).includes(hidden.value) ? hidden.value : '';
+            renderDictionaryCombo(combo, input.value);
+          });
+          input.addEventListener('keydown', (event) => {
+            const options = Array.from(panel.querySelectorAll('.product-dictionary-combo-option'));
+            const current = document.activeElement;
+            const index = options.indexOf(current);
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              if (panel.hidden) renderDictionaryCombo(combo, input.value);
+              (options[index + 1] || options[0])?.focus();
+            } else if (event.key === 'Escape') {
+              closeDictionaryCombo(combo);
+            } else if (event.key === 'Enter' && !panel.hidden && options.length) {
+              event.preventDefault();
+              const exact = options.find((button) => normalizeText(button.dataset.value) === normalizeText(input.value)) || options[0];
+              syncDictionaryComboValue(combo, exact.dataset.value || '');
+              closeDictionaryCombo(combo);
+            }
+          });
+          panel.addEventListener('keydown', (event) => {
+            const options = Array.from(panel.querySelectorAll('.product-dictionary-combo-option'));
+            const index = options.indexOf(document.activeElement);
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              const step = event.key === 'ArrowDown' ? 1 : -1;
+              options[(index + step + options.length) % options.length]?.focus();
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              const button = document.activeElement?.closest?.('.product-dictionary-combo-option');
+              if (button) {
+                syncDictionaryComboValue(combo, button.dataset.value || '');
+                closeDictionaryCombo(combo);
+                input.focus();
+              }
+            } else if (event.key === 'Escape') {
+              closeDictionaryCombo(combo);
+              input.focus();
+            }
+          });
+          panel.addEventListener('mousedown', (event) => {
+            const button = event.target.closest('.product-dictionary-combo-option');
+            if (!button) return;
+            event.preventDefault();
+            syncDictionaryComboValue(combo, button.dataset.value || '');
+            closeDictionaryCombo(combo);
+            input.focus();
+          });
+          toggle?.addEventListener('click', () => {
+            if (panel.hidden) {
+              renderDictionaryCombo(combo, input.value);
+              input.focus();
+            } else {
+              closeDictionaryCombo(combo);
+            }
+          });
+        });
+      };
+      initDictionaryCombos();
+      document.addEventListener('mousedown', (event) => {
+        dictionaryCombos.forEach((combo) => {
+          if (!combo.contains(event.target)) closeDictionaryCombo(combo);
+        });
+      });
       const addSelectOption = (type, value) => {
         document.querySelectorAll(`[data-product-dictionary-select="${type}"]`).forEach((select) => {
           if (!Array.from(select.options).some((option) => option.value === value)) {
@@ -1352,6 +1499,8 @@
             select.appendChild(option);
           }
           select.value = value;
+          const combo = document.querySelector(`[data-product-dictionary-combo="${type}"]`);
+          if (combo) syncDictionaryComboValue(combo, value);
         });
       };
       document.querySelectorAll('[data-product-dictionary-open]').forEach((button) => {
