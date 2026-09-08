@@ -982,7 +982,10 @@
                     <div class="product-dictionary-combo-panel" data-warehouse-product-dictionary-combo-panel hidden></div>
                   </div>
                 </label>
-                <button class="products-inline-add-btn" type="button" data-warehouse-product-dictionary-add="category" aria-label="Создать категорию">+</button>
+                <button class="products-inline-add-btn warehouse-product-dictionary-add" type="button" data-warehouse-product-dictionary-add="category" aria-label="Создать категорию">
+                  <span class="warehouse-product-dictionary-add-icon" aria-hidden="true">+</span>
+                  <span class="warehouse-product-dictionary-add-label">Добавить</span>
+                </button>
               </div>
               <div class="product-dictionary-select">
                 <label>
@@ -999,7 +1002,10 @@
                     <div class="product-dictionary-combo-panel" data-warehouse-product-dictionary-combo-panel hidden></div>
                   </div>
                 </label>
-                <button class="products-inline-add-btn" type="button" data-warehouse-product-dictionary-add="brand" aria-label="Создать бренд">+</button>
+                <button class="products-inline-add-btn warehouse-product-dictionary-add" type="button" data-warehouse-product-dictionary-add="brand" aria-label="Создать бренд">
+                  <span class="warehouse-product-dictionary-add-icon" aria-hidden="true">+</span>
+                  <span class="warehouse-product-dictionary-add-label">Добавить</span>
+                </button>
               </div>
               <label><span>Артикул</span><input name="sku" value="{{ warehouse_options.next_product_sku or '21000' }}" readonly title="Артикул создаётся автоматически" data-warehouse-product-sku /></label>
               <label><span>Единица*</span><input name="unit" value="Штука" required data-warehouse-product-unit /></label>
