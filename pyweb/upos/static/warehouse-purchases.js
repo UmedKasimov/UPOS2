@@ -1185,9 +1185,12 @@
     if (!form || !combo || !panel || !type) return;
     const needle = normalize(query);
     const rows = warehouseProductDictionaryValues(form, type).filter((value) => !needle || normalize(value).includes(needle));
-    panel.innerHTML = rows.length
+    const createLabel = type === "brand" ? "Создать бренд" : "Создать категорию";
+    const createButton = `<button type="button" class="product-dictionary-combo-create" data-warehouse-product-dictionary-create="${escapeHtml(type)}"><span aria-hidden="true">+</span>${createLabel}</button>`;
+    const optionsMarkup = rows.length
       ? rows.map((value) => `<button type="button" class="product-dictionary-combo-option" data-value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span></button>`).join("")
       : '<div class="product-dictionary-combo-empty">Ничего не найдено</div>';
+    panel.innerHTML = createButton + optionsMarkup;
     panel.hidden = false;
     combo.classList.add("is-open");
   }
@@ -1228,6 +1231,13 @@
         }
       });
       panel.addEventListener("mousedown", (event) => {
+        const createButton = event.target.closest("[data-warehouse-product-dictionary-create]");
+        if (createButton) {
+          event.preventDefault();
+          closeWarehouseProductDictionary(combo);
+          form.querySelector(`[data-warehouse-product-dictionary-add="${createButton.dataset.warehouseProductDictionaryCreate}"]`)?.click();
+          return;
+        }
         const button = event.target.closest(".product-dictionary-combo-option");
         if (!button) return;
         event.preventDefault();
