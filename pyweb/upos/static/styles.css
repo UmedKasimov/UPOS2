@@ -13289,8 +13289,8 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-product-dialog {
-  width: min(72rem, 96vw);
-  max-width: min(72rem, 96vw);
+  width: min(86rem, 97vw);
+  max-width: min(86rem, 97vw);
 }
 
 .sales-product-dialog-surface {
@@ -13298,6 +13298,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-product-dialog .sales-product-dialog-surface {
+  width: 100%;
   max-height: min(92vh, 58rem);
 }
 
@@ -13344,14 +13345,16 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   font-weight: 800;
 }
 
+@media (max-width: 1050px) {
+  .warehouse-product-dialog .sales-product-dialog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 760px) {
   .settings-profile-modal.warehouse-product-dialog {
     width: calc(100vw - 1rem);
     max-width: calc(100vw - 1rem);
-  }
-
-  .warehouse-product-dialog .sales-product-dialog-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .warehouse-product-dialog .warehouse-product-quick-form .product-form-grid > .product-dictionary-select {
@@ -17497,8 +17500,8 @@ html.dark .employees-page-wrap {
 }
 
 .settings-profile-modal.warehouse-product-dialog {
-  width: min(72rem, 96vw);
-  max-width: min(72rem, 96vw);
+  width: min(86rem, 97vw);
+  max-width: min(86rem, 97vw);
 }
 
 @keyframes settingsProfileModalIn {
