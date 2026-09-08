@@ -4004,11 +4004,16 @@ a.messenger-message-attachment:focus-visible {
   border: 1px solid color-mix(in srgb, var(--primary) 82%, white);
   border-radius: 0.7rem;
   background: var(--primary);
-  color: white;
+  color: #fff !important;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 22%, transparent);
   transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+}
+
+.warehouse-product-photo-picker-button > span,
+.warehouse-product-photo-picker-button > svg {
+  color: #fff !important;
 }
 
 .warehouse-product-photo-picker-button:hover {
