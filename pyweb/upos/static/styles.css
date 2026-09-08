@@ -17504,6 +17504,18 @@ html.dark .employees-page-wrap {
   max-width: min(86rem, 97vw);
 }
 
+/* Диалог переносится в body через JavaScript, поэтому привязываем итоговый
+   размер к его data-атрибуту и не зависим от контекста исходного шаблона. */
+dialog.settings-profile-modal[data-warehouse-product-dialog] {
+  width: min(90rem, calc(100vw - 2rem)) !important;
+  max-width: min(90rem, calc(100vw - 2rem)) !important;
+}
+
+dialog[data-warehouse-product-dialog] > .sales-product-dialog-surface {
+  width: 100%;
+  max-width: none;
+}
+
 @keyframes settingsProfileModalIn {
   from {
     opacity: 0;
