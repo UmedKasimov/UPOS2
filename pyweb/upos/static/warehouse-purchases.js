@@ -1241,14 +1241,57 @@
         const type = button.dataset.warehouseProductDictionaryAdd || "";
         const combo = form.querySelector(`[data-warehouse-product-dictionary-combo="${type}"]`);
         const input = combo?.querySelector("[data-warehouse-product-dictionary-combo-input]");
-        const value = String(input?.value || "").trim();
-        if (value) {
-          syncWarehouseProductDictionary(combo, value);
-          closeWarehouseProductDictionary(combo);
-        }
-        input?.focus();
+        const dialog = document.querySelector("[data-warehouse-product-dictionary-dialog]");
+        const dialogForm = dialog?.querySelector("[data-warehouse-product-dictionary-form]");
+        const nameInput = dialog?.querySelector("[data-warehouse-product-dictionary-name]");
+        if (!dialog || !dialogForm || !nameInput || !combo) return;
+        closeWarehouseProductDictionary(combo);
+        dialogForm.dataset.dictionaryType = type;
+        dialogForm._warehouseProductCombo = combo;
+        const isBrand = type === "brand";
+        const title = dialog.querySelector("[data-warehouse-product-dictionary-title]");
+        const label = dialog.querySelector("[data-warehouse-product-dictionary-label]");
+        if (title) title.textContent = isBrand ? "Добавление бренда" : "Добавление категории";
+        if (label) label.textContent = isBrand ? "Название бренда*" : "Название категории*";
+        nameInput.value = String(input?.value || "").trim();
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        setTimeout(() => {
+          nameInput.focus();
+          nameInput.select();
+        }, 0);
       });
     });
+
+    const dictionaryDialog = document.querySelector("[data-warehouse-product-dictionary-dialog]");
+    const dictionaryForm = dictionaryDialog?.querySelector("[data-warehouse-product-dictionary-form]");
+    if (dictionaryDialog && dictionaryForm && dictionaryDialog.dataset.ready !== "1") {
+      dictionaryDialog.dataset.ready = "1";
+      const closeDictionaryDialog = () => {
+        if (typeof dictionaryDialog.close === "function") dictionaryDialog.close();
+        else dictionaryDialog.removeAttribute("open");
+      };
+      dictionaryDialog.querySelectorAll("[data-warehouse-product-dictionary-close]").forEach((closeButton) => {
+        closeButton.addEventListener("click", closeDictionaryDialog);
+      });
+      dictionaryDialog.addEventListener("click", (event) => {
+        if (event.target === dictionaryDialog) closeDictionaryDialog();
+      });
+      dictionaryForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const nameInput = dictionaryForm.querySelector("[data-warehouse-product-dictionary-name]");
+        const value = String(nameInput?.value || "").trim();
+        if (!value) {
+          nameInput?.focus();
+          return;
+        }
+        const combo = dictionaryForm._warehouseProductCombo;
+        syncWarehouseProductDictionary(combo, value);
+        closeWarehouseProductDictionary(combo);
+        closeDictionaryDialog();
+        combo?.querySelector("[data-warehouse-product-dictionary-combo-input]")?.focus();
+      });
+    }
     const urlField = form.querySelector("[data-warehouse-product-photo-url]");
     const fileField = form.querySelector("[data-warehouse-product-photo-file]");
     urlField?.addEventListener("input", () => showWarehouseProductPreview(form, urlField.value));

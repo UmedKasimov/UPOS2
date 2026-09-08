@@ -13301,6 +13301,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   max-height: min(92vh, 58rem);
 }
 
+.warehouse-product-dictionary-dialog-surface {
+  width: min(420px, calc(100vw - 32px));
+}
+
 .sales-product-dialog-grid {
   margin-bottom: 0;
 }
