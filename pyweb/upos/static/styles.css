@@ -3972,6 +3972,75 @@ a.messenger-message-attachment:focus-visible {
   border-left: 1px solid var(--workbench-line, var(--border));
 }
 
+.warehouse-product-photo-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 4.25rem;
+  padding: 0.55rem 0.75rem;
+  border-left: 1px solid var(--workbench-line, var(--border));
+  background: var(--card);
+}
+
+.warehouse-product-photo-picker > input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.warehouse-product-photo-picker-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 82%, white);
+  border-radius: 0.7rem;
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 22%, transparent);
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+}
+
+.warehouse-product-photo-picker-button:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+.warehouse-product-photo-picker > input[type="file"]:focus-visible + .warehouse-product-photo-picker-button {
+  outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.warehouse-product-photo-picker-button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.warehouse-product-photo-picker-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .client-create-form .client-data-table {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;

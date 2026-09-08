@@ -960,7 +960,14 @@
                   <span>Фото*</span>
                   <div class="client-photo-source-controls">
                     <input name="photo_url" type="text" inputmode="url" placeholder="URL фото: https://..." data-warehouse-product-photo-url />
-                    <input name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-warehouse-product-photo-file />
+                    <div class="warehouse-product-photo-picker">
+                      <input id="warehouse-product-photo-file" name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-warehouse-product-photo-file />
+                      <label class="warehouse-product-photo-picker-button" for="warehouse-product-photo-file">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></svg>
+                        <span>Выбрать фото</span>
+                      </label>
+                      <span class="warehouse-product-photo-picker-name" data-warehouse-product-photo-file-name>Файл не выбран</span>
+                    </div>
                   </div>
                 </div>
               </div>

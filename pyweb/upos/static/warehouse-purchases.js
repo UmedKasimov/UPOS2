@@ -1304,9 +1304,11 @@
     }
     const urlField = form.querySelector("[data-warehouse-product-photo-url]");
     const fileField = form.querySelector("[data-warehouse-product-photo-file]");
+    const fileName = form.querySelector("[data-warehouse-product-photo-file-name]");
     urlField?.addEventListener("input", () => showWarehouseProductPreview(form, urlField.value));
     fileField?.addEventListener("change", () => {
       const file = fileField.files && fileField.files[0];
+      if (fileName) fileName.textContent = file ? file.name : "Файл не выбран";
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => showWarehouseProductPreview(form, reader.result);
