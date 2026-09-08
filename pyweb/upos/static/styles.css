@@ -13793,10 +13793,13 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .warehouse-supplier-dialog {
-  max-width: min(44rem, 94vw);
+  width: min(56rem, calc(100vw - 1.5rem));
+  max-width: min(56rem, calc(100vw - 1.5rem));
 }
 
 .warehouse-supplier-dialog-surface {
+  width: 100%;
+  max-width: none;
   max-height: min(92vh, 44rem);
 }
 
@@ -13804,9 +13807,38 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   margin-bottom: 0;
 }
 
+.warehouse-supplier-dialog-grid .settings-profile-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--foreground) 24%, var(--border));
+  background: color-mix(in srgb, var(--card) 96%, var(--foreground));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.warehouse-supplier-dialog-grid .settings-profile-input:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+}
+
+.warehouse-supplier-dialog-grid .settings-profile-input:focus,
+.warehouse-supplier-dialog-grid .settings-profile-input:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
 .warehouse-supplier-dialog-note {
   min-height: 5rem;
   resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .warehouse-supplier-dialog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .warehouse-supplier-dialog-grid .settings-profile-field {
+    grid-column: 1 / -1;
+  }
 }
 
 .sales-combo-option {
