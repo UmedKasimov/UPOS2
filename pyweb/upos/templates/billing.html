@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=424" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=425" />
   </head>
   <body data-theme="light">
     <main class="billing-page">
@@ -139,6 +139,10 @@
                   </form>
                   <code>{{ client.account_id or client.id }}</code>
                   <a class="btn btn-xs btn-secondary billing-client-info-btn" href="{{ url_for('billing_page') }}?detail={{ client.account_id or client.id }}">Данные</a>
+                  <div class="billing-client-size">
+                    <span>Занято: <strong>{{ client.total_size }}</strong></span>
+                    <small>База данных {{ client.db_size }} · файлы {{ client.folder_size }}</small>
+                  </div>
                   <small>{{ client.workspace_path }}</small>
                 </div>
               {% endfor %}

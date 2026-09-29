@@ -16833,6 +16833,15 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   justify-self: end;
 }
 
+.billing-client-size {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+}
+
+.billing-client-size strong {
+  color: var(--foreground);
+}
+
 .billing-client-row small {
   grid-column: 1 / -1;
   overflow-wrap: anywhere;

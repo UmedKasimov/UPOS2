@@ -32,7 +32,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook, load_workbook
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import flag_modified
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -437,40 +437,42 @@ WORKSPACE_SIZE_TABLES = (
 
 def db_account_size_bytes(owner_id: str) -> int:
     owner = str(owner_id or "").strip()
-    if not owner:
-        return 0
-    total = 0
+    return db_account_sizes_bytes([owner]).get(owner, 0) if owner else 0
+
+
+def db_account_sizes_bytes(owner_ids: list[str]) -> dict[str, int]:
+    owners = list(dict.fromkeys(str(owner_id).strip() for owner_id in owner_ids if str(owner_id).strip()))
+    sizes = {owner_id: 0 for owner_id in owners}
+    if not owners:
+        return sizes
+
+    user_query = text(
+        'SELECT COALESCE(t.employer_user_id, t.id) AS owner_id, '
+        'SUM(pg_column_size(t)) AS size FROM public."users" AS t '
+        'WHERE t.id IN :owners OR t.employer_user_id IN :owners '
+        'GROUP BY COALESCE(t.employer_user_id, t.id)'
+    ).bindparams(bindparam("owners", expanding=True))
     with get_engine().connect() as conn:
         try:
-            total += int(
-                conn.execute(
-                    text(
-                        'SELECT COALESCE(SUM(pg_column_size(t)), 0) '
-                        'FROM public."users" AS t '
-                        "WHERE t.id = :owner OR t.employer_user_id = :owner",
-                    ),
-                    {"owner": owner},
-                ).scalar()
-                or 0,
-            )
+            for owner_id, size in conn.execute(user_query, {"owners": owners}):
+                if str(owner_id) in sizes:
+                    sizes[str(owner_id)] += int(size or 0)
         except Exception:
-            logger.warning("[upos] не удалось посчитать пользователей пространства %s", owner, exc_info=True)
+            conn.rollback()
+            logger.warning("[upos] не удалось посчитать пользователей биллинга", exc_info=True)
+
         for table in WORKSPACE_SIZE_TABLES:
+            query = text(
+                f'SELECT t.workspace_owner_id, SUM(pg_column_size(t)) AS size '
+                f'FROM public."{table}" AS t '
+                'WHERE t.workspace_owner_id IN :owners GROUP BY t.workspace_owner_id'
+            ).bindparams(bindparam("owners", expanding=True))
             try:
-                total += int(
-                    conn.execute(
-                        text(
-                            f'SELECT COALESCE(SUM(pg_column_size(t)), 0) '
-                            f'FROM public."{table}" AS t '
-                            "WHERE t.workspace_owner_id = :owner",
-                        ),
-                        {"owner": owner},
-                    ).scalar()
-                    or 0,
-                )
+                for owner_id, size in conn.execute(query, {"owners": owners}):
+                    sizes[str(owner_id)] += int(size or 0)
             except Exception:
-                continue
-    return total
+                conn.rollback()
+    return sizes
 
 
 TELEPHONY_SETTING_LIST_KEYS = (
@@ -606,15 +608,22 @@ def _warehouse_expense_type_options(workspace_owner_id: str) -> list[dict[str, s
 
 def billing_clients_context() -> list[dict[str, Any]]:
     clients = []
-    for row in list_users_safe():
-        if str(row.get("role") or "") == "user":
-            account_key = str(row.get("account_id") or row.get("id") or "")
-            owner_id = str(row.get("id") or "")
-            clients.append({
-                **row,
-                "workspace_path": ensure_client_workspace(account_key),
-                "telephony": telephony_account_dashboard(owner_id) if owner_id else {},
-            })
+    owners = [row for row in list_users_safe() if str(row.get("role") or "") == "user"]
+    db_sizes = db_account_sizes_bytes([str(row.get("id") or "") for row in owners])
+    for row in owners:
+        account_key = str(row.get("account_id") or row.get("id") or "")
+        owner_id = str(row.get("id") or "")
+        workspace_path = ensure_client_workspace(account_key)
+        folder_bytes = folder_size_bytes(Path(workspace_path))
+        db_bytes = db_sizes.get(owner_id, 0)
+        clients.append({
+            **row,
+            "workspace_path": workspace_path,
+            "folder_size": format_bytes(folder_bytes),
+            "db_size": format_bytes(db_bytes),
+            "total_size": format_bytes(folder_bytes + db_bytes),
+            "telephony": telephony_account_dashboard(owner_id) if owner_id else {},
+        })
     return clients
 
 
