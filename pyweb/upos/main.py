@@ -15361,6 +15361,10 @@ def create_app() -> FastAPI:
             warehouse_stocks=warehouse_stocks,
             warehouse_stock_total=_sales_money_label(warehouse_stock_total),
             warehouse_operations=warehouse_operations,
+            warehouse_adjustment_documents=[
+                item for item in warehouse_operations
+                if item["operation_type"] in {"in", "out", "adjustment"}
+            ],
             warehouse_purchases=warehouse_purchases,
             warehouse_purchases_pagination=warehouse_purchases_pagination,
             warehouse_purchase_edit=warehouse_purchase_edit,

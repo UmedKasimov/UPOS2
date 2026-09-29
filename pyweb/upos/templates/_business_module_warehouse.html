@@ -1391,17 +1391,65 @@
     </dialog>
   </article>
 
+  <article class="products-list-panel warehouse-adjustment-documents" data-workspace-view="adjustments" hidden>
+    <header class="products-panel-head warehouse-adjustment-documents-head">
+      <div>
+        <h2>Документы корректировок</h2>
+        <span>Всего: {{ warehouse_adjustment_documents|length }}</span>
+      </div>
+      <button type="button" class="btn" data-warehouse-adjustment-create>+ Создать корректировку</button>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Дата</th>
+            <th>Тип</th>
+            <th>Склад</th>
+            <th>Товар</th>
+            <th>Количество</th>
+            <th>Сумма</th>
+            <th>Ответственный</th>
+            <th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in warehouse_adjustment_documents %}
+            <tr>
+              <td><strong>{{ row.number }}</strong></td>
+              <td>{{ row.date or "—" }}</td>
+              <td>{{ row.operation_label }}</td>
+              <td>{{ row.warehouse or "—" }}</td>
+              <td>{{ row.product or "—" }}</td>
+              <td>{{ row.quantity }}</td>
+              <td>{{ row.amount }} {{ row.currency }}</td>
+              <td>{{ row.responsible or "—" }}</td>
+              <td>{{ row.note or "—" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="9">Документов корректировок пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</div>
+
   {% set adjustment_direction = warehouse_operation_preset if warehouse_operation_preset in ['in', 'out'] else 'out' %}
-  <article class="warehouse-adjustment-entry product-form-panel" data-workspace-view="adjustments" hidden>
+  <dialog class="warehouse-adjustment-entry warehouse-adjustment-dialog product-form-panel" data-warehouse-adjustment-dialog {% if request.query_params.get('create') == '1' or (warehouse_operation_preset and request.query_params.get('error')) %}data-open-on-load="1"{% endif %}>
     <header class="products-panel-head warehouse-adjustment-entry-head">
       <div>
         <h2>{{ 'Приход на склад' if adjustment_direction == 'in' else 'Списание со склада' }}</h2>
         <span>{{ 'Укажите поступившее количество: остатки увеличатся.' if adjustment_direction == 'in' else 'Укажите списываемое количество: остатки уменьшатся.' }}</span>
       </div>
-      <span class="warehouse-adjustment-direction warehouse-adjustment-direction--{{ adjustment_direction }}">
-        {{ 'Приход' if adjustment_direction == 'in' else 'Списание' }}
-      </span>
+      <div class="warehouse-adjustment-dialog-head-actions">
+        <a class="warehouse-adjustment-direction {% if adjustment_direction == 'in' %}warehouse-adjustment-direction--selected{% endif %}" href="{{ url_for('warehouse_get') }}?module_view=adjustments&op=in&create=1#adjustments">Приход</a>
+        <a class="warehouse-adjustment-direction warehouse-adjustment-direction--out {% if adjustment_direction == 'out' %}warehouse-adjustment-direction--selected{% endif %}" href="{{ url_for('warehouse_get') }}?module_view=adjustments&op=out&create=1#adjustments">Списание</a>
+        <button type="button" class="settings-profile-modal-close" data-warehouse-adjustment-close aria-label="Закрыть">×</button>
+      </div>
     </header>
+    {% if flash_err and warehouse_operation_preset %}<div class="flash err warehouse-adjustment-dialog-error">{{ flash_err }}</div>{% endif %}
     <form
       method="post"
       action="{{ url_for('warehouse_operation_save') }}"
@@ -1617,7 +1665,7 @@
       </label>
       <div class="sales-form-footer warehouse-adjustment-footer">
         <div class="product-form-actions warehouse-adjustment-actions">
-          <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#adjustments">Отмена</a>
+          <button type="button" class="btn btn-secondary" data-warehouse-adjustment-close>Отмена</button>
           <button class="btn" type="submit" data-adjustment-submit>
             {{ 'Оприходовать' if adjustment_direction == 'in' else 'Списать со склада' }}
           </button>
@@ -1653,8 +1701,7 @@
         </form>
       </dialog>
     {% endif %}
-  </article>
-</div>
+  </dialog>
 
 <dialog class="settings-profile-modal warehouse-operation-dialog" id="warehouse-operation-dialog">
   <div class="settings-profile-modal-surface warehouse-operation-dialog-surface">
@@ -1665,10 +1712,10 @@
       <button type="button" class="settings-profile-modal-close" data-warehouse-close-operation aria-label="Закрыть">×</button>
     </header>
     <div class="warehouse-operation-choices">
-      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=in#adjustments" data-warehouse-operation-link>
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?module_view=adjustments&op=in&create=1#adjustments" data-warehouse-operation-link>
         <strong>Приход</strong>
       </a>
-      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=out#adjustments" data-warehouse-operation-link>
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?module_view=adjustments&op=out&create=1#adjustments" data-warehouse-operation-link>
         <strong>Списание</strong>
       </a>
       <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=transfer#transfers" data-warehouse-operation-link>

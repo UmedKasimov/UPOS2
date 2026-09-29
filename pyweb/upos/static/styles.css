@@ -31884,6 +31884,17 @@ html.dark .clients-map-empty {
 }
 
 /* Warehouse stock receipt and write-off editor */
+.warehouse-adjustment-documents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.warehouse-adjustment-documents-head .btn {
+  flex: none;
+}
+
 .warehouse-adjustment-entry {
   width: 100%;
   max-width: none;
@@ -36043,4 +36054,50 @@ html.dark .client-own-tag--other {
   opacity: 0.55;
   pointer-events: none;
   transition: opacity 0.12s ease;
+}
+
+/* The adjustment editor opens above its document list. */
+.workspace-module-root .warehouse-adjustment-dialog {
+  position: fixed;
+  width: min(1180px, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border-radius: 0.75rem;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+}
+
+.warehouse-adjustment-dialog::backdrop {
+  background: rgb(15 23 42 / 48%);
+}
+
+.warehouse-adjustment-dialog-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.warehouse-adjustment-dialog-head-actions .warehouse-adjustment-direction {
+  text-decoration: none;
+}
+
+.warehouse-adjustment-direction--selected {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.warehouse-adjustment-dialog-error {
+  margin: 0.75rem 1rem 0;
+}
+
+@media (max-width: 720px) {
+  .warehouse-adjustment-documents-head,
+  .warehouse-adjustment-entry-head {
+    flex-wrap: wrap;
+  }
+
+  .warehouse-adjustment-documents-head .btn {
+    width: 100%;
+  }
 }
