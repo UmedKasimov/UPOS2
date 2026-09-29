@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="{{ url_for('static', path='telephony-contacts.css') }}?v=105" />
     <script src="{{ url_for('static', path='telephony.js') }}?v=13" defer></script>
   {% elif active == "warehouse" %}
-    <script src="{{ url_for('static', path='warehouse.js') }}?v=2" defer></script>
-    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=88" defer></script>
+    <script src="{{ url_for('static', path='warehouse.js') }}?v=3" defer></script>
+    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=89" defer></script>
   {% elif active == "clients" %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
@@ -54,7 +54,7 @@
 {% elif active == "suppliers" %}
   {% set module_stack_views = module_views ~ " supplier_create" %}
 {% elif active == "warehouse" %}
-  {% set module_stack_views = module_views ~ " purchase_edit" %}
+  {% set module_stack_views = module_views ~ " purchase_edit adjustment_create" %}
 {% else %}
   {% set module_stack_views = module_views %}
 {% endif %}
@@ -78,6 +78,7 @@
     {% if active == "clients" and selected_client_card %}data-workspace-default-tab="client-{{ selected_client_card.id }}"{% endif %}
     {% if active == "suppliers" and selected_supplier_card %}data-workspace-default-tab="supplier-{{ selected_supplier_card.id }}"{% elif active == "suppliers" %}{# Лончер поставщиков свёлся к одной карточке — раздел открывается сразу списком. #}data-workspace-default-tab="suppliers" data-workspace-home-tab-id="suppliers"{% endif %}
     {% if active == "warehouse" and warehouse_purchase_edit %}data-workspace-default-tab="purchase-edit-{{ warehouse_purchase_edit.id }}"{% endif %}
+    {% if active == "warehouse" and request.query_params.get('module_view') == 'adjustment_create' %}data-workspace-default-tab="adjustment-create"{% endif %}
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Изменения сохранены.</div>

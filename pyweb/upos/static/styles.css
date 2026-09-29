@@ -32119,6 +32119,11 @@ html.dark .clients-map-empty {
   border-color: color-mix(in srgb, var(--brand-box, #2563eb) 18%, var(--workbench-line, var(--border)));
 }
 
+.warehouse-adjustment-table th {
+  white-space: normal;
+  line-height: 1.25;
+}
+
 .warehouse-adjustment-table td:nth-child(3) {
   white-space: normal;
 }

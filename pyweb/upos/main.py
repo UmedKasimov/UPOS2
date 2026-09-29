@@ -13506,7 +13506,7 @@ def create_app() -> FastAPI:
 
     def _warehouse_adjustment_lines_payload(form: Any, workspace_owner_id: str) -> tuple[dict[str, Any], list[dict[str, Any]], Decimal, str]:
         operation_type = str(form.get("operation_type") or "out").strip()
-        if operation_type not in {"in", "out"}:
+        if operation_type not in {"in", "out", "adjustment"}:
             operation_type = "out"
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
         usd_rate = _workspace_usd_uzs_rate(workspace_owner_id)
@@ -13633,6 +13633,9 @@ def create_app() -> FastAPI:
     def _warehouse_operation_data(row: WarehouseOperation) -> dict[str, Any]:
         data = _json_object(row.data)
         quantity = _sales_decimal(row.quantity)
+        signed_quantity = data.get("signed_quantity")
+        if row.operation_type == "adjustment" and signed_quantity is not None:
+            quantity = _sales_decimal(signed_quantity)
         return {
             "id": row.id,
             "number": row.number,
@@ -14915,6 +14918,8 @@ def create_app() -> FastAPI:
         module_home = _business_module_home(request, "warehouse")
         if module_home is not None:
             return module_home
+        if request.query_params.get("create") == "1" and str(op or "").strip() in {"in", "out"}:
+            return RedirectResponse(url="/warehouse?module_view=adjustment_create#adjustment-create", status_code=302)
         selected_view = str(request.query_params.get("module_view") or "")
         load_purchase_documents = selected_view in {"", "purchases", "purchase_edit"}
         purchase_supplier_filter = str(request.query_params.get("supplier") or "").strip()
@@ -15452,12 +15457,15 @@ def create_app() -> FastAPI:
         assert wid is not None
         if "line_product" in form:
             requested_operation_type = str(form.get("operation_type") or "out").strip()
-            requested_operation_type = requested_operation_type if requested_operation_type in {"in", "out"} else "out"
+            requested_operation_type = requested_operation_type if requested_operation_type in {"in", "out", "adjustment"} else "out"
+            adjustment_url = "/warehouse?module_view=adjustment_create" + (
+                "&op=" + requested_operation_type if requested_operation_type in {"in", "out"} else ""
+            )
             try:
                 data, lines, _total, currency = _warehouse_adjustment_lines_payload(form, wid)
             except ValueError as exc:
                 return RedirectResponse(
-                    url=f"/warehouse?op={requested_operation_type}&error=" + quote(str(exc)) + "#adjustments",
+                    url=adjustment_url + "&error=" + quote(str(exc)) + "#adjustment-create",
                     status_code=302,
                 )
             with session_scope() as session:
@@ -15477,35 +15485,36 @@ def create_app() -> FastAPI:
                         )
                     data["supplier"] = supplier_row.name
                     data["counterparty_id"] = supplier_row.id
-                delta_sign = 1 if data["operation_type"] == "in" else -1
+                delta_sign = 1 if data["operation_type"] in {"in", "adjustment"} else -1
                 prepared_lines: list[dict[str, Any]] = []
                 seen_products: set[str] = set()
                 for line in lines:
                     product_row = _resolve_product_row(session, wid, str(line.get("product") or ""))
                     if product_row is None:
                         return RedirectResponse(
-                            url=f"/warehouse?op={data['operation_type']}&error=" + quote("Товар не найден") + "#adjustments",
+                            url=adjustment_url + "&error=" + quote("Товар не найден") + "#adjustment-create",
                             status_code=302,
                         )
                     if product_row.id in seen_products:
                         return RedirectResponse(
-                            url=f"/warehouse?op={data['operation_type']}&error=" + quote("Один товар нельзя добавлять дважды") + "#adjustments",
+                            url=adjustment_url + "&error=" + quote("Один товар нельзя добавлять дважды") + "#adjustment-create",
                             status_code=302,
                         )
                     seen_products.add(product_row.id)
                     quantity = _sales_decimal(line.get("quantity"))
                     current_stock = _product_available_in_warehouse(product_row, warehouse_name)
+                    signed_change = Decimal(delta_sign) * quantity
                     if "target_stock" in line:
                         target_stock = _sales_decimal(line["target_stock"])
                         signed_change = target_stock - current_stock
-                        if signed_change * Decimal(delta_sign) < 0:
+                        if data["operation_type"] != "adjustment" and signed_change * Decimal(delta_sign) < 0:
                             return RedirectResponse(
-                                url=f"/warehouse?op={data['operation_type']}&error=" + quote("Для изменения остатка в другую сторону переключите Приход / Списание") + "#adjustments",
+                                url=adjustment_url + "&error=" + quote("Направление изменения остатка не совпадает с операцией") + "#adjustment-create",
                                 status_code=302,
                             )
                         if abs(signed_change) != quantity:
                             return RedirectResponse(
-                                url=f"/warehouse?op={data['operation_type']}&error=" + quote("Остаток товара изменился. Обновите страницу и проверьте корректировку") + "#adjustments",
+                                url=adjustment_url + "&error=" + quote("Остаток товара изменился. Обновите страницу и проверьте корректировку") + "#adjustment-create",
                                 status_code=302,
                             )
                         if quantity == 0:
@@ -15517,24 +15526,29 @@ def create_app() -> FastAPI:
                             "product": product_row.name,
                             "warehouse": warehouse_name,
                             "stock_before": (_decimal_plain_text(current_stock) or "0"),
-                            "stock_after": _decimal_plain_text(current_stock + Decimal(delta_sign) * quantity) or "0",
+                            "stock_after": _decimal_plain_text(current_stock + signed_change) or "0",
+                            "line_sign": 1 if signed_change > 0 else -1,
                         }
                     )
                     prepared_lines.append(prepared_line)
                 warehouse_row = _ensure_warehouse(session, wid, name=warehouse_name)
                 try:
-                    resolved_lines = _sync_product_lines(
-                        session,
-                        wid,
-                        warehouse_name=warehouse_row.name,
-                        lines=prepared_lines,
-                        delta_sign=delta_sign,
-                        op_date=str(data.get("date") or ""),
-                        require_stock_product=True,
-                    )
+                    resolved_lines = []
+                    for line_sign in (-1, 1):
+                        signed_lines = [line for line in prepared_lines if line["line_sign"] == line_sign]
+                        if signed_lines:
+                            resolved_lines.extend(_sync_product_lines(
+                                session,
+                                wid,
+                                warehouse_name=warehouse_row.name,
+                                lines=signed_lines,
+                                delta_sign=line_sign,
+                                op_date=str(data.get("date") or ""),
+                                require_stock_product=True,
+                            ))
                 except ValueError as exc:
                     return RedirectResponse(
-                        url=f"/warehouse?op={data['operation_type']}&error=" + quote(str(exc)) + "#adjustments",
+                        url=adjustment_url + "&error=" + quote(str(exc)) + "#adjustment-create",
                         status_code=302,
                     )
                 price_types = _workspace_price_types(wid)
@@ -15568,7 +15582,7 @@ def create_app() -> FastAPI:
                         **line,
                         "warehouse_id": warehouse_row.id,
                         "operation_batch_id": operation_batch_id,
-                        "signed_quantity": _decimal_plain_text(Decimal(delta_sign) * quantity) or "0",
+                        "signed_quantity": _decimal_plain_text(Decimal(line["line_sign"]) * quantity) or "0",
                     }
                     session.add(
                         WarehouseOperation(
@@ -15579,12 +15593,12 @@ def create_app() -> FastAPI:
                             warehouse_id=warehouse_row.id,
                             product_id=str(line.get("product_id") or "") or None,
                             quantity=quantity,
-                            amount=quantity * cost_price,
+                            amount=(Decimal(line["line_sign"]) if data["operation_type"] == "adjustment" else Decimal("1")) * quantity * cost_price,
                             currency=currency,
                             data=line_data,
                         )
                     )
-            return RedirectResponse(url=f"/warehouse?op={data['operation_type']}&msg=saved#adjustments", status_code=302)
+            return RedirectResponse(url="/warehouse?module_view=adjustments&msg=saved#adjustments", status_code=302)
         try:
             data, amount = _warehouse_operation_payload(form)
         except ValueError as exc:
@@ -15692,12 +15706,17 @@ def create_app() -> FastAPI:
                             op_date=str(data.get("date") or ""),
                         )
                     else:
+                        signed_quantity = data.get("signed_quantity")
+                        if row.operation_type == "adjustment" and signed_quantity is not None:
+                            reverse_sign = -1 if _sales_decimal(signed_quantity) > 0 else 1
+                        else:
+                            reverse_sign = -1 if row.operation_type in {"in", "adjustment"} else 1
                         _sync_product_lines(
                             session,
                             wid,
                             warehouse_name=str(data.get("warehouse") or ""),
                             lines=[{"product": data.get("product"), "product_id": row.product_id, "quantity": str(quantity), "price": data.get("price")}],
-                            delta_sign=-1 if row.operation_type in {"in", "adjustment"} else 1,
+                            delta_sign=reverse_sign,
                             op_date=str(data.get("date") or ""),
                         )
                 except ValueError as exc:

@@ -2435,8 +2435,6 @@
       const options = readPurchaseOptions();
       const products = Array.isArray(options.product_rows) ? options.product_rows : [];
       wireProductDialog(form);
-      wireSupplierPicker(form);
-      wireSupplierDialog(form);
       const body = form.querySelector("[data-adjustment-lines]");
       const supplierInput = form.querySelector("[data-adjustment-supplier]");
       const supplierNameInput = form.querySelector("[data-adjustment-supplier-name]");
@@ -2453,9 +2451,9 @@
       const productsQuantityOutput = form.querySelector("[data-adjustment-products-quantity]");
       const expenseTotalOutput = form.querySelector("[data-adjustment-expense-total]");
       const landedTotalOutput = form.querySelector("[data-adjustment-landed-total]");
-      const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
-      const directionSign = direction === "in" ? 1 : -1;
-      const signLabel = direction === "in" ? "+" : "−";
+      const direction = "adjustment";
+      const directionSign = 1;
+      const signLabel = "+";
       const expenseRowCurrency = (row) => row.querySelector("[data-adjustment-expense-currency-select]")?.value || currency();
       const syncSupplier = () => {
         const supplierId = String(supplierInput?.value || "").trim();
@@ -2551,7 +2549,6 @@
       const recalc = () => {
         let total = 0;
         let hasLine = false;
-        let invalidDirection = false;
         let duplicateProduct = false;
         const selectedProducts = new Set();
         rows().forEach((row) => {
@@ -2566,16 +2563,15 @@
           const target = targetEntered ? Math.max(0, purchaseEntryNumber(targetInput.value)) : current;
           const difference = target - current;
           const quantity = targetEntered ? Math.abs(difference) : 0;
-          const rowInvalid = Boolean(product && targetEntered && difference * directionSign < 0);
-          if (quantityInput) quantityInput.value = quantity > 0 && !rowInvalid ? quantityText(quantity) : "";
-          const lineTotal = quantity * price;
+          const rowInvalid = false;
+          if (quantityInput) quantityInput.value = quantity > 0 ? quantityText(quantity) : "";
+          const lineTotal = difference * price;
           const productId = String(product?.id || "");
           if (productId) {
             if (selectedProducts.has(productId)) duplicateProduct = true;
             selectedProducts.add(productId);
           }
-          hasLine = hasLine || Boolean(product && quantity > 0 && !rowInvalid);
-          invalidDirection = invalidDirection || rowInvalid;
+          hasLine = hasLine || Boolean(product && quantity > 0);
           row.classList.toggle("is-insufficient", rowInvalid);
           targetInput?.setAttribute("aria-invalid", rowInvalid ? "true" : "false");
           setOutput(row, "[data-adjustment-current]", quantityText(current));
@@ -2590,11 +2586,11 @@
           setOutput(
             row,
             "[data-adjustment-line-total]",
-            `${signLabel} ${purchaseEntryMoney(lineTotal, currency())}`,
+            `${difference > 0 ? "+" : difference < 0 ? "−" : ""} ${purchaseEntryMoney(Math.abs(lineTotal), currency())}`,
           );
-          if (product && quantity > 0 && !rowInvalid) total += lineTotal;
+          if (product && quantity > 0) total += lineTotal;
         });
-        const extraTotal = direction === "in" ? expenseTotal() : 0;
+        const extraTotal = 0;
         const quantityTotal = rows().reduce((sum, row) => {
           if (!productForRow(row)) return sum;
           return sum + Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-quantity]")?.value));
@@ -2610,7 +2606,7 @@
           setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(lineTotal + allocatedExpense, currency()));
         });
         const landedTotal = total + extraTotal;
-        if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(direction === "in" ? landedTotal : total, currency())}`;
+        if (totalOutput) totalOutput.textContent = `${total > 0 ? "+" : total < 0 ? "−" : ""} ${purchaseEntryMoney(Math.abs(total), currency())}`;
         goodsTotalOutputs.forEach((output) => {
           output.textContent = purchaseEntryMoney(total, currency());
         });
@@ -2620,11 +2616,9 @@
         if (errorOutput) {
           errorOutput.textContent = duplicateProduct
             ? "Один товар нельзя добавлять дважды."
-            : invalidDirection
-              ? `Фактический остаток ${direction === "in" ? "меньше" : "больше"} текущего. Переключитесь на «${direction === "in" ? "Списание" : "Приход"}».`
-              : "";
+            : "";
         }
-        if (submitButton) submitButton.disabled = !hasLine || invalidDirection || duplicateProduct;
+        if (submitButton) submitButton.disabled = !hasLine || duplicateProduct;
         renumber();
         syncSearchRows();
       };
