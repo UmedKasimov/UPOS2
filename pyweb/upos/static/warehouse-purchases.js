@@ -2450,6 +2450,12 @@
         }
         return stocks.length ? 0 : purchaseEntryNumber(product?.quantity);
       };
+      const totalStockForProduct = (product) => {
+        const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
+        return stocks.length
+          ? stocks.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0)
+          : purchaseEntryNumber(product?.quantity);
+      };
       const priceForProduct = (product) => {
         const warehouse = normalize(warehouseInput?.value);
         const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
@@ -2652,12 +2658,12 @@
             (list.length
             ? list
                 .map((item) => {
-                  const stock = stockForProduct(item);
+                  const stock = totalStockForProduct(item);
                   return (
                     '<button type="button" class="sales-combo-option">' +
                     '<span class="sales-combo-main">' +
                     highlightText(item.name, query) +
-                    ' · Остаток: ' + escapeHtml(quantityText(stock)) + ' ' + escapeHtml(item.unit || "шт") +
+                    ' <span class="warehouse-adjustment-picker-stock">' + escapeHtml(quantityText(stock)) + '</span>' +
                     "</span>" +
                     "</button>"
                   );

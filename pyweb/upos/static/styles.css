@@ -12025,6 +12025,12 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   min-width: 0;
 }
 
+.warehouse-adjustment-picker-stock {
+  color: var(--brand-box, #2563eb);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .warehouse-adjustment-product-control .sales-combo-add {
   display: inline-grid;
 }
