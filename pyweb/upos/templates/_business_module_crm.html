@@ -740,7 +740,14 @@
             <input autocomplete="off" data-crm-order-input placeholder="Номер заказа или клиент" />
             <div class="sales-combo-panel sales-combo-panel--wide" data-crm-order-panel hidden></div>
           </label>
-          <label data-crm-deal-create-field data-crm-task-hidden><span>Канал · Откуда о нас узнали</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+          <label class="crm-source-picker-field" data-crm-deal-create-field data-crm-task-hidden>
+            <span>Канал · Откуда о нас узнали</span>
+            <input type="hidden" name="lead_source" value="{{ crm_lead_sources[0] if crm_lead_sources else '' }}" data-crm-source-value />
+            <input type="search" autocomplete="off" data-crm-source-input value="{{ crm_lead_sources[0] if crm_lead_sources else '' }}" placeholder="Найти или создать канал" aria-label="Найти канал" />
+            <div class="sales-combo-panel crm-source-panel" data-crm-source-panel hidden></div>
+            <small class="crm-source-error" data-crm-source-error hidden></small>
+          </label>
+          <select data-crm-source-options hidden aria-hidden="true" tabindex="-1">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
           <label class="wide crm-deal-contact-field" data-crm-deal-create-field data-crm-task-hidden>
             <span>Контакт*</span>
             <input name="contact" type="tel" inputmode="tel" autocomplete="tel" list="crm-contact-list" placeholder="+998 90 123 45 67" />

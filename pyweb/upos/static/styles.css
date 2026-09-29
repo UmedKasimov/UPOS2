@@ -7373,6 +7373,23 @@ a.messenger-message-attachment:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.crm-record-form-grid > [data-crm-source-options] {
+  display: none;
+}
+
+.crm-source-picker-field [data-crm-source-input] {
+  width: 100%;
+}
+
+.crm-source-picker-field .crm-source-error {
+  color: var(--destructive, #c03636);
+  font-weight: 600;
+}
+
+.crm-source-create-option .sales-combo-main {
+  color: var(--primary, #2563eb);
+}
+
 .crm-deal-contact-field {
   display: none;
 }

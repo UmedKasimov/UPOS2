@@ -1510,6 +1510,12 @@
     const orderSelect = form?.querySelector("[data-crm-order-select]");
     const orderInput = form?.querySelector("[data-crm-order-input]");
     const contactInput = form?.querySelector('input[name="contact"]');
+    const sourceInput = form?.querySelector("[data-crm-source-input]");
+    const sourceValue = form?.querySelector("[data-crm-source-value]");
+    const sourcePanel = form?.querySelector("[data-crm-source-panel]");
+    const sourceError = form?.querySelector("[data-crm-source-error]");
+    const sourceRows = Array.from(form?.querySelectorAll("[data-crm-source-options] option") || [])
+      .map((option) => String(option.value || "").trim()).filter(Boolean);
     const duplicateNote = dialog.querySelector("[data-crm-client-duplicate]");
     const contactMatchNote = dialog.querySelector("[data-crm-contact-match]");
     const clientPanel = dialog.querySelector("[data-crm-client-panel]");
@@ -1665,6 +1671,81 @@
           clientInput.dispatchEvent(new Event("change", { bubbles: true }));
           closeClientPanel();
         });
+      });
+    };
+
+    const closeSourcePanel = () => {
+      if (!sourcePanel) return;
+      sourcePanel.hidden = true;
+      sourcePanel.innerHTML = "";
+    };
+
+    const positionSourcePanel = () => {
+      if (!sourceInput || !sourcePanel || sourcePanel.hidden) return;
+      const rect = sourceInput.getBoundingClientRect();
+      const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 24);
+      sourcePanel.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+      sourcePanel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 96)}px`;
+      sourcePanel.style.width = `${width}px`;
+    };
+
+    const syncSourceDisplay = () => {
+      if (sourceInput && sourceValue) sourceInput.value = sourceValue.value;
+      if (sourceError) sourceError.hidden = true;
+    };
+
+    const chooseSource = (name) => {
+      if (!sourceInput || !sourceValue) return;
+      sourceValue.value = name;
+      sourceInput.value = name;
+      sourceValue.dispatchEvent(new Event("change", { bubbles: true }));
+      if (sourceError) sourceError.hidden = true;
+      closeSourcePanel();
+    };
+
+    const renderSourcePanel = () => {
+      if (!sourceInput || !sourcePanel) return;
+      const query = String(sourceInput.value || "").trim();
+      const filterQuery = query === String(sourceValue?.value || "").trim() ? "" : query;
+      const rows = sourceRows.filter((name) => name.toLocaleLowerCase().includes(filterQuery.toLocaleLowerCase()));
+      const exact = sourceRows.some((name) => name.toLocaleLowerCase() === query.toLocaleLowerCase());
+      sourcePanel.innerHTML = (rows.length
+        ? rows.map((name) => `<button type="button" class="sales-combo-option" data-crm-source-choice><span class="sales-combo-main">${escapeHtml(name)}</span></button>`).join("")
+        : '<div class="sales-combo-empty">Канал не найден</div>')
+        + (!exact ? `<button type="button" class="sales-combo-option crm-source-create-option" data-crm-source-create><span class="sales-combo-main">+ Создать канал${query ? ` «${escapeHtml(query)}»` : ""}</span><span class="sales-combo-meta"><span>${query ? "Добавить и выбрать" : "Введите название в поле поиска"}</span></span></button>` : "");
+      sourcePanel.hidden = false;
+      positionSourcePanel();
+      sourcePanel.querySelectorAll("[data-crm-source-choice]").forEach((button, index) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          chooseSource(rows[index]);
+        });
+      });
+      sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("mousedown", (event) => event.preventDefault());
+      sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (!query) { sourceInput.focus(); return; }
+        const button = event.currentTarget;
+        button.disabled = true;
+        if (sourceError) sourceError.hidden = true;
+        try {
+          const body = new FormData();
+          body.set("csrf_token", form.querySelector('input[name="csrf_token"]')?.value || "");
+          body.set("name", query);
+          const response = await fetch("/crm/lead-sources", { method: "POST", body, headers: { Accept: "application/json" } });
+          const result = await response.json();
+          if (!response.ok || !result.name) throw new Error(result.error || "Не удалось создать канал");
+          const name = String(result.name);
+          if (!sourceRows.some((item) => item.toLocaleLowerCase() === name.toLocaleLowerCase())) sourceRows.push(name);
+          chooseSource(name);
+        } catch (error) {
+          if (sourceError) {
+            sourceError.textContent = error.message || "Не удалось создать канал";
+            sourceError.hidden = false;
+          }
+          button.disabled = false;
+        }
       });
     };
 
@@ -1976,6 +2057,8 @@
       if (taskChecklist) delete taskChecklist.dataset.crmTaskAutofilled;
       syncDealDisplay();
       syncOrderDisplay();
+      syncSourceDisplay();
+      closeSourcePanel();
       if (title) title.textContent = "Новая запись";
       if (subtitle) subtitle.textContent = "Сделка, задача или история контакта";
       if (submit) submit.textContent = "Сохранить запись";
@@ -2062,6 +2145,15 @@
     responsibleInput?.addEventListener("input", renderResponsiblePanel);
     responsibleInput?.addEventListener("focus", renderResponsiblePanel);
     responsibleInput?.addEventListener("click", renderResponsiblePanel);
+    sourceInput?.addEventListener("input", () => {
+      const exact = sourceRows.find((name) => name.toLocaleLowerCase() === sourceInput.value.trim().toLocaleLowerCase());
+      if (sourceValue) sourceValue.value = exact || "";
+      if (sourceError) sourceError.hidden = true;
+      renderSourcePanel();
+    });
+    sourceInput?.addEventListener("focus", renderSourcePanel);
+    sourceInput?.addEventListener("click", renderSourcePanel);
+    sourceValue?.addEventListener("change", syncSourceDisplay);
     dealInput?.addEventListener("input", () => {
       if (dealSelect) dealSelect.value = "";
       renderDealPanel();
@@ -2084,10 +2176,28 @@
     window.addEventListener("resize", positionResponsiblePanel);
     window.addEventListener("resize", positionDealPanel);
     window.addEventListener("resize", positionOrderPanel);
+    window.addEventListener("resize", positionSourcePanel);
     window.addEventListener("scroll", positionClientPanel, true);
     window.addEventListener("scroll", positionResponsiblePanel, true);
     window.addEventListener("scroll", positionDealPanel, true);
     window.addEventListener("scroll", positionOrderPanel, true);
+    window.addEventListener("scroll", positionSourcePanel, true);
+    document.addEventListener("mousedown", (event) => {
+      if (!sourcePanel || !sourceInput) return;
+      if (event.target === sourceInput || sourcePanel.contains(event.target)) return;
+      closeSourcePanel();
+    });
+    form?.addEventListener("submit", (event) => {
+      if (form.querySelector('input[name="item_type"]:checked')?.value === "task") return;
+      if (sourceValue?.value) return;
+      event.preventDefault();
+      sourceInput?.focus();
+      renderSourcePanel();
+      if (sourceError) {
+        sourceError.textContent = "Выберите канал из списка или создайте новый.";
+        sourceError.hidden = false;
+      }
+    });
     document.addEventListener("mousedown", (event) => {
       if (!clientPanel || !clientInput) return;
       if (event.target === clientInput || clientPanel.contains(event.target)) return;
@@ -2257,7 +2367,7 @@
       setField("contact_type", params.get("crm_contact_type") || "Чат Telegram");
       setField("chat_ref", params.get("crm_chat_ref") || "");
       setField("note", params.get("crm_note") || "Создано из диалога мессенджера");
-      setSelectByValueOrText("lead_source", params.get("crm_source") || "Telegram", params.get("crm_source") || "Telegram");
+      setField("lead_source", params.get("crm_source") || "Telegram");
       setSelectByValueOrText("stage_id", params.get("crm_stage") || "leads", "лид");
       setSelectByValueOrText("status", params.get("crm_status") || "new", "нов");
       syncFormPresentation("create", "deal");

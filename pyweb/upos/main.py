@@ -4243,6 +4243,17 @@ def create_app() -> FastAPI:
     )
     CRM_LOST_REASON_MAX = 500
     CRM_LEAD_SOURCES = ("Сайт", "Instagram", "Telegram", "WhatsApp", "Facebook", "Звонок", "Ручной ввод")
+    def _crm_lead_source_options(raw: Any, used: Any = ()) -> list[str]:
+        names: list[str] = []
+        seen: set[str] = set()
+        for value in [*CRM_LEAD_SOURCES, *(raw if isinstance(raw, list) else []), *used]:
+            name = " ".join(str(value or "").split())[:80]
+            key = name.casefold()
+            if name and key not in seen:
+                names.append(name)
+                seen.add(key)
+        return names
+
     CRM_SERVICE_TYPES = (
         "Консультация",
         "Диагностика",
@@ -18116,7 +18127,10 @@ def create_app() -> FastAPI:
             crm_pipeline_stages=crm_stages,
             crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
             crm_kanban_columns=crm_kanban_columns,
-            crm_lead_sources=list(CRM_LEAD_SOURCES),
+            crm_lead_sources=_crm_lead_source_options(
+                crm_workspace_settings.get("crm_lead_sources"),
+                (item.get("lead_source") for item in crm_records),
+            ),
             crm_lost_reasons=list(CRM_LOST_REASONS),
             crm_service_types=list(CRM_SERVICE_TYPES),
             crm_task_types=crm_task_types,
@@ -21335,6 +21349,34 @@ def create_app() -> FastAPI:
     @app.get("/messengers/telegram")
     def messengers_telegram_redirect():
         return RedirectResponse(url="/messengers#telegram", status_code=302)
+
+    @app.post("/crm/lead-sources", name="crm_lead_source_create")
+    async def crm_lead_source_create(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"error": "Сессия истекла. Обновите страницу."}, status_code=403)
+        denied = _employee_module_denied(request, "crm")
+        if denied is not None:
+            return JSONResponse({"error": "Нет доступа к CRM."}, status_code=403)
+        wid, redir = _product_workspace_owner(request)
+        if redir or wid is None:
+            return JSONResponse({"error": "Требуется вход в систему."}, status_code=401)
+        name = " ".join(str(form.get("name") or "").split())
+        if not name or len(name) > 80:
+            return JSONResponse({"error": "Укажите название канала до 80 символов."}, status_code=400)
+        settings = load_workspace_settings(wid)
+        options = _crm_lead_source_options(settings.get("crm_lead_sources"))
+        existing = next((item for item in options if item.casefold() == name.casefold()), None)
+        if existing:
+            return JSONResponse({"name": existing, "created": False})
+        custom = settings.get("crm_lead_sources")
+        custom = list(custom) if isinstance(custom, list) else []
+        if len(custom) >= 100:
+            return JSONResponse({"error": "Достигнут предел в 100 каналов."}, status_code=400)
+        custom.append(name)
+        settings["crm_lead_sources"] = custom
+        save_workspace_settings(wid, settings)
+        return JSONResponse({"name": name, "created": True})
 
     @app.post("/crm/save", name="crm_save")
     async def crm_save(request: Request):
