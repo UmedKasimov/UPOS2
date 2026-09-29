@@ -314,7 +314,11 @@
                 </svg>
               </button>
             {% endif %}
-            <button class="btn btn-secondary" type="button" data-products-clear-selection disabled>Снять выбор</button>
+            <button class="products-action-icon" type="button" data-products-clear-selection aria-label="Снять выбор товаров" title="Снять выбор" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
           </div>
           {% if can_bulk_delete_products %}
             <dialog class="products-bulk-dialog" data-products-bulk-delete-dialog>
