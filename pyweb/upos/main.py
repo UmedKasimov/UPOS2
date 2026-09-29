@@ -6059,6 +6059,7 @@ def create_app() -> FastAPI:
         catalog_currency: str = "",
         page_size: str = "500",
         page: str = "1",
+        zero_stock: str = "0",
         edit: str = "",
         price_type: str = "",
         price_page: str = "1",
@@ -6107,6 +6108,10 @@ def create_app() -> FastAPI:
             status_values=query.getlist("status"),
             kind_values=query.getlist("kind"),
         )
+        zero_stock_active = zero_stock == "1"
+        if zero_stock_active:
+            filters["kind"] = "product"
+            filters["kind_values"] = ["product"]
         product_page_size = _product_page_size(page_size)
         # Таблицу каталога рендерим целиком и фильтруем на клиенте
         # (catalog-kind-tabs.js): раздел, категория, группа, бренд, папка и
@@ -6128,6 +6133,11 @@ def create_app() -> FastAPI:
         table_filters["folder_values"] = []
         with session_scope() as session:
             products, edit_product, options = _collect_products_view_data(session, wid, table_filters, edit=edit)
+            if zero_stock_active:
+                products = [
+                    item for item in products
+                    if item.get("kind") == "product" and _sales_decimal(item.get("quantity")) == 0
+                ]
             price_products = [
                 _product_data(row)
                 for row in session.execute(
@@ -6262,6 +6272,7 @@ def create_app() -> FastAPI:
             product_next_page_url=product_page_url(min(product_total_pages, product_page + 1)),
             product_page_urls={page_no: product_page_url(page_no) for page_no in product_pagination_pages},
             product_filters=filters,
+            zero_stock_active=zero_stock_active,
             product_options=options,
             next_product_sku=next_product_sku,
             catalog_totals=catalog_totals,

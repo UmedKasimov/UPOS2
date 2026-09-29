@@ -23,7 +23,7 @@
   {{ super() }}
   {% if not module_home_only %}
   <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
-  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=5" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=6" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
@@ -119,6 +119,7 @@
           </div>
           <div class="products-panel-top-actions">
             <div class="products-panel-actions">
+              <button class="btn{% if not zero_stock_active %} btn-secondary{% endif %}" type="button" data-products-zero-stock-toggle aria-pressed="{{ 'true' if zero_stock_active else 'false' }}" title="Показать только товары с нулевым остатком">Нулевой остаток</button>
               {% set create_kind = product_filters.kind if product_filters.kind in ['product', 'service', 'subscription'] else 'product' %}
               <a class="btn" href="{{ url_for('products_get') }}?kind={{ create_kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form" data-workspace-tab-href="{{ url_for('products_get') }}?kind={{ create_kind }}">
                 + Создать
@@ -154,6 +155,7 @@
             data-products-auto-filter
             data-products-filter-base-action="{{ url_for('products_get') }}"
           >
+            <input type="hidden" name="zero_stock" value="{{ '1' if zero_stock_active else '0' }}" />
             <label class="products-catalog-search">
               <span>Поиск</span>
               <input name="q" type="search" value="{{ product_filters.q }}" placeholder="Поиск" />
