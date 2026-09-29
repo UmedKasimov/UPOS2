@@ -17935,6 +17935,11 @@ def create_app() -> FastAPI:
                 item["related_documents"] = related_documents[:8]
                 item["kanban_amount"] = item["order_amount"] if related_orders else item["amount"]
                 item["kanban_amount_value"] = order_total_value if related_orders else item["amount_value"]
+                item["kanban_amount_uzs_value"] = (
+                    item["kanban_amount_value"] * crm_usd_rate
+                    if not related_orders and str(item["currency"] or "UZS").strip().upper() == "USD"
+                    else item["kanban_amount_value"]
+                )
                 item["chat_label"] = item["chat_ref"] or chat_for_counterparty(counterparty)
                 messenger_channels: list[dict[str, str]] = []
                 messenger_threads = messenger_threads_by_client.get(str(item["client"] or "").strip().casefold(), [])
@@ -18046,15 +18051,15 @@ def create_app() -> FastAPI:
                         crm_next_actions.append(item)
                     if item["item_type"] in {"deal", "task"} and (not item["due_date"] or not item["next_step"]):
                         crm_summary["missing_next_step_count"] += 1
-                    if isinstance(item["kanban_amount_value"], Decimal):
-                        summary_pipeline_total += item["kanban_amount_value"]
+                    if isinstance(item["kanban_amount_uzs_value"], Decimal):
+                        summary_pipeline_total += item["kanban_amount_uzs_value"]
                 if item["item_type"] == "deal" and item["status"] == "won":
                     summary_won += 1
                 elif item["item_type"] == "deal" and item["status"] == "lost":
                     summary_lost += 1
                 column = crm_stage_map.get(item["stage_id"]) or crm_stage_map[crm_stages[0]["id"]]
                 column["records"].append(item)
-                column["total_value"] += item["kanban_amount_value"] if isinstance(item["kanban_amount_value"], Decimal) else Decimal("0")
+                column["total_value"] += item["kanban_amount_uzs_value"] if isinstance(item["kanban_amount_uzs_value"], Decimal) else Decimal("0")
             employee_responsibles = {
                 str(emp.get("name") or emp.get("username") or "").strip()
                 for emp in list_employees_safe(wid)

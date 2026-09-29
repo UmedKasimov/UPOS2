@@ -287,7 +287,7 @@
               data-crm-detail-priority="{{ row.priority_label|e }}"
               data-crm-detail-probability="{{ row.probability_label|e }}"
               data-crm-detail-amount="{{ ((row.kanban_amount ~ ' ' ~ (row.order_currency or row.currency)) if row.kanban_amount else 'Сумма не указана')|e }}"
-              data-crm-amount-value="{{ row.kanban_amount_value }}"
+              data-crm-amount-value="{{ row.kanban_amount_uzs_value }}"
               data-crm-amount-currency="{{ (row.order_currency or row.currency or 'UZS')|e }}"
               data-crm-order-count="{{ row.order_count or 0 }}"
               data-crm-detail-responsible="{{ (row.responsible or 'Без ответственного')|e }}"
