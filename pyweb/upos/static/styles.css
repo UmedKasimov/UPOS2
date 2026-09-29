@@ -30468,6 +30468,109 @@ body.upos-table-column-resizing * {
   gap: 0.25rem;
 }
 
+/* Menu order is changed only while the owner has opened its edit controls. */
+.menu-order-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  min-height: 1.75rem;
+  flex: none;
+}
+
+.general-report-launcher > .menu-order-toolbar {
+  grid-column: 1 / -1;
+  justify-self: end;
+  width: 100%;
+}
+
+.menu-order-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 16%);
+  border-radius: 0.45rem;
+  background: var(--background);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.menu-order-button:hover,
+.menu-order-button:focus-visible {
+  background: color-mix(in srgb, var(--primary), transparent 90%);
+  outline: 2px solid color-mix(in srgb, var(--primary), transparent 55%);
+  outline-offset: 1px;
+}
+
+.menu-order-button--save,
+.menu-order-button--cancel,
+.menu-order-editing .menu-order-button--edit {
+  display: none;
+}
+
+.menu-order-editing .menu-order-button--save,
+.menu-order-editing .menu-order-button--cancel {
+  display: inline-flex;
+}
+
+.menu-order-button--save {
+  color: #fff;
+  background: var(--primary);
+}
+
+.menu-order-grip {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
+  color: currentColor;
+  opacity: 0.85;
+  cursor: grab;
+  touch-action: none;
+}
+
+.menu-order-editing > .general-report-card,
+.menu-order-editing > .nav-link,
+.menu-order-editing > .nav-sublink {
+  position: relative;
+  cursor: default;
+}
+
+.menu-order-editing > .general-report-card > .menu-order-grip {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  padding: 0.15rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, black, transparent 80%);
+}
+
+.menu-order-editing > .nav-link > .menu-order-grip,
+.menu-order-editing > .nav-sublink > .menu-order-grip {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.menu-order-editing .menu-order-grip:active {
+  cursor: grabbing;
+}
+
+.menu-order-dragging {
+  opacity: 0.55;
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+}
+
+body.sidebar-rail .nav > .menu-order-toolbar {
+  display: none;
+}
+
 .upos-table-column-btn {
   display: inline-grid;
   place-items: center;
