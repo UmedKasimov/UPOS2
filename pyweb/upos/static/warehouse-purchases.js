@@ -2603,6 +2603,7 @@
         if (targetInput) {
           targetInput.value = "0";
           targetInput.dataset.adjustmentTargetTouched = "0";
+          targetInput.dataset.adjustmentTargetEdited = "0";
         }
         // Разблокировать комбобокс товара и скрыть его панель.
         const picker = row.querySelector("[data-adjustment-product-picker]");
@@ -2750,7 +2751,8 @@
           const suggestedPrice = priceForProduct(product);
           if (targetInput) {
             targetInput.value = "0";
-            targetInput.dataset.adjustmentTargetTouched = "0";
+            targetInput.dataset.adjustmentTargetTouched = product ? "1" : "0";
+            targetInput.dataset.adjustmentTargetEdited = "0";
           }
           if (priceInput) {
             priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
@@ -2766,6 +2768,7 @@
         targetInput?.addEventListener("input", () => {
           targetInput.value = targetInput.value.replace(/[^\d\s.,]/g, "");
           targetInput.dataset.adjustmentTargetTouched = "1";
+          targetInput.dataset.adjustmentTargetEdited = "1";
           recalc();
         });
         priceInput?.addEventListener("input", () => {
@@ -2815,7 +2818,7 @@
         if (row) {
           const input = row.querySelector("[data-adjustment-target]");
           if (input) {
-            const currentTarget = input.dataset.adjustmentTargetTouched === "1"
+            const currentTarget = input.dataset.adjustmentTargetEdited === "1"
               ? purchaseEntryNumber(input.value)
               : stockForProduct(item);
             input.value = quantityText(Math.max(0, currentTarget + directionSign * quantity));
@@ -2939,7 +2942,8 @@
           const targetInput = row.querySelector("[data-adjustment-target]");
           if (targetInput) {
             targetInput.value = "0";
-            targetInput.dataset.adjustmentTargetTouched = "0";
+            targetInput.dataset.adjustmentTargetTouched = product ? "1" : "0";
+            targetInput.dataset.adjustmentTargetEdited = "0";
           }
           const priceInput = row.querySelector("[data-adjustment-price]");
           if (!priceInput || priceInput.dataset.adjustmentAutoPrice === "0") return;
