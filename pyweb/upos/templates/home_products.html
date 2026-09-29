@@ -21,12 +21,14 @@
 
 {% block scripts %}
   {{ super() }}
+  {% if not module_home_only %}
   <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
   <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=5" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
   <script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
+  {% endif %}
 {% endblock %}
 
 {% block main %}
@@ -36,6 +38,7 @@
     data-workspace-key="products"
     data-workspace-default-tab="{{ products_default_tab }}"
     data-workspace-home-href="{{ url_for('products_get') }}"
+    data-workspace-lazy-home-enabled="1"
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Товар сохранён.</div>
@@ -92,6 +95,7 @@
       </a>
     </section>
 
+    {% if not module_home_only %}
     <div class="workspace-module-stack" data-workspace-view="catalog service create price_types price_type_detail categories" hidden>
 
     <datalist id="product-category-list">
@@ -1372,7 +1376,9 @@
       </form>
     </dialog>
     </div>
+    {% endif %}
   </section>
+	  {% if not module_home_only %}
 	  <script>
 	    (() => {
 	      const priceDialog = document.getElementById('products-price-type-dialog');
@@ -1676,4 +1682,5 @@
       });
     })();
   </script>
+  {% endif %}
 {% endblock %}

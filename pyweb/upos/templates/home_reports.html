@@ -42,7 +42,7 @@
   }) %}
   <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root org-reports-page">
     <nav class="general-module-tabs" aria-label="{{ _('nav.home_sections') }}" data-org-report-open-tabs>
-      <a class="general-module-tab active" href="{{ url_for('home_reports') }}" aria-current="page" data-org-report-home-tab>{{ _('nav.reports') }}</a>
+      <a class="general-module-tab active" href="{{ url_for('home_reports') }}?module_home=1" aria-current="page" data-org-report-home-tab>{{ _('nav.reports') }}</a>
     </nav>
 
     <section class="general-report-launcher org-report-launcher" role="tablist" aria-label="Отчёты организации">
@@ -106,6 +106,7 @@
       </button>
     </section>
 
+    {% if not reports_home_only %}
     <div class="reports-root general-reports-root org-reports-root" data-org-reports-root hidden>
       <section class="reports-panel" id="report-courier-debts" data-org-report-panel="courier-debts" hidden>
         <header class="reports-panel-head">
@@ -1057,10 +1058,24 @@
         <button type="button" class="btn btn-primary" data-sales-archive-error-close>Понятно</button>
       </section>
     </dialog>
+    {% endif %}
   </div>
 {% endblock %}
 
 {% block scripts %}
+{% if reports_home_only %}
+<script>
+(() => {
+  document.querySelector('.org-report-launcher')?.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-org-report-card]');
+    if (!card) return;
+    const url = new URL('{{ url_for("home_reports") }}', window.location.href);
+    url.searchParams.set('open_report', card.dataset.orgReportCard);
+    window.location.assign(url.toString());
+  });
+})();
+</script>
+{% else %}
 <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
 <script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
 <script>
@@ -2649,8 +2664,7 @@
 
   homeTab.addEventListener('click', (event) => {
     event.preventDefault();
-    activeTab = '';
-    render();
+    window.location.assign(homeTab.href);
   });
 
   function reportProductPhotoDialog() {
@@ -2867,4 +2881,5 @@
   render();
 })();
 </script>
+{% endif %}
 {% endblock %}

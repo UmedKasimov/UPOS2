@@ -6068,6 +6068,17 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        if list(request.query_params.multi_items()) == [("module_home", "1")]:
+            return tpl(
+                request,
+                "home_products.html",
+                variant="user",
+                active="products",
+                module_home_only=True,
+                product_filters={"kind": "product"},
+                product_options={},
+                edit_product=None,
+            )
         query = request.query_params
         filters = _product_filters_payload(
             q,
@@ -10404,6 +10415,17 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        if list(request.query_params.multi_items()) == [("module_home", "1")]:
+            return tpl(
+                request,
+                "home_sales.html",
+                variant="user",
+                active="sales",
+                module_home_only=True,
+                sales_filters={"doc_type": "all", "status": "all"},
+                sales_prefill={},
+                sales_embed="",
+            )
         # Досинхронизация кассы запускалась только с экрана кассы, поэтому
         # расхождение «оплата есть — транзакции нет» висело, пока туда не зайдут.
         # Вызов затроттлен 30 секундами, журналу продаж он почти ничего не стоит.
@@ -21637,6 +21659,14 @@ def create_app() -> FastAPI:
     def home_reports(request: Request):
         u = request.session.get("user") or {}
         wid = str(u.get("workspace_owner_id") or u.get("user_id") or "").strip()
+        if list(request.query_params.multi_items()) == [("module_home", "1")]:
+            return tpl(
+                request,
+                "home_reports.html",
+                variant="user",
+                active="reports",
+                reports_home_only=True,
+            )
         loc = resolve_locale(request, u)
         ws = load_workspace_settings(wid) if valid_workspace_owner_id(wid) else {}
         courier_debt_limits = ws.get("delivery_debt_limits") if isinstance(ws.get("delivery_debt_limits"), dict) else {}
