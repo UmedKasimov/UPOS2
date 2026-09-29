@@ -32,9 +32,12 @@
   }
   function minimumCellWidth(cell) {
     const requested = Number(cell?.dataset?.uposMinWidth);
-    return Number.isFinite(requested) && requested > MIN_COLUMN_WIDTH
+    const configured = Number.isFinite(requested) && requested > MIN_COLUMN_WIDTH
       ? Math.min(MAX_COLUMN_WIDTH, requested)
       : MIN_COLUMN_WIDTH;
+    return cell?.classList?.contains('upos-table-column-control-slot')
+      ? Math.max(72, configured)
+      : configured;
   }
 
   function minimumColumnWidth(table, key) {
@@ -213,10 +216,50 @@
     return Array.from(document.querySelectorAll(TABLE_SELECTOR)).indexOf(table);
   }
 
-  function storageKey(table) {
+  function legacyStorageKey(table) {
     const panel = table.closest('[id]');
     const key = table.id || panel?.id || table.className || 'table';
     return `upos.tableColumns:${location.pathname}:${key}:${tableIndex(table)}`;
+  }
+
+  function storageKey(table) {
+    const user = document.body?.dataset.userId || 'anonymous';
+    if (table.dataset.uposTableStorageKey || table.id) {
+      return `upos.tableColumns.v2:${user}:${location.pathname}:${table.dataset.uposTableStorageKey || table.id}`;
+    }
+    if (!table._uposStorageIdentity) {
+      const panel = table.parentElement?.closest('[id]') || document.body;
+      const parts = [];
+      for (let node = table; node && node !== panel; node = node.parentElement) {
+        const siblings = Array.from(node.parentElement?.children || [])
+          .filter((item) => item.tagName === node.tagName);
+        parts.unshift(`${node.tagName.toLowerCase()}${siblings.indexOf(node)}`);
+      }
+      table._uposStorageIdentity = `${panel.id || 'page'}:${parts.join('/')}`;
+    }
+    return `upos.tableColumns.v2:${user}:${location.pathname}:${table._uposStorageIdentity}`;
+  }
+
+  function readStored(table, suffix, fallback) {
+    const key = `${storageKey(table)}${suffix}`;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved;
+    const oldKey = `${legacyStorageKey(table)}${suffix}`;
+    let legacy = localStorage.getItem(oldKey);
+    if (legacy === null && table.id) {
+      const prefix = `upos.tableColumns:${location.pathname}:${table.id}:`;
+      const matching = Object.keys(localStorage).filter((item) => {
+        if (!item.startsWith(prefix)) return false;
+        const tail = item.slice(prefix.length);
+        return suffix
+          ? tail.endsWith(suffix) && /^\d+$/.test(tail.slice(0, -suffix.length))
+          : /^\d+$/.test(tail);
+      });
+      if (matching.length) legacy = localStorage.getItem(matching[matching.length - 1]);
+    }
+    if (legacy === null) return fallback;
+    localStorage.setItem(key, legacy);
+    return legacy;
   }
 
   function orderStorageKey(table) {
@@ -229,7 +272,7 @@
 
   function readWidths(table) {
     try {
-      const raw = JSON.parse(localStorage.getItem(widthStorageKey(table)) || '{}');
+      const raw = JSON.parse(readStored(table, WIDTH_STORAGE_SUFFIX, '{}'));
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
       return Object.fromEntries(
         Object.entries(raw)
@@ -289,6 +332,7 @@
     const widths = {
       ...(table._uposBaseColumnWidths || {}),
       ...saved,
+      ...(table._uposDraftWidths || {}),
       ...overrides,
     };
     let totalWidth = 0;
@@ -401,7 +445,7 @@
 
   function readHidden(table) {
     try {
-      const raw = JSON.parse(localStorage.getItem(storageKey(table)) || '[]');
+      const raw = JSON.parse(readStored(table, '', '[]'));
       if (!Array.isArray(raw)) return new Set();
       const list = columns(table);
       const keys = new Set(list.map((column) => column.key));
@@ -430,7 +474,7 @@
     const available = new Set(columns(table).map((column) => column.key));
     const fallback = (table._uposDefaultColumnOrder || []).filter((key) => available.has(key));
     try {
-      const raw = JSON.parse(localStorage.getItem(orderStorageKey(table)) || '[]');
+      const raw = JSON.parse(readStored(table, ORDER_STORAGE_SUFFIX, '[]'));
       if (!Array.isArray(raw)) return fallback;
       const order = raw.map(String).filter((key, index, items) => (
         available.has(key) && items.indexOf(key) === index
@@ -618,9 +662,46 @@
     menu.append(footer);
   }
 
+  function closeWidthMode(table, save = false) {
+    const root = table?._uposColumnControlRoot;
+    if (!root || !table._uposDraftWidths) return;
+    if (save) saveWidths(table, { ...readWidths(table), ...table._uposDraftWidths });
+    table._uposDraftWidths = null;
+    table.classList.remove('upos-table-width-editing');
+    root.classList.remove('is-width-editor-open');
+    const panel = root._uposWidthPanel;
+    if (panel) panel.hidden = true;
+    root.querySelector('[data-upos-column-width-toggle]')?.setAttribute('aria-expanded', 'false');
+    applyWidths(table);
+  }
+
+  function openWidthMode(table, root, button) {
+    document.querySelectorAll('.upos-table-column-control.is-width-editor-open').forEach((item) => {
+      if (item !== root) closeWidthMode(item._uposColumnTable);
+    });
+    closeMenus();
+    table._uposDraftWidths = {};
+    table.classList.add('upos-table-width-editing');
+    root.classList.add('is-width-editor-open');
+    const panel = root._uposWidthPanel;
+    if (panel.parentElement !== document.body) document.body.append(panel);
+    panel.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    positionMenu(button, panel);
+  }
+
   function createControl(table) {
     const root = document.createElement('div');
     root.className = 'upos-table-column-control';
+
+    const widthButton = document.createElement('button');
+    widthButton.type = 'button';
+    widthButton.className = 'upos-table-column-btn upos-table-width-btn';
+    widthButton.dataset.uposColumnWidthToggle = '1';
+    widthButton.title = 'Настроить ширину столбцов';
+    widthButton.setAttribute('aria-label', 'Настроить ширину столбцов');
+    widthButton.setAttribute('aria-expanded', 'false');
+    widthButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7h18M3 17h18M7 4 4 7l3 3m10-6 3 3-3 3M7 14l-3 3 3 3m10-6 3 3-3 3" /></svg>';
 
     const button = document.createElement('button');
     button.type = 'button';
@@ -641,11 +722,28 @@
     menu.dataset.uposColumnMenu = '1';
     menu.hidden = true;
 
-    root.append(button, menu);
+    const widthPanel = document.createElement('div');
+    widthPanel.className = 'upos-table-column-menu upos-table-width-panel';
+    widthPanel.dataset.uposColumnWidthPanel = '1';
+    widthPanel.setAttribute('role', 'dialog');
+    widthPanel.setAttribute('aria-label', 'Ширина столбцов');
+    widthPanel.hidden = true;
+    widthPanel.innerHTML = '<div class="upos-table-column-menu-title">Ширина столбцов</div>'
+      + '<p>Потяните границу нужного столбца или используйте клавиши ← → на границе. Затем сохраните изменения.</p>'
+      + '<div class="upos-table-width-panel-actions">'
+      + '<button type="button" class="upos-table-column-reset" data-upos-column-width-cancel>Отмена</button>'
+      + '<button type="button" class="upos-table-column-reset upos-table-width-save" data-upos-column-width-save>Сохранить</button>'
+      + '</div>';
+
+    root.append(widthButton, button, menu, widthPanel);
     root._uposColumnMenu = menu;
+    root._uposWidthPanel = widthPanel;
     root._uposColumnTable = table;
     menu._uposColumnRoot = root;
     menu._uposColumnTable = table;
+    widthPanel._uposColumnRoot = root;
+    widthPanel._uposColumnTable = table;
+    table._uposColumnControlRoot = root;
     renderMenu(table, root);
     return root;
   }
@@ -691,11 +789,29 @@
   }
 
   document.addEventListener('click', (event) => {
+    const widthToggle = event.target.closest('[data-upos-column-width-toggle]');
+    if (widthToggle) {
+      const root = widthToggle.closest('.upos-table-column-control');
+      const table = root?._uposColumnTable;
+      if (!root || !table) return;
+      if (table._uposDraftWidths) closeWidthMode(table);
+      else openWidthMode(table, root, widthToggle);
+      return;
+    }
+
+    const widthAction = event.target.closest('[data-upos-column-width-save], [data-upos-column-width-cancel]');
+    if (widthAction) {
+      const table = widthAction.closest('[data-upos-column-width-panel]')?._uposColumnTable;
+      if (table) closeWidthMode(table, widthAction.hasAttribute('data-upos-column-width-save'));
+      return;
+    }
+
     const toggle = event.target.closest('[data-upos-column-menu-toggle]');
     if (toggle) {
       const root = toggle.closest('.upos-table-column-control');
       const table = root?._uposColumnTable || toggle.closest('table');
       if (!root || !table) return;
+      if (table._uposDraftWidths) closeWidthMode(table);
       closeMenus(root);
       renderMenu(table, root);
       const menu = root._uposColumnMenu || root.querySelector('[data-upos-column-menu]');
@@ -712,7 +828,7 @@
     if (reset) {
       const table = reset.closest('[data-upos-column-menu]')?._uposColumnTable || reset.closest('table');
       if (!table) return;
-      localStorage.removeItem(storageKey(table));
+      saveHidden(table, new Set());
       renderMenu(table, reset.closest('[data-upos-column-menu]')?._uposColumnRoot || reset.closest('.upos-table-column-control'));
       applyVisibility(table);
       applyWidths(table);
@@ -724,7 +840,7 @@
       const menu = widthReset.closest('[data-upos-column-menu]');
       const table = menu?._uposColumnTable || widthReset.closest('table');
       if (!table) return;
-      localStorage.removeItem(widthStorageKey(table));
+      saveWidths(table, {});
       applyWidths(table);
       return;
     }
@@ -734,7 +850,7 @@
       const menu = orderReset.closest('[data-upos-column-menu]');
       const table = menu?._uposColumnTable || orderReset.closest('table');
       if (!table) return;
-      localStorage.removeItem(orderStorageKey(table));
+      saveOrder(table, []);
       applyOrder(table);
       applyVisibility(table);
       applyWidths(table);
@@ -761,8 +877,9 @@
 
   function resizeColumn(table, key, width, persist = false) {
     const nextWidth = Math.max(minimumColumnWidth(table, key), Math.min(MAX_COLUMN_WIDTH, Math.round(width)));
+    if (table._uposDraftWidths) table._uposDraftWidths[key] = nextWidth;
     applyWidths(table, { [key]: nextWidth });
-    if (persist) {
+    if (persist && !table._uposDraftWidths) {
       const widths = readWidths(table);
       widths[key] = nextWidth;
       saveWidths(table, widths);
@@ -823,6 +940,12 @@
     const table = header?.closest(TABLE_SELECTOR);
     if (!handle || !header || !table) return;
     event.preventDefault();
+    if (table._uposDraftWidths) {
+      const key = header.getAttribute(CELL_KEY_ATTR);
+      table._uposDraftWidths[key] = table._uposBaseColumnWidths?.[key] || minimumColumnWidth(table, key);
+      applyWidths(table);
+      return;
+    }
     const widths = readWidths(table);
     delete widths[header.getAttribute(CELL_KEY_ATTR)];
     saveWidths(table, widths);
@@ -830,6 +953,14 @@
   });
 
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      const active = document.querySelector('.upos-table-column-control.is-width-editor-open');
+      if (active) {
+        event.preventDefault();
+        closeWidthMode(active._uposColumnTable);
+        return;
+      }
+    }
     const moveHandle = event.target.closest('[data-upos-header-drag-handle]');
     if (moveHandle && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
       const header = moveHandle.closest(`th[${CELL_KEY_ATTR}]`);
@@ -1038,9 +1169,17 @@
       const menu = root._uposColumnMenu || root.querySelector('[data-upos-column-menu]');
       if (menu && !menu.hidden) positionMenu(button, menu);
     });
+    document.querySelectorAll('.upos-table-column-control.is-width-editor-open').forEach((root) => {
+      const button = root.querySelector('[data-upos-column-width-toggle]');
+      const panel = root._uposWidthPanel;
+      if (panel && !panel.hidden) positionMenu(button, panel);
+    });
   }
 
   const observer = new MutationObserver((records) => {
+    document.querySelectorAll('[data-upos-column-width-panel]').forEach((panel) => {
+      if (panel._uposColumnRoot && !panel._uposColumnRoot.isConnected) panel.remove();
+    });
     const tablesToRefresh = new Set();
     records.forEach((record) => {
       record.addedNodes.forEach((node) => {

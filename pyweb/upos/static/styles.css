@@ -30462,8 +30462,10 @@ body.upos-table-column-resizing * {
 }
 
 .upos-table-column-control {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
 }
 
 .upos-table-column-btn {
@@ -30480,7 +30482,8 @@ body.upos-table-column-resizing * {
 }
 
 .upos-table-column-btn:hover,
-.upos-table-column-control.is-column-menu-open .upos-table-column-btn {
+.upos-table-column-control.is-column-menu-open [data-upos-column-menu-toggle],
+.upos-table-column-control.is-width-editor-open .upos-table-width-btn {
   border-color: color-mix(in srgb, var(--primary), transparent 26%);
   background: color-mix(in srgb, var(--primary), transparent 88%);
 }
@@ -30517,6 +30520,35 @@ body.upos-table-column-resizing * {
 
 .upos-table-column-menu[hidden] {
   display: none;
+}
+
+.upos-table-width-panel p {
+  margin: 0 0 0.4rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.upos-table-width-panel-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.upos-table-width-save {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.upos-table-width-save:hover {
+  background: color-mix(in srgb, var(--primary), black 12%);
+}
+
+.upos-table-width-editing .upos-table-column-resize-handle::after {
+  width: 3px;
+  background: var(--primary);
+  opacity: 1;
 }
 
 .upos-table-column-menu-title {
@@ -34557,8 +34589,10 @@ html.dark .crm-task-calendar-event {
 }
 
 .upos-table-column-control-slot .upos-table-column-control {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
   vertical-align: middle;
 }
 
