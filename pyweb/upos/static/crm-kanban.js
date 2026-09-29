@@ -1511,6 +1511,7 @@
     const orderSelect = form?.querySelector("[data-crm-order-select]");
     const orderInput = form?.querySelector("[data-crm-order-input]");
     const contactInput = form?.querySelector('input[name="contact"]');
+    const amountInput = form?.querySelector("[data-crm-deal-amount]");
     const contactClientId = form?.querySelector("[data-crm-client-id]");
     const contactPanel = form?.querySelector("[data-crm-contact-panel]");
     const contactCardLink = form?.querySelector("[data-crm-contact-card]");
@@ -1673,6 +1674,33 @@
           closeClientPanel();
         });
       });
+    };
+    const formatDealAmount = () => {
+      if (!amountInput) return;
+      const raw = amountInput.value;
+      const cursor = amountInput.selectionStart ?? raw.length;
+      const beforeCursor = raw.slice(0, cursor);
+      const digitsBefore = (beforeCursor.match(/\d/g) || []).length;
+      const afterSeparator = /[.,]/.test(beforeCursor);
+      const cleaned = raw.replace(/[^\d.,]/g, "");
+      const separator = cleaned.search(/[.,]/);
+      const whole = (separator < 0 ? cleaned : cleaned.slice(0, separator)).replace(/\D/g, "");
+      const fraction = separator < 0 ? "" : cleaned.slice(separator + 1).replace(/\D/g, "");
+      const formatted = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (separator < 0 ? "" : `,${fraction}`);
+      if (raw === formatted) return;
+      amountInput.value = formatted;
+      let nextCursor = 0;
+      let seenDigits = 0;
+      while (nextCursor < formatted.length && seenDigits < digitsBefore) {
+        if (/\d/.test(formatted[nextCursor])) seenDigits += 1;
+        nextCursor += 1;
+      }
+      if (afterSeparator && separator >= 0) {
+        nextCursor = Math.max(nextCursor, formatted.indexOf(",") + 1);
+      } else {
+        while (formatted[nextCursor] === " ") nextCursor += 1;
+      }
+      amountInput.setSelectionRange(nextCursor, nextCursor);
     };
 
     const closeSourcePanel = () => {
@@ -2316,6 +2344,7 @@
       syncContactMatch();
       renderContactPanel();
     });
+    amountInput?.addEventListener("input", formatDealAmount);
     contactInput?.addEventListener("focus", renderContactPanel);
     contactInput?.addEventListener("click", renderContactPanel);
     clientCreateDialog?.querySelectorAll("[data-crm-client-create-close]").forEach((button) => {

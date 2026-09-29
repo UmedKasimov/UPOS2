@@ -773,8 +773,8 @@
              в работу: select не находил своего значения и слал «Новый». #}
           <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option><option value="archived">Архив</option></select></label>
           <label data-crm-task-hidden><span>Вероятность</span><input name="probability" inputmode="numeric" placeholder="0-100" /></label>
-          <label class="wide" data-crm-deal-create-field data-crm-task-hidden><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" placeholder="0" /></label>
-          <label data-crm-task-hidden><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+          <label class="wide crm-deal-currency-field" data-crm-deal-create-field data-crm-task-hidden><span>Валюта сделки</span><select name="currency" data-crm-deal-currency>{% for currency in crm_options.currencies %}<option value="{{ currency }}" {% if currency == 'UZS' %}selected{% endif %}>{{ currency }}</option>{% endfor %}</select></label>
+          <label class="wide" data-crm-deal-create-field data-crm-task-hidden><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" autocomplete="off" data-crm-deal-amount placeholder="0" /></label>
           <label class="wide" data-crm-next-step-field><span>Следующий шаг*</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
           <label class="wide" data-crm-task-only hidden>
             <span>Чеклист</span>

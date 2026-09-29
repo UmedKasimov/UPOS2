@@ -7373,6 +7373,11 @@ a.messenger-message-attachment:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.crm-deal-currency-field select {
+  width: 100%;
+  max-width: none;
+}
+
 .crm-record-form-grid > [data-crm-source-options] {
   display: none;
 }

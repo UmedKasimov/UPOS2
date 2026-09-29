@@ -17651,7 +17651,7 @@ def create_app() -> FastAPI:
         summary_pipeline_total = Decimal("0")
         summary_won = 0
         summary_lost = 0
-        crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": [], "orders": []}
+        crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": [], "orders": [], "currencies": ["UZS", "USD", "RUB", "EUR"]}
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_task_types = _crm_clean_task_types(crm_workspace_settings.get("crm_task_types"))
@@ -18081,6 +18081,11 @@ def create_app() -> FastAPI:
                 ),
                 "deals": deal_options,
                 "orders": order_options,
+                "currencies": sorted(
+                    {"UZS", "USD", "RUB", "EUR"}
+                    | {str(item.get("currency") or "").upper() for item in crm_records if item.get("currency")},
+                    key=lambda value: (value != "UZS", value),
+                ),
             }
         crm_kanban_columns = []
         for stage in crm_stages:
