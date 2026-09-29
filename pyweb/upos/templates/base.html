@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=699" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=701" />
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -234,34 +234,6 @@
         </nav>
         <div class="sidebar-foot">
           {% if user %}
-            {% if user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('settings')) %}
-              <div class="sidebar-ibox-sync-wrap">
-                <button
-                  type="button"
-                  class="sidebar-ibox-sync"
-                  data-sidebar-ibox-sync
-                  data-state="idle"
-                  aria-label="Синхронизировать данные с IBOX"
-                  title="Ручная синхронизация с IBOX"
-                >
-                  <span class="sidebar-ibox-sync-icon" aria-hidden="true">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M20 7h-5V2" />
-                      <path d="M4 17h5v5" />
-                      <path d="M5.1 9a8 8 0 0 1 13.2-3L20 7" />
-                      <path d="M18.9 15a8 8 0 0 1-13.2 3L4 17" />
-                    </svg>
-                  </span>
-                  <span class="sidebar-ibox-sync-copy">
-                    <strong>IBOX</strong>
-                    <small data-sidebar-ibox-sync-status>Синхронизировать вручную</small>
-                    <small class="sidebar-ibox-sync-last" data-sidebar-ibox-sync-last hidden></small>
-                  </span>
-                  <span class="sidebar-ibox-sync-dot" aria-hidden="true"></span>
-                </button>
-                <span class="sidebar-ibox-sync-live" data-sidebar-ibox-sync-live aria-live="polite"></span>
-              </div>
-            {% endif %}
             <div class="sidebar-user">
               <div class="sidebar-user-avatar" id="sidebar-avatar-trigger" style="cursor: pointer; position: relative; overflow: hidden;" title="{{ _('profile.avatar') }}">
                 {% if user.avatar_path %}

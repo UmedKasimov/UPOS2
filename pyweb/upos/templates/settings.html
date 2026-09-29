@@ -1730,6 +1730,7 @@
                       <button type="button" class="btn btn-secondary btn-sm" data-ibox-sync>Синхронизировать всё</button>
                     </div>
                     <p class="integr-sync-status" data-ibox-status></p>
+                    <p class="integr-sync-last" data-ibox-last-sync hidden></p>
                       </div>
                       <div class="integr-card-body" data-integr-form="clopos" hidden>
                     <label for="clopos_api_base_url">{{ _('settings.api_base_url') }}</label>
@@ -2319,6 +2320,6 @@
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
   <script src="{{ url_for('static', path='price-template-editor.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='price-tag.js') }}?v=6" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=35" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=36" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

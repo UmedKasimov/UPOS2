@@ -11391,7 +11391,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  margin-left: auto;
+  margin-left: 0;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-weight: 800;
@@ -11528,6 +11528,26 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   line-height: 1.25;
 }
 
+.upos-catalog-picker-product {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.upos-catalog-picker-product > input {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 1.05rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.upos-catalog-picker-product > span {
+  min-width: 0;
+}
+
 .upos-catalog-picker-table small {
   display: block;
   margin-top: 0.18rem;
@@ -11611,6 +11631,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   .upos-catalog-picker-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .upos-catalog-picker-select-all {
+    width: 100%;
+    margin-left: 0;
   }
 
   .upos-catalog-picker-search {
@@ -12029,6 +12054,25 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   color: var(--brand-box, #2563eb);
   font-weight: 900;
   white-space: nowrap;
+}
+
+.upos-catalog-picker-select-all {
+  min-height: 2.25rem;
+  margin-left: auto;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.upos-catalog-picker-select-all:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .warehouse-adjustment-product-control .sales-combo-add {
@@ -18963,6 +19007,12 @@ details.integr-card--ios[open] > summary .integr-card-chevron--ios svg {
 
 .integr-sync-status[data-variant="err"] {
   color: var(--destructive);
+}
+
+.integr-sync-last {
+  margin: 0.1rem 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
