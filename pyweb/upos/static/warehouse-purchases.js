@@ -2599,6 +2599,8 @@
           delete control.dataset.adjustmentAutoPrice;
           delete control.dataset.adjustmentManualSalePrice;
         });
+        const targetInput = row.querySelector("[data-adjustment-target]");
+        if (targetInput) targetInput.value = "0";
         // Разблокировать комбобокс товара и скрыть его панель.
         const picker = row.querySelector("[data-adjustment-product-picker]");
         if (picker) picker.classList.remove("is-locked");
