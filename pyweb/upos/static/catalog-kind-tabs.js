@@ -160,6 +160,7 @@
       updateTotals(shown, qtyByUnit);
       if (totalLabel) totalLabel.textContent = String(shown);
       if (shownLabel) shownLabel.textContent = shown ? "1-" + shown : "0";
+      table.dispatchEvent(new Event("catalog-filter-applied"));
     }
 
     // Клик по вкладке = выбор одного вида: синхронизируем чекбоксы «Тип»,

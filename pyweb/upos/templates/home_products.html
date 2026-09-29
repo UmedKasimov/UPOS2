@@ -22,8 +22,8 @@
 {% block scripts %}
   {{ super() }}
   {% if not module_home_only %}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
-  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=6" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=14" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=7" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
@@ -48,6 +48,8 @@
       <div class="flash ok settings-ios-flash">Импорт завершён: {{ imported_count }} строк.</div>
     {% elif flash_ok == "bulk_saved" %}
       <div class="flash ok settings-ios-flash">Обновлено товаров: {{ bulk_updated_count }}.</div>
+    {% elif flash_ok == "bulk_deleted" %}
+      <div class="flash ok settings-ios-flash">Удалено товаров: {{ bulk_updated_count }}.</div>
     {% endif %}
     {% if flash_err %}
       <div class="flash err settings-ios-flash">{{ flash_err }}</div>
@@ -294,14 +296,35 @@
           {% for item in product_filters.catalog_currency_values %}<input type="hidden" name="catalog_currency" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
+          <input type="hidden" name="zero_stock" value="{{ '1' if zero_stock_active else '0' }}" />
           <input type="hidden" name="page_size" value="{{ product_page_size }}" />
           <div class="products-bulk-summary">
             <strong>Выбрано: <span data-products-selected-count>0</span></strong>
           </div>
           <div class="products-bulk-actions">
             <button class="btn" type="button" data-products-bulk-open disabled>Редактировать</button>
+            {% if can_bulk_delete_products %}
+              <button class="btn btn-danger-ghost" type="button" data-products-bulk-delete disabled>Удалить выбранные</button>
+            {% endif %}
             <button class="btn btn-secondary" type="button" data-products-clear-selection disabled>Снять выбор</button>
           </div>
+          {% if can_bulk_delete_products %}
+            <dialog class="products-bulk-dialog" data-products-bulk-delete-dialog>
+              <div class="products-bulk-dialog-panel">
+                <header class="products-bulk-dialog-head">
+                  <h3>Удалить выбранные товары?</h3>
+                  <button type="button" class="products-bulk-dialog-close" data-products-bulk-delete-close aria-label="Закрыть">×</button>
+                </header>
+                <div class="products-bulk-dialog-body">
+                  <p>Выбрано товаров: <strong data-products-bulk-delete-count>0</strong>. Удаление нельзя отменить. Если хотя бы один товар есть в наличии, ни один из выбранных товаров не будет удалён.</p>
+                </div>
+                <footer class="products-bulk-dialog-actions">
+                  <button class="btn btn-danger-ghost" type="submit" name="confirm_delete" value="1" formaction="{{ url_for('products_bulk_delete') }}">Удалить товары</button>
+                  <button class="btn btn-secondary" type="button" data-products-bulk-delete-close>Отмена</button>
+                </footer>
+              </div>
+            </dialog>
+          {% endif %}
           <dialog class="products-bulk-dialog" data-products-bulk-dialog>
             <div class="products-bulk-dialog-panel">
               <header class="products-bulk-dialog-head">

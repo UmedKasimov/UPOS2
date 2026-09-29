@@ -5979,6 +5979,7 @@ def create_app() -> FastAPI:
         status: str = "active",
         kind: str = "product",
         catalog_currency: str = "",
+        zero_stock: str = "0",
         msg: str = "",
         count: int = 0,
         error: str = "",
@@ -6033,6 +6034,8 @@ def create_app() -> FastAPI:
             query["catalog_currency"] = selected_catalog_currency
         if selected_status:
             query["status"] = selected_status
+        if zero_stock == "1":
+            query["zero_stock"] = "1"
         if selected_kind:
             query["kind"] = selected_kind
         if msg:
@@ -6257,6 +6260,7 @@ def create_app() -> FastAPI:
             catalog_kind_counts=catalog_kind_counts,
             # Правка цены прямо в списке — только администратору.
             can_edit_catalog_price=_can_edit_catalog_price(request.session.get("user") or {}),
+            can_bulk_delete_products=_can_edit_catalog_price(request.session.get("user") or {}),
             default_price_type_id=_workspace_default_price_type_id(wid) or "1",
             service_bonus_percent=(
                 load_earning_rules(wid).get("by_service", {}).get(str(edit_product.get("id") or ""))
@@ -7540,6 +7544,7 @@ def create_app() -> FastAPI:
             status_values=[str(item or "") for item in form.getlist("status")],
             kind_values=[str(item or "") for item in form.getlist("kind")],
         )
+        filters["zero_stock"] = "1" if str(form.get("zero_stock") or "") == "1" else "0"
         product_ids = [str(item or "").strip() for item in form.getlist("product_ids") if str(item or "").strip()]
         updates = {
             "category": str(form.get("bulk_category") or "").strip(),
@@ -7581,6 +7586,69 @@ def create_app() -> FastAPI:
 
         return RedirectResponse(
             url=_product_list_redirect_url(**filters, msg="bulk_saved", count=updated_count),
+            status_code=302,
+        )
+
+    @app.post("/products/bulk-delete", name="products_bulk_delete")
+    async def products_bulk_delete(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/products?err=csrf", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        if not _can_edit_catalog_price(request.session.get("user") or {}):
+            return PlainTextResponse("Недостаточно прав", status_code=403)
+
+        filters = _product_filters_payload(
+            str(form.get("q") or ""),
+            str(form.get("category") or ""),
+            str(form.get("group") or ""),
+            str(form.get("brand") or ""),
+            str(form.get("folder") or ""),
+            str(form.get("catalog_price_list") or ""),
+            str(form.get("status") or "active"),
+            str(form.get("kind") or "product"),
+            str(form.get("catalog_currency") or ""),
+            category_values=[str(item or "") for item in form.getlist("category")],
+            group_values=[str(item or "") for item in form.getlist("group")],
+            brand_values=[str(item or "") for item in form.getlist("brand")],
+            folder_values=[str(item or "") for item in form.getlist("folder")],
+            catalog_price_list_values=[str(item or "") for item in form.getlist("catalog_price_list")],
+            catalog_currency_values=[str(item or "") for item in form.getlist("catalog_currency")],
+            status_values=[str(item or "") for item in form.getlist("status")],
+            kind_values=[str(item or "") for item in form.getlist("kind")],
+        )
+        filters["zero_stock"] = "1" if str(form.get("zero_stock") or "") == "1" else "0"
+        product_ids = list(dict.fromkeys(
+            str(item or "").strip() for item in form.getlist("product_ids") if str(item or "").strip()
+        ))
+        if not product_ids or form.get("confirm_delete") != "1":
+            return RedirectResponse(
+                url=_product_list_redirect_url(**filters, error="Подтвердите удаление выбранных товаров"),
+                status_code=302,
+            )
+
+        with session_scope() as session:
+            rows = list(session.execute(
+                select(Product).where(Product.workspace_owner_id == wid, Product.id.in_(product_ids))
+            ).scalars())
+            if len(rows) != len(product_ids):
+                return RedirectResponse(
+                    url=_product_list_redirect_url(**filters, error="Некоторые товары не найдены. Обновите список"),
+                    status_code=302,
+                )
+            if any(_sales_decimal(_product_data(row).get("quantity")) > 0 for row in rows):
+                return RedirectResponse(
+                    url=_product_list_redirect_url(**filters, error="Нельзя удалить товары, которые есть в наличии"),
+                    status_code=302,
+                )
+            for row in rows:
+                session.delete(row)
+
+        return RedirectResponse(
+            url=_product_list_redirect_url(**filters, msg="bulk_deleted", count=len(rows)),
             status_code=302,
         )
 

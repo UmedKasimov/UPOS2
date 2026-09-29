@@ -440,11 +440,12 @@
     const selected = selectedInputs(table);
     const count = selected.length;
     const allToggle = table.querySelector("[data-products-select-all]");
-    const rowInputs = selectionInputs(table);
+    const rowInputs = selectionInputs(table).filter((input) => !input.closest("tr")?.hidden);
+    const visibleSelectedCount = rowInputs.filter((input) => input.checked).length;
 
     if (allToggle) {
-      allToggle.checked = count > 0 && count === rowInputs.length;
-      allToggle.indeterminate = count > 0 && count < rowInputs.length;
+      allToggle.checked = rowInputs.length > 0 && visibleSelectedCount === rowInputs.length;
+      allToggle.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < rowInputs.length;
     }
 
     if (!form) return;
@@ -453,12 +454,17 @@
     form.querySelectorAll("[data-products-selected-count]").forEach((node) => {
       node.textContent = String(count);
     });
-    form.querySelectorAll("[data-products-bulk-open], [data-products-clear-selection]").forEach((node) => {
+    form.querySelectorAll("[data-products-bulk-open], [data-products-bulk-delete], [data-products-clear-selection]").forEach((node) => {
       node.disabled = count <= 0;
+    });
+    form.querySelectorAll("[data-products-bulk-delete-count]").forEach((node) => {
+      node.textContent = String(count);
     });
     if (count <= 0) {
       const dialog = form.querySelector("[data-products-bulk-dialog]");
       if (dialog?.open) dialog.close();
+      const deleteDialog = form.querySelector("[data-products-bulk-delete-dialog]");
+      if (deleteDialog?.open) deleteDialog.close();
       form.querySelectorAll("[data-products-bulk-toggle]").forEach((toggle) => {
         toggle.checked = false;
       });
@@ -506,7 +512,7 @@
     table.addEventListener("change", (event) => {
       const selectAll = event.target.closest("[data-products-select-all]");
       if (selectAll) {
-        selectionInputs(table).forEach((input) => {
+        selectionInputs(table).filter((input) => !input.closest("tr")?.hidden).forEach((input) => {
           input.checked = selectAll.checked;
         });
         updateSelectionControls(table);
@@ -516,6 +522,7 @@
       if (!checkbox) return;
       updateSelectionControls(table);
     });
+    table.addEventListener("catalog-filter-applied", () => updateSelectionControls(table));
 
     const form = bulkForm(table);
     form?.addEventListener("click", (event) => {
@@ -532,6 +539,22 @@
       if (closeButton) {
         event.preventDefault();
         const dialog = form.querySelector("[data-products-bulk-dialog]");
+        if (dialog?.open && typeof dialog.close === "function") dialog.close();
+        else if (dialog) dialog.removeAttribute("open");
+        return;
+      }
+      const deleteButton = event.target.closest("[data-products-bulk-delete]");
+      if (deleteButton) {
+        event.preventDefault();
+        const dialog = form.querySelector("[data-products-bulk-delete-dialog]");
+        if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+        else if (dialog) dialog.setAttribute("open", "");
+        return;
+      }
+      const deleteCloseButton = event.target.closest("[data-products-bulk-delete-close]");
+      if (deleteCloseButton) {
+        event.preventDefault();
+        const dialog = form.querySelector("[data-products-bulk-delete-dialog]");
         if (dialog?.open && typeof dialog.close === "function") dialog.close();
         else if (dialog) dialog.removeAttribute("open");
         return;
