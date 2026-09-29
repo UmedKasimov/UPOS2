@@ -2525,7 +2525,7 @@
           const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
           const price = Math.max(0, purchaseEntryNumber(priceInput?.value));
           const current = product ? stockForProduct(product) : 0;
-          const targetEntered = String(targetInput?.value || "").trim() !== "";
+          const targetEntered = targetInput?.dataset.adjustmentTargetTouched === "1" && String(targetInput.value || "").trim() !== "";
           const target = targetEntered ? Math.max(0, purchaseEntryNumber(targetInput.value)) : current;
           const difference = target - current;
           const quantity = targetEntered ? Math.abs(difference) : 0;
@@ -2600,7 +2600,10 @@
           delete control.dataset.adjustmentManualSalePrice;
         });
         const targetInput = row.querySelector("[data-adjustment-target]");
-        if (targetInput) targetInput.value = "0";
+        if (targetInput) {
+          targetInput.value = "0";
+          targetInput.dataset.adjustmentTargetTouched = "0";
+        }
         // Разблокировать комбобокс товара и скрыть его панель.
         const picker = row.querySelector("[data-adjustment-product-picker]");
         if (picker) picker.classList.remove("is-locked");
@@ -2745,7 +2748,10 @@
         productInput?.addEventListener("change", () => {
           const product = productForRow(row);
           const suggestedPrice = priceForProduct(product);
-          if (targetInput) targetInput.value = product ? quantityText(stockForProduct(product)) : "";
+          if (targetInput) {
+            targetInput.value = "0";
+            targetInput.dataset.adjustmentTargetTouched = "0";
+          }
           if (priceInput) {
             priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
             priceInput.dataset.adjustmentAutoPrice = "1";
@@ -2759,6 +2765,7 @@
         });
         targetInput?.addEventListener("input", () => {
           targetInput.value = targetInput.value.replace(/[^\d\s.,]/g, "");
+          targetInput.dataset.adjustmentTargetTouched = "1";
           recalc();
         });
         priceInput?.addEventListener("input", () => {
@@ -2808,7 +2815,10 @@
         if (row) {
           const input = row.querySelector("[data-adjustment-target]");
           if (input) {
-            input.value = quantityText(Math.max(0, purchaseEntryNumber(input.value) + directionSign * quantity));
+            const currentTarget = input.dataset.adjustmentTargetTouched === "1"
+              ? purchaseEntryNumber(input.value)
+              : stockForProduct(item);
+            input.value = quantityText(Math.max(0, currentTarget + directionSign * quantity));
             input.dispatchEvent(new Event("input", { bubbles: true }));
           }
           return;
@@ -2927,7 +2937,10 @@
         rows().forEach((row) => {
           const product = productForRow(row);
           const targetInput = row.querySelector("[data-adjustment-target]");
-          if (targetInput) targetInput.value = product ? quantityText(stockForProduct(product)) : "";
+          if (targetInput) {
+            targetInput.value = "0";
+            targetInput.dataset.adjustmentTargetTouched = "0";
+          }
           const priceInput = row.querySelector("[data-adjustment-price]");
           if (!priceInput || priceInput.dataset.adjustmentAutoPrice === "0") return;
           const suggestedPrice = priceForProduct(product);
@@ -2951,6 +2964,8 @@
           return;
         }
         rows().forEach((row) => {
+          const targetInput = row.querySelector("[data-adjustment-target]");
+          if (targetInput && targetInput.dataset.adjustmentTargetTouched !== "1") targetInput.value = "";
           row.querySelectorAll("[data-adjustment-quantity], [data-adjustment-price], [data-adjustment-sale-price]").forEach((input) => {
             const value = purchaseEntryNumber(input.value);
             input.value = value ? String(value) : "";
