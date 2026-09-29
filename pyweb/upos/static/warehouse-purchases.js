@@ -3038,6 +3038,88 @@
     });
   }
 
+  function initWarehouseAdjustmentDocuments(root = document) {
+    const view = root.querySelector(".warehouse-adjustment-documents");
+    if (!view || view.dataset.adjustmentDocumentsReady === "1") return;
+    view.dataset.adjustmentDocumentsReady = "1";
+    const panel = view.querySelector("[data-adjustment-document-detail]");
+    const backdrop = view.querySelector(".warehouse-adjustment-detail-backdrop");
+    if (!panel || !backdrop) return;
+    let opener = null;
+    const setText = (selector, value) => {
+      const element = panel.querySelector(selector);
+      if (element) element.textContent = value;
+    };
+    const formatQuantity = (raw) => {
+      if (raw === "" || raw == null) return "—";
+      const value = Number(String(raw).replace(",", "."));
+      return Number.isFinite(value) ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(value) : String(raw);
+    };
+    const close = () => {
+      panel.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
+      window.setTimeout(() => {
+        if (panel.classList.contains("is-open")) return;
+        panel.hidden = true;
+        backdrop.hidden = true;
+      }, 180);
+      opener?.focus?.();
+    };
+    const open = (id, trigger) => {
+      const source = document.getElementById(`warehouse-adjustment-document-${id}`);
+      if (!source) return;
+      let documentData;
+      try { documentData = JSON.parse(source.textContent || "{}"); }
+      catch (_error) { return; }
+      opener = trigger;
+      setText("[data-adjustment-detail-title]", `${documentData.operation_label || "Корректировка"} ${documentData.number || ""}`);
+      setText("[data-adjustment-detail-date]", documentData.date || "");
+      setText("[data-adjustment-detail-warehouse]", documentData.warehouse || "—");
+      setText("[data-adjustment-detail-count]", String(documentData.position_count || 0));
+      setText("[data-adjustment-detail-responsible]", documentData.responsible || "—");
+      setText("[data-adjustment-detail-total]", `${documentData.amount || "0"} ${documentData.currency || ""}`.trim());
+      setText("[data-adjustment-detail-note]", documentData.note || "Комментарий не указан");
+      const body = panel.querySelector("[data-adjustment-detail-lines]");
+      body?.replaceChildren();
+      (documentData.lines || []).forEach((line, index) => {
+        const row = document.createElement("tr");
+        const cells = [
+          index + 1,
+          line.product || "—",
+          formatQuantity(line.stock_before),
+          formatQuantity(line.stock_after),
+          formatQuantity(line.quantity),
+          `${formatQuantity(line.price)} ${documentData.currency || ""}`.trim(),
+          `${line.amount || "0"} ${documentData.currency || ""}`.trim(),
+        ];
+        cells.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          row.append(cell);
+        });
+        body?.append(row);
+      });
+      panel.hidden = false;
+      backdrop.hidden = false;
+      requestAnimationFrame(() => {
+        panel.classList.add("is-open");
+        backdrop.classList.add("is-open");
+      });
+      panel.querySelector("[data-adjustment-document-close]")?.focus();
+    };
+    view.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-adjustment-document-open]");
+      if (trigger) {
+        open(trigger.dataset.adjustmentDocumentOpen || "", trigger.matches("button") ? trigger : trigger.querySelector("button"));
+        return;
+      }
+      if (event.target.closest("[data-adjustment-document-close]")) close();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) close();
+    });
+  }
+
   function readPurchase(id) {
     const node = document.getElementById(`warehouse-purchase-data-${id}`);
     if (!node) return null;
@@ -3806,6 +3888,7 @@
   function init(root = document) {
     initPurchaseEntry(root);
     initWarehouseAdjustment(root);
+    initWarehouseAdjustmentDocuments(root);
     initPurchasesSort(root);
     root.querySelectorAll("[data-warehouse-purchases-filter]").forEach((form) => {
       if (form.dataset.warehousePurchasesReady === "1") return;

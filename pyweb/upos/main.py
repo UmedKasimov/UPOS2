@@ -13648,12 +13648,58 @@ def create_app() -> FastAPI:
             "product": str(data.get("product") or ""),
             "quantity": (_decimal_plain_text(quantity) or "0"),
             "amount": _sales_money_label(row.amount),
+            "amount_value": _decimal_plain_text(_sales_decimal(row.amount)) or "0",
+            "price": str(data.get("cost_price") or data.get("price") or "0"),
+            "stock_before": str(data.get("stock_before") or ""),
+            "stock_after": str(data.get("stock_after") or ""),
+            "operation_batch_id": str(data.get("operation_batch_id") or ""),
             "currency": row.currency,
             "responsible": str(data.get("responsible") or ""),
             "supplier": str(data.get("supplier") or ""),
             "counterparty_id": str(data.get("counterparty_id") or ""),
             "note": str(data.get("note") or ""),
         }
+
+    def _warehouse_adjustment_document_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        documents: dict[str, dict[str, Any]] = {}
+        for item in items:
+            if item["operation_type"] not in {"in", "out", "adjustment"}:
+                continue
+            batch_id = item["operation_batch_id"] or item["id"]
+            if batch_id not in documents:
+                documents[batch_id] = {
+                    "id": batch_id,
+                    "number": item["number"],
+                    "date": item["date"],
+                    "operation_label": item["operation_label"],
+                    "warehouse": item["warehouse"],
+                    "responsible": item["responsible"],
+                    "note": item["note"],
+                    "currency": item["currency"],
+                    "lines": [],
+                    "_quantity": Decimal("0"),
+                    "_amount": Decimal("0"),
+                }
+            document = documents[batch_id]
+            if _document_number_sort_value(item["number"]) < _document_number_sort_value(document["number"]):
+                document["number"] = item["number"]
+            document["lines"].append({
+                "number": item["number"],
+                "product": item["product"],
+                "stock_before": item["stock_before"],
+                "stock_after": item["stock_after"],
+                "quantity": item["quantity"],
+                "price": item["price"],
+                "amount": item["amount"],
+            })
+            document["_quantity"] += _sales_decimal(item["quantity"])
+            document["_amount"] += _sales_decimal(item["amount_value"])
+        for document in documents.values():
+            document["lines"].sort(key=lambda line: _document_number_sort_value(line["number"]))
+            document["position_count"] = len(document["lines"])
+            document["quantity"] = _decimal_plain_text(document.pop("_quantity")) or "0"
+            document["amount"] = _sales_money_label(document.pop("_amount"))
+        return list(documents.values())
 
     def _warehouse_operation_order_key(row: WarehouseOperation) -> tuple[str, str, int, str]:
         data = _json_object(row.data)
@@ -15388,10 +15434,7 @@ def create_app() -> FastAPI:
             warehouse_stocks=warehouse_stocks,
             warehouse_stock_total=_sales_money_label(warehouse_stock_total),
             warehouse_operations=warehouse_operations,
-            warehouse_adjustment_documents=[
-                item for item in warehouse_operations
-                if item["operation_type"] in {"in", "out", "adjustment"}
-            ],
+            warehouse_adjustment_documents=_warehouse_adjustment_document_rows(warehouse_operations),
             warehouse_purchases=warehouse_purchases,
             warehouse_purchases_pagination=warehouse_purchases_pagination,
             warehouse_purchase_edit=warehouse_purchase_edit,

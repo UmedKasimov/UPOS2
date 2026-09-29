@@ -32042,6 +32042,74 @@ html.dark .clients-map-empty {
   margin-bottom: 0.55rem;
 }
 
+.warehouse-adjustment-document-row {
+  cursor: pointer;
+}
+
+.warehouse-adjustment-document-row:hover td {
+  background: color-mix(in srgb, var(--products-table-blue-strong) 9%, var(--card));
+}
+
+.warehouse-adjustment-document-number {
+  border: 0;
+  background: transparent;
+  color: var(--brand-box, var(--primary));
+  font: inherit;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.warehouse-adjustment-document-number:focus-visible {
+  outline: 2px solid var(--brand-box, var(--primary));
+  outline-offset: 2px;
+}
+
+.warehouse-adjustment-detail {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.warehouse-adjustment-detail-note {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.warehouse-adjustment-detail-note p {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.warehouse-adjustment-detail-table td:nth-child(n+3) {
+  white-space: nowrap;
+}
+
+.warehouse-adjustment-detail .warehouse-purchase-detail-table-wrap {
+  border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 30%, var(--border, #cbd5e1));
+  border-radius: 6px;
+}
+
+.warehouse-adjustment-detail-table th,
+.warehouse-adjustment-detail-table td {
+  border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 25%, var(--border, #cbd5e1));
+}
+
+.warehouse-adjustment-detail-table thead th {
+  background: var(--products-table-head-bg, #e8efff);
+}
+
+.warehouse-adjustment-detail-table tbody tr:nth-child(even) td {
+  background: var(--products-table-row-alt-bg, #f4f7ff);
+}
+
+.warehouse-adjustment-detail-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--primary, #2563eb) 10%, var(--card, #fff));
+}
+
+.warehouse-adjustment-detail-table tfoot td {
+  border-top: 2px solid color-mix(in srgb, var(--primary, #2563eb) 40%, var(--border, #cbd5e1));
+  background: var(--products-table-head-bg, #e8efff);
+}
+
 .warehouse-adjustment-add {
   min-height: 34px;
   padding: 6px 12px;

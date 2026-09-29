@@ -1403,12 +1403,12 @@
       <table class="products-table" data-upos-column-controls>
         <thead>
           <tr>
-            <th>№</th>
+            <th data-upos-min-width="150">№</th>
             <th>Дата</th>
             <th>Тип</th>
             <th>Склад</th>
-            <th>Товар</th>
-            <th>Количество</th>
+            <th>Товары</th>
+            <th>Изменение</th>
             <th>Сумма</th>
             <th>Ответственный</th>
             <th>Комментарий</th>
@@ -1416,12 +1416,12 @@
         </thead>
         <tbody>
           {% for row in warehouse_adjustment_documents %}
-            <tr>
-              <td><strong>{{ row.number }}</strong></td>
+            <tr class="warehouse-adjustment-document-row" data-adjustment-document-open="{{ row.id }}">
+              <td><button type="button" class="warehouse-adjustment-document-number" data-adjustment-document-open="{{ row.id }}">{{ row.number }}</button></td>
               <td>{{ row.date or "—" }}</td>
               <td>{{ row.operation_label }}</td>
               <td>{{ row.warehouse or "—" }}</td>
-              <td>{{ row.product or "—" }}</td>
+              <td>{{ row.lines[0].product if row.position_count == 1 else row.position_count ~ " позиций" }}</td>
               <td>{{ row.quantity }}</td>
               <td>{{ row.amount }} {{ row.currency }}</td>
               <td>{{ row.responsible or "—" }}</td>
@@ -1433,6 +1433,32 @@
         </tbody>
       </table>
     </div>
+    {% for row in warehouse_adjustment_documents %}
+      <script type="application/json" id="warehouse-adjustment-document-{{ row.id }}">{{ row|tojson }}</script>
+    {% endfor %}
+    <div class="warehouse-purchase-detail-backdrop warehouse-adjustment-detail-backdrop" data-adjustment-document-close hidden></div>
+    <aside class="warehouse-purchase-detail warehouse-adjustment-detail" data-adjustment-document-detail hidden aria-live="polite">
+      <header class="warehouse-purchase-detail-head">
+        <div>
+          <p data-adjustment-detail-date></p>
+          <h2 data-adjustment-detail-title>Корректировка</h2>
+        </div>
+        <button class="warehouse-purchase-detail-close" type="button" data-adjustment-document-close aria-label="Закрыть">×</button>
+      </header>
+      <section class="warehouse-purchase-detail-summary">
+        <div class="warehouse-purchase-detail-summary-cell"><span>Склад</span><strong data-adjustment-detail-warehouse></strong></div>
+        <div class="warehouse-purchase-detail-summary-cell"><span>Позиций</span><strong data-adjustment-detail-count></strong></div>
+        <div class="warehouse-purchase-detail-summary-cell"><span>Ответственный</span><strong data-adjustment-detail-responsible></strong></div>
+      </section>
+      <div class="warehouse-purchase-detail-table-wrap">
+        <table class="warehouse-purchase-detail-table warehouse-adjustment-detail-table">
+          <thead><tr><th>№</th><th>Товар</th><th>Было</th><th>Стало</th><th>Разница</th><th>Цена</th><th>Сумма</th></tr></thead>
+          <tbody data-adjustment-detail-lines></tbody>
+          <tfoot><tr><td colspan="6">Итого</td><td data-adjustment-detail-total></td></tr></tfoot>
+        </table>
+      </div>
+      <section class="warehouse-adjustment-detail-note"><strong>Комментарий</strong><p data-adjustment-detail-note></p></section>
+    </aside>
   </article>
 </div>
 
