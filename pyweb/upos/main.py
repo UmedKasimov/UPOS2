@@ -3467,6 +3467,20 @@ def create_app() -> FastAPI:
         }
         return modules[key]
 
+    def _business_module_home(request: Request, key: str):
+        # Sidebar links request only the launcher. Do not query or render every
+        # tab before the user chooses one of them.
+        if list(request.query_params.multi_items()) != [("module_home", "1")]:
+            return None
+        return tpl(
+            request,
+            "home_business_module.html",
+            variant="user",
+            active=key,
+            module=_business_module_context(key),
+            module_home_only=True,
+        )
+
     def _product_workspace_owner(request: Request) -> tuple[str | None, RedirectResponse | None]:
         u = request.session.get("user") or {}
         if u.get("role") == "admin":
@@ -14857,6 +14871,11 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        module_home = _business_module_home(request, "warehouse")
+        if module_home is not None:
+            return module_home
+        selected_view = str(request.query_params.get("module_view") or "")
+        load_purchase_documents = selected_view in {"", "purchases", "purchase_edit"}
         purchase_supplier_filter = str(request.query_params.get("supplier") or "").strip()
         purchase_status_filter = str(request.query_params.get("purchase_status") or "").strip()
         purchase_date_from = str(request.query_params.get("date_from") or "").strip()
@@ -14918,14 +14937,16 @@ def create_app() -> FastAPI:
                 ).scalars()
             )
             operation_rows.sort(key=_warehouse_operation_order_key, reverse=True)
-            purchase_rows = list(
-                session.execute(
-                    select(PurchaseDocument)
-                    .where(PurchaseDocument.workspace_owner_id == wid)
-                    .order_by(PurchaseDocument.updated_at.desc())
-                ).scalars()
-            )
-            purchase_rows.sort(key=_purchase_document_order_key, reverse=True)
+            purchase_rows = []
+            if load_purchase_documents:
+                purchase_rows = list(
+                    session.execute(
+                        select(PurchaseDocument)
+                        .where(PurchaseDocument.workspace_owner_id == wid)
+                        .order_by(PurchaseDocument.updated_at.desc())
+                    ).scalars()
+                )
+                purchase_rows.sort(key=_purchase_document_order_key, reverse=True)
             supplier_rows = list(
                 session.execute(
                     select(Counterparty)
@@ -15113,7 +15134,7 @@ def create_app() -> FastAPI:
                 if filters["op_type"] != "all" and item["operation_type"] != filters["op_type"]:
                     continue
                 warehouse_operations.append(item)
-            purchase_product_meta = _purchase_line_product_meta(session, wid)
+            purchase_product_meta = _purchase_line_product_meta(session, wid) if load_purchase_documents else {}
             for row in purchase_rows:
                 item = _purchase_document_data(row, purchase_product_meta)
                 supplier_card = purchase_supplier_card(item)
@@ -15721,6 +15742,10 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        module_home = _business_module_home(request, "clients")
+        if module_home is not None:
+            return module_home
+        load_client_map = str(request.query_params.get("module_view") or "") in {"", "clients_map"}
         business_segments = _workspace_business_segments(wid)
         filters = {
             "q": q.strip(),
@@ -15897,7 +15922,7 @@ def create_app() -> FastAPI:
                 # Карта показывает всю базу: фильтры списка на неё не влияют,
                 # иначе после поиска или отбора по программе на карте
                 # оставалась горстка клиентов.
-                if not archive_mode:
+                if not archive_mode and load_client_map:
                     map_source_records.append(item)
                 search_fields = " ".join(
                     [
@@ -17344,6 +17369,9 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        module_home = _business_module_home(request, "crm")
+        if module_home is not None:
+            return module_home
         filters = {
             "q": q.strip(),
             "client": client.strip(),
@@ -19980,6 +20008,9 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        module_home = _business_module_home(request, "telephony")
+        if module_home is not None:
+            return module_home
         filters = {
             "q": q.strip(),
             "provider": provider.strip(),
@@ -20889,6 +20920,9 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        module_home = _business_module_home(request, "messengers")
+        if module_home is not None:
+            return module_home
         filters = {
             "q": q.strip(),
             "channel": _messenger_channel_key(channel.strip() or "Telegram"),

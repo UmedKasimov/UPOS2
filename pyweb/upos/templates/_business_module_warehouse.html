@@ -7,6 +7,7 @@
 </div>
 
 <form class="business-module-filters" method="get" action="{{ url_for('warehouse_get') }}" data-workspace-view="stocks transfers" hidden>
+  <input type="hidden" name="module_view" value="{{ module_selected_view or 'stocks' }}" />
   <label><span>Поиск</span><input name="q" value="{{ warehouse_filters.q }}" placeholder="Товар, склад, документ" /></label>
   <label><span>Склад</span><input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Склад" /></label>
   <label><span>Товар</span><input name="product" list="warehouse-product-list" value="{{ warehouse_filters.product }}" placeholder="Товар" /></label>
@@ -221,6 +222,7 @@
     </form>
   </aside>
 
+  {% if not module_selected_view or module_selected_view == 'purchases' %}
   <article class="products-list-panel warehouse-purchases-board" id="warehouse-purchases" data-workspace-view="purchases" hidden>
     <header class="products-panel-head sales-journal-head">
       <div class="products-panel-title">
@@ -237,6 +239,7 @@
         data-workspace-tab-hash="purchase-new"
       >+ Закупка</button>
       <form class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
+        <input type="hidden" name="module_view" value="purchases" />
         <input type="hidden" name="purchase_page_size" value="{{ warehouse_purchases_pagination.page_size }}" />
         <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
           <span>Поиск</span>
@@ -790,6 +793,7 @@
       </div>
     </dialog>
   </article>
+  {% endif %}
 
   {% if warehouse_purchase_edit %}
     <span

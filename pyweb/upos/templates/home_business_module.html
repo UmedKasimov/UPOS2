@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ module.title }}{% endblock %}
 {% block extra_head %}
+  {% if not module_home_only %}
   {% if active == "messengers" %}
     <script src="{{ url_for('static', path='messengers.js') }}?v=28" defer></script>
     <script src="{{ url_for('static', path='messengers-telegram.js') }}?v=2" defer></script>
@@ -11,6 +12,7 @@
     <script src="{{ url_for('static', path='telephony.js') }}?v=13" defer></script>
   {% elif active == "warehouse" %}
     <script src="{{ url_for('static', path='warehouse.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=79" defer></script>
   {% elif active == "clients" %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
@@ -20,6 +22,7 @@
        разделам из clients.js. Leaflet не подключаем — карт здесь нет, а инициализация
        карт в скрипте сама отступает, если window.L отсутствует. #}
     <script src="{{ url_for('static', path='clients.js') }}?v=54" defer></script>
+  {% endif %}
   {% endif %}
 {% endblock %}
 
@@ -41,6 +44,7 @@
   {% set module_views_ns.value = module_views_ns.value ~ (' ' if module_views_ns.value else '') ~ item.id %}
 {% endfor %}
 {% set module_views = module_views_ns.value %}
+{% set module_selected_view = request.query_params.get('module_view', '') if active in ['warehouse', 'clients'] else '' %}
 {% if active == "clients" and selected_client_card %}
   {% set module_stack_views = module_views ~ " profile client_create client_edit clients_map" %}
 {% elif active == "clients" %}
@@ -69,6 +73,8 @@
     data-workspace-tabs
     data-workspace-key="{{ active }}"
     data-workspace-home-href="{{ module_home_url }}"
+    {% if active in ['warehouse', 'clients', 'crm', 'telephony', 'messengers'] %}data-workspace-lazy-home-enabled="1"{% endif %}
+    {% if module_home_only %}data-workspace-lazy-home="1"{% endif %}
     {% if active == "clients" and selected_client_card %}data-workspace-default-tab="client-{{ selected_client_card.id }}"{% endif %}
     {% if active == "suppliers" and selected_supplier_card %}data-workspace-default-tab="supplier-{{ selected_supplier_card.id }}"{% elif active == "suppliers" %}{# Лончер поставщиков свёлся к одной карточке — раздел открывается сразу списком. #}data-workspace-default-tab="suppliers" data-workspace-home-tab-id="suppliers"{% endif %}
     {% if active == "warehouse" and warehouse_purchase_edit %}data-workspace-default-tab="purchase-edit-{{ warehouse_purchase_edit.id }}"{% endif %}
@@ -151,6 +157,7 @@
       {% endfor %}
     </section>
 
+    {% if not module_home_only %}
     <div class="workspace-module-stack" data-workspace-view="{{ module_stack_views }}" hidden>
       {% if active == "warehouse" %}
         {% include "_business_module_warehouse.html" %}
@@ -172,5 +179,6 @@
         {% include "_business_module_crm.html" %}
       {% endif %}
     </div>
+    {% endif %}
   </section>
 {% endblock %}

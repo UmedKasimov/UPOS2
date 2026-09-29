@@ -84,7 +84,18 @@
 
     function homeUrl() {
       const href = root.dataset.workspaceHomeHref || homeTab.getAttribute("href") || "";
-      return href ? new URL(href, window.location.href) : new URL(window.location.href);
+      const url = href ? new URL(href, window.location.href) : new URL(window.location.href);
+      if (root.dataset.workspaceLazyHomeEnabled === "1") url.searchParams.set("module_home", "1");
+      return url;
+    }
+
+    function contentUrl(value, viewId) {
+      const url = new URL(value, window.location.href);
+      if (root.dataset.workspaceLazyHomeEnabled === "1") url.searchParams.delete("module_home");
+      if (key === "warehouse" || key === "clients") {
+        url.searchParams.set("module_view", viewId);
+      }
+      return url;
     }
 
     function registerMeta(source) {
@@ -163,7 +174,8 @@
     }
 
     function tabUrl(tabId) {
-      return rememberedTabUrl(tabId) || canonicalTabUrl(tabId);
+      const url = rememberedTabUrl(tabId) || canonicalTabUrl(tabId);
+      return url ? contentUrl(url, tabMeta.get(tabId)?.viewId || tabId) : null;
     }
 
     function matchesLocation(url, includeHash = false) {
@@ -376,7 +388,9 @@
       lastActiveTab = tabId;
       saveState();
 
-      const url = options.url ? new URL(options.url, window.location.href) : tabUrl(tabId);
+      const url = options.url
+        ? contentUrl(options.url, tabMeta.get(tabId)?.viewId || tabId)
+        : tabUrl(tabId);
       if (options.navigate !== false && url && !matchesLocation(url)) {
         render();
         window.location.assign(url.toString());
@@ -467,6 +481,16 @@
           if ((form.getAttribute("method") || "get").toLowerCase() !== "get" || !activeTab) return;
           const meta = tabMeta.get(activeTab);
           if (!meta?.hash) return;
+          if (key === "warehouse" || key === "clients") {
+            let viewInput = form.querySelector('input[name="module_view"]');
+            if (!viewInput) {
+              viewInput = document.createElement("input");
+              viewInput.type = "hidden";
+              viewInput.name = "module_view";
+              form.appendChild(viewInput);
+            }
+            viewInput.value = meta.viewId || activeTab;
+          }
           try {
             const url = new URL(form.getAttribute("action") || window.location.href, window.location.href);
             form.setAttribute("action", `${url.pathname}${url.search}#${meta.hash}`);
