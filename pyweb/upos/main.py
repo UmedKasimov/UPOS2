@@ -13977,6 +13977,7 @@ def create_app() -> FastAPI:
             "item_type",
             "title",
             "client",
+            "counterparty_id",
             "task_type",
             "checklist_text",
             "contact",
@@ -18066,11 +18067,11 @@ def create_app() -> FastAPI:
                 ),
                 "contacts": [
                     {
+                        "id": row.id,
                         "name": row.name,
                         "phone": str(row.phone or _counterparty_extra(row).get("phone") or "").strip(),
                     }
                     for row in counterparty_rows
-                    if str(row.phone or _counterparty_extra(row).get("phone") or "").strip()
                 ],
                 "responsibles": sorted(
                     {item["responsible"] for item in crm_records if item["responsible"]}
@@ -21404,6 +21405,13 @@ def create_app() -> FastAPI:
         _crm_append_activity(data, "Карточка создана", _crm_actor_name(request))
         with session_scope() as session:
             counterparty_id = _crm_apply_related_order(session, wid, data)
+            selected_client_id = str(form.get("counterparty_id") or "").strip()
+            selected_client = session.get(Counterparty, selected_client_id) if selected_client_id else None
+            if selected_client and selected_client.workspace_owner_id == wid:
+                counterparty_id = selected_client.id
+                data["client"] = selected_client.name
+            else:
+                selected_client = None
             contact_match = (
                 _counterparty_duplicate(session, wid, phone=data["contact"])
                 if data["contact"]
@@ -21468,6 +21476,13 @@ def create_app() -> FastAPI:
             if not row or row.workspace_owner_id != wid:
                 return RedirectResponse(url="/crm?error=" + quote("CRM-запись не найдена") + "#tasks", status_code=302)
             counterparty_id = _crm_apply_related_order(session, wid, data)
+            selected_client_id = str(form.get("counterparty_id") or "").strip()
+            selected_client = session.get(Counterparty, selected_client_id) if selected_client_id else None
+            if selected_client and selected_client.workspace_owner_id == wid:
+                counterparty_id = selected_client.id
+                data["client"] = selected_client.name
+            else:
+                selected_client = None
             contact_match = (
                 _counterparty_duplicate(session, wid, phone=data["contact"])
                 if data["contact"]

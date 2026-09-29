@@ -1501,6 +1501,7 @@
     const form = dialog.querySelector("form");
     const defaultAction = form?.getAttribute("action") || "/crm/save";
     const title = dialog.querySelector("#crm-record-dialog-title");
+    const titleFieldLabel = form?.querySelector("[data-crm-title-label]");
     const subtitle = dialog.querySelector(".settings-profile-modal-sub");
     const submit = dialog.querySelector('.crm-record-form-actions button[type="submit"]');
     const clientInput = form?.querySelector('input[name="client"]');
@@ -1510,6 +1511,9 @@
     const orderSelect = form?.querySelector("[data-crm-order-select]");
     const orderInput = form?.querySelector("[data-crm-order-input]");
     const contactInput = form?.querySelector('input[name="contact"]');
+    const contactClientId = form?.querySelector("[data-crm-client-id]");
+    const contactPanel = form?.querySelector("[data-crm-contact-panel]");
+    const contactCardLink = form?.querySelector("[data-crm-contact-card]");
     const sourceInput = form?.querySelector("[data-crm-source-input]");
     const sourceValue = form?.querySelector("[data-crm-source-value]");
     const sourcePanel = form?.querySelector("[data-crm-source-panel]");
@@ -1564,17 +1568,14 @@
       if (digits.length < 7) return "";
       return digits.length >= 9 ? digits.slice(-9) : digits;
     };
-    const clientsByPhone = new Map(
-      Array.from(document.querySelectorAll("#crm-contact-list option"))
-        .map((option) => [
-          normalizePhone(option.value),
-          {
-            name: String(option.dataset.clientName || option.textContent || "").trim(),
-            phone: String(option.value || "").trim(),
-          },
-        ])
-        .filter(([phone, client]) => phone && client.name),
-    );
+    const contactRows = Array.from(document.querySelectorAll("#crm-contact-list option"))
+      .map((option) => ({
+        id: String(option.dataset.clientId || "").trim(),
+        name: String(option.dataset.clientName || option.textContent || "").trim(),
+        phone: String(option.dataset.clientPhone || "").trim(),
+      }))
+      .filter((item) => item.id && item.name)
+      .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 
     const syncDuplicateNotice = () => {
       if (!duplicateNote || !clientInput) return;
@@ -1949,23 +1950,100 @@
       });
     };
 
+    const closeContactPanel = () => {
+      if (!contactPanel) return;
+      contactPanel.hidden = true;
+      contactPanel.innerHTML = "";
+    };
+
+    const positionContactPanel = () => {
+      if (!contactInput || !contactPanel || contactPanel.hidden) return;
+      const rect = contactInput.getBoundingClientRect();
+      const width = Math.min(Math.max(rect.width, 300), window.innerWidth - 24);
+      contactPanel.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+      contactPanel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 96)}px`;
+      contactPanel.style.width = `${width}px`;
+    };
+
     const syncContactMatch = () => {
       if (!contactInput || !contactMatchNote || !clientInput) return;
-      const match = clientsByPhone.get(normalizePhone(contactInput.value));
-      const previousMatch = String(clientInput.dataset.crmContactMatch || "");
-      if (!match) {
-        contactMatchNote.hidden = true;
-        contactMatchNote.textContent = "";
+      const phone = normalizePhone(contactInput.value);
+      let selected = contactRows.find((item) => item.id === String(contactClientId?.value || ""));
+      const selectedText = selected?.phone || selected?.name || "";
+      const stillSelected = selected && (selected.phone
+        ? normalizePhone(selected.phone) === phone
+        : selectedText.toLocaleLowerCase() === String(contactInput.value || "").trim().toLocaleLowerCase());
+      if (selected && !stillSelected) {
+        if (contactClientId) contactClientId.value = "";
+        selected = null;
+      }
+      const matches = phone ? contactRows.filter((item) => normalizePhone(item.phone) === phone) : [];
+      if (!selected && matches.length === 1) {
+        selected = matches[0];
+        if (contactClientId) contactClientId.value = selected.id;
+      }
+      contactInput.classList.toggle("crm-contact-known", matches.length > 0);
+      if (selected) {
+        clientInput.value = selected.name;
+        clientInput.dataset.crmContactMatch = selected.name;
+        contactMatchNote.textContent = selected.phone
+          ? `Номер есть в базе: ${selected.name}`
+          : `Клиент есть в базе: ${selected.name}. Номер не указан.`;
+        contactMatchNote.hidden = false;
+        if (contactCardLink) {
+          contactCardLink.href = `/clients?client=${encodeURIComponent(selected.id)}#client-card`;
+          contactCardLink.hidden = false;
+        }
+      } else {
+        const previousMatch = String(clientInput.dataset.crmContactMatch || "");
         if (previousMatch && clientInput.value === previousMatch) clientInput.value = "";
         delete clientInput.dataset.crmContactMatch;
-        syncDuplicateNotice();
-        return;
+        contactMatchNote.textContent = matches.length > 1
+          ? `Номер есть у ${matches.length} клиентов. Выберите нужное имя из списка.` : "";
+        contactMatchNote.hidden = matches.length <= 1;
+        if (contactCardLink) {
+          contactCardLink.hidden = true;
+          contactCardLink.removeAttribute("href");
+        }
       }
-      clientInput.value = match.name;
-      clientInput.dataset.crmContactMatch = match.name;
-      contactMatchNote.textContent = `Номер уже есть: ${match.name}. Сделка будет привязана к этому клиенту.`;
-      contactMatchNote.hidden = false;
       syncDuplicateNotice();
+    };
+
+    const chooseContact = (item) => {
+      if (!contactInput || !item) return;
+      contactInput.value = item.phone || item.name;
+      if (contactClientId) contactClientId.value = item.id;
+      syncContactMatch();
+      closeContactPanel();
+      contactInput.focus();
+    };
+
+    const renderContactPanel = () => {
+      if (!contactInput || !contactPanel) return;
+      const query = String(contactInput.value || "").trim();
+      const selected = contactRows.find((item) => item.id === String(contactClientId?.value || ""));
+      const search = selected && query === (selected.phone || selected.name) ? "" : query;
+      const digits = search.replace(/\D+/g, "");
+      const rows = contactRows.filter((item) => !search
+        || item.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())
+        || (digits.length >= 2 && item.phone.replace(/\D+/g, "").includes(digits))).slice(0, 80);
+      contactPanel.innerHTML = rows.length
+        ? rows.map((item) => (
+          '<button type="button" class="sales-combo-option crm-contact-option" data-crm-contact-choice>'
+          + `<span class="sales-combo-main">${escapeHtml(item.name)}</span>`
+          + `<span class="sales-combo-meta"><span class="${item.phone ? "crm-contact-phone" : ""}">${escapeHtml(item.phone || "Номер не указан")}</span><strong>В базе клиентов</strong></span>`
+          + '</button>'
+        )).join("")
+        : '<div class="sales-combo-empty">Клиент не найден. Номер можно ввести вручную.</div>';
+      contactPanel.hidden = false;
+      positionContactPanel();
+      contactPanel.querySelectorAll("[data-crm-contact-choice]").forEach((button, index) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          chooseContact(rows[index]);
+        });
+      });
     };
 
     const syncConditionalFields = () => {
@@ -2030,6 +2108,9 @@
         field.hidden = !isTaskMode;
       });
       if (contactInput) contactInput.required = isCompactDeal;
+      if (titleFieldLabel) titleFieldLabel.textContent = isCompactDeal ? "Описание сделки*" : "Название*";
+      const titleInput = form.querySelector('input[name="title"]');
+      if (titleInput) titleInput.placeholder = isCompactDeal ? "Краткое описание сделки" : isTaskMode ? "Название задачи" : "Название сделки";
       if (isCompactDeal) {
         if (title) title.textContent = "Новая сделка";
         if (subtitle) subtitle.textContent = "Основные данные сделки";
@@ -2040,8 +2121,6 @@
         if (title) title.textContent = mode === "edit" ? "Редактировать задачу" : "Новая задача";
         if (subtitle) subtitle.textContent = "Клиент, ответственный, срок и следующий шаг";
         if (submit) submit.textContent = mode === "edit" ? "Сохранить задачу" : "Создать задачу";
-        const titleInput = form.querySelector('input[name="title"]');
-        if (titleInput) titleInput.placeholder = "Название задачи";
         applyTaskTypeChecklist(false);
       }
       syncConditionalFields();
@@ -2059,7 +2138,9 @@
       syncOrderDisplay();
       syncSourceDisplay();
       closeSourcePanel();
+      closeContactPanel();
       if (title) title.textContent = "Новая запись";
+      if (titleFieldLabel) titleFieldLabel.textContent = "Название*";
       if (subtitle) subtitle.textContent = "Сделка, задача или история контакта";
       if (submit) submit.textContent = "Сохранить запись";
       syncConditionalFields();
@@ -2102,6 +2183,7 @@
       syncFormPresentation(mode, kind);
       syncDuplicateNotice();
       syncContactMatch();
+      closeContactPanel();
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {
@@ -2137,6 +2219,11 @@
       field.addEventListener("change", syncConditionalFields);
     });
     clientInput?.addEventListener("input", () => {
+      if (document.activeElement === clientInput && contactClientId) {
+        contactClientId.value = "";
+        delete clientInput.dataset.crmContactMatch;
+        if (contactCardLink) contactCardLink.hidden = true;
+      }
       syncDuplicateNotice();
       renderClientPanel();
     });
@@ -2177,11 +2264,18 @@
     window.addEventListener("resize", positionDealPanel);
     window.addEventListener("resize", positionOrderPanel);
     window.addEventListener("resize", positionSourcePanel);
+    window.addEventListener("resize", positionContactPanel);
     window.addEventListener("scroll", positionClientPanel, true);
     window.addEventListener("scroll", positionResponsiblePanel, true);
     window.addEventListener("scroll", positionDealPanel, true);
     window.addEventListener("scroll", positionOrderPanel, true);
     window.addEventListener("scroll", positionSourcePanel, true);
+    window.addEventListener("scroll", positionContactPanel, true);
+    document.addEventListener("mousedown", (event) => {
+      if (!contactPanel || !contactInput) return;
+      if (event.target === contactInput || contactPanel.contains(event.target)) return;
+      closeContactPanel();
+    });
     document.addEventListener("mousedown", (event) => {
       if (!sourcePanel || !sourceInput) return;
       if (event.target === sourceInput || sourcePanel.contains(event.target)) return;
@@ -2218,7 +2312,12 @@
       if (event.target === orderInput || orderPanel.contains(event.target)) return;
       closeOrderPanel();
     });
-    contactInput?.addEventListener("input", syncContactMatch);
+    contactInput?.addEventListener("input", () => {
+      syncContactMatch();
+      renderContactPanel();
+    });
+    contactInput?.addEventListener("focus", renderContactPanel);
+    contactInput?.addEventListener("click", renderContactPanel);
     clientCreateDialog?.querySelectorAll("[data-crm-client-create-close]").forEach((button) => {
       button.addEventListener("click", closeClientCreateDialog);
     });
@@ -2254,8 +2353,11 @@
             clientRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
           }
           if (name) existingClients.add(name.toLocaleLowerCase());
-          const phoneKey = normalizePhone(phone);
-          if (phoneKey && name) clientsByPhone.set(phoneKey, { name, phone });
+          const id = String(client.id || "").trim();
+          if (id && normalizePhone(phone) && !contactRows.some((item) => item.id === id)) {
+            contactRows.push({ id, name, phone });
+            contactRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+          }
           if (clientInput) {
             clientInput.value = name;
             clientInput.dispatchEvent(new Event("change", { bubbles: true }));

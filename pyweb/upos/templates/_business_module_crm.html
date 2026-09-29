@@ -4,7 +4,7 @@
   {% for item in crm_options.clients %}<option value="{{ item }}">{% endfor %}
 </datalist>
 <datalist id="crm-contact-list">
-  {% for item in crm_options.contacts %}<option value="{{ item.phone }}" data-client-name="{{ item.name }}">{{ item.name }}</option>{% endfor %}
+  {% for item in crm_options.contacts %}<option value="{{ item.phone or item.name }}" data-client-id="{{ item.id }}" data-client-name="{{ item.name }}" data-client-phone="{{ item.phone }}">{{ item.name }}</option>{% endfor %}
 </datalist>
 <datalist id="crm-responsible-list">
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
@@ -694,6 +694,7 @@
       <form method="post" action="{{ url_for('crm_save') }}" class="product-form crm-record-form">
         {% include "_csrf_field.html" %}
         <input type="hidden" name="record_id" value="" data-crm-record-id-field />
+        <input type="hidden" name="counterparty_id" value="" data-crm-client-id />
         <input type="hidden" name="tags" value="" />
         <div class="product-kind-toggle" data-crm-extended-field>
           <label><input type="radio" name="item_type" value="task" /> Задача</label>
@@ -701,7 +702,7 @@
           <label><input type="radio" name="item_type" value="history" /> История</label>
         </div>
         <div class="product-form-grid crm-record-form-grid">
-          <label class="wide" data-crm-deal-create-field><span>Название*</span><input name="title" required placeholder="Название сделки" /></label>
+          <label class="wide" data-crm-deal-create-field><span data-crm-title-label>Название*</span><input name="title" required placeholder="Название сделки" /></label>
           <label class="crm-client-picker-field">
             <span>Клиент</span>
             <input name="client" autocomplete="off" data-crm-client-input placeholder="Выберите или введите клиента" />
@@ -750,8 +751,10 @@
           <select data-crm-source-options hidden aria-hidden="true" tabindex="-1">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
           <label class="wide crm-deal-contact-field" data-crm-deal-create-field data-crm-task-hidden>
             <span>Контакт*</span>
-            <input name="contact" type="tel" inputmode="tel" autocomplete="tel" list="crm-contact-list" placeholder="+998 90 123 45 67" />
+            <input name="contact" type="search" autocomplete="off" data-crm-contact-input placeholder="Имя клиента или номер телефона" />
+            <div class="sales-combo-panel crm-contact-panel" data-crm-contact-panel hidden></div>
             <small class="crm-client-duplicate-note" data-crm-contact-match hidden></small>
+            <a class="crm-contact-card-link" data-crm-contact-card target="_blank" rel="noopener" hidden>Карточка клиента ↗</a>
           </label>
           <label data-crm-task-hidden><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
           <label class="crm-deal-picker-field">
