@@ -2652,14 +2652,13 @@
             (list.length
             ? list
                 .map((item) => {
+                  const stock = stockForProduct(item);
                   return (
                     '<button type="button" class="sales-combo-option">' +
                     '<span class="sales-combo-main">' +
                     highlightText(item.name, query) +
+                    ' · Остаток: ' + escapeHtml(quantityText(stock)) + ' ' + escapeHtml(item.unit || "шт") +
                     "</span>" +
-                    (stockForProduct(item) > 0
-                      ? '<span class="sales-combo-meta">Остаток: ' + escapeHtml(quantityText(stockForProduct(item))) + ' ' + escapeHtml(item.unit || "шт") + '</span>'
-                      : "") +
                     "</button>"
                   );
                 })
