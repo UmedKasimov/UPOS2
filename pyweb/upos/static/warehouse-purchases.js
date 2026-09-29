@@ -2948,6 +2948,27 @@
           },
         });
       });
+      form.querySelector("[data-adjustment-zero-all]")?.addEventListener("click", () => {
+        const selectedRows = rows().filter((row) => productForRow(row));
+        if (!selectedRows.length) {
+          window.alert("Сначала добавьте товары в корректировку.");
+          return;
+        }
+        const warehouseName = warehouseInput?.selectedOptions?.[0]?.textContent?.trim() || "выбранном складе";
+        const confirmed = window.confirm(
+          `Обнулить фактический остаток у ${selectedRows.length} товаров в текущей корректировке на складе «${warehouseName}»? ` +
+          "Все введённые остатки этих товаров будут заменены на 0. Изменение запасов произойдёт только после нажатия «Сохранить»."
+        );
+        if (!confirmed) return;
+        selectedRows.forEach((row) => {
+          const targetInput = row.querySelector("[data-adjustment-target]");
+          if (!targetInput) return;
+          targetInput.value = "0";
+          targetInput.dataset.adjustmentTargetTouched = "1";
+          targetInput.dataset.adjustmentTargetEdited = "1";
+        });
+        recalc();
+      });
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
       form.querySelector("[data-adjustment-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
