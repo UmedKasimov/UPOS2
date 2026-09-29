@@ -2514,33 +2514,36 @@
       const recalc = () => {
         let total = 0;
         let hasLine = false;
-        let invalidStock = false;
+        let invalidDirection = false;
         let duplicateProduct = false;
         const selectedProducts = new Set();
         rows().forEach((row) => {
           const product = productForRow(row);
+          const targetInput = row.querySelector("[data-adjustment-target]");
           const quantityInput = row.querySelector("[data-adjustment-quantity]");
           const priceInput = row.querySelector("[data-adjustment-price]");
           const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
-          const quantity = Math.max(0, purchaseEntryNumber(quantityInput?.value));
           const price = Math.max(0, purchaseEntryNumber(priceInput?.value));
           const current = product ? stockForProduct(product) : 0;
-          const after = current + directionSign * quantity;
+          const targetEntered = String(targetInput?.value || "").trim() !== "";
+          const target = targetEntered ? Math.max(0, purchaseEntryNumber(targetInput.value)) : current;
+          const difference = target - current;
+          const quantity = targetEntered ? Math.abs(difference) : 0;
+          const rowInvalid = Boolean(product && targetEntered && difference * directionSign < 0);
+          if (quantityInput) quantityInput.value = quantity > 0 && !rowInvalid ? quantityText(quantity) : "";
           const lineTotal = quantity * price;
           const productId = String(product?.id || "");
           if (productId) {
             if (selectedProducts.has(productId)) duplicateProduct = true;
             selectedProducts.add(productId);
           }
-          hasLine = hasLine || Boolean(product && quantity > 0);
-          const rowInvalid = direction === "out" && Boolean(product) && quantity > current;
-          invalidStock = invalidStock || rowInvalid;
+          hasLine = hasLine || Boolean(product && quantity > 0 && !rowInvalid);
+          invalidDirection = invalidDirection || rowInvalid;
           row.classList.toggle("is-insufficient", rowInvalid);
-          quantityInput?.setAttribute("aria-invalid", rowInvalid ? "true" : "false");
+          targetInput?.setAttribute("aria-invalid", rowInvalid ? "true" : "false");
           setOutput(row, "[data-adjustment-current]", quantityText(current));
-          setOutput(row, "[data-adjustment-after]", quantityText(after));
+          setOutput(row, "[data-adjustment-after]", difference > 0 ? `+${quantityText(difference)}` : difference < 0 ? `−${quantityText(-difference)}` : "0");
           setOutput(row, "[data-adjustment-unit]", product?.unit || "");
-          setOutput(row, "[data-adjustment-sign]", signLabel);
           if (salePriceInput && salePriceInput.dataset.adjustmentManualSalePrice !== "1") {
             const salesPrice = product ? salesPriceForProduct(product) : { price: 0, currency: "UZS" };
             salePriceInput.value = salesPrice.price
@@ -2552,7 +2555,7 @@
             "[data-adjustment-line-total]",
             `${signLabel} ${purchaseEntryMoney(lineTotal, currency())}`,
           );
-          if (product && quantity > 0) total += lineTotal;
+          if (product && quantity > 0 && !rowInvalid) total += lineTotal;
         });
         const extraTotal = direction === "in" ? expenseTotal() : 0;
         const quantityTotal = rows().reduce((sum, row) => {
@@ -2567,8 +2570,7 @@
           const basis = total > 0 ? lineTotal : quantity;
           const basisTotal = total > 0 ? total : quantityTotal;
           const allocatedExpense = product && basisTotal > 0 ? extraTotal * basis / basisTotal : 0;
-          const costPrice = quantity > 0 ? (lineTotal + allocatedExpense) / quantity : 0;
-          setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(costPrice, currency()));
+          setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(lineTotal + allocatedExpense, currency()));
         });
         const landedTotal = total + extraTotal;
         if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(direction === "in" ? landedTotal : total, currency())}`;
@@ -2581,11 +2583,11 @@
         if (errorOutput) {
           errorOutput.textContent = duplicateProduct
             ? "Один товар нельзя добавлять дважды."
-            : invalidStock
-              ? "Количество списания превышает доступный остаток."
+            : invalidDirection
+              ? `Фактический остаток ${direction === "in" ? "меньше" : "больше"} текущего. Переключитесь на «${direction === "in" ? "Списание" : "Приход"}».`
               : "";
         }
-        if (submitButton) submitButton.disabled = !hasLine || invalidStock || duplicateProduct;
+        if (submitButton) submitButton.disabled = !hasLine || invalidDirection || duplicateProduct;
         renumber();
         syncSearchRows();
       };
@@ -2614,6 +2616,16 @@
         if (salePriceInput) salePriceInput.value = "";
         setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
       };
+      const autoSelectStockWarehouse = (product) => {
+        if (!warehouseInput || warehouseInput.dataset.adjustmentWarehouseTouched === "1" || rows().some(productForRow)) return;
+        const warehousesWithStock = [...new Set((Array.isArray(product?.stocks) ? product.stocks : [])
+          .filter((stock) => purchaseEntryNumber(stock?.quantity) > 0)
+          .map((stock) => String(stock?.warehouse || "").trim())
+          .filter(Boolean))];
+        if (warehousesWithStock.length !== 1 || stockForProduct(product) > 0) return;
+        const option = Array.from(warehouseInput.options).find((entry) => normalize(entry.value) === normalize(warehousesWithStock[0]));
+        if (option) warehouseInput.value = option.value;
+      };
       // Выбор товара — поиском (комбобокс как в продаже), а не выпадающим
       // списком: печатаешь название, выпадают совпадения с остатком.
       const wireAdjustmentPicker = (row) => {
@@ -2634,6 +2646,7 @@
         };
         const pick = (item) => {
           if (!item) return;
+          autoSelectStockWarehouse(item);
           search.value = item.name || "";
           hidden.value = item.id || "";
           lock(true);
@@ -2724,11 +2737,13 @@
         row.dataset.warehouseAdjustmentRowReady = "1";
         wireAdjustmentPicker(row);
         const productInput = row.querySelector("[data-adjustment-product]");
-        const quantityInput = row.querySelector("[data-adjustment-quantity]");
+        const targetInput = row.querySelector("[data-adjustment-target]");
         const priceInput = row.querySelector("[data-adjustment-price]");
         const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
         productInput?.addEventListener("change", () => {
-          const suggestedPrice = priceForProduct(productForRow(row));
+          const product = productForRow(row);
+          const suggestedPrice = priceForProduct(product);
+          if (targetInput) targetInput.value = product ? quantityText(stockForProduct(product)) : "";
           if (priceInput) {
             priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
             priceInput.dataset.adjustmentAutoPrice = "1";
@@ -2738,10 +2753,10 @@
           if (productForRow(row) && rows().every((line) => Boolean(productForRow(line)))) {
             addRow({ focus: false });
           }
-          quantityInput?.focus();
+          targetInput?.focus();
         });
-        quantityInput?.addEventListener("input", () => {
-          quantityInput.value = quantityInput.value.replace(/[^\d\s.,]/g, "");
+        targetInput?.addEventListener("input", () => {
+          targetInput.value = targetInput.value.replace(/[^\d\s.,]/g, "");
           recalc();
         });
         priceInput?.addEventListener("input", () => {
@@ -2754,18 +2769,16 @@
           formatPurchasePriceInput(salePriceInput, saleCurrency);
           salePriceInput.dataset.adjustmentManualSalePrice = "1";
         });
-        [quantityInput, priceInput, salePriceInput].forEach((input) => {
+        [targetInput, priceInput, salePriceInput].forEach((input) => {
           input?.addEventListener("focus", () => window.setTimeout(() => input.select(), 0));
           input?.addEventListener("blur", () => {
             const value = purchaseEntryNumber(input.value);
-            input.value = value
-              ? input === quantityInput
-                ? quantityText(value)
-                : purchaseEntryFormatCurrency(
-                  value,
-                  input === salePriceInput ? selectedAdjustmentPriceType().currency : currency(),
-                )
-              : "";
+            input.value = input === targetInput
+              ? String(input.value).trim() === "" ? "" : quantityText(Math.max(0, value))
+              : value ? purchaseEntryFormatCurrency(
+                value,
+                input === salePriceInput ? selectedAdjustmentPriceType().currency : currency(),
+              ) : "";
             recalc();
           });
         });
@@ -2791,13 +2804,14 @@
         if (!productId || quantity <= 0) return;
         let row = rows().find((entry) => String(entry.querySelector("[data-adjustment-product]")?.value || "") === productId);
         if (row) {
-          const input = row.querySelector("[data-adjustment-quantity]");
+          const input = row.querySelector("[data-adjustment-target]");
           if (input) {
-            input.value = quantityText(purchaseEntryNumber(input.value) + quantity);
+            input.value = quantityText(Math.max(0, purchaseEntryNumber(input.value) + directionSign * quantity));
             input.dispatchEvent(new Event("input", { bubbles: true }));
           }
           return;
         }
+        autoSelectStockWarehouse(item);
         row = rows().find((entry) => !entry.querySelector("[data-adjustment-product]")?.value);
         if (!row) {
           addRow({ focus: false });
@@ -2817,9 +2831,9 @@
         if (edit) edit.hidden = false;
         if (panel) panel.hidden = true;
         hidden.dispatchEvent(new Event("change", { bubbles: true }));
-        const input = row.querySelector("[data-adjustment-quantity]");
+        const input = row.querySelector("[data-adjustment-target]");
         if (input) {
-          input.value = quantityText(quantity);
+          input.value = quantityText(Math.max(0, stockForProduct(item) + directionSign * quantity));
           input.dispatchEvent(new Event("input", { bubbles: true }));
         }
       };
@@ -2878,9 +2892,14 @@
       wireExpenseTypeDialog(form);
       form.querySelector("[data-adjustment-catalog-pick]")?.addEventListener("click", () => {
         openPurchaseCatalogPicker(form, addCatalogProductToAdjustment, {
-          subtitle: "Выберите товары и количество для корректировки на выбранном складе.",
-          stockValue: stockForProduct,
-          stockLabel: (item) => `${quantityText(stockForProduct(item))} ${item.unit || "шт"}`,
+          subtitle: "Выберите товары и количество. Показаны остатки на выбранном складе и всего.",
+          stockValue: totalStockForProduct,
+          stockLabel: (item) => {
+            const selected = stockForProduct(item);
+            const total = totalStockForProduct(item);
+            const label = `${quantityText(selected)} ${item.unit || "шт"}`;
+            return total === selected ? label : `${label} · всего ${quantityText(total)}`;
+          },
         });
       });
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
@@ -2902,10 +2921,14 @@
         if (expenseSection) expenseSection.hidden = true;
       });
       warehouseInput?.addEventListener("change", () => {
+        warehouseInput.dataset.adjustmentWarehouseTouched = "1";
         rows().forEach((row) => {
+          const product = productForRow(row);
+          const targetInput = row.querySelector("[data-adjustment-target]");
+          if (targetInput) targetInput.value = product ? quantityText(stockForProduct(product)) : "";
           const priceInput = row.querySelector("[data-adjustment-price]");
           if (!priceInput || priceInput.dataset.adjustmentAutoPrice === "0") return;
-          const suggestedPrice = priceForProduct(productForRow(row));
+          const suggestedPrice = priceForProduct(product);
           priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
         });
         recalc();

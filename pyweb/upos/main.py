@@ -13510,26 +13510,35 @@ def create_app() -> FastAPI:
             operation_type = "out"
         currency = str(form.get("currency") or "UZS").strip().upper()[:3] or "UZS"
         usd_rate = _workspace_usd_uzs_rate(workspace_owner_id)
+        target_mode = str(form.get("adjustment_mode") or "").strip() == "target_stock"
         products = list(form.getlist("line_product"))
         quantities = list(form.getlist("line_quantity"))
+        targets = list(form.getlist("line_target_stock")) if target_mode else []
         prices = list(form.getlist("line_price"))
         sale_prices = list(form.getlist("line_sale_price"))
         lines: list[dict[str, Any]] = []
         total = Decimal("0")
-        for index in range(max(len(products), len(quantities), len(prices), len(sale_prices))):
+        for index in range(max(len(products), len(quantities), len(targets), len(prices), len(sale_prices))):
             product = str(products[index] if index < len(products) else "").strip()
             quantity_raw = quantities[index] if index < len(quantities) else ""
+            target_raw = targets[index] if index < len(targets) else ""
             price_raw = prices[index] if index < len(prices) else ""
             sale_price_raw = sale_prices[index] if index < len(sale_prices) else ""
+            if target_mode and not str(target_raw or "").strip():
+                continue
             if not product and not str(quantity_raw or "").strip() and not str(price_raw or "").strip() and not str(sale_price_raw or "").strip():
                 continue
             if not product:
                 raise ValueError("Выберите товар в каждой заполненной строке")
+            target_stock = _sales_decimal_strict(target_raw, "Фактический остаток") if target_mode else None
+            if target_stock is not None and target_stock < 0:
+                raise ValueError("Фактический остаток не может быть отрицательным")
             quantity = _sales_decimal_strict(quantity_raw, "Количество")
             price = _sales_decimal_strict(price_raw, "Цена")
             sale_price = _sales_decimal_strict(sale_price_raw, "Продажная цена")
             if quantity <= 0:
-                raise ValueError("Количество должно быть больше нуля")
+                if not target_mode:
+                    raise ValueError("Количество должно быть больше нуля")
             if price < 0:
                 raise ValueError("Цена не может быть отрицательной")
             if sale_price < 0:
@@ -13540,13 +13549,14 @@ def create_app() -> FastAPI:
                 {
                     "product": product,
                     "quantity": _decimal_plain_text(quantity),
+                    **({"target_stock": _decimal_plain_text(target_stock)} if target_stock is not None else {}),
                     "price": (_decimal_plain_text(price) or "0"),
                     "sale_price": (_decimal_plain_text(sale_price) or "0"),
                     "total": (_decimal_plain_text(line_total) or "0"),
                 }
             )
-        if not lines:
-            raise ValueError("Добавьте хотя бы один товар")
+        if not lines or (target_mode and not any(_sales_decimal(line.get("quantity")) > 0 for line in lines)):
+            raise ValueError("Укажите фактический остаток, отличающийся от текущего" if target_mode else "Добавьте хотя бы один товар")
         extra_expenses: list[dict[str, str]] = []
         extra_expense_total = Decimal("0")
         if operation_type == "in":
@@ -13575,16 +13585,17 @@ def create_app() -> FastAPI:
                 )
                 extra_expense_total += expense_document_amount
 
-            allocation_total = sum((_sales_decimal(line.get("total")) for line in lines), Decimal("0"))
+            allocation_lines = [line for line in lines if _sales_decimal(line.get("quantity")) > 0]
+            allocation_total = sum((_sales_decimal(line.get("total")) for line in allocation_lines), Decimal("0"))
             use_quantity_basis = allocation_total <= 0
             if use_quantity_basis:
-                allocation_total = sum((_sales_decimal(line.get("quantity")) for line in lines), Decimal("0"))
+                allocation_total = sum((_sales_decimal(line.get("quantity")) for line in allocation_lines), Decimal("0"))
             remaining_expense = extra_expense_total
-            for index, line in enumerate(lines):
+            for index, line in enumerate(allocation_lines):
                 quantity = _sales_decimal(line.get("quantity"))
                 line_total = _sales_decimal(line.get("total"))
                 basis = quantity if use_quantity_basis else line_total
-                if index == len(lines) - 1:
+                if index == len(allocation_lines) - 1:
                     allocated_expense = remaining_expense
                 elif allocation_total > 0 and extra_expense_total > 0:
                     allocated_expense = (
@@ -15098,6 +15109,16 @@ def create_app() -> FastAPI:
 
             warehouse_records = [_warehouse_view_data(row) for row in warehouse_rows]
             product_view_rows = [_product_data(row) for row in product_rows]
+            adjustment_warehouses = list(dict.fromkeys([
+                *[str(item.get("name") or "").strip() for item in warehouse_records],
+                *[
+                    str(stock.get("warehouse") or "").strip()
+                    for item in product_view_rows
+                    for stock in item.get("stocks", [])
+                    if isinstance(stock, dict)
+                ],
+            ]))
+            adjustment_warehouses = [name for name in adjustment_warehouses if name] or ["Основной склад"]
             product_names = [str(row.name) for row in product_rows]
             settings_payload = load_workspace_settings(wid)
             stored_product_categories = [
@@ -15357,6 +15378,7 @@ def create_app() -> FastAPI:
             module=_business_module_context("warehouse"),
             warehouse_filters=filters,
             warehouse_options=warehouse_options,
+            adjustment_warehouses=adjustment_warehouses,
             warehouse_records=warehouse_records,
             warehouse_stocks=warehouse_stocks,
             warehouse_stock_total=_sales_money_label(warehouse_stock_total),
@@ -15439,7 +15461,7 @@ def create_app() -> FastAPI:
                     status_code=302,
                 )
             with session_scope() as session:
-                warehouse_row = _ensure_warehouse(session, wid, name=data["warehouse"])
+                warehouse_name = data["warehouse"]
                 if data["operation_type"] == "in" and data.get("counterparty_id"):
                     supplier_row = _resolve_counterparty(
                         session,
@@ -15457,6 +15479,7 @@ def create_app() -> FastAPI:
                     data["counterparty_id"] = supplier_row.id
                 delta_sign = 1 if data["operation_type"] == "in" else -1
                 prepared_lines: list[dict[str, Any]] = []
+                seen_products: set[str] = set()
                 for line in lines:
                     product_row = _resolve_product_row(session, wid, str(line.get("product") or ""))
                     if product_row is None:
@@ -15464,19 +15487,41 @@ def create_app() -> FastAPI:
                             url=f"/warehouse?op={data['operation_type']}&error=" + quote("Товар не найден") + "#adjustments",
                             status_code=302,
                         )
+                    if product_row.id in seen_products:
+                        return RedirectResponse(
+                            url=f"/warehouse?op={data['operation_type']}&error=" + quote("Один товар нельзя добавлять дважды") + "#adjustments",
+                            status_code=302,
+                        )
+                    seen_products.add(product_row.id)
                     quantity = _sales_decimal(line.get("quantity"))
-                    current_stock = _product_available_in_warehouse(product_row, warehouse_row.name)
+                    current_stock = _product_available_in_warehouse(product_row, warehouse_name)
+                    if "target_stock" in line:
+                        target_stock = _sales_decimal(line["target_stock"])
+                        signed_change = target_stock - current_stock
+                        if signed_change * Decimal(delta_sign) < 0:
+                            return RedirectResponse(
+                                url=f"/warehouse?op={data['operation_type']}&error=" + quote("Для изменения остатка в другую сторону переключите Приход / Списание") + "#adjustments",
+                                status_code=302,
+                            )
+                        if abs(signed_change) != quantity:
+                            return RedirectResponse(
+                                url=f"/warehouse?op={data['operation_type']}&error=" + quote("Остаток товара изменился. Обновите страницу и проверьте корректировку") + "#adjustments",
+                                status_code=302,
+                            )
+                        if quantity == 0:
+                            continue
                     prepared_line = dict(line)
                     prepared_line.update(
                         {
                             "product_id": product_row.id,
                             "product": product_row.name,
-                            "warehouse": warehouse_row.name,
+                            "warehouse": warehouse_name,
                             "stock_before": (_decimal_plain_text(current_stock) or "0"),
                             "stock_after": _decimal_plain_text(current_stock + Decimal(delta_sign) * quantity) or "0",
                         }
                     )
                     prepared_lines.append(prepared_line)
+                warehouse_row = _ensure_warehouse(session, wid, name=warehouse_name)
                 try:
                     resolved_lines = _sync_product_lines(
                         session,

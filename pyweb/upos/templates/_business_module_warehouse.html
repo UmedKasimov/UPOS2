@@ -1441,7 +1441,7 @@
     <header class="products-panel-head warehouse-adjustment-entry-head">
       <div>
         <h2>{{ 'Приход на склад' if adjustment_direction == 'in' else 'Списание со склада' }}</h2>
-        <span>{{ 'Укажите поступившее количество: остатки увеличатся.' if adjustment_direction == 'in' else 'Укажите списываемое количество: остатки уменьшатся.' }}</span>
+        <span>{{ 'Укажите фактический остаток после прихода.' if adjustment_direction == 'in' else 'Укажите фактический остаток после списания.' }}</span>
       </div>
       <div class="warehouse-adjustment-dialog-head-actions">
         <a class="warehouse-adjustment-direction {% if adjustment_direction == 'in' %}warehouse-adjustment-direction--selected{% endif %}" href="{{ url_for('warehouse_get') }}?module_view=adjustments&op=in&create=1#adjustments">Приход</a>
@@ -1461,6 +1461,7 @@
     >
       {% include "_csrf_field.html" %}
       <input type="hidden" name="operation_type" value="{{ adjustment_direction }}" />
+      <input type="hidden" name="adjustment_mode" value="target_stock" />
       <div class="product-form-grid warehouse-adjustment-meta">
         <label>
           <span>Дата</span>
@@ -1500,7 +1501,7 @@
         <label>
           <span>Склад*</span>
           <select name="warehouse" required data-adjustment-warehouse>
-            {% for warehouse in warehouse_options.warehouses %}
+            {% for warehouse in adjustment_warehouses %}
               <option value="{{ warehouse }}" {% if warehouse == 'Основной склад' %}selected{% endif %}>{{ warehouse }}</option>
             {% endfor %}
           </select>
@@ -1547,10 +1548,10 @@
                 <th>№</th>
                 <th>Товар</th>
                 <th>Остаток</th>
-                <th>Изменение</th>
-                <th>После операции</th>
+                <th>Фактический остаток</th>
+                <th>Разница</th>
                 <th>{{ 'Приходная цена' if adjustment_direction == 'in' else 'Цена' }}</th>
-                {% if adjustment_direction == 'in' %}<th>Цена после расходов</th>{% endif %}
+                {% if adjustment_direction == 'in' %}<th>Сумма после расходов</th>{% endif %}
                 {% if adjustment_direction == 'in' %}<th data-adjustment-sale-price-title>Продажная цена</th>{% endif %}
                 <th>Сумма</th>
                 <th></th>
@@ -1577,8 +1578,8 @@
                 </td>
                 <td>
                   <div class="warehouse-adjustment-change">
-                    <span data-adjustment-sign>{{ '+' if adjustment_direction == 'in' else '−' }}</span>
-                    <input name="line_quantity" inputmode="decimal" placeholder="0" data-adjustment-quantity />
+                    <input name="line_target_stock" inputmode="decimal" placeholder="0" data-adjustment-target />
+                    <input type="hidden" name="line_quantity" data-adjustment-quantity />
                   </div>
                 </td>
                 <td>
