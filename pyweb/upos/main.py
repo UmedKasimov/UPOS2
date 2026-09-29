@@ -622,7 +622,6 @@ def billing_clients_context() -> list[dict[str, Any]]:
             "folder_size": format_bytes(folder_bytes),
             "db_size": format_bytes(db_bytes),
             "total_size": format_bytes(folder_bytes + db_bytes),
-            "telephony": telephony_account_dashboard(owner_id) if owner_id else {},
         })
     return clients
 
