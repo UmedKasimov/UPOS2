@@ -1,0 +1,1675 @@
+<div class="business-module-toolbar" data-workspace-view="stocks transfers" hidden>
+  <div>
+    <p class="settings-ios-footnote">{{ module.subtitle }}</p>
+    <h2 id="business-module-title">{{ module.heading }}</h2>
+  </div>
+  <button type="button" class="btn" data-warehouse-open-operation>{{ module.action }}</button>
+</div>
+
+<form class="business-module-filters" method="get" action="{{ url_for('warehouse_get') }}" data-workspace-view="stocks transfers" hidden>
+  <label><span>Поиск</span><input name="q" value="{{ warehouse_filters.q }}" placeholder="Товар, склад, документ" /></label>
+  <label><span>Склад</span><input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Склад" /></label>
+  <label><span>Товар</span><input name="product" list="warehouse-product-list" value="{{ warehouse_filters.product }}" placeholder="Товар" /></label>
+  <label>
+    <span>Тип операции</span>
+    <select name="op_type">
+      <option value="all" {% if warehouse_filters.op_type == 'all' %}selected{% endif %}>Все</option>
+      <option value="in" {% if warehouse_filters.op_type == 'in' %}selected{% endif %}>Приход</option>
+      <option value="out" {% if warehouse_filters.op_type == 'out' %}selected{% endif %}>Списание</option>
+      <option value="adjustment" {% if warehouse_filters.op_type == 'adjustment' %}selected{% endif %}>Корректировка</option>
+      <option value="transfer" {% if warehouse_filters.op_type == 'transfer' %}selected{% endif %}>Перемещение</option>
+    </select>
+  </label>
+  <label class="business-module-check">
+    <span>Только критичные</span>
+    <input type="checkbox" name="critical" value="1" {% if warehouse_filters.critical == '1' %}checked{% endif %} />
+  </label>
+  <button class="btn btn-secondary" type="submit">Применить</button>
+  <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Очистить</a>
+</form>
+
+<datalist id="warehouse-name-list">
+  {% for item in warehouse_options.warehouses %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="warehouse-product-list">
+  {% for item in warehouse_options.products %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="warehouse-supplier-list">
+  {% for item in warehouse_options.suppliers %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<script type="application/json" id="warehouse-purchase-options">{{ warehouse_options | tojson }}</script>
+
+<div class="products-layout" data-workspace-view="stocks warehouses transfers purchases adjustments purchase_edit" hidden>
+  <article class="products-list-panel" data-workspace-view="stocks" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Остатки</h2>
+        <span>Позиций: {{ warehouse_stocks|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>Товар</th>
+            <th>Склад</th>
+            <th>Количество</th>
+            <th>Ед.</th>
+            <th>Категория</th>
+            <th>Мин. остаток</th>
+            <th>Себестоимость</th>
+            <th>Сумма</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in warehouse_stocks %}
+            <tr class="{% if row.is_critical %}warehouse-stock-critical{% endif %}">
+              <td>{{ row.product }}</td>
+              <td>{{ row.warehouse }}</td>
+              <td>{{ row.quantity }}</td>
+              <td>{{ row.unit }}</td>
+              <td>{{ row.category or "-" }}</td>
+              <td>{{ row.min_stock or "-" }}</td>
+              <td>{{ row.cost }}</td>
+              <td>{{ row.stock_total }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8">Остатков пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7">Итого по складу</td>
+            <td>{{ warehouse_stock_total }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="warehouses" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Склады</h2>
+        <span>Всего: {{ warehouse_records|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Ответственный</th>
+            <th>Статус</th>
+            <th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in warehouse_records %}
+            <tr>
+              <td><strong>{{ item.name }}</strong></td>
+              <td>{{ item.manager or "-" }}</td>
+              <td>{{ "Активный" if item.status == "active" else "Неактивный" }}</td>
+              <td>{{ item.note or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">Склады пока не созданы.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="warehouses" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Новый склад</h2>
+        <span>Точка хранения и ответственный</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label class="wide"><span>Название склада*</span><input name="name" required /></label>
+        <label><span>Ответственный</span><input name="manager" /></label>
+        <label><span>Статус</span><select name="status"><option value="active">Активный</option><option value="inactive">Неактивный</option></select></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить склад</button>
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+
+  <article class="products-list-panel" data-workspace-view="transfers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Журнал операций</h2>
+        <span>Всего: {{ warehouse_operations|length }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap">
+      <table class="products-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Дата</th>
+            <th>Тип</th>
+            <th>Маршрут</th>
+            <th>Товар</th>
+            <th>Количество</th>
+            <th>Ответственный</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in warehouse_operations %}
+            <tr>
+              <td><strong>{{ row.number }}</strong><small>{{ row.note or row.operation_label }}</small></td>
+              <td>{{ row.date or "-" }}</td>
+              <td>{{ row.operation_label }}</td>
+              <td>
+                {% if row.operation_type == 'transfer' %}
+                  {{ row.from_warehouse or "-" }} → {{ row.to_warehouse or "-" }}
+                {% else %}
+                  {{ row.warehouse or "-" }}
+                {% endif %}
+              </td>
+              <td>{{ row.product or "-" }}</td>
+              <td>{{ row.quantity }}</td>
+              <td>{{ row.responsible or "-" }}</td>
+              <td class="products-row-actions">
+                <form method="post" action="{{ url_for('warehouse_operation_delete', operation_id=row.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <button type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8">Складских операций пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <aside class="product-form-panel" data-workspace-view="transfers" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Перемещение</h2>
+        <span>Между складами</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_operation_save') }}" class="product-form">
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="operation_type" value="transfer" />
+      <div class="product-form-grid">
+        <label><span>Дата</span><input name="date" type="date" value="{{ today }}" /></label>
+        <label><span>Товар*</span><input name="product" list="warehouse-product-list" required /></label>
+        <label><span>Со склада*</span><input name="from_warehouse" list="warehouse-name-list" value="Основной склад" required /></label>
+        <label><span>На склад*</span><input name="to_warehouse" list="warehouse-name-list" required /></label>
+        <label><span>Количество*</span><input name="quantity" inputmode="decimal" required /></label>
+        <label><span>Цена</span><input name="price" inputmode="decimal" /></label>
+        <label><span>Ответственный</span><input name="responsible" value="{{ user.name if user else '' }}" /></label>
+        <label class="wide"><span>Комментарий</span><input name="note" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить перемещение</button>
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}">Отмена</a>
+      </div>
+    </form>
+  </aside>
+
+  <article class="products-list-panel warehouse-purchases-board" id="warehouse-purchases" data-workspace-view="purchases" hidden>
+    <header class="products-panel-head sales-journal-head">
+      <div class="products-panel-title">
+        <h2>Закупки</h2>
+        <span>Всего: {{ warehouse_purchases_pagination.total }}</span>
+      </div>
+      <button
+        type="button"
+        class="btn sales-journal-create-btn"
+        data-workspace-trigger="purchase-new"
+        data-workspace-tab-id="purchase-new"
+        data-workspace-view-id="purchase_edit"
+        data-workspace-tab-title="Новая закупка"
+        data-workspace-tab-hash="purchase-new"
+      >+ Закупка</button>
+      <form class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('warehouse_get') }}#purchases" data-warehouse-purchases-filter>
+        <input type="hidden" name="purchase_page_size" value="{{ warehouse_purchases_pagination.page_size }}" />
+        <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
+          <span>Поиск</span>
+          <input name="q" type="search" value="{{ warehouse_filters.q }}" placeholder="Номер, поставщик, склад" />
+        </label>
+        <label class="sales-journal-filter-field">
+          <span>Склад</span>
+          <input name="warehouse" list="warehouse-name-list" value="{{ warehouse_filters.warehouse }}" placeholder="Все склады" />
+        </label>
+        <label class="sales-journal-filter-field">
+          <span>Поставщик</span>
+          <input name="supplier" list="warehouse-supplier-list" value="{{ warehouse_filters.supplier | default('') }}" placeholder="Все поставщики" />
+        </label>
+        <label class="sales-journal-filter-field sales-journal-filter-date">
+          <span>Дата</span>
+          <input name="date_from" type="date" value="{{ warehouse_filters.date_from | default('') }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период закупок: день, месяц или от и до" />
+          <input name="date_to" type="hidden" value="{{ warehouse_filters.date_to | default('') }}" />
+        </label>
+        <input type="hidden" name="product" value="{{ warehouse_filters.product }}" />
+        <input type="hidden" name="op_type" value="{{ warehouse_filters.op_type }}" />
+        <input type="hidden" name="purchase_status" value="{{ warehouse_filters.purchase_status | default('') }}" />
+        {% if warehouse_filters.critical %}<input type="hidden" name="critical" value="{{ warehouse_filters.critical }}" />{% endif %}
+      </form>
+    </header>
+    <nav
+      class="messenger-channel-tabs sales-document-tabs"
+      aria-label="Разделы закупок"
+      data-ajax-nav
+      data-ajax-targets="#warehouse-purchases"
+      data-ajax-reinit="WarehousePurchasesInit"
+    >
+      <span class="sales-document-tabs-title">Разделы закупок</span>
+      {% for tab in warehouse_purchase_tabs %}
+        <a
+          class="messenger-channel-tab sales-document-tab{% if tab.active %} active{% endif %}"
+          href="{{ tab.href }}"
+          data-channel-brand="{{ tab.brand }}"
+          {% if tab.active %}aria-current="page"{% endif %}
+        >
+          <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
+          <span class="messenger-channel-label">{{ tab.label }}</span>
+          <b>{{ tab.count }}</b>
+        </a>
+      {% endfor %}
+    </nav>
+    <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
+      <table class="products-table products-catalog-table sales-table sales-journal-table warehouse-purchases-table" id="warehouse-purchases-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th data-column-label="№">№</th>
+            <th data-column-label="Номер" data-sort-kind="text" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Номер</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Дата" data-sort-kind="date" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Дней" data-sort-kind="number" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Дней</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Поставщик" data-sort-kind="text" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Поставщик</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Баланс поставщика" data-sort-kind="text" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Баланс поставщика</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Склад" data-sort-kind="text" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Склад</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th class="num" data-column-label="Сумма" data-sort-kind="number" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Сумма</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th class="num" data-column-label="Оплачено" data-sort-kind="number" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Оплачено</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th class="num" data-column-label="Долг" data-sort-kind="number" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Долг</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Статус" data-sort-kind="text" aria-sort="none">
+              <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+              </button>
+            </th>
+            <th data-column-label="Действия" class="warehouse-purchases-actions-col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in warehouse_purchases %}
+            <tr class="sales-journal-row warehouse-purchase-row warehouse-purchase-row--{{ doc.status }}">
+              <td>{{ loop.index + warehouse_purchases_pagination.page_from - 1 }}</td>
+              <td>
+                <a
+                  class="warehouse-purchase-number"
+                  href="{{ url_for('warehouse_get') }}?purchase_id={{ doc.id }}#purchases"
+                  data-warehouse-purchase-open
+                  data-purchase-id="{{ doc.id }}"
+                >
+                  <span aria-hidden="true">#</span>
+                  <strong data-warehouse-purchase-highlight>{{ doc.number }}</strong>
+                </a>
+              </td>
+              <td class="sales-journal-date-cell" data-warehouse-purchase-highlight>
+                {{ doc.date or "-" }}
+              </td>
+              <td class="warehouse-purchase-age-cell" data-sort-value="{{ doc.payment_age_days if doc.payment_age_days is not none else '' }}">{{ doc.payment_age_label or "-" }}</td>
+              <td><a class="warehouse-purchase-supplier sales-journal-client-cell" href="#" data-warehouse-purchase-highlight>{{ doc.supplier or "-" }}</a></td>
+              <td class="warehouse-purchase-supplier-balance-cell" data-balance-kind="{{ doc.supplier_balance_kind or 'zero' }}" data-warehouse-purchase-highlight>
+                {{ doc.supplier_balance or "Нет долга" }}
+              </td>
+              <td data-warehouse-purchase-highlight>{{ doc.warehouse or "-" }}</td>
+              <td class="num warehouse-purchase-money" data-warehouse-purchase-highlight>
+                <strong>{{ doc.amount }} {{ doc.currency }}</strong>
+              </td>
+              <td
+                class="num warehouse-purchase-money warehouse-purchase-paid"
+                data-payment-progress="{{ doc.payment_progress }}"
+                style="--purchase-paid-progress: {{ doc.payment_progress }}%;"
+                title="{{ doc.payment_progress }}% оплачено"
+              >
+                <span class="warehouse-purchase-paid-chip" data-warehouse-purchase-highlight>{{ doc.paid_amount }} {{ doc.currency }}</span>
+              </td>
+              <td class="num warehouse-purchase-debt-cell{% if doc.debt_amount and doc.debt_amount != '0' %} has-debt{% endif %}" data-warehouse-purchase-highlight>
+                {% if doc.debt_amount and doc.debt_amount != '0' %}{{ doc.debt_amount }} {{ doc.currency }}{% else %}-{% endif %}
+              </td>
+              <td>
+                <form class="warehouse-purchase-status-form" method="post" action="{{ url_for('warehouse_purchase_status', purchase_id=doc.id) }}">
+                  {% include "_csrf_field.html" %}
+                  <select
+                    class="warehouse-purchase-status warehouse-purchase-status--{{ doc.status }}"
+                    name="status"
+                    aria-label="Статус закупки {{ doc.number }}"
+                    data-purchase-status-select
+                    data-purchase-id="{{ doc.id }}"
+                  >
+                    <option value="ordered" {% if doc.status == "ordered" %}selected{% endif %}>Заказ</option>
+                    <option value="draft" {% if doc.status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="purchased" {% if doc.status == "purchased" %}selected{% endif %}>Завершён</option>
+                  </select>
+                </form>
+              </td>
+              <td class="warehouse-purchase-row-actions">
+                <div class="warehouse-purchase-row-actions-inner">
+                  <a
+                    class="products-action-icon products-action-icon--edit"
+                    href="{{ url_for('warehouse_get') }}?purchase_id={{ doc.id }}#purchases"
+                    data-warehouse-purchase-open
+                    data-purchase-id="{{ doc.id }}"
+                    title="Редактировать"
+                    aria-label="Редактировать {{ doc.number }}"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </a>
+                  <form method="post" action="{{ url_for('warehouse_purchase_delete', purchase_id=doc.id) }}" data-purchase-delete-form data-purchase-number="{{ doc.number }}">
+                    {% include "_csrf_field.html" %}
+                    <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить" aria-label="Удалить {{ doc.number }}">
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v5" />
+                        <path d="M14 11v5" />
+                      </svg>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="12" class="sales-journal-empty">Документов закупки пока нет.</td></tr>
+          {% endfor %}
+          {% if warehouse_purchase_totals %}
+            <tr class="sales-journal-total-row">
+              <td colspan="7">ИТОГО</td>
+              <td class="num warehouse-purchase-total">
+                {% for total in warehouse_purchase_totals %}
+                  <div>{{ total.amount }} {{ total.currency }}</div>
+                {% endfor %}
+              </td>
+              <td class="num warehouse-purchase-total">
+                {% for total in warehouse_purchase_paid_totals %}
+                  <div>{{ total.amount }} {{ total.currency }}</div>
+                {% endfor %}
+              </td>
+              <td class="num warehouse-purchase-total warehouse-purchase-debt-total">
+                {% for total in warehouse_purchase_debt_totals %}
+                  <div>{{ total.amount }} {{ total.currency }}</div>
+                {% endfor %}
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <footer class="warehouse-purchases-footer">
+      <nav class="products-pagination" aria-label="Страницы закупок" data-ajax-nav data-ajax-targets="#warehouse-purchases" data-ajax-reinit="WarehousePurchasesInit">
+        <a class="products-page-link {% if warehouse_purchases_pagination.page <= 1 %}disabled{% endif %}" href="{{ warehouse_purchases_pagination.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+        {% for page_no in warehouse_purchases_pagination.pagination_pages %}
+          <a class="products-page-link {% if page_no == warehouse_purchases_pagination.page %}active{% endif %}" href="{{ warehouse_purchases_pagination.page_urls[page_no] }}" {% if page_no == warehouse_purchases_pagination.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+        {% endfor %}
+        <a class="products-page-link {% if warehouse_purchases_pagination.page >= warehouse_purchases_pagination.total_pages %}disabled{% endif %}" href="{{ warehouse_purchases_pagination.next_page_url }}" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. {{ warehouse_purchases_pagination.page }} из {{ warehouse_purchases_pagination.total_pages }}</span>
+      </nav>
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по закупкам">
+          <span>Всего: {{ warehouse_purchases_pagination.total }}</span>
+          <span>Показано: {{ warehouse_purchases_pagination.page_from }}-{{ warehouse_purchases_pagination.page_to }}</span>
+        </div>
+        <label class="products-page-size products-page-size--footer">
+          <span>Показать</span>
+          <select aria-label="Размер страницы закупок" data-ajax-page-size data-ajax-targets="#warehouse-purchases" data-ajax-reinit="WarehousePurchasesInit">
+            {% for size in [100, 500, 1000] %}
+              <option value="{{ warehouse_purchases_pagination.page_size_urls[size] }}" {% if warehouse_purchases_pagination.page_size == size %}selected{% endif %}>{{ size }} шт</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </footer>
+    {% for doc in warehouse_purchases %}
+      <script type="application/json" id="warehouse-purchase-data-{{ doc.id }}">{{ doc.detail_json|tojson }}</script>
+    {% endfor %}
+    <div class="warehouse-purchase-detail-backdrop" data-warehouse-purchase-close hidden></div>
+    <aside class="warehouse-purchase-detail" data-warehouse-purchase-detail hidden aria-live="polite">
+      <header class="warehouse-purchase-detail-head">
+        <div>
+          <p data-purchase-detail-date></p>
+          <h2 data-purchase-detail-title>Закупка</h2>
+        </div>
+        <div class="warehouse-purchase-detail-actions">
+          <button class="warehouse-purchases-icon" type="button" title="Печать" aria-label="Печать">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+          </button>
+          <div class="warehouse-purchase-detail-menu-wrap">
+            <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню" aria-expanded="false" data-purchase-detail-menu-toggle>⋮</button>
+            <div class="warehouse-purchase-detail-menu" data-purchase-detail-menu hidden>
+              <button type="button" data-purchase-detail-edit>Редактировать</button>
+            </div>
+          </div>
+          <button class="warehouse-purchase-detail-close" type="button" data-warehouse-purchase-close aria-label="Закрыть">×</button>
+        </div>
+      </header>
+      <section class="warehouse-purchase-detail-summary">
+        <div class="warehouse-purchase-detail-summary-cell warehouse-purchase-detail-summary-cell--supplier">
+          <button type="button" class="warehouse-purchase-detail-supplier-card" data-purchase-detail-supplier-open>
+            <span>Поставщик</span>
+            <strong data-purchase-detail-supplier></strong>
+            <small data-purchase-detail-supplier-balance></small>
+          </button>
+        </div>
+        <div class="warehouse-purchase-detail-summary-cell">
+          <span>Склад</span>
+          <strong data-purchase-detail-warehouse></strong>
+        </div>
+        <div class="warehouse-purchase-detail-summary-cell">
+          <span>Статус</span>
+          <strong data-purchase-detail-status></strong>
+        </div>
+      </section>
+      <dialog class="settings-profile-modal warehouse-supplier-card-dialog" data-purchase-supplier-card-dialog>
+        <section class="settings-profile-modal-surface warehouse-supplier-card-dialog-surface">
+          <div class="settings-profile-modal-head">
+            <div>
+              <h2 class="settings-profile-modal-title" data-purchase-supplier-card-name>Поставщик</h2>
+              <p class="settings-profile-modal-sub" data-purchase-supplier-card-sub>Баланс и контакты</p>
+            </div>
+            <button type="button" class="settings-profile-modal-close" data-purchase-supplier-card-close aria-label="Закрыть">×</button>
+          </div>
+          <div class="settings-profile-modal-scroll">
+            <div class="settings-profile-modal-body warehouse-supplier-card-body">
+              <div class="warehouse-supplier-card-balance" data-purchase-supplier-card-balance></div>
+              <div class="warehouse-supplier-card-metrics" data-purchase-supplier-card-metrics></div>
+              <nav class="warehouse-supplier-card-tabs" data-purchase-supplier-card-tabs aria-label="Разделы поставщика"></nav>
+              <div class="warehouse-supplier-card-panels" data-purchase-supplier-card-panels></div>
+            </div>
+          </div>
+          <div class="settings-profile-modal-foot">
+            <button type="button" class="btn btn-secondary" data-purchase-supplier-card-close>Закрыть</button>
+          </div>
+        </section>
+      </dialog>
+      <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы закупки">
+        <button type="button" class="active" data-purchase-detail-tab="items" aria-selected="true">Товары</button>
+        <button type="button" data-purchase-detail-tab="payment" aria-selected="false">Оплата</button>
+        <button type="button" data-purchase-detail-tab="note" aria-selected="false">Комментарий</button>
+      </nav>
+      <section class="warehouse-purchase-detail-pane active" data-purchase-detail-pane="items">
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table purchase-document-detail-table purchase-document-items-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Товар</th>
+                <th>К-во</th>
+                <th>Приходная цена</th>
+                <th>Цена после расходов</th>
+                <th data-purchase-detail-sale-price-title>Продажная цена</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody data-purchase-detail-lines></tbody>
+            <tbody data-purchase-detail-expense-lines></tbody>
+            <tfoot>
+              <tr class="warehouse-purchase-detail-totals">
+                <td colspan="2"><strong>Итого</strong></td>
+                <td><strong data-purchase-detail-quantity-total>0</strong></td>
+                <td colspan="3">
+                  <div class="warehouse-purchase-detail-payment-summary">
+                    <span>Оплачено <strong data-purchase-detail-paid></strong></span>
+                    <span class="warehouse-purchase-detail-payment-debt">Долг <strong data-purchase-detail-debt></strong></span>
+                  </div>
+                </td>
+                <td><strong data-purchase-detail-total></strong></td>
+              </tr>
+              <tr class="warehouse-purchase-detail-cost-summary" data-purchase-detail-cost-summary hidden>
+                <td colspan="5">Себестоимость с расходами</td>
+                <td colspan="2"><strong data-purchase-detail-landed-total></strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+      <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-purchase-detail-pane="payment" hidden>
+        <div class="warehouse-purchase-detail-table-wrap" data-purchase-payment-list hidden>
+          <table class="warehouse-purchase-detail-table purchase-document-detail-table purchase-document-payment-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Счёт</th>
+                <th>Тип оплаты</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody data-purchase-payment-lines></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" class="purchase-document-payment-action-cell">
+                  <div class="purchase-document-payment-action-wrap">
+                    <form class="document-detail-payment-actions" method="post" action="" data-purchase-payment-form data-purchase-payment-url-template="{{ url_for('warehouse_purchase_pay', purchase_id='__purchase_id__') }}" hidden>
+                      {% include "_csrf_field.html" %}
+                      <button class="btn document-detail-payment-pay-btn" type="button" data-purchase-payment-pay>Оплатить</button>
+                    </form>
+                    <form class="document-detail-payment-actions" method="post" action="" data-purchase-expense-payment-form data-purchase-expense-payment-url-template="{{ url_for('warehouse_purchase_expenses_pay', purchase_id='__purchase_id__') }}" hidden>
+                      {% include "_csrf_field.html" %}
+                      <button class="btn btn-secondary document-detail-expense-pay-btn" type="button" data-purchase-expense-payment-pay>Оплатить доп. расходы</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <section class="purchase-document-payment-summary" data-purchase-payment-summary aria-label="Сводка по оплате">
+          <div class="purchase-document-payment-summary-item">
+            <span>Сумма закупки</span>
+            <strong data-purchase-payment-total>0 UZS</strong>
+          </div>
+          <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--paid">
+            <span>Оплачено</span>
+            <strong data-purchase-payment-paid>0 UZS</strong>
+          </div>
+          <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--debt">
+            <span>Остаток долга</span>
+            <strong data-purchase-payment-debt>0 UZS</strong>
+          </div>
+        </section>
+      </section>
+      <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-purchase-detail-pane="note" hidden>
+        <div class="warehouse-purchase-detail-table-wrap">
+          <table class="warehouse-purchase-detail-table purchase-document-detail-table purchase-document-note-table">
+            <thead>
+              <tr>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-purchase-detail-note></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+    <dialog class="settings-profile-modal sales-payment-dialog warehouse-purchase-detail-payment-dialog" data-purchase-detail-payment-dialog>
+      <form class="settings-profile-modal-surface sales-payment-dialog-surface" method="post" action="" data-purchase-detail-payment-modal-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="payment_lines" value="[]" data-detail-payment-lines />
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Добавить оплату</h2>
+            <p class="settings-profile-modal-sub">Оплату закупки можно разделить по нескольким счетам.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-detail-payment-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body">
+          <div class="sales-payment-lines" data-detail-payment-lines-ui>
+            <div class="sales-payment-line" data-detail-payment-line>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Счёт</span>
+                <select class="settings-profile-input" data-detail-payment-account>
+                  {% for account in warehouse_options.payment_accounts %}
+                    <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}{% if account.balance %} · остаток {{ account.balance }}{% endif %}</option>
+                  {% else %}
+                    <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Валюта</span>
+                <select class="settings-profile-input" data-detail-payment-currency>
+                  <option value="UZS">UZS</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Сумма</span>
+                <input class="settings-profile-input" inputmode="decimal" data-detail-payment-amount />
+              </label>
+              <button type="button" class="sales-payment-remove" data-detail-payment-remove aria-label="Удалить оплату">×</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary sales-payment-add-line" data-detail-payment-add-line>+ Ещё счёт</button>
+          <div class="sales-payment-summary-card" data-detail-payment-summary>
+            <label class="settings-profile-field">
+              <span class="settings-profile-field-label">Курс USD → UZS</span>
+              <input class="settings-profile-input" name="payment_rate" inputmode="decimal" data-detail-payment-rate />
+            </label>
+            <div class="sales-payment-summary-row">
+              <span>К оплате:</span>
+              <strong data-detail-payment-due>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Оплачено:</span>
+              <strong data-detail-payment-paid>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Остаток:</span>
+              <strong data-detail-payment-rest>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row sales-payment-summary-row--over" data-detail-payment-over-row hidden>
+              <span>Даёте больше:</span>
+              <strong data-detail-payment-over>0 UZS</strong>
+            </div>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-detail-payment-cancel>Отмена</button>
+          <button type="submit" class="btn sales-payment-submit" data-detail-payment-submit>Применить оплату</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="settings-profile-modal sales-payment-dialog warehouse-purchase-expense-payment-dialog" data-purchase-expense-payment-dialog>
+      <form class="settings-profile-modal-surface sales-payment-dialog-surface" method="post" action="" data-purchase-expense-payment-modal-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="payment_lines" value="[]" data-purchase-expense-payment-lines />
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Оплата дополнительных расходов</h2>
+            <p class="settings-profile-modal-sub">Оплату расходов можно разделить по нескольким счетам.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-purchase-expense-payment-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body">
+          <div class="sales-payment-lines" data-purchase-expense-payment-lines-ui data-detail-payment-lines-ui>
+            <div class="sales-payment-line" data-detail-payment-line>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Счёт</span>
+                <select class="settings-profile-input" data-detail-payment-account>
+                  {% for account in warehouse_options.payment_accounts %}
+                    <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}{% if account.balance %} · остаток {{ account.balance }}{% endif %}</option>
+                  {% else %}
+                    <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Валюта</span>
+                <select class="settings-profile-input" data-detail-payment-currency>
+                  <option value="UZS">UZS</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Сумма</span>
+                <input class="settings-profile-input" inputmode="decimal" data-detail-payment-amount />
+              </label>
+              <button type="button" class="sales-payment-remove" data-detail-payment-remove aria-label="Удалить оплату">×</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary sales-payment-add-line" data-purchase-expense-payment-add-line>+ Ещё счёт</button>
+          <div class="sales-payment-summary-card" data-detail-payment-summary>
+            <label class="settings-profile-field">
+              <span class="settings-profile-field-label">Курс USD → UZS</span>
+              <input class="settings-profile-input" name="payment_rate" inputmode="decimal" data-detail-payment-rate />
+            </label>
+            <div class="sales-payment-summary-row">
+              <span>К оплате:</span>
+              <strong data-detail-payment-due>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Оплачено:</span>
+              <strong data-detail-payment-paid>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Остаток:</span>
+              <strong data-detail-payment-rest>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row sales-payment-summary-row--over" data-detail-payment-over-row hidden>
+              <span>Даёте больше:</span>
+              <strong data-detail-payment-over>0 UZS</strong>
+            </div>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-purchase-expense-payment-cancel>Отмена</button>
+          <button type="submit" class="btn sales-payment-submit" data-detail-payment-submit>Применить оплату</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="sale-done-dialog purchase-done-dialog" data-purchase-done-dialog>
+      <div class="sale-done-card">
+        <span class="sale-done-icon" aria-hidden="true">✓</span>
+        <h2 data-purchase-done-title>Оплата внесена</h2>
+        <p class="sale-done-sum" data-purchase-done-sum></p>
+        <p class="sale-done-meta" data-purchase-done-meta></p>
+        <div class="sale-done-summary" data-purchase-done-summary></div>
+        <div class="sale-done-actions">
+          <button class="btn btn-secondary" type="button" data-purchase-done-close>Закрыть</button>
+        </div>
+      </div>
+    </dialog>
+  </article>
+
+  {% if warehouse_purchase_edit %}
+    <span
+      hidden
+      data-workspace-trigger="purchase-edit-{{ warehouse_purchase_edit.id }}"
+      data-workspace-tab-id="purchase-edit-{{ warehouse_purchase_edit.id }}"
+      data-workspace-view-id="purchase_edit"
+      data-workspace-tab-title="Закупка {{ warehouse_purchase_edit.number }}"
+      data-workspace-tab-hash="purchase-edit"
+      data-workspace-tab-href="{{ url_for('warehouse_get') }}?edit_purchase={{ warehouse_purchase_edit.id }}"
+    ></span>
+  {% endif %}
+  <article class="warehouse-purchase-entry product-form-panel" data-workspace-view="purchase_edit" hidden>
+    <header class="products-panel-head warehouse-purchase-entry-head">
+      <div>
+        <h2>{{ 'Редактирование закупки ' ~ warehouse_purchase_edit.number if warehouse_purchase_edit else 'Новая закупка' }}</h2>
+        <span>{{ 'Изменения заменят текущие позиции документа и пересчитают остатки.' if warehouse_purchase_edit else 'Закупка сразу попадет в остатки склада.' }}</span>
+      </div>
+      <div class="warehouse-purchase-supplier-balance" data-warehouse-purchase-supplier-balance data-balance-kind="zero" aria-live="polite">
+        <span data-warehouse-purchase-supplier-balance-name>Поставщик не выбран</span>
+        <strong data-warehouse-purchase-supplier-balance-value>Баланс: -</strong>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('warehouse_purchase_update', purchase_id=warehouse_purchase_edit.id) if warehouse_purchase_edit else url_for('warehouse_purchase_save') }}" class="product-form sales-form warehouse-purchase-entry-form" data-warehouse-purchase-entry data-purchase-edit-id="{{ warehouse_purchase_edit.id if warehouse_purchase_edit else '' }}" data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}" data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}" data-purchase-expense-type-save-url="{{ url_for('warehouse_purchase_expense_type_save') }}" data-purchase-expense-type-delete-url="{{ url_for('warehouse_purchase_expense_type_delete') }}">
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="amount" value="0" data-purchase-entry-amount />
+      <input type="hidden" name="paid_amount" value="{{ warehouse_purchase_edit.paid_amount if warehouse_purchase_edit else '0' }}" data-purchase-paid-amount />
+      <input type="hidden" name="payment_type" value="{{ warehouse_purchase_edit.payment_type if warehouse_purchase_edit else '' }}" data-purchase-payment-type />
+      <input type="hidden" name="payment_lines" value='{{ warehouse_purchase_edit.payment_lines|tojson|forceescape if warehouse_purchase_edit else "[]" }}' data-purchase-payment-lines />
+      <input type="hidden" name="status" value="new" data-purchase-status />
+
+      <div class="product-form-grid warehouse-purchase-entry-grid">
+        <label>
+          <span>ID</span>
+          <input name="number" value="{{ warehouse_purchase_edit.number if warehouse_purchase_edit else '' }}" placeholder="Авто" autocomplete="off" />
+        </label>
+        <label>
+          <span>Дата</span>
+          <input name="date" type="date" value="{{ warehouse_purchase_edit.date if warehouse_purchase_edit and warehouse_purchase_edit.date else today }}" />
+        </label>
+        <label class="sales-combobox warehouse-supplier-picker{{ ' is-locked' if warehouse_purchase_edit else '' }}" data-warehouse-supplier-picker>
+          <span>Поставщик*</span>
+          <div class="sales-lock-field">
+            <input name="supplier" value="{{ warehouse_purchase_edit.supplier if warehouse_purchase_edit else '' }}" placeholder="Выберите или введите поставщика" autocomplete="off" required data-warehouse-supplier-input {{ 'readonly aria-readonly=true' if warehouse_purchase_edit else '' }} />
+            <button type="button" class="sales-combo-add" data-warehouse-supplier-create-open aria-label="Добавить нового поставщика" title="Добавить поставщика">+</button>
+            <button type="button" class="sales-combo-edit" data-warehouse-supplier-edit aria-label="Сменить поставщика" title="Сменить поставщика" {{ 'hidden' if not warehouse_purchase_edit else '' }}>✎</button>
+          </div>
+          <div class="sales-combo-panel" data-warehouse-supplier-panel hidden></div>
+        </label>
+        <label>
+          <span>Склад*</span>
+          <input name="warehouse" list="warehouse-name-list" value="{{ warehouse_purchase_edit.warehouse if warehouse_purchase_edit else 'Основной склад' }}" autocomplete="off" required />
+        </label>
+        <label>
+          <span>Валюта</span>
+          <select name="currency" data-purchase-entry-currency>
+            <option value="UZS" {{ 'selected' if not warehouse_purchase_edit or warehouse_purchase_edit.currency == 'UZS' else '' }}>UZS</option>
+            <option value="USD" {{ 'selected' if warehouse_purchase_edit and warehouse_purchase_edit.currency == 'USD' else '' }}>USD</option>
+          </select>
+        </label>
+        <label>
+          <span>Прайс</span>
+          <select name="purchase_price_type_id" data-purchase-price-type>
+            {% for price_type in warehouse_options.price_types %}
+              <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}" {{ 'selected' if warehouse_purchase_edit and warehouse_purchase_edit.price_type_id == price_type.id else '' }}>{{ price_type.name }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="purchase_price_type_name" data-purchase-price-type-name />
+        </label>
+        <label class="warehouse-price-save-toggle">
+          <input type="checkbox" name="save_purchase_prices" value="1" data-purchase-save-prices />
+          <span>Сохранить в этот прайс</span>
+        </label>
+      </div>
+
+      <section class="product-form-section warehouse-purchase-entry-section">
+        <div class="sales-section-head warehouse-purchase-entry-section-head">
+          <h3>Товары</h3>
+          <div class="sales-section-actions">
+            <button type="button" class="btn btn-secondary btn-sm upos-catalog-pick-trigger" data-purchase-catalog-pick>Подбор</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-purchase-entry-add-product>+ Товар</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-purchase-expense-open>+ Доп. расходы</button>
+          </div>
+        </div>
+        <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel warehouse-purchase-entry-table-wrap">
+          <table class="products-table products-catalog-table sales-lines-table warehouse-purchase-entry-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Товар</th>
+                <th>К-во</th>
+                <th>Приходная цена</th>
+                <th>Цена после расходов</th>
+                <th data-purchase-sale-price-title>Продажная цена</th>
+                <th>Сумма</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody data-purchase-entry-lines>
+              {% set purchase_entry_lines = (warehouse_purchase_edit.lines + [none]) if warehouse_purchase_edit and warehouse_purchase_edit.lines else [none] %}
+              {% for purchase_line in purchase_entry_lines %}
+              <tr class="sales-line-grid sales-line-grid--compact" data-purchase-entry-row>
+                <td class="warehouse-purchase-entry-row-number">{{ loop.index }}</td>
+                <td>
+                  <label class="sales-combobox sales-product-picker warehouse-product-picker{{ ' is-locked' if purchase_line else '' }}" data-warehouse-product-picker {% if purchase_line %}data-product-id="{{ purchase_line.product_id }}"{% endif %}>
+                    <div class="sales-lock-field">
+                      <input name="line_product" value="{{ purchase_line.product if purchase_line else '' }}" placeholder="Товар" autocomplete="off" data-warehouse-product-input {{ 'readonly aria-readonly=true' if purchase_line else '' }} />
+                      <button type="button" class="sales-combo-edit" data-warehouse-product-edit aria-label="Сменить товар" title="Сменить товар" {{ 'hidden' if not purchase_line else '' }}>✎</button>
+                    </div>
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-warehouse-product-panel hidden></div>
+                  </label>
+                </td>
+                <td>
+                  <input name="line_quantity" value="{{ purchase_line.quantity if purchase_line else '' }}" inputmode="decimal" placeholder="К-во" data-purchase-entry-number />
+                </td>
+                <td>
+                  <input name="line_price" value="{{ purchase_line.price if purchase_line else '' }}" inputmode="decimal" placeholder="Цена" data-purchase-entry-number />
+                </td>
+                <td>
+                  <strong data-purchase-entry-cost-price>
+                    {{ (purchase_line.cost_price ~ ' ' ~ warehouse_purchase_edit.currency) if purchase_line and purchase_line.cost_price else '0 ' ~ (warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS') }}
+                  </strong>
+                </td>
+                <td>
+                  <input name="line_sale_price" value="{{ purchase_line.sale_price if purchase_line else '' }}" inputmode="decimal" placeholder="Продажная цена" data-purchase-entry-sale-price />
+                </td>
+                <td>
+                  <strong data-purchase-entry-line-total>0 UZS</strong>
+                </td>
+                <td class="sales-line-remove-cell">
+                  <button type="button" class="sales-line-remove warehouse-purchase-entry-line-remove" data-purchase-entry-remove aria-label="Удалить строку">×</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="warehouse-purchase-entry-summary-row">
+                <td colspan="5"></td>
+                <td>
+                  <span>Продажная сумма</span>
+                  <output data-purchase-entry-sale-total>0 UZS</output>
+                </td>
+                <td>
+                  <span>Итого</span>
+                  <output data-purchase-entry-total>0 UZS</output>
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="sales-total-bar warehouse-purchase-entry-total">
+          <span>ИТОГО</span>
+          <output data-purchase-entry-total-display>0 UZS</output>
+        </div>
+      </section>
+
+      <section class="product-form-section warehouse-purchase-expenses" data-purchase-expenses>
+        <div class="sales-section-head warehouse-purchase-expenses-head">
+          <div>
+            <h3>Дополнительные расходы</h3>
+            <span>Доставка, таможня и другие расходы распределяются по себестоимости товаров.</span>
+          </div>
+          <button class="btn btn-secondary" type="button" data-purchase-expense-add>+ Доп. расход</button>
+        </div>
+        <div class="warehouse-purchase-expenses-list" data-purchase-expense-lines>
+          {% set purchase_extra_expenses = (warehouse_purchase_edit.extra_expenses + [none]) if warehouse_purchase_edit and warehouse_purchase_edit.extra_expenses else [none] %}
+          {% for expense in purchase_extra_expenses %}
+            <div class="warehouse-purchase-expense-row" data-purchase-expense-row>
+              <div class="warehouse-purchase-expense-type-field">
+                <select name="extra_expense_name" data-purchase-expense-type-select>
+                  <option value="" {% if not expense %}selected{% endif %}>Выберите вид расхода</option>
+                  {% if expense %}
+                    <option value="{{ expense.name }}" selected>{{ expense.name }}</option>
+                  {% endif %}
+                  {% for expense_type in warehouse_options.expense_types %}
+                    {% if not expense or expense_type.name != expense.name %}
+                      <option value="{{ expense_type.name }}">{{ expense_type.name }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+                <button type="button" class="warehouse-purchase-expense-type-add" data-purchase-expense-type-open aria-label="Добавить новый тип расхода" title="Добавить новый тип расхода">+</button>
+              </div>
+              <input name="extra_expense_amount" value="{{ expense.amount if expense else '' }}" placeholder="Сумма" inputmode="decimal" data-purchase-expense-amount />
+              <select name="extra_expense_currency" data-purchase-expense-currency-select aria-label="Валюта расхода">
+                {% set expense_currency = (expense.currency if expense else (warehouse_purchase_edit.currency if warehouse_purchase_edit else 'UZS')) %}
+                <option value="UZS" {{ 'selected' if expense_currency == 'UZS' else '' }}>UZS</option>
+                <option value="USD" {{ 'selected' if expense_currency == 'USD' else '' }}>USD</option>
+              </select>
+              <input type="hidden" name="extra_expense_account_id" value="{{ expense.account_id if expense else '' }}" data-purchase-expense-account-id />
+              <input type="hidden" name="extra_expense_account" value="{{ expense.account if expense else '' }}" data-purchase-expense-account />
+              <button type="button" class="sales-line-remove" data-purchase-expense-remove aria-label="Удалить расход">×</button>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="warehouse-purchase-expenses-summary">
+          <span>Товары <strong data-purchase-expense-goods-total>0 UZS</strong></span>
+          <span>Доп. расходы <strong data-purchase-expense-total>0 UZS</strong></span>
+          <span class="warehouse-purchase-expenses-landed">Себестоимость <strong data-purchase-landed-total>0 UZS</strong></span>
+        </div>
+      </section>
+
+      <div class="sales-payment-breakdown" data-purchase-payment-breakdown hidden>
+        <button type="button" class="sales-payment-breakdown-clear" data-purchase-payment-clear aria-label="Убрать оплату" title="Убрать оплату">×</button>
+        <div class="sales-payment-breakdown-row sales-payment-breakdown-row--total">
+          <span>Сумма</span>
+          <strong data-purchase-payment-breakdown-total>0 UZS</strong>
+        </div>
+        <div class="sales-payment-breakdown-lines" data-purchase-payment-breakdown-lines></div>
+        <div class="sales-payment-breakdown-row sales-payment-breakdown-row--rest">
+          <span>Остаток</span>
+          <strong data-purchase-payment-breakdown-rest>0 UZS</strong>
+        </div>
+      </div>
+
+      <label class="wide warehouse-purchase-entry-note">
+        <span>Комментарий</span>
+        <textarea name="note" rows="2" autocomplete="off" placeholder="Комментарий к закупке">{{ warehouse_purchase_edit.note if warehouse_purchase_edit else '' }}</textarea>
+      </label>
+
+      <div class="product-form-actions warehouse-purchase-entry-footer">
+        <button type="button" class="btn sales-payment-add-btn" data-purchase-payment-open>+ Добавить оплату</button>
+        <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#purchases">Отмена</a>
+        <button class="btn" type="submit">{{ 'Сохранить изменения' if warehouse_purchase_edit else 'Сохранить закупку' }}</button>
+      </div>
+    </form>
+
+    <dialog class="settings-profile-modal sales-product-dialog warehouse-product-dialog" data-warehouse-product-dialog>
+      <form class="settings-profile-modal-surface sales-product-dialog-surface product-form product-form--clean client-photo-form warehouse-product-quick-form" data-warehouse-product-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="kind" value="product" data-warehouse-product-kind />
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Создание товара</h2>
+            <p class="settings-profile-modal-sub">Товар сразу появится в текущей закупке.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-warehouse-product-dialog-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-scroll">
+          <div class="settings-profile-modal-body">
+            <div class="client-edit-photo-row warehouse-product-quick-photo-row">
+              <div class="client-profile-photo client-profile-photo--edit" data-warehouse-product-photo aria-hidden="true"><span></span></div>
+              <div class="product-form-grid client-photo-data-table">
+                <label class="wide"><span>Название товара*</span><input name="name" required data-warehouse-product-name /></label>
+                <div class="client-photo-source-field wide">
+                  <span>Фото*</span>
+                  <div class="client-photo-source-controls">
+                    <input name="photo_url" type="text" inputmode="url" placeholder="URL фото: https://..." data-warehouse-product-photo-url />
+                    <div class="warehouse-product-photo-picker">
+                      <input id="warehouse-product-photo-file" name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-warehouse-product-photo-file />
+                      <label class="warehouse-product-photo-picker-button" for="warehouse-product-photo-file">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></svg>
+                        <span>Выбрать фото</span>
+                      </label>
+                      <span class="warehouse-product-photo-picker-name" data-warehouse-product-photo-file-name>Файл не выбран</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="product-form-grid product-form-grid--identity sales-product-dialog-grid">
+              <div class="product-dictionary-select">
+                <label>
+                  <span>Категория*</span>
+                  <input type="hidden" name="category" value="" data-warehouse-product-dictionary-value="category" />
+                  <select data-warehouse-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
+                    <option value="">Выберите категорию</option>
+                    {% for item in warehouse_options.product_categories %}
+                      <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="product-dictionary-combo" data-warehouse-product-dictionary-combo="category">
+                    <input type="text" autocomplete="off" placeholder="Выберите категорию" required data-warehouse-product-dictionary-combo-input />
+                    <div class="product-dictionary-combo-panel" data-warehouse-product-dictionary-combo-panel hidden></div>
+                  </div>
+                </label>
+                <button class="products-inline-add-btn warehouse-product-dictionary-add" type="button" data-warehouse-product-dictionary-add="category" aria-label="Создать категорию">
+                  <span class="warehouse-product-dictionary-add-icon" aria-hidden="true">+</span>
+                  <span class="warehouse-product-dictionary-add-label">Добавить</span>
+                </button>
+              </div>
+              <div class="product-dictionary-select">
+                <label>
+                  <span>Бренд*</span>
+                  <input type="hidden" name="brand" value="" data-warehouse-product-dictionary-value="brand" />
+                  <select data-warehouse-product-dictionary-select="brand" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true">
+                    <option value="">Выберите бренд</option>
+                    {% for item in warehouse_options.product_brands %}
+                      <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="product-dictionary-combo" data-warehouse-product-dictionary-combo="brand">
+                    <input type="text" autocomplete="off" placeholder="Выберите бренд" required data-warehouse-product-dictionary-combo-input />
+                    <div class="product-dictionary-combo-panel" data-warehouse-product-dictionary-combo-panel hidden></div>
+                  </div>
+                </label>
+                <button class="products-inline-add-btn warehouse-product-dictionary-add" type="button" data-warehouse-product-dictionary-add="brand" aria-label="Создать бренд">
+                  <span class="warehouse-product-dictionary-add-icon" aria-hidden="true">+</span>
+                  <span class="warehouse-product-dictionary-add-label">Добавить</span>
+                </button>
+              </div>
+              <label><span>Артикул</span><input name="sku" value="{{ warehouse_options.next_product_sku or '21000' }}" readonly title="Артикул создаётся автоматически" data-warehouse-product-sku /></label>
+              <label><span>Единица*</span><input name="unit" value="Штука" required data-warehouse-product-unit /></label>
+              <label><span>Статус</span><select name="status"><option value="active" selected>Активный</option><option value="inactive">Неактивный</option></select></label>
+            </div>
+
+            <section class="product-form-section product-form-section--primary warehouse-product-quick-price">
+              <div class="product-form-section-head">
+                <h3>Продажная цена</h3>
+              </div>
+              <div class="product-form-grid">
+                <input type="hidden" name="price_name" value="Продажная цена" />
+                <label><span>Продажная цена*</span><input name="price_value" inputmode="decimal" placeholder="0" required data-warehouse-product-price data-upos-money-format data-upos-money-decimals="0" /></label>
+                <label>
+                  <span>Валюта</span>
+                  <select name="price_currency" data-warehouse-product-currency>
+                    <option value="UZS">UZS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="product-form-section product-form-section--primary warehouse-product-quick-barcode">
+              <div class="product-form-section-head">
+                <h3>Штрихкод</h3>
+              </div>
+              <div class="product-line-grid product-line-grid--barcode">
+                <input name="barcode" placeholder="Штрихкод" inputmode="numeric" />
+                <select name="barcode_type">
+                  <option value="EAN13" selected>EAN-13</option>
+                  <option value="EAN8">EAN-8</option>
+                  <option value="CODE128">CODE-128</option>
+                  <option value="QR">QR</option>
+                </select>
+              </div>
+            </section>
+            <input type="hidden" name="stock_warehouse" value="{{ warehouse_options.warehouses[0] if warehouse_options.warehouses else 'Основной склад' }}" data-warehouse-product-warehouse />
+            <input type="hidden" name="stock_quantity" value="" />
+            <input type="hidden" name="stock_price" value="" />
+            <input type="hidden" name="stock_date" value="{{ today }}" />
+            <p class="sales-product-dialog-status" data-warehouse-product-status aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-warehouse-product-dialog-cancel>Отмена</button>
+          <button type="submit" class="btn" data-warehouse-product-submit>Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="settings-profile-modal warehouse-product-dictionary-dialog" data-warehouse-product-dictionary-dialog>
+      <form class="settings-profile-modal-surface warehouse-product-dictionary-dialog-surface" data-warehouse-product-dictionary-form>
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title" data-warehouse-product-dictionary-title>Добавление категории</h2>
+            <p class="settings-profile-modal-sub">Новое значение будет выбрано в карточке товара.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-warehouse-product-dictionary-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body">
+          <label class="settings-profile-field">
+            <span data-warehouse-product-dictionary-label>Название категории*</span>
+            <input class="settings-profile-input" name="name" autocomplete="off" required data-warehouse-product-dictionary-name />
+          </label>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-warehouse-product-dictionary-close>Отмена</button>
+          <button type="submit" class="btn">Добавить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="settings-profile-modal sales-payment-dialog warehouse-purchase-payment-dialog" data-purchase-payment-dialog>
+      <form class="settings-profile-modal-surface sales-payment-dialog-surface" data-purchase-payment-form>
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Добавить оплату</h2>
+            <p class="settings-profile-modal-sub">Оплату закупки можно разделить по нескольким счетам.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-purchase-payment-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body warehouse-payment-dialog-body">
+          <div class="warehouse-payment-overview">
+            <section class="warehouse-payment-overview-card">
+              <div class="warehouse-payment-overview-head">
+                <h3>Товары закупки</h3>
+                <strong data-purchase-payment-goods-total>0 UZS</strong>
+              </div>
+              <div class="warehouse-payment-table-wrap">
+                <table class="warehouse-payment-info-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Товар</th>
+                      <th>К-во</th>
+                      <th>Цена</th>
+                      <th>Сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody data-purchase-payment-product-lines>
+                    <tr><td colspan="5">Товары пока не выбраны</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section class="warehouse-payment-overview-card">
+              <div class="warehouse-payment-overview-head">
+                <h3>Доп. расходы</h3>
+                <strong data-purchase-payment-expense-total>0 UZS</strong>
+              </div>
+              <div class="warehouse-payment-table-wrap">
+                <table class="warehouse-payment-info-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Расход</th>
+                      <th>Сумма</th>
+                      <th>Счёт оплаты</th>
+                    </tr>
+                  </thead>
+                  <tbody data-purchase-payment-expense-lines>
+                    <tr><td colspan="4">Дополнительных расходов нет</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <section class="warehouse-payment-overview-card warehouse-payment-lines-card">
+            <div class="warehouse-payment-overview-head">
+              <h3>Оплата товаров</h3>
+            </div>
+            <div class="warehouse-payment-table-wrap">
+              <table class="warehouse-payment-info-table warehouse-payment-entry-table">
+                <thead>
+                  <tr>
+                    <th>Счёт</th>
+                    <th>Валюта</th>
+                    <th>Сумма</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody class="sales-payment-lines" data-purchase-payment-lines-ui>
+                  <tr class="sales-payment-line" data-purchase-payment-line>
+                    <td>
+                      <select class="settings-profile-input" aria-label="Счёт оплаты товаров" data-purchase-payment-account>
+                        {% for account in warehouse_options.payment_accounts %}
+                          <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}{% if account.balance %} · остаток {{ account.balance }}{% endif %}</option>
+                        {% else %}
+                          <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
+                        {% endfor %}
+                      </select>
+                    </td>
+                    <td>
+                      <select class="settings-profile-input" aria-label="Валюта оплаты товаров" data-purchase-payment-currency>
+                        <option value="UZS">UZS</option>
+                        <option value="USD">USD</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input class="settings-profile-input" inputmode="decimal" aria-label="Сумма оплаты товаров" data-purchase-payment-amount />
+                    </td>
+                    <td class="warehouse-payment-action-cell">
+                      <button type="button" class="sales-payment-remove" data-purchase-payment-remove aria-label="Удалить оплату">×</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <button type="button" class="btn btn-secondary sales-payment-add-line" data-purchase-payment-add-line>+ Ещё счёт</button>
+          <div class="sales-payment-summary-card" data-purchase-payment-summary>
+            <div class="sales-payment-summary-row">
+              <span>К оплате:</span>
+              <strong data-purchase-payment-due>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Оплачено:</span>
+              <strong data-purchase-payment-paid>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row">
+              <span>Остаток:</span>
+              <strong data-purchase-payment-rest>0 UZS</strong>
+            </div>
+            <div class="sales-payment-summary-row sales-payment-summary-row--over" data-purchase-payment-over-row hidden>
+              <span>Больше суммы:</span>
+              <strong data-purchase-payment-over>0 UZS</strong>
+            </div>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-purchase-payment-cancel>Отмена</button>
+          <button type="submit" class="btn sales-payment-submit" data-purchase-payment-submit>Применить оплату</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="settings-profile-modal warehouse-supplier-dialog" data-warehouse-supplier-dialog>
+      <form class="settings-profile-modal-surface warehouse-supplier-dialog-surface" data-warehouse-supplier-form>
+        {% include "_csrf_field.html" %}
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Создание поставщика</h2>
+            <p class="settings-profile-modal-sub">Карточка сразу попадет в выбор поставщика для закупки.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-warehouse-supplier-dialog-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-scroll">
+          <div class="settings-profile-modal-body">
+            <div class="settings-profile-form-grid warehouse-supplier-dialog-grid">
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Название*</span>
+                <input class="settings-profile-input" name="name" required data-warehouse-supplier-name />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Официальное название</span>
+                <input class="settings-profile-input" name="official_name" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Телефон</span>
+                <input class="settings-profile-input" name="phone" inputmode="tel" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">ИНН</span>
+                <input class="settings-profile-input" name="tax_id" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Email</span>
+                <input class="settings-profile-input" name="email" type="email" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Категория</span>
+                <input class="settings-profile-input" name="category" />
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Статус</span>
+                <select class="settings-profile-input" name="status">
+                  <option value="active" selected>Активный</option>
+                  <option value="inactive">Неактивный</option>
+                </select>
+              </label>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Также клиент</span>
+                <select class="settings-profile-input" name="is_client">
+                  <option value="0">Нет</option>
+                  <option value="1">Да</option>
+                </select>
+              </label>
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Адрес</span>
+                <input class="settings-profile-input" name="address" />
+              </label>
+              <label class="settings-profile-field settings-profile-field--full">
+                <span class="settings-profile-field-label">Комментарий</span>
+                <textarea class="settings-profile-input warehouse-supplier-dialog-note" name="note"></textarea>
+              </label>
+            </div>
+            <p class="sales-product-dialog-status" data-warehouse-supplier-status aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-warehouse-supplier-dialog-cancel>Отмена</button>
+          <button type="submit" class="btn" data-warehouse-supplier-submit>Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="settings-profile-modal warehouse-expense-type-dialog" data-purchase-expense-type-dialog>
+      <form class="settings-profile-modal-surface warehouse-expense-type-dialog-surface" data-purchase-expense-type-form>
+        {% include "_csrf_field.html" %}
+        <div class="settings-profile-modal-head">
+          <div>
+            <h2 class="settings-profile-modal-title">Виды расходов</h2>
+            <p class="settings-profile-modal-sub">Создайте вид один раз и выбирайте его в следующих закупках.</p>
+          </div>
+          <button type="button" class="settings-profile-modal-close" data-purchase-expense-type-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-profile-modal-body warehouse-expense-type-dialog-body">
+          <label class="settings-profile-field">
+            <span class="settings-profile-field-label">Новый вид расхода</span>
+            <div class="warehouse-expense-type-create">
+              <input class="settings-profile-input" name="name" maxlength="120" required placeholder="Например, доставка" data-purchase-expense-type-name />
+              <button type="submit" class="btn" data-purchase-expense-type-submit>Создать</button>
+            </div>
+          </label>
+          <p class="sales-product-dialog-status" data-purchase-expense-type-status aria-live="polite"></p>
+          <div class="warehouse-expense-type-list" data-purchase-expense-type-list></div>
+        </div>
+        <div class="settings-profile-modal-foot">
+          <button type="button" class="btn btn-secondary" data-purchase-expense-type-close>Готово</button>
+        </div>
+      </form>
+    </dialog>
+  </article>
+
+  {% set adjustment_direction = warehouse_operation_preset if warehouse_operation_preset in ['in', 'out'] else 'out' %}
+  <article class="warehouse-adjustment-entry product-form-panel" data-workspace-view="adjustments" hidden>
+    <header class="products-panel-head warehouse-adjustment-entry-head">
+      <div>
+        <h2>{{ 'Приход на склад' if adjustment_direction == 'in' else 'Списание со склада' }}</h2>
+        <span>{{ 'Укажите поступившее количество: остатки увеличатся.' if adjustment_direction == 'in' else 'Укажите списываемое количество: остатки уменьшатся.' }}</span>
+      </div>
+      <span class="warehouse-adjustment-direction warehouse-adjustment-direction--{{ adjustment_direction }}">
+        {{ 'Приход' if adjustment_direction == 'in' else 'Списание' }}
+      </span>
+    </header>
+    <form
+      method="post"
+      action="{{ url_for('warehouse_operation_save') }}"
+      class="product-form warehouse-adjustment-form warehouse-adjustment-form--sales warehouse-adjustment-form--wide"
+      data-warehouse-adjustment-entry
+      data-adjustment-direction="{{ adjustment_direction }}"
+      data-warehouse-supplier-quick-save-url="{{ url_for('warehouse_supplier_quick_save') }}"
+      data-warehouse-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
+    >
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="operation_type" value="{{ adjustment_direction }}" />
+      <div class="product-form-grid warehouse-adjustment-meta">
+        <label>
+          <span>Дата</span>
+          <input name="date" type="date" value="{{ today }}" required />
+        </label>
+        {% if adjustment_direction == 'in' %}
+          <label class="warehouse-adjustment-supplier-field">
+            <span>Поставщик</span>
+            <div
+              class="sales-combobox warehouse-supplier-picker"
+              data-warehouse-supplier-picker
+              data-adjustment-supplier-picker
+            >
+              <div class="sales-lock-field">
+                <input
+                  placeholder="Выберите поставщика"
+                  autocomplete="off"
+                  data-warehouse-supplier-input
+                  data-adjustment-supplier-input
+                />
+                <button
+                  type="button"
+                  class="sales-combo-edit"
+                  data-warehouse-supplier-edit
+                  aria-label="Сменить поставщика"
+                  title="Сменить поставщика"
+                  hidden
+                >✎</button>
+              </div>
+              <div class="sales-combo-panel" data-warehouse-supplier-panel hidden></div>
+            </div>
+            <input type="hidden" name="counterparty_id" data-adjustment-supplier />
+            <input type="hidden" name="supplier" data-adjustment-supplier-name />
+            <small class="warehouse-adjustment-supplier-balance is-zero" data-adjustment-supplier-balance>Нет долга</small>
+          </label>
+        {% endif %}
+        <label>
+          <span>Склад*</span>
+          <select name="warehouse" required data-adjustment-warehouse>
+            {% for warehouse in warehouse_options.warehouses %}
+              <option value="{{ warehouse }}" {% if warehouse == 'Основной склад' %}selected{% endif %}>{{ warehouse }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Валюта</span>
+          <select name="currency" data-adjustment-currency>
+            <option value="UZS">UZS</option>
+            <option value="USD">USD</option>
+          </select>
+        </label>
+        <label>
+          <span>Ответственный</span>
+          <input name="responsible" value="{{ user.name if user else '' }}" autocomplete="off" />
+        </label>
+        {% if adjustment_direction == 'in' %}
+          <label>
+            <span>Прайс-лист</span>
+            <select name="price_type_id" data-adjustment-price-type>
+              {% for price_type in warehouse_options.price_types %}
+                <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="price_type_name" data-adjustment-price-type-name />
+            <input type="hidden" name="price_type_currency" data-adjustment-price-type-currency />
+          </label>
+        {% endif %}
+      </div>
+
+      <section class="product-form-section warehouse-adjustment-section">
+        <div class="sales-section-head warehouse-adjustment-section-head">
+          <h3>Товары</h3>
+          <div class="sales-section-actions">
+            {% if adjustment_direction == 'in' %}
+              <button type="button" class="btn btn-secondary btn-sm" data-adjustment-expense-open>+ Доп. расходы</button>
+            {% endif %}
+          </div>
+        </div>
+        <div class="sales-lines-table-wrap products-table-wrap warehouse-adjustment-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table sales-lines-table warehouse-adjustment-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Товар</th>
+                <th>Остаток</th>
+                <th>Изменение</th>
+                <th>После операции</th>
+                <th>{{ 'Приходная цена' if adjustment_direction == 'in' else 'Цена' }}</th>
+                {% if adjustment_direction == 'in' %}<th>Цена после расходов</th>{% endif %}
+                {% if adjustment_direction == 'in' %}<th data-adjustment-sale-price-title>Продажная цена</th>{% endif %}
+                <th>Сумма</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody data-adjustment-lines>
+              <tr class="sales-line-grid sales-line-grid--compact" data-adjustment-row>
+                <td class="warehouse-adjustment-row-number">1</td>
+                <td>
+                  <div class="warehouse-adjustment-product-control">
+                    <div class="sales-combobox sales-product-picker warehouse-adjustment-product-picker" data-adjustment-product-picker>
+                    <div class="sales-lock-field">
+                      <input placeholder="Товар" autocomplete="off" data-adjustment-product-input />
+                      <button type="button" class="sales-combo-edit" data-adjustment-product-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                    </div>
+                    <input type="hidden" name="line_product" data-adjustment-product />
+                      <div class="sales-combo-panel sales-combo-panel--wide" data-adjustment-product-panel hidden></div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <strong class="warehouse-adjustment-stock" data-adjustment-current>0</strong>
+                  <small data-adjustment-unit></small>
+                </td>
+                <td>
+                  <div class="warehouse-adjustment-change">
+                    <span data-adjustment-sign>{{ '+' if adjustment_direction == 'in' else '−' }}</span>
+                    <input name="line_quantity" inputmode="decimal" placeholder="0" data-adjustment-quantity />
+                  </div>
+                </td>
+                <td>
+                  <strong data-adjustment-after>0</strong>
+                </td>
+                <td>
+                  <input name="line_price" inputmode="decimal" placeholder="0" data-adjustment-price />
+                </td>
+                {% if adjustment_direction == 'in' %}
+                  <td>
+                    <strong class="warehouse-adjustment-cost-price" data-adjustment-cost-price>0 UZS</strong>
+                  </td>
+                  <td>
+                    <input class="warehouse-adjustment-sale-price" name="line_sale_price" inputmode="decimal" placeholder="—" data-adjustment-sale-price />
+                  </td>
+                {% endif %}
+                <td>
+                  <strong class="warehouse-adjustment-line-total" data-adjustment-line-total>0 UZS</strong>
+                </td>
+                <td>
+                  <button type="button" class="sales-line-remove" data-adjustment-remove aria-label="Удалить строку" title="Удалить строку">×</button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="sales-subtotal-row warehouse-adjustment-subtotal-row">
+                <td colspan="3">Итого товары</td>
+                <td><output data-adjustment-products-quantity>0</output></td>
+                <td colspan="{{ 4 if adjustment_direction == 'in' else 2 }}"></td>
+                <td><output data-adjustment-goods-total>0 UZS</output></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="sales-total-bar warehouse-adjustment-summary">
+          <span>{{ 'Итого себестоимость' if adjustment_direction == 'in' else 'Итого списание' }}</span>
+          <output data-adjustment-total>− 0 UZS</output>
+        </div>
+        <p class="warehouse-adjustment-error" data-adjustment-error aria-live="polite"></p>
+      </section>
+
+      {% if adjustment_direction == 'in' %}
+        <section class="product-form-section warehouse-purchase-expenses warehouse-adjustment-expenses" data-adjustment-expenses hidden>
+          <div class="sales-section-head warehouse-purchase-expenses-head">
+            <div>
+              <h3>Дополнительные расходы</h3>
+              <span>Доставка, таможня и другие расходы распределяются по себестоимости товаров.</span>
+            </div>
+            <div class="sales-section-actions">
+              <button class="btn btn-secondary btn-sm" type="button" data-adjustment-expense-add>+ Доп. расход</button>
+              <button type="button" class="sales-line-remove warehouse-adjustment-expense-close" data-adjustment-expense-close aria-label="Скрыть дополнительные расходы" title="Скрыть дополнительные расходы">×</button>
+            </div>
+          </div>
+          <div class="warehouse-purchase-expenses-list" data-adjustment-expense-lines>
+            <div class="warehouse-purchase-expense-row" data-adjustment-expense-row>
+              <div class="warehouse-purchase-expense-type-field">
+                <select name="extra_expense_name" data-purchase-expense-type-select>
+                  <option value="" selected>Выберите вид расхода</option>
+                  {% for expense_type in warehouse_options.expense_types %}
+                    <option value="{{ expense_type.name }}">{{ expense_type.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="button" class="warehouse-purchase-expense-type-add" data-adjustment-expense-type-open aria-label="Добавить новый тип расхода" title="Добавить новый тип расхода">+</button>
+              </div>
+              <input name="extra_expense_amount" placeholder="Сумма" inputmode="decimal" data-adjustment-expense-amount />
+              <select name="extra_expense_currency" data-adjustment-expense-currency-select aria-label="Валюта расхода">
+                <option value="UZS" selected>UZS</option>
+                <option value="USD">USD</option>
+              </select>
+              <button type="button" class="sales-line-remove" data-adjustment-expense-remove aria-label="Удалить расход">×</button>
+            </div>
+          </div>
+          <div class="warehouse-purchase-expenses-summary">
+            <span>Товары <strong data-adjustment-expense-goods-total>0 UZS</strong></span>
+            <span>Доп. расходы <strong data-adjustment-expense-total>0 UZS</strong></span>
+            <span class="warehouse-purchase-expenses-landed">Себестоимость <strong data-adjustment-landed-total>0 UZS</strong></span>
+          </div>
+        </section>
+      {% endif %}
+
+      <label class="wide sales-document-note warehouse-adjustment-note">
+        <span>Комментарий</span>
+        <textarea name="note" rows="2" placeholder="Причина складской операции"></textarea>
+      </label>
+      <div class="sales-form-footer warehouse-adjustment-footer">
+        <div class="product-form-actions warehouse-adjustment-actions">
+          <a class="btn btn-secondary" href="{{ url_for('warehouse_get') }}#adjustments">Отмена</a>
+          <button class="btn" type="submit" data-adjustment-submit>
+            {{ 'Оприходовать' if adjustment_direction == 'in' else 'Списать со склада' }}
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {% if adjustment_direction == 'in' %}
+      <dialog class="settings-profile-modal warehouse-expense-type-dialog" data-purchase-expense-type-dialog>
+        <form class="settings-profile-modal-surface warehouse-expense-type-dialog-surface" data-purchase-expense-type-form>
+          {% include "_csrf_field.html" %}
+          <div class="settings-profile-modal-head">
+            <div>
+              <h2 class="settings-profile-modal-title">Виды расходов</h2>
+              <p class="settings-profile-modal-sub">Создайте новый тип или выберите расход из финансов.</p>
+            </div>
+            <button type="button" class="settings-profile-modal-close" data-purchase-expense-type-close aria-label="Закрыть">×</button>
+          </div>
+          <div class="settings-profile-modal-body warehouse-expense-type-dialog-body">
+            <label class="settings-profile-field">
+              <span class="settings-profile-field-label">Новый тип расхода</span>
+              <div class="warehouse-expense-type-create">
+                <input class="settings-profile-input" name="name" maxlength="120" required placeholder="Например, доставка" data-purchase-expense-type-name />
+                <button type="submit" class="btn" data-purchase-expense-type-submit>Создать</button>
+              </div>
+            </label>
+            <p class="sales-product-dialog-status" data-purchase-expense-type-status aria-live="polite"></p>
+            <div class="warehouse-expense-type-list" data-purchase-expense-type-list></div>
+          </div>
+          <div class="settings-profile-modal-foot">
+            <button type="button" class="btn btn-secondary" data-purchase-expense-type-close>Готово</button>
+          </div>
+        </form>
+      </dialog>
+    {% endif %}
+  </article>
+</div>
+
+<dialog class="settings-profile-modal warehouse-operation-dialog" id="warehouse-operation-dialog">
+  <div class="settings-profile-modal-surface warehouse-operation-dialog-surface">
+    <header class="settings-profile-modal-head">
+      <div>
+        <h2>Складская операция</h2>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-warehouse-close-operation aria-label="Закрыть">×</button>
+    </header>
+    <div class="warehouse-operation-choices">
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=in#adjustments" data-warehouse-operation-link>
+        <strong>Приход</strong>
+      </a>
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=out#adjustments" data-warehouse-operation-link>
+        <strong>Списание</strong>
+      </a>
+      <a class="warehouse-operation-choice" href="{{ url_for('warehouse_get') }}?op=transfer#transfers" data-warehouse-operation-link>
+        <strong>Перемещение</strong>
+      </a>
+    </div>
+  </div>
+</dialog>

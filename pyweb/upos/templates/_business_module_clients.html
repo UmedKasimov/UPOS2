@@ -1,0 +1,1582 @@
+<datalist id="client-territory-list">
+  {% for item in client_options.territories %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="client-category-list">
+  {% for item in client_options.categories %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="client-industry-list">
+  <option value="Продуктовый">
+  <option value="Ресторан">
+  <option value="Кафе">
+  <option value="Одежда">
+  <option value="Аксессуар">
+</datalist>
+<datalist id="client-program-list">
+  {% for item in client_options.programs %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="client-route-list">
+  {% for item in client_options.routes %}<option value="{{ item }}">{% endfor %}
+</datalist>
+<datalist id="client-name-list">
+  {% for item in client_options.clients %}<option value="{{ item }}">{% endfor %}
+</datalist>
+{% set client_program_defaults = ["YESPOS", "BILLZ", "1C", "iiko", "R-Keeper", "Poster", "Jowi", "МойСклад", "Excel"] %}
+
+<div class="products-layout clients-module-layout" data-workspace-view="clients" hidden>
+  <article id="clients-directory-panel" class="products-list-panel clients-list-panel" data-workspace-view="clients" hidden>
+    <header class="products-panel-head clients-panel-head">
+      <div class="products-panel-titleline">
+        <h2>{{ 'Архив клиентов' if clients_archive_mode else 'Клиенты' }}</h2>
+        <span>Всего: {{ clients_total }}</span>
+      </div>
+
+      <div class="products-panel-top-actions">
+        <span class="client-bulk-selection-count" data-client-bulk-selection-count hidden>
+          Выбрано: <strong data-client-bulk-selection-value>0</strong>
+        </span>
+        <button type="button" class="btn btn-secondary" data-client-bulk-attach-open hidden>Прикрепление</button>
+        <form method="post" action="{{ url_for('clients_import') }}" enctype="multipart/form-data" class="clients-import-form">
+          {% include "_csrf_field.html" %}
+          <label class="btn btn-secondary clients-import-trigger">
+            <span>Загрузить из файла</span>
+            <input type="file" name="excel_file" accept=".xlsx" onchange="if (this.files && this.files.length) this.form.submit()" hidden />
+          </label>
+        </form>
+        <button type="button" class="btn btn-secondary" data-clients-locations-fill>
+          <span>Определить локации</span>
+        </button>
+        {% if clients_archive_mode %}
+          <a class="btn btn-secondary" href="{{ url_for('clients_get') }}#clients">← К клиентам</a>
+        {% else %}
+          <a class="btn btn-secondary" href="{{ url_for('clients_get') }}?archive=1#clients">Архив{% if clients_archived_total %} ({{ clients_archived_total }}){% endif %}</a>
+        {% endif %}
+        <span class="clients-locations-status" data-clients-locations-status role="status"></span>
+        <a
+          class="btn btn-secondary"
+          href="{{ url_for('clients_get') }}#clients-map"
+          data-workspace-trigger="clients-map"
+          data-workspace-tab-id="clients-map"
+          data-workspace-view-id="clients_map"
+          data-workspace-tab-title="Карта клиентов"
+          data-workspace-tab-hash="clients-map"
+          data-workspace-tab-href="{{ url_for('clients_get') }}"
+        >Показать на карте</a>
+        <a
+          class="btn"
+          href="{{ url_for('clients_get') }}#client-create"
+          data-workspace-trigger="client-create"
+          data-workspace-tab-id="client-create"
+          data-workspace-view-id="client_create"
+          data-workspace-tab-title="Новый клиент"
+          data-workspace-tab-hash="client-create"
+          data-workspace-tab-href="{{ url_for('clients_get') }}"
+        >+ Клиент</a>
+        <button type="button" class="btn btn-secondary" disabled>⋮</button>
+      </div>
+
+      <form id="clients-filter-form" class="products-catalog-filter clients-filter-form" method="get" action="{{ url_for('clients_get') }}#clients">
+        <input type="hidden" name="client_sort" value="{{ clients_sort_key }}" />
+        <input type="hidden" name="client_sort_dir" value="{{ clients_sort_direction }}" />
+        <input type="hidden" name="page_size" value="{{ clients_page_size }}" data-clients-page-size-value />
+        {% if clients_archive_mode %}<input type="hidden" name="archive" value="1" />{% endif %}
+        <label class="products-catalog-search">
+          <span>Поиск</span>
+          <input name="q" value="{{ client_filters.q }}" placeholder="Клиент, телефон, ИНН, код" />
+        </label>
+        <label>
+          <span>Территория</span>
+          <input name="territory" list="client-territory-list" value="{{ client_filters.territory }}" placeholder="Территория" />
+        </label>
+        <label>
+          <span>Категория</span>
+          <input name="category" list="client-category-list" value="{{ client_filters.category }}" placeholder="Категория" />
+        </label>
+        <div class="client-program-picker clients-filter-program-picker">
+          <span>Программа</span>
+          <details class="client-program-dropdown clients-filter-program-dropdown" data-client-program-dropdown data-empty-label="Все программы">
+            <summary>
+              <span data-client-program-summary>{{ client_filters.program or "Все программы" }}</span>
+            </summary>
+            <div class="client-program-menu">
+              <input type="search" placeholder="Поиск программы" data-client-program-search data-client-filter-program-search />
+              <div class="client-program-options">
+                <label data-client-program-option-row>
+                  <input type="radio" name="program" value="" {% if not client_filters.program %}checked{% endif %} />
+                  <span>Все программы</span>
+                </label>
+                {% for item in client_options.programs %}
+                  <label data-client-program-option-row>
+                    <input type="radio" name="program" value="{{ item }}" {% if client_filters.program == item %}checked{% endif %} />
+                    <span>{{ item }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </details>
+        </div>
+        <label>
+          <span>Маршрут</span>
+          <input name="route" list="client-route-list" value="{{ client_filters.route }}" placeholder="Маршрут" />
+        </label>
+        <label>
+          <span>Клиенты</span>
+          <select name="ownership">
+            <option value="" {% if not client_ownership %}selected{% endif %}>Все</option>
+            <option value="ours" {% if client_ownership == 'ours' %}selected{% endif %}>Наши клиенты</option>
+            <option value="others" {% if client_ownership == 'others' %}selected{% endif %}>Не наши</option>
+          </select>
+        </label>
+        <label>
+          <span>Статус</span>
+          <select name="status">
+            <option value="all" {% if client_filters.status == 'all' %}selected{% endif %}>Все</option>
+            <option value="active" {% if client_filters.status == 'active' %}selected{% endif %}>Активный</option>
+            <option value="inactive" {% if client_filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
+          </select>
+        </label>
+      </form>
+      <script>
+        (() => {
+          // Фильтр применяется сам: поиск с задержкой, списки — сразу.
+          const form = document.getElementById('clients-filter-form');
+          if (!form || form.dataset.autoFilterReady === '1') return;
+          form.dataset.autoFilterReady = '1';
+          let timer = 0;
+          form.addEventListener('input', (event) => {
+            if (!(event.target instanceof HTMLInputElement)) return;
+            if (event.target.matches('[data-client-filter-program-search]')) return;
+            if (event.target.type === 'radio' || event.target.type === 'checkbox') return;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => form.submit(), 500);
+          });
+          form.addEventListener('change', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLSelectElement) && !(target instanceof HTMLInputElement && target.type === 'radio')) return;
+            window.clearTimeout(timer);
+            target.closest('details')?.removeAttribute('open');
+            form.submit();
+          });
+        })();
+      </script>
+    </header>
+
+    <div class="products-table-wrap clients-table-wrap">
+      <table
+        id="clients-directory-table"
+        class="products-table products-catalog-table clients-table"
+        data-upos-column-controls
+        data-clients-directory-table
+        data-clients-search-query="{{ client_filters.q }}"
+        data-clients-sort-key="{{ clients_sort_key }}"
+        data-clients-sort-direction="{{ clients_sort_direction }}"
+      >
+        <thead>
+          <tr>
+            <th class="products-check-col"><input type="checkbox" data-client-directory-select-all aria-label="Выбрать всех клиентов на странице" /></th>
+            <th class="clients-col-id">ИД</th>
+            <th class="clients-col-own">Клиент</th>
+            <th>Название</th>
+            <th>Официальное название</th>
+            <th>Баланс</th>
+            <th>Последняя отгрузка</th>
+            <th>Сегмент</th>
+            <th>Локация</th>
+            <th>Дата создания</th>
+            <th>Телефон</th>
+            <th>Категория</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for client in clients_records %}
+            {% set client_tab_href = url_for('clients_get') ~ '?client=' ~ client.id %}
+            <tr>
+              <td class="products-check-col"><input type="checkbox" value="{{ client.id }}" data-client-map-select data-client-directory-select aria-label="Выбрать {{ client.name }}" /></td>
+              <td class="clients-col-id"><span class="client-id-badge">#{{ client.directory_number }}</span></td>
+              <td class="clients-col-own">
+                {% if client.is_ours %}
+                  <span class="client-own-tag client-own-tag--ours">Клиент</span>
+                {% else %}
+                  <span class="client-own-tag client-own-tag--other">Не клиент</span>
+                {% endif %}
+              </td>
+              <td>
+                <a
+                  class="client-open-link product-cell-main product-cell-meta"
+                  href="{{ client_tab_href }}#client-card"
+                  data-workspace-trigger="profile"
+                  data-workspace-tab-id="client-{{ client.id }}"
+                  data-workspace-view-id="profile"
+                  data-workspace-tab-title="{{ client.name }}"
+                  data-workspace-tab-hash="client-card"
+                  data-workspace-tab-href="{{ client_tab_href }}"
+                  title="{{ client.name }}{% if client.route or client.territory %} · {{ client.route or client.territory }}{% endif %}"
+                >
+                  <strong>{{ client.name }}</strong>
+                  {% if client.route or client.territory %}
+                    <small>{{ client.route or client.territory }}</small>
+                  {% endif %}
+                </a>
+              </td>
+              <td title="{{ client.official_name or '-' }}">{{ client.official_name or "-" }}</td>
+              <td>
+                {# Балансы по каждой валюте отдельно — как у поставщиков. #}
+                {% set balance_lines = client.balance_lines | rejectattr("kind", "equalto", "zero") | list %}
+                {% if not balance_lines %}
+                  <span class="client-balance-empty">-</span>
+                {% else %}
+                  <div class="client-balance-total-lines">
+                    {% for line in balance_lines %}
+                      <span class="client-balance-pill client-balance-pill--{{ line.kind }}">{{ line.display }} {{ line.currency }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </td>
+              <td title="{{ client.last_date or '-' }}">{{ client.last_date or "-" }}</td>
+              <td title="{{ client.business_segment or 'Выбрать сегмент' }}">
+                <div
+                  class="client-directory-segment-picker"
+                  data-client-directory-segment-picker
+                  data-client-id="{{ client.id }}"
+                  data-csrf="{{ csrf_token }}"
+                  data-selected-segment-ids="{{ client.business_segment_ids | tojson | forceescape }}"
+                >
+                  <details class="client-segment-dropdown client-directory-segment-dropdown">
+                    <summary>
+                      <span class="client-directory-segment-summary" data-client-directory-segment-summary>
+                        {% if client.business_segments %}
+                          {% for segment in client.business_segments %}
+                            <span class="client-segment-chip">{{ segment.icon }} {{ segment.name }}</span>
+                          {% endfor %}
+                        {% else %}
+                          <span class="client-directory-segment-empty">Выбрать</span>
+                        {% endif %}
+                      </span>
+                    </summary>
+                    {# Список сегментов не дублируется в каждой строке: он лежит
+                       в одном шаблоне и подставляется при открытии — иначе
+                       страница разрастается до десятка мегабайт. #}
+                    <div class="client-segment-menu client-directory-segment-menu" data-client-segment-lazy-menu>
+                      <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+                      <div class="client-segment-options" data-client-map-segment-options></div>
+                      <small class="client-directory-segment-status" data-client-directory-segment-status aria-live="polite"></small>
+                    </div>
+                  </details>
+                </div>
+              </td>
+              <td
+                class="client-location-state-cell client-location-state-cell--interactive"
+                role="button"
+                tabindex="0"
+                data-client-location-dialog-trigger
+                data-client-id="{{ client.id }}"
+                data-client-name="{{ client.name }}"
+                data-client-lat="{{ client.latitude or '' }}"
+                data-client-lon="{{ client.longitude or '' }}"
+                data-client-address="{{ client.address or '' }}"
+                data-client-icon="{{ client.business_segment_icon or client.map_icon or client.industry or '' }}"
+                data-save-url="{{ url_for('client_location_save_api', counterparty_id=client.id) }}"
+                data-csrf="{{ csrf_token }}"
+                aria-label="Изменить локацию клиента {{ client.name }}"
+                title="Дважды нажмите, чтобы изменить локацию"
+              >
+                {% if client.latitude and client.longitude %}
+                  <span class="client-location-state client-location-state--yes" role="img" aria-label="Локация указана" title="Локация указана">✓</span>
+                {% else %}
+                  <span class="client-location-state client-location-state--no" role="img" aria-label="Локация не указана" title="Локация не указана">×</span>
+                {% endif %}
+              </td>
+              <td title="{{ client.created_at or '-' }}">{{ client.created_at or "-" }}</td>
+              <td title="{{ client.phone or '-' }}">{{ client.phone or "-" }}</td>
+              <td title="{{ client.category or '-' }}">{{ client.category or "-" }}</td>
+              <td class="products-row-actions">
+                <div class="products-row-actions-inner">
+                  <a
+                    class="products-action-icon products-action-icon--edit"
+                    href="{{ client_tab_href }}#client-edit"
+                    data-workspace-trigger="client-edit-{{ client.id }}"
+                    data-workspace-tab-id="client-edit-{{ client.id }}"
+                    data-workspace-view-id="client_edit"
+                    data-workspace-tab-title="Редактировать {{ client.name }}"
+                    data-workspace-tab-hash="client-edit"
+                    data-workspace-tab-href="{{ client_tab_href }}"
+                    title="Редактировать {{ client.name }}"
+                    aria-label="Редактировать {{ client.name }}"
+                  >✎</a>
+                  {% if clients_archive_mode %}
+                    <form method="post" action="{{ url_for('clients_restore', counterparty_id=client.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <button class="btn btn-secondary clients-restore-btn" type="submit" title="Восстановить {{ client.name }}">Восстановить</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{{ url_for('clients_delete', counterparty_id=client.id) }}" onsubmit="return confirm('Переместить клиента «{{ client.name }}» в архив? Его можно будет восстановить.')">
+                      {% include "_csrf_field.html" %}
+                      <button class="products-action-icon products-action-icon--delete" type="submit" title="В архив: {{ client.name }}" aria-label="В архив: {{ client.name }}">🗑</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="11">Клиенты пока не добавлены.</td></tr>
+          {% endfor %}
+        </tbody>
+        {# Итоги по балансу из подвала убраны: в списке клиентов суммы долгов
+           и авансов не нужны, для этого есть раздел должников. #}
+        <tfoot>
+          <tr class="clients-total-row">
+            <td colspan="14">Итого клиенты</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <footer class="products-catalog-footer clients-catalog-footer">
+      <nav class="products-pagination" aria-label="Страницы клиентов" data-ajax-nav data-ajax-targets="#clients-directory-panel" data-ajax-reinit="ClientsInit">
+        <a class="products-page-link {% if clients_page <= 1 %}disabled{% endif %}" href="{{ clients_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+        {% for page_no in clients_pagination_pages %}
+          <a class="products-page-link {% if page_no == clients_page %}active{% endif %}" href="{{ clients_page_urls[page_no] }}" {% if page_no == clients_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+        {% endfor %}
+        <a class="products-page-link {% if clients_page >= clients_total_pages %}disabled{% endif %}" href="{{ clients_next_page_url }}" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. {{ clients_page }} из {{ clients_total_pages }}</span>
+      </nav>
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по списку клиентов">
+          <span>Всего: {{ clients_total }}</span>
+          <span>Показано: {{ clients_page_from }}-{{ clients_page_to }}</span>
+        </div>
+        <label class="products-page-size products-page-size--footer">
+          <span>Показать</span>
+          <select form="clients-filter-form" data-clients-page-size data-ajax-page-size data-ajax-page-param="page_size" data-ajax-reset-params="page" data-ajax-hash="clients" data-ajax-targets="#clients-directory-panel" data-ajax-reinit="ClientsInit">
+            {% for size in [100, 500, 1000] %}
+              <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </footer>
+  </article>
+
+</div>
+
+<dialog
+  class="client-bulk-attach-dialog"
+  data-client-bulk-attach-dialog
+  data-save-url="{{ url_for('clients_bulk_attach_api') }}"
+  data-csrf="{{ csrf_token }}"
+  aria-labelledby="client-bulk-attach-title"
+>
+  <div class="client-bulk-attach-surface">
+    <header class="client-bulk-attach-head">
+      <div>
+        <h2 id="client-bulk-attach-title">Прикрепление</h2>
+        <p>Выбрано клиентов: <strong data-client-bulk-dialog-count>0</strong></p>
+      </div>
+      <button type="button" class="client-location-dialog-close" data-client-bulk-attach-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="client-bulk-attach-grid">
+      <section class="client-bulk-attach-section" data-client-program-dropdown>
+        <h3>Программы</h3>
+        <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+        <div class="client-bulk-attach-options">
+          {% for program in client_program_defaults %}
+            <label data-client-program-option-row><input type="checkbox" value="{{ program }}" data-client-bulk-program /><span>{{ program }}</span></label>
+          {% endfor %}
+          {% for program in client_options.programs %}
+            {% if program not in client_program_defaults %}
+              <label data-client-program-option-row><input type="checkbox" value="{{ program }}" data-client-bulk-program /><span>{{ program }}</span></label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+      <section class="client-bulk-attach-section" data-client-segment-picker>
+        <h3>Сегменты</h3>
+        <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+        <div class="client-bulk-attach-options">
+          {% for segment in client_business_segments %}
+            <label data-client-segment-option-row>
+              <input
+                type="checkbox"
+                value="{{ segment.id }}"
+                data-client-bulk-segment
+                data-client-segment-option
+                data-segment-label="{{ segment.name }}"
+                data-segment-icon="{{ segment.icon }}"
+              />
+              <span>{{ segment.icon }} {{ segment.name }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+    <div class="client-bulk-attach-status" data-client-bulk-attach-status role="status"></div>
+    <footer class="client-bulk-attach-actions">
+      <button type="button" class="btn btn-secondary" data-client-bulk-attach-close>Отмена</button>
+      <button type="button" class="btn" data-client-bulk-attach-save>Прикрепить</button>
+    </footer>
+  </div>
+</dialog>
+
+<dialog class="client-location-dialog" data-client-location-dialog aria-labelledby="client-location-dialog-title">
+  <div class="client-location-dialog-surface">
+    <header class="client-location-dialog-head">
+      <div>
+        <h2 id="client-location-dialog-title" data-client-location-dialog-title>Локация клиента</h2>
+        <p>Нажмите на карту или перетащите маркер в нужную точку.</p>
+      </div>
+      <button type="button" class="client-location-dialog-close" data-client-location-dialog-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="client-location-search client-location-dialog-search" data-client-location-search-box>
+      <input
+        type="search"
+        placeholder="Найдите улицу, район или ориентир"
+        data-client-location-search
+        aria-label="Поиск адреса на карте"
+      />
+      <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+      <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+      <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Найденные адреса" hidden></ul>
+    </div>
+    <div class="client-location-dialog-map" data-client-location-dialog-map aria-label="Выбор точки клиента на карте"></div>
+    <div class="client-location-dialog-status" data-client-location-dialog-status role="status">Выберите точку на карте.</div>
+    <footer class="client-location-dialog-actions">
+      <button type="button" class="btn btn-secondary" data-client-location-dialog-close>Отмена</button>
+      <button type="button" class="btn" data-client-location-dialog-save disabled>Сохранить точку</button>
+    </footer>
+  </div>
+</dialog>
+
+<section
+  id="clients-map"
+  class="products-list-panel clients-map-shell"
+  data-workspace-view="clients_map"
+  data-clients-map-saved-filter="{{ (clients_map_filter or {}) | tojson | forceescape }}"
+  hidden
+>
+  <header class="products-panel-head">
+    <div>
+      <h2>Карта клиентов</h2>
+      <span>Все клиенты и состояние их локации</span>
+    </div>
+  </header>
+  <section class="clients-map-insights" data-clients-map-insights aria-live="polite">
+    <header class="clients-map-insights-head">
+      <div>
+        <span>Сводка по текущему фильтру</span>
+        <strong data-clients-map-filter-label>Все клиенты на карте</strong>
+      </div>
+      <div class="clients-map-head-actions">
+        <span class="clients-map-filter-summary" data-clients-map-filter-summary>Без фильтров</span>
+        <div class="clients-map-ownership" role="group" aria-label="Кто из клиентов работает с нами">
+          <button type="button" data-clients-map-ownership="" aria-pressed="true">Все</button>
+          <button type="button" data-clients-map-ownership="ours" aria-pressed="false">Наши клиенты</button>
+          <button type="button" data-clients-map-ownership="others" aria-pressed="false">Не наши</button>
+        </div>
+        <button type="button" class="btn btn-secondary" data-clients-map-filter-open>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg>
+          <span>Фильтр</span>
+          <span class="clients-map-filter-count" data-clients-map-filter-count hidden>0</span>
+        </button>
+        <button type="button" class="btn btn-secondary" data-clients-map-show-all hidden>Показать всех</button>
+      </div>
+    </header>
+    <div class="clients-map-kpi-grid">
+      <article class="clients-map-kpi clients-map-kpi--total">
+        <span>Клиенты</span>
+        <strong data-clients-map-total>0</strong>
+        <small>попали в текущий фильтр</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--active">
+        <span>Активные</span>
+        <strong data-clients-map-active>0</strong>
+        <small data-clients-map-active-share>0% от выбранных</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--no-location">
+        <span>Без локации</span>
+        <strong data-clients-map-no-location>0</strong>
+        <small data-clients-map-no-location-share>0% от выбранных</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--segments">
+        <span>Сегменты</span>
+        <strong data-clients-map-segment-total>0</strong>
+        <small>разных сегментов</small>
+      </article>
+      <article class="clients-map-kpi clients-map-kpi--programs">
+        <span>Программы</span>
+        <strong data-clients-map-program-total>0</strong>
+        <small>используют клиенты</small>
+      </article>
+    </div>
+    <div class="clients-map-breakdowns">
+      <section class="clients-map-breakdown">
+        <header><h3>Клиенты по сегментам</h3><span>Количество</span></header>
+        <div class="clients-map-breakdown-grid" data-clients-map-segment-breakdown></div>
+      </section>
+      <section class="clients-map-breakdown">
+        <header><h3>Клиенты по программам</h3><span>Количество</span></header>
+        <div class="clients-map-breakdown-grid" data-clients-map-program-breakdown></div>
+      </section>
+    </div>
+  </section>
+
+
+  <dialog class="clients-map-filter-dialog" data-clients-map-filter-dialog data-clients-map-filter>
+    <form method="dialog" class="clients-map-filter-form">
+      <header class="clients-map-filter-dialog-head">
+        <div>
+          <strong>Настройка фильтра</strong>
+          <span>Шаблон сохраняется и применяется при следующем входе</span>
+        </div>
+        <button type="button" class="btn btn-secondary" data-clients-map-filter-close aria-label="Закрыть">✕</button>
+      </header>
+
+      <div class="clients-map-filter-grid">
+        <label class="clients-map-filter-field">
+          <span>Тип клиента</span>
+          <select data-clients-map-type>
+            <option value="">Все типы</option>
+            <option value="company">Компания</option>
+            <option value="individual">Физическое лицо</option>
+          </select>
+        </label>
+
+        <label class="clients-map-filter-field">
+          <span>Категория</span>
+          <select data-clients-map-category>
+            <option value="">Все категории</option>
+            {% for item in client_options.categories %}<option value="{{ item }}">{{ item }}</option>{% endfor %}
+          </select>
+        </label>
+
+        <label class="clients-map-filter-field">
+          <span>Статус</span>
+          <select data-clients-map-status>
+            <option value="">Все</option>
+            <option value="active">Активный</option>
+            <option value="inactive">Неактивный</option>
+          </select>
+        </label>
+
+        <label class="clients-map-filter-field">
+          <span>Локация</span>
+          <select data-clients-map-location-select>
+            <option value="">Любая</option>
+            <option value="coords">С координатами</option>
+            <option value="address">Только адрес</option>
+            <option value="missing">Без локации</option>
+          </select>
+        </label>
+
+        <div class="clients-map-filter-field clients-map-filter-field--wide">
+          <span>Программа</span>
+          <div class="clients-map-filter-options" data-clients-map-filter-options>
+            {% for item in client_options.programs %}
+              <label data-client-program-option-row>
+                <input type="checkbox" value="{{ item }}" data-clients-map-program />
+                <span>{{ item }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="clients-map-filter-field clients-map-filter-field--wide">
+          <span>Сегмент</span>
+          <div class="clients-map-filter-options" data-clients-map-filter-options>
+            {% for segment in client_business_segments %}
+              <label data-client-segment-option-row>
+                <input type="checkbox" value="{{ segment.name }}" data-clients-map-segment />
+                <span>{{ segment.icon }} {{ segment.name }}</span>
+              </label>
+            {% else %}
+              <span class="clients-map-filter-empty">Сегменты пока не заведены</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <footer class="clients-map-filter-dialog-foot">
+        <button type="button" class="btn btn-secondary" data-clients-map-clear>Сбросить</button>
+        <span class="clients-map-filter-status" data-clients-map-filter-status role="status"></span>
+        <button type="button" class="btn" data-clients-map-filter-save>Сохранить</button>
+      </footer>
+    </form>
+  </dialog>
+
+  {% set map_clients = clients_map_records %}
+  <div class="clients-map-layout">
+    <div class="clients-map-frame">
+      <div class="client-location-search clients-overview-location-search" data-client-location-search-box>
+        <input
+          type="search"
+          placeholder="Найдите адрес или ориентир на карте"
+          data-client-location-search
+          aria-label="Поиск адреса на общей карте клиентов"
+        />
+        <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+        <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+        <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Найденные адреса" hidden></ul>
+      </div>
+      {% set first_map_client = map_clients|selectattr('latitude')|first %}
+      <div
+        class="clients-overview-map{% if not first_map_client or not first_map_client.latitude or not first_map_client.longitude %} clients-overview-map--empty{% endif %}"
+        data-clients-overview-map
+        {% if first_map_client and first_map_client.latitude and first_map_client.longitude %}
+          data-default-lat="{{ first_map_client.latitude }}"
+          data-default-lon="{{ first_map_client.longitude }}"
+        {% endif %}
+      >
+        <div class="clients-map-empty">У клиентов пока нет сохраненной геолокации.</div>
+        <section class="clients-map-point-picker" data-clients-map-point-picker hidden aria-live="polite">
+          <div class="clients-map-point-picker-copy">
+            <strong data-clients-map-point-picker-title>Выберите местоположение</strong>
+            <span data-clients-map-point-picker-status>Поставьте точку на карте или перетащите маркер.</span>
+          </div>
+          <div class="clients-map-point-picker-actions">
+            <button type="button" class="btn btn-secondary" data-clients-map-point-picker-cancel>Отмена</button>
+            <button type="button" class="btn btn-primary" data-clients-map-point-picker-save>Сохранить</button>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div class="clients-map-list">
+      <template data-client-map-segment-options-template>
+        {% for segment in client_business_segments %}
+          <label data-client-segment-option-row>
+            <input
+              type="checkbox"
+              value="{{ segment.id }}"
+              data-client-directory-segment-option
+              data-segment-label="{{ segment.name }}"
+              data-segment-icon="{{ segment.icon }}"
+            />
+            <span>{{ segment.icon }} {{ segment.name }}</span>
+          </label>
+        {% endfor %}
+      </template>
+      <table
+        class="org-ops-table clients-map-table"
+        data-upos-no-column-controls
+      >
+        <thead>
+          <tr>
+            <th class="clients-map-select-column">
+              <input type="checkbox" data-clients-map-select-all aria-label="Выбрать всех видимых клиентов" />
+            </th>
+            <th class="clients-map-client-column">
+              <span>Клиент</span>
+              <input type="search" placeholder="Поиск клиента" aria-label="Поиск клиента" data-clients-map-search />
+            </th>
+            <th>Сегмент</th>
+            <th class="clients-map-location-column">Локация</th>
+            <th>Адрес</th>
+          </tr>
+        </thead>
+        <tbody data-clients-map-body>
+          {# Строки лежат в template: браузер не строит из них живой DOM, пока
+             вкладка карты закрыта. Иначе почти тысяча строк размечается впустую. #}
+          <template data-clients-map-rows>
+{% include "_clients_map_rows.html" %}
+          </template>
+        </tbody>
+        {% if map_clients %}
+          <tfoot>
+            <tr>
+              <td colspan="5">
+                <div class="clients-map-location-filters" aria-label="Фильтр по наличию локации">
+                  <button type="button" class="is-active" data-clients-map-location-filter="" aria-pressed="true">Итого: {{ clients_map_counts.total }}</button>
+                  <button type="button" data-clients-map-location-filter="coords" aria-pressed="false">С координатами: {{ clients_map_counts.coords }}</button>
+                  <button type="button" data-clients-map-location-filter="address" aria-pressed="false">Только адрес: {{ clients_map_counts.address }}</button>
+                  <button type="button" data-clients-map-location-filter="missing" aria-pressed="false">Без локации: {{ clients_map_counts.missing }}</button>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
+      {% if map_clients %}
+        {# Футер как в журнале продаж: страницы, счётчики и размер показа. #}
+        <footer class="products-catalog-footer clients-map-list-footer" data-clients-map-footer>
+          <nav class="products-pagination" aria-label="Страницы списка клиентов" data-clients-map-pages></nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Информация по списку клиентов">
+              <span data-clients-map-total>Всего: {{ clients_map_counts.total }}</span>
+              <span data-clients-map-shown>Показано: {{ clients_map_counts.total }}</span>
+              {# Сохранённый шаблон фильтра применялся молча: человек видел
+                 часть базы и не понимал, почему клиентов мало. #}
+              <button type="button" class="clients-map-filter-reset" data-clients-map-filter-reset hidden>
+                Фильтр активен · показать всех
+              </button>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select data-clients-map-page-size-select aria-label="Количество клиентов на странице">
+                <option value="50">50 шт</option>
+                <option value="100">100 шт</option>
+                <option value="500">500 шт</option>
+                <option value="1000">1000 шт</option>
+                <option value="2000">2000 шт</option>
+                <option value="" selected>Макс</option>
+              </select>
+            </label>
+          </div>
+        </footer>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section id="client-create" class="products-list-panel client-create-shell" data-workspace-view="client_create" hidden>
+  <header class="products-panel-head">
+    <div>
+      <h2>Создание клиента</h2>
+      <span>Карточка клиента</span>
+    </div>
+  </header>
+  <form method="post" action="{{ url_for('clients_save') }}" class="product-form client-create-form client-photo-form" enctype="multipart/form-data">
+    {% include "_csrf_field.html" %}
+    <div class="client-edit-photo-row">
+      <div class="client-profile-photo client-profile-photo--edit" data-client-photo-preview aria-hidden="true"><span></span></div>
+      <div class="product-form-grid client-photo-data-table">
+        <label class="wide"><span>Название клиента*</span><input name="name" required /></label>
+        <div class="client-photo-source-field wide">
+          <span>Фото</span>
+          <div class="client-photo-source-controls">
+            <input name="photo_url" type="text" inputmode="url" placeholder="URL фото: https://..." data-client-photo-url />
+            <input name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-client-photo-file />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="product-form-grid client-data-table">
+      <label><span>Официальное название</span><input name="official_name" /></label>
+      <label><span>Тип клиента</span><select name="client_type"><option value="company">Компания</option><option value="individual">Физическое лицо</option></select></label>
+      <label><span>Телефон</span><input name="phone" data-uz-phone placeholder="+998 90 123 45 67" /></label>
+      <label><span>Telegram номер</span><input name="telegram_phone" data-uz-phone placeholder="+998 90 123 45 67" /></label>
+      <label><span>ИНН</span><input name="tax_id" /></label>
+      <label><span>ПИНФЛ</span><input name="pinfl" /></label>
+      <label><span>Категория</span><input name="category" list="client-category-list" /></label>
+      <label>
+        <span>Иконка на карте</span>
+        <select name="map_icon" data-client-map-icon>
+          <option value="default">Обычная</option>
+          <option value="Продуктовый">Продуктовый</option>
+          <option value="Ресторан">Ресторан</option>
+          <option value="Кафе">Кафе</option>
+          <option value="Одежда">Одежда</option>
+          <option value="Аксессуар">Аксессуар</option>
+        </select>
+      </label>
+      <label>
+        <span>CRM статус</span>
+        <select name="crm_status">
+          <option value="new_lead">Новый лид</option>
+          <option value="qualification">Квалификация</option>
+          <option value="negotiation">Переговоры</option>
+          <option value="invoice">Счёт</option>
+          <option value="our_client">Наш клиент</option>
+          <option value="lost">Потеряно</option>
+          <option value="in_work">В работе</option>
+          <option value="paused">Пауза</option>
+        </select>
+      </label>
+      <div class="client-segment-picker" data-client-segment-picker>
+        <span>Сегменты</span>
+        <details class="client-segment-dropdown">
+          <summary><span data-client-segment-summary>Не выбраны</span></summary>
+          <div class="client-segment-menu">
+            <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+            <div class="client-segment-options">
+              {% for segment in client_business_segments %}
+                <label data-client-segment-option-row>
+                  <input type="checkbox" name="business_segment_ids" value="{{ segment.id }}" data-client-segment-option data-segment-label="{{ segment.name }}" data-segment-icon="{{ segment.icon }}" />
+                  <span>{{ segment.icon }} {{ segment.name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="client-program-picker">
+        <span>Программы клиента</span>
+        <details class="client-program-dropdown client-segment-dropdown" data-client-program-dropdown>
+          <summary><span data-client-program-summary>Не выбраны</span></summary>
+          <div class="client-program-menu client-segment-menu">
+            <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+            <div class="client-program-options client-segment-options">
+              {% for program in client_program_defaults %}
+                <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" /><span>{{ program }}</span></label>
+              {% endfor %}
+              {% for program in client_options.programs %}
+                {% if program not in client_program_defaults %}
+                  <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" /><span>{{ program }}</span></label>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <input class="client-program-custom-input" name="program_custom" list="client-program-list" placeholder="Другая программа" />
+          </div>
+        </details>
+      </div>
+      <div class="client-location-panel wide">
+        <input type="hidden" name="address" data-client-address />
+        <input type="hidden" name="latitude" data-client-latitude />
+        <input type="hidden" name="longitude" data-client-longitude />
+        <div class="client-location-search" data-client-location-search-box>
+          <input type="search" placeholder="Найдите улицу, район или ориентир" data-client-location-search aria-label="Поиск по карте" />
+          <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+          <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+          <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Варианты на карте" hidden></ul>
+        </div>
+        <div class="client-location-actions">
+          <button class="btn btn-secondary" type="button" data-client-geolocate>Найти по геолокации</button>
+          <a class="btn btn-secondary" href="#" target="_blank" rel="noreferrer" data-client-map-link hidden>Открыть карту</a>
+        </div>
+        <div class="client-location-status" data-client-location-status>Локация не выбрана</div>
+        <div class="client-location-map client-location-map--empty" title="Карта клиента" data-client-map role="button" tabindex="0" aria-label="Выбрать точку клиента на карте">
+          <div class="client-location-map-grid"></div>
+          <div class="client-location-map-road client-location-map-road--main"></div>
+          <div class="client-location-map-road client-location-map-road--side"></div>
+          <div class="client-location-map-road client-location-map-road--cross"></div>
+          <div class="client-location-zone client-location-zone--a"></div>
+          <div class="client-location-zone client-location-zone--b"></div>
+          <div class="client-location-marker" data-client-map-marker hidden>
+            <span></span>
+            <strong>Клиент</strong>
+          </div>
+          <div class="client-location-map-hint">Нажмите на карту, чтобы выбрать точку клиента</div>
+        </div>
+      </div>
+      <label><span>Прайс-лист</span><input name="price_type" placeholder="ПРОДАЖНАЯ ЦЕНА" /></label>
+      <label><span>Кредитный лимит</span><input name="credit_limit" inputmode="decimal" /></label>
+      <label><span>Статус</span><select name="status"><option value="active">Активный</option><option value="inactive">Неактивный</option></select></label>
+      <label><span>Черный список</span><select name="is_blacklisted"><option value="0">Нет</option><option value="1">Да</option></select></label>
+      <label class="wide"><span>Комментарий</span><input name="comment" /></label>
+    </div>
+    <div class="product-form-actions">
+      <button class="btn" type="submit">Сохранить клиента</button>
+      <a class="btn btn-secondary" href="{{ url_for('clients_get') }}#clients">Отмена</a>
+    </div>
+  </form>
+</section>
+
+{% if selected_client_card %}
+  {% set selected_client_href = url_for('clients_get') ~ '?client=' ~ selected_client_card.id %}
+  <span
+    hidden
+    data-workspace-trigger="profile"
+    data-workspace-tab-id="client-{{ selected_client_card.id }}"
+    data-workspace-view-id="profile"
+    data-workspace-tab-title="{{ selected_client_card.name }}"
+    data-workspace-tab-hash="client-card"
+    data-workspace-tab-href="{{ selected_client_href }}"
+  ></span>
+
+  <section class="client-card-shell" id="client-card" data-workspace-view="profile" hidden>
+    <header class="client-card-header">
+      <div>
+        <div class="client-profile-breadcrumb">
+          <a href="{{ url_for('clients_get') }}#clients">← Клиенты</a>
+          <span>›</span>
+          <strong>{{ selected_client_card.name }}</strong>
+          <a class="client-crm-tag" data-status="{{ selected_client_card.crm_status }}" href="{{ url_for('crm_get') }}?client={{ selected_client_card.name|urlencode }}#deals">{{ selected_client_card.crm_status_label }}</a>
+        </div>
+        <p>{{ selected_client_card.official_name or selected_client_card.category or "Клиентская карточка" }}</p>
+      </div>
+      <div class="client-card-actions">
+        <a
+          class="products-action-icon products-action-icon--edit"
+          href="{{ selected_client_href }}#client-edit"
+          data-workspace-trigger="client-edit-{{ selected_client_card.id }}"
+          data-workspace-tab-id="client-edit-{{ selected_client_card.id }}"
+          data-workspace-view-id="client_edit"
+          data-workspace-tab-title="Редактировать {{ selected_client_card.name }}"
+          data-workspace-tab-hash="client-edit"
+          data-workspace-tab-href="{{ selected_client_href }}"
+          title="Редактировать клиента"
+          aria-label="Редактировать клиента"
+        >✎</a>
+        <div class="client-document-menu" data-client-document-menu>
+          <button
+            class="btn client-document-menu-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            data-client-document-menu-toggle
+          >+ Новый документ</button>
+          <div class="client-document-menu-list" role="menu" data-client-document-menu-list hidden>
+            <a role="menuitem" href="{{ url_for('home_kassa') }}?new=payment&amp;client={{ selected_client_card.name|urlencode }}">Оплата</a>
+            <a role="menuitem" href="{{ url_for('home_kassa') }}?new=refund&amp;client={{ selected_client_card.name|urlencode }}">Возврат средств</a>
+            <a role="menuitem" href="{{ url_for('sales_get') }}?doc_type=order&amp;client={{ selected_client_card.name|urlencode }}#sales-form">Заказ</a>
+            <a role="menuitem" href="{{ url_for('sales_get') }}?doc_type=return&amp;client={{ selected_client_card.name|urlencode }}#sales-form">Возврат товара</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="client-profile-layout">
+      <aside class="client-profile-side">
+        <div class="client-profile-photo" aria-hidden="true">
+          {% if selected_client_card.photo_url %}
+            <img src="{{ selected_client_card.photo_url }}" alt="" loading="lazy" />
+          {% else %}
+            <span></span>
+          {% endif %}
+        </div>
+        <nav class="client-profile-menu" aria-label="Разделы клиента">
+          <a class="active" href="#info" data-client-section-nav="info">Информация</a>
+          <a href="#act" data-client-section-nav="act">Акт сверки</a>
+          <a href="#paymentReceivedList" data-client-section-nav="paymentReceivedList">Входящие платежи</a>
+          <a href="#shipment" data-client-section-nav="shipment">Отгрузки</a>
+          <a href="#location" data-client-section-nav="location">Локация</a>
+          <a href="#tasks" data-client-section-nav="tasks">Задачи</a>
+          <a href="#note" data-client-section-nav="note">Заметки</a>
+          <a href="#sms" data-client-section-nav="sms">Переписка</a>
+          <a href="#history" data-client-section-nav="history">История</a>
+        </nav>
+      </aside>
+
+      <main class="client-profile-main">
+    <div class="client-card-metrics" id="info" data-client-section-panel="info">
+      <div>
+        <span>Баланс</span>
+        <div class="client-balance-lines">
+          {% for line in selected_client_card.balance_lines %}
+            <strong class="client-balance-line client-balance-line--{{ line.kind }}">{{ line.display }}{% if line.display != "-" %} {{ line.currency }}{% endif %}</strong>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <span>Продажи</span>
+        <strong>{{ selected_client_card.summary.sales }} UZS</strong>
+      </div>
+      <div>
+        <span>Оплачено</span>
+        <strong>{{ selected_client_card.summary.paid }} UZS</strong>
+      </div>
+      <div>
+        <span>Заказы / задачи</span>
+        <strong>{{ selected_client_card.summary.orders_count }} / {{ selected_client_card.summary.tasks_count }}</strong>
+      </div>
+    </div>
+
+    <div class="client-card-grid">
+      <article class="client-card-panel client-card-panel--wide" id="act" data-client-section-panel="act">
+        <header>
+          <div>
+            <h3>Акт сверки</h3>
+            <span>Документы, оплаты и текущий остаток</span>
+          </div>
+          <div class="client-balance-lines client-balance-lines--compact">
+            {% for line in selected_client_card.balance_lines %}
+              <strong class="client-balance-line client-balance-line--{{ line.kind }}">{{ line.display }}{% if line.display != "-" %} {{ line.currency }}{% endif %}</strong>
+            {% endfor %}
+          </div>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Дебит</th>
+                <th>Кредит</th>
+                <th>Баланс</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.reconciliation %}
+                <tr>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.document }}</td>
+                  <td>{{ row.debit }} {{ row.currency }}</td>
+                  <td>{{ row.credit }} {{ row.currency }}</td>
+                  <td>{{ row.balance }} {{ row.currency }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5">Документов для акта сверки пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+            {% if selected_client_card.reconciliation %}
+              {% set reconciliation_totals = selected_client_card.reconciliation_totals|default(none) %}
+              {% set reconciliation_currency = reconciliation_totals.currency if reconciliation_totals else 'UZS' %}
+              <tfoot>
+                <tr class="client-act-total-row">
+                  <td colspan="2">Итого</td>
+                  <td>{{ reconciliation_totals.debit if reconciliation_totals else '0' }} {{ reconciliation_currency }}</td>
+                  <td>{{ reconciliation_totals.credit if reconciliation_totals else '0' }} {{ reconciliation_currency }}</td>
+                  <td>{{ reconciliation_totals.balance if reconciliation_totals else '0' }} {{ reconciliation_currency }}</td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+      </article>
+
+      <aside class="client-card-panel" data-client-section-panel="info">
+        <header>
+          <div>
+            <h3>Информация</h3>
+            <span>Контакты, адрес и реквизиты</span>
+          </div>
+        </header>
+        <dl class="client-card-info">
+          <div><dt>Телефон</dt><dd>{{ selected_client_card.phone or "-" }}</dd></div>
+          <div><dt>Telegram</dt><dd>{{ selected_client_card.telegram_phone or "-" }}</dd></div>
+          <div><dt>Email</dt><dd>{{ selected_client_card.email or "-" }}</dd></div>
+          <div><dt>ИНН</dt><dd>{{ selected_client_card.inn or "-" }}</dd></div>
+          <div><dt>ПИНФЛ</dt><dd>{{ selected_client_card.pinfl or "-" }}</dd></div>
+          <div><dt>Территория</dt><dd>{{ selected_client_card.territory or "-" }}</dd></div>
+          <div><dt>Локация</dt><dd>{{ selected_client_card.address or selected_client_card.route or "-" }}</dd></div>
+          <div><dt>CRM статус</dt><dd><a class="client-crm-tag" data-status="{{ selected_client_card.crm_status }}" href="{{ url_for('crm_get') }}?client={{ selected_client_card.name|urlencode }}#deals">{{ selected_client_card.crm_status_label }}</a></dd></div>
+          <div><dt>Отрасль</dt><dd>{{ selected_client_card.industry or "-" }}</dd></div>
+          <div><dt>Категория</dt><dd>{{ selected_client_card.category or "-" }}</dd></div>
+          <div><dt>Адрес</dt><dd>{{ selected_client_card.address or "-" }}</dd></div>
+          <div><dt>Прайс-лист</dt><dd>{{ selected_client_card.price_type or "-" }}</dd></div>
+          <div><dt>Кредитный лимит</dt><dd>{{ selected_client_card.credit_limit or "-" }}</dd></div>
+        </dl>
+      </aside>
+    </div>
+
+    <article
+      class="client-card-panel client-card-panel--wide client-card-location-card"
+      id="location"
+      data-client-section-panel="location"
+      hidden
+    >
+      <header>
+        <div>
+          <h3>Локация</h3>
+          <span>Адрес клиента и точка на карте</span>
+        </div>
+        {% if selected_client_card.latitude and selected_client_card.longitude %}
+          <a class="btn btn-secondary" href="https://www.openstreetmap.org/?mlat={{ selected_client_card.latitude }}&mlon={{ selected_client_card.longitude }}#map=17/{{ selected_client_card.latitude }}/{{ selected_client_card.longitude }}" target="_blank" rel="noreferrer">Открыть карту</a>
+        {% endif %}
+      </header>
+      <div class="client-location-search" data-client-location-search-box>
+        <input
+          type="search"
+          placeholder="Найдите территорию: улица, район, ориентир"
+          value="{{ selected_client_card.address or '' }}"
+          data-client-location-search
+          aria-label="Поиск территории на карте"
+        />
+        <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+        <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+        <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Варианты территории" hidden></ul>
+      </div>
+      <div
+        class="client-location-map client-card-location-map{% if not selected_client_card.latitude and not selected_client_card.longitude and not selected_client_card.address %} client-location-map--empty{% endif %}"
+        data-client-card-map
+        data-client-id="{{ selected_client_card.id }}"
+        data-save-url="{{ url_for('client_location_save_api', counterparty_id=selected_client_card.id) }}"
+        data-csrf="{{ csrf_token }}"
+        data-lat="{{ selected_client_card.latitude or '' }}"
+        data-lon="{{ selected_client_card.longitude or '' }}"
+        data-address="{{ selected_client_card.address or '' }}"
+        data-name="{{ selected_client_card.name }}"
+        data-icon="{{ selected_client_card.map_icon or selected_client_card.industry or '' }}"
+        data-category="{{ selected_client_card.category or '' }}"
+      >
+        <p class="client-location-map-hint">
+          {% if selected_client_card.address %}
+            {{ selected_client_card.address }}
+          {% else %}
+            Адрес и координаты клиента пока не указаны.
+          {% endif %}
+        </p>
+      </div>
+    </article>
+
+    <div class="client-card-grid client-card-grid--even">
+      <article class="client-card-panel" id="shipment" data-client-section-panel="shipment">
+        <header>
+          <div>
+            <h3>Отгрузки и заказы</h3>
+            <span>Последние документы клиента</span>
+          </div>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Тип</th>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.orders + selected_client_card.sales + selected_client_card.returns %}
+                <tr>
+                  <td>{{ row.number }}</td>
+                  <td>{{ row.doc_type_label }}</td>
+                  <td>{{ row.date or "-" }}</td>
+                  <td>{{ row.amount }} {{ row.currency }}</td>
+                  <td>{{ row.status_label }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5">Заказов и продаж по клиенту пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="client-card-panel" id="tasks" data-client-section-panel="tasks">
+        <header>
+          <div>
+            <h3>Задачи</h3>
+            <span>CRM-работа по клиенту</span>
+          </div>
+          <a class="btn btn-secondary" href="{{ url_for('crm_get') }}#tasks">+ Добавить задачу</a>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Задача</th>
+                <th>Исполнитель</th>
+                <th>Срок</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.tasks %}
+                <tr>
+                  <td><strong>{{ row.title }}</strong><small>{{ row.note or row.stage }}</small></td>
+                  <td>{{ row.responsible or "-" }}</td>
+                  <td>{{ row.due_date or row.date or "-" }}</td>
+                  <td>{{ row.status_label }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4">Задач по клиенту пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+
+    <div class="client-card-grid client-card-grid--even">
+      <article class="client-card-panel" id="paymentReceivedList" data-client-section-panel="paymentReceivedList">
+        <header>
+          <div>
+            <h3>Входящие платежи</h3>
+            <span>
+              {% if selected_client_card.payments_total %}
+                Принято: {{ selected_client_card.payments_total | join(' · ') }}
+              {% else %}
+                Оплаты клиента по документам
+              {% endif %}
+            </span>
+          </div>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table client-card-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Счёт</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in selected_client_card.payments %}
+                <tr>
+                  <td>{{ row.date or "-" }}</td>
+                  <td>{{ row.document }}</td>
+                  <td>{{ row.account or row.type }}</td>
+                  <td class="num">{{ row.amount }} {{ row.currency }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4">Оплат от клиента пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+      <article class="client-card-panel" id="note" data-client-section-panel="note">
+        <header>
+          <div>
+            <h3>Заметки</h3>
+            <span>Комментарий и вложения</span>
+          </div>
+        </header>
+        <div class="client-note-box">
+          <textarea readonly>{{ selected_client_card.comment or selected_client_card.note or "" }}</textarea>
+          <button class="btn btn-secondary" type="button" disabled>Прикрепить файл</button>
+        </div>
+      </article>
+    </div>
+
+    <article class="client-card-panel" id="sms" data-client-section-panel="sms">
+      <header>
+        <div>
+          <h3>Переписка</h3>
+          <span>Платформа общения, контакт и история сообщений</span>
+        </div>
+        <strong>{{ selected_client_card.summary.messages_count + selected_client_card.summary.calls_count }}</strong>
+      </header>
+      <div class="client-card-conversations">
+        {% for row in selected_client_card.conversations %}
+          <div class="client-card-conversation">
+            <strong><span class="client-platform-badge">{{ row.channel }}</span>{{ row.title }}</strong>
+            <span>{{ row.username or row.phone or row.chat_title or "Контакт привязан" }}</span>
+            <small>Статус: {{ row.status }}{% if row.chat_id %} · chat {{ row.chat_id }}{% endif %}</small>
+          </div>
+        {% endfor %}
+        {% for row in selected_client_card.correspondence %}
+          <div class="client-card-conversation">
+            <strong><span class="client-platform-badge">CRM</span>{{ row.title }}</strong>
+            <span>{{ row.note or row.contact_type or row.date or "CRM история" }}</span>
+            <small>{{ row.note or row.status_label }}</small>
+          </div>
+        {% endfor %}
+        {% for row in selected_client_card.calls %}
+          <div class="client-card-conversation">
+            <strong><span class="client-platform-badge">Телефония</span>{{ row.direction_label }}</strong>
+            <span>{{ row.phone or "Номер не указан" }}{% if row.responsible %} · {{ row.responsible }}{% endif %}</span>
+            <small>{{ row.started_at or "-" }} · {{ row.status_label }}{% if row.comment %} · {{ row.comment }}{% endif %}</small>
+          </div>
+        {% endfor %}
+        {% if not selected_client_card.conversations and not selected_client_card.correspondence and not selected_client_card.calls %}
+          <p class="client-card-empty">Переписок по клиенту пока нет.</p>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="client-card-panel client-card-panel--wide" id="history" data-client-section-panel="history" hidden>
+      <header>
+        <div>
+          <h3>История карточки</h3>
+          <span>Создание клиента и дальнейшие действия в системе</span>
+        </div>
+        <strong>{{ selected_client_card.history|length }}</strong>
+      </header>
+      <div class="client-history-list">
+        {% for row in selected_client_card.history %}
+          <div class="client-history-item client-history-item--{{ row.category }}">
+            <time>{{ row.date or "-" }}</time>
+            <div>
+              <strong>{{ row.title }}</strong>
+              {% if row.detail %}<span>{{ row.detail }}</span>{% endif %}
+            </div>
+            {% if row.amount or row.status %}
+              <small>{% if row.amount %}{{ row.amount }}{% endif %}{% if row.amount and row.status %} · {% endif %}{% if row.status %}{{ row.status }}{% endif %}</small>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="client-card-empty">Истории по клиенту пока нет.</p>
+        {% endfor %}
+      </div>
+    </article>
+      </main>
+    </div>
+  </section>
+
+  <section id="client-edit" class="products-list-panel client-create-shell client-edit-shell" data-workspace-view="client_edit" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Редактировать клиента</h2>
+        <span>{{ selected_client_card.name }}</span>
+      </div>
+    </header>
+    <form method="post" action="{{ url_for('clients_save') }}" class="product-form client-create-form client-photo-form" enctype="multipart/form-data">
+      {% include "_csrf_field.html" %}
+      <input type="hidden" name="client_id" value="{{ selected_client_card.id }}" />
+      <input type="hidden" name="return_to_card" value="1" />
+      <div class="client-edit-photo-row">
+        <div class="client-profile-photo client-profile-photo--edit" data-client-photo-preview aria-hidden="true">
+          {% if selected_client_card.photo_url %}
+            <img src="{{ selected_client_card.photo_url }}" alt="" loading="lazy" />
+          {% else %}
+            <span></span>
+          {% endif %}
+        </div>
+        <div class="product-form-grid client-photo-data-table">
+          <label class="wide"><span>Название клиента*</span><input name="name" value="{{ selected_client_card.name }}" required /></label>
+          <div class="client-photo-source-field wide">
+            <span>Фото</span>
+            <div class="client-photo-source-controls">
+              {# type="text": загруженное фото хранится относительным путём, а
+                 type="url" блокировал сабмит формы ошибкой «Введите URL». #}
+              <input name="photo_url" type="text" inputmode="url" value="{{ selected_client_card.photo_url or '' }}" placeholder="URL фото: https://..." data-client-photo-url />
+              <input name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-client-photo-file />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="product-form-grid client-data-table">
+        <input type="hidden" name="email" value="{{ selected_client_card.email or '' }}" />
+        <label><span>Официальное название</span><input name="official_name" value="{{ selected_client_card.official_name or '' }}" /></label>
+        <label><span>Тип клиента</span><select name="client_type"><option value="company" {% if selected_client_card.client_type == 'company' %}selected{% endif %}>Компания</option><option value="individual" {% if selected_client_card.client_type == 'individual' %}selected{% endif %}>Физическое лицо</option></select></label>
+        <label><span>Телефон</span><input name="phone" data-uz-phone placeholder="+998 90 123 45 67" value="{{ selected_client_card.phone or '' }}" /></label>
+        <label><span>Telegram номер</span><input name="telegram_phone" data-uz-phone placeholder="+998 90 123 45 67" value="{{ selected_client_card.telegram_phone or '' }}" /></label>
+        <label><span>ИНН</span><input name="tax_id" value="{{ selected_client_card.inn or '' }}" /></label>
+        <label><span>ПИНФЛ</span><input name="pinfl" value="{{ selected_client_card.pinfl or '' }}" /></label>
+        <label><span>Категория</span><input name="category" list="client-category-list" value="{{ selected_client_card.category or '' }}" /></label>
+        <label>
+          <span>Иконка на карте</span>
+          <select name="map_icon" data-client-map-icon>
+            <option value="default" {% if selected_client_card.map_icon == 'default' %}selected{% endif %}>Обычная</option>
+            <option value="Продуктовый" {% if selected_client_card.map_icon == 'Продуктовый' %}selected{% endif %}>Продуктовый</option>
+            <option value="Ресторан" {% if selected_client_card.map_icon == 'Ресторан' %}selected{% endif %}>Ресторан</option>
+            <option value="Кафе" {% if selected_client_card.map_icon == 'Кафе' %}selected{% endif %}>Кафе</option>
+            <option value="Одежда" {% if selected_client_card.map_icon == 'Одежда' %}selected{% endif %}>Одежда</option>
+            <option value="Аксессуар" {% if selected_client_card.map_icon == 'Аксессуар' %}selected{% endif %}>Аксессуар</option>
+          </select>
+        </label>
+        <label>
+          <span>CRM статус</span>
+          <select name="crm_status">
+            <option value="new_lead" {% if selected_client_card.crm_status == 'new_lead' %}selected{% endif %}>Новый лид</option>
+            <option value="qualification" {% if selected_client_card.crm_status == 'qualification' %}selected{% endif %}>Квалификация</option>
+            <option value="negotiation" {% if selected_client_card.crm_status == 'negotiation' %}selected{% endif %}>Переговоры</option>
+            <option value="invoice" {% if selected_client_card.crm_status == 'invoice' %}selected{% endif %}>Счёт</option>
+            <option value="our_client" {% if selected_client_card.crm_status == 'our_client' %}selected{% endif %}>Наш клиент</option>
+            <option value="lost" {% if selected_client_card.crm_status == 'lost' %}selected{% endif %}>Потеряно</option>
+            <option value="in_work" {% if selected_client_card.crm_status == 'in_work' %}selected{% endif %}>В работе</option>
+            <option value="paused" {% if selected_client_card.crm_status == 'paused' %}selected{% endif %}>Пауза</option>
+          </select>
+        </label>
+        <div class="client-segment-picker" data-client-segment-picker>
+          <span>Сегменты</span>
+          <details class="client-segment-dropdown">
+            <summary><span data-client-segment-summary>Не выбраны</span></summary>
+            <div class="client-segment-menu">
+              <input type="search" placeholder="Найти сегмент" aria-label="Поиск сегмента" data-client-segment-search />
+              <div class="client-segment-options">
+                {% for segment in client_business_segments %}
+                  <label data-client-segment-option-row>
+                    <input type="checkbox" name="business_segment_ids" value="{{ segment.id }}" data-client-segment-option data-segment-label="{{ segment.name }}" data-segment-icon="{{ segment.icon }}" {% if segment.id in selected_client_card.business_segment_ids %}checked{% endif %} />
+                    <span>{{ segment.icon }} {{ segment.name }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </details>
+        </div>
+        <div class="client-program-picker">
+          <span>Программы клиента</span>
+          <details class="client-program-dropdown client-segment-dropdown" data-client-program-dropdown>
+            <summary><span data-client-program-summary>Не выбраны</span></summary>
+            <div class="client-program-menu client-segment-menu">
+              <input type="search" placeholder="Найти программу" aria-label="Поиск программы" data-client-program-search />
+              <div class="client-program-options client-segment-options">
+                {% for program in client_program_defaults %}
+                  <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" {% if program in selected_client_card.programs %}checked{% endif %} /><span>{{ program }}</span></label>
+                {% endfor %}
+                {% for program in client_options.programs %}
+                  {% if program not in client_program_defaults %}
+                    <label data-client-program-option-row><input type="checkbox" name="programs" value="{{ program }}" {% if program in selected_client_card.programs %}checked{% endif %} /><span>{{ program }}</span></label>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <input class="client-program-custom-input" name="program_custom" list="client-program-list" placeholder="Другая программа" />
+            </div>
+          </details>
+        </div>
+        <div class="client-location-panel wide" data-client-location-panel>
+          <input type="hidden" name="address" value="{{ selected_client_card.address or '' }}" data-client-address />
+          <input type="hidden" name="latitude" value="{{ selected_client_card.latitude or '' }}" data-client-latitude />
+          <input type="hidden" name="longitude" value="{{ selected_client_card.longitude or '' }}" data-client-longitude />
+          <div class="client-location-search" data-client-location-search-box>
+            <input
+              type="search"
+              placeholder="Найдите улицу, район или ориентир"
+              value="{{ selected_client_card.address or '' }}"
+              data-client-location-search
+              aria-label="Поиск по карте"
+            />
+            <button type="button" class="btn btn-secondary" data-client-location-search-run>Найти</button>
+            <span class="client-location-search-status" data-client-location-search-status role="status"></span>
+            <ul class="client-location-suggest" data-client-location-suggest role="listbox" aria-label="Варианты на карте" hidden></ul>
+          </div>
+          <div class="client-location-actions">
+            <button class="btn btn-secondary" type="button" data-client-geolocate>Найти по геолокации</button>
+            {% if selected_client_card.latitude and selected_client_card.longitude %}
+              <a class="btn btn-secondary" href="https://www.openstreetmap.org/?mlat={{ selected_client_card.latitude }}&mlon={{ selected_client_card.longitude }}#map=17/{{ selected_client_card.latitude }}/{{ selected_client_card.longitude }}" target="_blank" rel="noreferrer" data-client-map-link>Открыть карту</a>
+            {% else %}
+              <a class="btn btn-secondary" href="#" target="_blank" rel="noreferrer" data-client-map-link hidden>Открыть карту</a>
+            {% endif %}
+          </div>
+          <div class="client-location-status" data-client-location-status>{% if selected_client_card.latitude and selected_client_card.longitude %}Локация выбрана: {{ selected_client_card.latitude }}, {{ selected_client_card.longitude }}{% else %}Локация не выбрана{% endif %}</div>
+          <div class="client-location-map{% if not selected_client_card.latitude or not selected_client_card.longitude %} client-location-map--empty{% endif %}" title="Карта клиента" data-client-map role="button" tabindex="0" aria-label="Выбрать точку клиента на карте">
+            <div class="client-location-map-grid"></div>
+            <div class="client-location-map-road client-location-map-road--main"></div>
+            <div class="client-location-map-road client-location-map-road--side"></div>
+            <div class="client-location-map-road client-location-map-road--cross"></div>
+            <div class="client-location-zone client-location-zone--a"></div>
+            <div class="client-location-zone client-location-zone--b"></div>
+            <div class="client-location-marker" data-client-map-marker hidden>
+              <span></span>
+              <strong>Клиент</strong>
+            </div>
+            <div class="client-location-map-hint">Нажмите на карту, чтобы выбрать точку клиента</div>
+          </div>
+        </div>
+        <label><span>Прайс-лист</span><input name="price_type" value="{{ selected_client_card.price_type or '' }}" placeholder="ПРОДАЖНАЯ ЦЕНА" /></label>
+        <label><span>Кредитный лимит</span><input name="credit_limit" value="{{ selected_client_card.credit_limit or '' }}" inputmode="decimal" /></label>
+        <label><span>Статус</span><select name="status"><option value="active" {% if selected_client_card.status == 'active' %}selected{% endif %}>Активный</option><option value="inactive" {% if selected_client_card.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
+        <label><span>Черный список</span><select name="is_blacklisted"><option value="0" {% if not selected_client_card.is_blacklisted %}selected{% endif %}>Нет</option><option value="1" {% if selected_client_card.is_blacklisted %}selected{% endif %}>Да</option></select></label>
+        <label class="wide"><span>Комментарий</span><input name="comment" value="{{ selected_client_card.comment or '' }}" /></label>
+      </div>
+      <div class="product-form-actions">
+        <button class="btn" type="submit">Сохранить изменения</button>
+        <a class="btn btn-secondary" href="{{ selected_client_href }}#client-card">Отмена</a>
+      </div>
+    </form>
+  </section>
+{% endif %}
+
+<section class="products-dictionaries clients-dictionaries" data-workspace-view="routes balances" hidden>
+  <article id="clients-balances-panel" class="products-list-panel clients-list-panel" data-workspace-view="balances" hidden>
+    <header class="products-panel-head clients-panel-head">
+      <div class="products-panel-titleline">
+        <h2>Должники</h2>
+        <span>Всего: {{ client_balances_total }}</span>
+      </div>
+    </header>
+    <div class="products-table-wrap clients-table-wrap">
+      {# Тот же компактный дизайн, что и клиентская таблица: CSS расширен
+         на #debtors-directory-table через :is(). #}
+      <table id="debtors-directory-table" class="products-table products-catalog-table clients-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>ИД</th>
+            <th>Клиент</th>
+            <th>Баланс</th>
+            <th>Телефон</th>
+            <th>Срок оплаты</th>
+            <th>Последняя оплата</th>
+            <th>Маршрут</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in client_balances %}
+            {% set debtor_tab_href = url_for('clients_get') ~ '?client=' ~ row.id %}
+            <tr>
+              <td><span class="client-id-badge">#{{ client_balances_page_from + loop.index0 }}</span></td>
+              <td>
+                <a
+                  class="client-open-link product-cell-main product-cell-meta"
+                  href="{{ debtor_tab_href }}#client-card"
+                  data-workspace-trigger="profile"
+                  data-workspace-tab-id="client-{{ row.id }}"
+                  data-workspace-view-id="profile"
+                  data-workspace-tab-title="{{ row.name }}"
+                  data-workspace-tab-hash="client-card"
+                  data-workspace-tab-href="{{ debtor_tab_href }}"
+                  title="{{ row.name }}"
+                >
+                  <strong>{{ row.name }}</strong>
+                  <small>{{ row.category or row.territory or "Без категории" }}</small>
+                </a>
+              </td>
+              <td><span class="client-balance-pill client-balance-pill--debt">{{ row.balance_display }} UZS</span></td>
+              <td title="{{ row.phone or '-' }}">{{ row.phone or "-" }}</td>
+              <td>{{ row.consignment_days or "-" }}</td>
+              <td title="{{ row.last_date or '-' }}">{{ row.last_date or "-" }}</td>
+              <td title="{{ row.route or '-' }}">{{ row.route or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">Должников пока нет.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if client_balances %}
+          <tfoot>
+            <tr class="clients-total-row">
+              <td colspan="2">Итого должники</td>
+              <td>
+                <span class="client-balance-pill client-balance-pill--debt">{{ client_balances_debt_total }} UZS</span>
+              </td>
+              <td colspan="4">
+                <div class="client-balance-net">
+                  <span>Должников</span>
+                  <strong>{{ client_balances_total }}</strong>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
+    </div>
+    <footer class="products-catalog-footer clients-catalog-footer">
+      <nav class="products-pagination" aria-label="Страницы должников" data-ajax-nav data-ajax-targets="#clients-balances-panel" data-ajax-reinit="ClientsInit">
+        <a class="products-page-link {% if client_balances_page <= 1 %}disabled{% endif %}" href="{{ client_balances_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+        {% for page_no in client_balances_pagination_pages %}
+          <a class="products-page-link {% if page_no == client_balances_page %}active{% endif %}" href="{{ client_balances_page_urls[page_no] }}" {% if page_no == client_balances_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+        {% endfor %}
+        <a class="products-page-link {% if client_balances_page >= client_balances_total_pages %}disabled{% endif %}" href="{{ client_balances_next_page_url }}" aria-label="Следующая страница">›</a>
+        <span class="products-page-count">Стр. {{ client_balances_page }} из {{ client_balances_total_pages }}</span>
+      </nav>
+      <div class="products-catalog-footer-meta">
+        <div class="products-panel-stats" aria-label="Информация по списку должников">
+          <span>Всего: {{ client_balances_total }}</span>
+          <span>Показано: {{ client_balances_page_from }}-{{ client_balances_page_to }}</span>
+        </div>
+        <label class="products-page-size products-page-size--footer">
+          <span>Показать</span>
+          <select form="clients-filter-form" data-clients-page-size data-ajax-page-size data-ajax-page-param="page_size" data-ajax-reset-params="balance_page" data-ajax-hash="balances" data-ajax-targets="#clients-balances-panel" data-ajax-reinit="ClientsInit">
+            {% for size in [100, 500, 1000] %}
+              <option value="{{ size }}" {% if clients_page_size == size %}selected{% endif %}>{{ size }} шт</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </footer>
+  </article>
+
+  <article class="products-list-panel" data-workspace-view="routes" hidden>
+    <header class="products-panel-head">
+      <div>
+        <h2>Маршруты</h2>
+        <span>Всего: {{ client_routes|length }}</span>
+      </div>
+      <button type="button" class="btn" onclick="document.getElementById('client-route-form')?.scrollIntoView({behavior: 'smooth', block: 'start'});">+ Маршрут</button>
+    </header>
+    <form id="client-route-form" method="post" action="/clients/routes/save" class="product-form client-route-form">
+      {% include "_csrf_field.html" %}
+      <div class="product-form-grid">
+        <label><span>Клиент*</span><input name="client" list="client-name-list" required /></label>
+        <label><span>Маршрут*</span><input name="route" list="client-route-list" required /></label>
+        <label><span>Территория</span><input name="territory" list="client-territory-list" /></label>
+        <label><span>Дни посещения</span><input name="route_day" placeholder="ПН, СР, ПТ" /></label>
+        <label><span>Торговый агент</span><input name="route_agent" placeholder="Ответственный" /></label>
+        <div class="product-form-actions">
+          <button class="btn" type="submit">Сохранить маршрут</button>
+        </div>
+      </div>
+    </form>
+    <div class="products-table-wrap">
+      <table class="products-table clients-table" data-upos-column-controls>
+        <thead>
+          <tr>
+            <th>Маршрут</th>
+            <th>Территория</th>
+            <th>Клиентов</th>
+            <th>Клиенты</th>
+            <th>Дни</th>
+            <th>Агент</th>
+            <th>Баланс</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in client_routes %}
+            <tr>
+              <td><strong>{{ row.route }}</strong></td>
+              <td>{{ row.territory }}</td>
+              <td>{{ row.count }}</td>
+              <td>{{ row.clients or "-" }}</td>
+              <td>{{ row.day }}</td>
+              <td>{{ row.agent }}</td>
+              <td>{{ row.balance }} UZS</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">Маршруты пока не заданы.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>

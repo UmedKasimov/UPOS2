@@ -1,0 +1,2041 @@
+{% extends "base.html" %}
+{% block title %}Продажи{% endblock %}
+{% block extra_head %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="{{ url_for('static', path='clients.js') }}?v=51" defer></script>
+{% endblock %}
+
+{% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid', 'converted', 'already_converted'] %}
+{% set sales_journal_requested = request.query_params.get('view') == 'journal' %}
+{# Заход в раздел открывает кнопки разделов; журнал, заказы и долги —
+   по своим карточкам и прямым ссылкам. #}
+{% set sales_default_tab = 'new' if sales_embed else ('journal' if flash_ok in sales_saved_messages or sales_journal_requested else ('new' if sales_prefill.crm_record_id else ('order' if sales_filters.doc_type == 'order' else ('return' if sales_filters.doc_type == 'return' else ('debt' if sales_filters.status == 'debt' else ''))))) %}
+{% set sales_form_doc_type = sales_filters.doc_type if sales_filters.doc_type in ['sale', 'order', 'return'] else 'sale' %}
+{% set sales_form_title = 'Новый возврат' if sales_form_doc_type == 'return' else ('Новый заказ' if sales_form_doc_type == 'order' else 'Новая продажа') %}
+{% set sales_form_action_label = '+ Возврат' if sales_form_doc_type == 'return' else ('+ Заказ' if sales_form_doc_type == 'order' else '+ Продажа') %}
+{% set sales_form_save_label = 'Сохранить возврат' if sales_form_doc_type == 'return' else ('Сохранить заказ' if sales_form_doc_type == 'order' else 'Сохранить продажу') %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">Торговый контур</span>
+    <h1 class="page-title settings-ios-page-title">Продажи</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <section
+    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root sales-workspace products-workspace workspace-module-root workspace-module-root--sales{% if sales_embed %} sales-workspace--embed{% endif %}"
+    data-workspace-tabs
+    data-workspace-key="sales"
+    data-workspace-default-tab="{{ sales_default_tab }}"
+    data-workspace-force-tab="{{ '' if sales_embed else ('journal' if flash_ok in sales_saved_messages else '') }}"
+    data-workspace-close-tabs-on-load="{{ '' if sales_embed else ('new' if flash_ok in ['saved', 'order_saved', 'return_saved', 'updated'] else '') }}"
+    data-workspace-home-href="{{ url_for('sales_get') }}"
+  >
+    {% if flash_ok == "saved" %}
+      <div class="flash ok settings-ios-flash">Успешно продано. Продажа добавлена в журнал.</div>
+    {% elif flash_ok == "order_saved" %}
+      <div class="flash ok settings-ios-flash">Заказ сохранён и добавлен в журнал продаж.</div>
+    {% elif flash_ok == "return_saved" %}
+      <div class="flash ok settings-ios-flash">Возврат сохранён и добавлен в журнал продаж.</div>
+    {% elif flash_ok == "updated" %}
+      <div class="flash ok settings-ios-flash">Документ продажи обновлён.</div>
+    {% elif flash_ok == "paid" %}
+      <div class="flash ok settings-ios-flash">Оплата внесена. Продажа обновлена.</div>
+    {% elif flash_ok == "converted" %}
+      <div class="flash ok settings-ios-flash">Продажа создана из заказа.</div>
+    {% elif flash_ok == "already_converted" %}
+      <div class="flash ok settings-ios-flash">Этот заказ уже преобразован в продажу.</div>
+    {% elif flash_ok == "deleted" %}
+      <div class="flash ok settings-ios-flash">Документ продажи удалён.</div>
+    {% endif %}
+    {% if flash_err %}
+      <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+    {% endif %}
+
+    <nav class="general-module-tabs workbench-open-tabs sales-open-tabs" aria-label="Открытые вкладки продаж" data-workspace-open-tabs>
+      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Продажи</button>
+    </nav>
+    {% include "_workspace_tabs_early.html" %}
+
+    <section class="general-report-launcher workbench-launcher sales-launcher" aria-label="Разделы продаж" data-workspace-launcher{% if sales_default_tab %} hidden{% endif %}>
+      <a class="general-report-card" href="#sales-form" data-workspace-card="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}{% if sales_form_doc_type != 'sale' %}?doc_type={{ sales_form_doc_type }}{% endif %}#sales-form">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M5 5h14v14H5z" />
+            <path d="M8 9h8M8 13h5" />
+            <path d="M17 17h3M18.5 15.5v3" />
+          </svg>
+        </span>
+        <span>{{ sales_form_title }}</span>
+        <small>Счёт, заказ или реализация</small>
+      </a>
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?view=journal#sales-journal" data-workspace-card="journal" data-workspace-tab-title="Журнал" data-workspace-tab-hash="sales-journal" data-workspace-tab-href="{{ url_for('sales_get') }}?view=journal">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M5 4h14v16H5z" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+            <path d="M3 8h2M3 12h2M3 16h2" />
+          </svg>
+        </span>
+        <span>Журнал</span>
+        <small>Продажи по документам</small>
+      </a>
+      {# Карточка «Заказы» убрана, но вкладка живёт: контроллер берёт из
+         этой записи название и адрес — без неё прямая ссылка на заказы
+         открывала бы пустой экран. #}
+      <span hidden aria-hidden="true" data-workspace-card="order" data-workspace-tab-title="Заказы" data-workspace-tab-hash="order" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=order"></span>
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?doc_type=return#return" data-workspace-card="return" data-workspace-tab-title="Возвраты" data-workspace-tab-hash="return" data-workspace-tab-href="{{ url_for('sales_get') }}?doc_type=return">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 14 4 9l5-5" />
+            <path d="M4 9h10a6 6 0 1 1 0 12H8" />
+          </svg>
+        </span>
+        <span>Возвраты</span>
+        <small>Возврат товара клиентом</small>
+      </a>
+      <a class="general-report-card" href="{{ url_for('sales_get') }}?status=debt#debt" data-workspace-card="debt" data-workspace-tab-title="Долги" data-workspace-tab-hash="debt" data-workspace-tab-href="{{ url_for('sales_get') }}?status=debt">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3v18" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+        <span>Долги</span>
+        <small>Неполная оплата и остаток</small>
+      </a>
+    </section>
+
+
+    <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
+    {% macro render_sales_journal_filter(form_id, target_view, workspace_views) %}
+    <form id="{{ form_id }}" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if target_view == 'debt' else '#sales-journal' }}" data-sales-journal-auto-filter data-sales-filter-target="{{ target_view }}" data-workspace-view="{{ workspace_views }}">
+      <input type="hidden" name="journal_page_size" value="{{ sales_journal_pagination.page_size }}" />
+      <input type="hidden" name="debt_page_size" value="{{ sales_debt_workspace.page_size }}" />
+      {% if target_view != 'debt' %}<input type="hidden" name="view" value="journal" />{% endif %}
+      <label class="products-catalog-search sales-journal-filter-field sales-journal-filter-search">
+        <span>Поиск</span>
+        <input name="q" type="search" value="{{ sales_filters.q }}" placeholder="Номер, клиент, склад" />
+      </label>
+      <div class="sales-status-filter sales-doc-type-filter sales-journal-filter-field" data-sales-doc-type-filter>
+        <span>Тип документа</span>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по типам документов">
+            <span data-sales-doc-type-summary>{{ sales_filters.doc_type_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-doc-type-all {% if not sales_filters.doc_types %}checked{% endif %} />
+              <span>Все виды</span>
+            </label>
+            {% for option in sales_options.doc_type_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="doc_type"
+                  value="{{ option.value }}"
+                  data-sales-doc-type-option
+                  {% if option.value in sales_filters.doc_types %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      {# Отдельного поля «Клиент» нет: поиск сверху уже ищет по номеру, клиенту и складу. #}
+      <label class="sales-journal-filter-field sales-journal-filter-date">
+        <span>Дата</span>
+        <input name="date_from" type="date" value="{{ sales_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период продаж: день, месяц или от и до" />
+        <input name="date_to" type="hidden" value="{{ sales_filters.date_to }}" />
+      </label>
+      <div class="sales-status-filter sales-payment-status-filter sales-journal-filter-field" data-sales-payment-status-filter>
+        <span>Оплата</span>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по состоянию оплаты">
+            <span data-sales-payment-status-summary>{{ sales_filters.payment_status_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-payment-status-all {% if not sales_filters.payment_statuses %}checked{% endif %} />
+              <span>Все оплаты</span>
+            </label>
+            {% for option in sales_options.payment_status_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="payment_status"
+                  value="{{ option.value }}"
+                  data-sales-payment-status-option
+                  {% if option.value in sales_filters.payment_statuses %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      <div class="sales-status-filter sales-crm-stage-filter sales-journal-filter-field" data-sales-crm-stage-filter>
+        <span>Этап CRM</span>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по этапам CRM">
+            <span data-sales-crm-stage-summary>{{ sales_filters.crm_stage_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-crm-stage-all {% if not sales_filters.crm_stages %}checked{% endif %} />
+              <span>Все этапы</span>
+            </label>
+            {% for option in sales_options.crm_stage_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="crm_stage"
+                  value="{{ option.value }}"
+                  data-sales-crm-stage-option
+                  {% if option.value in sales_filters.crm_stages %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      <div class="sales-status-filter sales-journal-filter-field" data-sales-status-filter>
+        <span>Статус</span>
+        <details class="sales-status-filter-details">
+          <summary aria-label="Фильтр по статусам">
+            <span data-sales-status-summary>{{ sales_filters.status_summary }}</span>
+          </summary>
+          <div class="sales-status-filter-menu">
+            <label class="sales-status-filter-option sales-status-filter-option--all">
+              <input type="checkbox" data-sales-status-all {% if not sales_filters.statuses %}checked{% endif %} />
+              <span>Все статусы</span>
+            </label>
+            {% for option in sales_options.status_filters %}
+              <label class="sales-status-filter-option">
+                <input
+                  type="checkbox"
+                  name="status"
+                  value="{{ option.value }}"
+                  data-sales-status-option
+                  {% if option.value in sales_filters.statuses %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+    </form>
+    {% endmacro %}
+    <datalist id="sales-client-list">
+      {% for item in sales_options.clients %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="sales-warehouse-list">
+      {% for item in sales_options.warehouses %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="sales-product-list">
+      {% for item in sales_options.products %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+
+    <div class="sales-layout products-layout">
+      <article class="products-list-panel sales-debt-workspace" id="debt" data-workspace-view="debt"{% if sales_default_tab != 'debt' %} hidden{% endif %}>
+        <header class="products-panel-head sales-debt-head">
+          <div>
+            <h2>Дебиторская задолженность</h2>
+            <span>{{ sales_debt_workspace.clients_count }} клиентов · {{ sales_debt_workspace.documents_count }} документов</span>
+          </div>
+          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}{% if sales_form_doc_type != 'sale' %}?doc_type={{ sales_form_doc_type }}{% endif %}#sales-form">{{ sales_form_action_label }}</a>
+        </header>
+        {% if sales_filters.status == 'debt' %}
+          {{ render_sales_journal_filter('sales-debt-filter', 'debt', 'debt') }}
+        {% endif %}
+        <section class="sales-debt-summary" aria-label="Сводка долгов">
+          <div class="sales-debt-metric sales-debt-metric--total">
+            <span>Общий долг</span>
+            <strong>
+              {% for total in sales_debt_workspace.totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.clients_count }} клиентов</small>
+          </div>
+          <div class="sales-debt-metric sales-debt-metric--overdue">
+            <span>Просрочено</span>
+            <strong>
+              {% for total in sales_debt_workspace.overdue_totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.overdue_documents_count }} документов</small>
+          </div>
+          <div class="sales-debt-metric sales-debt-metric--today">
+            <span>Срок сегодня</span>
+            <strong>
+              {% for total in sales_debt_workspace.due_today_totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.due_today_documents_count }} документов</small>
+          </div>
+          <div class="sales-debt-metric sales-debt-metric--upcoming">
+            <span>Предстоящие</span>
+            <strong>
+              {% for total in sales_debt_workspace.upcoming_totals %}
+                <b>{{ total.amount }} {{ total.currency }}</b>
+              {% else %}
+                <b>0</b>
+              {% endfor %}
+            </strong>
+            <small>{{ sales_debt_workspace.upcoming_documents_count }} документов</small>
+          </div>
+        </section>
+        <div class="sales-debt-table-wrap">
+          <table
+            class="products-table products-catalog-table sales-debt-table"
+            id="sales-debt-table"
+            data-upos-column-controls
+          >
+            <thead>
+              <tr>
+                <th data-column-key="client" data-column-label="Клиент">Клиент</th>
+                <th data-column-key="debt" data-column-label="Долг">Долг</th>
+                <th data-column-key="documents" data-column-label="Документы">Документы</th>
+                <th data-column-key="due" data-column-label="Ближайший срок">Ближайший срок</th>
+                <th data-column-key="overdue" data-column-label="Просрочка">Просрочка</th>
+                <th data-column-key="manager" data-column-label="Ответственный">Ответственный</th>
+                <th data-column-key="status" data-column-label="Статус">Статус</th>
+                <th data-column-key="payment" data-column-label="Оплата">Оплата</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for debt_client in sales_debt_workspace.clients %}
+                <tr class="sales-debt-client-row sales-debt-client-row--{{ debt_client.status }}">
+                  <td>
+                    <div class="sales-debt-client-label">
+                      <strong>{{ debt_client.client }}</strong>
+                      <span>{{ debt_client.documents_count }} неоплаченных продаж</span>
+                    </div>
+                  </td>
+                  <td>
+                    {% for total in debt_client.totals_list %}
+                      <strong class="sales-debt-money">{{ total.amount }} {{ total.currency }}</strong>
+                    {% endfor %}
+                  </td>
+                  <td>{{ debt_client.documents_count }}</td>
+                  <td>{{ debt_client.nearest_due_label }}</td>
+                  <td>
+                    {% if debt_client.max_days_overdue %}
+                      {{ debt_client.max_days_overdue }} дн.
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td>{{ debt_client.manager }}</td>
+                  <td><span class="sales-debt-pill sales-debt-pill--{{ debt_client.status }}">{{ debt_client.status_label }}</span></td>
+                  <td>
+                    {% if debt_client.documents %}
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm sales-debt-row-pay-btn"
+                        data-sales-debt-pay
+                        data-sale-id="{{ debt_client.documents[0].id }}"
+                      >Оплатить</button>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="8">Долгов по текущим фильтрам нет.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <footer class="products-catalog-footer sales-debt-footer">
+          <nav class="products-pagination" aria-label="Страницы долгов клиентов" data-ajax-nav data-ajax-targets="#debt" data-ajax-reinit="SalesJournalInit">
+            <a class="products-page-link {% if sales_debt_workspace.page <= 1 %}disabled{% endif %}" href="{{ sales_debt_workspace.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+            {% for page_no in sales_debt_workspace.pagination_pages %}
+              <a class="products-page-link {% if page_no == sales_debt_workspace.page %}active{% endif %}" href="{{ sales_debt_workspace.page_urls[page_no] }}" {% if page_no == sales_debt_workspace.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+            {% endfor %}
+            <a class="products-page-link {% if sales_debt_workspace.page >= sales_debt_workspace.total_pages %}disabled{% endif %}" href="{{ sales_debt_workspace.next_page_url }}" aria-label="Следующая страница">›</a>
+            <span class="products-page-count">Стр. {{ sales_debt_workspace.page }} из {{ sales_debt_workspace.total_pages }}</span>
+          </nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Итоги списка долгов">
+              <span>Клиентов: {{ sales_debt_workspace.clients_count }}</span>
+              <span>Документов: {{ sales_debt_workspace.documents_count }}</span>
+              {% for total in sales_debt_workspace.totals %}
+                <span>Общий долг: {{ total.amount }} {{ total.currency }}</span>
+              {% endfor %}
+              <span>Показано: {{ sales_debt_workspace.page_from }}-{{ sales_debt_workspace.page_to }}</span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select aria-label="Количество клиентов на странице" data-ajax-page-size data-ajax-targets="#debt" data-ajax-reinit="SalesJournalInit">
+                {% for size in [100, 500, 1000] %}
+                  <option value="{{ sales_debt_workspace.page_size_urls[size] }}" {% if sales_debt_workspace.page_size == size %}selected{% endif %}>{{ size }} шт</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </footer>
+      </article>
+
+      <article class="products-list-panel{% if sales_filters.status == 'debt' %} sales-journal-support{% endif %}" id="sales-journal" data-workspace-view="journal order return debt"{% if sales_default_tab not in ['journal', 'order', 'return', 'debt'] %} hidden{% endif %}>
+        <header class="products-panel-head sales-journal-head">
+          <div class="products-panel-title">
+            <h2>Журнал продаж</h2>
+            <span>Всего: {{ sales_journal_pagination.total }}</span>
+          </div>
+          <div class="products-panel-top-actions">
+            <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="Новая продажа" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}#sales-form">+ Продажа</a>
+            <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="Новый заказ" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}?doc_type=order#sales-form">+ Заказ</a>
+          </div>
+          {% if sales_filters.status != 'debt' %}
+            {{ render_sales_journal_filter('sales-journal-filter', 'journal', 'journal order return') }}
+          {% endif %}
+        </header>
+        <nav
+          class="messenger-channel-tabs sales-document-tabs"
+          aria-label="Типы документов журнала"
+          data-ajax-nav
+          data-ajax-targets="#sales-journal"
+          data-ajax-reinit="SalesJournalInit"
+        >
+          <span class="sales-document-tabs-title">Разделы журнала</span>
+          {% for tab in sales_options.document_tabs %}
+            <a
+              class="messenger-channel-tab sales-document-tab{% if tab.active %} active{% endif %}"
+              href="{{ tab.href }}"
+              data-channel-brand="{{ tab.brand }}"
+              {% if tab.current %}aria-current="page"{% endif %}
+            >
+              <span class="messenger-channel-logo" aria-hidden="true">{{ tab.logo }}</span>
+              <span class="messenger-channel-label">{{ tab.label }}</span>
+              <b>{{ tab.count }}</b>
+            </a>
+          {% endfor %}
+        </nav>
+        <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table sales-table sales-journal-table" id="sales-journal-table" data-upos-column-controls>
+            <thead>
+              <tr>
+                <th data-column-label="№">№</th>
+                <th data-column-label="ID" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>ID</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Дата" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Дата</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Срок" data-sort-kind="number" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Срок</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Тип" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Тип</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Клиент" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Клиент</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Склад" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Склад</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Сумма" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Сумма</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Оплачено" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Оплачено</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Долг" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Долг</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Дней долга" data-sort-kind="number" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Дней долга</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Задачи" data-sort-kind="number" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Задачи</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Этап CRM" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Этап CRM</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Статус" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn sales-journal-sort-btn">
+                    <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Действия" class="products-actions-head"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sale in sales %}
+                <tr class="sales-table-row--{{ sale.doc_type }}{% if sales_saved_id and sales_saved_id == sale.id %} sales-table-row--saved{% endif %}" data-sales-journal-row>
+                  <td class="sales-journal-row-index">{{ sales_journal_pagination.row_offset + loop.index }}</td>
+                  <td class="sales-journal-id-cell" data-sort-value="{{ sale.number }}" data-sales-journal-open data-sale-id="{{ sale.id }}" role="button" tabindex="0">
+                    <strong>{{ sale.number }}</strong>
+                    <small>{{ sale.manager or "Без ответственного" }}</small>
+                  </td>
+                  <td data-sort-value="{{ sale.date or sale.date_label or '' }}">{{ sale.date_label or sale.date or "-" }}</td>
+                  <td class="sales-journal-age-cell" data-sort-value="{{ sale.document_age_days if sale.document_age_days is not none else '' }}">{{ sale.document_age_label or "-" }}</td>
+                  <td class="sales-journal-doc-type-cell">{{ sale.doc_type_label }}</td>
+                  <td class="sales-journal-client-cell" title="{{ sale.client or '-' }}">
+                    <span class="sales-journal-client-name">{{ sale.client or "-" }}</span>
+                    {% if sale.business_segment %}
+                      <span class="sales-business-segment-tag">
+                        {% if sale.business_segment_icon %}<span aria-hidden="true">{{ sale.business_segment_icon }}</span>{% endif %}
+                        {{ sale.business_segment }}
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>{{ sale.warehouse or "-" }}</td>
+                  <td data-sort-value="{{ sale.amount_value }}">{{ sale.amount }} {{ sale.currency }}</td>
+                  <td
+                    class="sales-journal-payment-progress"
+                    data-payment-progress="{{ sale.payment_progress }}"
+                    data-sort-value="{{ sale.paid_value }}"
+                    style="--sales-payment-progress: {{ sale.payment_progress }}%;"
+                    title="Оплачено: {{ sale.payment_progress }}%"
+                  >
+                    <span>{{ sale.paid_amount }} {{ sale.currency }}</span>
+                  </td>
+                  <td class="sales-journal-debt-cell{% if sale.has_debt %} has-debt{% endif %}" data-sort-value="{{ sale.debt_value }}">
+                    {% if sale.has_debt %}
+                      <span class="sales-journal-debt-badge">
+                        <span class="sales-journal-debt-amount">-{{ sale.debt_amount }} {{ sale.currency }}</span>
+                      </span>
+                    {% else %}
+                      <span class="sales-journal-no-debt">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="sales-journal-debt-age-cell" data-sort-value="{{ sale.debt_age_days if sale.has_debt and sale.debt_age_days is not none else '' }}">
+                    {% if sale.has_debt and sale.debt_age_days is not none %}{{ sale.debt_age_days }} дн.{% else %}-{% endif %}
+                  </td>
+                  <td class="sales-journal-tasks-cell" data-sort-value="{{ sale.task_total_count }}">
+                    {% if sale.task_total_count %}
+                      <span class="sales-journal-task-progress" title="Выполнено {{ sale.task_completed_count }} из {{ sale.task_total_count }}">
+                        <small>из</small>
+                        <strong class="sales-journal-task-total">{{ sale.task_total_count }}</strong>
+                        <span aria-hidden="true">/</span>
+                        <strong class="sales-journal-task-completed">{{ sale.task_completed_count }}</strong>
+                        <small>выполнено</small>
+                      </span>
+                    {% else %}
+                      <span class="sales-journal-no-tasks">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="sales-journal-crm-cell" data-sort-value="{{ sale.crm_status_label or '' }}">
+                    {% if sales_options.crm_stages %}
+                      <select
+                        class="kassa-status-select sales-journal-crm-select"
+                        data-sales-journal-crm-stage
+                        data-sale-id="{{ sale.id }}"
+                        data-action-template="{{ url_for('sales_crm_stage_update', sale_id='__sale_id__') }}"
+                        data-crm-status="{{ sale.crm_status or 'unassigned' }}"
+                        aria-label="Этап CRM для {{ sale.number }}"
+                        title="Этап CRM: {{ sale.crm_status_label or 'Не назначен' }}"
+                      >
+                        <option value="" disabled {% if not sale.crm_status %}selected{% endif %}>Не назначен</option>
+                        {% for stage in sales_options.crm_stages %}
+                          <option value="{{ stage.id }}" {% if sale.crm_status == stage.id %}selected{% endif %}>{{ stage.title }}</option>
+                        {% endfor %}
+                      </select>
+                    {% else %}
+                      <span class="sales-journal-crm-empty">{{ sale.crm_status_label or "Не назначен" }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% set status_style = 'confirmed' if sale.status in ['completed', 'archived'] else ('rejected' if sale.status == 'return' else ('pending' if sale.status in ['shipped', 'installation'] else 'draft')) %}
+                    <form class="sales-status-form" method="post" action="{{ url_for('sales_status_update', sale_id=sale.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <select
+                        class="kassa-status-select kassa-status-select--{{ status_style }} sales-status-select"
+                        name="status"
+                        data-sales-status-select
+                        aria-label="Статус продажи {{ sale.number }}"
+                      >
+                        {% if sale.doc_type == 'return' %}
+                          <option value="return" selected>Возврат</option>
+                        {% else %}
+                          <option value="new" {% if sale.status == 'new' %}selected{% endif %}>Новый</option>
+                          <option value="shipped" {% if sale.status == 'shipped' %}selected{% endif %}>Отгружен</option>
+                          <option value="installation" {% if sale.status == 'installation' %}selected{% endif %}>Установка</option>
+                          <option value="completed" {% if sale.status == 'completed' %}selected{% endif %}>Завершен</option>
+                          <option value="archived" {% if sale.status == 'archived' %}selected{% endif %}>Архив</option>
+                        {% endif %}
+                      </select>
+                    </form>
+                  </td>
+                  <td class="products-row-actions">
+                    <button
+                      class="products-action-icon products-action-icon--edit sales-journal-edit"
+                      type="button"
+                      data-sales-journal-edit
+                      data-sale-id="{{ sale.id }}"
+                      title="Редактировать"
+                      aria-label="Редактировать {{ sale.number }}"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    <form method="post" action="{{ url_for('sales_delete', sale_id=sale.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <button class="products-action-icon products-action-icon--delete sales-journal-delete" type="submit" aria-label="Удалить" title="Удалить">×</button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="15">Пока нет продаж. Создайте первую продажу справа.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            {% if sales %}
+              <tfoot>
+                <tr class="sales-journal-total-row">
+                  <td colspan="7">ИТОГО</td>
+                  <td>
+                    {% for total in sales_journal_totals %}
+                      <span>{{ total.amount }} {{ total.currency }}</span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% for total in sales_journal_totals %}
+                      <span>{{ total.paid }} {{ total.currency }}</span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% for total in sales_journal_totals %}
+                      {% if total.has_debt %}
+                        <small class="sales-journal-debt-amount">-{{ total.debt }} {{ total.currency }}</small>
+                      {% endif %}
+                    {% endfor %}
+                  </td>
+                  <td colspan="5"></td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+        <footer class="products-catalog-footer sales-journal-footer">
+          <nav class="products-pagination" aria-label="Страницы журнала продаж" data-ajax-nav data-ajax-targets="#sales-journal" data-ajax-reinit="SalesJournalInit">
+            <a class="products-page-link {% if sales_journal_pagination.page <= 1 %}disabled{% endif %}" href="{{ sales_journal_pagination.prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+            {% for page_no in sales_journal_pagination.pagination_pages %}
+              <a class="products-page-link {% if page_no == sales_journal_pagination.page %}active{% endif %}" href="{{ sales_journal_pagination.page_urls[page_no] }}" {% if page_no == sales_journal_pagination.page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+            {% endfor %}
+            <a class="products-page-link {% if sales_journal_pagination.page >= sales_journal_pagination.total_pages %}disabled{% endif %}" href="{{ sales_journal_pagination.next_page_url }}" aria-label="Следующая страница">›</a>
+            <span class="products-page-count">Стр. {{ sales_journal_pagination.page }} из {{ sales_journal_pagination.total_pages }}</span>
+          </nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Информация по журналу продаж">
+              <span>Всего: {{ sales_journal_pagination.total }}</span>
+              <span>Показано: {{ sales_journal_pagination.page_from }}-{{ sales_journal_pagination.page_to }}</span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select aria-label="Количество продаж на странице" data-ajax-page-size data-ajax-targets="#sales-journal" data-ajax-reinit="SalesJournalInit">
+                {% for size in [100, 500, 1000] %}
+                  <option value="{{ sales_journal_pagination.page_size_urls[size] }}" {% if sales_journal_pagination.page_size == size %}selected{% endif %}>{{ size }} шт</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </footer>
+        {% for sale in sales %}
+          <script type="application/json" id="sales-journal-data-{{ sale.id }}">{{ sale.detail_json|tojson }}</script>
+        {% endfor %}
+        {# Подтверждение после сохранения: показываем итог и даём сразу
+           напечатать чек. #}
+        <dialog class="sale-done-dialog" data-sale-done-dialog>
+          <div class="sale-done-card">
+            <span class="sale-done-icon" aria-hidden="true">✓</span>
+            <h2 data-sale-done-title>Продажа проведена</h2>
+            <p class="sale-done-sum" data-sale-done-sum></p>
+            <p class="sale-done-meta" data-sale-done-meta></p>
+            <div class="sale-done-summary" data-sale-done-summary></div>
+            <div class="sale-done-actions">
+              <button class="btn" type="button" data-sale-done-print-receipt>Печать чека</button>
+              <button class="btn btn-secondary" type="button" data-sale-done-close>Закрыть</button>
+            </div>
+          </div>
+        </dialog>
+
+        <div class="warehouse-purchase-detail-backdrop sales-document-detail-backdrop" data-sales-journal-close hidden></div>
+        <aside class="warehouse-purchase-detail sales-document-detail" data-sales-journal-detail hidden aria-live="polite">
+          <header class="warehouse-purchase-detail-head">
+            <div class="sales-document-detail-heading">
+              <div class="sales-document-detail-heading-meta">
+                <p data-sales-detail-date></p>
+                <label class="sales-document-detail-crm-control">
+                  <span class="sales-document-detail-crm-prefix">CRM</span>
+                  <select
+                    class="sales-document-detail-crm-status"
+                    data-sales-detail-crm-status
+                    data-action-template="{{ url_for('sales_crm_stage_update', sale_id='__sale_id__') }}"
+                    aria-label="Этап CRM"
+                  >
+                    <option value="" disabled>Не назначен</option>
+                    {% for stage in sales_options.crm_stages %}
+                      <option value="{{ stage.id }}">{{ stage.title }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
+              <h2 data-sales-detail-title>Продажа</h2>
+            </div>
+            <div class="warehouse-purchase-detail-actions">
+              <form
+                method="post"
+                action=""
+                data-sales-detail-convert-form
+                data-action-template="{{ url_for('sales_convert_to_sale', sale_id='__sale_id__') }}"
+                hidden
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button class="btn btn-primary btn-sm" type="submit" data-sales-detail-convert>
+                  Сделать продажу
+                </button>
+              </form>
+              <button class="btn btn-secondary btn-sm sales-detail-return-btn" type="button" data-sales-detail-return hidden>
+                Сделать возврат
+              </button>
+              {# Прибыль программы считается только по архивным документам,
+                 поэтому архивация вынесена отдельной кнопкой. #}
+              <form
+                method="post"
+                action=""
+                data-sales-detail-archive-form
+                data-action-template="{{ url_for('sales_status_update', sale_id='__sale_id__') }}"
+                hidden
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="status" value="archived" />
+                <button class="btn btn-primary btn-sm" type="submit" data-sales-detail-archive>
+                  Отправить в архив
+                </button>
+              </form>
+              <button class="warehouse-purchases-icon" type="button" title="Печать" aria-label="Печать" data-sales-detail-print>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+              </button>
+              <div class="sales-document-detail-menu-wrap">
+                <button class="warehouse-purchases-icon" type="button" title="Меню" aria-label="Меню" aria-expanded="false" data-sales-detail-menu-toggle>⋮</button>
+                <div class="sales-document-detail-menu" data-sales-detail-menu hidden>
+                  <button type="button" data-sales-detail-menu-edit>Редактировать</button>
+                  <button type="button" data-sales-detail-menu-return>Сделать возврат</button>
+                  <button type="button" data-sales-detail-menu-print>Печать</button>
+                  <button type="button" data-sales-detail-menu-close>Закрыть</button>
+                </div>
+              </div>
+              <button class="warehouse-purchase-detail-close" type="button" data-sales-journal-close aria-label="Закрыть">×</button>
+            </div>
+          </header>
+          <section class="warehouse-purchase-detail-summary">
+            <div>
+              <span>Клиент</span>
+              <strong data-sales-detail-client></strong>
+            </div>
+            <div>
+              <span>Склад</span>
+              <strong data-sales-detail-warehouse></strong>
+            </div>
+            <div>
+              <span>Ответственный</span>
+              <strong data-sales-detail-manager></strong>
+            </div>
+            <div>
+              <span>Статус</span>
+              <strong data-sales-detail-status></strong>
+            </div>
+          </section>
+          <nav class="warehouse-purchase-detail-tabs" aria-label="Разделы продажи">
+            <button type="button" class="active" data-sales-detail-tab="items" aria-selected="true">Товары</button>
+            <button type="button" data-sales-detail-tab="payment" aria-selected="false">Оплата</button>
+            <button type="button" data-sales-detail-tab="tasks" aria-selected="false">
+              Задачи
+              <span class="sales-detail-tab-count" data-sales-detail-task-count>0</span>
+            </button>
+            <button type="button" data-sales-detail-tab="note" aria-selected="false">Комментарий</button>
+          </nav>
+          <section class="warehouse-purchase-detail-pane active" data-sales-detail-pane="items">
+            <div class="warehouse-purchase-detail-table-wrap">
+              <table class="warehouse-purchase-detail-table sales-document-detail-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Товар</th>
+                    <th>Склад</th>
+                    <th>К-во</th>
+                    <th>Цена</th>
+                    <th>Сумма</th>
+                  </tr>
+                </thead>
+            <tbody data-sales-detail-lines></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="warehouse-purchase-detail-pane warehouse-purchase-payment-pane" data-sales-detail-pane="payment" hidden>
+            <div class="warehouse-purchase-detail-table-wrap" data-sales-payment-list hidden>
+              <table class="warehouse-purchase-detail-table purchase-document-payment-table sales-document-payment-table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Счёт</th>
+                    <th>Тип оплаты</th>
+                    <th>Сумма</th>
+                  </tr>
+                </thead>
+                <tbody data-sales-payment-lines></tbody>
+              </table>
+            </div>
+            {# График рассрочки: когда и сколько платить, что уже оплачено. #}
+            <div class="sales-installment-schedule" data-sales-installment-schedule hidden>
+              <h4>График рассрочки</h4>
+              <div class="warehouse-purchase-detail-table-wrap">
+                <table class="warehouse-purchase-detail-table sales-installment-schedule-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Дата платежа</th>
+                      <th>Сумма</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody data-sales-installment-schedule-rows></tbody>
+                </table>
+              </div>
+            </div>
+            <section class="purchase-document-payment-summary sales-document-payment-summary" data-sales-payment-summary aria-label="Сводка по оплате">
+              <div class="purchase-document-payment-summary-item">
+                <span>Сумма продажи</span>
+                <strong data-sales-payment-total>0 UZS</strong>
+              </div>
+              <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--paid">
+                <span>Оплачено</span>
+                <strong data-sales-payment-paid>0 UZS</strong>
+              </div>
+              <div class="purchase-document-payment-summary-item purchase-document-payment-summary-item--debt">
+                <span>Остаток к оплате</span>
+                <strong data-sales-payment-debt>0 UZS</strong>
+              </div>
+            </section>
+            <form class="document-detail-payment-actions" method="post" action="" data-sales-payment-form data-sales-payment-url-template="{{ url_for('sales_pay', sale_id='__sale_id__') }}" hidden>
+              {% include "_csrf_field.html" %}
+              {# Кнопка частичной оплаты — только у рассрочки: вносит один
+                 месячный платёж вместо всей суммы сразу. #}
+              <button class="btn btn-secondary document-detail-payment-installment-btn" type="button" data-sales-payment-installment hidden>Оплатить платёж</button>
+              <button class="btn document-detail-payment-pay-btn" type="button" data-sales-payment-pay>Оплатить</button>
+            </form>
+          </section>
+          <section class="warehouse-purchase-detail-pane warehouse-purchase-note-pane" data-sales-detail-pane="note" hidden>
+            <div class="warehouse-purchase-detail-table-wrap">
+              <table class="warehouse-purchase-detail-table sales-document-note-table">
+                <thead>
+                  <tr>
+                    <th>Комментарий</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td data-sales-detail-note></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="warehouse-purchase-detail-pane sales-document-tasks-pane" data-sales-detail-pane="tasks" hidden>
+            {# Форма — как задача в карточке CRM; уходит в связанную сделку документа. #}
+            <form class="crm-card-detail-activity-form crm-card-detail-task-form sales-document-task-form" data-sales-detail-task-form>
+              {% include "_csrf_field.html" %}
+              <div class="crm-task-form-main">
+                <input name="crm_task_text" maxlength="500" placeholder="Название задачи" required />
+              </div>
+              <div class="crm-task-form-grid">
+                <label><span>Дата</span><input name="crm_task_due_date" type="date" /></label>
+                <label><span>Время</span><input name="crm_task_due_time" type="time" /></label>
+                <label><span>Ответственный</span><input name="crm_task_assignee" list="sales-crm-responsible-list" placeholder="Сотрудник" /></label>
+                <label><span>Приоритет</span><select name="crm_task_priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
+              </div>
+              <div class="sales-document-task-form-status" data-sales-detail-task-status hidden></div>
+              <button class="btn" type="submit">Добавить задачу</button>
+            </form>
+            <div class="sales-document-completed-tasks" data-sales-detail-tasks></div>
+          </section>
+          <footer class="warehouse-purchase-detail-footer">
+            <div>
+              <span>Оплачено</span>
+              <strong data-sales-detail-paid></strong>
+            </div>
+            <div>
+              <span>Долг</span>
+              <strong data-sales-detail-debt></strong>
+            </div>
+            <div class="warehouse-purchase-detail-total">
+              <span>Итого</span>
+              <strong data-sales-detail-total></strong>
+            </div>
+          </footer>
+        </aside>
+        <dialog class="settings-profile-modal sales-payment-dialog" data-sales-detail-payment-dialog>
+          <form class="settings-profile-modal-surface sales-payment-dialog-surface" method="post" action="" data-sales-detail-payment-modal-form>
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="payment_lines" value="[]" data-detail-payment-lines />
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Добавить оплату</h2>
+                <p class="settings-profile-modal-sub">Можно разделить оплату по двум или нескольким счетам.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-detail-payment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-payment-lines" data-detail-payment-lines-ui>
+                <div class="sales-payment-line" data-detail-payment-line>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Счёт</span>
+                    <select class="settings-profile-input" data-detail-payment-account>
+                      {% for account in sales_options.payment_accounts %}
+                        <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}{% if account.balance %} · остаток {{ account.balance }}{% endif %}</option>
+                      {% else %}
+                        <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Валюта</span>
+                    <select class="settings-profile-input" data-detail-payment-currency>
+                      {% for currency in sales_options.currencies %}
+                        <option value="{{ currency }}">{{ currency }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Сумма</span>
+                    <input class="settings-profile-input" inputmode="decimal" data-detail-payment-amount />
+                  </label>
+                  <button type="button" class="sales-payment-remove" data-detail-payment-remove aria-label="Удалить оплату">×</button>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary sales-payment-add-line" data-detail-payment-add-line>+ Ещё счёт</button>
+              <div class="sales-payment-summary-card" data-detail-payment-summary>
+                <div class="sales-payment-summary-row">
+                  <span>К оплате:</span>
+                  <strong data-detail-payment-due>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row">
+                  <span>Оплачено:</span>
+                  <strong data-detail-payment-paid>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row">
+                  <span>Остаток:</span>
+                  <strong data-detail-payment-rest>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row sales-payment-summary-row--over" data-detail-payment-over-row hidden>
+                  <span>Даёте больше:</span>
+                  <strong data-detail-payment-over>0 UZS</strong>
+                </div>
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-detail-payment-cancel>Отмена</button>
+              <button type="submit" class="btn sales-payment-submit" data-detail-payment-submit>Применить оплату</button>
+            </div>
+          </form>
+        </dialog>
+      </article>
+
+      <aside class="product-form-panel" id="sales-form" data-workspace-view="new"{% if not sales_embed and sales_default_tab != 'new' %} hidden{% endif %}>
+        <header class="products-panel-head">
+          <div>
+            <h2 data-sales-form-title>{{ sales_form_title }}</h2>
+          </div>
+        </header>
+        <script type="application/json" id="sales-form-options">{{ sales_options | tojson }}</script>
+        <form
+          method="post"
+          action="{{ url_for('sales_save') }}"
+          class="product-form sales-form"
+          data-sales-product-quick-save-url="{{ url_for('sales_product_quick_save') }}"
+          data-sales-client-save-url="{{ url_for('clients_save') }}"
+          data-sales-segment-save-url="{{ url_for('sales_business_segment_save') }}"
+          data-sales-client-card-url-template="{{ url_for('sales_client_card_api', client_id='__client_id__') }}"
+          data-sales-prefill-client="{{ sales_prefill.client|e }}"
+        >
+          {% include "_csrf_field.html" %}
+
+          {% if sales_embed %}<input type="hidden" name="embed" value="1" />{% endif %}
+          <input type="hidden" name="sale_id" value="" />
+          <input type="hidden" name="doc_type" value="{{ sales_form_doc_type }}" />
+          <input type="hidden" name="crm_record_id" value="{{ sales_prefill.crm_record_id|e }}" />
+          <input type="hidden" name="source_sale_id" value="" />
+          {# Статус после сохранения: продажа из заказа сразу идёт в отгрузку. #}
+          <input type="hidden" name="next_status" value="" data-sales-next-status />
+
+          <div class="product-form-grid sales-form-identity-grid">
+            <label class="sales-combobox sales-form-client-field" data-sales-combobox="client">
+              <span class="sales-client-label-line">
+                <span>Клиент*</span>
+                <span class="sales-client-balance" data-sales-client-balance hidden></span>
+              </span>
+              <div class="sales-lock-field">
+                <input name="client" required autocomplete="off" value="{{ sales_prefill.client|e }}" placeholder="Выберите или введите клиента" data-sales-combo-input />
+                <input type="hidden" name="counterparty_id" value="" data-sales-client-id />
+                <button type="button" class="sales-combo-add" data-sales-client-create-open aria-label="Добавить нового клиента" title="Добавить клиента">+</button>
+                <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить клиента" title="Сменить клиента" hidden>✎</button>
+              </div>
+              <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
+            </label>
+            <label class="sales-form-date-field">
+              <span>Дата</span>
+              <input name="date" type="date" value="{{ today }}" data-upos-date-range data-upos-date-to="date_to" />
+              <input name="date_to" type="hidden" value="{{ today }}" />
+            </label>
+            <label class="sales-form-segment-field">
+              <span>Сегмент</span>
+              <span class="sales-segment-control">
+                <select name="business_segment_id" data-sales-segment-select>
+                  <option value="">Не выбран</option>
+                  {% for segment in sales_options.business_segments %}
+                    <option value="{{ segment.id }}">{{ segment.icon }} {{ segment.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="button" class="sales-segment-add" data-sales-segment-create-open aria-label="Добавить сегмент" title="Добавить сегмент">+</button>
+              </span>
+            </label>
+            <label class="sales-form-currency-field"><span>Валюта</span>
+              <select name="currency" data-sales-currency>
+                {% for currency in sales_options.currencies %}
+                  <option value="{{ currency }}" {% if currency == "UZS" %}selected{% endif %}>{{ currency }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="sales-form-id-field"><span>ID</span><input name="number" value="{{ sales_options.next_numbers[sales_form_doc_type] }}" readonly data-sales-auto-number aria-readonly="true" /></label>
+            <input type="hidden" name="manager" value="{{ user.name if user else '' }}" />
+            <input type="hidden" name="paid_amount" value="0" data-sales-paid-amount />
+            <input type="hidden" name="payment_type" value="" data-sales-payment-type />
+            <input type="hidden" name="payment_lines" value="[]" data-sales-payment-lines />
+          </div>
+
+          <section class="product-form-section sales-installation-section" data-sales-installation-section hidden>
+            <div class="sales-section-head">
+              <div>
+                <h3>Установка</h3>
+                <p>Назначение установщика и чек-листа по заказу</p>
+              </div>
+            </div>
+            <div class="sales-installation-grid">
+              <label>
+                <span>Установщик</span>
+                <select name="installer_user_id" data-sales-installation-installer>
+                  <option value="">Не назначен</option>
+                  {% for installer in sales_options.installers %}
+                    <option value="{{ installer.id }}">{{ installer.name }}{% if installer.position %} · {{ installer.position }}{% endif %}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="sales-installation-date-field">
+                <span>Дата и время установки</span>
+                <span class="sales-installation-date-control">
+                  <input
+                    type="datetime-local"
+                    name="installation_scheduled_at"
+                    data-sales-installation-date
+                    readonly
+                    aria-haspopup="dialog"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-secondary sales-installation-calendar-trigger"
+                    data-sales-installation-calendar-open
+                    aria-label="Открыть календарь установщика"
+                    title="Открыть календарь установщика"
+                  >Календарь</button>
+                </span>
+              </label>
+              <label>
+                <span>Шаблон задач</span>
+                <select name="installation_template_id">
+                  {% for template in sales_options.installation_templates %}
+                    <option value="{{ template.id }}">{{ template.name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Приоритет</span>
+                <select name="installation_priority">
+                  {% for priority in sales_options.installation_priorities %}
+                    <option value="{{ priority.value }}"{% if priority.value == "normal" %} selected{% endif %}>{{ priority.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="sales-installation-grid-wide">
+                <span>Задача установщику</span>
+                <textarea name="installation_notes" rows="2" placeholder="Что нужно учесть при установке"></textarea>
+              </label>
+              <label class="sales-installation-grid-wide">
+                <span>Вложения</span>
+                <textarea name="installation_attachment_urls" rows="2" placeholder="Ссылки на файлы, по одной в строке"></textarea>
+              </label>
+            </div>
+          </section>
+
+          {# Секция «CRM: агент и задача» убрана из формы продажи по просьбе —
+             задача заводится из карточки CRM. Список сотрудников оставлен:
+             он подсказывает исполнителя в форме задачи карточки документа. #}
+          <datalist id="sales-crm-responsible-list">
+            {% for item in sales_options.responsibles %}{% if item %}<option value="{{ item }}"></option>{% endif %}{% endfor %}
+          </datalist>
+
+          <section class="product-form-section">
+            <div class="sales-section-head">
+              <h3>Позиции</h3>
+              <div class="sales-section-actions">
+                <label class="sales-price-type-inline">
+                  <span>Прайс-лист</span>
+                  <select name="price_type_id" data-sales-price-type>
+                    {% for price_type in sales_options.price_types %}
+                      <option value="{{ price_type.id }}" data-name="{{ price_type.name }}" data-currency="{{ price_type.currency }}">{{ price_type.name }}</option>
+                    {% else %}
+                      <option value="" data-name="" data-currency="UZS">Продажная цена</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <input type="hidden" name="price_type_name" data-sales-price-type-name />
+                <button type="button" class="btn btn-secondary btn-sm sales-catalog-pick-btn" data-sales-catalog-pick>Подбор</button>
+                <button type="button" class="btn btn-secondary btn-sm sales-add-subscription-btn" data-sales-subscription-open>+ Подписка</button>
+                <button type="button" class="btn btn-secondary btn-sm sales-add-service-btn" data-sales-add-service>+ Услуга</button>
+                <button type="button" class="btn btn-secondary btn-sm sales-add-installment-btn" data-sales-installment-add>+ Рассрочка</button>
+              </div>
+            </div>
+            <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+              <table class="products-table products-catalog-table sales-lines-table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Товар</th>
+                    <th>Склад</th>
+                    <th>К-во</th>
+                    <th>Цена</th>
+                    <th>Скидка</th>
+                    <th>Сумма</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--product" data-sales-line-kind="product">
+                    <td class="sales-line-number"></td>
+                    <td>
+                      <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
+                        <div class="sales-lock-field">
+                          <input name="line_product" autocomplete="off" placeholder="Товар" data-sales-combo-input />
+                          <input type="hidden" name="line_product_id" value="" data-sales-line-product-id />
+                          <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
+                        </div>
+                        <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                        <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
+                      </label>
+                      <input type="hidden" name="line_subscription_program" />
+                      <input type="hidden" name="line_subscription_plan" />
+                      <input type="hidden" name="line_subscription_months" />
+                    </td>
+                    <td>
+                      <label class="sales-combobox sales-warehouse-picker" data-sales-combobox="warehouse">
+                        <input name="line_warehouse" autocomplete="off" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" placeholder="Склад" data-sales-combo-input readonly aria-readonly="true" />
+                        <div class="sales-combo-panel" data-sales-combo-panel hidden></div>
+                      </label>
+                    </td>
+                    <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                    <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                    <td class="sales-line-discount-cell">
+                      <div class="sales-discount-control" data-sales-discount>
+                        <button type="button" class="sales-discount-mode" data-sales-discount-mode-button data-mode="discount">-</button>
+                        <input type="hidden" name="line_discount_mode" value="discount" data-sales-discount-mode />
+                        <div class="sales-discount-menu" data-sales-discount-menu hidden>
+                          <button type="button" data-sales-discount-pick="discount">- Скидка</button>
+                          <button type="button" data-sales-discount-pick="markup">+ Наценка</button>
+                        </div>
+                        <input name="line_discount_value" value="0" inputmode="decimal" data-sales-discount-value />
+                        <select name="line_discount_unit" data-sales-discount-unit>
+                          <option value="percent">%</option>
+                          <option value="amount">UZS</option>
+                        </select>
+                      </div>
+                    </td>
+                    <td class="sales-line-total" data-sales-line-total></td>
+                    <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="sales-subtotal-row" data-sales-total-trigger-kind="product" role="button" tabindex="0" title="Изменить сумму товаров">
+                    <td colspan="3">Итого товары</td>
+                    <td><output data-sales-products-quantity>0</output></td>
+                    <td></td>
+                    <td></td>
+                    <td><output data-sales-products-total>0 UZS</output></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div class="sales-services-block" data-sales-services-block hidden>
+              <div class="sales-section-head sales-section-head--sub">
+                <h3>Услуги</h3>
+              </div>
+              <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+                <table class="products-table products-catalog-table sales-lines-table sales-services-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Услуга</th>
+                      <th>Категория</th>
+                      <th>К-во</th>
+                      <th>Цена</th>
+                      <th>Скидка</th>
+                      <th>Сумма</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody data-sales-services-body></tbody>
+                  <tfoot>
+                    <tr class="sales-subtotal-row" data-sales-total-trigger-kind="service" role="button" tabindex="0" title="Изменить сумму услуг">
+                      <td colspan="3">Итого услуги</td>
+                      <td><output data-sales-services-quantity>0</output></td>
+                      <td></td>
+                      <td></td>
+                      <td><output data-sales-services-total>0 UZS</output></td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <template id="sales-service-row-template">
+              <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--service" data-sales-line-kind="service">
+                <td class="sales-line-number"></td>
+                <td>
+                  <label class="sales-combobox sales-product-picker" data-sales-combobox="service">
+                    <div class="sales-lock-field">
+                      <input name="line_product" autocomplete="off" placeholder="Услуга" data-sales-combo-input />
+                      <input type="hidden" name="line_product_id" value="" data-sales-line-product-id />
+                      <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить услугу" title="Сменить услугу" hidden>✎</button>
+                    </div>
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                    <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
+                  </label>
+                  <input type="hidden" name="line_warehouse" value="Услуги" />
+                  <input type="hidden" name="line_subscription_program" />
+                  <input type="hidden" name="line_subscription_plan" />
+                  <input type="hidden" name="line_subscription_months" />
+                </td>
+                <td class="sales-line-category" data-sales-line-category></td>
+                <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                <td class="sales-line-discount-cell">
+                  <div class="sales-discount-control" data-sales-discount>
+                    <button type="button" class="sales-discount-mode" data-sales-discount-mode-button data-mode="discount">-</button>
+                    <input type="hidden" name="line_discount_mode" value="discount" data-sales-discount-mode />
+                    <div class="sales-discount-menu" data-sales-discount-menu hidden>
+                      <button type="button" data-sales-discount-pick="discount">- Скидка</button>
+                      <button type="button" data-sales-discount-pick="markup">+ Наценка</button>
+                    </div>
+                    <input name="line_discount_value" value="0" inputmode="decimal" data-sales-discount-value />
+                    <select name="line_discount_unit" data-sales-discount-unit>
+                      <option value="percent">%</option>
+                      <option value="amount">UZS</option>
+                    </select>
+                  </div>
+                </td>
+                <td class="sales-line-total" data-sales-line-total></td>
+                <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
+              </tr>
+            </template>
+
+            <div class="sales-services-block" data-sales-subscriptions-block hidden>
+              <div class="sales-section-head sales-section-head--sub">
+                <h3>Подписки</h3>
+              </div>
+              <div class="sales-lines-table-wrap products-table-wrap org-ops-table-wrap org-ops-table-wrap--excel">
+                <table class="products-table products-catalog-table sales-lines-table sales-services-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Подписка</th>
+                      <th>Программа</th>
+                      <th>К-во</th>
+                      <th>Цена</th>
+                      <th>Скидка</th>
+                      <th>Сумма</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody data-sales-subscriptions-body></tbody>
+                  <tfoot>
+                    <tr class="sales-subtotal-row" data-sales-total-trigger-kind="subscription" role="button" tabindex="0" title="Изменить сумму подписок">
+                      <td colspan="3">Итого подписки</td>
+                      <td><output data-sales-subscriptions-quantity>0</output></td>
+                      <td></td>
+                      <td></td>
+                      <td><output data-sales-subscriptions-total>0 UZS</output></td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <template id="sales-subscription-row-template">
+              <tr class="sales-line-grid sales-line-grid--compact sales-line-grid--service" data-sales-line-kind="subscription">
+                <td class="sales-line-number"></td>
+                <td>
+                  <label class="sales-combobox sales-product-picker" data-sales-combobox="subscription">
+                    <div class="sales-lock-field">
+                      <input name="line_product" autocomplete="off" placeholder="Подписка" data-sales-combo-input />
+                      <input type="hidden" name="line_product_id" value="" data-sales-line-product-id />
+                      <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить подписку" title="Сменить подписку" hidden>✎</button>
+                    </div>
+                    <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
+                    <small class="sales-subscription-line-meta" data-sales-subscription-line-meta hidden></small>
+                  </label>
+                  <input type="hidden" name="line_warehouse" value="Подписки" />
+                  <input type="hidden" name="line_subscription_program" />
+                  <input type="hidden" name="line_subscription_plan" />
+                  <input type="hidden" name="line_subscription_months" />
+                </td>
+                <td class="sales-line-category" data-sales-line-category></td>
+                <td><input name="line_quantity" placeholder="К-во" inputmode="decimal" /></td>
+                <td><input name="line_price" placeholder="Цена" inputmode="decimal" /></td>
+                <td class="sales-line-discount-cell">
+                  <div class="sales-discount-control" data-sales-discount>
+                    <button type="button" class="sales-discount-mode" data-sales-discount-mode-button data-mode="discount">-</button>
+                    <input type="hidden" name="line_discount_mode" value="discount" data-sales-discount-mode />
+                    <div class="sales-discount-menu" data-sales-discount-menu hidden>
+                      <button type="button" data-sales-discount-pick="discount">- Скидка</button>
+                      <button type="button" data-sales-discount-pick="markup">+ Наценка</button>
+                    </div>
+                    <input name="line_discount_value" value="0" inputmode="decimal" data-sales-discount-value />
+                    <select name="line_discount_unit" data-sales-discount-unit>
+                      <option value="percent">%</option>
+                      <option value="amount">UZS</option>
+                    </select>
+                  </div>
+                </td>
+                <td class="sales-line-total" data-sales-line-total></td>
+                <td class="sales-line-remove-cell"><button type="button" class="sales-line-remove" data-sales-line-remove aria-label="Удалить строку" title="Удалить строку">×</button></td>
+              </tr>
+            </template>
+
+            <div class="sales-total-bar" data-sales-total-trigger role="button" tabindex="0" title="Изменить общую сумму">
+              <span>Итого</span>
+              <span class="sales-total-quantity">Кол-во <output data-sales-lines-quantity>0</output></span>
+              <span class="sales-total-discount" data-sales-total-discount hidden></span>
+              <output data-sales-lines-total>0 UZS</output>
+            </div>
+          </section>
+
+          {# Рассрочка: срок и условия хранятся в документе, суммы считаются
+             от итога позиций. #}
+          <input type="hidden" name="installment_enabled" value="0" data-sales-installment-enabled />
+          <input type="hidden" name="installment_months" value="" data-sales-installment-months-field />
+          <input type="hidden" name="installment_initial" value="" data-sales-installment-initial-field />
+          <input type="hidden" name="installment_markup_percent" value="" data-sales-installment-markup-field />
+          <section class="product-form-section sales-installment-section" data-sales-installment-section hidden>
+            <div class="sales-section-head">
+              <h3>Рассрочка</h3>
+              <div class="sales-section-actions">
+                <button type="button" class="sales-installment-remove" data-sales-installment-remove aria-label="Убрать рассрочку" title="Убрать рассрочку">×</button>
+              </div>
+            </div>
+            <div class="sales-installment-body" data-sales-installment-body>
+              <div class="sales-installment-controls">
+                <label class="sales-installment-period">
+                  <span>Период</span>
+                  <span class="sales-installment-period-field">
+                    <input type="text" inputmode="numeric" value="1" data-sales-installment-months placeholder="1" />
+                    <b>мес.</b>
+                  </span>
+                </label>
+                <button type="button" class="btn btn-secondary" data-sales-installment-open>Условия рассрочки</button>
+              </div>
+              <div class="sales-installment-summary" data-sales-installment-summary hidden>
+                <div class="sales-installment-summary-row sales-installment-summary-row--total">
+                  <span>Итого</span>
+                  <strong data-sales-installment-total>0 UZS</strong>
+                </div>
+                <div class="sales-installment-summary-details" data-sales-installment-details>
+                  <div class="sales-installment-summary-row">
+                    <span>Начальная сумма</span>
+                    <strong data-sales-installment-initial>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row">
+                    <span>Осталось</span>
+                    <strong data-sales-installment-rest>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row">
+                    <span>Прибыль</span>
+                    <strong data-sales-installment-profit>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row sales-installment-summary-row--rest">
+                    <span>Итого остаток</span>
+                    <strong data-sales-installment-rest-total>0 UZS</strong>
+                  </div>
+                  <div class="sales-installment-summary-row sales-installment-summary-row--month">
+                    <span>Платёж в месяц</span>
+                    <strong data-sales-installment-month>0 UZS</strong>
+                  </div>
+                </div>
+                <button type="button" class="sales-installment-details-toggle" data-sales-installment-details-toggle>Скрыть детали</button>
+              </div>
+            </div>
+          </section>
+
+          <div class="sales-payment-breakdown" data-sales-payment-breakdown hidden>
+            <button type="button" class="sales-payment-breakdown-clear" data-sales-payment-clear aria-label="Убрать оплату" title="Убрать оплату">×</button>
+            <div class="sales-payment-breakdown-row sales-payment-breakdown-row--total">
+              <span>Сумма</span>
+              <strong data-sales-payment-breakdown-total>0 UZS</strong>
+            </div>
+            <div class="sales-payment-breakdown-summary">
+              <div class="sales-payment-breakdown-row sales-payment-breakdown-row--paid">
+                <span>Оплачено</span>
+                <strong data-sales-payment-breakdown-paid>0 UZS</strong>
+              </div>
+              <div class="sales-payment-breakdown-row sales-payment-breakdown-row--debt">
+                <span>Остаток долга</span>
+                <strong data-sales-payment-breakdown-debt>0 UZS</strong>
+              </div>
+            </div>
+            <div class="sales-payment-breakdown-lines" data-sales-payment-breakdown-lines></div>
+          </div>
+
+          <label class="wide sales-document-note">
+            <span>Комментарий</span>
+            <textarea name="note" rows="2" autocomplete="off" placeholder="Комментарий к продаже"></textarea>
+          </label>
+
+          <div class="sales-form-footer">
+            <button type="button" class="btn sales-payment-add-btn" data-sales-payment-open>+ Добавить оплату</button>
+            <div class="product-form-actions">
+              {% if sales_embed %}
+                <button class="btn btn-secondary" type="button" data-sales-embed-cancel>Отмена</button>
+              {% else %}
+                <a class="btn btn-secondary" href="{{ url_for('sales_get') }}">Отмена</a>
+              {% endif %}
+              <button class="btn" type="submit" data-sales-form-submit>{{ sales_form_save_label }}</button>
+            </div>
+          </div>
+        </form>
+
+        <dialog class="settings-profile-modal sales-installation-calendar-dialog" data-sales-installation-calendar-dialog>
+          <section class="settings-profile-modal-surface sales-installation-calendar-surface" aria-labelledby="sales-installation-calendar-title">
+            <header class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title" id="sales-installation-calendar-title">Календарь установщика</h2>
+                <p class="settings-profile-modal-sub" data-sales-installation-calendar-installer>Сначала выберите установщика</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-installation-calendar-close aria-label="Закрыть">×</button>
+            </header>
+            <div class="sales-installation-calendar-toolbar">
+              <div class="sales-installation-calendar-navigation" aria-label="Навигация по календарю">
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-prev aria-label="Предыдущий месяц">←</button>
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-today>Сегодня</button>
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-next aria-label="Следующий месяц">→</button>
+              </div>
+              <strong data-sales-installation-calendar-month></strong>
+              <span class="sales-installation-calendar-legend">
+                <i aria-hidden="true"></i>
+                Назначенные заказы
+              </span>
+            </div>
+            <div class="sales-installation-calendar-status" data-sales-installation-calendar-status aria-live="polite"></div>
+            <div class="sales-installation-calendar-scroll">
+              <div class="sales-installation-calendar-weekdays" aria-hidden="true">
+                <span>Пн</span>
+                <span>Вт</span>
+                <span>Ср</span>
+                <span>Чт</span>
+                <span>Пт</span>
+                <span>Сб</span>
+                <span>Вс</span>
+              </div>
+              <div class="sales-installation-calendar-grid" data-sales-installation-calendar-grid></div>
+            </div>
+            <footer class="sales-installation-calendar-footer">
+              <div class="sales-installation-calendar-selection">
+                <span>Выбранная установка</span>
+                <strong data-sales-installation-calendar-selected>Дата не выбрана</strong>
+              </div>
+              <label>
+                <span>Время</span>
+                <input type="time" value="09:00" data-sales-installation-calendar-time />
+              </label>
+              <div class="sales-installation-calendar-actions">
+                <button type="button" class="btn btn-secondary" data-sales-installation-calendar-cancel>Отмена</button>
+                <button type="button" class="btn" data-sales-installation-calendar-apply disabled>Выбрать дату</button>
+              </div>
+            </footer>
+          </section>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-installment-dialog" data-sales-installment-dialog>
+          <div class="settings-profile-modal-surface sales-installment-dialog-surface">
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Условия рассрочки</h2>
+                <p class="settings-profile-modal-sub">Первый взнос и наценка за рассрочку.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-installment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-installment-dialog-grid">
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Итого</span>
+                  <input class="settings-profile-input" data-sales-installment-dialog-total readonly />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Начальная сумма</span>
+                  <input class="settings-profile-input" inputmode="decimal" data-sales-installment-dialog-initial placeholder="0" />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Осталось</span>
+                  <input class="settings-profile-input" data-sales-installment-dialog-rest readonly />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Прибыль, %</span>
+                  <input class="settings-profile-input" inputmode="decimal" data-sales-installment-dialog-markup placeholder="0" />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Период, мес.</span>
+                  <input class="settings-profile-input" inputmode="numeric" data-sales-installment-dialog-months placeholder="1" />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Платёж в месяц</span>
+                  <input class="settings-profile-input" data-sales-installment-dialog-month readonly />
+                </label>
+              </div>
+              <div class="sales-payment-summary-card">
+                <div class="sales-payment-summary-row">
+                  <span>Итого остаток</span>
+                  <strong data-sales-installment-dialog-rest-total>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row sales-payment-summary-row--total">
+                  <span>Итого к оплате</span>
+                  <strong data-sales-installment-dialog-grand>0 UZS</strong>
+                </div>
+              </div>
+            </div>
+            <div class="settings-profile-modal-actions">
+              <button type="button" class="btn btn-secondary" data-sales-installment-close>Закрыть</button>
+              <button type="button" class="btn" data-sales-installment-save>Сохранить</button>
+            </div>
+          </div>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-subscription-dialog" data-sales-subscription-dialog>
+          <form class="settings-profile-modal-surface sales-subscription-dialog-surface" data-sales-subscription-form>
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Добавить подписку</h2>
+                <p class="settings-profile-modal-sub">Выберите программу, подписку, количество и срок.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-subscription-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-subscription-grid">
+                <label class="settings-profile-field sales-subscription-grid-wide">
+                  <span class="settings-profile-field-label">Программа</span>
+                  <select class="settings-profile-input" data-sales-subscription-program required></select>
+                </label>
+              </div>
+              <div class="sales-subscription-list-head">
+                <span class="settings-profile-field-label">Подписки</span>
+                <button type="button" class="sales-subscription-add-row" data-sales-subscription-add-row aria-label="Добавить ещё подписку" title="Добавить ещё подписку">+</button>
+              </div>
+              <div class="sales-subscription-lines" data-sales-subscription-lines></div>
+              <template data-sales-subscription-line-template>
+                <div class="sales-subscription-line" data-sales-subscription-line>
+                  <label class="settings-profile-field sales-subscription-plan-field">
+                    <span class="settings-profile-field-label">Подписка</span>
+                    <select class="settings-profile-input" data-sales-subscription-plan required></select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Количество</span>
+                    <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-quantity required />
+                  </label>
+                  <button type="button" class="sales-subscription-remove-row" data-sales-subscription-remove-row aria-label="Удалить подписку" title="Удалить подписку">×</button>
+                  <p class="sales-subscription-description" data-sales-subscription-description hidden></p>
+                </div>
+              </template>
+              <div class="sales-subscription-summary" data-sales-subscription-summary>
+                <label class="sales-subscription-common-months">
+                  <span>Месяцы</span>
+                  <input class="settings-profile-input" type="number" min="1" step="1" value="1" data-sales-subscription-months required />
+                </label>
+                <button type="button" class="sales-subscription-total-trigger" data-sales-subscription-discount-toggle aria-expanded="false" title="Добавить скидку">
+                  <span data-sales-subscription-total-label>Итого за период</span>
+                  <strong data-sales-subscription-total>0 UZS</strong>
+                </button>
+                <small data-sales-subscription-formula></small>
+                <div class="sales-subscription-discount" data-sales-subscription-discount-panel hidden>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Ручная скидка</span>
+                    <div class="sales-subscription-discount-control">
+                      <input class="settings-profile-input" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal" data-sales-subscription-discount />
+                      <select class="settings-profile-input" data-sales-subscription-discount-unit aria-label="Тип скидки">
+                        <option value="percent">%</option>
+                        <option value="amount">Сумма</option>
+                      </select>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div class="sales-subscription-empty" data-sales-subscription-empty hidden>
+                В разделе «Товары» пока нет доступных подписок.
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-subscription-close>Отмена</button>
+              <button type="submit" class="btn" data-sales-subscription-add>Добавить</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-payment-dialog" data-sales-payment-dialog>
+          <form class="settings-profile-modal-surface sales-payment-dialog-surface" data-sales-payment-form>
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Добавить оплату</h2>
+                <p class="settings-profile-modal-sub">Можно разделить оплату по двум или нескольким счетам.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-payment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="sales-payment-lines" data-sales-payment-lines-ui>
+                <div class="sales-payment-line" data-sales-payment-line>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Счёт</span>
+                    <select class="settings-profile-input" data-sales-payment-account>
+                      {% for account in sales_options.payment_accounts %}
+                        <option value="{{ account.id }}" data-label="{{ account.label }}">{{ account.label }}</option>
+                      {% else %}
+                        <option value="" disabled selected>Нет счетов — создайте счёт в разделе «Финансы»</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Валюта</span>
+                    <select class="settings-profile-input" data-sales-payment-currency>
+                      {% for currency in sales_options.currencies %}
+                        <option value="{{ currency }}">{{ currency }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Сумма</span>
+                    <input class="settings-profile-input" inputmode="decimal" data-sales-payment-amount />
+                  </label>
+                  <button type="button" class="sales-payment-remove" data-sales-payment-remove aria-label="Удалить оплату">×</button>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary sales-payment-add-line" data-sales-payment-add-line>+ Ещё счёт</button>
+              <div class="sales-payment-summary-card" data-sales-payment-summary>
+                <div class="sales-payment-summary-row">
+                  <span>К оплате:</span>
+                  <strong data-sales-payment-due>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row">
+                  <span>Оплачено:</span>
+                  <strong data-sales-payment-paid>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row">
+                  <span>Остаток:</span>
+                  <strong data-sales-payment-rest>0 UZS</strong>
+                </div>
+                <div class="sales-payment-summary-row sales-payment-summary-row--over" data-sales-payment-over-row hidden>
+                  <span>Даёте больше:</span>
+                  <strong data-sales-payment-over>0 UZS</strong>
+                </div>
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-payment-cancel>Отмена</button>
+              <button type="submit" class="btn sales-payment-submit" data-sales-payment-submit>Применить оплату</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-client-create-dialog" data-sales-client-create-dialog>
+          <form class="settings-profile-modal-surface sales-client-create-surface" data-sales-client-create-form data-client-location-no-submit="1">
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="response" value="json" />
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Создание клиента</h2>
+                <p class="settings-profile-modal-sub">Полная карточка сразу попадет в выбор клиента для продажи.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-client-create-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-scroll">
+              <div class="settings-profile-modal-body">
+                <div class="settings-profile-form-grid sales-client-create-grid">
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Название клиента*</span>
+                    <input class="settings-profile-input" name="name" required data-sales-client-create-name />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Официальное название</span>
+                    <input class="settings-profile-input" name="official_name" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Тип клиента</span>
+                    <select class="settings-profile-input" name="client_type">
+                      <option value="company">Компания</option>
+                      <option value="individual">Физическое лицо</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Телефон</span>
+                    <input class="settings-profile-input" name="phone" inputmode="tel" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Email</span>
+                    <input class="settings-profile-input" name="email" type="email" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Telegram номер</span>
+                    <input class="settings-profile-input" name="telegram_phone" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">ИНН</span>
+                    <input class="settings-profile-input" name="tax_id" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">ПИНФЛ</span>
+                    <input class="settings-profile-input" name="pinfl" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Категория</span>
+                    <input class="settings-profile-input" name="category" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Сегмент бизнеса</span>
+                    <select class="settings-profile-input" name="business_segment_id" data-sales-client-segment-select>
+                      <option value="">Не выбран</option>
+                      {% for segment in sales_options.business_segments %}
+                        <option value="{{ segment.id }}">{{ segment.icon }} {{ segment.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Иконка на карте</span>
+                    <select class="settings-profile-input" name="map_icon" data-client-map-icon>
+                      <option value="default">Обычная</option>
+                      <option value="Продуктовый">Продуктовый</option>
+                      <option value="Ресторан">Ресторан</option>
+                      <option value="Кафе">Кафе</option>
+                      <option value="Одежда">Одежда</option>
+                      <option value="Аксессуар">Аксессуар</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">CRM статус</span>
+                    <select class="settings-profile-input" name="crm_status">
+                      <option value="new_lead">Новый лид</option>
+                      <option value="qualification">Квалификация</option>
+                      <option value="negotiation">Переговоры</option>
+                      <option value="invoice">Счёт</option>
+                      <option value="our_client">Наш клиент</option>
+                      <option value="lost">Потеряно</option>
+                      <option value="in_work">В работе</option>
+                      <option value="paused">Пауза</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Программа клиента</span>
+                    <input class="settings-profile-input" name="program_custom" placeholder="Например: лояльность" />
+                  </label>
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Адрес</span>
+                    <input class="settings-profile-input" name="address" data-client-address />
+                  </label>
+                  <div class="client-location-panel settings-profile-field--full">
+                    <input type="hidden" name="latitude" data-client-latitude />
+                    <input type="hidden" name="longitude" data-client-longitude />
+                    <div class="client-location-actions">
+                      <button class="btn btn-secondary" type="button" data-client-geolocate>Найти по геолокации</button>
+                      <a class="btn btn-secondary" href="#" target="_blank" rel="noreferrer" data-client-map-link hidden>Открыть карту</a>
+                    </div>
+                    <div class="client-location-status" data-client-location-status>Локация не выбрана</div>
+                    <div class="client-location-map client-location-map--empty" title="Карта клиента" data-client-map role="button" tabindex="0" aria-label="Выбрать точку клиента на карте">
+                      <div class="client-location-map-grid"></div>
+                      <div class="client-location-map-road client-location-map-road--main"></div>
+                      <div class="client-location-map-road client-location-map-road--side"></div>
+                      <div class="client-location-map-road client-location-map-road--cross"></div>
+                      <div class="client-location-zone client-location-zone--a"></div>
+                      <div class="client-location-zone client-location-zone--b"></div>
+                      <div class="client-location-marker" data-client-map-marker hidden>
+                        <span></span>
+                        <strong>Клиент</strong>
+                      </div>
+                      <div class="client-location-map-hint">Нажмите на карту, чтобы выбрать точку клиента</div>
+                    </div>
+                  </div>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Прайс-лист</span>
+                    <input class="settings-profile-input" name="price_type" placeholder="ПРОДАЖНАЯ ЦЕНА" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Кредитный лимит</span>
+                    <input class="settings-profile-input" name="credit_limit" inputmode="decimal" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Статус</span>
+                    <select class="settings-profile-input" name="status">
+                      <option value="active">Активный</option>
+                      <option value="inactive">Неактивный</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Черный список</span>
+                    <select class="settings-profile-input" name="is_blacklisted">
+                      <option value="0">Нет</option>
+                      <option value="1">Да</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Комментарий</span>
+                    <textarea class="settings-profile-input sales-client-create-note" name="comment"></textarea>
+                  </label>
+                </div>
+                <p class="sales-product-dialog-status" data-sales-client-create-status aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-client-create-cancel>Отмена</button>
+              <button type="submit" class="btn" data-sales-client-create-submit>Сохранить клиента</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-segment-dialog" data-sales-segment-dialog>
+          <form class="settings-profile-modal-surface" data-sales-segment-form>
+            {% include "_csrf_field.html" %}
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Новый сегмент</h2>
+                <p class="settings-profile-modal-sub">Сегмент сохранится в справочнике и будет доступен во всех продажах.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-segment-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Название*</span>
+                <input class="settings-profile-input" name="name" required maxlength="80" data-sales-segment-name />
+              </label>
+              <fieldset class="sales-segment-icon-picker">
+                <legend>Иконка на карте</legend>
+                {% for icon in ["🍽️", "☕", "🍔", "🏪", "🛒", "🛍️", "📦", "🧰", "🚗", "👕", "🧴", "🥣", "🏷️"] %}
+                  <label>
+                    <input type="radio" name="icon" value="{{ icon }}" {% if loop.first %}checked{% endif %} />
+                    <span aria-hidden="true">{{ icon }}</span>
+                  </label>
+                {% endfor %}
+              </fieldset>
+              <label class="settings-profile-field">
+                <span class="settings-profile-field-label">Своя иконка</span>
+                <input class="settings-profile-input" name="icon_custom" maxlength="8" placeholder="Например: 🏢" />
+              </label>
+              <p class="sales-product-dialog-status" data-sales-segment-status aria-live="polite"></p>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-segment-cancel>Отмена</button>
+              <button type="submit" class="btn" data-sales-segment-submit>Добавить сегмент</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-product-dialog" data-sales-product-dialog>
+          <form class="settings-profile-modal-surface sales-product-dialog-surface" data-sales-product-form>
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="kind" value="product" data-sales-product-kind />
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title" data-sales-product-dialog-title>Создание товара</h2>
+                <p class="settings-profile-modal-sub" data-sales-product-dialog-sub>Позиция сразу попадёт в поиск продаж.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-product-dialog-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-scroll">
+              <div class="settings-profile-modal-body">
+                <div class="settings-profile-form-grid sales-product-dialog-grid">
+                  <label class="settings-profile-field settings-profile-field--full">
+                    <span class="settings-profile-field-label">Название*</span>
+                    <input class="settings-profile-input" name="name" required data-sales-product-name />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Категория</span>
+                    <input class="settings-profile-input" name="category" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Бренд</span>
+                    <input class="settings-profile-input" name="brand" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Артикул</span>
+                    <input class="settings-profile-input" name="sku" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Штрихкод</span>
+                    <input class="settings-profile-input" name="barcode" />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Единица*</span>
+                    <input class="settings-profile-input" name="unit" value="Штука" required data-sales-product-unit />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Статус</span>
+                    <select class="settings-profile-input" name="status">
+                      <option value="active" selected>Активный</option>
+                      <option value="inactive">Неактивный</option>
+                    </select>
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Цена</span>
+                    <input class="settings-profile-input" name="price_value" inputmode="decimal" data-sales-product-price />
+                  </label>
+                  <label class="settings-profile-field">
+                    <span class="settings-profile-field-label">Валюта</span>
+                    <select class="settings-profile-input" name="price_currency" data-sales-product-currency>
+                      {% for currency in sales_options.currencies %}
+                        <option value="{{ currency }}">{{ currency }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <input type="hidden" name="price_name" value="Продажная цена" />
+                  <input type="hidden" name="stock_warehouse" value="{{ sales_options.warehouses[0] if sales_options.warehouses else 'Основной склад' }}" data-sales-product-warehouse />
+                  <input type="hidden" name="stock_quantity" value="" />
+                  <input type="hidden" name="stock_price" value="" />
+                  <input type="hidden" name="stock_date" value="{{ today }}" />
+                  <input type="hidden" name="barcode_type" value="EAN13" />
+                </div>
+                <p class="sales-product-dialog-status" data-sales-product-status aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-product-dialog-cancel>Отмена</button>
+              <button type="submit" class="btn" data-sales-product-submit>Сохранить</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-total-dialog" data-sales-total-dialog>
+          <form class="settings-profile-modal-surface sales-total-dialog-surface" data-sales-total-form>
+            <div class="settings-profile-modal-head">
+              <div>
+                <h2 class="settings-profile-modal-title">Новая общая сумма</h2>
+                <p class="settings-profile-modal-sub">Цены в строках пересчитаются пропорционально, старые цены будут зачёркнуты.</p>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-total-close aria-label="Закрыть">×</button>
+            </div>
+            <div class="settings-profile-modal-body">
+              <div class="settings-profile-form-grid sales-total-dialog-grid">
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Итог</span>
+                  <input class="settings-profile-input" name="manual_total" inputmode="decimal" required data-sales-total-input />
+                </label>
+                <label class="settings-profile-field">
+                  <span class="settings-profile-field-label">Скидка %</span>
+                  <input class="settings-profile-input" name="manual_percent" inputmode="decimal" data-sales-total-percent />
+                </label>
+              </div>
+              <p class="sales-product-dialog-status" data-sales-total-status aria-live="polite"></p>
+            </div>
+            <div class="settings-profile-modal-foot">
+              <button type="button" class="btn btn-secondary" data-sales-total-reset>Сбросить</button>
+              <button type="button" class="btn btn-secondary" data-sales-total-cancel>Отмена</button>
+              <button type="submit" class="btn">Применить</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="settings-profile-modal sales-client-card-dialog" data-sales-client-card-dialog>
+          <div class="settings-profile-modal-surface sales-client-card-surface">
+            <header class="settings-profile-modal-head sales-client-card-head">
+              <div>
+                <p class="settings-profile-modal-sub">Карточка клиента</p>
+                <h2 class="settings-profile-modal-title" data-sales-client-card-title>Клиент</h2>
+              </div>
+              <button type="button" class="settings-profile-modal-close" data-sales-client-card-close aria-label="Закрыть">×</button>
+            </header>
+            <div class="sales-client-card-loading" data-sales-client-card-loading>Загрузка данных...</div>
+            <div class="sales-client-card-content" data-sales-client-card-content hidden>
+              <div class="sales-client-card-metrics" data-sales-client-card-metrics></div>
+              <nav class="sales-client-card-tabs" aria-label="Разделы карточки клиента" data-sales-client-card-tabs></nav>
+              <div class="sales-client-card-panels" data-sales-client-card-panels></div>
+            </div>
+            <div class="sales-client-card-error" data-sales-client-card-error hidden>Не удалось загрузить карточку клиента.</div>
+          </div>
+        </dialog>
+      </aside>
+    </div>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  {{ super() }}
+  <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=40" defer></script>
+  <script src="{{ url_for('static', path='sale-done.js') }}?v=6" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=83" defer></script>
+  {% if sales_embed %}
+    <script>
+      (() => {
+        const notifyParent = (type, detail = {}) => {
+          if (window.parent !== window) {
+            window.parent.postMessage({ type, ...detail }, window.location.origin);
+          }
+        };
+        document.querySelector("[data-sales-embed-cancel]")?.addEventListener("click", () => {
+          notifyParent("upos:sales-order-cancel");
+        });
+        const params = new URLSearchParams(window.location.search);
+        if (["saved", "order_saved", "return_saved", "updated"].includes(params.get("msg") || "")) {
+          notifyParent("upos:sales-order-saved", { saleId: params.get("saved_id") || "" });
+        }
+      })();
+    </script>
+  {% endif %}
+{% endblock %}

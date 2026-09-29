@@ -1,0 +1,2870 @@
+{% extends "base.html" %}
+{% block title %}{{ _('reports.title_page') }}{% endblock %}
+
+{% block extra_head %}
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <link rel="stylesheet" href="{{ url_for('static', path='general-kassa-page.css') }}?v=126" />
+  <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
+  <link rel="stylesheet" href="{{ url_for('static', path='reports-page.css') }}?v=144" />
+{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ user.get('active_organization_name') or _('workspace.default_name') }}</span>
+    <h1 class="page-title settings-ios-page-title">{{ _('nav.reports') }}</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  {% set business_reports = business_reports|default({
+    'sales': {
+      'summary': {'period': '', 'count': 0, 'amount': '0 UZS'},
+      'top_clients': [],
+      'top_products': [],
+      'days': []
+    },
+    'stock': {
+      'summary': {'items': 0, 'total': '0 UZS'},
+      'rows': []
+    },
+    'stock_analysis': {
+      'summary': {'items': 0, 'quantity': '0 шт', 'cost_total': '0 UZS', 'revenue_total': '0 UZS'},
+      'rows': []
+    },
+    'receivables': {
+      'summary': {'clients': 0, 'total': '0 UZS'},
+      'rows': []
+    },
+    'calls': {
+      'summary': {'total': 0, 'answered': 0, 'missed': 0, 'conversion': 0},
+      'rows': []
+    }
+  }) %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root org-reports-page">
+    <nav class="general-module-tabs" aria-label="{{ _('nav.home_sections') }}" data-org-report-open-tabs>
+      <a class="general-module-tab active" href="{{ url_for('home_reports') }}" aria-current="page" data-org-report-home-tab>{{ _('nav.reports') }}</a>
+    </nav>
+
+    <section class="general-report-launcher org-report-launcher" role="tablist" aria-label="Отчёты организации">
+      {# Отчёты по доставщикам (долги, отгрузки, баланс) убраны по просьбе
+         владельца — панели и JS остаются, карточек нет. #}
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="sales-overview" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-3 3 2 5-7"/><path d="M18 7h1v1"/></svg>
+        </span>
+        <span>Продажи</span>
+        <small>Сумма, клиенты, товары</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="profit" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><path d="m4 20 4-4"/><path d="M4 16v4h4"/></svg>
+        </span>
+        <span>Прибыль</span>
+        <small>Доходы и все расходы</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="sales-cost" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 4h18v16H3z"></path><path d="M3 9h18"></path><path d="M9 9v11"></path><path d="M15 9v11"></path></svg>
+        </span>
+        <span>Продажи и себестоимость</span>
+        <small>Каждый документ: сумма и прибыль</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="stock-movement" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 13h10"/><path d="m8 17-3-3 3-3"/><path d="m16 11 3 3-3 3"/></svg>
+        </span>
+        <span>Движение по складу</span>
+        <small>Приходы, списания, остатки</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="stock-analysis" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M8 17h8"/><path d="m17 8 3-3"/><path d="m20 5 1 4"/></svg>
+        </span>
+        <span>Анализ остатков</span>
+        <small>Себестоимость и выручка</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="receivables" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M17 16h3"/></svg>
+        </span>
+        <span>Дебиторская задолженность</span>
+        <small>Долги клиентов</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="company-balance" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/><path d="M12 3v2"/></svg>
+        </span>
+        <span>Баланс компании</span>
+        <small>Деньги, склад, долги</small>
+      </button>
+      <button type="button" class="general-report-card" role="tab" data-org-report-card="calls-conversion" aria-selected="false">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/><path d="M14 3h7v7"/><path d="m21 3-9 9"/></svg>
+        </span>
+        <span>Звонки и конверсия</span>
+        <small>Ответы и сделки</small>
+      </button>
+    </section>
+
+    <div class="reports-root general-reports-root org-reports-root" data-org-reports-root hidden>
+      <section class="reports-panel" id="report-courier-debts" data-org-report-panel="courier-debts" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Delivery</p>
+            <h2>Долги доставщиков</h2>
+            <p>Сверка по отгрузкам и оплатам через кассу.</p>
+          </div>
+        </header>
+        <div class="reports-analysis-grid reports-analysis-grid--single">
+          <article class="reports-flow">
+            <div class="reports-flow-head">
+              <span class="reports-flow-dot" aria-hidden="true"></span>
+              <div>
+                <h3>Акт сверки</h3>
+                <p>{{ delivery_debts|length }} доставщиков</p>
+              </div>
+            </div>
+            <div class="reports-category-list">
+              {% for debt in delivery_debts %}
+                <div class="reports-category-row">
+                  <div class="reports-category-main">
+                    <span>{{ debt.courier_name }}</span>
+                    <strong>{{ debt.debt_amount_label }} {{ debt.currency }}</strong>
+                  </div>
+                  <div class="reports-category-meta">
+                    <span>Отгружено {{ debt.total_amount_label }} · оплачено {{ debt.paid_amount_label }}</span>
+                    <div class="reports-bar-track">
+                      {% set paid_width = (debt.paid_amount / debt.total_amount * 100) if debt.total_amount else 0 %}
+                      <span style="width: {{ paid_width|round(0, 'floor') }}%"></span>
+                    </div>
+                  </div>
+                </div>
+              {% else %}
+                <div class="reports-empty-state">Долгов доставщиков пока нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-courier-balance" data-org-report-panel="courier-balance" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Delivery</p>
+            <h2>Баланс доставщиков</h2>
+            <p>Сводный дебет, кредит и остаток долга по каждому доставщику.</p>
+          </div>
+        </header>
+        <div class="reports-courier-balance" data-courier-balance-dashboard>
+          <div class="reports-courier-balance-switcher" role="tablist" aria-label="Виды диаграмм баланса доставщиков">
+            <button type="button" data-courier-balance-view="bars" aria-selected="true">Полосы</button>
+            <button type="button" data-courier-balance-view="stack">Кредит / долг</button>
+            <button type="button" data-courier-balance-view="ranking">Рейтинг</button>
+            <button type="button" data-courier-balance-view="share">Доля долга</button>
+            <button type="button" data-courier-balance-view="limits">Контроль баланса</button>
+          </div>
+          <div class="reports-courier-balance-totals" data-courier-balance-totals></div>
+          <div class="reports-courier-balance-charts">
+            <article class="reports-flow reports-courier-balance-chart">
+              <div class="reports-flow-head">
+                <span class="reports-flow-dot" aria-hidden="true"></span>
+                <div>
+                  <h3 data-courier-balance-title>Диаграмма дебета и кредита</h3>
+                  <p data-courier-balance-count>0 доставщиков</p>
+                </div>
+              </div>
+              <div class="reports-courier-balance-list" data-courier-balance-chart></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-delivery-shipments" data-org-report-panel="delivery-shipments" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Delivery</p>
+            <h2>Отгрузки</h2>
+            <p>Журнал созданных отгрузок с оплатой и остатком долга.</p>
+          </div>
+          {% if delivery_shipment_totals.currencies %}
+            <div class="reports-balance-total">
+              {% for row in delivery_shipment_totals.currencies %}
+                <span><b>{{ row.debt_label }}</b> {{ row.currency }} долг · {{ row.count }} отгрузок</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </header>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table reports-shipments-table">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Доставщик</th>
+                <th>Товар</th>
+                <th>Сумма</th>
+                <th>Оплата</th>
+                <th>Долг</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for shipment in delivery_shipments %}
+                {% set first_item = shipment.items[0] if shipment.items else None %}
+                <tr>
+                  <td>{{ shipment.number }}</td>
+                  <td>{{ shipment.shipment_date }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="reports-courier-link"
+                      data-courier-name="{{ shipment.courier_name }}"
+                      aria-label="Открыть акт сверки {{ shipment.courier_name }}"
+                    >{{ shipment.courier_name }}</button>
+                  </td>
+                  <td>{{ first_item.product_name if first_item else shipment.note }}</td>
+                  <td>{{ shipment.total_amount_label }} {{ shipment.currency }}</td>
+                  <td>{{ shipment.paid_amount_label }} {{ shipment.currency }}</td>
+                  <td><strong>{{ shipment.debt_amount_label }} {{ shipment.currency }}</strong></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7" class="reports-empty-cell">Отгрузок пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-sales-overview" data-org-report-panel="sales-overview" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Продажи</p>
+            <h2>Отчёт по продажам</h2>
+            <p>{{ business_reports.sales.summary.period }} · продаж: {{ business_reports.sales.summary.count or 0 }} · возвратов: {{ business_reports.sales.summary.return_count or 0 }}</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.sales.summary.amount or "0 UZS" }}</b> чистая выручка</span>
+          </div>
+        </header>
+        <div class="reports-sales-kpis">
+          <article><span>Валовые продажи</span><strong>{{ business_reports.sales.summary.gross_sales or "0 UZS" }}</strong></article>
+          <article class="is-return"><span>Возвраты</span><strong>{{ business_reports.sales.summary.returns or "0 UZS" }}</strong></article>
+          <article><span>Оплачено</span><strong>{{ business_reports.sales.summary.paid or "0 UZS" }}</strong></article>
+          <article class="is-debt"><span>Долг клиентов</span><strong>{{ business_reports.sales.summary.debt or "0 UZS" }}</strong></article>
+          <article><span>Себестоимость</span><strong>{{ business_reports.sales.summary.cost or "0 UZS" }}</strong></article>
+          <article class="is-profit"><span>Прибыль</span><strong>{{ business_reports.sales.summary.profit or "0 UZS" }}</strong></article>
+          <article class="is-order"><span>Заказы</span><strong>{{ business_reports.sales.summary.orders or "0 UZS" }}</strong><small>{{ business_reports.sales.summary.order_count or 0 }} документов</small></article>
+        </div>
+        <div class="reports-table-wrap reports-sales-table-wrap">
+          <table class="reports-data-table reports-sales-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Тип</th>
+                <th>Клиент</th>
+                <th>Склад</th>
+                <th>Сумма</th>
+                <th>Оплачено</th>
+                <th>Долг</th>
+                <th>Себестоимость</th>
+                <th>Прибыль</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.sales.rows %}
+                <tr class="reports-sales-row reports-sales-row--{{ row.type_key }}">
+                  <td>{{ row.date }}</td>
+                  <td><strong>{{ row.number }}</strong>{% if row.source_sale_number %}<small>из {{ row.source_sale_number }}</small>{% endif %}</td>
+                  <td><span class="reports-sales-type">{{ row.type }}</span></td>
+                  <td>{{ row.client }}</td>
+                  <td>{{ row.warehouse }}</td>
+                  <td><strong>{{ row.amount }}</strong></td>
+                  <td>{{ row.paid }}</td>
+                  <td>{{ row.debt }}</td>
+                  <td>{{ row.cost }}</td>
+                  <td><strong>{{ row.profit }}</strong></td>
+                  <td>{{ row.status }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="11" class="reports-empty-cell">Продаж за выбранный период пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="reports-analysis-grid">
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Топ-10 клиентов</h3><p>По сумме продаж</p></div></div>
+            <div class="reports-category-list">
+              {% for row in business_reports.sales.top_clients %}
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}</span><strong>{{ row.amount }}</strong></div></div>
+              {% else %}
+                <div class="reports-empty-state">Продаж за период пока нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Топ-10 товаров</h3><p>По количеству</p></div></div>
+            <div class="reports-category-list">
+              {% for row in business_reports.sales.top_products %}
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}</span><strong>{{ row.quantity }}</strong></div></div>
+              {% else %}
+                <div class="reports-empty-state">Товарных строк пока нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+        <article class="reports-flow">
+          <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>График по дням</h3><p>Сумма продаж</p></div></div>
+          <div class="reports-category-list">
+            {% for row in business_reports.sales.days %}
+              <div class="reports-category-row">
+                <div class="reports-category-main"><span>{{ row.date }}</span><strong>{{ row.amount }}</strong></div>
+                <div class="reports-category-meta"><div class="reports-bar-track"><span style="width: {{ row.bar_width }}%"></span></div></div>
+              </div>
+            {% else %}
+              <div class="reports-empty-state">Нет данных для графика.</div>
+            {% endfor %}
+          </div>
+        </article>
+      </section>
+
+      <section class="reports-panel" id="report-profit" data-org-report-panel="profit" hidden>
+        {% set profit = business_reports.profit or {} %}
+        {% set profit_summary = profit.summary or {} %}
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Прибыль</p>
+            <h2>Отчёт о прибыли</h2>
+            <p>{{ profit_summary.period }} · статей расходов: {{ profit_summary.expense_count or 0 }}</p>
+          </div>
+          <form class="reports-profit-period" method="get" action="{{ url_for('home_reports') }}" data-reports-period-form>
+            <input type="hidden" name="period" value="custom" />
+            <label class="sales-journal-filter-field sales-journal-filter-date">
+              <span>Период</span>
+              <input name="date_from" type="date" value="{{ reports.period_date_from or '' }}" onchange="this.form.submit()" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период отчёта о прибыли" />
+              <input name="date_to" type="hidden" value="{{ reports.period_date_to or '' }}" />
+            </label>
+          </form>
+          <div class="reports-balance-total">
+            <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта" data-profit-currency-switch data-initial-currency="{{ report_currency }}">
+              <button type="button" data-profit-currency="UZS" {% if report_currency == 'UZS' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>UZS</button>
+              <button type="button" data-profit-currency="USD" {% if report_currency == 'USD' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>USD</button>
+            </div>
+            <span><b data-profit-money data-money-uzs="{{ profit_summary.net_uzs or 0 }}">{{ profit_summary.net or "0 UZS" }}</b> чистая прибыль</span>
+          </div>
+        </header>
+        <div class="reports-sales-kpis">
+          <article><span>Выручка</span><strong data-profit-money data-money-uzs="{{ profit_summary.revenue_uzs or 0 }}">{{ profit_summary.revenue or "0 UZS" }}</strong></article>
+          <article><span>Себестоимость</span><strong data-profit-money data-money-uzs="{{ profit_summary.cost_uzs or 0 }}">{{ profit_summary.cost or "0 UZS" }}</strong></article>
+          <article class="is-profit"><span>Валовая прибыль</span><strong data-profit-money data-money-uzs="{{ profit_summary.gross_uzs or 0 }}">{{ profit_summary.gross or "0 UZS" }}</strong></article>
+          <article><span>Прочие доходы</span><strong data-profit-money data-money-uzs="{{ profit_summary.other_income_uzs or 0 }}">{{ profit_summary.other_income or "0 UZS" }}</strong></article>
+          <article class="is-return"><span>Расходы</span><strong data-profit-money data-money-uzs="{{ profit_summary.expenses_uzs or 0 }}">{{ profit_summary.expenses or "0 UZS" }}</strong></article>
+          <article class="{{ 'is-debt' if profit_summary.net_negative else 'is-profit' }}"><span>Чистая прибыль</span><strong data-profit-money data-money-uzs="{{ profit_summary.net_uzs or 0 }}">{{ profit_summary.net or "0 UZS" }}</strong></article>
+        </div>
+        <div class="reports-analysis-grid">
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Все расходы</h3><p>Касса и зарплаты за период</p></div></div>
+            <div class="reports-category-list">
+              {% for row in profit.expenses %}
+                <div class="reports-category-row">
+                  <div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong data-profit-money data-money-uzs="{{ row.amount_uzs or 0 }}">{{ row.amount }}</strong></div>
+                  <div class="reports-category-meta"><div class="reports-bar-track"><span style="width: {{ row.bar_width }}%"></span></div></div>
+                </div>
+              {% else %}
+                <div class="reports-empty-state">Расходов за период нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Прочие доходы</h3><p>Кассовые поступления вне продаж и подписки</p></div></div>
+            <div class="reports-category-list">
+              {% for row in profit.other_income %}
+                <div class="reports-category-row"><div class="reports-category-main"><span>{{ row.name }}{% if row.count %} <small>({{ row.count }})</small>{% endif %}</span><strong data-profit-money data-money-uzs="{{ row.amount_uzs or 0 }}">{{ row.amount }}</strong></div></div>
+              {% else %}
+                <div class="reports-empty-state">Прочих доходов за период нет.</div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+        <article class="reports-flow">
+          <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Как считается</h3><p>Формула отчёта</p></div></div>
+          <div class="reports-category-list">
+            <div class="reports-category-row"><div class="reports-category-main"><span>Выручка − Себестоимость</span><strong>= Валовая прибыль</strong></div></div>
+            <div class="reports-category-row"><div class="reports-category-main"><span>Валовая + Прочие доходы − Все расходы</span><strong>= Чистая прибыль</strong></div></div>
+            <div class="reports-category-row"><div class="reports-category-main"><span><small>Оплаты поставщикам за товар не входят в расходы — закуп уже учтён в себестоимости.</small></span></div></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="reports-panel" id="report-sales-cost" data-org-report-panel="sales-cost" hidden>
+        {% set sc_summary = (business_reports.profit or {}).summary or {} %}
+        {% set sc_rows = (business_reports.profit or {}).sales_rows or [] %}
+        {% set sc_stages = (business_reports.profit or {}).stages or {'all': {}, 'shipment': {}, 'archive': {}} %}
+        {% set sc_filters = (business_reports.profit or {}).filters or {} %}
+        {% set sc_filter_options = (business_reports.profit or {}).filter_options or {'employees': [], 'clients': [], 'products': []} %}
+        {% set can_archive_sales = not user.get('is_employee') or emp_perms.get('sales') %}
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Прибыль</p>
+            <h2>Продажи и себестоимость</h2>
+            <p>{{ sc_summary.period }} · документов: {{ sc_rows | length }}</p>
+          </div>
+          <form class="reports-profit-period reports-sales-cost-filters" method="get" action="{{ url_for('home_reports') }}" data-reports-period-form>
+            <input type="hidden" name="period" value="custom" />
+            <input type="hidden" name="open_report" value="sales-cost" />
+            <input type="hidden" name="currency" value="{{ report_currency }}" />
+            <label class="sales-journal-filter-field sales-journal-filter-date">
+              <span>Период</span>
+              <input name="date_from" type="date" value="{{ reports.period_date_from or '' }}" onchange="this.form.submit()" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Период продаж и себестоимости" />
+              <input id="sales_cost_date_to" name="date_to" type="hidden" value="{{ reports.period_date_to or '' }}" />
+            </label>
+            <div class="reports-filter-field reports-select-filter" data-reports-select-filter>
+              <span>Сотрудник</span>
+              <details class="reports-select-filter-details">
+                <summary aria-label="Фильтр по сотруднику">
+                  <span data-reports-select-summary>{{ sc_filters.employee or 'Все' }}</span>
+                </summary>
+                <div class="reports-select-filter-menu">
+                  <label class="reports-select-filter-option">
+                    <input type="radio" name="sales_cost_employee" value="" {% if not sc_filters.employee %}checked{% endif %} />
+                    <span>Все</span>
+                  </label>
+                  {% for employee in sc_filter_options.employees %}
+                    <label class="reports-select-filter-option">
+                      <input type="radio" name="sales_cost_employee" value="{{ employee }}" {% if sc_filters.employee == employee %}checked{% endif %} />
+                      <span>{{ employee }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </details>
+            </div>
+            <div class="reports-filter-field reports-select-filter" data-reports-select-filter>
+              <span>Клиент</span>
+              <details class="reports-select-filter-details">
+                <summary aria-label="Фильтр по клиенту">
+                  <span data-reports-select-summary>{{ sc_filters.client or 'Все клиенты' }}</span>
+                </summary>
+                <div class="reports-select-filter-menu">
+                  <input class="reports-select-filter-search" type="search" placeholder="Поиск клиента" data-reports-select-search />
+                  <label class="reports-select-filter-option">
+                    <input type="radio" name="sales_cost_client" value="" {% if not sc_filters.client %}checked{% endif %} />
+                    <span>Все клиенты</span>
+                  </label>
+                  {% for client in sc_filter_options.clients %}
+                    <label class="reports-select-filter-option">
+                      <input type="radio" name="sales_cost_client" value="{{ client }}" {% if sc_filters.client == client %}checked{% endif %} />
+                      <span>{{ client }}</span>
+                    </label>
+                  {% endfor %}
+                  <p class="reports-select-filter-empty" data-reports-select-empty hidden>Ничего не найдено</p>
+                </div>
+              </details>
+            </div>
+            <div class="reports-filter-field reports-select-filter" data-reports-select-filter>
+              <span>Программа</span>
+              <details class="reports-select-filter-details">
+                <summary aria-label="Фильтр по программе">
+                  <span data-reports-select-summary>{{ sc_filters.product or 'Все программы' }}</span>
+                </summary>
+                <div class="reports-select-filter-menu">
+                  <input class="reports-select-filter-search" type="search" placeholder="Поиск программы" data-reports-select-search />
+                  <label class="reports-select-filter-option">
+                    <input type="radio" name="sales_cost_product" value="" {% if not sc_filters.product %}checked{% endif %} />
+                    <span>Все программы</span>
+                  </label>
+                  {% for product in sc_filter_options.products %}
+                    <label class="reports-select-filter-option">
+                      <input type="radio" name="sales_cost_product" value="{{ product }}" {% if sc_filters.product == product %}checked{% endif %} />
+                      <span>{{ product }}</span>
+                    </label>
+                  {% endfor %}
+                  <p class="reports-select-filter-empty" data-reports-select-empty hidden>Ничего не найдено</p>
+                </div>
+              </details>
+            </div>
+            <button class="btn btn-secondary" type="submit">Найти</button>
+            {% if sc_filters.employee or sc_filters.client or sc_filters.product %}
+              <a class="btn btn-secondary" href="{{ url_for('home_reports') }}?period=custom&date_from={{ reports.period_date_from }}&date_to={{ reports.period_date_to }}&open_report=sales-cost&currency={{ report_currency }}">Сбросить</a>
+            {% endif %}
+          </form>
+          <div class="reports-stock-analysis-tools reports-sales-cost-tools">
+            <button type="button" class="btn btn-secondary" data-sales-cost-export>
+              Скачать Excel
+            </button>
+            <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
+              <button type="button" data-profit-currency="UZS" {% if report_currency == 'UZS' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>UZS</button>
+              <button type="button" data-profit-currency="USD" {% if report_currency == 'USD' %}class="active" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>USD</button>
+            </div>
+            <div class="reports-balance-total">
+              <span><b data-profit-money data-money-uzs="{{ sc_stages.all.cost_uzs or 0 }}" data-sales-cost-total>{{ sc_stages.all.cost or "0 UZS" }}</b> себестоимость</span>
+              <span><b data-profit-money data-money-uzs="{{ sc_stages.all.profit_uzs or 0 }}" data-sales-cost-profit>{{ sc_stages.all.profit or "0 UZS" }}</b> <span data-sales-cost-profit-label>прибыль</span></span>
+            </div>
+          </div>
+        </header>
+        {# Отгрузки дают ожидаемую прибыль, архив — реальную: разделы
+           переключают и таблицу, и суммы наверху. #}
+        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Фильтр по учёту прибыли" data-sales-cost-stages>
+          <span class="sales-document-tabs-title">Прибыль учтена</span>
+          {% for stage in [
+            {'key': 'all', 'label': 'Все', 'logo': 'ВС', 'note': 'прибыль'},
+            {'key': 'shipment', 'label': 'Ожидаемая', 'logo': 'ОЖ', 'note': 'ожидаемая прибыль'},
+            {'key': 'archive', 'label': 'Реальная', 'logo': 'РЕ', 'note': 'реальная прибыль'},
+          ] %}
+            {% set stage_data = sc_stages[stage.key] %}
+            <button
+              type="button"
+              class="messenger-channel-tab sales-document-tab{% if stage.key == 'all' %} active{% endif %}"
+              data-channel-brand="{{ stage.key }}"
+              data-sales-cost-stage="{{ stage.key }}"
+              data-stage-cost="{{ stage_data.cost_uzs or 0 }}"
+              data-stage-profit="{{ stage_data.profit_uzs or 0 }}"
+              data-stage-revenue="{{ stage_data.revenue_uzs or 0 }}"
+              data-stage-note="{{ stage.note }}"
+              aria-pressed="{{ 'true' if stage.key == 'all' else 'false' }}"
+            >
+              <span class="messenger-channel-logo" aria-hidden="true">{{ stage.logo }}</span>
+              <span class="messenger-channel-label">{{ stage.label }}</span>
+              <b>{{ stage_data.count or 0 }}</b>
+            </button>
+          {% endfor %}
+        </nav>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>№</th>
+                <th>Тип</th>
+                <th>Клиент</th>
+                <th>Продажа</th>
+                <th>Себестоимость</th>
+                <th>Прибыль</th>
+                <th>Маржа</th>
+                <th>Прибыль учтена</th>
+                <th>Действие</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in sc_rows %}
+                {% set detail_id = 'sales-cost-detail-' ~ loop.index %}
+                <tr data-sales-cost-row="{{ row.stage or 'shipment' }}" data-sales-cost-row-id="{{ loop.index }}">
+                  <td>
+                    <button class="reports-row-toggle" type="button" data-sales-cost-toggle aria-expanded="false" aria-controls="{{ detail_id }}">
+                      <span>{{ row.date }}</span>
+                      <span class="reports-row-toggle-icon" aria-hidden="true"></span>
+                    </button>
+                  </td>
+                  <td>{{ row.number or "-" }}</td>
+                  <td>{{ row.kind }}</td>
+                  <td>{{ row.client }}</td>
+                  <td><span data-profit-money data-money-uzs="{{ row.amount_uzs }}">{{ row.amount }}</span></td>
+                  <td{% if row.cost_missing %} class="reports-cost-missing" title="У товара нет себестоимости"{% endif %}><span data-profit-money data-money-uzs="{{ row.cost_uzs }}">{{ row.cost }}</span></td>
+                  <td{% if row.profit_negative %} class="is-negative"{% endif %}><span data-profit-money data-money-uzs="{{ row.profit_uzs }}">{{ row.profit }}</span></td>
+                  <td>{{ row.margin }}</td>
+                  <td>
+                    {% if (row.stage or 'shipment') == 'archive' %}
+                      <span class="reports-stage-flag reports-stage-flag--real">Реальная</span>
+                    {% else %}
+                      <span class="reports-stage-flag reports-stage-flag--expected">Ожидаемая</span>
+                    {% endif %}
+                  </td>
+                  <td class="reports-sales-cost-action-cell">
+                    {% if row.can_archive and can_archive_sales %}
+                      <form class="reports-sales-cost-archive-form" method="post" action="{{ url_for('sales_status_update', sale_id=row.document_id) }}" data-sales-cost-archive-form data-archive-info="{{ (row.archive_info or {})|tojson|forceescape }}" data-archive-number="{{ row.number or '-' }}" data-archive-client="{{ row.client }}">
+                        {% include "_csrf_field.html" %}
+                        <input type="hidden" name="status" value="archived" />
+                        <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
+                        <button class="btn btn-secondary reports-sales-cost-archive-button" type="submit">Архивировать</button>
+                      </form>
+                    {% else %}
+                      <span class="reports-sales-cost-action-empty">-</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr class="reports-sales-cost-detail-row" data-sales-cost-detail-row="{{ row.stage or 'shipment' }}" data-sales-cost-detail-for="{{ loop.index }}" hidden>
+                  <td colspan="10">
+                    <div id="{{ detail_id }}" class="reports-sales-cost-detail" data-sales-cost-detail-panel>
+                      {% if row.line_details %}
+                        <table class="reports-data-table reports-sales-cost-detail-table" aria-label="Товары документа № {{ row.number or '-' }}">
+                          <thead>
+                            <tr>
+                              <th>Товар</th>
+                              <th>Кол-во</th>
+                              <th>Продажная цена</th>
+                              <th>Себестоимость</th>
+                              <th>Прибыль</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for line in row.line_details %}
+                              <tr>
+                                <td>{{ line.product }}</td>
+                                <td>{{ line.qty }}</td>
+                                <td><span data-profit-money data-money-uzs="{{ line.amount_uzs }}">{{ line.amount }}</span></td>
+                                <td><span data-profit-money data-money-uzs="{{ line.cost_uzs }}">{{ line.cost }}</span></td>
+                                <td{% if line.profit_negative %} class="is-negative"{% endif %}><span data-profit-money data-money-uzs="{{ line.profit_uzs }}">{{ line.profit }}</span></td>
+                              </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      {% else %}
+                        <p class="reports-sales-cost-detail-empty">В документе нет товарных позиций.</p>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="10" class="reports-empty-state">Продаж за период нет.</td></tr>
+              {% endfor %}
+              <tr hidden data-sales-cost-empty><td colspan="10" class="reports-empty-state">В этом разделе документов нет.</td></tr>
+            </tbody>
+            {% if sc_rows %}
+              <tfoot>
+                <tr>
+                  <td colspan="4"><strong>Итого</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.revenue_uzs or 0 }}" data-sales-cost-foot-revenue>{{ sc_stages.all.revenue or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.cost_uzs or 0 }}" data-sales-cost-foot-cost>{{ sc_stages.all.cost or "0 UZS" }}</strong></td>
+                  <td><strong data-profit-money data-money-uzs="{{ sc_stages.all.profit_uzs or 0 }}" data-sales-cost-foot-profit>{{ sc_stages.all.profit or "0 UZS" }}</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-stock-movement" data-org-report-panel="stock-movement" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Склад</p>
+            <h2>Движение по складу</h2>
+            <p>Приходы, списания и остатки по каждому товару.</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.stock.summary.total or "0 UZS" }}</b> сумма остатков</span>
+          </div>
+        </header>
+        <form method="post" action="{{ url_for('reports_stock_prices_save') }}" class="reports-stock-prices-form">
+          {% include "_csrf_field.html" %}
+          <div class="reports-table-wrap">
+            <table class="reports-data-table reports-stock-movement-table">
+              <thead>
+                <tr>
+                  <th class="reports-stock-photo-col"></th>
+                  <th>Товар</th>
+                  <th>Начало</th>
+                  <th>Приход</th>
+                  <th>Списание</th>
+                  <th>Конец</th>
+                  <th>Приходная цена</th>
+                  <th>Продажная цена</th>
+                  <th>Себестоимость</th>
+                  <th>Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in business_reports.stock.rows %}
+                  <tr>
+                    <td class="reports-stock-photo-col">
+                      {% if row.photo_url %}
+                        <img class="product-thumb" src="{{ row.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      {% else %}
+                        <span class="product-thumb-frame" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                            <path d="m3.3 7 8.7 5 8.7-5" />
+                            <path d="M12 22V12" />
+                          </svg>
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td>{{ row.product }}</td>
+                    <td>{{ row.begin }}</td>
+                    <td>{{ row.incoming }}</td>
+                    <td>{{ row.outgoing }}</td>
+                    <td>{{ row.end }}</td>
+                    {% if row.product_id %}
+                      <input type="hidden" name="product_id" value="{{ row.product_id }}" />
+                      <td class="reports-stock-price-cell">
+                        <input name="purchase_price" value="{{ row.purchase_price_value }}" inputmode="decimal" aria-label="Приходная цена {{ row.product }}" />
+                      </td>
+                      <td class="reports-stock-price-cell">
+                        <input name="sale_price" value="{{ row.sale_price_value }}" inputmode="decimal" aria-label="Продажная цена {{ row.product }}" />
+                      </td>
+                    {% else %}
+                      <td>-</td>
+                      <td>-</td>
+                    {% endif %}
+                    <td>{{ row.cost }}</td>
+                    <td><strong>{{ row.total }}</strong></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="10" class="reports-empty-cell">Складских движений пока нет.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if business_reports.stock.rows %}
+            <div class="reports-stock-prices-actions">
+              <button class="btn" type="submit">Сохранить цены</button>
+            </div>
+          {% endif %}
+        </form>
+      </section>
+
+      <section class="reports-panel reports-stock-analysis" id="report-stock-analysis" data-org-report-panel="stock-analysis" hidden>
+        <header class="reports-panel-head reports-stock-analysis-head">
+          <div>
+            <p class="reports-section-kicker">Склад</p>
+            <h2>Анализ остатков</h2>
+          </div>
+          <div class="reports-stock-analysis-tools">
+            <div class="reports-currency-switch" role="group" aria-label="Валюта отчёта">
+              <button type="button" class="active" data-stock-currency="UZS" aria-pressed="true">UZS</button>
+              <button type="button" data-stock-currency="USD" aria-pressed="false">USD</button>
+            </div>
+            <div class="reports-balance-total">
+              <span><b data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.cost_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.cost_total or "0 UZS" }}</b> себестоимость</span>
+              <span><b data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.revenue_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.revenue_total or "0 UZS" }}</b> выручка</span>
+              {% if business_reports.stock_analysis.summary.negative_count %}
+                <span class="reports-stock-negative-total"><b>{{ business_reports.stock_analysis.summary.negative_count }}</b> отрицательных остатков</span>
+              {% endif %}
+            </div>
+          </div>
+        </header>
+        <div class="reports-stock-filterbar">
+          <button type="button">На дату</button>
+          <label class="reports-stock-search-field">
+            <span>Товар</span>
+            <input type="search" autocomplete="off" placeholder="Название, буквы, склад" data-stock-product-search />
+            <button type="button" data-stock-product-search-clear aria-label="Очистить поиск" title="Очистить поиск" hidden>×</button>
+            <small data-stock-product-search-count></small>
+          </label>
+          <button type="button">Категория товара</button>
+          <button type="button">Группа товара</button>
+          <button type="button">Бренд</button>
+          <button type="button">Склад</button>
+        </div>
+        <div class="reports-table-wrap reports-stock-analysis-wrap">
+          <table class="reports-data-table reports-stock-analysis-table" data-upos-column-controls>
+            <thead>
+              <tr>
+                <th class="reports-history-col" data-report-no-sort>№</th>
+                <th>Товар</th>
+                <th>На складе</th>
+                <th>Ср. себестоимость</th>
+                <th>Сумма себест.</th>
+                <th class="reports-stock-price-head" data-report-no-sort>
+                  <select class="reports-stock-price-select" data-stock-price-type-select aria-label="Прайс-лист для колонки цены">
+                    {% for pt in business_reports.stock_analysis.price_types %}
+                      <option value="{{ pt.id }}" {% if pt.id == business_reports.stock_analysis.selected_price_type_id %}selected{% endif %}>{{ pt.name }}</option>
+                    {% endfor %}
+                  </select>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.stock_analysis.rows %}
+                <tr{% if row.is_negative %} class="reports-stock-row--negative"{% endif %} data-stock-analysis-row data-stock-search-text="{{ (row.product ~ ' ' ~ row.warehouse)|e }}">
+                  <td class="reports-history-col" data-sort-value="{{ loop.index }}">
+                    <div class="product-history-actions">
+                      <span class="product-history-index"></span>
+                      <button type="button" class="products-action-icon product-history-btn" data-product-history="{{ row.product_id }}" data-product-history-name="{{ row.product }}" title="История товара" aria-label="История товара {{ row.product }}">
+                        <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+                      </button>
+                      <button type="button" class="products-action-icon product-history-btn" data-product-price-history="{{ row.product_id }}" data-product-history-name="{{ row.product }}" title="История изменения цен" aria-label="История цен {{ row.product }}">
+                        <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18"/><path d="m7 13 3-3 3 2 5-6"/><circle cx="7" cy="13" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="13" cy="12" r="1"/><circle cx="18" cy="6" r="1"/></svg>
+                      </button>
+                    </div>
+                  </td>
+                  <td data-sort-value="{{ row.product }}">
+                    <button type="button" class="reports-stock-product" data-stock-history-product="{{ row.product_id }}" data-stock-history-name="{{ row.product }}" aria-label="Показать историю приходов: {{ row.product }}">
+                      <span class="reports-stock-thumb">
+                        {% if row.photo_url %}
+                          <img src="{{ row.photo_url }}" alt="{{ row.product }}" loading="lazy" data-report-product-photo-preview />
+                        {% else %}
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8l-9-5-9 5v8l9 5z"/><path d="M3.3 7.7 12 12.5l8.7-4.8"/><path d="M12 22V12"/></svg>
+                        {% endif %}
+                      </span>
+                      <span>
+                        <strong data-stock-product-name>{{ row.product }}</strong>
+                        <small>{{ row.warehouse }}</small>
+                      </span>
+                    </button>
+                  </td>
+                  <td data-sort-value="{{ row.quantity_raw }}">{% if row.is_negative %}<span class="reports-stock-alert" aria-hidden="true">!</span>{% elif row.is_critical %}<span class="reports-stock-alert" aria-hidden="true">▲</span>{% endif %}{{ row.quantity }}</td>
+                  <td data-sort-value="{{ row.avg_cost_uzs }}"><span data-stock-money data-money-uzs="{{ row.avg_cost_uzs }}">{{ row.avg_cost }}</span></td>
+                  <td data-sort-value="{{ row.cost_sum_uzs }}"><span data-stock-money data-money-uzs="{{ row.cost_sum_uzs }}">{{ row.cost_sum }}</span></td>
+                  {# Цена в отчёте только для чтения — правится в прайс-листах. #}
+                  <td data-sort-value="{{ row.sale_price_raw }}" class="reports-stock-price-cell" data-stock-price-cell data-product-id="{{ row.product_id }}" data-quantity="{{ row.quantity_raw }}">{{ row.sale_price_display }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="6" class="reports-empty-cell">Остатков пока нет.</td></tr>
+              {% endfor %}
+              <tr data-stock-search-empty hidden><td colspan="6" class="reports-empty-cell">По этому поиску товары не найдены.</td></tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="reports-history-col"></td>
+                <td>Итого</td>
+                <td>{{ business_reports.stock_analysis.summary.quantity }}</td>
+                <td></td>
+                <td><span data-stock-money data-money-uzs="{{ business_reports.stock_analysis.summary.cost_total_uzs or 0 }}">{{ business_reports.stock_analysis.summary.cost_total }}</span></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-company-balance" data-org-report-panel="company-balance" hidden>
+        {% set company_balance = business_reports.company_balance or {} %}
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Баланс компании</p>
+            <h2>Активы и обязательства</h2>
+          </div>
+          <div class="reports-balance-total">
+            {% for row in company_balance.money_total %}
+              <span><b>{{ row.amount }} {{ row.currency }}</b> на счетах</span>
+            {% endfor %}
+          </div>
+        </header>
+        <div class="reports-sales-kpis">
+          {% for row in company_balance.money_total %}
+            <article><span>Деньги ({{ row.currency }})</span><strong>{{ row.amount }} {{ row.currency }}</strong></article>
+          {% endfor %}
+          <article><span>Склад по себестоимости</span><strong>{{ company_balance.stock_total or "0 UZS" }}</strong></article>
+          {% for row in company_balance.receivables %}
+            <article class="is-profit"><span>Нам должны клиенты ({{ row.currency }})</span><strong>{{ row.amount }}</strong><small>{{ company_balance.receivable_clients or 0 }} должников</small></article>
+          {% else %}
+            <article class="is-profit"><span>Нам должны клиенты</span><strong>0 UZS</strong></article>
+          {% endfor %}
+          {% for row in company_balance.payables %}
+            <article class="is-debt"><span>Мы должны поставщикам ({{ row.currency }})</span><strong>{{ row.amount }}</strong></article>
+          {% else %}
+            <article class="is-debt"><span>Мы должны поставщикам</span><strong>0 UZS</strong></article>
+          {% endfor %}
+        </div>
+        <div class="reports-analysis-grid">
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Деньги по счетам</h3><p>Кассы, карты и банк</p></div></div>
+            <div class="reports-category-list">
+              {% for account in company_balance.accounts %}
+                <div class="reports-category-row">
+                  <div class="reports-category-main">
+                    <span>{{ account.label }}{% if account.note %} <small>{{ account.note }}</small>{% endif %}</span>
+                    <strong>{% for entry in account.entries %}{{ entry.amount_label }} {{ entry.currency }}{% if not loop.last %} · {% endif %}{% endfor %}</strong>
+                  </div>
+                </div>
+              {% else %}
+                <div class="reports-empty-state">Счета пока не заведены.</div>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="reports-flow">
+            <div class="reports-flow-head"><span class="reports-flow-dot"></span><div><h3>Как читать баланс</h3><p>Что входит в цифры</p></div></div>
+            <div class="reports-category-list">
+              <div class="reports-category-row"><div class="reports-category-main"><span>Деньги</span><strong>остатки по счетам и кассам</strong></div></div>
+              <div class="reports-category-row"><div class="reports-category-main"><span>Склад</span><strong>остатки по себестоимости</strong></div></div>
+              <div class="reports-category-row"><div class="reports-category-main"><span>Дебиторка</span><strong>долги клиентов по продажам</strong></div></div>
+              <div class="reports-category-row"><div class="reports-category-main"><span>Кредиторка</span><strong>наши долги поставщикам</strong></div></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="reports-stock-history-backdrop" data-stock-history-close hidden></div>
+      <aside class="reports-stock-history-drawer" data-stock-history-drawer hidden aria-labelledby="reports-stock-history-title">
+        <header class="reports-stock-history-head">
+          <div>
+            <p>История приходов</p>
+            <h2 id="reports-stock-history-title" data-stock-history-title>Товар</h2>
+          </div>
+          <button type="button" class="reports-stock-history-close" data-stock-history-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="reports-stock-history-summary" data-stock-history-summary></div>
+        <div class="reports-stock-history-list" data-stock-history-list></div>
+      </aside>
+
+      <section class="reports-panel" id="report-receivables" data-org-report-panel="receivables" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Дебиторка</p>
+            <h2>Дебиторская задолженность</h2>
+            <p>Клиенты с долгом и сроком просрочки.</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.receivables.summary.total or "0 UZS" }}</b> долг · {{ business_reports.receivables.summary.clients or 0 }} клиентов</span>
+          </div>
+        </header>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table reports-receivables-table">
+            <thead>
+              <tr>
+                <th>Клиент</th>
+                <th>Сумма долга</th>
+                <th>Последняя оплата</th>
+                <th>Дней просрочки</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.receivables.rows %}
+                <tr>
+                  <td>{{ row.client }}</td>
+                  <td><strong>{{ row.debt }}</strong></td>
+                  <td>{{ row.last_payment }}</td>
+                  <td>{{ row.overdue_days }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" class="reports-empty-cell">Долгов клиентов пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-calls-conversion" data-org-report-panel="calls-conversion" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Телефония</p>
+            <h2>Звонки и конверсия</h2>
+            <p>Отвеченные, пропущенные и связь звонков со сделками CRM.</p>
+          </div>
+          <div class="reports-balance-total">
+            <span><b>{{ business_reports.calls.summary.conversion or 0 }}%</b> звонок → сделка</span>
+          </div>
+        </header>
+        <div class="reports-analysis-grid">
+          <article class="reports-balance-card"><span>Всего звонков</span><strong>{{ business_reports.calls.summary.total or 0 }}</strong></article>
+          <article class="reports-balance-card"><span>Отвеченные</span><strong>{{ business_reports.calls.summary.answered or 0 }}</strong></article>
+          <article class="reports-balance-card"><span>Пропущенные</span><strong>{{ business_reports.calls.summary.missed or 0 }}</strong></article>
+        </div>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Клиент</th>
+                <th>Телефон</th>
+                <th>Ответственный</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in business_reports.calls.rows %}
+                <tr>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.client }}</td>
+                  <td>{{ row.phone }}</td>
+                  <td>{{ row.responsible }}</td>
+                  <td>{{ row.status }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5" class="reports-empty-cell">Звонков за период пока нет.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="reports-panel" id="report-courier-reconcile" data-org-report-panel="courier-reconcile" hidden>
+        <header class="reports-panel-head">
+          <div>
+            <p class="reports-section-kicker">Акт сверки</p>
+            <h2 data-reconcile-title>Доставщик</h2>
+            <p data-reconcile-subtitle>Дебет, кредит и итог по отгрузкам.</p>
+          </div>
+        </header>
+        <div class="reports-reconcile-toolbar" data-reconcile-filter>
+          <div id="reports-reconcile-date-picker"></div>
+        </div>
+        <div class="reports-table-wrap">
+          <table class="reports-data-table reports-reconcile-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Документ</th>
+                <th>Дебет</th>
+                <th>Кредит</th>
+                <th>Итог</th>
+              </tr>
+            </thead>
+            <tbody data-reconcile-rows></tbody>
+          </table>
+          <h3 class="reports-reconcile-subhead">Поступления из кассы</h3>
+          <table class="reports-data-table reports-reconcile-payments-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Операция</th>
+                <th>Наличные</th>
+                <th>Перечисление</th>
+                <th>Возврат</th>
+                <th>Скидка</th>
+                <th>Терминал</th>
+                <th>Долг</th>
+                <th>Старый долг</th>
+                <th>Расходы</th>
+                <th>Разница</th>
+              </tr>
+            </thead>
+            <tbody data-reconcile-payment-rows></tbody>
+          </table>
+          <div class="reports-reconcile-summary" data-reconcile-summary></div>
+        </div>
+      </section>
+    </div>
+
+    <script type="application/json" id="delivery-shipments-report-data">{{ delivery_shipments|tojson }}</script>
+    <script type="application/json" id="delivery-payments-report-data">{{ delivery_payments|tojson }}</script>
+    <script type="application/json" id="delivery-debts-report-data">{{ delivery_debts|tojson }}</script>
+    <script type="application/json" id="delivery-debt-limits-data">{{ courier_debt_limits|tojson }}</script>
+    <script type="application/json" id="stock-purchase-history-data">{{ business_reports.stock_analysis.history|default({})|tojson }}</script>
+
+    <dialog class="reports-success-dialog" data-sales-archive-success-dialog aria-labelledby="sales-archive-success-title">
+      <section class="reports-success-dialog-surface">
+        <button type="button" class="reports-success-dialog-close" data-sales-archive-success-close aria-label="Закрыть">×</button>
+        <div class="reports-success-dialog-icon" aria-hidden="true"><span></span></div>
+        <h2 id="sales-archive-success-title">Продажа архивирована</h2>
+        <p>Прибыль перенесена в раздел «Реальная».</p>
+        <button type="button" class="btn btn-primary" data-sales-archive-success-close>Готово</button>
+      </section>
+    </dialog>
+
+    <dialog class="reports-success-dialog reports-archive-dialog" data-sales-archive-confirm-dialog aria-labelledby="sales-archive-confirm-title">
+      <section class="reports-success-dialog-surface reports-archive-dialog-surface">
+        <button type="button" class="reports-success-dialog-close" data-sales-archive-confirm-cancel aria-label="Закрыть">×</button>
+        <div class="reports-success-dialog-icon reports-success-dialog-icon--confirm" aria-hidden="true"><span></span></div>
+        <h2 id="sales-archive-confirm-title">Подтвердите архивацию</h2>
+        <div class="reports-archive-dialog-body" data-sales-archive-confirm-message></div>
+        <div class="reports-archive-dialog-actions">
+          <button type="button" class="btn btn-secondary" data-sales-archive-confirm-cancel>Отмена</button>
+          <button type="button" class="btn btn-primary" data-sales-archive-confirm-ok>Архивировать</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog class="reports-success-dialog reports-archive-dialog reports-archive-dialog--error" data-sales-archive-error-dialog aria-labelledby="sales-archive-error-title">
+      <section class="reports-success-dialog-surface reports-archive-dialog-surface">
+        <button type="button" class="reports-success-dialog-close" data-sales-archive-error-close aria-label="Закрыть">×</button>
+        <div class="reports-success-dialog-icon reports-success-dialog-icon--error" aria-hidden="true"><span></span></div>
+        <h2 id="sales-archive-error-title">Архивация не выполнена</h2>
+        <div class="reports-archive-dialog-body" data-sales-archive-error-message></div>
+        <button type="button" class="btn btn-primary" data-sales-archive-error-close>Понятно</button>
+      </section>
+    </dialog>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
+<script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
+<script>
+(() => {
+  const dataNode = document.getElementById('delivery-shipments-report-data');
+  const paymentsNode = document.getElementById('delivery-payments-report-data');
+  const debtsNode = document.getElementById('delivery-debts-report-data');
+  const debtLimitsNode = document.getElementById('delivery-debt-limits-data');
+  const stockHistoryNode = document.getElementById('stock-purchase-history-data');
+  const tabsShell = document.querySelector('[data-org-report-open-tabs]');
+  const homeTab = document.querySelector('[data-org-report-home-tab]');
+  const launcher = document.querySelector('.org-report-launcher');
+  const root = document.querySelector('[data-org-reports-root]');
+  if (!tabsShell || !homeTab || !launcher || !root) return;
+  const stockUsdRate = Number({{ reports_usd_rate|default('12000')|tojson }}) || 12000;
+
+  function bindReportsSelectFilters(scope = document) {
+    scope.querySelectorAll('[data-reports-select-filter]').forEach((filter) => {
+      if (filter.dataset.reportsSelectReady === '1') return;
+      filter.dataset.reportsSelectReady = '1';
+      const details = filter.querySelector('.reports-select-filter-details');
+      const summary = filter.querySelector('[data-reports-select-summary]');
+      const search = filter.querySelector('[data-reports-select-search]');
+      const empty = filter.querySelector('[data-reports-select-empty]');
+      const options = [...filter.querySelectorAll('.reports-select-filter-option')];
+
+      const syncSummary = () => {
+        const checked = filter.querySelector('.reports-select-filter-option input:checked');
+        const text = checked?.closest('.reports-select-filter-option')?.querySelector('span')?.textContent?.trim();
+        if (summary && text) summary.textContent = text;
+      };
+
+      const filterOptions = () => {
+        const query = String(search?.value || '').trim().toLocaleLowerCase();
+        let shown = 0;
+        options.forEach((option) => {
+          const input = option.querySelector('input');
+          const alwaysShow = !input?.value;
+          const text = option.textContent.toLocaleLowerCase();
+          const match = !query || alwaysShow || text.includes(query);
+          option.hidden = !match;
+          if (match && !alwaysShow) shown += 1;
+        });
+        if (empty) empty.hidden = shown > 0 || !query;
+      };
+
+      details?.addEventListener('toggle', () => {
+        if (!details.open) return;
+        scope.querySelectorAll('.reports-select-filter-details[open]').forEach((item) => {
+          if (item !== details) item.open = false;
+        });
+        search?.focus();
+      });
+      search?.addEventListener('input', filterOptions);
+      options.forEach((option) => {
+        option.querySelector('input')?.addEventListener('change', () => {
+          syncSummary();
+          details.open = false;
+          const form = filter.closest('form');
+          if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form?.submit();
+        });
+      });
+      syncSummary();
+      filterOptions();
+    });
+  }
+
+  bindReportsSelectFilters();
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-reports-select-filter]')) return;
+    document.querySelectorAll('.reports-select-filter-details[open]').forEach((details) => {
+      details.open = false;
+    });
+  });
+
+  const reportMeta = {
+    'courier-debts': 'Долги доставщиков',
+    'courier-balance': 'Баланс доставщиков',
+    'delivery-shipments': 'Отгрузки',
+    'sales-overview': 'Продажи',
+    'profit': 'Прибыль',
+    'sales-cost': 'Продажи и себестоимость',
+    'company-balance': 'Баланс компании',
+    'stock-movement': 'Движение по складу',
+    'stock-analysis': 'Анализ остатков',
+    'receivables': 'Дебиторка',
+    'calls-conversion': 'Звонки',
+  };
+  reportMeta['courier-reconcile'] = 'Акт сверки';
+  const openTabs = [];
+  let activeTab = '';
+  let reconcileCourierName = '';
+  let reconcilePeriod = 'all';
+  let reconcileDateFrom = '';
+  let reconcileDateTo = '';
+  let reconcileDatePicker = null;
+  let shipments = [];
+  let payments = [];
+  let courierDebts = [];
+  let courierDebtLimits = {};
+  let courierDebtLimitSaving = false;
+  let courierDebtLimitStatus = '';
+  let courierBalanceView = 'bars';
+  let stockCurrency = 'UZS';
+  let stockPurchaseHistory = {};
+  try {
+    shipments = JSON.parse(dataNode?.textContent || '[]');
+  } catch {
+    shipments = [];
+  }
+  try {
+    payments = JSON.parse(paymentsNode?.textContent || '[]');
+  } catch {
+    payments = [];
+  }
+  try {
+    courierDebts = JSON.parse(debtsNode?.textContent || '[]');
+  } catch {
+    courierDebts = [];
+  }
+  try {
+    courierDebtLimits = JSON.parse(debtLimitsNode?.textContent || '{}') || {};
+  } catch {
+    courierDebtLimits = {};
+  }
+  try {
+    stockPurchaseHistory = JSON.parse(stockHistoryNode?.textContent || '{}') || {};
+  } catch {
+    stockPurchaseHistory = {};
+  }
+
+  const numberFormatter = new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 2,
+  });
+
+  function money(value, currency) {
+    const amount = Number(value || 0);
+    return `${numberFormatter.format(amount)} ${currency || 'UZS'}`;
+  }
+
+  function reportsXmlEscape(value) {
+    return String(value ?? '')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function reportsColumnLetter(index) {
+    let n = index + 1;
+    let name = '';
+    while (n > 0) {
+      const mod = (n - 1) % 26;
+      name = String.fromCharCode(65 + mod) + name;
+      n = Math.floor((n - mod) / 26);
+    }
+    return name;
+  }
+
+  function reportsCrc32(bytes) {
+    if (!reportsCrc32.table) {
+      reportsCrc32.table = Array.from({ length: 256 }, (_, n) => {
+        let c = n;
+        for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        return c >>> 0;
+      });
+    }
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i += 1) c = reportsCrc32.table[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function reportsWriteUint16LE(target, value) {
+    target.push(value & 0xff, (value >>> 8) & 0xff);
+  }
+
+  function reportsWriteUint32LE(target, value) {
+    target.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+  }
+
+  function reportsDosDateTime(date) {
+    const year = Math.max(1980, date.getFullYear());
+    return {
+      time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+      date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+    };
+  }
+
+  function reportsCreateZip(files) {
+    const encoder = new TextEncoder();
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+    const stamp = reportsDosDateTime(new Date());
+    files.forEach((file) => {
+      const nameBytes = encoder.encode(file.name);
+      const dataBytes = typeof file.content === 'string' ? encoder.encode(file.content) : file.content;
+      const crc = reportsCrc32(dataBytes);
+      const local = [];
+      reportsWriteUint32LE(local, 0x04034b50);
+      reportsWriteUint16LE(local, 20);
+      reportsWriteUint16LE(local, 0x0800);
+      reportsWriteUint16LE(local, 0);
+      reportsWriteUint16LE(local, stamp.time);
+      reportsWriteUint16LE(local, stamp.date);
+      reportsWriteUint32LE(local, crc);
+      reportsWriteUint32LE(local, dataBytes.length);
+      reportsWriteUint32LE(local, dataBytes.length);
+      reportsWriteUint16LE(local, nameBytes.length);
+      reportsWriteUint16LE(local, 0);
+      chunks.push(Uint8Array.from(local), nameBytes, dataBytes);
+
+      const entry = [];
+      reportsWriteUint32LE(entry, 0x02014b50);
+      reportsWriteUint16LE(entry, 20);
+      reportsWriteUint16LE(entry, 20);
+      reportsWriteUint16LE(entry, 0x0800);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, stamp.time);
+      reportsWriteUint16LE(entry, stamp.date);
+      reportsWriteUint32LE(entry, crc);
+      reportsWriteUint32LE(entry, dataBytes.length);
+      reportsWriteUint32LE(entry, dataBytes.length);
+      reportsWriteUint16LE(entry, nameBytes.length);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint16LE(entry, 0);
+      reportsWriteUint32LE(entry, 0);
+      reportsWriteUint32LE(entry, offset);
+      central.push(Uint8Array.from(entry), nameBytes);
+      offset += local.length + nameBytes.length + dataBytes.length;
+    });
+    const centralSize = central.reduce((sum, part) => sum + part.length, 0);
+    const end = [];
+    reportsWriteUint32LE(end, 0x06054b50);
+    reportsWriteUint16LE(end, 0);
+    reportsWriteUint16LE(end, 0);
+    reportsWriteUint16LE(end, files.length);
+    reportsWriteUint16LE(end, files.length);
+    reportsWriteUint32LE(end, centralSize);
+    reportsWriteUint32LE(end, offset);
+    reportsWriteUint16LE(end, 0);
+    return new Blob([...chunks, ...central, Uint8Array.from(end)], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+  }
+
+  function reportsXlsxCell(value, rowNumber, colIndex, isHeader) {
+    const ref = `${reportsColumnLetter(colIndex)}${rowNumber}`;
+    const style = isHeader ? ' s="1"' : '';
+    return `<c r="${ref}" t="inlineStr"${style}><is><t>${reportsXmlEscape(value)}</t></is></c>`;
+  }
+
+  function reportsBuildXlsx(sheetName, rows) {
+    const maxColumns = Math.max(...rows.map((row) => row.length), 1);
+    const normalized = rows.map((row) => Array.from({ length: maxColumns }, (_, index) => row[index] ?? ''));
+    const widths = Array.from({ length: maxColumns }, (_, index) => {
+      const maxLen = normalized.reduce((max, row) => Math.max(max, String(row[index] ?? '').length), 0);
+      return Math.max(10, Math.min(46, maxLen + 2));
+    });
+    const lastCell = `${reportsColumnLetter(maxColumns - 1)}${normalized.length}`;
+    const colsXml = widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join('');
+    const rowsXml = normalized.map((row, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      const isHeader = rowIndex === 4;
+      const cells = row.map((value, colIndex) => reportsXlsxCell(value, rowNumber, colIndex, isHeader)).join('');
+      return `<row r="${rowNumber}">${cells}</row>`;
+    }).join('');
+    const safeSheetName = reportsXmlEscape(String(sheetName || 'Report').slice(0, 31));
+    const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="5" topLeftCell="A6" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${colsXml}</cols><sheetData>${rowsXml}</sheetData><autoFilter ref="A5:${lastCell}"/></worksheet>`;
+    return reportsCreateZip([
+      { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+      { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+      { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${safeSheetName}" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+      { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+      { name: 'xl/styles.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>` },
+      { name: 'xl/worksheets/sheet1.xml', content: sheetXml },
+    ]);
+  }
+
+  function reportsDownloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportSalesCostXlsx() {
+    const panel = document.getElementById('report-sales-cost');
+    const table = panel?.querySelector('.reports-data-table');
+    if (!panel || !table) return;
+    const activeStage = panel.querySelector('[data-sales-cost-stage].active');
+    const stageLabel = activeStage?.querySelector('.messenger-channel-label')?.textContent?.trim() || 'Все';
+    const periodLabel = panel.querySelector('.reports-panel-head p:last-child')?.textContent?.trim() || '';
+    const headers = [...table.querySelectorAll('thead th')].map((cell) => cell.textContent.trim());
+    const rows = [...table.querySelectorAll('tbody tr[data-sales-cost-row]')]
+      .filter((row) => !row.hidden)
+      .map((row) => [...row.cells].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()));
+    const footer = [...table.querySelectorAll('tfoot tr')]
+      .map((row) => [...row.cells].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()));
+    if (!rows.length) {
+      alert('Нет данных для экспорта');
+      return;
+    }
+    const exportRows = [
+      ['Продажи и себестоимость'],
+      ['Период', periodLabel],
+      ['Раздел', stageLabel],
+      [],
+      headers,
+      ...rows,
+      ...footer,
+    ];
+    const date = new Date().toISOString().slice(0, 10);
+    const stageKey = activeStage?.getAttribute('data-sales-cost-stage') || 'all';
+    reportsDownloadBlob(reportsBuildXlsx('Sales cost', exportRows), `sales-cost-${stageKey}-${date}.xlsx`);
+  }
+
+  let profitCurrency = document.querySelector('[data-profit-currency-switch]')?.getAttribute('data-initial-currency') === 'UZS' ? 'UZS' : 'USD';
+
+  function renderProfitCurrency() {
+    document.querySelectorAll('[data-profit-money]').forEach((node) => {
+      const amountUzs = Number(node.getAttribute('data-money-uzs') || 0);
+      const amount = profitCurrency === 'USD' ? amountUzs / stockUsdRate : amountUzs;
+      node.textContent = `${numberFormatter.format(amount)} ${profitCurrency}`;
+    });
+    document.querySelectorAll('[data-profit-currency]').forEach((button) => {
+      const active = button.getAttribute('data-profit-currency') === profitCurrency;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  // Разделы прибыли: «Отгрузки» показывают ожидаемую прибыль, «Архив» —
+  // реальную, потому что программа признаёт прибыль только после архива.
+  function closeSalesCostDetail(detailRow, toggle) {
+    if (!detailRow) return;
+    detailRow.classList.remove('is-open');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    window.setTimeout(() => {
+      if (!detailRow.classList.contains('is-open')) detailRow.hidden = true;
+    }, 260);
+  }
+
+  function toggleSalesCostDetail(toggle) {
+    const row = toggle.closest('[data-sales-cost-row]');
+    const rowId = row?.getAttribute('data-sales-cost-row-id');
+    const detailRow = rowId ? document.querySelector(`[data-sales-cost-detail-for="${rowId}"]`) : null;
+    if (!detailRow) return;
+    const open = !detailRow.classList.contains('is-open');
+    document.querySelectorAll('[data-sales-cost-detail-row].is-open').forEach((item) => {
+      if (item !== detailRow) {
+        const itemId = item.getAttribute('data-sales-cost-detail-for');
+        const itemToggle = itemId ? document.querySelector(`[data-sales-cost-row-id="${itemId}"] [data-sales-cost-toggle]`) : null;
+        closeSalesCostDetail(item, itemToggle);
+      }
+    });
+    if (!open) {
+      closeSalesCostDetail(detailRow, toggle);
+      return;
+    }
+    detailRow.hidden = false;
+    requestAnimationFrame(() => {
+      detailRow.classList.add('is-open');
+      toggle.setAttribute('aria-expanded', 'true');
+    });
+  }
+
+  function applySalesCostStage(stage) {
+    const tabs = document.querySelector('[data-sales-cost-stages]');
+    if (!tabs) return;
+    const button = tabs.querySelector(`[data-sales-cost-stage="${stage}"]`) || tabs.querySelector('[data-sales-cost-stage]');
+    if (!button) return;
+    const active = button.getAttribute('data-sales-cost-stage');
+    tabs.querySelectorAll('[data-sales-cost-stage]').forEach((node) => {
+      const on = node === button;
+      node.classList.toggle('active', on);
+      node.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+
+    let visible = 0;
+    document.querySelectorAll('[data-sales-cost-row]').forEach((row) => {
+      const show = active === 'all' || row.getAttribute('data-sales-cost-row') === active;
+      row.hidden = !show;
+      const rowId = row.getAttribute('data-sales-cost-row-id');
+      const detailRow = rowId ? document.querySelector(`[data-sales-cost-detail-for="${rowId}"]`) : null;
+      const toggle = row.querySelector('[data-sales-cost-toggle]');
+      if (!show) closeSalesCostDetail(detailRow, toggle);
+      if (show) visible += 1;
+    });
+    const emptyRow = document.querySelector('[data-sales-cost-empty]');
+    if (emptyRow) emptyRow.hidden = visible > 0;
+
+    const cost = button.getAttribute('data-stage-cost') || '0';
+    const profit = button.getAttribute('data-stage-profit') || '0';
+    const revenue = button.getAttribute('data-stage-revenue') || '0';
+    const pairs = [
+      ['[data-sales-cost-total]', cost],
+      ['[data-sales-cost-profit]', profit],
+      ['[data-sales-cost-foot-revenue]', revenue],
+      ['[data-sales-cost-foot-cost]', cost],
+      ['[data-sales-cost-foot-profit]', profit],
+    ];
+    pairs.forEach(([selector, value]) => {
+      const node = document.querySelector(selector);
+      if (node) node.setAttribute('data-money-uzs', value);
+    });
+    const label = document.querySelector('[data-sales-cost-profit-label]');
+    if (label) label.textContent = button.getAttribute('data-stage-note') || 'прибыль';
+    renderProfitCurrency();
+  }
+
+  document.querySelector('[data-sales-cost-stages]')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-sales-cost-stage]');
+    if (!button) return;
+    applySalesCostStage(button.getAttribute('data-sales-cost-stage'));
+  });
+
+  const archiveConfirmDialog = document.querySelector('[data-sales-archive-confirm-dialog]');
+  const archiveConfirmMessage = document.querySelector('[data-sales-archive-confirm-message]');
+  const archiveErrorDialog = document.querySelector('[data-sales-archive-error-dialog]');
+  const archiveErrorMessage = document.querySelector('[data-sales-archive-error-message]');
+  let archiveConfirmResolve = null;
+
+  const escapeArchiveHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+
+  function archiveRowsTable(rows, emptyText) {
+    const cleanRows = Array.isArray(rows) ? rows : [];
+    if (!cleanRows.length) {
+      return `<div class="reports-archive-dialog-empty">${escapeArchiveHtml(emptyText || '-')}</div>`;
+    }
+    return [
+      '<div class="reports-archive-dialog-table-wrap">',
+      '<table class="reports-archive-dialog-table">',
+      '<thead><tr><th>Дата</th><th>Операция</th><th>Сумма</th></tr></thead>',
+      '<tbody>',
+      cleanRows.map((row) => (
+        '<tr>' +
+        `<td>${escapeArchiveHtml(row.date || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.type || row.name || 'Оплата')}</td>` +
+        `<td><strong>${escapeArchiveHtml(row.amount || '-')}</strong></td>` +
+        '</tr>'
+      )).join(''),
+      '</tbody></table></div>',
+    ].join('');
+  }
+
+  function archiveDebtTable(rows) {
+    const cleanRows = Array.isArray(rows) ? rows : [];
+    if (!cleanRows.length) return '<div class="reports-archive-dialog-empty">Документы с долгом не найдены.</div>';
+    return [
+      '<div class="reports-archive-dialog-table-wrap">',
+      '<table class="reports-archive-dialog-table reports-archive-dialog-table--debt">',
+      '<thead><tr><th>Дата</th><th>№</th><th>Сумма</th><th>Оплачено</th><th>Долг</th></tr></thead>',
+      '<tbody>',
+      cleanRows.map((row) => (
+        '<tr>' +
+        `<td>${escapeArchiveHtml(row.date || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.number || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.amount || '-')}</td>` +
+        `<td>${escapeArchiveHtml(row.paid || '-')}</td>` +
+        `<td><strong>${escapeArchiveHtml(row.debt || '-')}</strong></td>` +
+        '</tr>'
+      )).join(''),
+      '</tbody></table></div>',
+    ].join('');
+  }
+
+  function archiveSummaryTable(rows) {
+    return [
+      '<table class="reports-archive-dialog-summary"><tbody>',
+      rows.map(([label, value]) => (
+        `<tr><th>${escapeArchiveHtml(label)}</th><td>${escapeArchiveHtml(value || '-')}</td></tr>`
+      )).join(''),
+      '</tbody></table>',
+    ].join('');
+  }
+
+  function closeSalesArchiveConfirm(value) {
+    if (archiveConfirmDialog?.open) archiveConfirmDialog.close();
+    if (archiveConfirmResolve) {
+      archiveConfirmResolve(Boolean(value));
+      archiveConfirmResolve = null;
+    }
+  }
+
+  function showSalesArchiveConfirm(data) {
+    if (!archiveConfirmDialog || !archiveConfirmMessage) return Promise.resolve(true);
+    archiveConfirmMessage.innerHTML = [
+      '<p class="reports-archive-dialog-lead">Архивировать продажу и учесть прибыль как реальную?</p>',
+      archiveSummaryTable([
+        ['Документ', data.number],
+        ['Клиент', data.client],
+        ['Сумма продажи', data.total],
+        ['Оплачено', data.paid],
+        ['Не оплачено', data.outstanding],
+      ]),
+      '<h3>Оплаты</h3>',
+      archiveRowsTable(data.payments, 'Оплат нет'),
+    ].join('');
+    archiveConfirmDialog.showModal();
+    return new Promise((resolve) => {
+      archiveConfirmResolve = resolve;
+    });
+  }
+
+  function showSalesArchiveError(message, details = null) {
+    const clean = String(message || 'Не удалось архивировать продажу.').trim();
+    if (!archiveErrorDialog || !archiveErrorMessage) return;
+    if (details && Array.isArray(details.debts)) {
+      archiveErrorMessage.innerHTML = [
+        `<p class="reports-archive-dialog-lead">${escapeArchiveHtml(details.title || clean.split('\n')[0] || clean)}</p>`,
+        archiveSummaryTable([
+          ['Клиент', details.client || '-'],
+          ['Общий долг', details.total_debt || '-'],
+        ]),
+        '<h3>Документы с долгом</h3>',
+        archiveDebtTable(details.debts),
+        details.more ? `<p class="reports-archive-dialog-note">${escapeArchiveHtml(details.more)}</p>` : '',
+        `<p class="reports-archive-dialog-note">${escapeArchiveHtml(details.hint || 'Сначала закройте оплату, потом архивируйте продажу.')}</p>`,
+      ].join('');
+    } else {
+      const lines = clean.split('\n').filter(Boolean);
+      archiveErrorMessage.innerHTML = [
+        `<p class="reports-archive-dialog-lead">${escapeArchiveHtml(lines.shift() || clean)}</p>`,
+        lines.length ? `<div class="reports-archive-dialog-text">${lines.map(escapeArchiveHtml).join('<br>')}</div>` : '',
+      ].join('');
+    }
+    archiveErrorDialog.showModal();
+  }
+
+  archiveConfirmDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeSalesArchiveConfirm(false);
+  });
+
+  archiveConfirmDialog?.addEventListener('click', (event) => {
+    if (event.target === archiveConfirmDialog || event.target.closest('[data-sales-archive-confirm-cancel]')) {
+      closeSalesArchiveConfirm(false);
+      return;
+    }
+    if (event.target.closest('[data-sales-archive-confirm-ok]')) {
+      closeSalesArchiveConfirm(true);
+    }
+  });
+
+  archiveErrorDialog?.addEventListener('click', (event) => {
+    if (event.target === archiveErrorDialog || event.target.closest('[data-sales-archive-error-close]')) {
+      archiveErrorDialog.close();
+    }
+  });
+
+  const archiveErrorParams = new URLSearchParams(window.location.search);
+  const archiveError = archiveErrorParams.get('sales_archive_error');
+  if (archiveError) {
+    showSalesArchiveError(archiveError);
+    archiveErrorParams.delete('sales_archive_error');
+    const cleanQuery = archiveErrorParams.toString();
+    const cleanUrl = `${window.location.pathname}${cleanQuery ? '?' + cleanQuery : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
+  function salesCostArchiveData(form) {
+    let info = {};
+    try {
+      info = JSON.parse(form?.dataset?.archiveInfo || '{}') || {};
+    } catch (error) {
+      info = {};
+    }
+    const number = form?.dataset?.archiveNumber || '-';
+    const client = form?.dataset?.archiveClient || '-';
+    const payments = Array.isArray(info.payments) ? info.payments : [];
+    return {
+      number,
+      client,
+      total: info.total || '-',
+      paid: info.paid || '0 UZS',
+      outstanding: info.outstanding || '0 UZS',
+      payments,
+    };
+  }
+
+  const archiveSuccessDialog = document.querySelector('[data-sales-archive-success-dialog]');
+  if (archiveErrorParams.get('sales_archived') === '1' && archiveSuccessDialog) {
+    archiveSuccessDialog.showModal();
+    archiveErrorParams.delete('sales_archived');
+    const cleanQuery = archiveErrorParams.toString();
+    const cleanUrl = `${window.location.pathname}${cleanQuery ? '?' + cleanQuery : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
+  archiveSuccessDialog?.addEventListener('click', (event) => {
+    if (event.target === archiveSuccessDialog || event.target.closest('[data-sales-archive-success-close]')) {
+      archiveSuccessDialog.close();
+    }
+  });
+
+  document.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-sales-cost-archive-form]');
+    if (!form) return;
+    event.preventDefault();
+    const button = event.submitter || form.querySelector('.reports-sales-cost-archive-button');
+    if (button?.disabled) return;
+    const confirmed = await showSalesArchiveConfirm(salesCostArchiveData(form));
+    if (!confirmed) {
+      return;
+    }
+    const returnTo = form.querySelector('input[name="return_to"]');
+    if (returnTo) {
+      const url = new URL(returnTo.value || '/reports', window.location.origin);
+      url.searchParams.set('profit_stage', 'archive');
+      returnTo.value = `${url.pathname}${url.search}`;
+    }
+    if (button) button.disabled = true;
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+      const body = await response.json().catch(() => null);
+      if (response.ok && body?.ok) {
+        window.location.href = body.redirect || '/reports?open_report=sales-cost&profit_stage=archive&sales_archived=1';
+        return;
+      }
+      showSalesArchiveError(body?.error || `Сервер вернул ошибку HTTP ${response.status}. Обновите страницу и попробуйте ещё раз.`, body?.details || null);
+    } catch (error) {
+      showSalesArchiveError(`Не удалось отправить запрос на архивацию.\n${error?.message || error}`);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+
+  const initialProfitStage = new URLSearchParams(window.location.search).get('profit_stage');
+  if (['all', 'shipment', 'archive'].includes(initialProfitStage)) {
+    applySalesCostStage(initialProfitStage);
+  }
+
+  document.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-sales-cost-toggle]');
+    if (!toggle) return;
+    toggleSalesCostDetail(toggle);
+  });
+
+  document.querySelector('[data-sales-cost-export]')?.addEventListener('click', exportSalesCostXlsx);
+
+  function renderStockCurrency() {
+    document.querySelectorAll('[data-stock-money]').forEach((node) => {
+      const amountUzs = Number(node.getAttribute('data-money-uzs') || 0);
+      const amount = stockCurrency === 'USD' ? amountUzs / stockUsdRate : amountUzs;
+      node.textContent = `${numberFormatter.format(amount)} ${stockCurrency}`;
+    });
+    document.querySelectorAll('[data-stock-currency]').forEach((button) => {
+      const active = button.getAttribute('data-stock-currency') === stockCurrency;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function stockSearchFold(value) {
+    return String(value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+  }
+
+  function stockSearchTokens(value) {
+    return stockSearchFold(value).trim().split(/\s+/).filter(Boolean);
+  }
+
+  function stockSearchMatchIndexes(text, query) {
+    const tokens = stockSearchTokens(query);
+    if (!tokens.length) return { matched: true, indexes: new Set() };
+    const chars = Array.from(String(text || ''));
+    const folded = chars.map((char) => stockSearchFold(char)).join('');
+    const indexes = new Set();
+    const markRange = (start, length) => {
+      for (let index = start; index < start + length; index += 1) indexes.add(index);
+    };
+    for (const token of tokens) {
+      const directIndex = folded.indexOf(token);
+      if (directIndex >= 0) {
+        markRange(directIndex, token.length);
+        continue;
+      }
+      let cursor = 0;
+      const fuzzyIndexes = [];
+      for (const char of Array.from(token)) {
+        const foundAt = folded.indexOf(char, cursor);
+        if (foundAt < 0) return { matched: false, indexes };
+        fuzzyIndexes.push(foundAt);
+        cursor = foundAt + 1;
+      }
+      fuzzyIndexes.forEach((index) => indexes.add(index));
+    }
+    return { matched: true, indexes };
+  }
+
+  function renderStockSearchHighlight(node, indexes) {
+    if (!node) return;
+    const original = node.dataset.stockOriginalText || node.textContent || '';
+    node.dataset.stockOriginalText = original;
+    node.textContent = '';
+    Array.from(original).forEach((char, index) => {
+      if (indexes?.has(index)) {
+        const mark = document.createElement('mark');
+        mark.textContent = char;
+        node.append(mark);
+      } else {
+        node.append(document.createTextNode(char));
+      }
+    });
+  }
+
+  function applyStockProductSearch() {
+    const panel = document.getElementById('report-stock-analysis');
+    const input = panel?.querySelector('[data-stock-product-search]');
+    if (!panel || !input) return;
+    const query = input.value || '';
+    const rows = [...panel.querySelectorAll('[data-stock-analysis-row]')];
+    const empty = panel.querySelector('[data-stock-search-empty]');
+    const count = panel.querySelector('[data-stock-product-search-count]');
+    const clear = panel.querySelector('[data-stock-product-search-clear]');
+    let shown = 0;
+    rows.forEach((row) => {
+      const nameNode = row.querySelector('[data-stock-product-name]');
+      const productName = nameNode?.dataset.stockOriginalText || nameNode?.textContent || '';
+      const haystack = row.getAttribute('data-stock-search-text') || row.textContent || '';
+      const productMatch = stockSearchMatchIndexes(productName, query);
+      const fullMatch = productMatch.matched || stockSearchMatchIndexes(haystack, query).matched;
+      row.hidden = !fullMatch;
+      if (fullMatch) shown += 1;
+      renderStockSearchHighlight(nameNode, query && fullMatch ? productMatch.indexes : new Set());
+    });
+    if (empty) empty.hidden = !query || shown > 0;
+    if (count) count.textContent = query ? `${shown} из ${rows.length}` : '';
+    if (clear) clear.hidden = !query;
+    input.closest('.reports-stock-search-field')?.classList.toggle('is-active', Boolean(query));
+  }
+
+  function closeStockHistory() {
+    const drawer = document.querySelector('[data-stock-history-drawer]');
+    const backdrop = document.querySelector('.reports-stock-history-backdrop');
+    drawer?.classList.remove('is-open');
+    backdrop?.classList.remove('is-open');
+    window.setTimeout(() => {
+      if (drawer) drawer.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+    }, 180);
+  }
+
+  function openStockHistory(productId, productName) {
+    const drawer = document.querySelector('[data-stock-history-drawer]');
+    const backdrop = document.querySelector('.reports-stock-history-backdrop');
+    const title = document.querySelector('[data-stock-history-title]');
+    const summary = document.querySelector('[data-stock-history-summary]');
+    const list = document.querySelector('[data-stock-history-list]');
+    if (!drawer || !backdrop || !title || !summary || !list) return;
+    const history = Array.isArray(stockPurchaseHistory[productId]) ? stockPurchaseHistory[productId] : [];
+    title.textContent = productName || 'Товар';
+    summary.textContent = history.length
+      ? `${history.length} ${history.length === 1 ? 'документ прихода' : 'документов прихода'}`
+      : 'Документы прихода не найдены';
+    list.innerHTML = history.length ? `
+      <table class="reports-data-table reports-stock-history-table">
+        <thead>
+          <tr><th>Дата</th><th>Документ</th><th>Поставщик</th><th>Склад</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>
+        </thead>
+        <tbody>
+          ${history.map((item) => `
+            <tr class="reports-stock-history-tr" data-history-url="${escapeHtml(item.url || '/warehouse#purchases')}">
+              <td>${escapeHtml(item.date || '-')}</td>
+              <td><strong>${escapeHtml(item.number || '-')}</strong></td>
+              <td>${escapeHtml(item.supplier || 'Без поставщика')}</td>
+              <td>${escapeHtml(item.warehouse || 'Основной склад')}</td>
+              <td class="num">${escapeHtml(item.quantity || '0')}${item.unit && item.unit !== 'Штука' ? ' ' + escapeHtml(item.unit) : ''}</td>
+              <td class="num">${escapeHtml(item.price || '0 UZS')}</td>
+              <td class="num"><b>${escapeHtml(item.amount || '0 UZS')}</b></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '<div class="reports-stock-history-empty">Для этого товара пока нет сохранённых закупок.</div>';
+    list.querySelectorAll('.reports-stock-history-tr').forEach((row) => {
+      row.addEventListener('click', () => { window.location.href = row.dataset.historyUrl; });
+    });
+    drawer.hidden = false;
+    backdrop.hidden = false;
+    window.requestAnimationFrame(() => {
+      drawer.classList.add('is-open');
+      backdrop.classList.add('is-open');
+    });
+  }
+
+  function sortableCellValue(cell) {
+    const raw = String(cell?.getAttribute('data-sort-value') || cell?.textContent || '').trim();
+    const numberLike = /^[!▲+\-]?\s*[\d\s.,]+\s*(?:UZS|USD|RUB|EUR|pcs|шт)?$/i.test(raw);
+    if (numberLike) {
+      const parsed = Number(raw.replace(/[!▲\s]/g, '').replace(',', '.').replace(/(?:UZS|USD|RUB|EUR|pcs|шт)$/i, ''));
+      if (Number.isFinite(parsed)) return {type: 'number', value: parsed};
+    }
+    return {type: 'text', value: raw.toLocaleLowerCase('ru-RU')};
+  }
+
+  function sortReportTable(table, columnIndex, direction) {
+    const body = table.tBodies[0];
+    if (!body) return;
+    const rows = Array.from(body.rows).filter((row) => !row.querySelector('.reports-empty-cell'));
+    rows.sort((left, right) => {
+      const a = sortableCellValue(left.cells[columnIndex]);
+      const b = sortableCellValue(right.cells[columnIndex]);
+      const result = a.type === 'number' && b.type === 'number'
+        ? a.value - b.value
+        : String(a.value).localeCompare(String(b.value), 'ru', {numeric: true, sensitivity: 'base'});
+      return direction === 'desc' ? -result : result;
+    });
+    rows.forEach((row) => body.appendChild(row));
+  }
+
+  function enhanceSortableTables() {
+    document.querySelectorAll('.reports-data-table').forEach((table) => {
+      table.querySelectorAll('thead th').forEach((header, columnIndex) => {
+        if (header.querySelector('.reports-sort-button') || !header.textContent.trim() || header.hasAttribute('data-report-no-sort')) return;
+        const label = header.textContent.trim();
+        header.textContent = '';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'reports-sort-button';
+        button.setAttribute('data-report-sort-column', String(columnIndex));
+        button.setAttribute('aria-label', `${label}: сортировать от большего к меньшему`);
+        button.innerHTML = `<span>${label}</span><span class="reports-sort-icon" aria-hidden="true">↕</span>`;
+        header.appendChild(button);
+      });
+    });
+  }
+
+  function percent(value, max) {
+    const cleanMax = Number(max || 0);
+    if (cleanMax <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round(Number(value || 0) / cleanMax * 100)));
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+      || document.querySelector('input[name="csrf_token"]')?.value
+      || '';
+  }
+
+  function parseLimitAmount(value) {
+    const normalized = String(value || '').replace(/\s|\u202f/g, '').replace(',', '.');
+    const amount = Number(normalized);
+    return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : 0;
+  }
+
+  function formatLimitAmount(value) {
+    const text = String(value || '').replace(/[^\d.,\s\u202f]/g, '').replace(/\s|\u202f/g, '').replace('.', ',');
+    if (!text) return '';
+    const [rawInteger, rawFraction = ''] = text.split(',');
+    const integer = Number(rawInteger || 0);
+    if (!Number.isFinite(integer)) return '';
+    const formatted = numberFormatter.format(integer).replace(/\u00a0|\u202f/g, ' ');
+    const fraction = rawFraction.replace(/\D/g, '').slice(0, 2);
+    return fraction ? `${formatted},${fraction}` : formatted;
+  }
+
+  function formatLimitInput(input) {
+    const formatted = formatLimitAmount(input.value);
+    input.value = formatted;
+  }
+
+  function courierLimitKey(row) {
+    return `${encodeURIComponent(String(row?.courier_name || '').trim())}|${String(row?.currency || 'UZS').toUpperCase()}`;
+  }
+
+  function courierLimitValue(row) {
+    return Number(courierDebtLimits[courierLimitKey(row)] || 0);
+  }
+
+  function courierNameButton(name, className = '') {
+    return `<button type="button" class="reports-courier-link ${className}" data-courier-name="${escapeHtml(name)}" aria-label="Открыть акт сверки ${escapeHtml(name)}">${escapeHtml(name)}</button>`;
+  }
+
+  function collectCourierDebtLimits() {
+    const limits = {};
+    document.querySelectorAll('[data-courier-limit-input]').forEach((input) => {
+      const key = input.getAttribute('data-courier-limit-input') || '';
+      const amount = parseLimitAmount(input.value);
+      if (key && amount > 0) limits[key] = amount;
+    });
+    return limits;
+  }
+
+  function setCourierLimitStatus(text) {
+    courierDebtLimitStatus = text || '';
+    document.querySelectorAll('[data-courier-limit-status]').forEach((node) => {
+      node.textContent = courierDebtLimitStatus;
+    });
+  }
+
+  async function saveCourierDebtLimits() {
+    if (courierDebtLimitSaving) return;
+    const limits = collectCourierDebtLimits();
+    courierDebtLimits = limits;
+    courierDebtLimitSaving = true;
+    setCourierLimitStatus('Сохранение...');
+    document.querySelectorAll('[data-courier-limit-save]').forEach((button) => { button.disabled = true; });
+    try {
+      const response = await fetch('/api/reports/courier-debt-limits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken(),
+        },
+        body: JSON.stringify({ limits }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'save_failed');
+      }
+      courierDebtLimits = payload.limits || limits;
+      setCourierLimitStatus('Лимиты сохранены');
+    } catch (err) {
+      setCourierLimitStatus('Не удалось сохранить лимиты');
+    } finally {
+      courierDebtLimitSaving = false;
+      renderCourierBalancePanel();
+    }
+  }
+
+  function txDate(tx) {
+    return String(tx?.created_at || '').slice(0, 10);
+  }
+
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function monthStartIso() {
+    const date = new Date();
+    date.setDate(1);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function yearStartIso() {
+    const date = new Date();
+    date.setMonth(0, 1);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function resetReconcileFilter() {
+    reconcilePeriod = 'month';
+    reconcileDateFrom = monthStartIso();
+    reconcileDateTo = todayIso();
+  }
+
+  function setReconcilePreset(period) {
+    reconcilePeriod = period || 'all';
+    if (reconcilePeriod === 'today') {
+      const today = todayIso();
+      reconcileDateFrom = today;
+      reconcileDateTo = today;
+    } else if (reconcilePeriod === 'month') {
+      reconcileDateFrom = monthStartIso();
+      reconcileDateTo = todayIso();
+    } else if (reconcilePeriod === 'year') {
+      reconcileDateFrom = yearStartIso();
+      reconcileDateTo = todayIso();
+    } else if (reconcilePeriod === 'all') {
+      reconcileDateFrom = '';
+      reconcileDateTo = '';
+    }
+  }
+
+  function tabLabel(tab) {
+    if (tab === 'courier-reconcile') {
+      return reconcileCourierName ? `Акт: ${reconcileCourierName}` : reportMeta[tab];
+    }
+    return reportMeta[tab] || tab;
+  }
+
+  function sortedCourierRows(courierName) {
+    const clean = String(courierName || '').trim();
+    return shipments
+      .filter((row) => String(row?.courier_name || '').trim() === clean)
+      .slice()
+      .sort((a, b) => {
+        const dateCompare = String(a.shipment_date || '').localeCompare(String(b.shipment_date || ''));
+        if (dateCompare) return dateCompare;
+        return Number(a.number || 0) - Number(b.number || 0);
+      });
+  }
+
+  function filteredCourierRows(courierName) {
+    return sortedCourierRows(courierName).filter((row) => {
+      const date = String(row?.shipment_date || '');
+      if (reconcileDateFrom && date < reconcileDateFrom) return false;
+      if (reconcileDateTo && date > reconcileDateTo) return false;
+      return true;
+    });
+  }
+
+  function filteredCourierPayments(courierName) {
+    const clean = String(courierName || '').trim();
+    return payments
+      .filter((tx) => {
+        const name = String(tx?.data?.courier_name || tx?.supplier || tx?.client || '').trim();
+        const date = txDate(tx);
+        if (name !== clean) return false;
+        if (reconcileDateFrom && date < reconcileDateFrom) return false;
+        if (reconcileDateTo && date > reconcileDateTo) return false;
+        return true;
+      })
+      .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')) || Number(a.number || 0) - Number(b.number || 0));
+  }
+
+  function buildReconcileSummary(summaryNode, totals) {
+    const currencies = Object.keys(totals).sort();
+    summaryNode.replaceChildren();
+    if (!currencies.length) {
+      const empty = document.createElement('div');
+      empty.className = 'reports-empty-state';
+      empty.textContent = 'По этому доставщику пока нет отгрузок.';
+      summaryNode.appendChild(empty);
+      return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'reports-data-table reports-reconcile-total-table';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Валюта</th>
+          <th>Итого дебет</th>
+          <th>Итого кредит</th>
+          <th>Итоговый долг</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector('tbody');
+
+    currencies.forEach((currency) => {
+      const row = totals[currency];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${currency}</td>
+        <td>${money(row.debit, currency)}</td>
+        <td>${money(row.credit, currency)}</td>
+        <td><strong>${money(row.balance, currency)}</strong></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    summaryNode.appendChild(table);
+  }
+
+  function renderReconcilePanel() {
+    const title = document.querySelector('[data-reconcile-title]');
+    const subtitle = document.querySelector('[data-reconcile-subtitle]');
+    const rowsNode = document.querySelector('[data-reconcile-rows]');
+    const paymentRowsNode = document.querySelector('[data-reconcile-payment-rows]');
+    const summaryNode = document.querySelector('[data-reconcile-summary]');
+    if (!title || !subtitle || !rowsNode || !paymentRowsNode || !summaryNode) return;
+
+    initReconcileDatePicker();
+    if (reconcileDatePicker && typeof reconcileDatePicker.setValue === 'function') {
+      reconcileDatePicker.setValue({
+        preset: reconcilePeriod,
+        date_from: reconcileDateFrom,
+        date_to: reconcileDateTo,
+      });
+    }
+
+    const allRows = sortedCourierRows(reconcileCourierName);
+    const rows = filteredCourierRows(reconcileCourierName);
+    const totals = {};
+    rowsNode.replaceChildren();
+    paymentRowsNode.replaceChildren();
+    title.textContent = reconcileCourierName || 'Акт сверки';
+    subtitle.textContent = `${rows.length} из ${allRows.length} отгрузок в акте сверки.`;
+
+    rows.forEach((row) => {
+      const currency = row.currency || 'UZS';
+      if (!totals[currency]) totals[currency] = { debit: 0, credit: 0, balance: 0 };
+      const debit = Number(row.total_amount || 0);
+      const credit = Number(row.paid_amount || 0);
+      totals[currency].debit += debit;
+      totals[currency].credit += credit;
+      totals[currency].balance += debit - credit;
+
+      const tr = document.createElement('tr');
+      const firstItem = Array.isArray(row.items) && row.items.length ? row.items[0] : null;
+      const documentName = firstItem?.product_name
+        ? `Отгрузка №${row.number} - ${firstItem.product_name}`
+        : `Отгрузка №${row.number}`;
+      tr.innerHTML = `
+        <td>${row.shipment_date || ''}</td>
+        <td>${documentName}</td>
+        <td>${money(debit, currency)}</td>
+        <td>${money(credit, currency)}</td>
+        <td><strong>${money(totals[currency].balance, currency)}</strong></td>
+      `;
+      rowsNode.appendChild(tr);
+    });
+
+    if (!rows.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="reports-empty-cell">За выбранный период отгрузок нет.</td>';
+      rowsNode.appendChild(tr);
+    }
+
+    const paymentRows = filteredCourierPayments(reconcileCourierName);
+    paymentRows.forEach((tx) => {
+      const currency = tx.currency || 'UZS';
+      const b = tx?.data?.courier_breakdown || {};
+      const accountLine = (text) => text ? `<br><small>${escapeHtml(text)}</small>` : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(txDate(tx))}</td>
+        <td>Касса №${escapeHtml(tx.number || '')}</td>
+        <td>${escapeHtml(money(b.cash ?? tx.amount, currency))}${accountLine(b.cash_account_id_label)}</td>
+        <td>${escapeHtml(money(b.transfer, currency))}${accountLine(b.transfer_account_id_label)}</td>
+        <td>${escapeHtml(money(b.return_goods, currency))}</td>
+        <td>${escapeHtml(money(b.discount, currency))}</td>
+        <td>${escapeHtml(money(b.terminal, currency))}${accountLine(b.terminal_account_id_label)}</td>
+        <td>${escapeHtml(money(b.current_debt, currency))}</td>
+        <td>${escapeHtml(money(b.old_debt, currency))}</td>
+        <td>${escapeHtml(money(b.expense, currency))}${b.expense_type ? `<br><small>${escapeHtml(b.expense_type)}</small>` : ''}</td>
+        <td><strong>${escapeHtml(money(b.difference, currency))}</strong></td>
+      `;
+      paymentRowsNode.appendChild(tr);
+    });
+    if (!paymentRows.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="11" class="reports-empty-cell">Поступлений из кассы за выбранный период нет.</td>';
+      paymentRowsNode.appendChild(tr);
+    }
+
+    buildReconcileSummary(summaryNode, totals);
+  }
+
+  function balanceRows() {
+    const byKey = new Map();
+    courierDebts.forEach((row) => {
+      const courier = String(row?.courier_name || '').trim();
+      const currency = String(row?.currency || 'UZS').toUpperCase();
+      if (!courier) return;
+      const key = `${courier}|${currency}`;
+      const item = byKey.get(key) || {
+        courier_name: courier,
+        currency,
+        debit: 0,
+        credit: 0,
+        debt: 0,
+        shipment_count: 0,
+      };
+      item.debit += Number(row?.total_amount || 0);
+      item.credit += Number(row?.paid_amount || 0);
+      item.debt += Number(row?.debt_amount || 0);
+      item.shipment_count += Number(row?.shipment_count || 0);
+      byKey.set(key, item);
+    });
+    return [...byKey.values()].sort((a, b) => (
+      b.debt - a.debt
+      || b.debit - a.debit
+      || a.courier_name.localeCompare(b.courier_name, 'ru')
+      || a.currency.localeCompare(b.currency)
+    ));
+  }
+
+  const balanceViewMeta = {
+    bars: {
+      title: 'Дебет, кредит и долг',
+      count: (rows) => `${rows.length} доставщиков`,
+    },
+    stack: {
+      title: 'Кредит и долг внутри дебета',
+      count: (rows) => `${rows.length} доставщиков`,
+    },
+    ranking: {
+      title: 'Рейтинг по задолженности',
+      count: (rows) => `Топ ${rows.length} доставщиков`,
+    },
+    share: {
+      title: 'Доля в общей задолженности',
+      count: (rows) => `${rows.length} долей`,
+    },
+    limits: {
+      title: 'Контроль лимита долга',
+      count: (rows) => `${rows.length} доставщиков`,
+    },
+  };
+
+  function updateBalanceViewButtons() {
+    document.querySelectorAll('[data-courier-balance-view]').forEach((button) => {
+      const isActive = button.getAttribute('data-courier-balance-view') === courierBalanceView;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+  }
+
+  function renderBalanceBars(chartNode, rows, maxByCurrency) {
+    rows.forEach((row) => {
+      const max = maxByCurrency.get(row.currency) || 0;
+      const item = document.createElement('div');
+      item.className = 'reports-courier-balance-row';
+      item.innerHTML = `
+        <div class="reports-courier-balance-name">
+          <strong>${courierNameButton(row.courier_name)}</strong>
+          <span>${escapeHtml(row.currency)} · ${row.shipment_count} отгрузок</span>
+        </div>
+        <div class="reports-courier-balance-bars">
+          <div class="reports-courier-balance-bar reports-courier-balance-bar--debit">
+            <span>Дебет</span>
+            <i><b style="width:${percent(row.debit, max)}%"></b></i>
+            <em>${escapeHtml(money(row.debit, row.currency))}</em>
+          </div>
+          <div class="reports-courier-balance-bar reports-courier-balance-bar--credit">
+            <span>Кредит</span>
+            <i><b style="width:${percent(row.credit, max)}%"></b></i>
+            <em>${escapeHtml(money(row.credit, row.currency))}</em>
+          </div>
+          <div class="reports-courier-balance-bar reports-courier-balance-bar--debt">
+            <span>Долг</span>
+            <i><b style="width:${percent(row.debt, max)}%"></b></i>
+            <em>${escapeHtml(money(row.debt, row.currency))}</em>
+          </div>
+        </div>
+      `;
+      chartNode.appendChild(item);
+    });
+  }
+
+  function renderBalanceStack(chartNode, rows) {
+    rows.forEach((row) => {
+      const base = Math.max(Number(row.debit || 0), Number(row.credit || 0) + Number(row.debt || 0));
+      const creditWidth = percent(row.credit, base);
+      const debtWidth = Math.max(0, 100 - creditWidth);
+      const item = document.createElement('div');
+      item.className = 'reports-courier-balance-stack';
+      item.innerHTML = `
+        <div class="reports-courier-balance-name">
+          <strong>${courierNameButton(row.courier_name)}</strong>
+          <span>${escapeHtml(money(row.debit, row.currency))} дебет · ${row.shipment_count} отгрузок</span>
+        </div>
+        <div class="reports-courier-stack-track" aria-label="Кредит и долг">
+          <span class="reports-courier-stack-credit" style="width:${creditWidth}%"></span>
+          <span class="reports-courier-stack-debt" style="width:${debtWidth}%"></span>
+        </div>
+        <div class="reports-courier-stack-legend">
+          <span><i class="reports-courier-stack-credit"></i> Кредит ${escapeHtml(money(row.credit, row.currency))}</span>
+          <span><i class="reports-courier-stack-debt"></i> Долг ${escapeHtml(money(row.debt, row.currency))}</span>
+        </div>
+      `;
+      chartNode.appendChild(item);
+    });
+  }
+
+  function renderBalanceRanking(chartNode, rows, maxDebt) {
+    const list = document.createElement('div');
+    list.className = 'reports-courier-balance-ranking';
+    rows.forEach((row, index) => {
+      const item = document.createElement('div');
+      item.className = 'reports-courier-rank-card';
+      item.innerHTML = `
+        <div class="reports-courier-rank-number">${index + 1}</div>
+        <div class="reports-courier-rank-bar"><span style="height:${percent(row.debt, maxDebt)}%"></span></div>
+        <strong>${courierNameButton(row.courier_name)}</strong>
+        <em>${escapeHtml(money(row.debt, row.currency))}</em>
+      `;
+      list.appendChild(item);
+    });
+    chartNode.appendChild(list);
+  }
+
+  function renderBalanceShare(chartNode, rows, debtTotals) {
+    const list = document.createElement('div');
+    list.className = 'reports-courier-balance-share';
+    const visibleRows = rows.filter((row) => Number(row.debt || 0) > 0 && Number(debtTotals.get(row.currency) || 0) > 0);
+    if (!visibleRows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'reports-empty-state reports-empty-state--large';
+      empty.textContent = 'По долям задолженности пока нет данных.';
+      chartNode.appendChild(empty);
+      return;
+    }
+    visibleRows.forEach((row) => {
+      const share = percent(row.debt, debtTotals.get(row.currency) || 0);
+      const item = document.createElement('div');
+      item.className = 'reports-courier-share-card';
+      item.innerHTML = `
+        <div class="reports-courier-share-ring" style="--share:${share}%"><span>${share}%</span></div>
+        <div>
+          <strong>${courierNameButton(row.courier_name)}</strong>
+          <span>${escapeHtml(money(row.debt, row.currency))} из общей задолженности ${escapeHtml(row.currency)}</span>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+    chartNode.appendChild(list);
+  }
+
+  function renderBalanceLimits(chartNode, rows) {
+    const shell = document.createElement('div');
+    shell.className = 'reports-courier-limit-shell';
+    shell.innerHTML = `
+      <div class="reports-courier-limit-toolbar">
+        <div>
+          <strong>Контроль баланса</strong>
+          <span>Закрепите максимальный долг и смотрите, на сколько процентов доставщик заполнил лимит.</span>
+        </div>
+        <button type="button" class="btn btn-secondary" data-courier-limit-save ${courierDebtLimitSaving ? 'disabled' : ''}>Сохранить лимиты</button>
+        <em data-courier-limit-status>${escapeHtml(courierDebtLimitStatus)}</em>
+      </div>
+      <div class="reports-courier-limit-grid"></div>
+    `;
+    const grid = shell.querySelector('.reports-courier-limit-grid');
+    rows.forEach((row) => {
+      const limit = courierLimitValue(row);
+      const filled = limit > 0 ? Math.round(Number(row.debt || 0) / limit * 100) : 0;
+      const capped = Math.max(0, Math.min(100, filled));
+      const isOver = limit > 0 && Number(row.debt || 0) > limit;
+      const card = document.createElement('article');
+      card.className = `reports-courier-limit-card${isOver ? ' is-over' : ''}`;
+      card.innerHTML = `
+        <div class="reports-courier-limit-head">
+          <div>
+            <strong>${courierNameButton(row.courier_name)}</strong>
+            <span>${escapeHtml(row.currency)} · ${row.shipment_count} отгрузок</span>
+          </div>
+          <div class="reports-courier-limit-ring${isOver ? ' is-over' : ''}" style="--fill:${capped}%"><span>${limit > 0 ? `${filled}%` : '0%'}</span></div>
+        </div>
+        <div class="reports-courier-limit-track"><span style="width:${capped}%"></span></div>
+        <div class="reports-courier-limit-values">
+          <span>Долг <b>${escapeHtml(money(row.debt, row.currency))}</b></span>
+          <label>Максимальный долг
+            <input
+              class="reports-courier-limit-input"
+              type="text"
+              inputmode="decimal"
+              data-courier-limit-input="${escapeHtml(courierLimitKey(row))}"
+              value="${limit > 0 ? escapeHtml(formatLimitAmount(String(limit))) : ''}"
+              placeholder="0"
+            />
+          </label>
+        </div>
+        <small>${limit > 0 ? escapeHtml(money(Math.max(limit - Number(row.debt || 0), 0), row.currency)) + ' осталось до лимита' : 'Лимит не задан'}</small>
+      `;
+      grid.appendChild(card);
+    });
+    chartNode.appendChild(shell);
+  }
+
+  function renderCourierBalancePanel() {
+    const totalsNode = document.querySelector('[data-courier-balance-totals]');
+    const chartNode = document.querySelector('[data-courier-balance-chart]');
+    const countNode = document.querySelector('[data-courier-balance-count]');
+    const titleNode = document.querySelector('[data-courier-balance-title]');
+    if (!totalsNode || !chartNode) return;
+
+    const rows = balanceRows();
+    const totals = new Map();
+    const maxByCurrency = new Map();
+    const debtTotals = new Map();
+    let maxDebt = 0;
+    rows.forEach((row) => {
+      const current = totals.get(row.currency) || { debit: 0, credit: 0, debt: 0, count: 0 };
+      current.debit += row.debit;
+      current.credit += row.credit;
+      current.debt += row.debt;
+      current.count += 1;
+      totals.set(row.currency, current);
+      debtTotals.set(row.currency, (debtTotals.get(row.currency) || 0) + row.debt);
+      maxDebt = Math.max(maxDebt, row.debt);
+      maxByCurrency.set(
+        row.currency,
+        Math.max(maxByCurrency.get(row.currency) || 0, row.debit, row.credit, row.debt)
+      );
+    });
+
+    updateBalanceViewButtons();
+    const viewMeta = balanceViewMeta[courierBalanceView] || balanceViewMeta.bars;
+    if (titleNode) titleNode.textContent = viewMeta.title;
+    totalsNode.replaceChildren();
+    chartNode.replaceChildren();
+    if (countNode) countNode.textContent = viewMeta.count(rows);
+
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'reports-empty-state reports-empty-state--large';
+      empty.textContent = 'По доставщикам пока нет данных для баланса.';
+      chartNode.appendChild(empty);
+      return;
+    }
+
+    [...totals.entries()]
+      .filter(([, item]) => Number(item.debit || 0) || Number(item.credit || 0) || Number(item.debt || 0))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([currency, item]) => {
+        const card = document.createElement('article');
+        card.className = 'reports-courier-balance-total';
+        card.innerHTML = `
+          <span>${escapeHtml(currency)}</span>
+          <strong>${escapeHtml(money(item.debt, currency))}</strong>
+          <small>Общая задолженность</small>
+          <div>
+            <b>Дебет ${escapeHtml(money(item.debit, currency))}</b>
+            <b>Кредит ${escapeHtml(money(item.credit, currency))}</b>
+          </div>
+        `;
+        totalsNode.appendChild(card);
+      });
+
+    if (courierBalanceView === 'stack') {
+      renderBalanceStack(chartNode, rows);
+    } else if (courierBalanceView === 'ranking') {
+      renderBalanceRanking(chartNode, rows, maxDebt);
+    } else if (courierBalanceView === 'share') {
+      renderBalanceShare(chartNode, rows, debtTotals);
+    } else if (courierBalanceView === 'limits') {
+      renderBalanceLimits(chartNode, rows);
+    } else {
+      renderBalanceBars(chartNode, rows, maxByCurrency);
+    }
+  }
+
+  function initReconcileDatePicker() {
+    const mount = document.getElementById('reports-reconcile-date-picker');
+    if (!mount || !window.UPOS_DATE_RANGE || reconcileDatePicker) return;
+    reconcileDatePicker = window.UPOS_DATE_RANGE.create(mount, {
+      preset: reconcilePeriod,
+      date_from: reconcileDateFrom,
+      date_to: reconcileDateTo,
+      onApply: (range) => {
+        reconcilePeriod = range.preset || 'custom';
+        reconcileDateFrom = range.date_from || '';
+        reconcileDateTo = range.date_to || range.date_from || '';
+        renderReconcilePanel();
+      },
+    });
+  }
+
+  function ensureOpen(tab) {
+    if (!reportMeta[tab]) return;
+    if (!openTabs.includes(tab)) openTabs.push(tab);
+  }
+
+  const storageKey = 'upos.homeReports.openTabs';
+  const moduleHomeRequested = new URLSearchParams(window.location.search).get('module_home') === '1';
+  const requestedReport = new URLSearchParams(window.location.search).get('open_report') || '';
+
+  function saveState() {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ openTabs, activeTab }));
+    } catch (err) {
+      /* localStorage can be unavailable in private contexts. */
+    }
+  }
+
+  function restoreState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      const savedTabs = Array.isArray(saved.openTabs)
+        ? saved.openTabs.filter((tab) => reportMeta[tab])
+        : [];
+      savedTabs.forEach(ensureOpen);
+      activeTab = !moduleHomeRequested && reportMeta[requestedReport]
+        ? requestedReport
+        : !moduleHomeRequested && reportMeta[saved.activeTab]
+          ? saved.activeTab
+          : '';
+      if (activeTab) ensureOpen(activeTab);
+    } catch (err) {
+      activeTab = '';
+    }
+  }
+
+  function closeTab(tab) {
+    const idx = openTabs.indexOf(tab);
+    if (idx === -1) return;
+    openTabs.splice(idx, 1);
+    if (tab === 'courier-reconcile') reconcileCourierName = '';
+    if (activeTab === tab) {
+      activeTab = openTabs[idx] || openTabs[idx - 1] || '';
+    }
+    render();
+  }
+
+  function renderOpenTabs() {
+    tabsShell.querySelectorAll('[data-org-report-open-tab]').forEach((node) => node.remove());
+    const homeActive = !activeTab;
+    homeTab.classList.toggle('active', homeActive);
+    if (homeActive) homeTab.setAttribute('aria-current', 'page');
+    else homeTab.removeAttribute('aria-current');
+
+    openTabs.forEach((tab) => {
+      const item = document.createElement('span');
+      item.className = 'general-module-tab general-module-tab--report';
+      item.setAttribute('data-org-report-open-tab', tab);
+
+      const activate = document.createElement('button');
+      activate.type = 'button';
+      activate.className = 'general-module-tab-activate';
+      activate.setAttribute('data-org-report-activate', tab);
+      activate.setAttribute('role', 'tab');
+      activate.textContent = tabLabel(tab);
+
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'general-module-tab-close';
+      close.setAttribute('data-org-report-close-tab', tab);
+      close.setAttribute('aria-label', `Закрыть вкладку ${tabLabel(tab)}`);
+      close.textContent = '×';
+
+      item.append(activate, close);
+      tabsShell.appendChild(item);
+    });
+  }
+
+  function render() {
+    renderOpenTabs();
+    const hasReport = Boolean(activeTab);
+    launcher.hidden = hasReport;
+    root.hidden = !hasReport;
+
+    document.querySelectorAll('[data-org-report-card]').forEach((card) => {
+      const isActive = card.getAttribute('data-org-report-card') === activeTab;
+      card.classList.toggle('active', isActive);
+      card.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-org-report-open-tab]').forEach((tabEl) => {
+      tabEl.classList.toggle('active', tabEl.getAttribute('data-org-report-open-tab') === activeTab);
+    });
+    document.querySelectorAll('[data-org-report-activate]').forEach((btn) => {
+      btn.setAttribute('aria-selected', btn.getAttribute('data-org-report-activate') === activeTab ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-org-report-panel]').forEach((panel) => {
+      panel.hidden = panel.getAttribute('data-org-report-panel') !== activeTab;
+    });
+    if (activeTab === 'courier-reconcile') renderReconcilePanel();
+    if (activeTab === 'courier-balance') renderCourierBalancePanel();
+    enhanceSortableTables();
+    renderStockCurrency();
+    applyStockProductSearch();
+    saveState();
+  }
+
+  function openReport(tab) {
+    if (!reportMeta[tab]) return;
+    ensureOpen(tab);
+    activeTab = tab;
+    render();
+  }
+
+  function openReconcile(courierName) {
+    reconcileCourierName = String(courierName || '').trim();
+    resetReconcileFilter();
+    ensureOpen('courier-reconcile');
+    activeTab = 'courier-reconcile';
+    render();
+  }
+
+  homeTab.addEventListener('click', (event) => {
+    event.preventDefault();
+    activeTab = '';
+    render();
+  });
+
+  function reportProductPhotoDialog() {
+    let dialog = document.querySelector('[data-report-product-photo-dialog]');
+    if (dialog) return dialog;
+    dialog = document.createElement('dialog');
+    dialog.className = 'product-photo-dialog';
+    dialog.setAttribute('data-report-product-photo-dialog', '');
+    dialog.innerHTML = `
+      <div class="product-photo-dialog-panel">
+        <header class="product-photo-dialog-head">
+          <strong data-report-product-photo-title></strong>
+          <button type="button" class="product-photo-dialog-close" data-report-product-photo-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="product-photo-dialog-body">
+          <img alt="" data-report-product-photo-image />
+        </div>
+      </div>`;
+    document.body.append(dialog);
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog || event.target.closest('[data-report-product-photo-close]')) {
+        event.preventDefault();
+        if (dialog.open && typeof dialog.close === 'function') dialog.close();
+        else dialog.removeAttribute('open');
+      }
+    });
+    return dialog;
+  }
+
+  function openReportProductPhoto(image) {
+    const source = image?.currentSrc || image?.src || '';
+    if (!source) return;
+    const productButton = image.closest('[data-stock-history-product]');
+    const title = productButton?.getAttribute('data-stock-history-name') || image.alt || 'Фото товара';
+    const dialog = reportProductPhotoDialog();
+    const preview = dialog.querySelector('[data-report-product-photo-image]');
+    if (preview) {
+      preview.src = source;
+      preview.alt = title;
+    }
+    const heading = dialog.querySelector('[data-report-product-photo-title]');
+    if (heading) heading.textContent = title;
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
+  }
+
+  document.addEventListener('click', (event) => {
+    const productPhoto = event.target.closest('[data-report-product-photo-preview]');
+    if (productPhoto) {
+      event.preventDefault();
+      event.stopPropagation();
+      openReportProductPhoto(productPhoto);
+      return;
+    }
+    const historyProduct = event.target.closest('[data-stock-history-product]');
+    if (historyProduct) {
+      openStockHistory(
+        historyProduct.getAttribute('data-stock-history-product') || '',
+        historyProduct.getAttribute('data-stock-history-name') || historyProduct.textContent.trim(),
+      );
+      return;
+    }
+    if (event.target.closest('[data-stock-history-close]')) {
+      closeStockHistory();
+      return;
+    }
+    const currencyButton = event.target.closest('[data-stock-currency]');
+    if (currencyButton) {
+      stockCurrency = currencyButton.getAttribute('data-stock-currency') === 'USD' ? 'USD' : 'UZS';
+      renderStockCurrency();
+      return;
+    }
+    const stockSearchClear = event.target.closest('[data-stock-product-search-clear]');
+    if (stockSearchClear) {
+      const field = stockSearchClear.closest('.reports-stock-search-field');
+      const input = field?.querySelector('[data-stock-product-search]');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      applyStockProductSearch();
+      return;
+    }
+    const profitCurrencyButton = event.target.closest('[data-profit-currency]');
+    if (profitCurrencyButton) {
+      profitCurrency = profitCurrencyButton.getAttribute('data-profit-currency') === 'USD' ? 'USD' : 'UZS';
+      renderProfitCurrency();
+      return;
+    }
+    const sortButton = event.target.closest('[data-report-sort-column]');
+    if (sortButton) {
+      const table = sortButton.closest('table');
+      if (!table) return;
+      const nextDirection = sortButton.getAttribute('data-sort-direction') === 'desc' ? 'asc' : 'desc';
+      table.querySelectorAll('[data-report-sort-column]').forEach((button) => {
+        button.removeAttribute('data-sort-direction');
+        button.querySelector('.reports-sort-icon').textContent = '↕';
+      });
+      sortButton.setAttribute('data-sort-direction', nextDirection);
+      sortButton.querySelector('.reports-sort-icon').textContent = nextDirection === 'desc' ? '↓' : '↑';
+      sortButton.setAttribute('aria-label', `${sortButton.firstElementChild.textContent}: сортировать ${nextDirection === 'desc' ? 'от меньшего к большему' : 'от большего к меньшему'}`);
+      sortReportTable(table, Number(sortButton.getAttribute('data-report-sort-column')), nextDirection);
+      return;
+    }
+    const balanceViewButton = event.target.closest('[data-courier-balance-view]');
+    if (balanceViewButton) {
+      courierBalanceView = balanceViewButton.getAttribute('data-courier-balance-view') || 'bars';
+      renderCourierBalancePanel();
+      return;
+    }
+    const limitSave = event.target.closest('[data-courier-limit-save]');
+    if (limitSave) {
+      saveCourierDebtLimits();
+      return;
+    }
+    const card = event.target.closest('[data-org-report-card]');
+    if (card) {
+      openReport(card.getAttribute('data-org-report-card'));
+      return;
+    }
+    const activate = event.target.closest('[data-org-report-activate]');
+    if (activate) {
+      openReport(activate.getAttribute('data-org-report-activate'));
+      return;
+    }
+    const close = event.target.closest('[data-org-report-close-tab]');
+    if (close) {
+      closeTab(close.getAttribute('data-org-report-close-tab'));
+      return;
+    }
+    const resetFilter = event.target.closest('[data-reconcile-reset]');
+    if (resetFilter) {
+      resetReconcileFilter();
+      renderReconcilePanel();
+      return;
+    }
+    const courierButton = event.target.closest('[data-courier-name]');
+    if (courierButton) {
+      openReconcile(courierButton.getAttribute('data-courier-name') || courierButton.textContent.trim());
+    }
+  });
+
+  document.addEventListener('input', (event) => {
+    const stockProductSearch = event.target.closest('[data-stock-product-search]');
+    if (stockProductSearch) {
+      applyStockProductSearch();
+      return;
+    }
+    const limitInput = event.target.closest('[data-courier-limit-input]');
+    if (limitInput) {
+      formatLimitInput(limitInput);
+    }
+  });
+
+  document.addEventListener('change', (event) => {
+    const periodNode = event.target.closest('[data-reconcile-period]');
+    if (periodNode) {
+      setReconcilePreset(periodNode.value);
+      renderReconcilePanel();
+      return;
+    }
+    const fromNode = event.target.closest('[data-reconcile-date-from]');
+    if (fromNode) {
+      reconcileDateFrom = fromNode.value || '';
+      reconcilePeriod = 'custom';
+      renderReconcilePanel();
+      return;
+    }
+    const toNode = event.target.closest('[data-reconcile-date-to]');
+    if (toNode) {
+      reconcileDateTo = toNode.value || '';
+      reconcilePeriod = 'custom';
+      renderReconcilePanel();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeStockHistory();
+  });
+
+  // Выбор прайс-листа для колонки цены: значения обновляются на месте,
+  // без перезагрузки страницы.
+  document.addEventListener('change', async (event) => {
+    const select = event.target.closest('[data-stock-price-type-select]');
+    if (!select) return;
+    select.disabled = true;
+    try {
+      const response = await fetch(`/api/reports/stock-prices?price_type=${encodeURIComponent(select.value)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const payload = await response.json();
+      const prices = payload.prices || {};
+      document.querySelectorAll('[data-stock-price-cell]').forEach((cell) => {
+        const entry = prices[cell.dataset.productId] || null;
+        cell.textContent = entry ? entry.display : '-';
+        cell.setAttribute('data-sort-value', entry ? entry.raw : '0');
+      });
+      // Запоминаем выбор в адресе, чтобы обновление страницы его сохранило.
+      const url = new URL(window.location.href);
+      url.searchParams.set('stock_price_type', select.value);
+      window.history.replaceState(null, '', url.toString());
+    } catch (error) {
+      // При сбое честно перезагружаем страницу с выбранным прайсом.
+      const url = new URL(window.location.href);
+      url.searchParams.set('stock_price_type', select.value);
+      window.location.href = url.toString();
+    } finally {
+      select.disabled = false;
+    }
+  });
+
+  restoreState();
+  render();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="U-POS Установщик">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>U-POS Установщик</title>
+  <link rel="manifest" href="/static/installer-manifest.webmanifest">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/installer.css?v=33">
+  <script defer src="/static/jssip.min.js?v=1"></script>
+  <script defer src="/static/installer-softphone.js?v=13"></script>
+  <script defer src="/static/installer.js?v=33"></script>
+</head>
+<body data-can-manage="{{ '1' if installer_can_manage else '0' }}">
+  <div class="installer-app">
+    <header class="installer-header">
+      <button
+        class="installer-icon-button installer-menu-toggle"
+        id="installer-menu-toggle"
+        type="button"
+        title="Меню"
+        aria-label="Меню"
+        aria-expanded="false"
+        aria-controls="installer-menu"
+      >☰</button>
+      <div class="installer-identity">
+        <p class="installer-brand">U-POS</p>
+        <h1 title="{{ (user.name or user.username or 'Установщик') | e }}">
+          {{ user.name or user.username or "Установщик" }}
+        </h1>
+      </div>
+      <div class="installer-header-actions">
+        <span class="installer-connection" id="installer-connection">Онлайн</span>
+        <button class="installer-icon-button" id="installer-refresh" type="button" title="Обновить" aria-label="Обновить">↻</button>
+        <button class="installer-install-button" id="installer-install" type="button">Установить</button>
+      </div>
+    </header>
+
+    <div class="installer-menu-backdrop" id="installer-menu-backdrop" hidden></div>
+    <nav class="installer-menu" id="installer-menu" aria-label="Главное меню" hidden>
+      <div class="installer-menu-head">
+        <strong>Меню</strong>
+        <button type="button" class="installer-menu-close" id="installer-menu-close" aria-label="Закрыть меню">×</button>
+      </div>
+      <button type="button" data-menu-action="orders-calendar">Календарь заказов</button>
+      <button type="button" data-menu-action="notifications">
+        Уведомления
+        <b class="installer-menu-badge" id="installer-notify-badge" hidden>0</b>
+      </button>
+      <button type="button" data-menu-action="new-order">Заказать</button>
+      <button type="button" data-menu-action="clients">Клиенты</button>
+      <button type="button" data-menu-action="phonebook">Телефония</button>
+      <button type="button" data-menu-action="earnings">Мой заработок</button>
+      <button type="button" id="installer-push-toggle" hidden>Включить уведомления</button>
+    </nav>
+
+    <main>
+      <section class="installer-summary" aria-label="Сводка">
+        <div><strong id="installer-count-new">0</strong><span>Новые</span></div>
+        <div><strong id="installer-count-today">0</strong><span>Сегодня</span></div>
+        <div><strong id="installer-count-work">0</strong><span>В работе</span></div>
+        <div><strong id="installer-count-done">0</strong><span>Выполнено</span></div>
+      </section>
+
+      <div class="installer-manager-note" id="installer-manager-note" hidden>
+        Режим руководителя: показаны установки всей организации.
+      </div>
+
+      <section class="installer-order-list" id="installer-order-list" aria-live="polite">
+        <div class="installer-loading">Загрузка заказов...</div>
+      </section>
+
+      <button
+        class="installer-home-phone"
+        id="installer-home-phone"
+        type="button"
+        title="Открыть телефонию"
+        aria-label="Открыть телефонию"
+        hidden
+      ><span aria-hidden="true">&#9742;</span></button>
+    </main>
+
+    <nav class="installer-tabs" aria-label="Разделы установщика">
+      <button class="installer-tab is-active" type="button" data-tab="new">
+        <span>Новые</span><b id="installer-tab-new">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="calendar">
+        <span>Календарь</span><b id="installer-tab-calendar">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="work">
+        <span>В работе</span><b id="installer-tab-work">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="done">
+        <span>Готово</span><b id="installer-tab-done">0</b>
+      </button>
+      <button class="installer-tab" type="button" data-tab="archive">
+        <span>Архив</span><b id="installer-tab-archive">0</b>
+      </button>
+    </nav>
+  </div>
+
+  <dialog class="installer-detail" id="installer-detail">
+    <div class="installer-detail-shell">
+      <header class="installer-detail-head">
+        <div>
+          <p id="installer-detail-number">Заказ</p>
+          <h2 id="installer-detail-client">Клиент</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-detail-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <div class="installer-detail-body" id="installer-detail-body"></div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-calendar" id="installer-calendar">
+    <div class="installer-calendar-shell">
+      <header class="installer-calendar-head">
+        <div>
+          <p>График установок</p>
+          <h2 id="installer-calendar-title">Календарь заказов</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-calendar-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-calendar-body">
+        <div class="installer-calendar-toolbar">
+          <button class="installer-icon-button" id="installer-calendar-prev" type="button" aria-label="Предыдущий месяц">‹</button>
+          <strong id="installer-calendar-month"></strong>
+          <button class="installer-icon-button" id="installer-calendar-next" type="button" aria-label="Следующий месяц">›</button>
+        </div>
+        <div class="installer-calendar-weekdays" aria-hidden="true">
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+        </div>
+        <div class="installer-calendar-grid" id="installer-calendar-grid"></div>
+        <section class="installer-calendar-selection">
+          <h3 id="installer-calendar-selected-title">Заказы на выбранный день</h3>
+          <div class="installer-calendar-orders" id="installer-calendar-orders"></div>
+        </section>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-new-order">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Новый заказ на установку</p>
+          <h2>Заказать</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-new-order-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <form class="installer-order-form" id="installer-order-form">
+          <label>
+            <span>Клиент*</span>
+            <input type="search" id="installer-order-client" placeholder="Начните вводить название" autocomplete="off" required />
+            <div class="installer-suggest" id="installer-client-suggest" hidden></div>
+            <small>Если клиента нет в списке — впишите новое название, он создастся автоматически.</small>
+          </label>
+          <label id="installer-order-agent-wrap" hidden>
+            <span>Агент*</span>
+            <select id="installer-order-agent"></select>
+          </label>
+          <label>
+            <span>Дата и время установки*</span>
+            <input type="datetime-local" id="installer-order-date" required />
+          </label>
+          <div class="installer-order-goods">
+            <span class="installer-order-goods-title">Товары</span>
+            <div class="installer-order-goods-picker">
+              <input type="search" id="installer-order-product" placeholder="Найти товар" autocomplete="off" />
+              <div class="installer-suggest" id="installer-product-suggest" hidden></div>
+            </div>
+            <div class="installer-order-lines" id="installer-order-lines"></div>
+          </div>
+          <label>
+            <span>Сумма</span>
+            <input type="text" inputmode="decimal" id="installer-order-amount" placeholder="0" />
+            <small id="installer-order-amount-hint" hidden>Считается по добавленным товарам</small>
+          </label>
+          <label>
+            <span>Комментарий</span>
+            <textarea id="installer-order-note" rows="2" placeholder="Что установить, особенности объекта"></textarea>
+          </label>
+          <button class="installer-primary-button" type="submit">Создать заказ</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-clients">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>База клиентов</p>
+          <h2>Клиенты</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-clients-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <button class="installer-primary-button installer-client-add-open" id="installer-client-add-open" type="button">＋ Добавить клиента</button>
+        <label class="installer-phone-search">
+          <input type="search" id="installer-client-search" placeholder="Поиск клиента" />
+        </label>
+        <div class="installer-phone-list" id="installer-client-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-client-new">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>База клиентов</p>
+          <h2>Новый клиент</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-client-new-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <form class="installer-order-form installer-client-form" id="installer-client-form">
+          <label>
+            <span>Название*</span>
+            <input type="text" id="installer-client-name" placeholder="Компания или имя" required />
+          </label>
+          <label>
+            <span>Телефон</span>
+            <input type="tel" id="installer-client-phone" placeholder="+998" />
+          </label>
+          <label>
+            <span>Адрес</span>
+            <input type="text" id="installer-client-address" placeholder="Город, улица" />
+          </label>
+          <button class="installer-primary-button" type="submit">Добавить клиента</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-phonebook">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Клиентская база</p>
+          <h2>Телефония</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-phonebook-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body installer-phone-body">
+        <section class="installer-phone-tab" data-phone-tab="dial">
+          <div class="installer-sip-panel">
+            <div class="installer-sip-status">
+              <i class="installer-sip-dot" id="installer-sip-dot" aria-hidden="true"></i>
+              <select id="installer-sip-account" aria-label="SIP-аккаунт"></select>
+            </div>
+            <div class="installer-dial-row">
+              <input id="installer-dial-number" type="tel" inputmode="tel" placeholder="Номер" autocomplete="off" />
+              <button type="button" class="installer-icon-button" id="installer-dial-backspace" aria-label="Стереть">⌫</button>
+            </div>
+            <div class="installer-dialpad" id="installer-dialpad">
+              <button type="button" data-dial="1">1</button>
+              <button type="button" data-dial="2">2</button>
+              <button type="button" data-dial="3">3</button>
+              <button type="button" data-dial="4">4</button>
+              <button type="button" data-dial="5">5</button>
+              <button type="button" data-dial="6">6</button>
+              <button type="button" data-dial="7">7</button>
+              <button type="button" data-dial="8">8</button>
+              <button type="button" data-dial="9">9</button>
+              <button type="button" data-dial="*">*</button>
+              <button type="button" data-dial="0">0</button>
+              <button type="button" data-dial="#">#</button>
+            </div>
+            <button type="button" class="installer-primary-button installer-dial-call" id="installer-dial-call">&#128222; Позвонить</button>
+          </div>
+        </section>
+
+        <section class="installer-phone-tab" data-phone-tab="calls" hidden>
+          <div class="installer-phone-calls" id="installer-phone-calls"></div>
+        </section>
+
+        <section class="installer-phone-tab" data-phone-tab="contacts" hidden>
+          <label class="installer-phone-search">
+            <input type="search" id="installer-phone-search" placeholder="Поиск по имени или номеру" />
+          </label>
+          <p class="installer-phone-list-meta" id="installer-phone-list-meta"></p>
+          <div class="installer-phone-list" id="installer-phone-list"></div>
+        </section>
+      </div>
+
+      <nav class="installer-phone-nav" aria-label="Разделы телефонии">
+        <button type="button" class="is-active" data-phone-nav="dial">
+          <span class="installer-phone-nav-icon">&#9635;</span>
+          <span>Набор</span>
+        </button>
+        <button type="button" data-phone-nav="calls">
+          <span class="installer-phone-nav-icon">&#128340;</span>
+          <span>Журнал</span>
+        </button>
+        <button type="button" data-phone-nav="contacts">
+          <span class="installer-phone-nav-icon">&#128100;</span>
+          <span>Контакты</span>
+        </button>
+      </nav>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-notifications">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Центр уведомлений</p>
+          <h2>Уведомления</h2>
+        </div>
+        <div class="installer-notify-head-actions">
+          <button class="installer-secondary-button" id="installer-notify-read-all" type="button">Прочитать все</button>
+          <button class="installer-icon-button" id="installer-notifications-close" type="button" aria-label="Назад">←</button>
+        </div>
+      </header>
+      <div class="installer-earnings-body">
+        <div class="installer-notify-list" id="installer-notify-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-earnings" id="installer-earnings">
+    <div class="installer-earnings-shell">
+      <header class="installer-earnings-head">
+        <div>
+          <p>Начисления и выплаты</p>
+          <h2 id="installer-earnings-title">Мой заработок</h2>
+        </div>
+        <button class="installer-icon-button" id="installer-earnings-close" type="button" aria-label="Назад">←</button>
+      </header>
+      <div class="installer-earnings-body">
+        <div class="installer-earnings-totals" id="installer-earnings-totals"></div>
+        <h3 class="installer-earnings-subtitle">Движения</h3>
+        <div class="installer-earnings-list" id="installer-earnings-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="installer-help" id="installer-help">
+    <div>
+      <header>
+        <h2>Установка приложения</h2>
+        <button class="installer-icon-button" data-close-help type="button" aria-label="Закрыть">×</button>
+      </header>
+      <p>Откройте меню браузера и выберите «На экран Домой» или «Установить приложение».</p>
+      <button class="installer-primary-button" data-close-help type="button">Понятно</button>
+    </div>
+  </dialog>
+
+  <dialog class="installer-call-screen" id="installer-call-screen">
+    <div class="installer-call-inner">
+      <div class="installer-call-topline">
+        <span class="installer-call-live"><i aria-hidden="true"></i>SIP MySputnik</span>
+        <span class="installer-call-secure">Защищённый звонок</span>
+      </div>
+      <div class="installer-call-avatar" id="installer-call-avatar" aria-hidden="true"></div>
+      <h2 class="installer-call-name" id="installer-call-name">Клиент</h2>
+      <p class="installer-call-number" id="installer-call-number"></p>
+      <p class="installer-call-state" id="installer-call-state">Вызов…</p>
+      <p class="installer-call-timer" id="installer-call-timer" hidden>00:00</p>
+      <div class="installer-call-audio-state" id="installer-call-audio-state" data-state="waiting">
+        <span class="installer-call-wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span id="installer-call-audio-label">Подключаем голос…</span>
+      </div>
+      <div class="installer-call-actions" id="installer-call-actions-incoming" hidden>
+        <button type="button" class="installer-call-control is-decline" id="installer-call-decline" aria-label="Отклонить">
+          <span class="installer-call-btn">&#128222;</span><small>Отклонить</small>
+        </button>
+        <button type="button" class="installer-call-control is-accept" id="installer-call-accept" aria-label="Принять">
+          <span class="installer-call-btn">&#128222;</span><small>Принять</small>
+        </button>
+      </div>
+      <div class="installer-call-actions" id="installer-call-actions-active">
+        <button type="button" class="installer-call-control is-mute" id="installer-call-mute" aria-label="Выключить микрофон" aria-pressed="false">
+          <span class="installer-call-btn">&#127908;</span><small>Микрофон</small>
+        </button>
+        <button type="button" class="installer-call-control is-hangup" id="installer-call-hangup" aria-label="Завершить">
+          <span class="installer-call-btn">&#128222;</span><small>Завершить</small>
+        </button>
+        <button type="button" class="installer-call-control is-speaker" id="installer-call-speaker" aria-label="Включить динамик" aria-pressed="false">
+          <span class="installer-call-btn">&#128266;</span><small>Телефон</small>
+        </button>
+      </div>
+      <audio id="installer-call-audio" autoplay playsinline></audio>
+    </div>
+  </dialog>
+
+  <div class="installer-toast" id="installer-toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Отгрузки за день{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ selected_organization.name if selected_organization else 'Организация' }}</span>
+    <h1 class="page-title settings-ios-page-title">Отгрузки за {{ day }}</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    <div class="general-home-shell">
+      <section class="org-ops-panel org-shipments-day">
+        <div class="director-section-head">
+          <p class="settings-ios-footnote">Дневная вкладка</p>
+          <h2>Отгрузки за {{ day }}</h2>
+          <div class="org-shipments-document-actions">
+            <span class="org-shipments-document-status">
+              Статус документа:
+              <span class="org-shipments-doc-status org-shipments-doc-status--{{ document_status.value or 'new' }}">
+                {{ document_status.label or 'Новый' }}
+              </span>
+            </span>
+            <form
+              method="post"
+              action="{% if inside_organization %}/shipments/day/{{ day }}/delete{% else %}/organizations/shipments/day/{{ day }}/delete{% endif %}"
+              class="org-shipments-confirm-form"
+              onsubmit="return window.confirm('Удалить документ отгрузки?');"
+            >
+              {% include "_csrf_field.html" %}
+              {% if not inside_organization %}
+                <input type="hidden" name="organization_id" value="{{ selected_organization_id }}" />
+              {% endif %}
+              <button type="submit" class="btn btn-secondary org-shipments-delete-btn">Удалить документ</button>
+            </form>
+          </div>
+          <a
+            class="btn btn-secondary org-shipments-back-link"
+            href="{% if inside_organization %}/shipments{% else %}/organizations/shipments?organization_id={{ selected_organization_id }}{% endif %}"
+          >Назад</a>
+        </div>
+          <div class="org-ops-table-wrap org-ops-table-wrap--excel">
+            <table class="org-ops-table org-ops-table--shipments-entry org-shipments-day-table">
+              <thead>
+                <tr>
+                  <th>№ дня</th>
+                  <th>№ заказа</th>
+                  <th>Дата</th>
+                  <th>Доставщик</th>
+                  <th>Сумма</th>
+                  <th>Оплата</th>
+                  <th>Долг</th>
+                  <th>Документ</th>
+                  <th>Примечание</th>
+                  <th class="org-ops-row-actions-head">Ручка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for shipment in shipments %}
+                  <tr id="shipment-edit-{{ shipment.id }}">
+                    <td><strong>{{ loop.index }}</strong></td>
+                    <td>{{ shipment.number }}</td>
+                    <td>{{ shipment.shipment_date }}</td>
+                    <td>{{ shipment.courier_name }}</td>
+                    <td>{{ shipment.total_amount_label }} {{ shipment.currency }}</td>
+                    <td>{{ shipment.paid_amount_label }} {{ shipment.currency }}</td>
+                    <td><strong>{{ shipment.debt_amount_label }} {{ shipment.currency }}</strong></td>
+                    <td>
+                      <span class="org-shipments-doc-status org-shipments-doc-status--{{ shipment.doc_status or 'new' }}">
+                        {{ shipment.doc_status_label or 'Новый' }}
+                      </span>
+                    </td>
+                    <td>{{ shipment.note or '—' }}</td>
+                    <td class="org-ops-row-actions">
+                      <a
+                        class="org-ops-row-action org-ops-row-action--open"
+                        href="{% if inside_organization %}/shipments{% else %}/organizations/shipments?organization_id={{ selected_organization_id }}{% endif %}#shipment-{{ shipment.id }}"
+                        aria-label="Открыть отгрузку № {{ shipment.number }}"
+                      >✎</a>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="10" class="org-ops-empty">За этот день отгрузок нет.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

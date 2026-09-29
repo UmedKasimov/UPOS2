@@ -1,0 +1,15 @@
+{% extends "layout_error.html" %}
+{% block page_title %}{{ _('error.not_found_title') }}{% endblock %}
+{% block error_card %}
+  <div class="auth-card-head">
+    <h1 class="auth-card-title">{{ _('error.not_found_title') }}</h1>
+    <p class="auth-card-desc">
+      {{ _('error.not_found_lead', path=path) }}
+    </p>
+  </div>
+  <p class="error-card-actions">
+    <a href="/">{{ _('error.go_home') }}</a>
+    <span class="auth-muted">·</span>
+    <a href="/admin">{{ _('error.go_admin') }}</a>
+  </p>
+{% endblock %}

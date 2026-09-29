@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ _('forbidden.page_title') }}{% endblock %}
+{% block page_header %}
+  <h1 class="page-title">{{ _('forbidden.heading') }}</h1>
+{% endblock %}
+{% block main %}
+  <div class="card forbidden-card">
+    <p class="forbidden-lead">{{ _('forbidden.lead') }}</p>
+    <p class="forbidden-actions">
+      <a href="/" class="btn btn-secondary">{{ _('forbidden.home') }}</a>
+    </p>
+  </div>
+{% endblock %}

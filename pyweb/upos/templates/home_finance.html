@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Финансы · UPOS{% endblock %}
+
+{% block extra_head %}
+  <script>
+    (function () {
+      var key = "upos.finance.lastUrl";
+      var query = new URLSearchParams(window.location.search);
+      if (query.has("finance_reset")) {
+        try { localStorage.removeItem(key); } catch (error) {}
+        window.history.replaceState(null, "", "/finance");
+        return;
+      }
+      // Вкладка «Финансы» открывает лаунчер намеренно. Переход из бокового
+      // меню приходит без этого флага и сразу возвращает рабочую вкладку.
+      if (query.has("finance_home")) return;
+      try {
+        var saved = localStorage.getItem(key) || "";
+        if (!saved) return;
+        var target = new URL(saved, window.location.origin);
+        var allowed = ["/schet", "/kassa", "/earnings"];
+        if (target.origin === window.location.origin && allowed.indexOf(target.pathname) !== -1) {
+          window.location.replace(target.pathname + target.search + target.hash);
+        }
+      } catch (error) {}
+    })();
+  </script>
+{% endblock %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">{{ user.get('active_organization_name') or _('workspace.default_name') }}</span>
+    <h1 class="page-title settings-ios-page-title">Финансы</h1>
+  </div>
+{% endblock %}
+
+{% block main %}
+  {% set emp_perms = user.get('employee_permissions') or {} %}
+  <div class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root">
+    {% include "_finance_module_tabs.html" %}
+
+    <section class="general-report-launcher workbench-launcher" aria-label="Разделы финансов">
+      {% if not user.get('is_employee') or emp_perms.get('schet') %}
+        <a class="general-report-card" href="{{ url_for('home_schet') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+          </span>
+          <span>{{ _('nav.account') }}</span>
+          <small>Остатки и места хранения</small>
+        </a>
+      {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('kassa') %}
+        <a class="general-report-card" href="{{ url_for('home_kassa') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
+          </span>
+          <span>{{ _('nav.kassa') }}</span>
+          <small>Приходы, расходы, переводы</small>
+        </a>
+      {% endif %}
+      {% if not user.get('is_employee') or emp_perms.get('earnings') %}
+        <a class="general-report-card" href="{{ url_for('home_earnings') }}">
+          <span class="general-report-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+          </span>
+          <span>Заработок</span>
+          <small>Ставки и бонусы</small>
+        </a>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

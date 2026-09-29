@@ -1,0 +1,2178 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f3f6fb;
+  color: #152033;
+  letter-spacing: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: #f3f6fb;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+.installer-app {
+  width: min(100%, 820px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  background: #f8fafc;
+  border-inline: 1px solid #dbe3ef;
+}
+
+.installer-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 72px;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+  color: #fff;
+  background: #0f172a;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.16);
+}
+
+.installer-brand {
+  margin: 0 0 2px;
+  color: #63b3ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.installer-header h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.installer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.installer-menu-toggle {
+  flex: 0 0 auto;
+  margin-inline-end: 2px;
+}
+
+/* Меню выезжает панелью слева, а не всплывает окном у правого края. */
+.installer-menu {
+  position: fixed;
+  z-index: 60;
+  inset-block: 0;
+  inset-inline-start: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(280px, 82vw);
+  padding: calc(12px + env(safe-area-inset-top)) 10px 12px;
+  border-inline-end: 1px solid #cbd5e1;
+  background: #fff;
+  box-shadow: 12px 0 32px rgba(15, 23, 42, 0.22);
+}
+
+.installer-menu[hidden] {
+  display: none;
+}
+
+.installer-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 0 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.installer-menu-close {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: #475569;
+  background: #f1f5f9;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.installer-menu-backdrop {
+  position: fixed;
+  z-index: 55;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.installer-menu-backdrop[hidden] {
+  display: none;
+}
+
+.installer-menu button {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: #172033;
+  background: transparent;
+  font-weight: 750;
+  text-align: left;
+}
+
+.installer-menu button:hover,
+.installer-menu button:focus-visible {
+  outline: 0;
+  background: #eaf3ff;
+}
+
+.installer-connection {
+  padding: 4px 7px;
+  border: 1px solid rgba(134, 239, 172, 0.45);
+  border-radius: 999px;
+  color: #bfdbfe;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-connection.is-offline {
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #93c5fd;
+}
+
+.installer-icon-button {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #334155;
+  background: #fff;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.installer-header .installer-icon-button {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  background: #1e293b;
+}
+
+.installer-icon-button:hover,
+.installer-icon-button:focus-visible {
+  border-color: #2563eb;
+  outline: 2px solid rgba(59, 130, 246, 0.18);
+}
+
+.installer-install-button,
+.installer-primary-button,
+.installer-secondary-button,
+.installer-danger-button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 750;
+}
+
+.installer-install-button,
+.installer-primary-button {
+  color: #fff;
+  background: #1673dc;
+}
+
+.installer-install-button:hover,
+.installer-primary-button:hover {
+  background: #0f62bd;
+}
+
+.installer-secondary-button {
+  border-color: #b9c7da;
+  color: #24415f;
+  background: #fff;
+}
+
+.installer-danger-button {
+  border-color: #cbd5e1;
+  color: #2563eb;
+  background: #f1f5f9;
+}
+
+main {
+  position: relative;
+  min-height: calc(100vh - 156px);
+  min-height: calc(100dvh - 156px);
+  padding: 14px;
+  touch-action: pan-y;
+}
+
+.installer-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid #d8e1ee;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.installer-summary > div {
+  min-width: 0;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.installer-summary > div + div {
+  border-left: 1px solid #e2e8f0;
+}
+
+.installer-summary strong,
+.installer-summary span {
+  display: block;
+}
+
+.installer-summary strong {
+  color: #0f4c81;
+  font-size: 19px;
+}
+
+.installer-summary span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-manager-note {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-left: 3px solid #2563eb;
+  color: #334155;
+  background: #eaf3ff;
+  font-size: 12px;
+}
+
+.installer-order-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.installer-loading,
+.installer-empty {
+  padding: 56px 16px;
+  color: #64748b;
+  text-align: center;
+}
+
+.installer-home-phone {
+  position: fixed;
+  z-index: 8;
+  top: 52%;
+  left: 50%;
+  display: grid;
+  width: 78px;
+  height: 78px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  border: 1px solid #0f62bd;
+  border-radius: 50%;
+  color: #fff;
+  background: #1673dc;
+  box-shadow: 0 12px 28px rgba(22, 115, 220, 0.28);
+}
+
+.installer-home-phone[hidden] {
+  display: none;
+}
+
+.installer-home-phone::before,
+.installer-home-phone::after {
+  position: absolute;
+  inset: -1px;
+  border: 2px solid rgba(37, 99, 235, 0.42);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  animation: installerHomePhoneRing 2.4s ease-out infinite;
+}
+
+.installer-home-phone::after {
+  animation-delay: 1.2s;
+}
+
+.installer-home-phone span {
+  display: block;
+  font-size: 34px;
+  line-height: 1;
+  animation: installerHomePhoneCall 2.4s ease-in-out infinite;
+}
+
+.installer-home-phone:hover,
+.installer-home-phone:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.24);
+  background: #0f62bd;
+}
+
+@keyframes installerHomePhoneRing {
+  0% {
+    opacity: 0.62;
+    transform: scale(1);
+  }
+  72%,
+  100% {
+    opacity: 0;
+    transform: scale(1.62);
+  }
+}
+
+@keyframes installerHomePhoneCall {
+  0%,
+  72%,
+  100% {
+    transform: rotate(0deg);
+  }
+  8%,
+  24% {
+    transform: rotate(-8deg);
+  }
+  16%,
+  32% {
+    transform: rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .installer-home-phone::before,
+  .installer-home-phone::after,
+  .installer-home-phone span {
+    animation: none;
+  }
+}
+
+.installer-order-card {
+  position: relative;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #d5dfec;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.installer-order-card[data-priority="urgent"],
+.installer-order-card[data-priority="high"] {
+  border-left-color: #475569;
+}
+
+.installer-order-card:hover {
+  border-color: #82b5ee;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.installer-order-top,
+.installer-order-bottom,
+.installer-order-actions,
+.installer-detail-actions,
+.installer-client-actions,
+.installer-schedule-row,
+.installer-progress-label {
+  display: flex;
+  align-items: center;
+}
+
+.installer-order-top,
+.installer-order-bottom,
+.installer-progress-label {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.installer-order-number {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-status {
+  padding: 4px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #075aa8;
+  background: #eff6ff;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.installer-order-card h2 {
+  margin: 10px 0 5px;
+  overflow: hidden;
+  color: #111827;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-order-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+  color: #526175;
+  font-size: 12px;
+}
+
+.installer-order-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-order-meta strong {
+  color: #172033;
+}
+
+.installer-progress {
+  margin: 12px 0 10px;
+}
+
+.installer-progress-label {
+  margin-bottom: 5px;
+  color: #5d6c80;
+  font-size: 11px;
+}
+
+.installer-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4eaf2;
+}
+
+.installer-progress-track i {
+  display: block;
+  height: 100%;
+  background: #2563eb;
+}
+
+.installer-order-bottom {
+  padding-top: 10px;
+  border-top: 1px solid #edf1f6;
+  color: #607086;
+  font-size: 12px;
+}
+
+.installer-order-actions,
+.installer-detail-actions,
+.installer-client-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.installer-order-actions {
+  margin-top: 11px;
+}
+
+.installer-order-actions button {
+  flex: 1 1 120px;
+}
+
+.installer-tabs {
+  position: fixed;
+  z-index: 30;
+  bottom: 0;
+  left: 50%;
+  display: grid;
+  width: min(100%, 820px);
+  min-height: 66px;
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.installer-tab {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 4px;
+  place-items: center;
+  border: 0;
+  color: #64748b;
+  background: transparent;
+  font-size: 10px;
+}
+
+.installer-tab span {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-tab b {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #475569;
+  background: #e7edf5;
+  font-size: 10px;
+}
+
+.installer-tab.is-active {
+  color: #0b65c2;
+  font-weight: 800;
+}
+
+.installer-tab.is-active b {
+  color: #fff;
+  background: #1673dc;
+}
+
+.installer-detail,
+.installer-calendar,
+.installer-help {
+  width: min(100%, 820px);
+  max-width: none;
+  height: min(94vh, 900px);
+  max-height: none;
+  margin: auto auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: #fff;
+}
+
+.installer-detail::backdrop,
+.installer-calendar::backdrop,
+.installer-help::backdrop {
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.installer-detail-shell {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.installer-calendar {
+  width: min(calc(100% - 16px), 820px);
+  height: min(96vh, 920px);
+  margin: auto;
+  border-radius: 8px;
+}
+
+.installer-calendar-shell {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.installer-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #dce4ef;
+}
+
+.installer-calendar-head p {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-calendar-head h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.installer-calendar-body {
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.installer-calendar-toolbar {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.installer-calendar-toolbar strong {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.installer-calendar-weekdays,
+.installer-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.installer-calendar-weekdays {
+  border: 1px solid #d8e1ee;
+  border-bottom: 0;
+  color: #64748b;
+  background: #f1f5f9;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.installer-calendar-weekdays span {
+  padding: 7px 2px;
+}
+
+.installer-calendar-day {
+  min-width: 0;
+  min-height: 90px;
+  padding: 5px;
+  border-right: 1px solid #d8e1ee;
+  border-bottom: 1px solid #d8e1ee;
+  background: #fff;
+}
+
+.installer-calendar-day:nth-child(7n + 1) {
+  border-left: 1px solid #d8e1ee;
+}
+
+.installer-calendar-day.is-outside {
+  background: #f8fafc;
+}
+
+.installer-calendar-day.is-selected {
+  background: #eaf3ff;
+  box-shadow: inset 0 0 0 2px #1673dc;
+}
+
+.installer-calendar-day.is-today .installer-calendar-date {
+  color: #fff;
+  background: #1673dc;
+}
+
+.installer-calendar-date {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #334155;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.installer-calendar-event {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid #b9d5f2;
+  border-radius: 5px;
+  color: #154d80;
+  background: #edf6ff;
+  font-size: 9px;
+  font-weight: 750;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-calendar-more {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.installer-calendar-selection {
+  margin-top: 14px;
+}
+
+.installer-calendar-selection h3 {
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+
+.installer-calendar-orders {
+  border-top: 1px solid #dce4ef;
+}
+
+.installer-calendar-order {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 11px 4px;
+  border: 0;
+  border-bottom: 1px solid #dce4ef;
+  color: #172033;
+  background: transparent;
+  text-align: left;
+}
+
+.installer-calendar-order:hover,
+.installer-calendar-order:focus-visible {
+  outline: 0;
+  background: #f1f7ff;
+}
+
+.installer-calendar-order strong,
+.installer-calendar-order span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-calendar-order small {
+  grid-column: 1 / -1;
+  color: #64748b;
+}
+
+.installer-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #dce4ef;
+}
+
+.installer-detail-head p {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-detail-head h2 {
+  max-width: min(70vw, 600px);
+  margin: 0;
+  overflow: hidden;
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-detail-body {
+  min-height: 0;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.installer-detail-section {
+  padding: 14px 0;
+  border-bottom: 1px solid #e6ebf2;
+}
+
+.installer-detail-section:first-child {
+  padding-top: 0;
+}
+
+.installer-detail-section h3 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.installer-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.installer-detail-value {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e0e7f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.installer-detail-value span,
+.installer-detail-value strong {
+  display: block;
+}
+
+.installer-detail-value span {
+  margin-bottom: 3px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.installer-detail-value strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-client-actions {
+  margin-top: 10px;
+}
+
+.installer-client-actions a {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 8px 12px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b9c7da;
+  border-radius: 8px;
+  color: #154d80;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.installer-schedule-row {
+  gap: 8px;
+}
+
+.installer-schedule-row input {
+  min-width: 0;
+  height: 40px;
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #b9c7da;
+  border-radius: 7px;
+  color: #172033;
+  background: #fff;
+}
+
+.installer-checklist {
+  display: grid;
+  gap: 7px;
+}
+
+.installer-task {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 44px;
+  padding: 9px;
+  align-items: start;
+  border: 1px solid #dce4ef;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.installer-task input {
+  width: 19px;
+  height: 19px;
+  margin: 1px 0 0;
+  accent-color: #1e40af;
+}
+
+.installer-task strong,
+.installer-task small {
+  display: block;
+}
+
+.installer-task strong {
+  font-size: 13px;
+}
+
+.installer-task small {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.installer-task.is-done strong {
+  color: #64748b;
+  text-decoration: line-through;
+}
+
+.installer-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.installer-lines th,
+.installer-lines td {
+  padding: 8px 6px;
+  border: 1px solid #dce4ef;
+  text-align: left;
+}
+
+.installer-lines th {
+  color: #526175;
+  background: #f1f5f9;
+  font-size: 10px;
+}
+
+.installer-comment {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid #b9c7da;
+  border-radius: 7px;
+  color: #172033;
+  background: #fff;
+}
+
+.installer-detail-actions {
+  position: sticky;
+  bottom: -18px;
+  margin: 14px -16px -18px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #dce4ef;
+  background: #fff;
+}
+
+.installer-detail-actions button {
+  flex: 1 1 145px;
+}
+
+.installer-warning {
+  padding: 9px 10px;
+  border-left: 3px solid #64748b;
+  color: #1e40af;
+  background: #f1f5f9;
+  font-size: 12px;
+}
+
+.installer-help {
+  width: min(calc(100% - 24px), 430px);
+  height: auto;
+  margin: auto;
+  border-radius: 8px;
+}
+
+.installer-help > div {
+  padding: 16px;
+}
+
+.installer-help header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.installer-help h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.installer-help p {
+  color: #526175;
+  line-height: 1.5;
+}
+
+.installer-help .installer-primary-button {
+  width: 100%;
+}
+
+.installer-toast {
+  position: fixed;
+  z-index: 100;
+  right: 16px;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  left: 16px;
+  max-width: 520px;
+  margin: auto;
+  padding: 11px 13px;
+  transform: translateY(24px);
+  border-radius: 8px;
+  color: #fff;
+  background: #172033;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.installer-toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.installer-toast.is-error {
+  background: #334155;
+}
+
+@media (max-width: 600px) {
+  .installer-header {
+    padding-inline: 12px;
+  }
+
+  .installer-install-button {
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+
+  main {
+    padding: 10px;
+  }
+
+  .installer-summary > div {
+    padding-inline: 4px;
+  }
+
+  .installer-summary span {
+    font-size: 10px;
+  }
+
+  .installer-order-meta,
+  .installer-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .installer-order-meta strong {
+    text-align: left;
+  }
+
+  .installer-calendar-body {
+    padding: 8px;
+  }
+
+  .installer-calendar-day {
+    min-height: 76px;
+    padding: 3px;
+  }
+
+  .installer-calendar-event {
+    padding: 3px;
+    font-size: 8px;
+  }
+
+  .installer-calendar-order {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .installer-calendar-order small {
+    grid-column: auto;
+  }
+}
+
+@media (display-mode: standalone) {
+  .installer-install-button {
+    display: none;
+  }
+}
+
+.installer-earnings {
+  width: min(560px, 100vw);
+  max-width: 100vw;
+  max-height: 100vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.installer-earnings-shell {
+  display: flex;
+  overflow: hidden;
+  max-height: 100vh;
+  flex-direction: column;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.installer-earnings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.installer-earnings-head p {
+  margin: 0 0 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-earnings-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.installer-earnings-body {
+  overflow: auto;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+}
+
+.installer-earnings-card {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.installer-earnings-card > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.installer-earnings-card dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.installer-earnings-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.installer-earnings-card dt {
+  color: #64748b;
+}
+
+.installer-earnings-card dd {
+  margin: 0;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.installer-earnings-card .is-balance {
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.installer-earnings-card .is-balance dd {
+  color: #334155;
+}
+
+.installer-earnings-subtitle {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.installer-earnings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.installer-earnings-row strong {
+  display: block;
+  font-size: 14px;
+}
+
+.installer-earnings-row small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.installer-earnings-row b {
+  color: #1e40af;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.installer-earnings-row.is-payout b {
+  color: #334155;
+}
+
+/* Имя пользователя в шапке: длинное не должно ломать строку с кнопками. */
+.installer-identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.installer-identity h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .installer-identity h1 {
+    font-size: 17px;
+  }
+
+  /* На узком экране имя важнее статуса: «Онлайн» прячем, а «Офлайн»
+     оставляем — о потере связи сотрудник должен узнать сразу. */
+  .installer-connection:not(.is-offline) {
+    display: none;
+  }
+
+  .installer-header {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+}
+
+.installer-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.installer-menu-badge {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: #475569;
+  font-size: 12px;
+  text-align: center;
+}
+
+.installer-menu-badge[hidden] {
+  display: none;
+}
+
+.installer-notify-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.installer-notify-item {
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #dbe7f6;
+  border-left: 3px solid #1673dc;
+  border-radius: 10px;
+  background: #f4f9ff;
+  cursor: pointer;
+}
+
+/* Прочитанное уходит в серый и теряет акцентную полосу. */
+.installer-notify-item.is-read {
+  border-color: #e2e8f0;
+  border-left-color: #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: default;
+}
+
+.installer-notify-item.is-read strong {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.installer-notify-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.installer-notify-item strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.installer-notify-new {
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.installer-notify-item p {
+  margin: 5px 0 4px;
+  font-size: 13px;
+}
+
+.installer-notify-item small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+/* ===== Разделы меню открываются как полноценные экраны ===== */
+/* Календарь, уведомления и заработок — это отдельные страницы приложения,
+   а не всплывающие окна: занимают весь экран, без рамок и затемнения. */
+.installer-calendar[open],
+.installer-earnings[open] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #f8fafc;
+}
+
+.installer-calendar::backdrop,
+.installer-earnings::backdrop {
+  background: #f8fafc;
+}
+
+.installer-calendar-shell,
+.installer-earnings-shell {
+  width: 100%;
+  max-width: 820px;
+  height: 100%;
+  max-height: none;
+  margin: 0 auto;
+  border-radius: 0;
+  background: #f8fafc;
+}
+
+/* Шапка экрана ведёт себя как шапка страницы: липкая, с кнопкой назад. */
+.installer-calendar-head,
+.installer-earnings-head {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  border-bottom: 1px solid #dbe3ef;
+  background: #fff;
+}
+
+.installer-screen-back {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.installer-earnings-body,
+.installer-calendar-body {
+  max-height: none;
+}
+
+.installer-phone-search input {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 6px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.installer-phone-list-meta {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.installer-phone-item {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 40px minmax(0, 1fr) 42px;
+  gap: 10px;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.installer-phone-avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  color: #1d4ed8;
+  background: #e8f1ff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.installer-phone-info {
+  min-width: 0;
+}
+
+.installer-phone-info strong {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installer-phone-info span {
+  color: #334155;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.installer-phone-call {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #b8d5ff;
+  border-radius: 50%;
+  color: #1268ce;
+  background: #edf5ff;
+  font-size: 17px;
+}
+
+.installer-phone-call:active {
+  background: #dbeafe;
+}
+
+.installer-phone-call-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 13px;
+}
+
+.installer-phone-call-row small {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.installer-order-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.installer-order-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.installer-order-form input,
+.installer-order-form select,
+.installer-order-form textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 500;
+}
+
+.installer-order-form textarea {
+  min-height: 62px;
+  resize: vertical;
+}
+
+.installer-order-form small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.installer-client-form {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* display:grid у label перебивает атрибут hidden — возвращаем скрытие. */
+.installer-order-form label[hidden] {
+  display: none;
+}
+
+.installer-suggest {
+  display: grid;
+  gap: 2px;
+  max-height: 240px;
+  margin-top: 4px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.installer-suggest[hidden] {
+  display: none;
+}
+
+.installer-suggest button {
+  display: grid;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.installer-suggest button:hover,
+.installer-suggest button:focus-visible {
+  outline: 0;
+  background: #eaf3ff;
+}
+
+.installer-suggest strong {
+  font-size: 14px;
+}
+
+.installer-suggest small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.installer-order-goods {
+  display: grid;
+  gap: 6px;
+}
+
+.installer-order-goods-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.installer-order-goods-picker {
+  position: relative;
+}
+
+.installer-order-goods-picker input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.installer-order-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  margin-top: 6px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.installer-order-line strong {
+  display: block;
+  font-size: 13px;
+}
+
+.installer-order-line small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.installer-order-line-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.installer-order-line-actions button {
+  min-width: 30px;
+  min-height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.installer-order-lines-empty {
+  margin: 6px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.installer-client-add-open {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* ===== Телефония: SIP-панель и номеронабиратель ===== */
+.installer-sip-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.installer-sip-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.installer-sip-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.installer-sip-dot.is-online {
+  background: #2563eb;
+}
+
+.installer-sip-status select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.installer-dial-row {
+  display: flex;
+  gap: 8px;
+}
+
+.installer-dial-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.installer-dial-row .installer-icon-button {
+  width: 46px;
+  height: 46px;
+}
+
+.installer-dialpad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.installer-dialpad button {
+  min-height: 52px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.installer-dialpad button:active {
+  background: #e2edfb;
+}
+
+.installer-dial-call {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+/* ===== Экран активного звонка ===== */
+.installer-call-screen {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: #0f172a;
+  color: #fff;
+  overflow: hidden;
+}
+
+.installer-call-screen:not([open]),
+.installer-call-screen[hidden] {
+  display: none;
+}
+
+.installer-call-screen::backdrop {
+  background: #0f172a;
+}
+
+.installer-call-inner {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto auto auto;
+  justify-items: center;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 520px);
+  min-height: 100%;
+  min-height: 100dvh;
+  padding: max(18px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.installer-call-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 0 18px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.installer-call-live,
+.installer-call-secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.installer-call-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+}
+
+.installer-call-avatar {
+  display: grid;
+  place-items: center;
+  align-self: end;
+  width: 118px;
+  height: 118px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 48px;
+  font-weight: 800;
+}
+
+/* Пульсация, пока идёт дозвон/входящий. */
+.installer-call-screen.is-ringing .installer-call-avatar {
+  animation: installerCallPulse 1.4s ease-out infinite;
+}
+
+@keyframes installerCallPulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.55); }
+  100% { box-shadow: 0 0 0 26px rgba(59, 130, 246, 0); }
+}
+
+.installer-call-name {
+  margin: 0;
+  max-width: 100%;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.installer-call-number {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.installer-call-state {
+  margin: 8px 0 0;
+  color: #e2e8f0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.installer-call-timer {
+  margin: 2px 0 0;
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.installer-call-audio-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 7px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 7px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.installer-call-audio-state[data-state="playing"] {
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #bbf7d0;
+}
+
+.installer-call-audio-state[data-state="blocked"],
+.installer-call-audio-state[data-state="failed"] {
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+.installer-call-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.installer-call-wave i {
+  width: 3px;
+  height: 5px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.installer-call-audio-state[data-state="playing"] .installer-call-wave i {
+  animation: installerVoiceWave 0.8s ease-in-out infinite alternate;
+}
+
+.installer-call-wave i:nth-child(2) { animation-delay: 0.12s; }
+.installer-call-wave i:nth-child(3) { animation-delay: 0.24s; }
+.installer-call-wave i:nth-child(4) { animation-delay: 0.36s; }
+
+@keyframes installerVoiceWave {
+  from { height: 5px; }
+  to { height: 16px; }
+}
+
+.installer-call-actions {
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  gap: clamp(24px, 9vw, 42px);
+  width: 100%;
+  margin-top: 24px;
+}
+
+/* Атрибут hidden должен побеждать display:flex. */
+.installer-call-actions[hidden] {
+  display: none;
+}
+
+.installer-call-timer[hidden] {
+  display: none;
+}
+
+.installer-call-control {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 72px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-call-control small {
+  font: inherit;
+}
+
+.installer-call-btn {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 28px;
+  color: #fff;
+}
+
+.installer-call-control.is-hangup .installer-call-btn,
+.installer-call-control.is-decline .installer-call-btn {
+  background: #dc2626;
+  transform: rotate(135deg);
+}
+
+.installer-call-control.is-accept .installer-call-btn {
+  background: #16a34a;
+}
+
+.installer-call-control.is-mute .installer-call-btn,
+.installer-call-control.is-speaker .installer-call-btn {
+  width: 58px;
+  height: 58px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 24px;
+}
+
+.installer-call-control.is-mute.is-on .installer-call-btn,
+.installer-call-control.is-speaker.is-on .installer-call-btn {
+  background: #2563eb;
+}
+
+.installer-call-control:active .installer-call-btn {
+  transform: scale(0.94);
+}
+
+.installer-call-control.is-hangup:active .installer-call-btn,
+.installer-call-control.is-decline:active .installer-call-btn {
+  transform: rotate(135deg) scale(0.94);
+}
+
+@media (max-width: 600px) {
+  .installer-call-inner {
+    width: 100%;
+    padding-inline: 18px;
+  }
+
+  .installer-call-avatar {
+    width: 104px;
+    height: 104px;
+    font-size: 42px;
+  }
+
+  .installer-call-name {
+    font-size: 25px;
+  }
+
+  .installer-call-actions {
+    margin-top: 18px;
+  }
+}
+
+.installer-sip-hint {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.installer-phone-call-row.is-missed strong {
+  color: #475569;
+}
+
+/* ===== Телефония: нижние вкладки Набор / Журнал / Контакты ===== */
+.installer-phone-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 18px;
+}
+
+#installer-phonebook .installer-earnings-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#installer-phonebook .installer-phone-tab {
+  width: min(100%, 560px);
+  margin: 0 auto;
+}
+
+.installer-phone-nav {
+  position: relative;
+  z-index: 6;
+  flex: 0 0 auto;
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid #dbe3ef;
+  background: #fff;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.installer-phone-nav button {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 9px 4px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.installer-phone-nav button.is-active {
+  color: #1673dc;
+}
+
+.installer-phone-nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.installer-phone-tab[hidden] {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .installer-earnings[open] {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  #installer-phonebook .installer-earnings-shell,
+  #installer-phonebook .installer-phone-body,
+  #installer-phonebook .installer-phone-tab,
+  #installer-phonebook .installer-sip-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #installer-phonebook .installer-earnings-shell {
+    border-inline: 1px solid #dbe3ef;
+  }
+
+  #installer-phonebook .installer-phone-body {
+    overflow-x: hidden;
+    padding: 10px 10px 18px;
+  }
+
+  #installer-phonebook .installer-sip-panel {
+    gap: 10px;
+    padding: 10px;
+    border-color: #cbd5e1;
+    border-radius: 10px;
+  }
+
+  #installer-phonebook .installer-sip-status {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  #installer-phonebook .installer-sip-status select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #installer-phonebook .installer-dial-row {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 8px;
+  }
+
+  #installer-phonebook .installer-dial-row input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 50px;
+    border-color: #b9c7da;
+    font-size: 23px;
+  }
+
+  #installer-phonebook .installer-dial-row .installer-icon-button {
+    width: 48px;
+    height: 50px;
+    border-color: #b9c7da;
+  }
+
+  #installer-phonebook .installer-dialpad {
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  #installer-phonebook .installer-dialpad button {
+    width: 100%;
+    min-width: 0;
+    min-height: 60px;
+    border-color: #cbd5e1;
+    font-size: 29px;
+    line-height: 1;
+  }
+
+  #installer-phonebook .installer-dial-call {
+    width: 100%;
+    min-width: 0;
+    min-height: 52px;
+    font-size: 17px;
+  }
+
+  #installer-phonebook .installer-phone-nav {
+    width: 100%;
+    border-inline: 1px solid #dbe3ef;
+  }
+}
+
+@media (max-width: 360px) {
+  #installer-phonebook .installer-phone-body {
+    padding-inline: 8px;
+  }
+
+  #installer-phonebook .installer-sip-panel,
+  #installer-phonebook .installer-dialpad {
+    gap: 6px;
+  }
+
+  #installer-phonebook .installer-dialpad button {
+    min-height: 56px;
+    font-size: 27px;
+  }
+}

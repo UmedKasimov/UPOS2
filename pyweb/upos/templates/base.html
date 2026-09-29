@@ -1,0 +1,426 @@
+{% import "brand_macros.html" as brand %}
+<!DOCTYPE html>
+<html lang="{{ html_lang | default('ru') }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#141d2e" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v=4" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', path='favicon.png') }}?v=4" type="image/png" sizes="48x48" />
+    <title>{% block title %}UPOS{% endblock %}</title>
+    {# Ключ формы нужен запросам, которые уходят без формы: загрузка аватара,
+       сохранение настроек и прочие обращения из скриптов. #}
+    {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}" />{% endif %}
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=694" />
+    <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body
+    data-theme="{{ body_theme | default('light') }}"
+    data-shell="{{ variant | default('user') }}"
+    {% if body_embed | default('') %}data-embed="{{ body_embed | default('') | e }}"{% endif %}
+    {% if user %}data-user-id="{{ user.user_id | default(user.id) | e }}" data-user-name="{{ (user.name or user.username or '') | e }}"{% endif %}
+    {% if user and not user.get('is_employee') and user.get('role') == 'user' %}data-device-heartbeat="1"{% endif %}
+  >
+    <div class="page-veil" data-page-veil aria-hidden="true">
+      <div class="page-veil-body"><div class="page-veil-spinner"></div></div>
+    </div>
+    <div class="layout">
+      <div
+        class="sidebar-backdrop"
+        data-sidebar-backdrop
+        hidden
+        aria-hidden="true"
+      ></div>
+      <aside class="sidebar" id="app-sidebar">
+        <div class="sidebar-head">
+          <div class="sidebar-head-row">
+            {% if variant == "admin" %}
+              <a href="/admin" class="brand-lockup" aria-label="{{ _('brand.admin') }}">
+                <div class="brand-lockup-text">
+                  <div class="brand-lockup-title">
+                    <span class="brand-lockup-upos">UPOS</span>
+                  </div>
+                </div>
+              </a>
+            {% else %}
+              <a href="/" class="brand-lockup" aria-label="{{ _('brand.user') }}">
+                <div class="brand-lockup-text">
+                  <div class="brand-lockup-title">
+                    <span class="brand-lockup-upos">UPOS</span>
+                  </div>
+                </div>
+              </a>
+            {% endif %}
+            <button
+              type="button"
+              class="sidebar-rail-toggle"
+              data-sidebar-rail-toggle
+              aria-expanded="true"
+              aria-controls="app-sidebar"
+              title="{{ _('nav.collapse_menu') }}"
+              aria-label="{{ _('nav.collapse_sidebar') }}"
+            >
+              <svg class="sidebar-rail-toggle-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <nav class="nav" aria-label="{{ _('nav.aria') }}">
+          {% if variant == "admin" %}
+            <a href="/admin" class="nav-link {{ 'active' if active == 'admin_home' else '' }}">
+              <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+              <span class="nav-label">{{ _('nav.overview') }}</span>
+            </a>
+          {% else %}
+            {% if user.get('can_switch_organizations') %}
+              {% set is_general_scope = user.get('org_scope') == 'general' %}
+              {% set active_workspace_name = user.get('active_organization_name') or _('workspace.default_name') %}
+              <details class="workspace-switcher" data-workspace-switcher>
+                <summary>
+                  <span class="workspace-switcher-trigger" aria-label="{{ _('workspace.switch_aria') }}">
+                    <span class="workspace-switcher-mark" aria-hidden="true">{{ (active_workspace_name or _('workspace.default_name'))[0]|upper }}</span>
+                    <span class="workspace-switcher-current">
+                      <span class="workspace-switcher-kicker">{{ _('workspace.kicker') }}</span>
+                      <span class="workspace-switcher-name">{{ active_workspace_name }}</span>
+                    </span>
+                    <svg class="workspace-switcher-chevrons" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </span>
+                </summary>
+                <div class="workspace-switcher-panel">
+                  <div class="workspace-switcher-head">
+                    <span class="workspace-switcher-head-title">{{ _('workspace.head_title') }}</span>
+                  </div>
+                  <div class="workspace-options">
+                    {% for org in user.get('organizations') or [] %}
+                      {% set org_name = org.name or _('workspace.default_name') %}
+                      {% set org_note = (org.note or '') | string | trim %}
+                      <form method="post" action="{{ url_for('organizations_switch') }}" class="workspace-option-form">
+                        {% include "_csrf_field.html" %}
+                        <input type="hidden" name="organization_id" value="{{ org.id }}" />
+                        <button type="submit" class="workspace-option {% if (not is_general_scope) and user.get('active_org_id') == org.id %}active{% endif %}">
+                          <span class="workspace-option-mark" aria-hidden="true">{{ org_name[0]|upper }}</span>
+                          <span class="workspace-option-copy">
+                            <span class="workspace-option-name">{{ org_name }}</span>
+                            {% if org_note and org_note != 'workspace.default_meta' %}
+                              <span class="workspace-option-meta">{{ org_note }}</span>
+                            {% endif %}
+                          </span>
+                        </button>
+                      </form>
+                    {% else %}
+                      <p class="workspace-switcher-empty">{{ _('workspace.empty') }}</p>
+                    {% endfor %}
+                  </div>
+                  <a href="{{ url_for('organizations_get') }}" class="workspace-switcher-manage">
+                    <span>{{ _('workspace.manage') }}</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                  </a>
+                </div>
+              </details>
+            {% endif %}
+            {% if user.get('org_scope') == 'general' %}
+              {% set general_home_nav_open = active in ['organizations', 'organizations_kassa', 'organizations_schet', 'organizations_reports', 'organizations_settings', 'organizations_users'] %}
+              <div class="nav-folder nav-folder--pinned{% if general_home_nav_open %} nav-folder--active-branch{% endif %}">
+                <div class="nav-folder-row">
+                    <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span class="nav-folder-label nav-label">{{ _('nav.home') }}</span>
+                </div>
+                <div class="nav-folder-panel" role="group" aria-label="{{ _('nav.general_sections') }}">
+                  <a href="{{ url_for('organizations_get') }}" class="nav-sublink {{ 'active' if active == 'organizations' else '' }}" title="{{ _('nav.organizations_panel') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M3 17h18"/><path d="M7 3v18"/><path d="M17 3v18"/></svg></span>
+                    <span class="nav-label">{{ _('nav.organizations_panel') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_kassa_get') }}" class="nav-sublink {{ 'active' if active == 'organizations_kassa' else '' }}" title="{{ _('nav.kassa') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg></span>
+                    <span class="nav-label">{{ _('nav.kassa') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_schet_get') }}" class="nav-sublink {{ 'active' if active == 'organizations_schet' else '' }}" title="{{ _('nav.account') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                    <span class="nav-label">{{ _('nav.account') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_reports_get') }}" class="nav-sublink {{ 'active' if active == 'organizations_reports' else '' }}" title="{{ _('nav.reports') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
+                    <span class="nav-label">{{ _('nav.reports') }}</span>
+                  </a>
+                  <a href="{{ url_for('organizations_settings_get') }}" class="nav-sublink {{ 'active' if active in ['organizations_settings', 'organizations_users'] else '' }}" title="{{ _('nav.settings') }}">
+                    <span class="nav-sublink-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                    <span class="nav-label">{{ _('nav.settings') }}</span>
+                  </a>
+                </div>
+              </div>
+            {% else %}
+              {% set emp_can = not user.get('is_employee') %}
+              {% if emp_can or emp_perms.get('dashboard') %}
+              <a href="{{ url_for('dashboard_get') }}" class="nav-link {{ 'active' if active == 'dashboard' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                <span class="nav-label">Дашборд</span>
+              </a>
+              {% endif %}
+              {% if emp_can or emp_perms.get('sales') %}
+              <a href="{{ url_for('sales_get') }}" class="nav-link {{ 'active' if active == 'sales' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                <span class="nav-label">Продажи</span>
+              </a>
+              {% endif %}
+              {% set home_nav_active = active in ['home_finance', 'home_account', 'home_kassa', 'home_earnings'] %}
+              {% if emp_can or emp_perms.get('finance') %}
+              <a href="{{ url_for('home_finance') }}" class="nav-link {{ 'active' if home_nav_active else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span class="nav-label">Финансы</span>
+              </a>
+              {% endif %}
+              {% if emp_can or emp_perms.get('products') %}
+              <a href="{{ url_for('products_get') }}" class="nav-link {{ 'active' if active == 'products' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                <span class="nav-label">Товары</span>
+              </a>
+              {% endif %}
+              {% if emp_can or emp_perms.get('warehouse') %}
+              <a href="{{ url_for('warehouse_get') }}" class="nav-link {{ 'active' if active == 'warehouse' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M13 13h4v8H7v-8h4"/><path d="M7 8h10"/></svg>
+                <span class="nav-label">Склад</span>
+              </a>
+              {% endif %}
+              {% if emp_can or emp_perms.get('clients') %}
+              <a href="{{ url_for('clients_get') }}" class="nav-link {{ 'active' if active == 'clients' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                <span class="nav-label">Клиенты</span>
+              </a>
+              {% endif %}
+              {# Поставщики открываются карточкой внутри Склада — отдельный
+                 пункт меню убран. #}
+              {% if emp_can or emp_perms.get('crm') %}
+              <a href="{{ url_for('crm_get') }}" class="nav-link {{ 'active' if active == 'crm' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15h3v3H7z"/><path d="M14 7h3v11h-3z"/><path d="M7 8h3v4H7z"/></svg>
+                <span class="nav-label">CRM</span>
+              </a>
+              {% endif %}
+              {% if emp_can or emp_perms.get('telephony') %}
+              <a href="{{ url_for('telephony_get') }}" class="nav-link {{ 'active' if active == 'telephony' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.16a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92z"/></svg>
+                <span class="nav-label">Телефония</span>
+              </a>
+              {% endif %}
+              {% if emp_can or emp_perms.get('messengers') %}
+              <a href="{{ url_for('messengers_get') }}" class="nav-link {{ 'active' if active == 'messengers' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
+                <span class="nav-label">Месенджеры</span>
+              </a>
+              {% endif %}
+              {# Заработок открывается карточкой внутри Финансов — отдельный
+                 пункт меню убран. #}
+              {% if not user.get('is_employee') or emp_perms.get('reports') %}
+              <a href="{{ url_for('home_reports') }}" class="nav-link {{ 'active' if active == 'home_reports' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                <span class="nav-label">{{ _('nav.reports') }}</span>
+              </a>
+              {% endif %}
+              {% if not user.get('is_employee') or emp_perms.get('settings') or emp_perms.get('dictionary') %}
+              <a href="{% if user.get('is_employee') and not emp_perms.get('settings') and emp_perms.get('dictionary') %}{{ url_for('settings_get') }}?tab=dictionary{% else %}{{ url_for('settings_get') }}{% endif %}" class="nav-link {{ 'active' if active == 'settings' else '' }}">
+                <svg class="nav-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span class="nav-label">{{ _('nav.settings') }}</span>
+              </a>
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        </nav>
+        <div class="sidebar-foot">
+          {% if user %}
+            {% if user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('settings')) %}
+              <div class="sidebar-ibox-sync-wrap">
+                <button
+                  type="button"
+                  class="sidebar-ibox-sync"
+                  data-sidebar-ibox-sync
+                  data-state="idle"
+                  aria-label="Синхронизировать данные с IBOX"
+                  title="Ручная синхронизация с IBOX"
+                >
+                  <span class="sidebar-ibox-sync-icon" aria-hidden="true">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20 7h-5V2" />
+                      <path d="M4 17h5v5" />
+                      <path d="M5.1 9a8 8 0 0 1 13.2-3L20 7" />
+                      <path d="M18.9 15a8 8 0 0 1-13.2 3L4 17" />
+                    </svg>
+                  </span>
+                  <span class="sidebar-ibox-sync-copy">
+                    <strong>IBOX</strong>
+                    <small data-sidebar-ibox-sync-status>Синхронизировать вручную</small>
+                    <small class="sidebar-ibox-sync-last" data-sidebar-ibox-sync-last hidden></small>
+                  </span>
+                  <span class="sidebar-ibox-sync-dot" aria-hidden="true"></span>
+                </button>
+                <span class="sidebar-ibox-sync-live" data-sidebar-ibox-sync-live aria-live="polite"></span>
+              </div>
+            {% endif %}
+            <div class="sidebar-user">
+              <div class="sidebar-user-avatar" id="sidebar-avatar-trigger" style="cursor: pointer; position: relative; overflow: hidden;" title="{{ _('profile.avatar') }}">
+                {% if user.avatar_path %}
+                  <img src="/static/{{ user.avatar_path }}" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;">
+                {% else %}
+                  {{ (user.name or user.email or user.username or 'U')[0]|upper }}
+                {% endif %}
+                <input type="file" id="sidebar-avatar-input" accept="image/*" style="display: none;">
+              </div>
+              <div class="sidebar-user-info">
+                {% if user.get('is_employee') and user.get('workspace_owner_name') %}
+                  <div class="sidebar-team-hint">{{ user.workspace_owner_name }}</div>
+                {% endif %}
+                <div class="who">{{ user.name or _('profile.placeholder') }}</div>
+                {% if user.email %}
+                  <div class="mail">{{ user.email }}</div>
+                {% elif user.username %}
+                  <div class="mail">{{ user.username }}</div>
+                {% endif %}
+                <div class="sidebar-user-role" aria-label="{{ _('profile.role') }}">
+                  {% if user.get('is_employee') %}
+                    {{ user.get('employee_role_name') or _('staff.role.' ~ (user.get('staff_role') or 'viewer')) }}
+                  {% elif user.get('role') == 'admin' %}
+                    {{ _('profile.role.admin') }}
+                  {% else %}
+                    {{ _('profile.role.owner') }}
+                  {% endif %}
+                </div>
+              </div>
+              <form action="{{ url_for('logout') }}" method="post" class="sidebar-logout-form">
+                {% include "_csrf_field.html" %}
+                <button type="submit" class="logout-btn-icon" aria-label="{{ _('logout.aria') }}" title="{{ _('logout.aria') }}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                </button>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+      </aside>
+      <div class="main-column">
+        <header class="mobile-topbar">
+          <button
+            type="button"
+            class="mobile-nav-toggle"
+            data-sidebar-toggle
+            aria-label="{{ _('mobile.open_nav') }}"
+            aria-expanded="false"
+            aria-controls="app-sidebar"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <span class="mobile-topbar-brand">
+            <span class="mobile-topbar-upos">UPOS</span>
+          </span>
+        </header>
+        <header class="page-header"><div class="page-header-inner">{% block page_header %}{% endblock %}</div></header>
+        <div class="page-body">
+          {% if request.query_params.get("err") == "csrf" %}
+            <div class="flash err">{{ _('flash.csrf') }}</div>
+          {% endif %}
+          {% block main %}{% endblock %}
+        </div>
+      </div>
+    </div>
+    {% if user %}
+    <div class="upos-floating-phone" data-floating-phone data-floating-phone-bridge="http://127.0.0.1:5058/call">
+      <button class="upos-floating-phone-toggle" type="button" data-floating-phone-toggle aria-label="Быстрый телефон" aria-expanded="false">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.16a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92z"/></svg>
+        <span class="upos-floating-phone-pulse" aria-hidden="true"></span>
+      </button>
+      <section class="upos-floating-phone-panel" data-floating-phone-panel hidden aria-label="Быстрый телефон">
+        <div class="upos-floating-phone-head">
+          <div>
+            <strong>Телефон</strong>
+            <span>SIP быстрый набор</span>
+          </div>
+          <button class="upos-floating-phone-close" type="button" data-floating-phone-close aria-label="Закрыть">×</button>
+        </div>
+        <form class="upos-floating-phone-form" data-floating-phone-form>
+          {% set floating_phone_providers = telephony_providers|default([]) %}
+          <label>
+            <span>Провайдер</span>
+            <select data-floating-phone-provider>
+              <option value="" data-login="" data-provider-name="Авто">Авто (SIP приложение)</option>
+              {% for provider in floating_phone_providers %}
+                <option
+                  value="{{ provider.id }}"
+                  data-login="{{ provider.login or provider.account or '' }}"
+                  data-provider-name="{{ provider.name or provider.login or provider.host or 'SIP' }}"
+                >
+                  {{ provider.name or provider.login or provider.host or 'SIP' }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Номер</span>
+            <input data-floating-phone-input type="tel" inputmode="tel" autocomplete="tel" placeholder="+998">
+          </label>
+          <button class="btn" type="submit">Позвонить</button>
+        </form>
+        <section class="upos-floating-phone-incoming" data-floating-phone-incoming hidden aria-live="assertive">
+          <span>Входящий звонок</span>
+          <strong data-floating-phone-caller>Неизвестный номер</strong>
+          <div class="upos-floating-phone-incoming-actions">
+            <button class="btn" type="button" data-floating-phone-answer>Ответить</button>
+            <button class="btn btn-secondary" type="button" data-floating-phone-reject>Отклонить</button>
+          </div>
+        </section>
+        {# Разговор идёт в самом браузере, поэтому нужен приёмник звука и
+           кнопка отбоя — раньше вызов только уходил в десктопное приложение. #}
+        <button class="btn btn-secondary upos-floating-phone-hangup" type="button" data-floating-phone-hangup hidden>Завершить</button>
+        <audio id="upos-floating-phone-audio" autoplay playsinline></audio>
+        <div class="upos-floating-phone-status" data-floating-phone-status>
+          <span aria-hidden="true"></span>
+          SIP готов к набору
+        </div>
+        <div class="upos-floating-phone-links">
+          <a href="{{ url_for('telephony_get') }}">Телефония</a>
+          <a href="{{ url_for('telephony_get') }}#calls">История</a>
+          <a href="{{ url_for('telephony_get') }}#integrations">SIP</a>
+        </div>
+      </section>
+    </div>
+    {% endif %}
+
+    <script>
+      window.upos_i18n = {{ upos_i18n | default({}) | tojson }};
+    </script>
+    <script src="{{ url_for('static', path='theme.js') }}"></script>
+    <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=12" defer></script>
+    <script src="{{ url_for('static', path='layout-sidebar.js') }}?v=3" defer></script>
+    <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=22" defer></script>
+    <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=9" defer></script>
+    <script src="{{ url_for('static', path='table-column-controls.js') }}?v=19" defer></script>
+    <script src="{{ url_for('static', path='cell-title.js') }}?v=2" defer></script>
+    <script src="{{ url_for('static', path='uz-phone.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=79" defer></script>
+    <script src="{{ url_for('static', path='ajax-sections.js') }}?v=8" defer></script>
+    <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
+    <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
+    <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=8" defer></script>
+    {% if user %}
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=5" defer></script>
+    <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
+    <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
+    <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>
+    <script src="{{ url_for('static', path='currency-select.js') }}?v=6"></script>
+    <script src="{{ url_for('static', path='avatar-upload.js') }}?v=3" defer></script>
+    {% if not user.get('is_employee') and user.get('role') == 'user' %}
+    <script src="{{ url_for('static', path='device-sessions.js') }}?v=3" defer></script>
+    {% endif %}
+    {% if user.get('can_switch_organizations') %}
+    <script src="{{ url_for('static', path='workspace-switcher.js') }}?v=3" defer></script>
+    {% endif %}
+    {% endif %}
+    <script src="{{ url_for('static', path='page-transition.js') }}?v=1" defer></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

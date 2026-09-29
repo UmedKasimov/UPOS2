@@ -1,0 +1,37 @@
+/* Keep the bulk-selection checkbox column compact. The generic first-column
+   percentage rule is more specific than the picker cell class. */
+.upos-catalog-picker-table th.upos-catalog-picker-select-cell,
+.upos-catalog-picker-table td.upos-catalog-picker-select-cell {
+  box-sizing: border-box;
+  width: 2.75rem !important;
+  min-width: 2.75rem;
+  max-width: 2.75rem;
+  padding-inline: 0.45rem;
+  text-align: center;
+}
+
+.upos-catalog-picker-table th:nth-child(2) {
+  width: calc(38% - 2.75rem) !important;
+}
+
+/* Long workbench forms must scroll in the page area. Data journals keep their
+   dedicated table scrollers because this rule only matches a visible form. */
+body:has(.workspace-module-root :is(.product-form-panel, .client-create-shell):not([hidden])) .page-body {
+  flex: 1 1 0;
+  height: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+body:has(.workspace-module-root :is(.product-form-panel, .client-create-shell):not([hidden])) .workspace-module-root,
+body:has(.workspace-module-root :is(.product-form-panel, .client-create-shell):not([hidden])) .workspace-module-stack,
+body:has(.workspace-module-root :is(.product-form-panel, .client-create-shell):not([hidden])) .products-layout {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: min-content;
+  max-height: none;
+  overflow: visible;
+}

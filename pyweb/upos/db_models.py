@@ -1,0 +1,1440 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, LargeBinary, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_id: Mapped[str | None] = mapped_column(String(5), nullable=True, unique=True)
+    username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
+    superuser: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_frozen: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    avatar_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    employer_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    organization_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    position: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    staff_role: Mapped[str] = mapped_column(String(32), nullable=False, default="viewer")
+    employee_role_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+    __table_args__ = (
+        UniqueConstraint("owner_user_id", "name", name="uq_organizations_owner_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class EmployeeOrganization(Base):
+    __tablename__ = "employee_organizations"
+
+    employee_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    organization_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class EmployeeAccountAccess(Base):
+    __tablename__ = "employee_account_access"
+
+    employee_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    account_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("finance_accounts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class HrEmployee(Base):
+    __tablename__ = "hr_employees"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    first_name: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    last_name: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    position_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("positions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    position: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    passport_series: Mapped[str] = mapped_column(String(16), nullable=False, default="", server_default=text("''"))
+    passport_number: Mapped[str] = mapped_column(String(32), nullable=False, default="", server_default=text("''"))
+    photo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    monthly_salary: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    is_courier: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active", server_default=text("'active'"))
+    hired_at: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    dismissed_at: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Position(Base):
+    __tablename__ = "positions"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="uq_positions_organization_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    organization_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class HrAttendance(Base):
+    __tablename__ = "hr_attendance"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "work_date", name="uq_hr_attendance_employee_date"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    employee_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("hr_employees.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    work_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="present", server_default=text("'present'"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class DeliveryShipment(Base):
+    __tablename__ = "delivery_shipments"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "number", name="uq_delivery_shipments_workspace_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    shipment_date: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    courier_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    employee_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("hr_employees.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    total_amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    paid_amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    debt_amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default=text("'open'"))
+    doc_status: Mapped[str] = mapped_column(String(20), nullable=False, default="new", server_default=text("'new'"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class DeliveryShipmentItem(Base):
+    __tablename__ = "delivery_shipment_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    shipment_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("delivery_shipments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    quantity: Mapped[object] = mapped_column(Numeric(18, 3), nullable=False, default=1, server_default=text("1"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class Role(Base):
+    __tablename__ = "roles"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "key", name="uq_roles_workspace_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    key: Mapped[str] = mapped_column(String(40), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    permissions: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class WorkspaceSetting(Base):
+    __tablename__ = "workspace_settings"
+
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Treasury(Base):
+    __tablename__ = "treasuries"
+
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class GlobalSetting(Base):
+    __tablename__ = "global_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class FinanceAccount(Base):
+    __tablename__ = "finance_accounts"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "name", name="uq_finance_accounts_workspace_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    kind: Mapped[str] = mapped_column(String(40), nullable=False, default="custom", server_default=text("'custom'"))
+    icon: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    owner_employee_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class AccountBalance(Base):
+    __tablename__ = "account_balances"
+    __table_args__ = (
+        UniqueConstraint("account_id", "currency", name="uq_account_balances_account_currency"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("finance_accounts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class FinanceCategory(Base):
+    __tablename__ = "finance_categories"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "type", "name", name="uq_finance_categories_workspace_type_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    type: Mapped[str] = mapped_column(String(20), nullable=False, default="expense", server_default=text("'expense'"))
+    parent_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("finance_categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Counterparty(Base):
+    __tablename__ = "counterparties"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "external_source",
+            "external_id",
+            name="uq_counterparties_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="client", server_default=text("'client'"))
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    tax_id: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    phone: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Branch(Base):
+    __tablename__ = "branches"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_branches_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "number", name="uq_transactions_workspace_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD", server_default=text("'USD'"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    client: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    employee_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    from_pocket_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    to_pocket_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    from_account_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("finance_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    to_account_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("finance_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    month: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    type: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'income'")) # income, expense, transfer
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="confirmed", server_default=text("'confirmed'"))
+    requires_confirmation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    confirmed_by: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    category_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("finance_categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    branch_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("branches.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    supplier: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TransactionEntry(Base):
+    __tablename__ = "transaction_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    transaction_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("transactions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    account_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("finance_accounts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class ExternalRecord(Base):
+    __tablename__ = "external_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "integration",
+            "entity_type",
+            "external_id",
+            name="uq_external_records_identity",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    integration: Mapped[str] = mapped_column(String(40), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class IntegrationSyncRun(Base):
+    __tablename__ = "integration_sync_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    integration: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running", server_default=text("'running'"))
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    imported_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+
+
+class Product(Base):
+    __tablename__ = "products"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_products_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    sku: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    barcode: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ProductPhoto(Base):
+    __tablename__ = "product_photos"
+
+    product_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False, default="image/webp", server_default=text("'image/webp'"))
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class Warehouse(Base):
+    __tablename__ = "warehouses"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_warehouses_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    branch_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class SaleDocument(Base):
+    __tablename__ = "sale_documents"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_sale_documents_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    branch_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PurchaseDocument(Base):
+    __tablename__ = "purchase_documents"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_purchase_documents_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    branch_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WarehouseOperation(Base):
+    __tablename__ = "warehouse_operations"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "number", name="uq_warehouse_operations_workspace_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    operation_type: Mapped[str] = mapped_column(String(24), nullable=False, default="adjustment", server_default=text("'adjustment'"))
+    warehouse_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    product_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    quantity: Mapped[object] = mapped_column(Numeric(18, 3), nullable=False, default=0, server_default=text("0"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CrmRecord(Base):
+    __tablename__ = "crm_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_type: Mapped[str] = mapped_column(String(24), nullable=False, default="task", server_default=text("'task'"))
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="new", server_default=text("'new'"))
+    due_date: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PaymentDocument(Base):
+    __tablename__ = "payment_documents"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_payment_documents_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    transaction_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
+    direction: Mapped[str] = mapped_column(String(10), nullable=False, default="in", server_default=text("'in'"))
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ExpenseDocument(Base):
+    __tablename__ = "expense_documents"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "external_source", "external_id", name="uq_expense_documents_external"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    category_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("finance_categories.id", ondelete="SET NULL"), nullable=True)
+    counterparty_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True)
+    transaction_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class TelegramBotConfig(Base):
+    __tablename__ = "telegram_bot_configs"
+
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    bot_token: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    bot_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    bot_username: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    bot_first_name: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    webhook_secret: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notification_prefs: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TelegramChat(Base):
+    __tablename__ = "telegram_chats"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "chat_id", name="uq_telegram_chats_workspace_chat"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    chat_type: Mapped[str] = mapped_column(String(32), nullable=False, default="group", server_default=text("'group'"))
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    bot_is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class TelegramSubscriber(Base):
+    __tablename__ = "telegram_subscribers"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "telegram_user_id", name="uq_telegram_subscribers_workspace_user"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    username: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    phone: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    contact_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default=text("'pending'"))
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    decided_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TelegramBusinessConnection(Base):
+    """Подключение бота к личному аккаунту через Telegram для бизнеса.
+
+    Владелец включает бота в настройках Telegram, и тот получает доступ к
+    личным перепискам. Идентификатор подключения нужен, чтобы отвечать
+    клиенту от имени владельца, а не от бота.
+    """
+
+    __tablename__ = "telegram_business_connections"
+    __table_args__ = (
+        UniqueConstraint("connection_id", name="uq_telegram_business_connection_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    connection_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Telegram-аккаунт владельца, к которому подключён бот.
+    user_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    username: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    can_reply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TelegramBusinessMessage(Base):
+    """Сообщение из личной переписки владельца: и входящее, и наш ответ."""
+
+    __tablename__ = "telegram_business_messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "chat_id",
+            "message_id",
+            name="uq_telegram_business_message",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    connection_id: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    message_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    # in — написал клиент, out — ответили мы (из программы или из телефона).
+    direction: Mapped[str] = mapped_column(String(8), nullable=False, default="in", server_default=text("'in'"))
+    sender_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    sender_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    sender_username: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default=text("''"))
+    sender_phone: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    text_body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Вложения и прочее, что не укладывается в текст.
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class UserAuthSession(Base):
+    __tablename__ = "user_auth_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_agent: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    device_label: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    os_family: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown", server_default=text("'unknown'"))
+    browser_family: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    device_type: Mapped[str] = mapped_column(String(20), nullable=False, default="desktop", server_default=text("'desktop'"))
+    ip_address: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    geo_label: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    client_meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TelegramDeliveryLog(Base):
+    __tablename__ = "telegram_delivery_log"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    target_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    dedupe_key: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InstallationTaskTemplate(Base):
+    """Шаблон чек-листа, который продавец выбирает при назначении установки."""
+
+    __tablename__ = "installation_task_templates"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "name", name="uq_installation_templates_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Список пунктов: [{"title": ..., "description": ..., "is_required": bool}]
+    tasks: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class InstallationOrder(Base):
+    """Выезд к клиенту: заказ из основной системы, назначенный установщику."""
+
+    __tablename__ = "installation_orders"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "external_source",
+            "external_id",
+            name="uq_installation_orders_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    number: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default=text("''"))
+    # Заказ-источник. SET NULL, чтобы удаление продажи не стирало историю выездов.
+    sale_document_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("sale_documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    branch_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("branches.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    installer_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="new", server_default=text("'new'"))
+    priority: Mapped[str] = mapped_column(String(16), nullable=False, default="normal", server_default=text("'normal'"))
+    # Плановое время выезда; отдельный флаг фиксирует, согласовал ли его установщик.
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduled_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    address: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    latitude: Mapped[str] = mapped_column(String(32), nullable=False, default="", server_default=text("''"))
+    longitude: Mapped[str] = mapped_column(String(32), nullable=False, default="", server_default=text("''"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    paid_amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    # Снимок позиций заказа, комментарии, вложения, контакты продавца и клиента.
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    external_source: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    external_id: Mapped[str] = mapped_column(String(180), nullable=False, default="", server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class InstallationTask(Base):
+    """Пункт чек-листа конкретной установки."""
+
+    __tablename__ = "installation_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    installation_order_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("installation_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default=text("''"))
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    is_done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    done_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    photo_path: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class InstallationEvent(Base):
+    """Журнал действий по установке: статусы, даты, оплаты, задачи, комментарии."""
+
+    __tablename__ = "installation_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    installation_order_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("installation_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    actor_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    actor_name: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Для аудита финансов и переносов даты храним «было/стало».
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class EmployeeEarning(Base):
+    """Начисление или выплата сотруднику.
+
+    Начисления создаются автоматически при завершении установки (по ставке
+    сотрудника) и вручную; выплаты вносит руководитель. Остаток к выплате —
+    разница сумм по сотруднику, отсюда же строится акт сверки.
+    """
+
+    __tablename__ = "employee_earnings"
+    __table_args__ = (
+        # Один автоматический начисляемый заказ — одно начисление. Ручные записи
+        # хранят NULL в installation_order_id, а NULL в Postgres не конфликтуют,
+        # поэтому их количество не ограничено.
+        UniqueConstraint(
+            "installation_order_id",
+            "kind",
+            name="uq_employee_earnings_order_kind",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    employee_user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # accrual — начислено сотруднику, payout — выплачено ему.
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="accrual", server_default=text("'accrual'"))
+    amount: Mapped[object] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default=text("0"))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UZS", server_default=text("'UZS'"))
+    # installation — посчитано по ставке с заказа, manual — внесено руками.
+    source: Mapped[str] = mapped_column(String(24), nullable=False, default="manual", server_default=text("'manual'"))
+    installation_order_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("installation_orders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    earned_on: Mapped[str] = mapped_column(String(10), nullable=False, default="", server_default=text("''"))
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Как посчитано: тип ставки, процент, база начисления.
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class UserNotification(Base):
+    """Уведомление сотрудника: то же, что уходит push-ом, но с историей.
+
+    Пишется всегда, даже когда push не настроен или устройство не подписано,
+    поэтому список в приложении не зависит от доставки.
+    """
+
+    __tablename__ = "user_notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default=text("''"))
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    url: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    # Ключ события: позволяет не плодить дубли по одному и тому же заказу.
+    tag: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InstallationPushSubscription(Base):
+    """Web Push подписка устройства установщика."""
+
+    __tablename__ = "installation_push_subscriptions"
+    __table_args__ = (
+        UniqueConstraint("workspace_owner_id", "endpoint_hash", name="uq_installation_push_endpoint"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    # Хэш нужен для уникальности: сам endpoint слишком длинный для индекса.
+    endpoint_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default=text("''"))
+    p256dh: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    auth: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    user_agent: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MessengerThread(Base):
+    """Переписка с одним человеком в мессенджере.
+
+    Канал вынесен в колонку: сейчас это Instagram, но та же таблица подойдёт
+    и другим каналам, где переписка приходит через веб-хук.
+    """
+
+    __tablename__ = "messenger_threads"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "channel",
+            "external_id",
+            name="uq_messenger_thread_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="instagram", server_default=text("'instagram'"))
+    # Идентификатор собеседника в мессенджере: для Instagram это IGSID.
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    username: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    avatar_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default=text("'active'"))
+    last_message_text: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    unread_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class MessengerMessage(Base):
+    """Одно сообщение переписки: и входящее, и наш ответ."""
+
+    __tablename__ = "messenger_messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "channel",
+            "external_id",
+            name="uq_messenger_message_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    thread_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("messenger_threads.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="instagram", server_default=text("'instagram'"))
+    # Идентификатор сообщения на стороне мессенджера: защищает от повторов,
+    # веб-хук может прислать одно событие несколько раз.
+    external_id: Mapped[str] = mapped_column(String(190), nullable=False, default="", server_default=text("''"))
+    direction: Mapped[str] = mapped_column(String(8), nullable=False, default="in", server_default=text("'in'"))
+    author: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    text_body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default=text("''"))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class MessengerLead(Base):
+    """Заявка из рекламы: имя, телефон и остальные поля формы."""
+
+    __tablename__ = "messenger_leads"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_owner_id",
+            "channel",
+            "external_id",
+            name="uq_messenger_lead_external",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(24), nullable=False, default="instagram", server_default=text("'instagram'"))
+    external_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    form_id: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    form_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    ad_id: Mapped[str] = mapped_column(String(120), nullable=False, default="", server_default=text("''"))
+    campaign_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default=text("''"))
+    phone: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default=text("''"))
+    email: Mapped[str] = mapped_column(String(190), nullable=False, default="", server_default=text("''"))
+    fields: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    counterparty_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("counterparties.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    crm_record_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("crm_records.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+

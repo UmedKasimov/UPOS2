@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% import "ui_macros.html" as ui %}
+{% block title %}{{ _('admin.home.title_page') }}{% endblock %}
+{% block page_header %}
+  <h1 class="page-title">{{ _('admin.home.title') }}</h1>
+{% endblock %}
+{% block main %}
+  {{
+    ui.empty_state(
+      _("admin.home.empty_title"),
+      _("admin.home.empty_desc")
+    )
+  }}
+{% endblock %}

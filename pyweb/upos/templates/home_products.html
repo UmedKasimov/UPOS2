@@ -1,0 +1,1679 @@
+{% extends "base.html" %}
+{% block title %}Товары{% endblock %}
+
+{% set current = edit_product or {} %}
+{% set product_form_kind = current.kind or product_filters.kind %}
+{% set product_program_options = product_options.programs or [] %}
+{% set product_category_selector_options = product_program_options if product_form_kind == 'subscription' else product_options.categories %}
+{% set prices = current.prices if current and current.prices else [{"name": "Продажная цена", "price": "", "currency": "UZS"}] %}
+{% set subscription_modifiers = current.subscription_modifiers if current and current.subscription_modifiers else [{"name": "", "description": "", "amount": "", "currency": "UZS"}] %}
+{% set stocks = current.stocks if current and current.stocks else [{"warehouse": "Основной склад", "quantity": "", "price": "", "date": ""}] %}
+{% set purchase_history = current.purchase_history if current and current.purchase_history else [{"date": "", "warehouse": "Основной склад", "quantity": "", "price": "", "supplier": ""}] %}
+{% set variations = current.variations if current and current.variations else [{"attribute": "Размер", "values": []}, {"attribute": "Цвет", "values": []}] %}
+{% set products_default_tab = ('product-' ~ edit_product.id) if edit_product else '' %}
+
+{% block page_header %}
+  <div class="general-page-header">
+    <span class="general-page-kicker">Торговый контур</span>
+    <h1 class="page-title settings-ios-page-title">Товары</h1>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=5" defer></script>
+  {% if can_edit_catalog_price %}
+    <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
+  {% endif %}
+  <script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
+{% endblock %}
+
+{% block main %}
+  <section
+    class="organizations-page-wrap organizations-page-wrap--general general-workspace org-ops-root products-workspace workspace-module-root workspace-module-root--products"
+    data-workspace-tabs
+    data-workspace-key="products"
+    data-workspace-default-tab="{{ products_default_tab }}"
+    data-workspace-home-href="{{ url_for('products_get') }}"
+  >
+    {% if flash_ok == "saved" %}
+      <div class="flash ok settings-ios-flash">Товар сохранён.</div>
+    {% elif flash_ok == "deleted" %}
+      <div class="flash ok settings-ios-flash">Товар удалён.</div>
+    {% elif flash_ok == "imported" %}
+      <div class="flash ok settings-ios-flash">Импорт завершён: {{ imported_count }} строк.</div>
+    {% elif flash_ok == "bulk_saved" %}
+      <div class="flash ok settings-ios-flash">Обновлено товаров: {{ bulk_updated_count }}.</div>
+    {% endif %}
+    {% if flash_err %}
+      <div class="flash err settings-ios-flash">{{ flash_err }}</div>
+    {% endif %}
+
+    <nav class="general-module-tabs workbench-open-tabs products-open-tabs" aria-label="Открытые вкладки товаров" data-workspace-open-tabs>
+      <button type="button" class="general-module-tab active" data-workspace-home-tab aria-current="page">Товары</button>
+    </nav>
+    {% include "_workspace_tabs_early.html" %}
+
+    <section class="general-report-launcher workbench-launcher products-launcher" aria-label="Разделы товаров" data-workspace-launcher>
+      <a class="general-report-card {{ 'active' if product_filters.kind == 'product' else '' }}" href="{{ url_for('products_get') }}#catalog" data-workspace-card="catalog" data-workspace-tab-title="Каталог" data-workspace-tab-hash="catalog" data-workspace-tab-href="{{ url_for('products_get') }}" {% if product_filters.kind == 'product' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+            <path d="m3.3 7 8.7 5 8.7-5" />
+            <path d="M12 22V12" />
+          </svg>
+        </span>
+        <span>Товары</span>
+        <small>Каталог и остатки</small>
+      </a>
+      <a class="general-report-card" href="#price-types" data-workspace-card="price_types" data-workspace-tab-title="Прайс-листы" data-workspace-tab-hash="price-types">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 5h16v14H4z" />
+            <path d="M8 9h8M8 13h5" />
+            <path d="M17 14h3v5h-3z" />
+          </svg>
+        </span>
+        <span>Прайс-листы</span>
+        <small>Продажные цены</small>
+      </a>
+      <a class="general-report-card" href="#categories" data-workspace-card="categories" data-workspace-tab-title="Категории" data-workspace-tab-hash="categories">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 5h16" />
+            <path d="M4 12h16" />
+            <path d="M4 19h16" />
+            <path d="M8 5v14" />
+          </svg>
+        </span>
+        <span>Категории</span>
+        <small>Разделы товаров</small>
+      </a>
+    </section>
+
+    <div class="workspace-module-stack" data-workspace-view="catalog service create price_types price_type_detail categories" hidden>
+
+    <datalist id="product-category-list">
+      {% for item in product_options.categories %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="product-group-list">
+      {% for item in product_options.groups %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="product-brand-list">
+      {% for item in product_options.brands %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+    <datalist id="product-folder-list">
+      {% for item in product_options.folders %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+
+    <div class="products-layout">
+      <article id="products-catalog-panel" class="products-list-panel" data-workspace-view="catalog service" hidden>
+        <header class="products-panel-head">
+          <div class="products-panel-title">
+            <h2>Товары</h2>
+          </div>
+          <div class="products-panel-top-actions">
+            <div class="products-panel-actions">
+              {% set create_kind = product_filters.kind if product_filters.kind in ['product', 'service', 'subscription'] else 'product' %}
+              <a class="btn" href="{{ url_for('products_get') }}?kind={{ create_kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form" data-workspace-tab-href="{{ url_for('products_get') }}?kind={{ create_kind }}">
+                + Создать
+              </a>
+              <a class="btn btn-secondary" href="#categories" data-workspace-card="categories" data-workspace-tab-title="Категории" data-workspace-tab-hash="categories">Категории</a>
+              <form method="get" action="{{ url_for('products_export') }}" class="products-filter-inline-form">
+                <input type="hidden" name="q" value="{{ product_filters.q }}" />
+                {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.category_values %}<input type="hidden" name="category" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.group_values %}<input type="hidden" name="group" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.catalog_price_list_values %}<input type="hidden" name="catalog_price_list" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.catalog_currency_values %}<input type="hidden" name="catalog_currency" value="{{ item }}" />{% endfor %}
+                {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
+                <button class="btn btn-secondary" type="submit">Экспорт Excel</button>
+              </form>
+              <form method="post" action="{{ url_for('products_import') }}" enctype="multipart/form-data" class="products-filter-inline-form">
+                {% include "_csrf_field.html" %}
+                <input type="hidden" name="kind" value="{{ product_filters.kind }}" />
+                <label class="btn btn-secondary products-import-trigger">
+                  <span>Импорт Excel</span>
+                  <input type="file" name="excel_file" accept=".xlsx" onchange="if (this.files && this.files.length) this.form.submit()" hidden />
+                </label>
+              </form>
+            </div>
+          </div>
+          <form
+            id="products-catalog-filter"
+            class="products-catalog-filter"
+            method="get"
+            action="{{ url_for('products_get') }}{% if product_filters.kind == 'service' %}#service{% else %}#catalog{% endif %}"
+            data-products-auto-filter
+            data-products-filter-base-action="{{ url_for('products_get') }}"
+          >
+            <label class="products-catalog-search">
+              <span>Поиск</span>
+              <input name="q" type="search" value="{{ product_filters.q }}" placeholder="Поиск" />
+            </label>
+            <label class="products-kind-filter">
+              <span>Тип</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Тип</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  <label><input type="checkbox" name="kind" value="all" data-products-filter-all {% if 'all' in product_filters.kind_values %}checked{% endif %} /> <span>Все типы</span></label>
+                  <label><input type="checkbox" name="kind" value="product" {% if 'product' in product_filters.kind_values %}checked{% endif %} /> <span>Товары</span></label>
+                  <label><input type="checkbox" name="kind" value="service" {% if 'service' in product_filters.kind_values %}checked{% endif %} /> <span>Услуги</span></label>
+                  <label><input type="checkbox" name="kind" value="subscription" {% if 'subscription' in product_filters.kind_values %}checked{% endif %} /> <span>Подписки</span></label>
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Категория</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Категория</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.categories %}
+                    <label><input type="checkbox" name="category" value="{{ item }}" {% if item in product_filters.category_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Группа</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Группа</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.groups %}
+                    <label><input type="checkbox" name="group" value="{{ item }}" {% if item in product_filters.group_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Бренд</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Бренд</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.brands %}
+                    <label><input type="checkbox" name="brand" value="{{ item }}" {% if item in product_filters.brand_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label>
+              <span>Папка</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Папка</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.folders %}
+                    <label><input type="checkbox" name="folder" value="{{ item }}" {% if item in product_filters.folder_values %}checked{% endif %} /> <span>{{ item }}</span></label>
+                  {% else %}
+                    <p>Нет значений</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label class="products-catalog-price-list">
+              <span>Прайс-листы</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Прайс-листы</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.price_lists %}
+                    <label>
+                      <input type="checkbox" name="catalog_price_list" value="{{ item.id }}" {% if item.id in product_filters.catalog_price_list_values %}checked{% endif %} />
+                      <span>{{ item.name }}</span>
+                    </label>
+                  {% else %}
+                    <p>Нет прайс-листов</p>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label class="products-catalog-currency">
+              <span>Валюта</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Валюта</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  {% for item in product_options.currencies %}
+                    <label>
+                      <input type="checkbox" name="catalog_currency" value="{{ item }}" {% if item in product_filters.catalog_currency_values %}checked{% endif %} />
+                      <span>{{ item }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </details>
+            </label>
+            <label class="products-catalog-status">
+              <span>Статус</span>
+              <details class="products-multi-filter" data-products-multi-filter>
+                <summary><span data-products-multi-filter-label>Статус</span></summary>
+                <div class="products-multi-filter-menu">
+                  <label class="products-multi-filter-select-all"><input type="checkbox" data-products-select-all /> <span>Выбрать все</span></label>
+                  <label><input type="checkbox" name="status" value="active" {% if 'active' in product_filters.status_values %}checked{% endif %} /> <span>Активный</span></label>
+                  <label><input type="checkbox" name="status" value="inactive" {% if 'inactive' in product_filters.status_values %}checked{% endif %} /> <span>Неактивный</span></label>
+                  <label><input type="checkbox" name="status" value="all" data-products-filter-all {% if 'all' in product_filters.status_values %}checked{% endif %} /> <span>Все</span></label>
+                </div>
+              </details>
+            </label>
+            <a class="products-filter-clear" href="{{ url_for('products_get') }}?kind=all#catalog" aria-label="Очистить фильтры" title="Очистить фильтры">×</a>
+          </form>
+        </header>
+        <form
+          id="products-bulk-form"
+          class="products-bulk-toolbar"
+          method="post"
+          action="{{ url_for('products_bulk_update') }}"
+          data-products-bulk-form
+          hidden
+        >
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="q" value="{{ product_filters.q }}" />
+          {% for item in product_filters.category_values %}<input type="hidden" name="category" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.group_values %}<input type="hidden" name="group" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.brand_values %}<input type="hidden" name="brand" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.folder_values %}<input type="hidden" name="folder" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.catalog_price_list_values %}<input type="hidden" name="catalog_price_list" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.catalog_currency_values %}<input type="hidden" name="catalog_currency" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
+          {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
+          <input type="hidden" name="page_size" value="{{ product_page_size }}" />
+          <div class="products-bulk-summary">
+            <strong>Выбрано: <span data-products-selected-count>0</span></strong>
+          </div>
+          <div class="products-bulk-actions">
+            <button class="btn" type="button" data-products-bulk-open disabled>Редактировать</button>
+            <button class="btn btn-secondary" type="button" data-products-clear-selection disabled>Снять выбор</button>
+          </div>
+          <dialog class="products-bulk-dialog" data-products-bulk-dialog>
+            <div class="products-bulk-dialog-panel">
+              <header class="products-bulk-dialog-head">
+                <h3>Массовое редактирование</h3>
+                <button type="button" class="products-bulk-dialog-close" data-products-bulk-close aria-label="Закрыть">×</button>
+              </header>
+              <div class="products-bulk-dialog-body">
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Категория</span>
+                  <input name="bulk_category" list="product-category-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Группа товара</span>
+                  <input name="bulk_group" list="product-group-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Бренд</span>
+                  <input name="bulk_brand" list="product-brand-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+                <label class="products-bulk-dialog-row">
+                  <input type="checkbox" data-products-bulk-toggle />
+                  <span>Папка</span>
+                  <input name="bulk_folder" list="product-folder-list" placeholder="Выбрать" data-products-bulk-input disabled />
+                </label>
+              </div>
+              <footer class="products-bulk-dialog-actions">
+                <button class="btn" type="submit" data-products-bulk-submit disabled>Сохранить</button>
+                <button class="btn btn-secondary" type="button" data-products-bulk-close>Отменить</button>
+              </footer>
+            </div>
+          </dialog>
+        </form>
+        <nav class="messenger-channel-tabs sales-document-tabs" aria-label="Разделы каталога">
+          <span class="sales-document-tabs-title">Разделы каталога</span>
+          {% for kind_key, kind_logo, kind_label in [('all', 'ВС', 'Все'), ('product', 'ТВ', 'Товары'), ('service', 'УС', 'Услуги'), ('subscription', 'ПД', 'Подписки')] %}
+            <a
+              class="messenger-channel-tab sales-document-tab{% if product_filters.kind == kind_key %} active{% endif %}"
+              href="{{ url_for('products_get') }}?kind={{ kind_key }}#catalog"
+              data-channel-brand="{{ kind_key }}"
+              {% if product_filters.kind == kind_key %}aria-current="page"{% endif %}
+            >
+              <span class="messenger-channel-logo" aria-hidden="true">{{ kind_logo }}</span>
+              <span class="messenger-channel-label">{{ kind_label }}</span>
+              <b>{{ catalog_kind_counts.get(kind_key, 0) }}</b>
+            </a>
+          {% endfor %}
+        </nav>
+        <div class="products-table-wrap products-table-wrap--catalog org-ops-table-wrap org-ops-table-wrap--excel">
+          <table class="products-table products-catalog-table{% if product_filters.kind == 'subscription' %} is-subscription-kind{% endif %}" id="products-catalog-table" data-upos-column-controls data-products-table>
+            <thead>
+              <tr>
+                <th data-column-label="№" class="products-history-col">№</th>
+                <th data-column-label="Выбор" class="products-check-col">
+                  <input type="checkbox" class="products-bulk-checkbox" data-products-select-all aria-label="Выбрать все товары" />
+                </th>
+                <th data-column-label="Фото" class="products-photo-col"></th>
+                <th data-column-label="Название" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="name">
+                    <span>Название</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Артикул" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="sku">
+                    <span>Артикул</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Штрихкод" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="barcode">
+                    <span>Штрихкод</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Единица хранения" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="unit">
+                    <span>Ед. хранения</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="На складе" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="quantity">
+                    <span>На складе</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Приходная цена" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="purchase-price">
+                    <span>Приходная цена</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th class="products-subscription-price-column" data-column-label="Прайс-лист" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price-list">
+                    <span>Прайс-лист</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th class="products-subscription-price-column" data-column-label="Цена" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="price">
+                    <span>Цена</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Категория" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="category">
+                    <span>Категория</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Статус" aria-sort="none">
+                  <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="status">
+                    <span>Статус</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
+                  </button>
+                </th>
+                <th data-column-label="Действия" class="products-actions-head"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for product in products %}
+                {% set product_tab_id = 'product-' ~ product.id %}
+                {% set product_tab_href = url_for('products_get') ~ '?edit=' ~ product.id %}
+                <tr
+                  data-product-row
+                  data-product-kind="{{ product.kind if product.kind in ['product', 'service', 'subscription'] else 'product' }}"
+                  data-filter-group="{{ (product.group or '')|lower }}"
+                  data-filter-brand="{{ (product.brand or '')|lower }}"
+                  data-filter-folder="{{ (product.folder or '')|lower }}"
+                  data-sort-name="{{ (product.name or '')|lower }}"
+                  data-sort-sku="{{ (product.sku or '')|lower }}"
+                  data-sort-barcode="{{ (product.barcode or '')|lower }}"
+                  data-sort-unit="{{ (product.unit or '')|lower }}"
+                  data-sort-quantity="{{ product.quantity or 0 }}"
+                  data-sort-purchase-price="{{ product.purchase_price_sort_value or 0 }}"
+                  data-sort-price-list="{{ (product.display_prices|map(attribute='name')|join(' '))|lower }}"
+                  data-sort-price="{{ product.price_sort_value or 0 }}"
+                  data-sort-category="{{ (product.category or '')|lower }}"
+                  data-sort-status="{{ product.status or '' }}"
+                >
+                  <td class="products-history-col">
+                    <div class="product-history-actions">
+                      <span class="product-history-index"></span>
+                      <button
+                        type="button"
+                        class="products-action-icon product-history-btn"
+                        data-product-history="{{ product.id }}"
+                        data-product-history-name="{{ product.name }}"
+                        title="История товара"
+                        aria-label="История товара {{ product.name }}"
+                      >
+                        <svg viewBox="0 0 24 24" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="products-action-icon product-history-btn"
+                        data-product-price-history="{{ product.id }}"
+                        data-product-history-name="{{ product.name }}"
+                        title="История изменения цен"
+                        aria-label="История цен {{ product.name }}"
+                      >
+                        <svg viewBox="0 0 24 24" focusable="false"><path d="M3 3v18h18"/><path d="m7 13 3-3 3 2 5-6"/><circle cx="7" cy="13" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="13" cy="12" r="1"/><circle cx="18" cy="6" r="1"/></svg>
+                      </button>
+                    </div>
+                  </td>
+                  <td class="products-check-col">
+                    <input
+                      type="checkbox"
+                      class="products-bulk-checkbox"
+                      name="product_ids"
+                      value="{{ product.id }}"
+                      form="products-bulk-form"
+                      data-products-select
+                      aria-label="Выбрать товар {{ product.name }}"
+                    />
+                  </td>
+                  <td class="products-photo-col">
+                    {% if product.photo_url %}
+                      <button
+                        class="product-thumb-frame product-thumb-button"
+                        type="button"
+                        data-product-photo-preview="{{ product.photo_url }}"
+                        data-product-photo-title="{{ product.name }}"
+                        aria-label="Открыть фото {{ product.name }}"
+                        title="Открыть фото"
+                      >
+                        <img class="product-thumb" src="{{ product.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      </button>
+                    {% else %}
+                      <span class="product-thumb-frame" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" focusable="false">
+                          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                          <path d="m3.3 7 8.7 5 8.7-5" />
+                          <path d="M12 22V12" />
+                        </svg>
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="product-cell-main">
+                      <a
+                        class="product-open-link product-cell-meta"
+                        href="{{ product_tab_href }}#product-form"
+                        data-workspace-trigger="create"
+                        data-workspace-tab-id="{{ product_tab_id }}"
+                        data-workspace-view-id="create"
+                        data-workspace-tab-title="{{ product.name }}"
+                        data-workspace-tab-hash="product-form"
+                        data-workspace-tab-href="{{ product_tab_href }}"
+                      >
+                        <strong>{{ product.name }}</strong>
+                        <small>{{ product.sku or product.barcode or "Без артикула" }}</small>
+                        {% if product.purchase_history %}
+                          <small>Приходов: {{ product.purchase_history|length }}</small>
+                        {% endif %}
+                      </a>
+                    </div>
+                  </td>
+                  <td data-products-search-highlight>{{ product.sku or "-" }}</td>
+                  <td>{{ product.barcode or "-" }}</td>
+                  <td>{{ product.unit or "-" }}</td>
+                  {# У услуг и подписок склада нет — остаток не показываем. #}
+                  <td class="products-catalog-number">{% if product.kind != 'product' %}<span class="products-quantity-na">—</span>{% else %}{{ product.quantity_display }}{% endif %}</td>
+                  <td class="products-price-list-cell products-purchase-price-cell">
+                    <div class="products-price-list-values">
+                      {% for price in product.purchase_prices %}
+                        <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
+                          <strong>{% if price.has_price %}{{ price.price_display }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td class="products-price-list-cell products-price-list-name-cell products-subscription-price-column">
+                    <div class="products-price-list-values">
+                      {% for price in product.display_prices %}
+                        <div class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}">
+                          <strong>{{ price.name }}</strong>
+                        </div>
+                      {% else %}
+                        <span class="products-price-list-empty">Нет прайс-листов</span>
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td class="products-price-list-cell products-price-value-cell products-subscription-price-column">
+                    <div class="products-price-list-values">
+                      {# Администратор правит цену прямо здесь: расчётные прайсы
+                         не трогаем — их значение пересчитается заново. #}
+                      {% for price in product.display_prices %}
+                        {% set price_editable = can_edit_catalog_price and price.editable %}
+                        <div
+                          class="products-price-list-value{% if not price.has_price %} is-empty{% endif %}{% if price_editable %} is-editable{% endif %}"
+                          {% if price_editable %}
+                            data-product-price-edit
+                            data-product-id="{{ product.id }}"
+                            data-price-type-id="{{ price.id }}"
+                            data-price-raw="{{ price.price or '' }}"
+                            data-price-currency="{{ price.currency }}"
+                            data-price-name="{{ price.name }}"
+                            role="button"
+                            tabindex="0"
+                            title="{{ price.name }}: нажмите, чтобы изменить цену"
+                          {% endif %}
+                        >
+                          <strong>{% if price.has_price %}{{ price.price_display }} {{ price.currency }}{% else %}Не задана{% endif %}</strong>
+                        </div>
+                      {% else %}
+                        <span class="products-price-list-empty">-</span>
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td>{{ product.category or "-" }}</td>
+                  <td>{{ "Активный" if product.status == "active" else "Неактивный" }}</td>
+                  <td class="products-row-actions">
+                    {% set product_has_stock = (product.quantity|float) > 0 %}
+                    <a
+                      class="products-action-icon products-action-icon--edit"
+                      href="{{ product_tab_href }}#product-form"
+                      data-workspace-trigger="create"
+                      data-workspace-tab-id="{{ product_tab_id }}"
+                      data-workspace-view-id="create"
+                      data-workspace-tab-title="{{ product.name }}"
+                      data-workspace-tab-hash="product-form"
+                      data-workspace-tab-href="{{ product_tab_href }}"
+                      aria-label="Редактировать {{ product.name }}"
+                      title="Редактировать"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </a>
+                    <form method="post" action="{{ url_for('products_delete', product_id=product.id) }}">
+                      {% include "_csrf_field.html" %}
+                      <button
+                        class="products-action-icon products-action-icon--delete"
+                        type="submit"
+                        aria-label="{% if product_has_stock %}Нельзя удалить {{ product.name }}: товар есть в наличии{% else %}Удалить {{ product.name }}{% endif %}"
+                        title="{% if product_has_stock %}Нельзя удалить: товар есть в наличии{% else %}Удалить{% endif %}"
+                        {% if product_has_stock %}disabled{% endif %}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v5" />
+                          <path d="M14 11v5" />
+                        </svg>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="14">Пока нет товаров. Создайте первый товар справа.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            {% if products_total %}
+              <tfoot>
+                {# Итог разложен по колонкам один в один со строками: с colspan
+                   скрытие колонок сдвигало значения, и «Штука» уезжала из-под
+                   «На складе». Первые две ячейки — sticky-стенка. #}
+                <tr class="products-catalog-total-row">
+                  <td class="products-history-col products-total-sticky"></td>
+                  <td class="products-check-col products-total-sticky"></td>
+                  <td></td>
+                  <td>
+                    <strong>Итого по выбранному каталогу</strong>
+                    <small data-catalog-total-count>{{ products_total }} позиций</small>
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td class="products-catalog-number" data-catalog-total-quantities>
+                    {% for total in catalog_totals.quantities %}
+                      {# «Штука» в итоге не пишем — это единица по умолчанию. #}
+                      <span>{{ total.value }}{% if total.unit and total.unit != 'Штука' %} {{ total.unit }}{% endif %}</span>
+                    {% else %}
+                      <span>0</span>
+                    {% endfor %}
+                  </td>
+                  {# Себестоимость остатка из итога убрана по просьбе владельца —
+                     ячейка остаётся, чтобы колонки не съезжали. #}
+                  <td class="products-price-list-cell products-purchase-price-cell"></td>
+                  {# Сумма продажных цен из итога убрана по просьбе владельца —
+                     ячейки остаются пустыми, чтобы колонки не съезжали. #}
+                  <td class="products-price-list-cell products-price-list-name-cell products-subscription-price-column"></td>
+                  <td class="products-price-list-cell products-price-value-cell products-subscription-price-column"></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+        <footer class="products-catalog-footer">
+          <nav class="products-pagination" aria-label="Страницы товаров" data-ajax-nav data-ajax-targets="#products-catalog-panel" data-ajax-reinit="ProductsTableInit">
+            <a class="products-page-link {% if product_page <= 1 %}disabled{% endif %}" href="{{ product_prev_page_url }}" aria-label="Предыдущая страница">‹</a>
+            {% for page_no in product_pagination_pages %}
+              <a class="products-page-link {% if page_no == product_page %}active{% endif %}" href="{{ product_page_urls[page_no] }}" {% if page_no == product_page %}aria-current="page"{% endif %}>{{ page_no }}</a>
+            {% endfor %}
+            <a class="products-page-link {% if product_page >= product_total_pages %}disabled{% endif %}" href="{{ product_next_page_url }}" aria-label="Следующая страница">›</a>
+            <span class="products-page-count">Стр. {{ product_page }} из {{ product_total_pages }}</span>
+          </nav>
+          <div class="products-catalog-footer-meta">
+            <div class="products-panel-stats" aria-label="Информация по списку">
+              <span>Всего: <b data-products-total-count>{{ products_total|default(products|length) }}</b></span>
+              <span>Показано: <span data-products-shown-range>{{ product_page_from }}-{{ product_page_to }}</span></span>
+            </div>
+            <label class="products-page-size products-page-size--footer">
+              <span>Показать</span>
+              <select name="page_size" form="products-catalog-filter" data-ajax-page-size data-ajax-page-param="page_size" data-ajax-reset-params="page" data-ajax-targets="#products-catalog-panel" data-ajax-reinit="ProductsTableInit">
+                {% for size in [100, 500, 1000] %}
+                  <option value="{{ size }}" {% if product_page_size == size %}selected{% endif %}>{{ size }} шт</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </footer>
+      </article>
+
+      <aside class="product-form-panel" id="product-form" data-workspace-view="create" hidden>
+        <header class="products-panel-head">
+          <div>
+            <h2>{% if edit_product %}Редактирование{% else %}Создание{% endif %}</h2>
+          </div>
+        </header>
+        <form method="post" action="{{ url_for('products_save') }}" enctype="multipart/form-data" class="product-form product-form--clean client-photo-form">
+          {% include "_csrf_field.html" %}
+          <input type="hidden" name="product_id" value="{{ current.id or '' }}" />
+
+          <section class="product-form-hero">
+            <div class="product-kind-toggle product-kind-toggle--compact">
+              <label><input type="radio" name="kind" value="product" {% if (current.kind or product_filters.kind) not in ['service', 'subscription'] %}checked{% endif %} /> Простой товар</label>
+              <label><input type="radio" name="kind" value="service" {% if (current.kind or product_filters.kind) == 'service' %}checked{% endif %} /> Услуга</label>
+              <label><input type="radio" name="kind" value="subscription" {% if (current.kind or product_filters.kind) == 'subscription' %}checked{% endif %} /> Подписка</label>
+            </div>
+
+            {# Фото и название — первым блоком, как в карточке клиента. #}
+            <div class="client-edit-photo-row">
+              <div class="client-profile-photo client-profile-photo--edit" data-product-form-photo aria-hidden="true">
+                {% if current.photo_url %}<img src="{{ current.photo_url }}" alt="" />{% else %}<span></span>{% endif %}
+              </div>
+              <div class="product-form-grid client-photo-data-table">
+                <label class="wide"><span>Название товара*</span><input name="name" required value="{{ current.name or '' }}" /></label>
+                <div class="client-photo-source-field wide">
+                  <span>Фото*</span>
+                  <div class="client-photo-source-controls">
+                    {# type="text": после загрузки фото сюда попадает внутренний путь
+                       /products/<id>/photo, а type="url" требует абсолютный адрес и
+                       браузер блокировал сабмит с ошибкой «Введите URL». #}
+                    <input name="photo_url" type="text" inputmode="url" value="{{ current.photo_url or '' }}" placeholder="URL фото: https://..." data-product-form-photo-url data-product-photo-required />
+                    <input name="photo_file" type="file" accept="image/*" aria-label="Выбрать фото из ПК" data-product-form-photo-file />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="product-form-grid product-form-grid--identity">
+              <div class="product-dictionary-select">
+                <label>
+                  <span data-product-category-label>{{ "Название программы*" if product_form_kind == "subscription" else "Категория*" }}</span>
+                  <input type="hidden" name="category" value="{{ current.category or '' }}" data-product-dictionary-value="category" />
+                  <select data-product-dictionary-select="category" class="product-dictionary-native-select" tabindex="-1" aria-hidden="true" data-product-category-options="{{ product_options.categories|tojson|forceescape }}" data-product-program-options="{{ product_program_options|tojson|forceescape }}">
+                    <option value="">{{ "Выберите название программы" if product_form_kind == "subscription" else "Выберите категорию" }}</option>
+                    {% if current.category and current.category not in product_category_selector_options %}
+                      <option value="{{ current.category }}" selected>{{ current.category }}</option>
+                    {% endif %}
+                    {% for item in product_category_selector_options %}
+                      <option value="{{ item }}" {% if current.category == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="product-dictionary-combo" data-product-dictionary-combo="category">
+                    <input
+                      type="text"
+                      autocomplete="off"
+                      value="{{ current.category or '' }}"
+                      placeholder="{{ 'Выберите название программы' if product_form_kind == 'subscription' else 'Выберите категорию' }}"
+                      data-product-dictionary-combo-input
+                      {% if not edit_product %}required{% endif %}
+                    />
+                    <div class="product-dictionary-combo-panel" data-product-dictionary-combo-panel hidden></div>
+                  </div>
+                </label>
+                <button class="products-inline-add-btn" type="button" data-product-dictionary-open data-product-dictionary-type="category" data-product-dictionary-title="Новая категория" data-product-program-title="Новая программа" data-product-program-label="Название программы*" aria-label="Создать категорию">+</button>
+              </div>
+              <div class="product-dictionary-select" data-product-brand-field {% if (current.kind or product_filters.kind) == 'subscription' %}hidden{% endif %}>
+                <label>
+                  <span>Бренд*</span>
+                  <select name="brand" data-product-dictionary-select="brand" {% if not edit_product and (current.kind or product_filters.kind) != 'subscription' %}required{% endif %} {% if (current.kind or product_filters.kind) == 'subscription' %}disabled{% endif %}>
+                    <option value="">Выберите бренд</option>
+                    {% if current.brand and current.brand not in product_options.brands %}
+                      <option value="{{ current.brand }}" selected>{{ current.brand }}</option>
+                    {% endif %}
+                    {% for item in product_options.brands %}
+                      <option value="{{ item }}" {% if current.brand == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <button class="products-inline-add-btn" type="button" data-product-dictionary-open data-product-dictionary-type="brand" data-product-dictionary-title="Новый бренд" aria-label="Создать бренд">+</button>
+              </div>
+              <label><span>Артикул</span><input name="sku" value="{{ current.sku or next_product_sku or '21000' }}" readonly title="Артикул создаётся автоматически" /></label>
+              <label><span>Единица*</span><input name="unit" value="{{ current.unit or 'Штука' }}" required /></label>
+              <label><span>Статус</span><select name="status"><option value="active" {% if current.status != 'inactive' %}selected{% endif %}>Активный</option><option value="inactive" {% if current.status == 'inactive' %}selected{% endif %}>Неактивный</option></select></label>
+            </div>
+          </section>
+
+          <section class="product-form-section product-form-section--primary" data-product-price-extra {% if (current.kind or product_filters.kind) in ['service', 'subscription'] %}hidden{% endif %}>
+            <div class="product-form-section-head">
+              <h3>Продажная цена</h3>
+            </div>
+            <div class="product-form-grid">
+              <input type="hidden" name="price_name" value="{{ prices[0].name if prices else 'Продажная цена' }}" data-product-price-input />
+              <label><span>Продажная цена*</span><input name="price_value" inputmode="decimal" value="{{ prices[0].price if prices else '' }}" placeholder="0" data-product-price-input data-upos-money-format data-upos-money-decimals="0" {% if not edit_product %}required{% endif %} /></label>
+              <label>
+                <span>Валюта</span>
+                <select name="price_currency" data-product-price-input>
+                  <option value="UZS" {% if (prices[0].currency if prices else 'UZS') == 'UZS' %}selected{% endif %}>UZS</option>
+                  <option value="USD" {% if (prices[0].currency if prices else 'UZS') == 'USD' %}selected{% endif %}>USD</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="product-form-section product-form-section--primary products-subscription-modifiers" data-subscription-modifiers {% if (current.kind or product_filters.kind) != 'subscription' %}hidden{% endif %}>
+            <div class="product-form-section-head products-subscription-modifiers-head">
+              <h3>Функции подписки</h3>
+              <button class="btn btn-secondary btn-sm" type="button" data-subscription-modifier-add>+ Функция</button>
+            </div>
+            <div class="products-subscription-modifier-list" data-subscription-modifier-list>
+              {% for modifier in subscription_modifiers %}
+                <div class="products-subscription-modifier-row" data-subscription-modifier-row>
+                  <label><span>Функция*</span><input name="subscription_modifier_name" value="{{ modifier.name or '' }}" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
+                  <label class="wide"><span>Описание</span><input name="subscription_modifier_description" value="{{ modifier.description or '' }}" placeholder="Что входит в подписку" /></label>
+                  <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" value="{{ modifier.amount or '' }}" placeholder="0" data-subscription-modifier-required data-upos-money-format data-upos-money-decimals="0" /></label>
+                  <label>
+                    <span>Валюта</span>
+                    <select name="subscription_modifier_currency">
+                      <option value="UZS" {% if (modifier.currency or 'UZS') == 'UZS' %}selected{% endif %}>UZS</option>
+                      <option value="USD" {% if modifier.currency == 'USD' %}selected{% endif %}>USD</option>
+                    </select>
+                  </label>
+                  <button type="button" class="products-subscription-modifier-remove" data-subscription-modifier-remove aria-label="Удалить модификатор" title="Удалить модификатор">×</button>
+                </div>
+              {% endfor %}
+            </div>
+            <template data-subscription-modifier-template>
+              <div class="products-subscription-modifier-row" data-subscription-modifier-row>
+                <label><span>Функция*</span><input name="subscription_modifier_name" placeholder="Например: Базовая" data-subscription-modifier-required /></label>
+                <label class="wide"><span>Описание</span><input name="subscription_modifier_description" placeholder="Что входит в подписку" /></label>
+                <label><span>Сумма*</span><input name="subscription_modifier_amount" inputmode="decimal" placeholder="0" data-subscription-modifier-required data-upos-money-format data-upos-money-decimals="0" /></label>
+                <label>
+                  <span>Валюта</span>
+                  <select name="subscription_modifier_currency">
+                    <option value="UZS" selected>UZS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+                <button type="button" class="products-subscription-modifier-remove" data-subscription-modifier-remove aria-label="Удалить модификатор" title="Удалить модификатор">×</button>
+              </div>
+            </template>
+          </section>
+
+          <section class="product-form-section product-form-section--primary" data-service-extra {% if current.kind != 'service' %}hidden{% endif %}>
+            <div class="product-form-section-head">
+              <h3>Услуга: цена и бонус</h3>
+            </div>
+            <div class="product-form-grid">
+              <label><span>Продажная цена*</span><input name="service_sale_price" inputmode="decimal" value="{{ current.sale_price or '' }}" placeholder="0" data-service-price-input data-upos-money-format data-upos-money-decimals="0" /></label>
+              <label>
+                <span>Валюта</span>
+                <select name="service_sale_currency" data-service-price-input>
+                  <option value="UZS" {% if (current.sale_currency or 'UZS') == 'UZS' %}selected{% endif %}>UZS</option>
+                  <option value="USD" {% if current.sale_currency == 'USD' %}selected{% endif %}>USD</option>
+                </select>
+              </label>
+              <label><span>Бонус сотрудникам, %</span><input name="service_bonus_percent" inputmode="decimal" value="{{ service_bonus_percent or '' }}" placeholder="0" /></label>
+            </div>
+            <p class="earnings-hint">Цена попадёт в прайс-лист по умолчанию. Бонус начисляется сотруднику при завершении установки с этой услугой.</p>
+          </section>
+          <script>
+            (function () {
+              var form = document.currentScript.closest('form');
+              var section = form && form.querySelector('[data-service-extra]');
+              var productPriceSection = form && form.querySelector('[data-product-price-extra]');
+              var subscriptionSection = form && form.querySelector('[data-subscription-modifiers]');
+              var subscriptionList = form && form.querySelector('[data-subscription-modifier-list]');
+              var subscriptionTemplate = form && form.querySelector('[data-subscription-modifier-template]');
+              var subscriptionAdd = form && form.querySelector('[data-subscription-modifier-add]');
+              var productId = form && form.querySelector('input[name="product_id"]');
+              var categoryLabel = form && form.querySelector('[data-product-category-label]');
+              var categorySelect = form && form.querySelector('[data-product-dictionary-select="category"]');
+              var categoryComboInput = form && form.querySelector('[data-product-dictionary-combo="category"] [data-product-dictionary-combo-input]');
+              var brandField = form && form.querySelector('[data-product-brand-field]');
+              var brandSelect = form && form.querySelector('[data-product-dictionary-select="brand"]');
+              var barcodeSection = form && form.querySelector('[data-product-barcode-section]');
+              if (!form || !section) return;
+              var categoryPlaceholder = function (isSubscription) {
+                return isSubscription ? 'Выберите название программы' : 'Выберите категорию';
+              };
+              var parseSelectOptions = function (name) {
+                if (!categorySelect) return [];
+                try {
+                  var raw = categorySelect.getAttribute(name) || '[]';
+                  var parsed = JSON.parse(raw);
+                  return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+                } catch (error) {
+                  return [];
+                }
+              };
+              var rebuildCategorySelect = function (isSubscription) {
+                if (!categorySelect) return;
+                var value = ((categoryComboInput && categoryComboInput.value) || categorySelect.value || '').trim();
+                var options = parseSelectOptions(isSubscription ? 'data-product-program-options' : 'data-product-category-options');
+                var placeholder = categoryPlaceholder(isSubscription);
+                categorySelect.replaceChildren();
+                categorySelect.appendChild(new Option(placeholder, ''));
+                if (value && !options.includes(value)) {
+                  categorySelect.appendChild(new Option(value, value, true, true));
+                }
+                options.forEach(function (item) {
+                  categorySelect.appendChild(new Option(item, item, item === value, item === value));
+                });
+                categorySelect.value = value;
+              };
+              var updateSubscriptionRows = function () {
+                if (!subscriptionList) return;
+                var rows = Array.prototype.slice.call(subscriptionList.querySelectorAll('[data-subscription-modifier-row]'));
+                rows.forEach(function (row) {
+                  var remove = row.querySelector('[data-subscription-modifier-remove]');
+                  if (remove) remove.hidden = rows.length <= 1;
+                });
+              };
+              var addSubscriptionModifier = function () {
+                if (!subscriptionList || !subscriptionTemplate) return null;
+                var node = subscriptionTemplate.content.firstElementChild.cloneNode(true);
+                subscriptionList.appendChild(node);
+                updateSubscriptionRows();
+                return node;
+              };
+              subscriptionAdd?.addEventListener('click', function () {
+                var row = addSubscriptionModifier();
+                row?.querySelector('input')?.focus();
+              });
+              subscriptionList?.addEventListener('click', function (event) {
+                var button = event.target.closest('[data-subscription-modifier-remove]');
+                if (!button) return;
+                var row = button.closest('[data-subscription-modifier-row]');
+                var rows = subscriptionList.querySelectorAll('[data-subscription-modifier-row]');
+                if (row && rows.length > 1) row.remove();
+                updateSubscriptionRows();
+              });
+              updateSubscriptionRows();
+              var sync = function () {
+                var service = form.querySelector('input[name="kind"][value="service"]');
+                var subscription = form.querySelector('input[name="kind"][value="subscription"]');
+                var isService = !!(service && service.checked);
+                var isSubscription = !!(subscription && subscription.checked);
+                var isStockProduct = !isService && !isSubscription;
+                var isCreate = !(productId && productId.value);
+                section.hidden = !isService;
+                section.style.display = isService ? '' : 'none';
+                if (productPriceSection) {
+                  productPriceSection.hidden = isService || isSubscription;
+                  productPriceSection.style.display = (isService || isSubscription) ? 'none' : '';
+                }
+                form.querySelectorAll('[data-product-price-input]').forEach(function (input) {
+                  input.disabled = isService || isSubscription;
+                  if (input.name === 'price_value') input.required = !isService && !isSubscription && isCreate;
+                });
+                form.querySelectorAll('[data-service-price-input]').forEach(function (input) {
+                  input.disabled = !isService;
+                  if (input.name === 'service_sale_price') input.required = isService && isCreate;
+                });
+                if (subscriptionSection) {
+                  subscriptionSection.hidden = !isSubscription;
+                  subscriptionSection.style.display = isSubscription ? '' : 'none';
+                  if (isSubscription && subscriptionList && !subscriptionList.querySelector('[data-subscription-modifier-row]')) {
+                    addSubscriptionModifier();
+                  }
+                }
+                form.querySelectorAll('[data-subscription-modifiers] input, [data-subscription-modifiers] select').forEach(function (input) {
+                  input.disabled = !isSubscription;
+                });
+                form.querySelectorAll('[data-subscription-modifier-required]').forEach(function (input) {
+                  input.required = isSubscription && isCreate;
+                });
+                if (categoryLabel) categoryLabel.textContent = isSubscription ? 'Название программы*' : 'Категория*';
+                rebuildCategorySelect(isSubscription);
+                if (categoryComboInput) {
+                  categoryComboInput.placeholder = categoryPlaceholder(isSubscription);
+                }
+                if (brandField) {
+                  brandField.hidden = isSubscription;
+                  brandField.style.display = isSubscription ? 'none' : '';
+                }
+                if (brandSelect) {
+                  brandSelect.disabled = isSubscription;
+                  brandSelect.required = !isSubscription && isCreate;
+                }
+                var liveBarcodeSection = barcodeSection || form.querySelector('[data-product-barcode-section]');
+                if (liveBarcodeSection) {
+                  liveBarcodeSection.hidden = !isStockProduct;
+                  liveBarcodeSection.style.display = isStockProduct ? '' : 'none';
+                  liveBarcodeSection.querySelectorAll('input, select').forEach(function (input) {
+                    input.disabled = !isStockProduct;
+                  });
+                }
+              };
+              form.querySelectorAll('input[name="kind"]').forEach(function (radio) {
+                radio.addEventListener('change', sync);
+              });
+              sync();
+
+              // Превью фото рядом с названием: показывает и адрес, и файл,
+              // выбранный с компьютера, ещё до сохранения товара.
+              var preview = form.querySelector('[data-product-form-photo]');
+              var urlField = form.querySelector('[data-product-form-photo-url]');
+              var fileField = form.querySelector('[data-product-form-photo-file]');
+              if (!preview) return;
+              var show = function (src) {
+                preview.innerHTML = src
+                  ? '<img src="' + String(src).replace(/"/g, '&quot;') + '" alt="" />'
+                  : '<span></span>';
+              };
+              if (urlField) {
+                urlField.addEventListener('input', function () {
+                  show(String(urlField.value || '').trim());
+                });
+              }
+              if (fileField) {
+                fileField.addEventListener('change', function () {
+                  var file = fileField.files && fileField.files[0];
+                  if (!file) return;
+                  var reader = new FileReader();
+                  reader.onload = function () { show(reader.result); };
+                  reader.readAsDataURL(file);
+                });
+              }
+              form.addEventListener('submit', function (event) {
+                var isCreate = !(productId && productId.value);
+                if (!isCreate) return;
+                var hasUrl = !!(urlField && String(urlField.value || '').trim());
+                var hasFile = !!(fileField && fileField.files && fileField.files.length);
+                if (!hasUrl && !hasFile) {
+                  event.preventDefault();
+                  if (urlField) {
+                    urlField.setCustomValidity('Добавьте фото: URL или файл.');
+                    urlField.reportValidity();
+                    window.setTimeout(function () { urlField.setCustomValidity(''); }, 1500);
+                  }
+                }
+              });
+            })();
+          </script>
+
+          {% for price in prices %}
+            {% if not loop.first %}
+              <input type="hidden" name="price_name" value="{{ price.name or 'Продажная цена' }}" />
+              <input type="hidden" name="price_value" value="{{ price.price or '' }}" />
+              <input type="hidden" name="price_currency" value="{{ price.currency or 'UZS' }}" />
+            {% endif %}
+          {% endfor %}
+          {% for stock in stocks %}
+            <input type="hidden" name="stock_warehouse" value="{{ stock.warehouse or 'Основной склад' }}" />
+            <input type="hidden" name="stock_quantity" value="{{ stock.quantity or '' }}" />
+            <input type="hidden" name="stock_price" value="{{ stock.price or '' }}" />
+            <input type="hidden" name="stock_date" value="{{ stock.date or '' }}" />
+          {% endfor %}
+
+          <section class="product-form-section product-form-section--primary" data-product-barcode-section {% if (current.kind or product_filters.kind) in ['service', 'subscription'] %}hidden{% endif %}>
+            <div class="product-form-section-head">
+              <h3>Штрихкод</h3>
+            </div>
+            <div class="product-line-grid product-line-grid--barcode">
+              <input name="barcode" value="{{ current.barcode or '' }}" placeholder="Штрихкод" />
+              <select name="barcode_type">
+                <option value="EAN13" {% if current.barcode_type != 'CODE128' %}selected{% endif %}>EAN13</option>
+                <option value="CODE128" {% if current.barcode_type == 'CODE128' %}selected{% endif %}>CODE128</option>
+              </select>
+            </div>
+          </section>
+
+          <input type="hidden" name="folder" value="{{ current.folder or '' }}" />
+          <input type="hidden" name="group" value="{{ current.group or '' }}" />
+          <input type="hidden" name="second_unit" value="{{ current.second_unit or '' }}" />
+          {% for variation in variations %}
+            <input type="hidden" name="variation_attribute" value="{{ variation.attribute or '' }}" />
+            <input type="hidden" name="variation_values" value="{{ variation.values_text or '' }}" />
+          {% endfor %}
+
+          <input type="hidden" name="purchase_history_json" value="{{ current.purchase_history_json or '' }}" />
+          <input type="hidden" name="batch_tracking" value="{{ '1' if current.batch_tracking else '0' }}" />
+          <input type="hidden" name="packages" value="{{ current.packages or '' }}" />
+          <input type="hidden" name="min_stock" value="{{ current.min_stock or '' }}" />
+          <input type="hidden" name="characteristics" value="{{ current.characteristics or '' }}" />
+          <input type="hidden" name="classification" value="{{ current.classification or '' }}" />
+          <input type="hidden" name="owner" value="{{ current.owner or '' }}" />
+
+          <div class="product-form-actions">
+            <button class="btn" type="submit">Сохранить</button>
+            <a class="btn btn-secondary" href="{{ url_for('products_get') }}">Отмена</a>
+          </div>
+        </form>
+      </aside>
+    </div>
+
+    <section class="products-dictionaries" data-workspace-view="price_types price_type_detail categories" hidden>
+      <article id="price-types" data-workspace-view="price_types" hidden>
+        <header class="products-dictionary-head">
+          <div>
+            <h2>Прайс-листы</h2>
+            <p>Именованные наборы цен для продаж, закупок и автоматического расчета.</p>
+          </div>
+          <button class="btn" type="button" data-price-type-open>+ Прайс-лист</button>
+        </header>
+
+        <div class="price-type-card-grid">
+          {% for item in price_type_state.price_types %}
+            <article class="price-type-card">
+              <a
+                href="{{ url_for('products_get') }}?price_type={{ item.id }}#price-type-detail"
+                class="price-type-card-main"
+                data-workspace-trigger="price-type-{{ item.id }}"
+                data-workspace-view-id="price_type_detail"
+                data-workspace-tab-title="{{ item.name }}"
+                data-workspace-tab-hash="price-type-detail"
+                data-workspace-tab-href="{{ url_for('products_get') }}?price_type={{ item.id }}"
+              >
+                <strong>{{ item.name }}</strong>
+                <span>{{ "Зависит от другой цены" if item.pricing_method == "dependent" else "Ручное назначение" }}</span>
+                <small>Изменено: {{ item.updated_at }} · {{ item.created_by }}</small>
+              </a>
+              <div class="price-type-card-meta">
+                {% if item.is_for_sales %}<span>В продажах</span>{% endif %}
+                {% if item.is_for_purchases %}<span>В закупках</span>{% endif %}
+                <span class="{{ 'is-ok' if item.is_active else 'is-muted' }}">{{ "Активный" if item.is_active else "Неактивный" }}</span>
+                <span>{{ item.product_count }} цен</span>
+                {% if default_price_type_id == item.id|string %}
+                  <span class="price-type-default-badge">✓ По умолчанию</span>
+                {% endif %}
+              </div>
+              <div class="price-type-card-actions">
+                {% if default_price_type_id != item.id|string %}
+                  <form method="post" action="{{ url_for('products_price_type_default') }}">
+                    {% include "_csrf_field.html" %}
+                    <input type="hidden" name="price_type_id" value="{{ item.id }}" />
+                    <button class="products-action-icon" type="submit" title="Сделать прайс-листом по умолчанию" aria-label="Сделать {{ item.name }} прайс-листом по умолчанию">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                    </button>
+                  </form>
+                {% endif %}
+                <button type="button" class="products-action-icon products-action-icon--edit" data-price-type-open
+                  data-id="{{ item.id }}" data-name="{{ item.name }}" data-sort-order="{{ item.sort_order }}"
+                  data-for-sales="{{ '1' if item.is_for_sales else '0' }}" data-for-purchases="{{ '1' if item.is_for_purchases else '0' }}"
+                  data-active="{{ '1' if item.is_active else '0' }}" data-method="{{ item.pricing_method }}"
+                  data-base="{{ item.base_price_type_id }}" data-markup-type="{{ item.markup_type }}" data-markup-value="{{ item.markup_value }}"
+                  data-currency="{{ item.convert_to_currency }}" data-rounding="{{ item.rounding }}" title="Редактировать">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                </button>
+                <form method="post" action="{{ url_for('products_price_type_toggle') }}">
+                  {% include "_csrf_field.html" %}
+                  <input type="hidden" name="price_type_id" value="{{ item.id }}" />
+                  <button class="products-action-icon" type="submit" title="Активный / неактивный">⋯</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+
+      </article>
+      <article id="price-type-detail" data-workspace-view="price_type_detail" hidden>
+        {% set selected_price = price_type_state.selected %}
+        <section class="price-type-products-panel">
+          <header class="products-dictionary-head">
+            <div>
+              <h3>{{ selected_price.name }}</h3>
+              <p>
+                {% if selected_price.pricing_method == "dependent" %}
+                  База: {{ "последняя закупочная цена" if selected_price.base_price_type_id == "last_purchase_price" else selected_price.base_price_type_id }} ·
+                  {{ "Наценка" if selected_price.markup_type == "markup" else "Скидка" }} {{ selected_price.markup_value or 0 }}% ·
+                  {{ selected_price.convert_to_currency }} · округление {{ selected_price.rounding }}
+                {% else %}
+                  Ручное редактирование цен по каждому товару.
+                {% endif %}
+              </p>
+            </div>
+          </header>
+          <form class="products-catalog-filter price-type-filter" method="get" action="{{ url_for('products_get') }}#price-type-detail">
+            <input type="hidden" name="price_type" value="{{ selected_price.id }}" />
+            <label class="products-catalog-search"><span>Поиск</span><input name="price_q" value="{{ price_type_state.filters.q }}" placeholder="Поиск" /></label>
+            <label><span>Вид</span><select name="price_kind"><option value="">Все</option><option value="product" {% if price_type_state.filters.kind == 'product' %}selected{% endif %}>Товары</option><option value="service" {% if price_type_state.filters.kind == 'service' %}selected{% endif %}>Услуги</option><option value="subscription" {% if price_type_state.filters.kind == 'subscription' %}selected{% endif %}>Подписки</option></select></label>
+            <label><span>Категория</span><select name="price_category"><option value="">Все</option>{% for item in product_options.categories %}<option value="{{ item }}" {% if price_type_state.filters.category == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+            <label><span>Группа</span><select name="price_group"><option value="">Все</option>{% for item in product_options.groups %}<option value="{{ item }}" {% if price_type_state.filters.group == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+            <label><span>Бренд</span><select name="price_brand"><option value="">Все</option>{% for item in product_options.brands %}<option value="{{ item }}" {% if price_type_state.filters.brand == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+            <label><span>Цена</span><select name="price_status"><option value="all" {% if price_type_state.filters.status == 'all' %}selected{% endif %}>Все</option><option value="with" {% if price_type_state.filters.status == 'with' %}selected{% endif %}>Есть цена</option><option value="without" {% if price_type_state.filters.status == 'without' %}selected{% endif %}>Нет цены</option></select></label>
+            <button class="btn btn-secondary" type="submit">Фильтр</button>
+          </form>
+          <form method="post" action="{{ url_for('products_price_type_prices_save') }}">
+            {% include "_csrf_field.html" %}
+            <input type="hidden" name="price_type_id" value="{{ selected_price.id }}" />
+            <div class="products-table-wrap">
+              <table class="products-table price-type-products-table">
+                <thead>
+                  <tr>
+                    <th>Фото</th>
+                    <th>Название</th>
+                    <th>Категория</th>
+                    <th>
+                      <div class="price-type-price-heading">
+                        <span>Цена за ед.хр</span>
+                        {% if selected_price.pricing_method == "dependent" %}
+                          <label class="price-type-auto-toggle price-type-auto-toggle--all">
+                            <input type="checkbox" data-dependent-price-auto-all />
+                            <span>Авто для всех</span>
+                          </label>
+                        {% endif %}
+                      </div>
+                    </th>
+                    <th>Валюта</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for product in price_type_state.rows %}
+                    <tr>
+                      <td>{% if product.photo_url %}<img class="product-thumb" src="{{ product.photo_url }}" alt="" />{% else %}<span class="product-thumb-frame">□</span>{% endif %}</td>
+                      <td><a class="product-open-link" href="{{ url_for('products_get') }}?edit={{ product.id }}#product-form"><strong>{{ product.name }}</strong></a></td>
+                      <td>{{ product.category or "-" }}<input type="hidden" name="product_id" value="{{ product.id }}" /></td>
+                      <td>
+                        {% if selected_price.pricing_method == "manual" %}
+                          <input class="price-type-price-input" name="price_value" value="{{ product.price_type_price }}" inputmode="decimal" data-upos-money-format data-upos-money-decimals="0" />
+                        {% else %}
+                          <div class="price-type-dependent-control">
+                            <input
+                              class="price-type-price-input"
+                              name="price_value"
+                              value="{{ product.price_type_price }}"
+                              inputmode="decimal"
+                              data-upos-money-format
+                              data-upos-money-decimals="0"
+                              data-dependent-price-input
+                              {{ "readonly" if not product.price_type_override else "" }}
+                            />
+                            <label class="price-type-auto-toggle">
+                              <input
+                                type="checkbox"
+                                name="price_auto"
+                                value="{{ product.id }}"
+                                data-dependent-price-auto
+                                {{ "checked" if not product.price_type_override else "" }}
+                              />
+                              <span>Авто</span>
+                            </label>
+                          </div>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if selected_price.pricing_method == "manual" %}
+                          <select name="price_currency"><option value="UZS" {% if product.price_type_currency == "UZS" %}selected{% endif %}>UZS</option><option value="USD" {% if product.price_type_currency == "USD" %}selected{% endif %}>USD</option></select>
+                        {% else %}
+                          {{ product.price_type_currency }}<input type="hidden" name="price_currency" value="{{ product.price_type_currency }}" />
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="5">Товары не найдены.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <footer class="products-catalog-footer">
+              <div class="products-pagination" data-ajax-nav data-ajax-targets="#price-type-detail" data-ajax-reinit="ProductsTableInit">
+                <a class="products-page-btn" href="{{ price_type_state.prev_url }}">‹</a>
+                {% for page_no, page_url in price_type_state.page_urls.items() %}
+                  <a class="products-page-btn {% if page_no == price_type_state.page %}active{% endif %}" href="{{ page_url }}">{{ page_no }}</a>
+                {% endfor %}
+                <a class="products-page-btn" href="{{ price_type_state.next_url }}">›</a>
+                <span>Стр. {{ price_type_state.page }} из {{ price_type_state.total_pages }}</span>
+              </div>
+              <div class="products-catalog-footer-meta"><span>Всего: {{ price_type_state.total }}</span><span>Показано: {{ price_type_state.from }}-{{ price_type_state.to }}</span></div>
+              <button class="btn" type="submit">Сохранить цены</button>
+            </footer>
+          </form>
+        </section>
+      </article>
+      <article id="categories" data-workspace-view="categories" hidden>
+        <header class="products-dictionary-head">
+          <div>
+            <h2>Категории</h2>
+            <p>Категории используются в фильтрах и карточках товаров.</p>
+          </div>
+          <button class="btn" type="button" data-product-category-open>+ Категория</button>
+        </header>
+        <div class="products-table-wrap">
+          <table class="products-table products-dictionary-table">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Товаров</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in product_options.category_rows %}
+                <tr>
+                  <td><strong>{{ item.name }}</strong></td>
+                  <td>{{ item.product_count }}</td>
+                  <td class="products-row-actions">
+                    <button
+                      class="products-action-icon products-action-icon--edit"
+                      type="button"
+                      title="Редактировать"
+                      aria-label="Редактировать {{ item.name }}"
+                      data-product-category-open
+                      data-category-name="{{ item.name }}"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    <form method="post" action="{{ url_for('products_category_delete') }}" onsubmit="return confirm({{ ('Удалить категорию ' ~ item.name ~ '? У товаров эта категория очистится.')|tojson }});">
+                      {% include "_csrf_field.html" %}
+                      <input type="hidden" name="name" value="{{ item.name }}" />
+                      <button class="products-action-icon products-action-icon--delete" type="submit" title="Удалить" aria-label="Удалить {{ item.name }}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v5" />
+                          <path d="M14 11v5" />
+                        </svg>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="3">Категории пока не заполнены.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+    <dialog class="settings-profile-modal products-category-dialog" id="products-price-type-dialog">
+      <form method="post" action="{{ url_for('products_price_type_save') }}" class="settings-profile-modal-card telephony-dialog-surface" data-price-type-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="price_type_id" data-price-type-id />
+        <header class="settings-profile-modal-head">
+          <div>
+            <p>Прайс-листы</p>
+            <h2 data-price-type-dialog-title>Новый прайс-лист</h2>
+          </div>
+          <button type="button" class="settings-profile-close" data-price-type-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="product-form-grid product-form-grid--identity price-type-dialog-grid">
+          <label class="wide"><span>Название*</span><input name="name" required data-price-type-name /></label>
+          <label><span>Сортировка</span><input name="sort_order" inputmode="numeric" data-price-type-sort /></label>
+          <label><span>Способ</span><select name="pricing_method" data-price-type-method><option value="manual">Ручное назначение</option><option value="dependent">Зависит от другой цены</option></select></label>
+          <label><span>Базовая цена</span><select name="base_price_type_id" data-price-type-base><option value="last_purchase_price">Последняя закупочная цена</option>{% for item in price_type_state.price_types %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+          <label><span>Тип</span><select name="markup_type" data-price-type-markup-type><option value="markup">Наценка</option><option value="discount">Скидка</option></select></label>
+          <label><span>%</span><input name="markup_value" inputmode="decimal" data-price-type-markup-value /></label>
+          <label><span>Валюта результата</span><select name="convert_to_currency" data-price-type-currency><option value="UZS">UZS</option><option value="USD">USD</option></select></label>
+          <label><span>Округление</span><select name="rounding" data-price-type-rounding>{% for item in price_type_state.roundings %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+        </div>
+        <div class="price-type-flags">
+          <label><input type="checkbox" name="is_for_sales" value="1" data-price-type-sales /> В продажах</label>
+          <label><input type="checkbox" name="is_for_purchases" value="1" data-price-type-purchases /> В закупках</label>
+          <label><input type="checkbox" name="is_active" value="1" data-price-type-active /> Активный</label>
+        </div>
+        <div class="products-bulk-dialog-actions">
+          <button class="btn" type="submit">Сохранить</button>
+          <button class="btn btn-secondary" type="button" data-price-type-close>Отмена</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="settings-profile-modal products-category-dialog" id="products-category-dialog">
+      <form method="post" action="{{ url_for('products_category_save') }}" class="settings-profile-modal-card telephony-dialog-surface" data-product-category-form>
+        {% include "_csrf_field.html" %}
+        <input type="hidden" name="old_name" data-product-category-old-name />
+        <header class="settings-profile-modal-head">
+          <div>
+            <p>Справочник товаров</p>
+            <h2 data-product-category-dialog-title>Новая категория</h2>
+          </div>
+          <button type="button" class="settings-profile-close" data-product-category-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="products-bulk-dialog-body">
+          <label class="product-form-grid product-category-dialog-field">
+            <span>Название категории*</span>
+            <input name="name" required data-product-category-name />
+          </label>
+        </div>
+        <div class="products-bulk-dialog-actions">
+          <button class="btn" type="submit">Сохранить</button>
+          <button class="btn btn-secondary" type="button" data-product-category-close>Отмена</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="settings-profile-modal products-category-dialog" id="products-dictionary-quick-dialog">
+      <form method="dialog" class="settings-profile-modal-card telephony-dialog-surface" data-product-dictionary-quick-form>
+        <header class="settings-profile-modal-head">
+          <div>
+            <p>Справочник товаров</p>
+            <h2 data-product-dictionary-quick-title>Новое значение</h2>
+          </div>
+          <button type="button" class="settings-profile-close" data-product-dictionary-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="products-bulk-dialog-body">
+          <label class="product-form-grid product-category-dialog-field">
+            <span data-product-dictionary-quick-label>Название*</span>
+            <input name="name" required autocomplete="off" data-product-dictionary-quick-name />
+          </label>
+          <p class="products-dictionary-quick-error" data-product-dictionary-quick-error hidden></p>
+        </div>
+        <div class="products-bulk-dialog-actions">
+          <button class="btn" type="submit" data-product-dictionary-save>Создать</button>
+          <button class="btn btn-secondary" type="button" data-product-dictionary-close>Отмена</button>
+        </div>
+      </form>
+    </dialog>
+    </div>
+  </section>
+	  <script>
+	    (() => {
+	      const priceDialog = document.getElementById('products-price-type-dialog');
+	      if (priceDialog) {
+	        const setValue = (selector, value) => {
+	          const node = priceDialog.querySelector(selector);
+	          if (node) node.value = value || '';
+	        };
+	        const setChecked = (selector, value) => {
+	          const node = priceDialog.querySelector(selector);
+	          if (node) node.checked = value === '1';
+	        };
+	        document.querySelectorAll('[data-price-type-open]').forEach((button) => {
+	          button.addEventListener('click', () => {
+	            const id = button.dataset.id || '';
+	            const title = priceDialog.querySelector('[data-price-type-dialog-title]');
+	            if (title) title.textContent = id ? 'Редактировать прайс-лист' : 'Новый прайс-лист';
+	            setValue('[data-price-type-id]', id);
+	            setValue('[data-price-type-name]', button.dataset.name || '');
+	            setValue('[data-price-type-sort]', button.dataset.sortOrder || '0');
+	            setValue('[data-price-type-method]', button.dataset.method || 'manual');
+	            setValue('[data-price-type-base]', button.dataset.base || 'last_purchase_price');
+	            setValue('[data-price-type-markup-type]', button.dataset.markupType || 'markup');
+	            setValue('[data-price-type-markup-value]', button.dataset.markupValue || '');
+	            setValue('[data-price-type-currency]', button.dataset.currency || 'UZS');
+	            setValue('[data-price-type-rounding]', button.dataset.rounding || '1.0');
+	            setChecked('[data-price-type-sales]', button.dataset.forSales || '1');
+	            setChecked('[data-price-type-purchases]', button.dataset.forPurchases || '0');
+	            setChecked('[data-price-type-active]', button.dataset.active || '1');
+	            if (typeof priceDialog.showModal === 'function') priceDialog.showModal();
+	            window.setTimeout(() => priceDialog.querySelector('[data-price-type-name]')?.focus(), 30);
+	          });
+	        });
+	        priceDialog.querySelectorAll('[data-price-type-close]').forEach((button) => {
+	          button.addEventListener('click', () => priceDialog.close());
+	        });
+	      }
+
+	      const dependentPriceToggles = Array.from(document.querySelectorAll('[data-dependent-price-auto]'));
+	      const allDependentPricesToggle = document.querySelector('[data-dependent-price-auto-all]');
+	      const syncAllDependentPrices = () => {
+	        if (!allDependentPricesToggle || !dependentPriceToggles.length) return;
+	        const checkedCount = dependentPriceToggles.filter((toggle) => toggle.checked).length;
+	        allDependentPricesToggle.checked = checkedCount === dependentPriceToggles.length;
+	        allDependentPricesToggle.indeterminate = checkedCount > 0 && checkedCount < dependentPriceToggles.length;
+	      };
+	      dependentPriceToggles.forEach((toggle) => {
+	        const input = toggle.closest('.price-type-dependent-control')?.querySelector('[data-dependent-price-input]');
+	        const sync = () => {
+	          if (!input) return;
+	          input.readOnly = toggle.checked;
+	          input.classList.toggle('is-automatic', toggle.checked);
+	          syncAllDependentPrices();
+	          window.setTimeout(syncAllDependentPrices, 0);
+	        };
+	        toggle.addEventListener('change', sync);
+	        sync();
+	      });
+	      if (allDependentPricesToggle) {
+	        allDependentPricesToggle.addEventListener('change', () => {
+	          const nextChecked = allDependentPricesToggle.checked;
+	          dependentPriceToggles.forEach((toggle) => {
+	            toggle.checked = nextChecked;
+	            toggle.dispatchEvent(new Event('change'));
+	          });
+	          syncAllDependentPrices();
+	        });
+	        syncAllDependentPrices();
+	      }
+
+	      const dialog = document.getElementById('products-category-dialog');
+	      if (!dialog) return;
+      const title = dialog.querySelector('[data-product-category-dialog-title]');
+      const oldName = dialog.querySelector('[data-product-category-old-name]');
+      const nameInput = dialog.querySelector('[data-product-category-name]');
+      document.querySelectorAll('[data-product-category-open]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const value = button.dataset.categoryName || '';
+          if (title) title.textContent = value ? 'Редактировать категорию' : 'Новая категория';
+          if (oldName) oldName.value = value;
+          if (nameInput) nameInput.value = value;
+          if (typeof dialog.showModal === 'function') dialog.showModal();
+          window.setTimeout(() => nameInput?.focus(), 30);
+        });
+      });
+      dialog.querySelectorAll('[data-product-category-close]').forEach((button) => {
+        button.addEventListener('click', () => dialog.close());
+      });
+
+      const quickDialog = document.getElementById('products-dictionary-quick-dialog');
+      const quickForm = quickDialog?.querySelector('[data-product-dictionary-quick-form]');
+      const quickTitle = quickDialog?.querySelector('[data-product-dictionary-quick-title]');
+      const quickLabel = quickDialog?.querySelector('[data-product-dictionary-quick-label]');
+      const quickInput = quickDialog?.querySelector('[data-product-dictionary-quick-name]');
+      const quickError = quickDialog?.querySelector('[data-product-dictionary-quick-error]');
+      const quickSave = quickDialog?.querySelector('[data-product-dictionary-save]');
+      let quickType = 'category';
+      let quickTargetType = 'category';
+      const normalizeText = (value) => String(value || '').trim().toLowerCase();
+      const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[ch]));
+      const csrfToken = () => (
+        document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || document.querySelector('input[name="csrf_token"]')?.value
+        || ''
+      );
+      const dictionaryCombos = Array.from(document.querySelectorAll('[data-product-dictionary-combo]'));
+      const optionValues = (select) => Array.from(select?.options || [])
+        .map((option) => option.value)
+        .filter(Boolean);
+      const closeDictionaryCombo = (combo) => {
+        const panel = combo?.querySelector('[data-product-dictionary-combo-panel]');
+        const toggle = combo?.querySelector('[data-product-dictionary-combo-toggle]');
+        if (panel) panel.hidden = true;
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        combo?.classList.remove('is-open');
+      };
+      const syncDictionaryComboValue = (combo, value) => {
+        const type = combo?.dataset.productDictionaryCombo || '';
+        const input = combo?.querySelector('[data-product-dictionary-combo-input]');
+        const select = document.querySelector(`[data-product-dictionary-select="${type}"]`);
+        const hidden = document.querySelector(`[data-product-dictionary-value="${type}"]`);
+        const clean = String(value || '').trim();
+        if (input) input.value = clean;
+        if (hidden) hidden.value = clean;
+        if (select) select.value = clean;
+      };
+      const renderDictionaryCombo = (combo, query = '') => {
+        const type = combo?.dataset.productDictionaryCombo || '';
+        const panel = combo?.querySelector('[data-product-dictionary-combo-panel]');
+        const toggle = combo?.querySelector('[data-product-dictionary-combo-toggle]');
+        const select = document.querySelector(`[data-product-dictionary-select="${type}"]`);
+        if (!combo || !panel || !select) return;
+        const needle = normalizeText(query);
+        const values = optionValues(select)
+          .filter((value) => !needle || normalizeText(value).includes(needle));
+        panel.innerHTML = values.length
+          ? values.map((value) => (
+              `<button type="button" class="product-dictionary-combo-option" data-value="${escapeHtml(value)}">` +
+              `<span>${escapeHtml(value)}</span>` +
+              `</button>`
+            )).join('')
+          : '<div class="product-dictionary-combo-empty">Ничего не найдено</div>';
+        panel.hidden = false;
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+        combo.classList.add('is-open');
+      };
+      const initDictionaryCombos = () => {
+        dictionaryCombos.forEach((combo) => {
+          if (combo.dataset.dictionaryComboReady === '1') return;
+          combo.dataset.dictionaryComboReady = '1';
+          const type = combo.dataset.productDictionaryCombo || '';
+          const input = combo.querySelector('[data-product-dictionary-combo-input]');
+          const panel = combo.querySelector('[data-product-dictionary-combo-panel]');
+          const toggle = combo.querySelector('[data-product-dictionary-combo-toggle]');
+          const select = document.querySelector(`[data-product-dictionary-select="${type}"]`);
+          const hidden = document.querySelector(`[data-product-dictionary-value="${type}"]`);
+          if (!input || !panel || !select || !hidden) return;
+          syncDictionaryComboValue(combo, hidden.value || select.value || input.value);
+          input.addEventListener('focus', () => renderDictionaryCombo(combo, input.value));
+          input.addEventListener('input', () => {
+            hidden.value = input.value.trim();
+            select.value = optionValues(select).includes(hidden.value) ? hidden.value : '';
+            renderDictionaryCombo(combo, input.value);
+          });
+          input.addEventListener('keydown', (event) => {
+            const options = Array.from(panel.querySelectorAll('.product-dictionary-combo-option'));
+            const current = document.activeElement;
+            const index = options.indexOf(current);
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              if (panel.hidden) renderDictionaryCombo(combo, input.value);
+              (options[index + 1] || options[0])?.focus();
+            } else if (event.key === 'Escape') {
+              closeDictionaryCombo(combo);
+            } else if (event.key === 'Enter' && !panel.hidden && options.length) {
+              event.preventDefault();
+              const exact = options.find((button) => normalizeText(button.dataset.value) === normalizeText(input.value)) || options[0];
+              syncDictionaryComboValue(combo, exact.dataset.value || '');
+              closeDictionaryCombo(combo);
+            }
+          });
+          panel.addEventListener('keydown', (event) => {
+            const options = Array.from(panel.querySelectorAll('.product-dictionary-combo-option'));
+            const index = options.indexOf(document.activeElement);
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              const step = event.key === 'ArrowDown' ? 1 : -1;
+              options[(index + step + options.length) % options.length]?.focus();
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              const button = document.activeElement?.closest?.('.product-dictionary-combo-option');
+              if (button) {
+                syncDictionaryComboValue(combo, button.dataset.value || '');
+                closeDictionaryCombo(combo);
+                input.focus();
+              }
+            } else if (event.key === 'Escape') {
+              closeDictionaryCombo(combo);
+              input.focus();
+            }
+          });
+          panel.addEventListener('mousedown', (event) => {
+            const button = event.target.closest('.product-dictionary-combo-option');
+            if (!button) return;
+            event.preventDefault();
+            syncDictionaryComboValue(combo, button.dataset.value || '');
+            closeDictionaryCombo(combo);
+            input.focus();
+          });
+          toggle?.addEventListener('click', () => {
+            if (panel.hidden) {
+              renderDictionaryCombo(combo, input.value);
+              input.focus();
+            } else {
+              closeDictionaryCombo(combo);
+            }
+          });
+        });
+      };
+      initDictionaryCombos();
+      document.addEventListener('mousedown', (event) => {
+        dictionaryCombos.forEach((combo) => {
+          if (!combo.contains(event.target)) closeDictionaryCombo(combo);
+        });
+      });
+      const addSelectOption = (type, value) => {
+        document.querySelectorAll(`[data-product-dictionary-select="${type}"]`).forEach((select) => {
+          if (!Array.from(select.options).some((option) => option.value === value)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            select.appendChild(option);
+          }
+          select.value = value;
+          const combo = document.querySelector(`[data-product-dictionary-combo="${type}"]`);
+          if (combo) syncDictionaryComboValue(combo, value);
+        });
+      };
+      document.querySelectorAll('[data-product-dictionary-open]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (!quickDialog || !quickInput) return;
+          quickType = button.dataset.productDictionaryType || 'category';
+          quickTargetType = quickType;
+          const isBrand = quickType === 'brand';
+          const isProgram = quickType === 'category' && document.querySelector('input[name="kind"][value="subscription"]')?.checked;
+          if (isProgram) quickType = 'program';
+          if (quickTitle) quickTitle.textContent = (isProgram && button.dataset.productProgramTitle) || button.dataset.productDictionaryTitle || (isBrand ? 'Новый бренд' : 'Новая категория');
+          if (quickLabel) quickLabel.textContent = (isProgram && button.dataset.productProgramLabel) || (isBrand ? 'Название бренда*' : 'Название категории*');
+          if (quickError) {
+            quickError.hidden = true;
+            quickError.textContent = '';
+          }
+          quickInput.value = '';
+          if (typeof quickDialog.showModal === 'function') quickDialog.showModal();
+          window.setTimeout(() => quickInput.focus(), 30);
+        });
+      });
+      quickDialog?.querySelectorAll('[data-product-dictionary-close]').forEach((button) => {
+        button.addEventListener('click', () => quickDialog.close());
+      });
+      quickForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!quickInput) return;
+        const name = quickInput.value.trim();
+        if (!name) {
+          if (quickError) {
+            quickError.textContent = 'Введите название.';
+            quickError.hidden = false;
+          }
+          quickInput.focus();
+          return;
+        }
+        if (quickSave) quickSave.disabled = true;
+        try {
+          const response = await fetch('{{ url_for("products_dictionary_quick_save") }}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken(),
+            },
+            body: JSON.stringify({ type: quickType, name }),
+          });
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok || !body.ok) throw new Error(body.error || 'save');
+          addSelectOption(quickTargetType, body.name || name);
+          quickDialog?.close();
+        } catch (error) {
+          if (quickError) {
+            quickError.textContent = 'Не удалось сохранить. Обновите страницу и попробуйте ещё раз.';
+            quickError.hidden = false;
+          }
+        } finally {
+          if (quickSave) quickSave.disabled = false;
+        }
+      });
+    })();
+  </script>
+{% endblock %}
