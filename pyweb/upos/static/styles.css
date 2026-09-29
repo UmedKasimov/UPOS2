@@ -34647,7 +34647,8 @@ html.dark .crm-task-calendar-event {
   opacity: 1;
 }
 
-#products-catalog-table .products-row-actions .products-action-icon--delete:not(:disabled) {
+#products-catalog-table .products-row-actions .products-action-icon--delete:not(:disabled),
+.products-bulk-actions .products-action-icon--delete:not(:disabled) {
   color: #dc2626;
   background: color-mix(in srgb, #dc2626 10%, var(--card));
   opacity: 1;
