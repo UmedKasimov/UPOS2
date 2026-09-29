@@ -22,7 +22,7 @@
 {% block scripts %}
   {{ super() }}
   {% if not module_home_only %}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=14" defer></script>
+  <script src="{{ url_for('static', path='products-table.js') }}?v=15" defer></script>
   <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=7" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
@@ -333,37 +333,44 @@
               </div>
             </dialog>
           {% endif %}
-          <dialog class="products-bulk-dialog" data-products-bulk-dialog>
+          <dialog class="products-bulk-dialog products-bulk-edit-dialog" data-products-bulk-dialog>
             <div class="products-bulk-dialog-panel">
               <header class="products-bulk-dialog-head">
-                <h3>Массовое редактирование</h3>
+                <div>
+                  <h3>Массовое редактирование</h3>
+                  <p>Выбрано товаров: <strong data-products-selected-count>0</strong>. Отметьте поля, которые нужно изменить.</p>
+                </div>
                 <button type="button" class="products-bulk-dialog-close" data-products-bulk-close aria-label="Закрыть">×</button>
               </header>
               <div class="products-bulk-dialog-body">
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Категория</span>
-                  <input name="bulk_category" list="product-category-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Группа товара</span>
-                  <input name="bulk_group" list="product-group-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Бренд</span>
-                  <input name="bulk_brand" list="product-brand-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Папка</span>
-                  <input name="bulk_folder" list="product-folder-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Категория</span></label>
+                  <div class="products-bulk-combo" data-products-bulk-combo data-list-id="product-category-list" data-create-label="категорию">
+                    <input name="bulk_category" placeholder="Выберите или создайте категорию" autocomplete="off" data-products-bulk-input disabled />
+                    <button type="button" data-products-bulk-combo-open aria-label="Показать категории" disabled>⌄</button>
+                    <div class="products-bulk-combo-panel" data-products-bulk-combo-panel hidden></div>
+                  </div>
+                </div>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Группа товара</span></label>
+                  <input name="bulk_group" list="product-group-list" placeholder="Выберите группу" data-products-bulk-input disabled />
+                </div>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Бренд</span></label>
+                  <div class="products-bulk-combo" data-products-bulk-combo data-list-id="product-brand-list" data-create-label="бренд">
+                    <input name="bulk_brand" placeholder="Выберите или создайте бренд" autocomplete="off" data-products-bulk-input disabled />
+                    <button type="button" data-products-bulk-combo-open aria-label="Показать бренды" disabled>⌄</button>
+                    <div class="products-bulk-combo-panel" data-products-bulk-combo-panel hidden></div>
+                  </div>
+                </div>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Папка</span></label>
+                  <input name="bulk_folder" list="product-folder-list" placeholder="Выберите папку" data-products-bulk-input disabled />
+                </div>
               </div>
               <footer class="products-bulk-dialog-actions">
-                <button class="btn" type="submit" data-products-bulk-submit disabled>Сохранить</button>
-                <button class="btn btn-secondary" type="button" data-products-bulk-close>Отменить</button>
+                <button class="btn btn-secondary" type="button" data-products-bulk-close>Отмена</button>
+                <button class="btn" type="submit" data-products-bulk-submit disabled>Сохранить изменения</button>
               </footer>
             </div>
           </dialog>

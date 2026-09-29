@@ -7584,6 +7584,15 @@ def create_app() -> FastAPI:
                 row.external_id = row.external_id or row.id
                 updated_count += 1
 
+        if updated_count and (updates.get("category") or updates.get("brand")):
+            workspace_settings = load_workspace_settings(wid)
+            if updates.get("category"):
+                stored_categories = workspace_settings.get("product_categories") or []
+                _save_product_categories(wid, [*stored_categories, updates["category"]])
+            if updates.get("brand"):
+                stored_brands = workspace_settings.get("product_brands") or []
+                _save_product_brands(wid, [*stored_brands, updates["brand"]])
+
         return RedirectResponse(
             url=_product_list_redirect_url(**filters, msg="bulk_saved", count=updated_count),
             status_code=302,
