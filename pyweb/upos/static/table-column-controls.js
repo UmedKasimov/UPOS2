@@ -30,6 +30,19 @@
   function isFixedWidthCell(cell) {
     return fixedCellWidth(cell) > 0;
   }
+  function minimumCellWidth(cell) {
+    const requested = Number(cell?.dataset?.uposMinWidth);
+    return Number.isFinite(requested) && requested > MIN_COLUMN_WIDTH
+      ? Math.min(MAX_COLUMN_WIDTH, requested)
+      : MIN_COLUMN_WIDTH;
+  }
+
+  function minimumColumnWidth(table, key) {
+    const cell = directCells(headerRow(table))
+      .find((item) => item.getAttribute(CELL_KEY_ATTR) === key);
+    return minimumCellWidth(cell);
+  }
+
   const MAX_COLUMN_WIDTH = 720;
   let draggedColumn = null;
   let draggedHeaderColumn = null;
@@ -249,7 +262,7 @@
       const key = cell.getAttribute(CELL_KEY_ATTR);
       const width = cell.getBoundingClientRect().width;
       if (key && Number.isFinite(width) && width > 0) {
-        widths[key] = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, width));
+        widths[key] = Math.max(minimumCellWidth(cell), Math.min(MAX_COLUMN_WIDTH, width));
       }
     });
     if (!Object.keys(widths).length) return;
@@ -262,7 +275,7 @@
     if (available > total && total > 0) {
       const factor = available / total;
       Object.keys(widths).forEach((key) => {
-        widths[key] = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.floor(widths[key] * factor)));
+        widths[key] = Math.max(minimumColumnWidth(table, key), Math.min(MAX_COLUMN_WIDTH, Math.floor(widths[key] * factor)));
       });
     }
     table._uposBaseColumnWidths = widths;
@@ -288,7 +301,7 @@
       const fixed = fixedCellWidth(sample);
       const value = fixed || Number(widths[column.key]);
       if (!Number.isFinite(value)) return;
-      const width = fixed || Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+      const width = fixed || Math.max(minimumColumnWidth(table, column.key), Math.min(MAX_COLUMN_WIDTH, value));
       tableRows(table).forEach((row) => {
         const cell = directCells(row).find((item) => item.getAttribute(CELL_KEY_ATTR) === column.key);
         if (!cell) return;
@@ -747,7 +760,7 @@
   });
 
   function resizeColumn(table, key, width, persist = false) {
-    const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.round(width)));
+    const nextWidth = Math.max(minimumColumnWidth(table, key), Math.min(MAX_COLUMN_WIDTH, Math.round(width)));
     applyWidths(table, { [key]: nextWidth });
     if (persist) {
       const widths = readWidths(table);
