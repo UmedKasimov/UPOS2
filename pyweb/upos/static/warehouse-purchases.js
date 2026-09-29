@@ -340,7 +340,7 @@
         <header class="upos-catalog-picker-head">
           <div>
             <h2>Подбор товаров</h2>
-            <p>Выберите товары из каталога и массово добавьте в приход.</p>
+            <p data-purchase-catalog-subtitle>Выберите товары из каталога и массово добавьте в приход.</p>
           </div>
           <button type="button" class="upos-catalog-picker-close" data-purchase-catalog-close aria-label="Закрыть">×</button>
         </header>
@@ -410,7 +410,7 @@
     const activeCategory = state.category || "";
     const byCategory = allRows.filter((item) => !activeCategory || catalogProductCategory(item) === activeCategory);
     const rows = byCategory.filter((item) => {
-      if (onlyStock && !purchaseEntryNumber(productStockLabel(item))) return false;
+      if (onlyStock && !(state.stockValue ? state.stockValue(item) : purchaseEntryNumber(productStockLabel(item)))) return false;
       return normalize(catalogProductSearchText(item)).includes(normalize(query));
     });
     const categoriesNode = dialog.querySelector("[data-purchase-catalog-categories]");
@@ -434,7 +434,7 @@
           <tr data-purchase-catalog-key="${escapeHtml(key)}">
             <td><strong>${highlightCatalogText(item.name, query)}</strong><small>${escapeHtml([item.category || "", item.sku || item.barcode || ""].filter(Boolean).join(" · "))}</small></td>
             <td>${escapeHtml(purchasePrice ? `${purchaseEntryFormatCurrency(purchasePrice, currency)} ${currency}` : "Без цены")}</td>
-            <td>${escapeHtml(productStockLabel(item))}</td>
+            <td>${escapeHtml(state.stockLabel ? state.stockLabel(item) : productStockLabel(item))}</td>
             <td><div class="upos-catalog-qty"><button type="button" data-purchase-catalog-step="-1">−</button><input inputmode="decimal" value="${escapeHtml(quantity)}" data-purchase-catalog-qty /><button type="button" data-purchase-catalog-step="1">+</button></div></td>
             <td>${escapeHtml(item.unit || "шт")}</td>
           </tr>`;
@@ -443,9 +443,11 @@
     updatePurchaseCatalogTotal(dialog);
   }
 
-  function openPurchaseCatalogPicker(form, onApply) {
+  function openPurchaseCatalogPicker(form, onApply, settings = {}) {
     const dialog = ensurePurchaseCatalogDialog();
-    dialog._uposPurchaseCatalogState = { form, category: "", onApply };
+    dialog._uposPurchaseCatalogState = { form, category: "", onApply, ...settings };
+    const subtitle = dialog.querySelector("[data-purchase-catalog-subtitle]");
+    if (subtitle) subtitle.textContent = settings.subtitle || "Выберите товары из каталога и массово добавьте в приход.";
     dialog._uposPurchaseCatalogQuantities = new Map();
     renderPurchaseCatalogPicker(dialog);
     if (dialog.dataset.purchaseCatalogReady !== "1") {
@@ -2446,8 +2448,7 @@
         if (matching.length) {
           return matching.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
         }
-        const totalStock = stocks.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
-        return stocks.length ? totalStock : purchaseEntryNumber(product?.quantity);
+        return stocks.length ? 0 : purchaseEntryNumber(product?.quantity);
       };
       const priceForProduct = (product) => {
         const warehouse = normalize(warehouseInput?.value);
@@ -2655,7 +2656,11 @@
                     '<button type="button" class="sales-combo-option">' +
                     '<span class="sales-combo-main">' +
                     highlightText(item.name, query) +
-                    "</span></button>"
+                    "</span>" +
+                    (stockForProduct(item) > 0
+                      ? '<span class="sales-combo-meta">Остаток: ' + escapeHtml(quantityText(stockForProduct(item))) + ' ' + escapeHtml(item.unit || "шт") + '</span>'
+                      : "") +
+                    "</button>"
                   );
                 })
                 .join("")
@@ -2776,6 +2781,43 @@
         recalc();
         if (focus) clone.querySelector("[data-adjustment-product-input]")?.focus();
       };
+      const addCatalogProductToAdjustment = (item, quantity) => {
+        const productId = String(item?.id || "");
+        if (!productId || quantity <= 0) return;
+        let row = rows().find((entry) => String(entry.querySelector("[data-adjustment-product]")?.value || "") === productId);
+        if (row) {
+          const input = row.querySelector("[data-adjustment-quantity]");
+          if (input) {
+            input.value = quantityText(purchaseEntryNumber(input.value) + quantity);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          return;
+        }
+        row = rows().find((entry) => !entry.querySelector("[data-adjustment-product]")?.value);
+        if (!row) {
+          addRow({ focus: false });
+          row = rows()[rows().length - 1];
+        }
+        if (!row) return;
+        const picker = row.querySelector("[data-adjustment-product-picker]");
+        const search = row.querySelector("[data-adjustment-product-input]");
+        const hidden = row.querySelector("[data-adjustment-product]");
+        const edit = row.querySelector("[data-adjustment-product-edit]");
+        const panel = row.querySelector("[data-adjustment-product-panel]");
+        if (!search || !hidden) return;
+        search.value = item.name || "";
+        search.readOnly = true;
+        hidden.value = productId;
+        picker?.classList.add("is-locked");
+        if (edit) edit.hidden = false;
+        if (panel) panel.hidden = true;
+        hidden.dispatchEvent(new Event("change", { bubbles: true }));
+        const input = row.querySelector("[data-adjustment-quantity]");
+        if (input) {
+          input.value = quantityText(quantity);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      };
       const wireExpenseRow = (row) => {
         if (!row || row.dataset.adjustmentExpenseReady === "1") return;
         row.dataset.adjustmentExpenseReady = "1";
@@ -2829,6 +2871,13 @@
       rows().forEach(wireRow);
       expenseRows().forEach(wireExpenseRow);
       wireExpenseTypeDialog(form);
+      form.querySelector("[data-adjustment-catalog-pick]")?.addEventListener("click", () => {
+        openPurchaseCatalogPicker(form, addCatalogProductToAdjustment, {
+          subtitle: "Выберите товары и количество для корректировки на выбранном складе.",
+          stockValue: stockForProduct,
+          stockLabel: (item) => `${quantityText(stockForProduct(item))} ${item.unit || "шт"}`,
+        });
+      });
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
       form.querySelector("[data-adjustment-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
