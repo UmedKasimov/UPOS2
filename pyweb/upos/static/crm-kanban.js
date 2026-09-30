@@ -1530,6 +1530,8 @@
     const clientCreateDialog = document.querySelector("#crm-client-create-dialog");
     const clientCreateForm = clientCreateDialog?.querySelector("[data-crm-client-create-form]");
     const clientCreateStatus = clientCreateDialog?.querySelector("[data-crm-client-create-status]");
+    const clientCreateSubtitle = clientCreateDialog?.querySelector("[data-crm-client-create-subtitle]");
+    let clientCreateFromContact = false;
     const taskTypeSelect = form?.querySelector("[data-crm-task-type-select]");
     const taskChecklist = form?.querySelector("[data-crm-task-checklist]");
     const clientRows = Array.from(document.querySelectorAll("#crm-client-list option"))
@@ -1607,17 +1609,27 @@
       }
     };
 
-    const openClientCreateDialog = () => {
+    const openClientCreateDialog = (fromContact = false) => {
       if (!clientCreateDialog || !clientCreateForm) return;
-      const suggestedName = String(clientInput?.value || "").trim();
+      clientCreateFromContact = fromContact;
+      const suggestion = String((fromContact ? contactInput : clientInput)?.value || "").trim();
+      const suggestedPhone = fromContact && /^[+\d\s().-]+$/.test(suggestion) && normalizePhone(suggestion)
+        ? suggestion : "";
+      const suggestedName = suggestedPhone ? "" : suggestion;
       clientCreateForm.reset();
       const nameInput = clientCreateForm.querySelector("[data-crm-client-create-name]");
       if (nameInput) nameInput.value = suggestedName;
+      const phoneInput = clientCreateForm.querySelector('input[name="phone"]');
+      if (phoneInput) phoneInput.value = suggestedPhone;
+      if (clientCreateSubtitle) clientCreateSubtitle.textContent = fromContact
+        ? "Клиент сохранится и сразу подставится в сделку."
+        : "Клиент сохранится и сразу подставится в задачу.";
       if (clientCreateStatus) {
         clientCreateStatus.textContent = "";
         clientCreateStatus.dataset.status = "";
       }
       closeClientPanel();
+      closeContactPanel();
       if (typeof clientCreateDialog.showModal === "function") {
         clientCreateDialog.showModal();
       } else {
@@ -2042,8 +2054,8 @@
       contactInput.value = item.phone || item.name;
       if (contactClientId) contactClientId.value = item.id;
       syncContactMatch();
-      closeContactPanel();
       contactInput.focus();
+      closeContactPanel();
     };
 
     const renderContactPanel = () => {
@@ -2062,7 +2074,10 @@
           + `<span class="sales-combo-meta"><span class="${item.phone ? "crm-contact-phone" : ""}">${escapeHtml(item.phone || "Номер не указан")}</span><strong>В базе клиентов</strong></span>`
           + '</button>'
         )).join("")
-        : '<div class="sales-combo-empty">Клиент не найден. Номер можно ввести вручную.</div>';
+        : '<div class="sales-combo-empty">Клиент не найден. Номер можно ввести вручную.</div>'
+          + '<button type="button" class="sales-combo-option crm-client-create-option" data-crm-contact-create-open>'
+          + '<span class="sales-combo-main">+ Создать клиента</span>'
+          + '<span class="sales-combo-meta">Добавить в базу клиентов</span></button>';
       contactPanel.hidden = false;
       positionContactPanel();
       contactPanel.querySelectorAll("[data-crm-contact-choice]").forEach((button, index) => {
@@ -2071,6 +2086,12 @@
           event.preventDefault();
           chooseContact(rows[index]);
         });
+      });
+      const createButton = contactPanel.querySelector("[data-crm-contact-create-open]");
+      createButton?.addEventListener("mousedown", (event) => event.preventDefault());
+      createButton?.addEventListener("click", (event) => {
+        event.preventDefault();
+        openClientCreateDialog(true);
       });
     };
 
@@ -2383,17 +2404,21 @@
           }
           if (name) existingClients.add(name.toLocaleLowerCase());
           const id = String(client.id || "").trim();
-          if (id && normalizePhone(phone) && !contactRows.some((item) => item.id === id)) {
+          if (id && name && !contactRows.some((item) => item.id === id)) {
             contactRows.push({ id, name, phone });
             contactRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
           }
-          if (clientInput) {
+          if (!clientCreateFromContact && clientInput) {
             clientInput.value = name;
             clientInput.dispatchEvent(new Event("change", { bubbles: true }));
           }
           syncDuplicateNotice();
           closeClientCreateDialog();
-          clientInput?.focus();
+          if (clientCreateFromContact && id) {
+            chooseContact({ id, name, phone });
+          } else {
+            clientInput?.focus();
+          }
         })
         .catch((error) => {
           if (clientCreateStatus) {
