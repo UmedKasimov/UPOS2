@@ -13971,6 +13971,7 @@ def create_app() -> FastAPI:
             activity_log = [{"at": created_at, "action": "Карточка создана", "actor": "UPOS", "detail": ""}]
         return {
             "id": row.id,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
             "title": row.title,
             "item_type": row.item_type,
             "item_type_label": _crm_type_label(row.item_type),
@@ -17676,6 +17677,7 @@ def create_app() -> FastAPI:
         crm_history_records: list[dict[str, Any]] = []
         crm_archive_records: list[dict[str, Any]] = []
         crm_next_actions: list[dict[str, Any]] = []
+        crm_contact_queue: list[dict[str, Any]] = []
         crm_task_summary = {
             "total_count": 0,
             "open_count": 0,
@@ -17841,6 +17843,46 @@ def create_app() -> FastAPI:
                     .order_by(CrmRecord.updated_at.desc())
                 ).scalars()
             )
+            def crm_local_moment(value: Any) -> datetime | None:
+                if isinstance(value, datetime):
+                    moment = value
+                else:
+                    raw = str(value or "").strip()
+                    if not raw:
+                        return None
+                    try:
+                        moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    except ValueError:
+                        return None
+                    if len(raw) == 10:
+                        return moment.replace(tzinfo=crm_timezone)
+                if moment.tzinfo is None:
+                    moment = moment.replace(tzinfo=timezone.utc)
+                return moment.astimezone(crm_timezone)
+
+            contact_by_deal: dict[str, date] = {}
+            contact_by_counterparty: dict[str, date] = {}
+            contact_by_client: dict[str, date] = {}
+            open_task_dates: dict[str, list[date]] = {}
+
+            def remember_contact(index: dict[str, date], key: str, day: date) -> None:
+                if key and (key not in index or day > index[key]):
+                    index[key] = day
+
+            for source in rows:
+                source_data = _json_object(source.data)
+                deal_id = str(source_data.get("related_deal_id") or "").strip()
+                if source.item_type == "history":
+                    contact_moment = crm_local_moment(source_data.get("date") or source.created_at)
+                    if contact_moment:
+                        contact_day = min(contact_moment.date(), crm_today_local)
+                        remember_contact(contact_by_deal, deal_id, contact_day)
+                        remember_contact(contact_by_counterparty, str(source.counterparty_id or ""), contact_day)
+                        remember_contact(contact_by_client, str(source_data.get("client") or "").strip().casefold(), contact_day)
+                elif source.item_type == "task" and source.status not in {"done", "archived", "won", "lost"} and deal_id:
+                    task_day = crm_local_moment(source.due_date or source_data.get("due_date"))
+                    if task_day:
+                        open_task_dates.setdefault(deal_id, []).append(task_day.date())
             def deal_option(row: CrmRecord) -> dict[str, str]:
                 data = _json_object(row.data)
                 linked_document_ids = {
@@ -17915,8 +17957,12 @@ def create_app() -> FastAPI:
                 if counterparty is not None:
                     item["client_id"] = counterparty.id
                     item["client_href"] = f"/clients?client={counterparty.id}#client-card"
+                    counterparty_extra = _counterparty_extra(counterparty)
+                    item["contact_phone"] = str(
+                        counterparty.phone or counterparty_extra.get("phone") or counterparty_extra.get("telegram_phone") or ""
+                    ).strip()
                     if item["item_type"] == "deal" and not item["business_segment_ids"]:
-                        extra = _counterparty_extra(counterparty)
+                        extra = counterparty_extra
                         segment_ids = extra.get("business_segment_ids") if isinstance(extra.get("business_segment_ids"), list) else []
                         item["business_segment_ids"] = [str(value) for value in segment_ids if value]
                         if not item["business_segment_ids"] and extra.get("business_segment_id"):
@@ -17925,6 +17971,7 @@ def create_app() -> FastAPI:
                 else:
                     item["client_id"] = ""
                     item["client_href"] = ""
+                    item["contact_phone"] = ""
                 record_data = _json_object(row.data)
                 linked_sale = (
                     sale_by_id.get(str(record_data.get("related_sale_id") or ""))
@@ -18182,6 +18229,83 @@ def create_app() -> FastAPI:
                 str(item.get("title") or ""),
             ),
         )[:6]
+        queue_stage_rank = {str(stage["id"]): index for index, stage in enumerate(crm_stages)}
+        stale_after_days = max(1, math.ceil(crm_activity_settings["red_hours"] / 24))
+        for item in crm_records:
+            if item["item_type"] != "deal" or item["status"] in {"done", "won", "lost", "archived"}:
+                continue
+            created_day = crm_local_moment(item.get("created_at"))
+            contact_days = [
+                contact_by_deal.get(item["id"]),
+                contact_by_counterparty.get(str(item.get("counterparty_id") or "")),
+                contact_by_client.get(str(item.get("client") or "").strip().casefold()),
+            ]
+            for event in item["activity_log"]:
+                if str(event.get("kind") or "") != "chat":
+                    continue
+                moment = crm_local_moment(event.get("at"))
+                if moment:
+                    contact_days.append(moment.date())
+            waiting_message = False
+            for thread in item.get("messenger_threads") or []:
+                messages = [
+                    (crm_local_moment(message.get("created_at")), str(message.get("kind") or ""))
+                    for message in thread.get("messages") or []
+                    if isinstance(message, dict)
+                ]
+                messages = [(moment, kind) for moment, kind in messages if moment and kind in {"in", "out"}]
+                if messages:
+                    latest_moment, latest_kind = max(messages, key=lambda entry: entry[0])
+                    if latest_kind == "in":
+                        waiting_message = True
+                    else:
+                        contact_days.append(latest_moment.date())
+            last_contact = max((day for day in contact_days if day), default=None)
+            baseline = last_contact or (created_day.date() if created_day else crm_today_local)
+            days_without_contact = max(0, (crm_today_local - baseline).days)
+            task_dates = open_task_dates.get(item["id"], [])
+            deal_due = crm_local_moment(item.get("due_date")) if item.get("next_step") else None
+            planned_dates = task_dates + ([deal_due.date()] if deal_due else [])
+            overdue_dates = [day for day in planned_dates if day < crm_today_local]
+            due_today = any(day == crm_today_local for day in planned_dates)
+            if overdue_dates:
+                reason, rank, due_sort = "Просрочено", 0, min(overdue_dates)
+            elif waiting_message:
+                reason, rank, due_sort = "Ждёт ответа", 1, crm_today_local
+            elif due_today:
+                reason, rank, due_sort = "Связаться сегодня", 2, crm_today_local
+            elif days_without_contact >= stale_after_days:
+                reason, rank, due_sort = "Давно не связывались", 3, crm_today_local
+            elif not planned_dates:
+                reason, rank, due_sort = "Нет следующего шага", 4, crm_today_local
+            else:
+                continue
+            phone = str(item.get("contact_phone") or item.get("contact") or "").strip()
+            phone_digits = re.sub(r"\D", "", phone)
+            call_href = "tel:" + ("+" if phone.startswith("+") else "") + phone_digits if len(phone_digits) >= 9 else ""
+            whatsapp_href = f"https://wa.me/{phone_digits}" if len(phone_digits) >= 11 else ""
+            messenger_channels = item.get("messenger_channels") or []
+            message_href = whatsapp_href or (str(messenger_channels[0].get("href") or "") if messenger_channels else "")
+            amount_value = item.get("kanban_amount_uzs_value")
+            crm_contact_queue.append({
+                "record_id": item["id"],
+                "client": item["client"] or item["contact"] or "Клиент не указан",
+                "title": item["title"],
+                "reason": reason,
+                "rank": rank,
+                "due_sort": due_sort,
+                "stage_rank": queue_stage_rank.get(str(item.get("stage_id") or ""), 0),
+                "amount_value": amount_value if isinstance(amount_value, Decimal) else Decimal("0"),
+                "amount": _sales_money_label(amount_value) if isinstance(amount_value, Decimal) else "0",
+                "days_without_contact": days_without_contact,
+                "has_contact": bool(last_contact),
+                "call_href": call_href,
+                "message_href": message_href,
+                "message_external": bool(whatsapp_href),
+            })
+        crm_contact_queue.sort(key=lambda entry: (
+            entry["rank"], entry["due_sort"], -entry["stage_rank"], -entry["amount_value"], entry["client"].casefold(),
+        ))
         crm_task_records = sorted(
             crm_task_records,
             key=lambda item: (
@@ -18206,6 +18330,8 @@ def create_app() -> FastAPI:
             crm_archive_records=crm_archive_records,
             crm_summary=crm_summary,
             crm_next_actions=crm_next_actions,
+            crm_contact_queue=crm_contact_queue,
+            crm_queue_today=crm_today_local.isoformat(),
             crm_pipeline_stages=crm_stages,
             crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
             crm_client_segments=_workspace_business_segments(wid),

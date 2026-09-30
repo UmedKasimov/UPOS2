@@ -938,9 +938,15 @@
       else taskDialog.removeAttribute("open");
     };
 
-    const openTaskDialog = () => {
+    const openTaskDialog = (preset = {}) => {
       if (!taskDialog || !detailCard) return;
       taskForm?.reset();
+      if (preset.title) taskForm.querySelector('[name="text"]').value = preset.title;
+      if (preset.dueDate) {
+        const dueDate = taskForm.querySelector('[name="due_date"]');
+        dueDate.value = preset.dueDate;
+        dueDate.dispatchEvent(new Event("change", { bubbles: true }));
+      }
       if (taskSubtitle) taskSubtitle.textContent = `По сделке «${detailCard.dataset.crmDetailTitle || ""}»`;
       if (typeof taskDialog.showModal === "function") taskDialog.showModal();
       else taskDialog.setAttribute("open", "");
@@ -983,7 +989,23 @@
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
     });
     orderButton?.addEventListener("click", openOrderDialog);
-    taskOpenButton?.addEventListener("click", openTaskDialog);
+    taskOpenButton?.addEventListener("click", () => openTaskDialog());
+    document.querySelectorAll("[data-crm-queue-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const recordId = button.dataset.crmQueueRecordId || "";
+        const card = Array.from(document.querySelectorAll(".crm-kanban-card"))
+          .find((candidate) => candidate.dataset.crmRecordId === recordId);
+        if (!card) return;
+        openDetails(card);
+        if (button.dataset.crmQueueAction === "task") {
+          showDetailPane("tasks");
+          openTaskDialog({
+            title: `Связаться с ${card.dataset.crmDetailClient || "клиентом"}`,
+            dueDate: button.dataset.crmQueueToday || "",
+          });
+        }
+      });
+    });
     taskDialog?.querySelectorAll("[data-crm-card-task-close]").forEach((button) => {
       button.addEventListener("click", closeTaskDialog);
     });

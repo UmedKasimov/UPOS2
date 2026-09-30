@@ -195,6 +195,43 @@
   </div>
 </section>
 
+<section class="crm-contact-queue" data-workspace-view="deals" aria-labelledby="crm-contact-queue-title" hidden>
+  <header class="crm-contact-queue-head">
+    <div>
+      <h2 id="crm-contact-queue-title">Кому связаться сегодня <span>{{ crm_contact_queue|length }}</span></h2>
+      <p>Сначала просроченные действия и сообщения без ответа. Затем сделки без недавнего контакта или плана.</p>
+    </div>
+  </header>
+  {% if crm_contact_queue %}
+    <div class="crm-contact-queue-scroll">
+      <div class="crm-contact-queue-list">
+        {% for item in crm_contact_queue %}
+          <article class="crm-contact-queue-row" data-priority="{{ item.rank }}">
+            <div class="crm-contact-queue-client">
+              <button type="button" data-crm-queue-action="open" data-crm-queue-record-id="{{ item.record_id }}">{{ item.client }}</button>
+              <small>{{ item.title }}</small>
+            </div>
+            <span class="crm-contact-queue-reason">{{ item.reason }}</span>
+            <strong class="crm-contact-queue-amount">{{ item.amount }} UZS</strong>
+            <span class="crm-contact-queue-days">{% if item.has_contact %}{{ item.days_without_contact }} дн. без контакта{% else %}Контакт не отмечен · {{ item.days_without_contact }} дн.{% endif %}</span>
+            <div class="crm-contact-queue-actions">
+              {% if item.call_href %}<a href="{{ item.call_href }}">Позвонить</a>{% else %}<span title="Номер клиента не указан">Нет номера</span>{% endif %}
+              {% if item.message_href %}
+                <a href="{{ item.message_href }}" {% if item.message_external %}target="_blank" rel="noopener"{% endif %}>Написать</a>
+              {% else %}
+                <span title="Нет номера или связанного канала">Нет канала</span>
+              {% endif %}
+              <button type="button" data-crm-queue-action="task" data-crm-queue-record-id="{{ item.record_id }}" data-crm-queue-today="{{ crm_queue_today }}">Назначить задачу</button>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <p class="crm-contact-queue-empty">Срочных контактов нет.</p>
+  {% endif %}
+</section>
+
 <section class="crm-pipeline-shell" data-workspace-view="deals" hidden>
   <header class="crm-pipeline-head crm-pipeline-head--filters">
     <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">

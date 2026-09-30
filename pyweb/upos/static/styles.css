@@ -6319,6 +6319,171 @@ a.messenger-message-attachment:focus-visible {
   margin-bottom: 1rem;
 }
 
+.crm-contact-queue {
+  min-width: 0;
+  margin-bottom: 1rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
+  overflow: hidden;
+}
+
+.crm-contact-queue[hidden] {
+  display: none;
+}
+
+.crm-contact-queue-head {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.crm-contact-queue-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.crm-contact-queue-head h2 span {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  color: var(--primary);
+  font-size: var(--text-xs);
+}
+
+.crm-contact-queue-head p {
+  margin: 0.2rem 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-contact-queue-scroll {
+  max-height: 19rem;
+  overflow: auto;
+}
+
+.crm-contact-queue-list {
+  min-width: 57rem;
+}
+
+.crm-contact-queue-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.4fr) minmax(7.5rem, 0.8fr) minmax(7rem, 0.7fr) minmax(9rem, 0.8fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  font-size: var(--text-xs);
+}
+
+.crm-contact-queue-row:last-child {
+  border-bottom: 0;
+}
+
+.crm-contact-queue-row:nth-child(even) {
+  background: color-mix(in srgb, var(--primary) 3%, var(--card));
+}
+
+.crm-contact-queue-client {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.crm-contact-queue-client button {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-client button:hover {
+  text-decoration: underline;
+}
+
+.crm-contact-queue-client small,
+.crm-contact-queue-days {
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-reason {
+  width: fit-content;
+  padding: 0.2rem 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  color: var(--primary);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-row[data-priority="0"] .crm-contact-queue-reason,
+.crm-contact-queue-row[data-priority="1"] .crm-contact-queue-reason {
+  background: color-mix(in srgb, #dc2626 10%, var(--card));
+  color: #b91c1c;
+}
+
+.crm-contact-queue-amount {
+  white-space: nowrap;
+}
+
+.crm-contact-queue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-actions a,
+.crm-contact-queue-actions button,
+.crm-contact-queue-actions span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.9rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.crm-contact-queue-actions a:hover,
+.crm-contact-queue-actions button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.crm-contact-queue-actions span {
+  color: var(--muted-foreground);
+  cursor: default;
+}
+
+.crm-contact-queue-empty {
+  margin: 0;
+  padding: 0.8rem 0.85rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
 .crm-service-metrics {
   display: grid;
   grid-template-columns: repeat(7, minmax(7.5rem, 1fr));
