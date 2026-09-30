@@ -681,6 +681,29 @@
   </form>
 </dialog>
 
+<dialog class="settings-profile-modal" id="crm-source-create-dialog" aria-labelledby="crm-source-create-dialog-title">
+  <form class="settings-profile-modal-surface" data-crm-source-create-form>
+    <header class="settings-profile-modal-head">
+      <div>
+        <h2 id="crm-source-create-dialog-title" class="settings-profile-modal-title">Новый канал продаж</h2>
+        <p class="settings-profile-modal-sub">Канал сохранится и сразу подставится в сделку.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-source-create-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-body">
+      <label class="settings-profile-field">
+        <span class="settings-profile-field-label">Название канала*</span>
+        <input class="settings-profile-input" name="name" required maxlength="80" data-crm-source-create-name />
+      </label>
+      <p class="sales-product-dialog-status" data-crm-source-create-status aria-live="polite"></p>
+    </div>
+    <footer class="settings-profile-modal-foot">
+      <button type="button" class="btn btn-secondary" data-crm-source-create-close>Отмена</button>
+      <button type="submit" class="btn" data-crm-source-create-submit>Создать канал</button>
+    </footer>
+  </form>
+</dialog>
+
 <dialog class="settings-profile-modal crm-record-dialog" id="crm-record-dialog" aria-labelledby="crm-record-dialog-title">
   <div class="settings-profile-modal-surface crm-record-dialog-surface">
     <header class="settings-profile-modal-head">

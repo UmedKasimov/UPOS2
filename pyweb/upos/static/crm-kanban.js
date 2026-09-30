@@ -1519,6 +1519,10 @@
     const sourceValue = form?.querySelector("[data-crm-source-value]");
     const sourcePanel = form?.querySelector("[data-crm-source-panel]");
     const sourceError = form?.querySelector("[data-crm-source-error]");
+    const sourceCreateDialog = document.querySelector("#crm-source-create-dialog");
+    const sourceCreateForm = sourceCreateDialog?.querySelector("[data-crm-source-create-form]");
+    const sourceCreateName = sourceCreateForm?.querySelector("[data-crm-source-create-name]");
+    const sourceCreateStatus = sourceCreateForm?.querySelector("[data-crm-source-create-status]");
     const sourceRows = Array.from(form?.querySelectorAll("[data-crm-source-options] option") || [])
       .map((option) => String(option.value || "").trim()).filter(Boolean);
     const duplicateNote = dialog.querySelector("[data-crm-client-duplicate]");
@@ -1744,6 +1748,23 @@
       closeSourcePanel();
     };
 
+    const closeSourceCreateDialog = () => {
+      if (sourceCreateDialog?.open) sourceCreateDialog.close();
+    };
+
+    const openSourceCreateDialog = (suggestedName = "") => {
+      if (!sourceCreateDialog || !sourceCreateForm) return;
+      sourceCreateForm.reset();
+      if (sourceCreateName) sourceCreateName.value = suggestedName;
+      if (sourceCreateStatus) {
+        sourceCreateStatus.textContent = "";
+        sourceCreateStatus.dataset.status = "";
+      }
+      closeSourcePanel();
+      sourceCreateDialog.showModal();
+      sourceCreateName?.focus();
+    };
+
     const renderSourcePanel = () => {
       if (!sourceInput || !sourcePanel) return;
       const query = String(sourceInput.value || "").trim();
@@ -1753,7 +1774,9 @@
       sourcePanel.innerHTML = (rows.length
         ? rows.map((name) => `<button type="button" class="sales-combo-option" data-crm-source-choice><span class="sales-combo-main">${escapeHtml(name)}</span></button>`).join("")
         : '<div class="sales-combo-empty">Канал не найден</div>')
-        + (!exact ? `<button type="button" class="sales-combo-option crm-source-create-option" data-crm-source-create><span class="sales-combo-main">+ Создать канал${query ? ` «${escapeHtml(query)}»` : ""}</span><span class="sales-combo-meta"><span>${query ? "Добавить и выбрать" : "Введите название в поле поиска"}</span></span></button>` : "");
+        + '<button type="button" class="sales-combo-option crm-source-create-option" data-crm-source-create>'
+        + '<span class="sales-combo-main">+ Создать канал продаж</span>'
+        + '<span class="sales-combo-meta"><span>Добавить новый канал</span></span></button>';
       sourcePanel.hidden = false;
       positionSourcePanel();
       sourcePanel.querySelectorAll("[data-crm-source-choice]").forEach((button, index) => {
@@ -1764,31 +1787,51 @@
         });
       });
       sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("mousedown", (event) => event.preventDefault());
-      sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("click", async (event) => {
+      sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("click", (event) => {
         event.preventDefault();
-        if (!query) { sourceInput.focus(); return; }
-        const button = event.currentTarget;
-        button.disabled = true;
-        if (sourceError) sourceError.hidden = true;
-        try {
-          const body = new FormData();
-          body.set("csrf_token", form.querySelector('input[name="csrf_token"]')?.value || "");
-          body.set("name", query);
-          const response = await fetch("/crm/lead-sources", { method: "POST", body, headers: { Accept: "application/json" } });
-          const result = await response.json();
-          if (!response.ok || !result.name) throw new Error(result.error || "Не удалось создать канал");
-          const name = String(result.name);
-          if (!sourceRows.some((item) => item.toLocaleLowerCase() === name.toLocaleLowerCase())) sourceRows.push(name);
-          chooseSource(name);
-        } catch (error) {
-          if (sourceError) {
-            sourceError.textContent = error.message || "Не удалось создать канал";
-            sourceError.hidden = false;
-          }
-          button.disabled = false;
-        }
+        openSourceCreateDialog(exact ? "" : query);
       });
     };
+
+    sourceCreateDialog?.querySelectorAll("[data-crm-source-create-close]").forEach((button) => {
+      button.addEventListener("click", closeSourceCreateDialog);
+    });
+    sourceCreateDialog?.addEventListener("click", (event) => {
+      if (event.target === sourceCreateDialog) closeSourceCreateDialog();
+    });
+    sourceCreateForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!sourceCreateForm.checkValidity()) {
+        sourceCreateForm.reportValidity();
+        return;
+      }
+      const name = String(sourceCreateName?.value || "").trim();
+      const submitButton = sourceCreateForm.querySelector("[data-crm-source-create-submit]");
+      if (submitButton) submitButton.disabled = true;
+      if (sourceCreateStatus) {
+        sourceCreateStatus.textContent = "Сохраняю...";
+        sourceCreateStatus.dataset.status = "";
+      }
+      try {
+        const body = new FormData();
+        body.set("csrf_token", form.querySelector('input[name="csrf_token"]')?.value || "");
+        body.set("name", name);
+        const response = await fetch("/crm/lead-sources", { method: "POST", body, headers: { Accept: "application/json" } });
+        const result = await response.json();
+        if (!response.ok || !result.name) throw new Error(result.error || "Не удалось создать канал");
+        const savedName = String(result.name);
+        if (!sourceRows.some((item) => item.toLocaleLowerCase() === savedName.toLocaleLowerCase())) sourceRows.push(savedName);
+        closeSourceCreateDialog();
+        chooseSource(savedName);
+      } catch (error) {
+        if (sourceCreateStatus) {
+          sourceCreateStatus.textContent = error.message || "Не удалось создать канал";
+          sourceCreateStatus.dataset.status = "error";
+        }
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
 
     const positionResponsiblePanel = () => {
       if (!responsibleInput || !responsiblePanel || responsiblePanel.hidden) return;
