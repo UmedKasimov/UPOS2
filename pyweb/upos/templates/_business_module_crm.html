@@ -81,6 +81,38 @@
           </tr>
         </thead>
         <tbody>
+          {% for item in crm_contact_queue %}
+            <tr
+              class="crm-task-followup-row{% if item.rank == 0 %} is-overdue{% endif %}"
+              data-crm-task-row
+              data-crm-followup-row
+              data-task-title="Связаться с {{ item.client|e }}"
+              data-task-client="{{ item.client|e }}"
+              data-task-order=""
+              data-task-responsible="{{ item.responsible|e }}"
+              data-task-priority="{{ 'high' if item.rank == 0 else 'normal' }}"
+              data-task-status="new"
+              data-task-due-date="{{ item.due_date }}"
+              data-task-action-state="{{ 'overdue' if item.rank == 0 else 'today' }}"
+              data-task-complete="false"
+            >
+              <td class="crm-task-complete-cell"><span class="crm-task-followup-mark" title="Напоминание по сделке">↗</span></td>
+              <td>
+                <button class="crm-task-title-button" type="button" data-crm-queue-action="open" data-crm-queue-record-id="{{ item.record_id }}">Связаться с {{ item.client }}</button>
+                <small>{{ item.title }} · {{ item.amount }} UZS · {{ item.days_without_contact }} дн. без контакта</small>
+              </td>
+              <td>{{ item.client }}</td>
+              <td>{{ item.responsible or "Не назначен" }}</td>
+              <td><span class="crm-task-priority crm-task-priority--{{ 'high' if item.rank == 0 else 'normal' }}">{{ 'Высокий' if item.rank == 0 else 'Обычный' }}</span></td>
+              <td>{{ item.due_date }}</td>
+              <td class="crm-task-followup-state">
+                <span class="crm-task-state crm-task-state--{{ 'overdue' if item.rank == 0 else 'today' }}">{{ item.reason }}</span>
+                {% if item.call_href %}<a href="{{ item.call_href }}">Позвонить</a>{% endif %}
+                {% if item.message_href %}<a href="{{ item.message_href }}" {% if item.message_external %}target="_blank" rel="noopener"{% endif %}>Написать</a>{% endif %}
+                <button type="button" data-crm-queue-action="task" data-crm-queue-record-id="{{ item.record_id }}" data-crm-queue-today="{{ crm_queue_today }}">Назначить задачу</button>
+              </td>
+            </tr>
+          {% endfor %}
           {% for row in crm_task_records %}
             {% set action_state = row.get("action_state") or {"id": "", "label": ""} %}
             {% set is_done = row.status == "done" %}
@@ -128,9 +160,10 @@
                 </span>
               </td>
             </tr>
-          {% else %}
-            <tr data-crm-task-server-empty><td colspan="7">Задач пока нет.</td></tr>
           {% endfor %}
+          {% if not crm_task_records and not crm_contact_queue %}
+            <tr data-crm-task-server-empty><td colspan="7">Задач пока нет.</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
@@ -195,46 +228,12 @@
   </div>
 </section>
 
-<section class="crm-contact-queue" data-workspace-view="deals" aria-labelledby="crm-contact-queue-title" hidden>
-  <header class="crm-contact-queue-head">
-    <div>
-      <h2 id="crm-contact-queue-title">Кому связаться сегодня <span>{{ crm_contact_queue|length }}</span></h2>
-      <p>Сначала просроченные действия и сообщения без ответа. Затем сделки без недавнего контакта или плана.</p>
-    </div>
-  </header>
-  {% if crm_contact_queue %}
-    <div class="crm-contact-queue-scroll">
-      <div class="crm-contact-queue-list">
-        {% for item in crm_contact_queue %}
-          <article class="crm-contact-queue-row" data-priority="{{ item.rank }}">
-            <div class="crm-contact-queue-client">
-              <button type="button" data-crm-queue-action="open" data-crm-queue-record-id="{{ item.record_id }}">{{ item.client }}</button>
-              <small>{{ item.title }}</small>
-            </div>
-            <span class="crm-contact-queue-reason">{{ item.reason }}</span>
-            <strong class="crm-contact-queue-amount">{{ item.amount }} UZS</strong>
-            <span class="crm-contact-queue-days">{% if item.has_contact %}{{ item.days_without_contact }} дн. без контакта{% else %}Контакт не отмечен · {{ item.days_without_contact }} дн.{% endif %}</span>
-            <div class="crm-contact-queue-actions">
-              {% if item.call_href %}<a href="{{ item.call_href }}">Позвонить</a>{% else %}<span title="Номер клиента не указан">Нет номера</span>{% endif %}
-              {% if item.message_href %}
-                <a href="{{ item.message_href }}" {% if item.message_external %}target="_blank" rel="noopener"{% endif %}>Написать</a>
-              {% else %}
-                <span title="Нет номера или связанного канала">Нет канала</span>
-              {% endif %}
-              <button type="button" data-crm-queue-action="task" data-crm-queue-record-id="{{ item.record_id }}" data-crm-queue-today="{{ crm_queue_today }}">Назначить задачу</button>
-            </div>
-          </article>
-        {% endfor %}
-      </div>
-    </div>
-  {% else %}
-    <p class="crm-contact-queue-empty">Срочных контактов нет.</p>
-  {% endif %}
-</section>
-
 <section class="crm-pipeline-shell" data-workspace-view="deals" hidden>
   <header class="crm-pipeline-head crm-pipeline-head--filters">
-    <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
+    <div class="crm-pipeline-head-actions">
+      <details class="crm-filter-popover">
+        <summary class="btn btn-secondary">Фильтры{% if crm_filters.q or crm_filters.client or crm_filters.responsible or crm_filters.status != 'all' or crm_filters.priority != 'all' %} · активны{% endif %}</summary>
+        <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
       <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" data-crm-search-dropdown="deals" placeholder="Задача, клиент, ответственный" autocomplete="off" /></label>
       <label><span>Клиент</span><input name="client" value="{{ crm_filters.client }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-client-list" data-crm-search-meta="Клиент" placeholder="Клиент" autocomplete="off" /></label>
       <label><span>Ответственный</span><input name="responsible" value="{{ crm_filters.responsible }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-responsible-list" data-crm-search-meta="Ответственный" placeholder="Ответственный" autocomplete="off" /></label>
@@ -261,9 +260,11 @@
       </label>
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Очистить</a>
+        </form>
+      </details>
       <button class="btn" type="button" data-crm-open-dialog data-crm-kind="deal">+ Сделка</button>
       <button class="btn btn-secondary" type="button" data-crm-open-dialog data-crm-kind="history">+ Контакт</button>
-    </form>
+    </div>
     <button
       class="btn btn-secondary crm-archive-toggle"
       type="button"

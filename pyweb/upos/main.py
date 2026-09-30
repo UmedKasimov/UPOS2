@@ -18291,9 +18291,11 @@ def create_app() -> FastAPI:
                 "record_id": item["id"],
                 "client": item["client"] or item["contact"] or "Клиент не указан",
                 "title": item["title"],
+                "responsible": item.get("responsible") or "",
                 "reason": reason,
                 "rank": rank,
                 "due_sort": due_sort,
+                "due_date": due_sort.isoformat(),
                 "stage_rank": queue_stage_rank.get(str(item.get("stage_id") or ""), 0),
                 "amount_value": amount_value if isinstance(amount_value, Decimal) else Decimal("0"),
                 "amount": _sales_money_label(amount_value) if isinstance(amount_value, Decimal) else "0",
@@ -18306,6 +18308,10 @@ def create_app() -> FastAPI:
         crm_contact_queue.sort(key=lambda entry: (
             entry["rank"], entry["due_sort"], -entry["stage_rank"], -entry["amount_value"], entry["client"].casefold(),
         ))
+        crm_task_summary["total_count"] += len(crm_contact_queue)
+        crm_task_summary["open_count"] += len(crm_contact_queue)
+        crm_task_summary["overdue_count"] += sum(item["rank"] == 0 for item in crm_contact_queue)
+        crm_task_summary["today_count"] += sum(item["rank"] != 0 for item in crm_contact_queue)
         crm_task_records = sorted(
             crm_task_records,
             key=lambda item: (

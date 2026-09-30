@@ -2825,6 +2825,11 @@
 
     const openTaskInfoDialog = (row) => {
       if (!taskInfoDialog || !row) return;
+      if (row.hasAttribute("data-crm-followup-row")) {
+        closeDayDialog();
+        row.querySelector('[data-crm-queue-action="open"]')?.click();
+        return;
+      }
       activeTaskRow = row;
       const payload = taskEditPayload(row);
       if (taskInfoTitle) taskInfoTitle.textContent = row.dataset.taskTitle || payload.title || "Задача";
@@ -3086,6 +3091,15 @@
   }
 
   function init() {
+    const filterPopover = document.querySelector(".crm-filter-popover");
+    if (filterPopover) {
+      document.addEventListener("click", (event) => {
+        if (filterPopover.open && !filterPopover.contains(event.target)) filterPopover.open = false;
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && filterPopover.open) filterPopover.open = false;
+      });
+    }
     initSearchDropdowns();
     document.querySelectorAll("[data-crm-kanban]").forEach(initKanban);
     initDialog();
