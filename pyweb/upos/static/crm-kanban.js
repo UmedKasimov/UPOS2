@@ -2182,7 +2182,18 @@
         return;
       }
       const field = fields[0];
-      field.value = value;
+      if (name === "currency" && field.tagName === "SELECT") {
+        field.querySelectorAll("[data-crm-legacy-currency]").forEach((option) => option.remove());
+        const currency = String(value || "UZS").trim().toUpperCase();
+        if (!Array.from(field.options).some((option) => option.value === currency)) {
+          const option = new Option(`${currency} (сохранено ранее)`, currency);
+          option.dataset.crmLegacyCurrency = "";
+          field.add(option);
+        }
+        field.value = currency;
+      } else {
+        field.value = value;
+      }
       field.dispatchEvent(new Event("change", { bubbles: true }));
       field.dispatchEvent(new Event("input", { bubbles: true }));
     };
@@ -2221,6 +2232,7 @@
     const resetDialog = () => {
       if (!form) return;
       form.reset();
+      form.querySelectorAll("[data-crm-legacy-currency]").forEach((option) => option.remove());
       form.dataset.crmDialogMode = "create";
       form.classList.remove("is-compact-deal-create", "is-task-mode");
       form.setAttribute("action", defaultAction);
