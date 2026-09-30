@@ -543,6 +543,10 @@
     const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
     const orderDialog = document.getElementById("crm-order-dialog");
     const orderFrame = orderDialog?.querySelector("[data-crm-order-dialog-frame]");
+    const taskDialog = document.getElementById("crm-card-task-dialog");
+    const taskForm = taskDialog?.querySelector('[data-crm-activity-form="task"]');
+    const taskOpenButton = dialog.querySelector("[data-crm-card-task-open]");
+    const taskSubtitle = taskDialog?.querySelector("[data-crm-card-task-subtitle]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
     const documents = dialog.querySelector("[data-crm-card-detail-documents]");
@@ -555,6 +559,7 @@
     const taskFeed = dialog.querySelector("[data-crm-card-detail-task-feed]");
     const commentFeed = dialog.querySelector("[data-crm-card-detail-comment-feed]");
     const activityForms = Array.from(dialog.querySelectorAll("[data-crm-activity-form]"));
+    if (taskForm) activityForms.push(taskForm);
     let detailCard = null;
     const fields = {
       title: dialog.querySelector('[data-crm-card-detail-field="title"]'),
@@ -895,6 +900,7 @@
 
     const closeDetails = () => {
       detailCard = null;
+      if (taskDialog?.open) taskDialog.close();
       if (dialog.open && typeof dialog.close === "function") {
         dialog.close();
       } else {
@@ -924,6 +930,21 @@
       } else {
         orderDialog.setAttribute("open", "");
       }
+    };
+
+    const closeTaskDialog = () => {
+      if (!taskDialog) return;
+      if (taskDialog.open && typeof taskDialog.close === "function") taskDialog.close();
+      else taskDialog.removeAttribute("open");
+    };
+
+    const openTaskDialog = () => {
+      if (!taskDialog || !detailCard) return;
+      taskForm?.reset();
+      if (taskSubtitle) taskSubtitle.textContent = `По сделке «${detailCard.dataset.crmDetailTitle || ""}»`;
+      if (typeof taskDialog.showModal === "function") taskDialog.showModal();
+      else taskDialog.setAttribute("open", "");
+      taskForm?.querySelector('[name="text"]')?.focus();
     };
 
     document.querySelectorAll(".crm-kanban-card").forEach((card) => {
@@ -962,6 +983,17 @@
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
     });
     orderButton?.addEventListener("click", openOrderDialog);
+    taskOpenButton?.addEventListener("click", openTaskDialog);
+    taskDialog?.querySelectorAll("[data-crm-card-task-close]").forEach((button) => {
+      button.addEventListener("click", closeTaskDialog);
+    });
+    taskDialog?.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeTaskDialog();
+    });
+    taskDialog?.addEventListener("click", (event) => {
+      if (event.target === taskDialog) closeTaskDialog();
+    });
     orderDialog?.querySelectorAll("[data-crm-order-dialog-close]").forEach((button) => {
       button.addEventListener("click", closeOrderDialog);
     });
@@ -1086,6 +1118,7 @@
               history.insertAdjacentHTML("afterbegin", renderActivityEvent(eventData, kind));
             }
             form.reset();
+            if (kind === "task") closeTaskDialog();
           })
           .catch(() => window.location.reload())
           .finally(() => form.classList.remove("is-saving"));

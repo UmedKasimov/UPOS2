@@ -977,22 +977,7 @@
         </div>
         <div class="crm-card-detail-work-pane" data-crm-detail-pane="tasks" hidden>
           <div class="crm-card-detail-feed" data-crm-card-detail-task-feed></div>
-          <form class="crm-card-detail-activity-form crm-card-detail-task-form" data-crm-activity-form="task">
-            <div class="crm-task-form-main">
-              <input name="text" maxlength="500" placeholder="Название задачи" required />
-              <label class="crm-task-done-toggle"><input name="completed" type="checkbox" value="1" /> Выполнено</label>
-            </div>
-            <div class="crm-task-form-grid">
-              <label><span>Дата</span><input name="due_date" type="date" /></label>
-              <label><span>Время</span><input name="due_time" type="time" /></label>
-              <label><span>Ответственный</span><input name="assignee" list="crm-responsible-list" placeholder="Сотрудник" /></label>
-              <label><span>Приоритет</span><select name="priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
-              <label><span>Участники</span><input name="participants" list="crm-responsible-list" placeholder="Через запятую" /></label>
-              <label><span>Напоминание</span><input name="reminder_at" type="datetime-local" /></label>
-            </div>
-            <textarea name="checklist" rows="3" maxlength="800" placeholder="Чеклист: каждый пункт с новой строки"></textarea>
-            <button class="btn" type="submit">Добавить задачу</button>
-          </form>
+          <button class="btn crm-card-detail-add-task" type="button" data-crm-card-task-open>+ Добавить задачу</button>
         </div>
         <div class="crm-card-detail-work-pane" data-crm-detail-pane="comments" hidden>
           <div class="crm-card-detail-feed" data-crm-card-detail-comment-feed></div>
@@ -1003,6 +988,35 @@
         </div>
       </section>
     </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal crm-card-task-dialog" id="crm-card-task-dialog" aria-labelledby="crm-card-task-dialog-title">
+  <div class="settings-profile-modal-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-card-task-dialog-title" class="settings-profile-modal-title">Новая задача</h2>
+        <p class="settings-profile-modal-sub" data-crm-card-task-subtitle>Задача по сделке</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-card-task-close aria-label="Закрыть">×</button>
+    </header>
+    <form class="crm-card-detail-activity-form crm-card-detail-task-form crm-card-task-dialog-form" data-crm-activity-form="task">
+      <div class="settings-profile-modal-scroll crm-card-task-dialog-fields">
+        <label class="wide"><span>Название задачи*</span><input name="text" maxlength="500" placeholder="Что нужно сделать" required /></label>
+        <label><span>Дата</span><input name="due_date" type="date" /></label>
+        <label><span>Время</span><input name="due_time" type="time" /></label>
+        <label><span>Ответственный</span><input name="assignee" list="crm-responsible-list" placeholder="Сотрудник" /></label>
+        <label><span>Приоритет</span><select name="priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
+        <label><span>Участники</span><input name="participants" list="crm-responsible-list" placeholder="Через запятую" /></label>
+        <label><span>Напоминание</span><input name="reminder_at" type="datetime-local" /></label>
+        <label class="wide"><span>Чеклист</span><textarea name="checklist" rows="3" maxlength="800" placeholder="Каждый пункт с новой строки"></textarea></label>
+        <label class="crm-task-done-toggle wide"><input name="completed" type="checkbox" value="1" /> Выполнено</label>
+      </div>
+      <footer class="settings-profile-modal-foot">
+        <button class="btn btn-secondary" type="button" data-crm-card-task-close>Отмена</button>
+        <button class="btn" type="submit">Добавить задачу</button>
+      </footer>
+    </form>
   </div>
 </dialog>
 

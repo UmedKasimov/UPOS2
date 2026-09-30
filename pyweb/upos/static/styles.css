@@ -8111,6 +8111,54 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   align-content: start;
 }
 
+.crm-card-detail-add-task {
+  width: 100%;
+}
+
+.settings-profile-modal.crm-card-task-dialog {
+  width: min(38rem, 94vw);
+  max-width: min(38rem, 94vw);
+}
+
+.crm-card-task-dialog-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crm-card-task-dialog-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+}
+
+.crm-card-task-dialog-fields label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-card-task-dialog-fields label.wide {
+  grid-column: 1 / -1;
+}
+
+.crm-card-task-dialog-fields .crm-task-done-toggle {
+  display: flex;
+  color: var(--foreground);
+}
+
+@media (max-width: 560px) {
+  .crm-card-task-dialog-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .crm-task-form-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
