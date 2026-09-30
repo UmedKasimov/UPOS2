@@ -1515,6 +1515,12 @@
     const contactClientId = form?.querySelector("[data-crm-client-id]");
     const contactPanel = form?.querySelector("[data-crm-contact-panel]");
     const contactCardLink = form?.querySelector("[data-crm-contact-card]");
+    const segmentField = form?.querySelector("[data-crm-segment-field]");
+    const segmentDropdown = segmentField?.querySelector("[data-crm-segment-dropdown]");
+    const segmentSummary = segmentField?.querySelector("[data-crm-segment-summary]");
+    const segmentSearch = segmentField?.querySelector("[data-crm-segment-search]");
+    const segmentChanged = segmentField?.querySelector("[data-crm-segment-changed]");
+    const segmentBoxes = Array.from(segmentField?.querySelectorAll("[data-crm-segment-option]") || []);
     const sourceInput = form?.querySelector("[data-crm-source-input]");
     const sourceValue = form?.querySelector("[data-crm-source-value]");
     const sourcePanel = form?.querySelector("[data-crm-source-panel]");
@@ -1581,6 +1587,7 @@
         name: String(option.dataset.clientName || option.textContent || "").trim(),
         phone: String(option.dataset.clientPhone || "").trim(),
         phones: String(option.dataset.clientPhones || option.dataset.clientPhone || "").trim(),
+        segmentIds: String(option.dataset.clientSegmentIds || "").split(",").filter(Boolean),
       }))
       .filter((item) => item.id && item.name)
       .sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -2049,9 +2056,37 @@
       contactPanel.style.width = `${width}px`;
     };
 
+    const syncSegmentSummary = () => {
+      if (!segmentSummary) return;
+      const selected = segmentBoxes.filter((box) => box.checked)
+        .map((box) => String(box.closest("label")?.querySelector("span")?.textContent || box.value).trim());
+      segmentSummary.textContent = selected.length
+        ? selected.slice(0, 2).join(" · ") + (selected.length > 2 ? ` · ещё ${selected.length - 2}` : "")
+        : "Не выбраны";
+    };
+
+    const setSegmentIds = (ids) => {
+      const selected = new Set(Array.isArray(ids) ? ids.map(String) : []);
+      segmentBoxes.forEach((box) => { box.checked = selected.has(box.value); });
+      if (segmentChanged) segmentChanged.value = "0";
+      syncSegmentSummary();
+    };
+
+    segmentBoxes.forEach((box) => box.addEventListener("change", () => {
+      if (segmentChanged) segmentChanged.value = "1";
+      syncSegmentSummary();
+    }));
+    segmentSearch?.addEventListener("input", () => {
+      const query = segmentSearch.value.trim().toLocaleLowerCase();
+      segmentField.querySelectorAll("[data-crm-segment-option-row]").forEach((row) => {
+        row.hidden = Boolean(query) && !row.textContent.toLocaleLowerCase().includes(query);
+      });
+    });
+
     const syncContactMatch = () => {
       if (!contactInput || !contactMatchNote || !clientInput) return;
       const phone = normalizePhone(contactInput.value);
+      const previousClientId = String(contactClientId?.value || "");
       let selected = contactRows.find((item) => item.id === String(contactClientId?.value || ""));
       const selectedText = selected?.phone || selected?.name || "";
       const stillSelected = selected && (selected.phone
@@ -2065,6 +2100,7 @@
       if (!selected && matches.length === 1) {
         selected = matches[0];
         if (contactClientId) contactClientId.value = selected.id;
+        if (selected.id !== previousClientId) setSegmentIds(selected.segmentIds);
       }
       contactInput.classList.toggle("crm-contact-known", matches.length > 0);
       if (selected) {
@@ -2097,6 +2133,7 @@
       if (!contactInput || !item) return;
       contactInput.value = item.phone || item.name;
       if (contactClientId) contactClientId.value = item.id;
+      setSegmentIds(item.segmentIds);
       syncContactMatch();
       contactInput.focus();
       closeContactPanel();
@@ -2238,6 +2275,7 @@
       const isTaskMode = kind === "task";
       form.classList.toggle("is-compact-deal-create", isCompactDeal);
       form.classList.toggle("is-task-mode", isTaskMode);
+      if (segmentField) segmentField.hidden = kind !== "deal";
       form.querySelectorAll("[data-crm-task-hidden]").forEach((field) => {
         field.hidden = isTaskMode;
       });
@@ -2266,6 +2304,10 @@
     const resetDialog = () => {
       if (!form) return;
       form.reset();
+      setSegmentIds([]);
+      if (segmentSearch) segmentSearch.value = "";
+      segmentField?.querySelectorAll("[data-crm-segment-option-row]").forEach((row) => { row.hidden = false; });
+      if (segmentDropdown) segmentDropdown.open = false;
       form.querySelectorAll("[data-crm-legacy-currency]").forEach((option) => option.remove());
       form.dataset.crmDialogMode = "create";
       form.classList.remove("is-compact-deal-create", "is-task-mode");
@@ -2291,6 +2333,8 @@
       Object.entries(payload).forEach(([name, value]) => {
         if (name === "id") {
           setField("record_id", value || "");
+        } else if (name === "business_segment_ids") {
+          setSegmentIds(value);
         } else if (name === "amount_input") {
           setField("amount", value || "");
         } else {
@@ -2451,7 +2495,9 @@
       closeOrderPanel();
     });
     contactInput?.addEventListener("input", () => {
+      const previousClientId = String(contactClientId?.value || "");
       syncContactMatch();
+      if (previousClientId && !contactClientId?.value) setSegmentIds([]);
       renderContactPanel();
     });
     amountInput?.addEventListener("input", formatDealAmount);

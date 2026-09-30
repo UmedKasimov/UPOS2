@@ -7453,6 +7453,91 @@ a.messenger-message-attachment:focus-visible {
   text-decoration: underline;
 }
 
+.crm-deal-segment-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.crm-deal-segment-field[hidden] {
+  display: none;
+}
+
+.crm-deal-segment-field > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.crm-deal-segment-dropdown {
+  position: relative;
+  min-width: 0;
+}
+
+.crm-deal-segment-dropdown > summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--card);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.crm-deal-segment-dropdown > summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-deal-segment-menu {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 13rem;
+  overflow: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--card);
+}
+
+.crm-deal-segment-menu > input {
+  width: 100%;
+}
+
+.crm-deal-segment-options {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.product-form .crm-deal-segment-options > label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.product-form .crm-deal-segment-options > label input {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.product-form .crm-deal-segment-options > label:hover {
+  background: color-mix(in srgb, var(--primary), transparent 92%);
+}
+
+.product-form .crm-deal-segment-options > label[hidden] {
+  display: none;
+}
+
 .crm-record-form.is-compact-deal-create {
   gap: 0.75rem;
   padding: 1rem;

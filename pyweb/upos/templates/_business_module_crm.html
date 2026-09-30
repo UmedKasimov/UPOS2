@@ -4,7 +4,7 @@
   {% for item in crm_options.clients %}<option value="{{ item }}">{% endfor %}
 </datalist>
 <datalist id="crm-contact-list">
-  {% for item in crm_options.contacts %}<option value="{{ item.phone or item.name }}" data-client-id="{{ item.id }}" data-client-name="{{ item.name }}" data-client-phone="{{ item.phone }}" data-client-phones="{{ item.phones | join(' · ') }}">{{ item.name }}</option>{% endfor %}
+  {% for item in crm_options.contacts %}<option value="{{ item.phone or item.name }}" data-client-id="{{ item.id }}" data-client-name="{{ item.name }}" data-client-phone="{{ item.phone }}" data-client-phones="{{ item.phones | join(' · ') }}" data-client-segment-ids="{{ item.segment_ids | join(',') }}">{{ item.name }}</option>{% endfor %}
 </datalist>
 <datalist id="crm-responsible-list">
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
@@ -779,6 +779,26 @@
             <small class="crm-client-duplicate-note" data-crm-contact-match hidden></small>
             <a class="crm-contact-card-link" data-crm-contact-card target="_blank" rel="noopener" hidden>Карточка клиента ↗</a>
           </label>
+          <div class="wide crm-deal-segment-field" data-crm-deal-create-field data-crm-task-hidden data-crm-segment-field>
+            <span>Сегменты клиента</span>
+            <input type="hidden" name="business_segment_changed" value="0" data-crm-segment-changed />
+            <details class="crm-deal-segment-dropdown" data-crm-segment-dropdown>
+              <summary><span data-crm-segment-summary>Не выбраны</span></summary>
+              <div class="crm-deal-segment-menu">
+                <input type="search" autocomplete="off" placeholder="Найти сегмент" aria-label="Найти сегмент" data-crm-segment-search />
+                <div class="crm-deal-segment-options">
+                  {% for segment in crm_client_segments %}
+                    <label data-crm-segment-option-row>
+                      <input type="checkbox" name="business_segment_ids" value="{{ segment.id }}" data-crm-segment-option />
+                      <span>{{ segment.icon }} {{ segment.name }}</span>
+                    </label>
+                  {% else %}
+                    <small>Сегменты пока не созданы в разделе «Клиенты».</small>
+                  {% endfor %}
+                </div>
+              </div>
+            </details>
+          </div>
           <label data-crm-task-hidden><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
           <label class="crm-deal-picker-field">
             <span>Связать со сделкой</span>

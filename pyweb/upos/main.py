@@ -13874,6 +13874,46 @@ def create_app() -> FastAPI:
             data["priority"] = "normal"
         return data, amount, currency
 
+    def _crm_apply_deal_segments(session: Any, workspace_owner_id: str, data: dict[str, Any], form: Any, counterparty_id: str | None) -> None:
+        if data.get("item_type") != "deal":
+            return
+        configured = _workspace_business_segments(workspace_owner_id)
+        client = session.get(Counterparty, counterparty_id) if counterparty_id else None
+        if client is not None and client.workspace_owner_id != workspace_owner_id:
+            client = None
+        changed = str(form.get("business_segment_changed") or "") == "1"
+        raw_ids = list(form.getlist("business_segment_ids"))
+        if not raw_ids and not changed and client is not None:
+            extra = _counterparty_extra(client)
+            raw_ids = extra.get("business_segment_ids") if isinstance(extra.get("business_segment_ids"), list) else []
+            if not raw_ids:
+                raw_ids = [extra.get("business_segment_id")]
+        selected = []
+        seen: set[str] = set()
+        for raw_id in raw_ids:
+            segment = _business_segment_for_value(raw_id, configured)
+            if segment is None or segment["id"] in seen:
+                continue
+            selected.append(dict(segment))
+            seen.add(segment["id"])
+        primary = selected[0] if selected else None
+        data["business_segment_ids"] = [segment["id"] for segment in selected]
+        data["business_segments"] = selected
+        data["business_segment_id"] = primary["id"] if primary else ""
+        data["business_segment"] = primary["name"] if primary else ""
+        data["business_segment_icon"] = primary["icon"] if primary else ""
+        if changed and client is not None:
+            extra = _counterparty_extra(client)
+            extra["business_segment_ids"] = data["business_segment_ids"]
+            extra["business_segments"] = selected
+            extra["business_segment_id"] = data["business_segment_id"]
+            extra["business_segment"] = data["business_segment"]
+            extra["business_segment_icon"] = data["business_segment_icon"]
+            extra["industry"] = data["business_segment"]
+            extra["map_icon"] = primary["icon"] if primary else "default"
+            client.data = extra
+            flag_modified(client, "data")
+
     def _crm_apply_related_order(session: Any, workspace_owner_id: str, data: dict[str, Any]) -> str | None:
         if data.get("item_type") != "task":
             return None
@@ -13941,6 +13981,8 @@ def create_app() -> FastAPI:
             "checklist": checklist[:40],
             "checklist_text": "\n".join(checklist[:40]),
             "contact": str(data.get("contact") or ""),
+            "business_segment_ids": [str(value) for value in data.get("business_segment_ids", [])] if isinstance(data.get("business_segment_ids"), list) else [],
+            "business_segment": str(data.get("business_segment") or ""),
             "responsible": str(data.get("responsible") or ""),
             "date": str(data.get("date") or ""),
             "due_date": row.due_date or str(data.get("due_date") or ""),
@@ -13971,7 +14013,7 @@ def create_app() -> FastAPI:
             "counterparty_id": row.counterparty_id or "",
         }
 
-    def _crm_record_edit_payload(item: dict[str, Any]) -> dict[str, str]:
+    def _crm_record_edit_payload(item: dict[str, Any]) -> dict[str, Any]:
         keys = (
             "id",
             "item_type",
@@ -13981,6 +14023,7 @@ def create_app() -> FastAPI:
             "task_type",
             "checklist_text",
             "contact",
+            "business_segment_ids",
             "responsible",
             "lead_source",
             "stage_id",
@@ -14001,8 +14044,11 @@ def create_app() -> FastAPI:
             "lost_reason",
             "tags",
         )
-        payload: dict[str, str] = {}
+        payload: dict[str, Any] = {}
         for key in keys:
+            if key == "business_segment_ids":
+                payload[key] = list(item.get(key) or [])
+                continue
             if key == "tags":
                 payload[key] = str(item.get("tags_text") or "")
                 continue
@@ -17858,6 +17904,13 @@ def create_app() -> FastAPI:
                 if counterparty is not None:
                     item["client_id"] = counterparty.id
                     item["client_href"] = f"/clients?client={counterparty.id}#client-card"
+                    if item["item_type"] == "deal" and not item["business_segment_ids"]:
+                        extra = _counterparty_extra(counterparty)
+                        segment_ids = extra.get("business_segment_ids") if isinstance(extra.get("business_segment_ids"), list) else []
+                        item["business_segment_ids"] = [str(value) for value in segment_ids if value]
+                        if not item["business_segment_ids"] and extra.get("business_segment_id"):
+                            item["business_segment_ids"] = [str(extra["business_segment_id"])]
+                        item["business_segment"] = str(extra.get("business_segment") or "")
                 else:
                     item["client_id"] = ""
                     item["client_href"] = ""
@@ -18076,6 +18129,7 @@ def create_app() -> FastAPI:
                     "name": row.name,
                     "phone": phones[0] if phones else "",
                     "phones": phones,
+                    "segment_ids": [str(value) for value in extra.get("business_segment_ids", []) if value] if isinstance(extra.get("business_segment_ids"), list) else ([str(extra["business_segment_id"])] if extra.get("business_segment_id") else []),
                 })
             crm_options = {
                 "clients": sorted(
@@ -18143,6 +18197,7 @@ def create_app() -> FastAPI:
             crm_next_actions=crm_next_actions,
             crm_pipeline_stages=crm_stages,
             crm_pipeline_stage_lines=_crm_stage_lines(crm_stages),
+            crm_client_segments=_workspace_business_segments(wid),
             crm_kanban_columns=crm_kanban_columns,
             crm_lead_sources=_crm_lead_source_options(
                 crm_workspace_settings.get("crm_lead_sources"),
@@ -21446,6 +21501,7 @@ def create_app() -> FastAPI:
             elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
                 counterparty_id = counterparty.id if counterparty else None
+            _crm_apply_deal_segments(session, wid, data, form, counterparty_id)
             row = CrmRecord(
                 id=str(uuid.uuid4()),
                 workspace_owner_id=wid,
@@ -21542,6 +21598,7 @@ def create_app() -> FastAPI:
                 data["client"] = old_data["client"]
             if counterparty_id is None:
                 counterparty_id = row.counterparty_id
+            _crm_apply_deal_segments(session, wid, data, form, counterparty_id)
             change_bits = []
             if row.title != title:
                 change_bits.append("название")
