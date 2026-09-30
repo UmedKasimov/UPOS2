@@ -18064,20 +18064,26 @@ def create_app() -> FastAPI:
                 str(emp.get("name") or emp.get("username") or "").strip()
                 for emp in list_employees_safe(wid)
             }
+            crm_contacts = []
+            for row in counterparty_rows:
+                extra = _counterparty_extra(row)
+                phones = list(dict.fromkeys(
+                    phone for value in (row.phone, extra.get("phone"), extra.get("telegram_phone"), extra.get("telegram"))
+                    if (phone := str(value or "").strip())
+                ))
+                crm_contacts.append({
+                    "id": row.id,
+                    "name": row.name,
+                    "phone": phones[0] if phones else "",
+                    "phones": phones,
+                })
             crm_options = {
                 "clients": sorted(
                     {row.name for row in counterparty_rows if row.name}
                     | {item["client"] for item in crm_records if item["client"]}
                     | {item["client"] for item in crm_task_records if item["client"]}
                 ),
-                "contacts": [
-                    {
-                        "id": row.id,
-                        "name": row.name,
-                        "phone": str(row.phone or _counterparty_extra(row).get("phone") or "").strip(),
-                    }
-                    for row in counterparty_rows
-                ],
+                "contacts": crm_contacts,
                 "responsibles": sorted(
                     {item["responsible"] for item in crm_records if item["responsible"]}
                     | {item["responsible"] for item in crm_task_records if item["responsible"]}

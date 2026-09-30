@@ -1580,6 +1580,7 @@
         id: String(option.dataset.clientId || "").trim(),
         name: String(option.dataset.clientName || option.textContent || "").trim(),
         phone: String(option.dataset.clientPhone || "").trim(),
+        phones: String(option.dataset.clientPhones || option.dataset.clientPhone || "").trim(),
       }))
       .filter((item) => item.id && item.name)
       .sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -2109,12 +2110,12 @@
       const digits = search.replace(/\D+/g, "");
       const rows = contactRows.filter((item) => !search
         || item.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())
-        || (digits.length >= 2 && item.phone.replace(/\D+/g, "").includes(digits))).slice(0, 80);
+        || (digits.length >= 2 && item.phones.split(" · ").some((value) => value.replace(/\D+/g, "").includes(digits)))).slice(0, 80);
       contactPanel.innerHTML = rows.length
         ? rows.map((item) => (
           '<button type="button" class="sales-combo-option crm-contact-option" data-crm-contact-choice>'
           + `<span class="sales-combo-main">${escapeHtml(item.name)}</span>`
-          + `<span class="sales-combo-meta"><span class="${item.phone ? "crm-contact-phone" : ""}">${escapeHtml(item.phone || "Номер не указан")}</span><strong>В базе клиентов</strong></span>`
+          + `<span class="sales-combo-meta"><span class="${item.phones ? "crm-contact-phone" : ""}">${escapeHtml(item.phones || "Номер не указан")}</span><strong>В базе клиентов</strong></span>`
           + '</button>'
         )).join("")
         : '<div class="sales-combo-empty">Клиент не найден. Номер можно ввести вручную.</div>'
@@ -2460,7 +2461,7 @@
           if (name) existingClients.add(name.toLocaleLowerCase());
           const id = String(client.id || "").trim();
           if (id && name && !contactRows.some((item) => item.id === id)) {
-            contactRows.push({ id, name, phone });
+            contactRows.push({ id, name, phone, phones: phone });
             contactRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
           }
           if (!clientCreateFromContact && clientInput) {

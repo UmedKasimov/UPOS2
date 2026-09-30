@@ -4,7 +4,7 @@
   {% for item in crm_options.clients %}<option value="{{ item }}">{% endfor %}
 </datalist>
 <datalist id="crm-contact-list">
-  {% for item in crm_options.contacts %}<option value="{{ item.phone or item.name }}" data-client-id="{{ item.id }}" data-client-name="{{ item.name }}" data-client-phone="{{ item.phone }}">{{ item.name }}</option>{% endfor %}
+  {% for item in crm_options.contacts %}<option value="{{ item.phone or item.name }}" data-client-id="{{ item.id }}" data-client-name="{{ item.name }}" data-client-phone="{{ item.phone }}" data-client-phones="{{ item.phones | join(' · ') }}">{{ item.name }}</option>{% endfor %}
 </datalist>
 <datalist id="crm-responsible-list">
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
