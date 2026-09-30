@@ -7144,6 +7144,13 @@ a.messenger-message-attachment:focus-visible {
   white-space: normal;
 }
 
+.crm-kanban-card-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .crm-kanban-card-date {
   width: fit-content;
   max-width: 100%;

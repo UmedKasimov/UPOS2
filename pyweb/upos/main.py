@@ -17702,6 +17702,8 @@ def create_app() -> FastAPI:
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_task_types = _crm_clean_task_types(crm_workspace_settings.get("crm_task_types"))
         crm_activity_settings = _crm_activity_settings(crm_workspace_settings)
+        crm_timezone = ZoneInfo(normalize_workspace_timezone(str(crm_workspace_settings.get("timezone") or "")))
+        crm_today_local = datetime.now(crm_timezone).date()
         crm_stage_map = {
             stage["id"]: {
                 **stage,
@@ -17892,6 +17894,15 @@ def create_app() -> FastAPI:
             deal_title_by_id = {item["id"]: item["title"] for item in all_deal_options}
             for row in rows:
                 item = _crm_record_data(row)
+                created_at = row.created_at
+                if created_at is not None:
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+                    created_days = max(0, (crm_today_local - created_at.astimezone(crm_timezone).date()).days)
+                    days_word = "день" if created_days % 10 == 1 and created_days % 100 != 11 else (
+                        "дня" if created_days % 10 in (2, 3, 4) and created_days % 100 not in (12, 13, 14) else "дней"
+                    )
+                    item["created_age_label"] = f"{created_days} {days_word}"
                 stage = _crm_stage_for_value(item["stage_id"], crm_stages, item["stage"])
                 item["stage_id"] = stage["id"]
                 item["stage"] = stage["title"]
