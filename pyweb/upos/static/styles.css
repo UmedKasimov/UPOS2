@@ -7432,6 +7432,14 @@ a.messenger-message-attachment:focus-visible {
   color: #1d4ed8;
 }
 
+.crm-contact-option .crm-contact-search-hit {
+  padding: 0 0.1rem;
+  border-radius: 0.2rem;
+  background: #fde68a;
+  color: #713f12;
+  font: inherit;
+}
+
 .crm-contact-card-link {
   width: fit-content;
   margin-top: 0.2rem;

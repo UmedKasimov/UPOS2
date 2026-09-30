@@ -2102,6 +2102,39 @@
       closeContactPanel();
     };
 
+    const highlightContactName = (value, query) => {
+      const name = String(value || "");
+      if (!query) return escapeHtml(name);
+      const start = name.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+      if (start < 0) return escapeHtml(name);
+      return escapeHtml(name.slice(0, start))
+        + `<mark class="crm-contact-search-hit">${escapeHtml(name.slice(start, start + query.length))}</mark>`
+        + escapeHtml(name.slice(start + query.length));
+    };
+
+    const highlightContactPhone = (value, digits) => {
+      const phone = String(value || "");
+      if (digits.length < 2) return escapeHtml(phone);
+      const match = phone.replace(/\D+/g, "").indexOf(digits);
+      if (match < 0) return escapeHtml(phone);
+      let seen = 0;
+      let start = -1;
+      let end = -1;
+      for (let index = 0; index < phone.length; index += 1) {
+        if (!/\d/.test(phone[index])) continue;
+        if (seen === match) start = index;
+        if (seen === match + digits.length - 1) {
+          end = index + 1;
+          break;
+        }
+        seen += 1;
+      }
+      if (start < 0 || end < 0) return escapeHtml(phone);
+      return escapeHtml(phone.slice(0, start))
+        + `<mark class="crm-contact-search-hit">${escapeHtml(phone.slice(start, end))}</mark>`
+        + escapeHtml(phone.slice(end));
+    };
+
     const renderContactPanel = () => {
       if (!contactInput || !contactPanel) return;
       const query = String(contactInput.value || "").trim();
@@ -2114,8 +2147,8 @@
       contactPanel.innerHTML = rows.length
         ? rows.map((item) => (
           '<button type="button" class="sales-combo-option crm-contact-option" data-crm-contact-choice>'
-          + `<span class="sales-combo-main">${escapeHtml(item.name)}</span>`
-          + `<span class="sales-combo-meta"><span class="${item.phones ? "crm-contact-phone" : ""}">${escapeHtml(item.phones || "Номер не указан")}</span><strong>В базе клиентов</strong></span>`
+          + `<span class="sales-combo-main">${highlightContactName(item.name, search)}</span>`
+          + `<span class="sales-combo-meta"><span class="${item.phones ? "crm-contact-phone" : ""}">${item.phones ? item.phones.split(" · ").map((phone) => highlightContactPhone(phone, digits)).join(" · ") : "Номер не указан"}</span><strong>В базе клиентов</strong></span>`
           + '</button>'
         )).join("")
         : '<div class="sales-combo-empty">Клиент не найден. Номер можно ввести вручную.</div>'
