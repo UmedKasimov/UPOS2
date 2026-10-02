@@ -57,7 +57,7 @@
         if (!Number.isFinite(at)) return;
         found.push({
           thread_id: String(thread.id || id), channel: thread.channel || "",
-          contact: thread.contact || "Клиент", kind: message.kind,
+          contact: thread.contact || "Клиент", username: thread.username || "", kind: message.kind,
           message: message.text || message.attachment_label || "Вложение",
           created_at: new Date(at).toISOString(),
           time_label: new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(at),
@@ -65,8 +65,7 @@
         });
       });
     });
-    found.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
-    return found.slice(0, 100);
+    return found;
   }
 
   function mergedMessages(serverRows) {
@@ -79,16 +78,41 @@
       var key = [row.thread_id, row.kind, Date.parse(row.created_at), row.message].join("|");
       if (!keys.has(key)) { result.push(row); keys.add(key); }
     });
-    result.sort(function (a, b) { return Date.parse(b.created_at || "") - Date.parse(a.created_at || ""); });
-    return result.slice(0, 100);
+    return result;
   }
 
-  function journalUrl(row) {
+  function chatUrl(row) {
     var params = new URLSearchParams();
-    if (row.channel) params.set("journal_channel", row.channel);
-    if (row.contact) params.set("journal_q", row.contact);
-    var query = params.toString();
-    return "/messengers" + (query ? "?" + query : "") + "#sms_journal";
+    if (row.channel) params.set("channel", row.channel);
+    if (row.thread_id) params.set("thread", row.thread_id);
+    return "/messengers?" + params.toString() + "#inbox";
+  }
+
+  function groupMessages(messages) {
+    var groups = new Map();
+    messages.forEach(function (row) {
+      var channel = String(row.channel || "").trim().toLowerCase();
+      var username = String(row.username || "").trim().replace(/^@/, "").toLowerCase();
+      var contact = String(row.contact || "Клиент").trim().toLowerCase();
+      var key = channel + "|" + (contact || username || String(row.thread_id || ""));
+      var group = groups.get(key);
+      if (!group) {
+        group = { channel: row.channel, contact: row.contact, latest: row, total: 0, unread: 0 };
+        groups.set(key, group);
+      }
+      group.total += 1;
+      group.unread += Number(row.unread || 0);
+      if (Date.parse(row.created_at || "") > Date.parse(group.latest.created_at || "")) group.latest = row;
+    });
+    return Array.from(groups.values()).sort(function (a, b) {
+      return Date.parse(b.latest.created_at || "") - Date.parse(a.latest.created_at || "");
+    });
+  }
+
+  function messageCountLabel(count) {
+    var n = Math.abs(Number(count || 0));
+    var ending = n % 100 >= 11 && n % 100 <= 14 ? 5 : n % 10;
+    return count + " " + (ending === 1 ? "сообщение" : ending >= 2 && ending <= 4 ? "сообщения" : "сообщений");
   }
 
   function createModal() {
@@ -96,7 +120,7 @@
     dialog.className = "sidebar-messenger-modal";
     dialog.innerHTML =
       '<section class="sidebar-messenger-modal-surface"><header class="sidebar-messenger-modal-head">' +
-      '<div><h2>Сообщения мессенджеров</h2><p data-messenger-modal-summary>История входящих и исходящих сообщений</p></div>' +
+      '<div><h2>Сообщения мессенджеров</h2><p data-messenger-modal-summary>Диалоги по собеседникам</p></div>' +
       '<button type="button" class="settings-profile-modal-close" data-messenger-modal-close aria-label="Закрыть">×</button>' +
       '</header><div class="sidebar-messenger-modal-list" data-messenger-modal-list></div>' +
       '<footer class="sidebar-messenger-modal-foot"><a class="btn btn-secondary" href="/messengers#inbox">Все диалоги</a>' +
@@ -118,13 +142,15 @@
       list.innerHTML = '<div class="sidebar-messenger-empty">Сообщений пока нет.</div>';
       return;
     }
-    list.innerHTML = rows.map(function (row) {
-      var unread = Number(row.unread || 0);
-      return '<a class="sidebar-messenger-row" href="' + escapeHtml(journalUrl(row)) + '">' +
-        '<span class="sidebar-messenger-channel">' + escapeHtml(row.channel || "Чат") + '</span>' +
-        '<span class="sidebar-messenger-row-main"><strong>' + escapeHtml(row.contact || "Клиент") + '</strong><small>' + (row.kind === "out" ? "Вы: " : "") + escapeHtml(row.message || "") + '</small></span>' +
+    list.innerHTML = rows.map(function (group) {
+      var row = group.latest;
+      var unread = Number(group.unread || 0);
+      return '<a class="sidebar-messenger-row" href="' + escapeHtml(chatUrl(row)) + '">' +
+        '<span class="sidebar-messenger-channel">' + escapeHtml(group.channel || "Чат") + '</span>' +
+        '<span class="sidebar-messenger-row-main"><strong>' + escapeHtml(group.contact || "Клиент") + '</strong><small>' + (row.kind === "out" ? "Вы: " : "") + escapeHtml(row.message || "") + '</small></span>' +
         '<span class="sidebar-messenger-row-side">' + (row.time_label ? '<time>' + escapeHtml(row.time_label) + '</time>' : '') +
-        (unread ? '<b>' + unread + '</b>' : '') + '</span></a>';
+        '<span class="sidebar-messenger-total">' + escapeHtml(messageCountLabel(group.total)) + '</span>' +
+        (unread ? '<b title="Непрочитанные сообщения">' + unread + '</b>' : '') + '</span></a>';
     }).join("");
   }
 
@@ -138,15 +164,21 @@
     var resumeTimer = 0;
 
     function apply(payload) {
-      rows = mergedMessages(payload.notifications);
+      var messages = mergedMessages(payload.notifications);
+      rows = groupMessages(messages);
       var unread = Number(payload.unread_total || 0);
       var status = button.querySelector("[data-sidebar-messenger-status]");
       var count = button.querySelector("[data-sidebar-messenger-count]");
-      var latest = rows.find(function (row) { return row.kind === "in"; });
+      var latest = messages.filter(function (row) { return row.kind === "in"; }).sort(function (a, b) {
+        return Date.parse(b.created_at || "") - Date.parse(a.created_at || "");
+      })[0];
       if (status) status.textContent = latest ? (latest.contact || "Клиент") + ": " + (latest.message || "Вложение") : "Сообщений пока нет";
       if (count) { count.hidden = unread <= 0; count.textContent = String(unread); }
       button.dataset.state = unread > 0 ? "new" : "idle";
-      if (modal && modal.open) renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
+      if (modal && modal.open) {
+        renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
+        modal.querySelector("[data-messenger-modal-summary]").textContent = rows.length ? rows.length + " диалогов · " + messageCountLabel(messages.length) : "Сообщений пока нет";
+      }
     }
 
     function refresh(force) {
@@ -181,7 +213,7 @@
       if (!modal) modal = createModal();
       renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
       modal.querySelector("[data-messenger-modal-summary]").textContent = rows.length
-        ? "Последние сообщения из всех подключённых каналов"
+        ? rows.length + " диалогов · " + messageCountLabel(rows.reduce(function (sum, group) { return sum + group.total; }, 0))
         : "Сообщений пока нет";
       modal.showModal();
       refresh(true);

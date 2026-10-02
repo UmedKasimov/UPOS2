@@ -106,7 +106,7 @@ body.sidebar-rail .sidebar-messenger-notice > b { display: none; }
 .sidebar-messenger-modal-head h2 { margin: 0; font-size: 1rem; }
 .sidebar-messenger-modal-head p { margin: 0.2rem 0 0; color: var(--muted-foreground); font-size: 0.78rem; }
 .sidebar-messenger-modal-list {
-  --messenger-notice-row-height: 3.75rem;
+  --messenger-notice-row-height: 4.4rem;
   display: grid;
   grid-auto-rows: var(--messenger-notice-row-height);
   max-height: calc((var(--messenger-notice-row-height) * 5) + 3.9rem);
@@ -125,6 +125,7 @@ body.sidebar-rail .sidebar-messenger-notice > b { display: none; }
 .sidebar-messenger-row-main small,
 .sidebar-messenger-row-side { color: var(--muted-foreground); }
 .sidebar-messenger-row-side { display: grid; justify-items: end; gap: 0.35rem; font-size: 0.68rem; }
+.sidebar-messenger-total { color: var(--foreground); font-weight: 700; white-space: nowrap; }
 .sidebar-messenger-empty { padding: 1rem; border: 1px dashed var(--border); border-radius: 6px; color: var(--muted-foreground); text-align: center; }
 
 .messenger-journal { min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
