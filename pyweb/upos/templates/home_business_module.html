@@ -4,6 +4,7 @@
   {% if not module_home_only %}
   {% if active == "messengers" %}
     <script src="{{ url_for('static', path='messengers.js') }}?v=28" defer></script>
+    <script src="{{ url_for('static', path='messenger-journal.js') }}?v=3" defer></script>
     <script src="{{ url_for('static', path='messengers-telegram.js') }}?v=2" defer></script>
   {% elif active == "crm" %}
     <script src="{{ url_for('static', path='crm-kanban.js') }}?v=66" defer></script>

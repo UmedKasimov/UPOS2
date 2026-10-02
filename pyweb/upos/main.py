@@ -3456,6 +3456,7 @@ def create_app() -> FastAPI:
                 "action": "+ Сообщение",
                 "launcher": [
                     {"id": "inbox", "title": "Диалоги", "subtitle": "Чаты и обращения", "icon": "chat"},
+                    {"id": "sms_journal", "title": "Журнал чатов", "subtitle": "История сообщений", "icon": "chat"},
                     {"id": "campaigns", "title": "Рассылки", "subtitle": "Кампании и сегменты", "icon": "broadcast"},
                     {"id": "templates", "title": "Шаблоны", "subtitle": "Тексты и сценарии", "icon": "template"},
                 ],
@@ -20396,6 +20397,35 @@ def create_app() -> FastAPI:
         )
         return rows
 
+    def _messenger_message_journal(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Настоящие сообщения по всем диалогам, без служебных карточек каналов."""
+        entries: list[dict[str, Any]] = []
+        for thread in rows:
+            inbound = [
+                message for message in thread.get("messages") or []
+                if message.get("kind") == "in" and _parse_iso_datetime(message.get("created_at") or "")
+            ]
+            inbound.sort(key=lambda message: _parse_iso_datetime(message.get("created_at") or ""), reverse=True)
+            unread_ids = {id(message) for message in inbound[:int(thread.get("unread") or 0)]}
+            for message in thread.get("messages") or []:
+                kind = str(message.get("kind") or "")
+                moment = _parse_iso_datetime(message.get("created_at") or "")
+                if kind not in {"in", "out"} or moment is None:
+                    continue
+                entries.append({
+                    "thread_id": str(thread.get("id") or ""),
+                    "channel": str(thread.get("channel") or ""),
+                    "contact": str(thread.get("contact") or "Клиент"),
+                    "author": str(message.get("author") or ""),
+                    "message": str(message.get("text") or message.get("attachment_label") or "Вложение"),
+                    "kind": kind,
+                    "created_at": moment.isoformat(),
+                    "time_label": moment.astimezone().strftime("%d.%m.%Y %H:%M"),
+                    "unread": id(message) in unread_ids,
+                })
+        entries.sort(key=lambda item: item["created_at"], reverse=True)
+        return entries
+
     def _messenger_filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[dict[str, Any]]:
         q = str(filters.get("q") or "").strip().lower()
         channel = str(filters.get("channel") or "").strip().lower()
@@ -21398,7 +21428,8 @@ def create_app() -> FastAPI:
             if _messenger_channel_connected(channel_accounts, option)
         }
         active_channel_connected = filters["channel"] in connected_channels
-        all_threads = _messenger_threads_from_sources(wid) if connected_channels else []
+        all_threads = _messenger_threads_from_sources(wid)
+        journal_rows = _messenger_message_journal(all_threads)
         # На вкладке канала — непрочитанные, как и в списке диалогов: общее
         # число сообщений висело бы там вечно.
         channel_unread_counts: dict[str, int] = {}
@@ -21434,6 +21465,7 @@ def create_app() -> FastAPI:
             messenger_channel_accounts=channel_accounts,
             messenger_active_channel_connected=active_channel_connected,
             messenger_threads=threads,
+            messenger_journal_rows=journal_rows,
             messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,
             messenger_templates=templates_rows,
@@ -27810,6 +27842,21 @@ def create_app() -> FastAPI:
         except TelegramApiError as exc:
             return JSONResponse({"error": str(exc)}, status_code=400)
         return {"ok": True, "as_owner": bool(connection_id)}
+
+    @app.get("/api/messengers/notifications")
+    def api_messenger_notifications(request: Request):
+        if not _has_permission(request.session.get("user"), "messengers"):
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        wid, err = _product_workspace_owner(request)
+        if err or wid is None:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        rows = _messenger_threads_from_sources(wid)
+        journal = _messenger_message_journal(rows)
+        return {
+            "ok": True,
+            "unread_total": sum(int(row.get("unread") or 0) for row in rows),
+            "notifications": journal[:100],
+        }
 
     @app.get("/api/messengers/threads")
     def api_messenger_threads(request: Request, channel: str = ""):

@@ -161,42 +161,20 @@
     }
   }
 
-  function rememberedUrl(route) {
-    try {
-      if (route.lastUrlKey) {
-        const stored = normalizeTabId(localStorage.getItem(route.lastUrlKey));
-        if (stored) {
-          const url = new URL(stored, window.location.origin);
-          if (url.origin === window.location.origin && routeAllowsPath(route, url.pathname)) {
-            return `${url.pathname}${url.search}${url.hash}`;
-          }
-        }
-      }
-      for (const key of route.keys) {
-        const saved = JSON.parse(localStorage.getItem(key) || "{}");
-        const tabId = normalizeTabId(saved.activeTab || saved.lastActiveTab);
-        if (!tabId) continue;
-        const storedUrl = normalizeTabId(saved.tabState?.[tabId]?.url);
-        const meta = saved.meta?.[tabId];
-        const fallback = normalizeTabId(meta?.href) || (meta?.hash ? `${route.path}#${meta.hash}` : "");
-        const url = new URL(storedUrl || fallback, window.location.origin);
-        if (route.path === "/sales" && tabId === "journal" && !url.searchParams.has("view")) {
-          url.searchParams.set("view", "journal");
-        }
-        if (url.origin === window.location.origin && routeAllowsPath(route, url.pathname)) {
-          return `${url.pathname}${url.search}${url.hash}`;
-        }
-      }
-    } catch {}
-    return "";
-  }
-
   function normalizeTabId(value) {
     return String(value || "").trim();
   }
 
   function routeAllowsPath(route, pathname) {
     return (route.allowedPaths || [route.path]).includes(pathname);
+  }
+
+  function moduleHomeHref(route, href) {
+    const url = new URL(href, window.location.href);
+    if (route.path === "/finance") url.searchParams.set("finance_home", "1");
+    else url.searchParams.set("module_home", "1");
+    url.hash = "";
+    return `${url.pathname}${url.search}`;
   }
 
   function rememberCurrentSection() {
@@ -218,12 +196,7 @@
       const route = routeForHref(baseHref);
       if (!route) return;
       link.dataset.workspaceBaseHref = baseHref;
-      if (link.classList.contains("active") && routeAllowsPath(route, window.location.pathname)) {
-        link.setAttribute("href", baseHref);
-        return;
-      }
-      const target = rememberedUrl(route);
-      link.setAttribute("href", target || baseHref);
+      link.setAttribute("href", moduleHomeHref(route, baseHref));
     });
   }
 
@@ -236,12 +209,7 @@
       const route = routeForHref(baseHref);
       if (!route) return;
       link.dataset.workspaceBaseHref = baseHref;
-      if (link.classList.contains("active") && routeAllowsPath(route, window.location.pathname)) {
-        link.setAttribute("href", baseHref);
-        return;
-      }
-      const target = rememberedUrl(route);
-      if (target) link.setAttribute("href", target);
+      link.setAttribute("href", moduleHomeHref(route, baseHref));
     },
     true
   );
@@ -345,8 +313,6 @@
   function bootSidebarIboxSync() {
     var button = document.querySelector("[data-sidebar-ibox-sync]");
     if (!button) return;
-    var STATUS_CACHE_KEY = "upos:ibox-status:v1";
-    var STATUS_CACHE_TTL_MS = 30 * 1000;
     var statusNode = button.querySelector("[data-sidebar-ibox-sync-status]");
     var liveNode = document.querySelector("[data-sidebar-ibox-sync-live]");
     var lastSyncNode = button.querySelector("[data-sidebar-ibox-sync-last]");
@@ -432,47 +398,17 @@
       return false;
     }
 
-    function readCachedStatus() {
-      try {
-        var cached = JSON.parse(window.sessionStorage.getItem(STATUS_CACHE_KEY) || "null");
-        if (!cached || !cached.at || !cached.body) return null;
-        return cached;
-      } catch (error) {
-        return null;
-      }
-    }
-
-    function cacheStatus(body) {
-      try {
-        window.sessionStorage.setItem(STATUS_CACHE_KEY, JSON.stringify({
-          at: Date.now(),
-          body: body,
-        }));
-      } catch (error) {}
-    }
-
-    function renderStatusBody(body, announce) {
-      showLastSync(body && body.last_sync_at);
-      return applyStatus(body && body.status, announce);
-    }
-
-    function pollStatus(announce, force) {
+    function pollStatus(announce) {
       clearTimeout(pollTimer);
-      var cached = readCachedStatus();
-      if (!force && !announce && cached) {
-        var running = renderStatusBody(cached.body, false);
-        if (!running && Date.now() - Number(cached.at) < STATUS_CACHE_TTL_MS) return;
-      }
-      if (!force && document.visibilityState === "hidden") return;
       fetch("/api/integrations/ibox/status", {
         headers: { Accept: "application/json" },
       })
         .then(readJsonResponse)
         .then(function (body) {
-          cacheStatus(body);
-          if (renderStatusBody(body, announce)) {
+          showLastSync(body.last_sync_at);
+          if (applyStatus(body.status, announce)) {
             pollTimer = window.setTimeout(function () {
-              pollStatus(true, true);
+              pollStatus(true);
             }, 1800);
           }
         })
@@ -496,10 +432,10 @@
         .then(function (body) {
           if (applyStatus(body.status, true)) {
             pollTimer = window.setTimeout(function () {
-              pollStatus(true, true);
+              pollStatus(true);
             }, 1200);
           } else {
-            pollStatus(false, true);
+            pollStatus(false);
           }
         })
         .catch(function (error) {
@@ -507,10 +443,7 @@
         });
     });
 
-    pollStatus(false, false);
-    document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") pollStatus(false, false);
-    });
+    pollStatus(false);
   }
 
   function setOpen(on) {
@@ -666,17 +599,28 @@
     root.dataset.workspaceTabsReady = "1";
 
     const storageKey = `upos.${key}.openTabs`;
+    const moduleHomeRequested = new URLSearchParams(window.location.search).get("module_home") === "1";
     const tabMeta = new Map();
     let openTabs = [];
     let activeTab = "";
     let lastActiveTab = "";
     let tabState = {};
     let lastSerializedState = "";
-    let renderedView = "";
 
     function homeUrl() {
       const href = root.dataset.workspaceHomeHref || homeTab.getAttribute("href") || "";
-      return href ? new URL(href, window.location.href) : new URL(window.location.href);
+      const url = href ? new URL(href, window.location.href) : new URL(window.location.href);
+      if (root.dataset.workspaceLazyHomeEnabled === "1") url.searchParams.set("module_home", "1");
+      return url;
+    }
+
+    function contentUrl(value, viewId) {
+      const url = new URL(value, window.location.href);
+      if (root.dataset.workspaceLazyHomeEnabled === "1") url.searchParams.delete("module_home");
+      if (key === "warehouse" || key === "clients") {
+        url.searchParams.set("module_view", viewId);
+      }
+      return url;
     }
 
     function registerMeta(source) {
@@ -755,7 +699,8 @@
     }
 
     function tabUrl(tabId) {
-      return rememberedTabUrl(tabId) || canonicalTabUrl(tabId);
+      const url = rememberedTabUrl(tabId) || canonicalTabUrl(tabId);
+      return url ? contentUrl(url, tabMeta.get(tabId)?.viewId || tabId) : null;
     }
 
     function matchesLocation(url, includeHash = false) {
@@ -844,7 +789,9 @@
       if (closeTabsOnLoad.length) {
         openTabs = openTabs.filter((tabId) => !closeTabsOnLoad.includes(tabId));
       }
-      if (forceTab && tabMeta.has(forceTab)) {
+      if (moduleHomeRequested) {
+        activeTab = "";
+      } else if (forceTab && tabMeta.has(forceTab)) {
         activeTab = forceTab;
       } else if (hashTab) {
         activeTab = hashTab;
@@ -882,13 +829,6 @@
         if (isActive) card.setAttribute("aria-current", "page");
         else card.removeAttribute("aria-current");
       });
-      if (renderedView !== currentView) {
-        renderedView = currentView;
-        root.dispatchEvent(new CustomEvent("upos:workspace-view-change", {
-          bubbles: true,
-          detail: { key, viewId: currentView, activeTab },
-        }));
-      }
     }
 
     function buildTabNode(tabId) {
@@ -973,7 +913,9 @@
       lastActiveTab = tabId;
       saveState();
 
-      const url = options.url ? new URL(options.url, window.location.href) : tabUrl(tabId);
+      const url = options.url
+        ? contentUrl(options.url, tabMeta.get(tabId)?.viewId || tabId)
+        : tabUrl(tabId);
       if (options.navigate !== false && url && !matchesLocation(url)) {
         render();
         window.location.assign(url.toString());
@@ -1064,6 +1006,16 @@
           if ((form.getAttribute("method") || "get").toLowerCase() !== "get" || !activeTab) return;
           const meta = tabMeta.get(activeTab);
           if (!meta?.hash) return;
+          if (key === "warehouse" || key === "clients") {
+            let viewInput = form.querySelector('input[name="module_view"]');
+            if (!viewInput) {
+              viewInput = document.createElement("input");
+              viewInput.type = "hidden";
+              viewInput.name = "module_view";
+              form.appendChild(viewInput);
+            }
+            viewInput.value = meta.viewId || activeTab;
+          }
           try {
             const url = new URL(form.getAttribute("action") || window.location.href, window.location.href);
             form.setAttribute("action", `${url.pathname}${url.search}#${meta.hash}`);
@@ -1419,17 +1371,9 @@
 })();
 
 /* source: ajax-sections.js */
-/* Updates server-rendered sections without reloading the application shell. */
+/* Обновляет разделы и серверную пагинацию без перезагрузки всей страницы. */
 (() => {
   "use strict";
-
-  const CACHE_TTL_MS = 2 * 60_000;
-  const CACHE_LIMIT = 32;
-  const responseCache = new Map();
-  const prefetchRequests = new Map();
-  const latestLoads = new Map();
-  const loadControllers = new Map();
-  let loadSequence = 0;
 
   function reinit(names) {
     (names || []).forEach((name) => {
@@ -1438,7 +1382,7 @@
       try {
         fn(document);
       } catch {
-        /* One optional module must not stop the rest of the page. */
+        /* Один модуль не должен останавливать обновление остальных. */
       }
     });
   }
@@ -1457,8 +1401,7 @@
     };
   }
 
-  function swapHtml(html, selectors) {
-    const parsed = new DOMParser().parseFromString(html, "text/html");
+  function swapParsed(parsed, selectors) {
     let swapped = 0;
     selectors.forEach((selector) => {
       const fresh = parsed.querySelector(selector);
@@ -1471,62 +1414,27 @@
     return swapped;
   }
 
-  function remember(href, html) {
-    responseCache.delete(href);
-    responseCache.set(href, { html, expiresAt: Date.now() + CACHE_TTL_MS });
-    while (responseCache.size > CACHE_LIMIT) {
-      responseCache.delete(responseCache.keys().next().value);
-    }
-    return html;
-  }
-
-  function cachedHtml(href) {
-    const cached = responseCache.get(href);
-    if (cached && cached.expiresAt > Date.now()) {
-      responseCache.delete(href);
-      responseCache.set(href, cached);
-      return cached.html;
-    }
-    if (cached) responseCache.delete(href);
-    return null;
-  }
-
-  function fetchHtml(href, signal) {
-    const cached = cachedHtml(href);
-    if (cached !== null) return Promise.resolve(cached);
-
+  function fetchParsed(href) {
     return fetch(href, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
       credentials: "same-origin",
-      signal,
     })
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.text();
       })
-      .then((html) => remember(href, html));
+      .then((html) => new DOMParser().parseFromString(html, "text/html"));
   }
+
+  const prefetchCache = new Map();
 
   function prefetch(href) {
-    if (!href || href.startsWith("#")) return;
-    if (cachedHtml(href) !== null || prefetchRequests.has(href)) return;
-    const pending = fetchHtml(href)
-      .catch(() => null)
-      .finally(() => prefetchRequests.delete(href));
-    prefetchRequests.set(href, pending);
-  }
-
-  async function loadHtml(href, signal) {
-    const pending = prefetchRequests.get(href);
-    if (pending) {
-      const prefetched = await pending;
-      if (prefetched !== null) return prefetched;
-    }
-    return fetchHtml(href, signal);
-  }
-
-  function loadKey(targets) {
-    return [...targets].sort().join("|");
+    if (!href || href.startsWith("#") || prefetchCache.has(href)) return;
+    const pending = fetchParsed(href).catch(() => {
+      prefetchCache.delete(href);
+      return null;
+    });
+    prefetchCache.set(href, pending);
   }
 
   async function load(href, source, options = {}) {
@@ -1537,25 +1445,18 @@
       return;
     }
 
-    const key = loadKey(targets);
-    loadControllers.get(key)?.abort();
-    const controller = new AbortController();
-    loadControllers.set(key, controller);
-    const token = ++loadSequence;
-    latestLoads.set(key, token);
     const currentTargets = targets.map((selector) => document.querySelector(selector)).filter(Boolean);
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
     const busyTimer = window.setTimeout(() => {
-      if (latestLoads.get(key) !== token) return;
       currentTargets.forEach((node) => node.setAttribute("aria-busy", "true"));
-    }, 140);
+    }, 160);
 
     try {
-      const html = await loadHtml(href, controller.signal);
-      if (latestLoads.get(key) !== token) return;
-      if (!swapHtml(html, targets)) throw new Error("targets not found");
-
+      const parsed =
+        (prefetchCache.has(href) ? await prefetchCache.get(href) : null) || (await fetchParsed(href));
+      prefetchCache.delete(href);
+      if (!swapParsed(parsed, targets)) throw new Error("targets not found");
       if (options.history !== false) {
         const currentState = window.history.state && typeof window.history.state === "object"
           ? window.history.state
@@ -1563,28 +1464,18 @@
         if (!currentState.ajaxSection) {
           window.history.replaceState({ ...currentState, ajaxSection: config }, "", window.location.href);
         }
-        const nextState = { ajaxSection: config };
-        if (options.history === "replace") {
-          window.history.replaceState(nextState, "", href);
-        } else {
-          window.history.pushState(nextState, "", href);
-        }
+        window.history.pushState({ ajaxSection: config }, "", href);
       }
-
       reinit(reinitNames);
       if (typeof window.initWorkspaceModuleTabs === "function") {
         window.initWorkspaceModuleTabs(document);
       }
       requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
-    } catch (error) {
-      if (error?.name === "AbortError") return;
-      if (latestLoads.get(key) === token) window.location.href = href;
+    } catch {
+      window.location.href = href;
     } finally {
       window.clearTimeout(busyTimer);
-      if (latestLoads.get(key) === token) {
-        currentTargets.forEach((node) => node.removeAttribute("aria-busy"));
-        if (loadControllers.get(key) === controller) loadControllers.delete(key);
-      }
+      currentTargets.forEach((node) => node.removeAttribute("aria-busy"));
     }
   }
 
@@ -1602,34 +1493,6 @@
       .forEach((name) => url.searchParams.delete(name));
     if (select.dataset.ajaxHash) url.hash = select.dataset.ajaxHash;
     return url.toString();
-  }
-
-  function filterHref(form) {
-    const url = new URL(form.action || window.location.href, window.location.href);
-    url.search = "";
-    new FormData(form).forEach((value, name) => {
-      if (typeof value === "string") url.searchParams.append(name, value);
-    });
-    (form.dataset.ajaxResetParams || "page")
-      .split(",")
-      .map((name) => name.trim())
-      .filter(Boolean)
-      .forEach((name) => url.searchParams.delete(name));
-    if (form.dataset.ajaxHash) url.hash = form.dataset.ajaxHash;
-    return url.toString();
-  }
-
-  function submitFilter(form, immediate = false) {
-    window.clearTimeout(Number(form.dataset.ajaxFilterTimer || 0));
-    const run = () => {
-      form.dataset.ajaxFilterTimer = "0";
-      void load(filterHref(form), form, { history: "replace" });
-    };
-    if (immediate) run();
-    else {
-      const delay = Math.max(100, Number(form.dataset.ajaxFilterDelay || 350));
-      form.dataset.ajaxFilterTimer = String(window.setTimeout(run, delay));
-    }
   }
 
   function markActiveLink(nav, activeLink) {
@@ -1650,49 +1513,33 @@
     if (!nav || !href || href.startsWith("#")) return;
     event.preventDefault();
     markActiveLink(nav, link);
-    void load(href, nav);
-  });
-
-  document.addEventListener("submit", (event) => {
-    const form = event.target.closest?.("form[data-ajax-filter]");
-    if (!form) return;
-    event.preventDefault();
-    submitFilter(form, true);
-  });
-
-  document.addEventListener("input", (event) => {
-    const form = event.target.closest?.("form[data-ajax-filter]");
-    if (!form || event.target instanceof HTMLSelectElement) return;
-    submitFilter(form, false);
+    load(href, nav);
   });
 
   document.addEventListener("change", (event) => {
     const select = event.target.closest?.("select[data-ajax-page-size]");
-    if (select) {
-      event.preventDefault();
-      event.stopPropagation();
-      void load(pageSizeHref(select), select);
-      return;
-    }
-    const form = event.target.closest?.("form[data-ajax-filter]");
-    if (form) submitFilter(form, true);
+    if (!select) return;
+
+    // Page-size controls often belong to auto-submit filter forms. Handle them
+    // before those form listeners so the active workspace never does a full reload.
+    event.preventDefault();
+    event.stopPropagation();
+    load(pageSizeHref(select), select);
   }, true);
 
   ["pointerdown", "mouseover", "focusin"].forEach((eventName) => {
     document.addEventListener(eventName, (event) => {
-      const link = event.target.closest?.("[data-ajax-nav] a[href]");
-      if (link && !link.classList.contains("disabled")) prefetch(link.href);
+      const link = event.target.closest("[data-ajax-nav] a[href]");
+      if (link && !link.classList.contains("disabled")) prefetch(link.getAttribute("href") || "");
     });
   });
 
   window.addEventListener("popstate", (event) => {
     const config = event.state?.ajaxSection;
     if (config?.targets?.length) {
-      void load(window.location.href, null, { config, history: false });
+      load(window.location.href, null, { config, history: false });
     }
   });
-
-  window.UPOSAjaxSections = { load, prefetch };
 })();
 
 /* source: password-toggle.js */
@@ -2429,11 +2276,12 @@
   var LEADER_TTL_MS = 12000;
   var MIN_REQUEST_GAP_MS = 2000;
   var RESUME_DEBOUNCE_MS = 180;
-  var LEADER_KEY = "upos:messenger-notifications:leader";
-  var PAYLOAD_KEY = "upos:messenger-notifications:payload";
+  var accountKey = String((document.body && document.body.dataset.userId) || "guest");
+  var LEADER_KEY = "upos:messenger-notifications:" + accountKey + ":leader";
+  var PAYLOAD_KEY = "upos:messenger-notifications:" + accountKey + ":payload";
   var TAB_ID = String(Date.now()) + ":" + Math.random().toString(36).slice(2);
   var channel = typeof BroadcastChannel === "function"
-    ? new BroadcastChannel("upos-messenger-notifications")
+    ? new BroadcastChannel("upos-messenger-notifications:" + accountKey)
     : null;
 
   function readStored(key) {
@@ -2469,6 +2317,45 @@
     return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  function cachedMessages() {
+    var ids = readStored("upos.messenger.threadIndex");
+    if (!Array.isArray(ids)) return [];
+    var found = [];
+    ids.slice(-100).forEach(function (id) {
+      var thread = readStored("upos.messenger.thread." + String(id));
+      if (!thread || !Array.isArray(thread.messages)) return;
+      thread.messages.forEach(function (message) {
+        if (!message || (message.kind !== "in" && message.kind !== "out")) return;
+        var at = Date.parse(message.created_at || "");
+        if (!Number.isFinite(at)) return;
+        found.push({
+          thread_id: String(thread.id || id), channel: thread.channel || "",
+          contact: thread.contact || "Клиент", kind: message.kind,
+          message: message.text || message.attachment_label || "Вложение",
+          created_at: new Date(at).toISOString(),
+          time_label: new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(at),
+          unread: 0
+        });
+      });
+    });
+    found.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
+    return found.slice(0, 100);
+  }
+
+  function mergedMessages(serverRows) {
+    var server = Array.isArray(serverRows) ? serverRows : [];
+    var result = server.slice();
+    var keys = new Set(server.map(function (row) {
+      return [row.thread_id, row.kind, Date.parse(row.created_at || ""), row.message].join("|");
+    }));
+    cachedMessages().forEach(function (row) {
+      var key = [row.thread_id, row.kind, Date.parse(row.created_at), row.message].join("|");
+      if (!keys.has(key)) { result.push(row); keys.add(key); }
+    });
+    result.sort(function (a, b) { return Date.parse(b.created_at || "") - Date.parse(a.created_at || ""); });
+    return result.slice(0, 100);
+  }
+
   function journalUrl(row) {
     var params = new URLSearchParams();
     if (row.channel) params.set("journal_channel", row.channel);
@@ -2482,11 +2369,11 @@
     dialog.className = "sidebar-messenger-modal";
     dialog.innerHTML =
       '<section class="sidebar-messenger-modal-surface"><header class="sidebar-messenger-modal-head">' +
-      '<div><h2>Сообщения новых лидов</h2><p data-messenger-modal-summary>Только непрочитанные</p></div>' +
+      '<div><h2>Сообщения мессенджеров</h2><p data-messenger-modal-summary>История входящих и исходящих сообщений</p></div>' +
       '<button type="button" class="settings-profile-modal-close" data-messenger-modal-close aria-label="Закрыть">×</button>' +
       '</header><div class="sidebar-messenger-modal-list" data-messenger-modal-list></div>' +
       '<footer class="sidebar-messenger-modal-foot"><a class="btn btn-secondary" href="/messengers#inbox">Все диалоги</a>' +
-      '<a class="btn btn-secondary" href="/messengers#sms_journal">Журнал сообщений</a>' +
+      '<a class="btn btn-secondary" href="/messengers#sms_journal">Журнал чатов</a>' +
       '<button type="button" class="btn" data-messenger-modal-close>Закрыть</button></footer></section>';
     dialog.addEventListener("click", function (event) { if (event.target === dialog) dialog.close(); });
     dialog.querySelectorAll("[data-messenger-modal-close]").forEach(function (button) {
@@ -2498,14 +2385,14 @@
 
   function renderList(list, rows) {
     if (!rows.length) {
-      list.innerHTML = '<div class="sidebar-messenger-empty">Новых сообщений от новых лидов пока нет.</div>';
+      list.innerHTML = '<div class="sidebar-messenger-empty">Сообщений пока нет.</div>';
       return;
     }
     list.innerHTML = rows.map(function (row) {
       var unread = Number(row.unread || 0);
       return '<a class="sidebar-messenger-row" href="' + escapeHtml(journalUrl(row)) + '">' +
         '<span class="sidebar-messenger-channel">' + escapeHtml(row.channel || "Чат") + '</span>' +
-        '<span class="sidebar-messenger-row-main"><strong>' + escapeHtml(row.contact || "Клиент") + '</strong><small>' + escapeHtml(row.message || "") + '</small></span>' +
+        '<span class="sidebar-messenger-row-main"><strong>' + escapeHtml(row.contact || "Клиент") + '</strong><small>' + (row.kind === "out" ? "Вы: " : "") + escapeHtml(row.message || "") + '</small></span>' +
         '<span class="sidebar-messenger-row-side">' + (row.time_label ? '<time>' + escapeHtml(row.time_label) + '</time>' : '') +
         (unread ? '<b>' + unread + '</b>' : '') + '</span></a>';
     }).join("");
@@ -2521,13 +2408,12 @@
     var resumeTimer = 0;
 
     function apply(payload) {
-      rows = Array.isArray(payload.notifications)
-        ? payload.notifications.filter(function (row) { return Number(row.unread || 0) > 0; })
-        : rows;
+      rows = mergedMessages(payload.notifications);
       var unread = Number(payload.unread_total || 0);
       var status = button.querySelector("[data-sidebar-messenger-status]");
       var count = button.querySelector("[data-sidebar-messenger-count]");
-      if (status) status.textContent = unread > 0 ? "Новые сообщения: " + unread : "Нет новых";
+      var latest = rows.find(function (row) { return row.kind === "in"; });
+      if (status) status.textContent = latest ? (latest.contact || "Клиент") + ": " + (latest.message || "Вложение") : "Сообщений пока нет";
       if (count) { count.hidden = unread <= 0; count.textContent = String(unread); }
       button.dataset.state = unread > 0 ? "new" : "idle";
       if (modal && modal.open) renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
@@ -2565,8 +2451,8 @@
       if (!modal) modal = createModal();
       renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
       modal.querySelector("[data-messenger-modal-summary]").textContent = rows.length
-        ? "Только непрочитанные"
-        : "Новых сообщений от новых лидов нет";
+        ? "Последние сообщения из всех подключённых каналов"
+        : "Сообщений пока нет";
       modal.showModal();
       refresh(true);
     });
@@ -2584,6 +2470,7 @@
       lastRequestAt = Number(saved.at || 0);
     }
 
+    apply({ notifications: [], unread_total: 0 });
     refresh();
     window.setInterval(refresh, REFRESH_MS);
     document.addEventListener("visibilitychange", function () {
@@ -2644,8 +2531,6 @@
 
   const storageKey = "upos:floating-phone-position";
   const providerStorageKey = "upos:floating-phone-provider";
-  const sipAccountsCacheKey = "upos:floating-phone:sip-accounts:v1";
-  const sipAccountsCacheTtlMs = 5 * 60 * 1000;
   const edgeGap = 8;
   const dragGap = 4;
   let dragState = null;
@@ -2879,38 +2764,6 @@
     return accountById(value);
   }
 
-  function readCachedAccounts() {
-    try {
-      const cached = JSON.parse(window.sessionStorage.getItem(sipAccountsCacheKey) || "null");
-      if (!cached || !Array.isArray(cached.accounts) || !cached.at) return null;
-      if (Date.now() - Number(cached.at) >= sipAccountsCacheTtlMs) return null;
-      return cached.accounts;
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function cacheAccounts(value) {
-    try {
-      window.sessionStorage.setItem(sipAccountsCacheKey, JSON.stringify({
-        at: Date.now(),
-        accounts: value,
-      }));
-    } catch (_error) {
-      // The phone still works when sessionStorage is unavailable.
-    }
-  }
-
-  async function loadAccounts() {
-    const cached = readCachedAccounts();
-    if (cached) return cached;
-    const response = await fetch("/api/telephony/sip", { credentials: "same-origin" });
-    const payload = await response.json().catch(() => ({}));
-    const loaded = Array.isArray(payload.accounts) ? payload.accounts : [];
-    cacheAccounts(loaded);
-    return loaded;
-  }
-
   function fillProviders() {
     if (!providerSelect || !accounts.length) return;
     // Список провайдеров в шаблоне приходит не на каждой странице, поэтому
@@ -3010,7 +2863,11 @@
   function ensureSoftphone() {
     if (softphoneReady) return softphoneReady;
     softphoneReady = (async () => {
-      accounts = (await loadAccounts()).filter((item) => item && item.ws_url && item.sip_uri);
+      const response = await fetch("/api/telephony/sip", { credentials: "same-origin" });
+      const payload = await response.json().catch(() => ({}));
+      accounts = Array.isArray(payload.accounts)
+        ? payload.accounts.filter((item) => item && item.ws_url && item.sip_uri)
+        : [];
       if (!accounts.length) {
         setStatus("SIP-аккаунт не настроен — вызов уйдёт в приложение", "ready");
         return null;
@@ -3142,16 +2999,9 @@
   });
 
   // A receiver must be registered before the first call arrives, not after the panel is opened.
-  const connectWhenForeground = () => {
-    if (document.visibilityState === "hidden") return;
-    if (typeof document.hasFocus === "function" && !document.hasFocus()) return;
+  window.setTimeout(() => {
     ensureSoftphone();
-  };
-  window.setTimeout(connectWhenForeground, 300);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") connectWhenForeground();
-  });
-  window.addEventListener("focus", connectWhenForeground);
+  }, 300);
 })();
 
 /* source: amount-format.js */

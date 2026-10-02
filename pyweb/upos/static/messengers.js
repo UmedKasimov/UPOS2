@@ -1466,7 +1466,8 @@
     } catch (err) {
       initialId = "";
     }
-    var initialThread = byId[String(initialId)] || threads[0];
+    var requestedId = new URLSearchParams(window.location.search).get("thread") || "";
+    var initialThread = byId[String(requestedId)] || byId[String(initialId)] || threads[0];
     if (initialThread) selectThread(root, initialThread);
 
     var sendToCrm = root.querySelector("[data-messenger-attach-client]");

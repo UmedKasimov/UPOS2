@@ -3,11 +3,12 @@
   var LEADER_TTL_MS = 12000;
   var MIN_REQUEST_GAP_MS = 2000;
   var RESUME_DEBOUNCE_MS = 180;
-  var LEADER_KEY = "upos:messenger-notifications:leader";
-  var PAYLOAD_KEY = "upos:messenger-notifications:payload";
+  var accountKey = String((document.body && document.body.dataset.userId) || "guest");
+  var LEADER_KEY = "upos:messenger-notifications:" + accountKey + ":leader";
+  var PAYLOAD_KEY = "upos:messenger-notifications:" + accountKey + ":payload";
   var TAB_ID = String(Date.now()) + ":" + Math.random().toString(36).slice(2);
   var channel = typeof BroadcastChannel === "function"
-    ? new BroadcastChannel("upos-messenger-notifications")
+    ? new BroadcastChannel("upos-messenger-notifications:" + accountKey)
     : null;
 
   function readStored(key) {
@@ -43,6 +44,45 @@
     return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  function cachedMessages() {
+    var ids = readStored("upos.messenger.threadIndex");
+    if (!Array.isArray(ids)) return [];
+    var found = [];
+    ids.slice(-100).forEach(function (id) {
+      var thread = readStored("upos.messenger.thread." + String(id));
+      if (!thread || !Array.isArray(thread.messages)) return;
+      thread.messages.forEach(function (message) {
+        if (!message || (message.kind !== "in" && message.kind !== "out")) return;
+        var at = Date.parse(message.created_at || "");
+        if (!Number.isFinite(at)) return;
+        found.push({
+          thread_id: String(thread.id || id), channel: thread.channel || "",
+          contact: thread.contact || "Клиент", kind: message.kind,
+          message: message.text || message.attachment_label || "Вложение",
+          created_at: new Date(at).toISOString(),
+          time_label: new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(at),
+          unread: 0
+        });
+      });
+    });
+    found.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
+    return found.slice(0, 100);
+  }
+
+  function mergedMessages(serverRows) {
+    var server = Array.isArray(serverRows) ? serverRows : [];
+    var result = server.slice();
+    var keys = new Set(server.map(function (row) {
+      return [row.thread_id, row.kind, Date.parse(row.created_at || ""), row.message].join("|");
+    }));
+    cachedMessages().forEach(function (row) {
+      var key = [row.thread_id, row.kind, Date.parse(row.created_at), row.message].join("|");
+      if (!keys.has(key)) { result.push(row); keys.add(key); }
+    });
+    result.sort(function (a, b) { return Date.parse(b.created_at || "") - Date.parse(a.created_at || ""); });
+    return result.slice(0, 100);
+  }
+
   function journalUrl(row) {
     var params = new URLSearchParams();
     if (row.channel) params.set("journal_channel", row.channel);
@@ -56,15 +96,18 @@
     dialog.className = "sidebar-messenger-modal";
     dialog.innerHTML =
       '<section class="sidebar-messenger-modal-surface"><header class="sidebar-messenger-modal-head">' +
-      '<div><h2>Сообщения новых лидов</h2><p data-messenger-modal-summary>Только непрочитанные</p></div>' +
+      '<div><h2>Сообщения мессенджеров</h2><p data-messenger-modal-summary>История входящих и исходящих сообщений</p></div>' +
       '<button type="button" class="settings-profile-modal-close" data-messenger-modal-close aria-label="Закрыть">×</button>' +
       '</header><div class="sidebar-messenger-modal-list" data-messenger-modal-list></div>' +
       '<footer class="sidebar-messenger-modal-foot"><a class="btn btn-secondary" href="/messengers#inbox">Все диалоги</a>' +
-      '<a class="btn btn-secondary" href="/messengers#sms_journal">Журнал сообщений</a>' +
+      '<a class="btn btn-secondary" href="/messengers#sms_journal">Журнал чатов</a>' +
       '<button type="button" class="btn" data-messenger-modal-close>Закрыть</button></footer></section>';
     dialog.addEventListener("click", function (event) { if (event.target === dialog) dialog.close(); });
     dialog.querySelectorAll("[data-messenger-modal-close]").forEach(function (button) {
       button.addEventListener("click", function () { dialog.close(); });
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target.closest("a[href]")) dialog.close();
     });
     document.body.appendChild(dialog);
     return dialog;
@@ -72,14 +115,14 @@
 
   function renderList(list, rows) {
     if (!rows.length) {
-      list.innerHTML = '<div class="sidebar-messenger-empty">Новых сообщений от новых лидов пока нет.</div>';
+      list.innerHTML = '<div class="sidebar-messenger-empty">Сообщений пока нет.</div>';
       return;
     }
     list.innerHTML = rows.map(function (row) {
       var unread = Number(row.unread || 0);
       return '<a class="sidebar-messenger-row" href="' + escapeHtml(journalUrl(row)) + '">' +
         '<span class="sidebar-messenger-channel">' + escapeHtml(row.channel || "Чат") + '</span>' +
-        '<span class="sidebar-messenger-row-main"><strong>' + escapeHtml(row.contact || "Клиент") + '</strong><small>' + escapeHtml(row.message || "") + '</small></span>' +
+        '<span class="sidebar-messenger-row-main"><strong>' + escapeHtml(row.contact || "Клиент") + '</strong><small>' + (row.kind === "out" ? "Вы: " : "") + escapeHtml(row.message || "") + '</small></span>' +
         '<span class="sidebar-messenger-row-side">' + (row.time_label ? '<time>' + escapeHtml(row.time_label) + '</time>' : '') +
         (unread ? '<b>' + unread + '</b>' : '') + '</span></a>';
     }).join("");
@@ -95,13 +138,12 @@
     var resumeTimer = 0;
 
     function apply(payload) {
-      rows = Array.isArray(payload.notifications)
-        ? payload.notifications.filter(function (row) { return Number(row.unread || 0) > 0; })
-        : rows;
+      rows = mergedMessages(payload.notifications);
       var unread = Number(payload.unread_total || 0);
       var status = button.querySelector("[data-sidebar-messenger-status]");
       var count = button.querySelector("[data-sidebar-messenger-count]");
-      if (status) status.textContent = unread > 0 ? "Новые сообщения: " + unread : "Нет новых";
+      var latest = rows.find(function (row) { return row.kind === "in"; });
+      if (status) status.textContent = latest ? (latest.contact || "Клиент") + ": " + (latest.message || "Вложение") : "Сообщений пока нет";
       if (count) { count.hidden = unread <= 0; count.textContent = String(unread); }
       button.dataset.state = unread > 0 ? "new" : "idle";
       if (modal && modal.open) renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
@@ -139,8 +181,8 @@
       if (!modal) modal = createModal();
       renderList(modal.querySelector("[data-messenger-modal-list]"), rows);
       modal.querySelector("[data-messenger-modal-summary]").textContent = rows.length
-        ? "Только непрочитанные"
-        : "Новых сообщений от новых лидов нет";
+        ? "Последние сообщения из всех подключённых каналов"
+        : "Сообщений пока нет";
       modal.showModal();
       refresh(true);
     });
@@ -158,6 +200,7 @@
       lastRequestAt = Number(saved.at || 0);
     }
 
+    apply({ notifications: [], unread_total: 0 });
     refresh();
     window.setInterval(refresh, REFRESH_MS);
     document.addEventListener("visibilitychange", function () {

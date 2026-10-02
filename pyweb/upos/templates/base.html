@@ -18,6 +18,9 @@
       rel="stylesheet"
     />
   <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=721" />
+    {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
+    <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=2" />
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -232,6 +235,15 @@
             {% endif %}
           {% endif %}
         </nav>
+        {% if user and user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
+        <div class="sidebar-messenger-notice-wrap">
+          <button type="button" class="sidebar-messenger-notice" data-sidebar-messenger-notifications data-state="idle" aria-label="Сообщения мессенджеров" title="Сообщения мессенджеров">
+            <span class="sidebar-messenger-notice-icon" aria-hidden="true">✉</span>
+            <span class="sidebar-messenger-notice-copy"><strong>Сообщения</strong><small data-sidebar-messenger-status>Загружаем…</small></span>
+            <b data-sidebar-messenger-count hidden></b>
+          </button>
+        </div>
+        {% endif %}
         <div class="sidebar-foot">
           {% if user %}
             <div class="sidebar-user">
@@ -379,6 +391,9 @@
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
     <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=8" defer></script>
     {% if user %}
+    {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
+    <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=5" defer></script>
+    {% endif %}
     <script src="{{ url_for('static', path='floating-phone.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
