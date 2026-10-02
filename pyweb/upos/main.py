@@ -10,6 +10,7 @@ import logging
 import math
 import os
 import re
+import threading
 import secrets
 import socket
 import time
@@ -300,6 +301,7 @@ from upos.users_store import (
 )
 
 logger = logging.getLogger(__name__)
+_messenger_campaign_lock = threading.Lock()
 
 BASE_DIR = Path(__file__).resolve().parent
 # Кеш картинок из переписки Telegram: временный, чистится каждый вечер.
@@ -19766,8 +19768,11 @@ def create_app() -> FastAPI:
             "paused": "Пауза",
             "archived": "Архив",
             "draft": "Черновик",
-            "scheduled": "Запланирована",
+            "scheduled": "Ожидает ручного запуска",
+            "sending": "Отправляется",
             "sent": "Отправлена",
+            "partial": "Отправлена частично",
+            "failed": "Ошибка отправки",
         }.get(str(value or ""), str(value or "") or "-")
 
     def _messenger_client_options(workspace_owner_id: str) -> list[str]:
@@ -19895,26 +19900,25 @@ def create_app() -> FastAPI:
                 messenger_mark_thread_read(workspace_owner_id, thread_key[len("instagram-thread-") :])
             except Exception:
                 pass
+        elif thread_key.startswith("telegram-thread-"):
+            messenger_mark_thread_read(workspace_owner_id, thread_key[len("telegram-thread-") :])
         return moment
 
     def _messenger_apply_read_state(workspace_owner_id: str, rows: list[dict[str, Any]]) -> None:
-        """Непрочитанные входящие и статус доставки исходящих.
+        """Unread incoming messages and confirmed outgoing sends.
 
-        Одна галочка — сообщение ушло, две — собеседник его прочитал:
-        признаком считаем любой его ответ после нашего сообщения.
+        Bot API does not report that the recipient opened our outgoing text.
+        A later reply must not be presented as a Telegram read receipt.
         """
         marks = _messenger_read_marks(workspace_owner_id)
         for item in rows:
             messages = item.get("messages") or []
             mark = _parse_iso_datetime(marks.get(str(item.get("id") or ""), ""))
             unread = 0
-            last_in: datetime | None = None
             for message in messages:
                 moment = _parse_iso_datetime(message.get("created_at") or "")
                 if message.get("kind") != "in":
                     continue
-                if moment and (last_in is None or moment > last_in):
-                    last_in = moment
                 if not moment:
                     # Служебные карточки каналов без даты за переписку не считаем.
                     continue
@@ -19924,8 +19928,7 @@ def create_app() -> FastAPI:
             for message in messages:
                 if message.get("kind") != "out":
                     continue
-                moment = _parse_iso_datetime(message.get("created_at") or "")
-                message["status"] = "read" if last_in and moment and moment <= last_in else "sent"
+                message["status"] = "sent"
             item["unread"] = unread
             if not unread:
                 item["is_new"] = False
@@ -20049,6 +20052,8 @@ def create_app() -> FastAPI:
         # попадал в список дважды — настоящим диалогом и пустой заявкой, и та
         # заявка выглядела как обнулившийся чат.
         business_threads = list_business_threads(workspace_owner_id)
+        bot_threads = messenger_list_threads(workspace_owner_id, channel="telegram_bot", limit=1000)
+        bot_chat_ids = {str(item.get("external_id") or "") for item in bot_threads}
 
         def _phone_tail(value: Any) -> str:
             digits = re.sub(r"\D+", "", str(value or ""))
@@ -20077,6 +20082,9 @@ def create_app() -> FastAPI:
 
         seen_chat_ids: set[str] = set()
         for sub in subscribers:
+            if str(sub.chat_id or "") in bot_chat_ids:
+                seen_chat_ids.add(str(sub.chat_id))
+                continue
             title = str(sub.display_name or sub.username or sub.phone or sub.telegram_user_id or "Telegram").strip()
             username = str(sub.username or "").strip()
             if _covered_by_business(sub.chat_id, username, str(sub.phone or "")):
@@ -20097,6 +20105,7 @@ def create_app() -> FastAPI:
             rows.append(
                 {
                     "id": f"telegram-sub-{sub.id}",
+                    "chat_id": str(sub.chat_id or ""),
                     # Ответ такому контакту уходит через бота.
                     "source": "telegram_bot",
                     "channel": "Telegram",
@@ -20124,13 +20133,14 @@ def create_app() -> FastAPI:
             seen_chat_ids.add(str(sub.chat_id))
 
         for chat in chats:
-            if str(chat.chat_id) in seen_chat_ids or _covered_by_business(chat.chat_id):
+            if str(chat.chat_id) in seen_chat_ids or str(chat.chat_id) in bot_chat_ids or _covered_by_business(chat.chat_id):
                 continue
             status_value = "active" if chat.is_enabled else "waiting"
             presence, presence_label = _messenger_presence(chat.last_seen_at, status_value)
             rows.append(
                 {
                     "id": f"telegram-chat-{chat.id}",
+                    "chat_id": str(chat.chat_id or ""),
                     "source": "telegram_bot",
                     "channel": "Telegram",
                     "contact": str(chat.title or chat.chat_id or "Telegram"),
@@ -20151,6 +20161,54 @@ def create_app() -> FastAPI:
                     ],
                 }
             )
+
+        # Bot API delivers new private messages by webhook. Unlike the old
+        # subscriber/chat placeholders these rows contain the real conversation.
+        for thread in bot_threads:
+            chat_id = str(thread.get("external_id") or "")
+            thread_id = str(thread.get("id") or "")
+            if not chat_id or not thread_id or _covered_by_business(chat_id, str(thread.get("username") or "")):
+                continue
+            history = messenger_list_messages(workspace_owner_id, thread_id, limit=200)
+            last_at = _parse_iso_datetime(thread.get("last_message_at"))
+            presence, presence_label = _messenger_presence(last_at, "active")
+            contact = str(thread.get("client") or thread.get("title") or "Клиент Telegram")
+            username = str(thread.get("username") or "")
+            telegram_url = _telegram_chat_url(username, chat_id)
+            rows.append({
+                "id": f"telegram-thread-{thread_id}",
+                "chat_id": chat_id,
+                "thread_id": thread_id,
+                "source": "telegram_bot",
+                "channel": "Telegram",
+                "contact": contact,
+                "client": str(thread.get("client") or ""),
+                "username": username,
+                "phone": "",
+                "topic": ("@" + username) if username else "Личная переписка с ботом",
+                "last_message": str(thread.get("last_message_text") or ""),
+                "responsible": "",
+                "status": "active",
+                "status_label": _messenger_status_label("active"),
+                "presence": presence,
+                "presence_label": presence_label,
+                "avatar_url": str(thread.get("avatar_url") or ""),
+                "avatar_ttl_days": 5,
+                "is_new": bool(thread.get("unread_count")),
+                "updated_at": last_at,
+                "telegram_url": telegram_url,
+                "messages": [
+                    {
+                        "author": str(message.get("author") or (contact if message.get("direction") == "in" else "UPOS")),
+                        "text": str(message.get("text") or ""),
+                        "kind": "out" if message.get("direction") == "out" else "in",
+                        "created_at": str(message.get("sent_at") or ""),
+                        "attachment_label": str((message.get("payload") or {}).get("label") or ""),
+                        "attachment_url": telegram_url if (message.get("payload") or {}).get("file_id") else "",
+                    }
+                    for message in history
+                ],
+            })
 
         social_data = load_workspace_settings(workspace_owner_id).get("social_links")
         social_links = social_data if isinstance(social_data, dict) else {}
@@ -20425,6 +20483,24 @@ def create_app() -> FastAPI:
                 })
         entries.sort(key=lambda item: item["created_at"], reverse=True)
         return entries
+
+    def _messenger_campaign_targets(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        targets = []
+        seen_chat_ids: set[int] = set()
+        for row in rows:
+            try:
+                chat_id = int(row.get("chat_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            if (row.get("source") != "telegram_bot" or row.get("status") != "active"
+                    or chat_id <= 0 or chat_id in seen_chat_ids):
+                continue
+            if str(row.get("id") or "").startswith("telegram-chat-") and row.get("topic") != "private":
+                continue
+            targets.append(row)
+            seen_chat_ids.add(chat_id)
+        targets.sort(key=lambda row: str(row.get("contact") or "").lower())
+        return targets
 
     def _messenger_filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[dict[str, Any]]:
         q = str(filters.get("q") or "").strip().lower()
@@ -21430,6 +21506,7 @@ def create_app() -> FastAPI:
         active_channel_connected = filters["channel"] in connected_channels
         all_threads = _messenger_threads_from_sources(wid)
         journal_rows = _messenger_message_journal(all_threads)
+        campaign_recipients = _messenger_campaign_targets(all_threads)
         # На вкладке канала — непрочитанные, как и в списке диалогов: общее
         # число сообщений висело бы там вечно.
         channel_unread_counts: dict[str, int] = {}
@@ -21449,6 +21526,7 @@ def create_app() -> FastAPI:
         auto_reply = data.get("messenger_auto_reply") if isinstance(data.get("messenger_auto_reply"), dict) else {}
         threads_json = json.dumps(threads, ensure_ascii=False, default=str).replace("</", "<\\/")
         templates_json = json.dumps(templates_rows, ensure_ascii=False, default=str).replace("</", "<\\/")
+        campaigns_json = json.dumps(campaigns, ensure_ascii=False, default=str).replace("</", "<\\/")
         return tpl(
             request,
             "home_business_module.html",
@@ -21468,6 +21546,9 @@ def create_app() -> FastAPI:
             messenger_journal_rows=journal_rows,
             messenger_threads_json=threads_json,
             messenger_campaigns=campaigns,
+            messenger_campaigns_json=campaigns_json,
+            messenger_campaign_recipients=campaign_recipients,
+            messenger_campaign_form_id=str(uuid.uuid4()),
             messenger_templates=templates_rows,
             messenger_templates_json=templates_json,
             messenger_auto_reply=auto_reply,
@@ -21487,23 +21568,92 @@ def create_app() -> FastAPI:
         title = str(form.get("title") or "").strip()
         if not title:
             return RedirectResponse(url="/messengers?error=" + quote("Название кампании обязательно") + "#campaigns", status_code=302)
-        status_value = str(form.get("action") or "draft").strip()
-        status_value = "scheduled" if status_value == "launch" else "draft"
-        _messenger_save_item(
-            wid,
-            "messenger_campaigns",
-            {
-                "title": title,
-                "channel": str(form.get("channel") or "Telegram").strip(),
-                "segment": str(form.get("segment") or "").strip(),
-                "template": str(form.get("template") or "").strip(),
-                "message": str(form.get("message") or "").strip(),
-                "run_at": str(form.get("run_at") or "").strip(),
-                "status": status_value,
-                "note": str(form.get("note") or "").strip(),
-            },
-        )
-        return RedirectResponse(url="/messengers?msg=saved#campaigns", status_code=302)
+        action = str(form.get("action") or "draft").strip()
+        message = str(form.get("message") or "").strip()
+        selected_ids = list(dict.fromkeys(str(value).strip() for value in form.getlist("recipient_ids") if str(value).strip()))
+        if len(selected_ids) > 20:
+            return RedirectResponse(url="/messengers?error=" + quote("За один запуск можно выбрать до 20 чатов") + "#campaigns", status_code=302)
+        available = {str(row["id"]): row for row in _messenger_campaign_targets(_messenger_threads_from_sources(wid))}
+        if any(item not in available for item in selected_ids):
+            return RedirectResponse(url="/messengers?error=" + quote("Список чатов изменился. Обновите страницу и выберите получателей снова") + "#campaigns", status_code=302)
+        if action == "launch" and (not selected_ids or not message):
+            return RedirectResponse(url="/messengers?error=" + quote("Выберите чаты и введите текст рассылки") + "#campaigns", status_code=302)
+        if len(message) > 4000:
+            return RedirectResponse(url="/messengers?error=" + quote("Текст рассылки слишком длинный") + "#campaigns", status_code=302)
+        try:
+            campaign_id = str(uuid.UUID(str(form.get("form_id") or "")))
+        except ValueError:
+            return RedirectResponse(url="/messengers?error=" + quote("Обновите форму рассылки") + "#campaigns", status_code=302)
+        recipient_rows = [available[item] for item in selected_ids]
+        campaign = {
+            "id": campaign_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "title": title,
+            "channel": "Telegram",
+            "segment": f"Выбрано чатов: {len(recipient_rows)}",
+            "message": message,
+            "recipient_ids": selected_ids,
+            "recipient_count": len(recipient_rows),
+            "status": "sending" if action == "launch" else "draft",
+            "note": str(form.get("note") or "").strip(),
+            "results": [],
+        }
+        # A repeated submit from the same form must never launch twice.
+        with _messenger_campaign_lock:
+            existing = next((row for row in _messenger_settings_payload(wid)["messenger_campaigns"] if str(row.get("id")) == campaign_id), None)
+            if existing and (existing.get("status") != "draft" or action != "launch"):
+                return RedirectResponse(url="/messengers?msg=saved#campaigns", status_code=302)
+            if existing:
+                campaign["created_at"] = existing.get("created_at") or campaign["created_at"]
+            if action == "launch":
+                from upos.telegram_store import get_bot_config_with_token
+
+                _, token = get_bot_config_with_token(wid)
+                if not token:
+                    return RedirectResponse(url="/messengers?error=" + quote("Подключите Telegram-бота перед запуском") + "#campaigns", status_code=302)
+            else:
+                token = ""
+            _messenger_save_item(wid, "messenger_campaigns", campaign)
+        if action != "launch":
+            return RedirectResponse(url="/messengers?msg=saved#campaigns", status_code=302)
+
+        from upos.telegram_client import TelegramApiError, send_message as tg_send_message
+        from upos.telegram_inbox import save_outgoing
+
+        actor = request.session.get("user") or {}
+        author = str(actor.get("name") or actor.get("username") or "UPOS")
+        for row in recipient_rows:
+            chat_id = int(row.get("chat_id") or 0)
+            result = {"thread_id": str(row["id"]), "contact": str(row.get("contact") or ""), "chat_id": chat_id}
+            try:
+                sent = await asyncio.to_thread(tg_send_message, token, chat_id, message, parse_mode="")
+                result["status"] = "sent"
+                result["message_id"] = int(sent.get("message_id") or 0)
+                try:
+                    result["history_saved"] = save_outgoing(
+                        wid, chat_id, sent, message, author=author, campaign_id=campaign_id,
+                        contact=str(row.get("contact") or ""), username=str(row.get("username") or ""),
+                    )
+                except Exception:
+                    result["history_saved"] = False
+                    logger.exception("[messenger] campaign delivery not saved to history wid=%s campaign=%s", wid, campaign_id)
+            except TelegramApiError as exc:
+                result["status"] = "failed"
+                result["error"] = str(exc)[:180]
+            except Exception:
+                result["status"] = "failed"
+                result["error"] = "Не удалось отправить сообщение"
+                logger.exception("[messenger] campaign delivery failed wid=%s campaign=%s", wid, campaign_id)
+            campaign["results"].append(result)
+            _messenger_save_item(wid, "messenger_campaigns", campaign)
+            await asyncio.sleep(0.1)
+        sent_count = sum(1 for item in campaign["results"] if item["status"] == "sent")
+        campaign["status"] = "sent" if sent_count == len(recipient_rows) else ("partial" if sent_count else "failed")
+        campaign["sent_count"] = sent_count
+        campaign["failed_count"] = len(recipient_rows) - sent_count
+        campaign["run_at"] = datetime.now(timezone.utc).isoformat()
+        _messenger_save_item(wid, "messenger_campaigns", campaign)
+        return RedirectResponse(url="/messengers?msg=" + quote(f"Отправлено: {sent_count} из {len(recipient_rows)}") + "#campaigns", status_code=302)
 
     @app.post("/messengers/templates/save", name="messenger_template_save")
     async def messenger_template_save(request: Request):
@@ -27805,7 +27955,12 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": "Бот не подключён к организации"}, status_code=400)
 
         chat_id = 0
-        if thread_id.startswith("telegram-chat-"):
+        if thread_id.startswith("telegram-thread-"):
+            saved_thread = messenger_thread_by_id(wid, thread_id[len("telegram-thread-") :])
+            if not saved_thread or saved_thread.get("channel") != "telegram_bot":
+                return JSONResponse({"error": "Чат не найден"}, status_code=404)
+            chat_id = int(saved_thread.get("external_id") or 0)
+        elif thread_id.startswith("telegram-chat-"):
             chat = get_chat_by_row_id(wid, thread_id[len("telegram-chat-") :])
             if not chat:
                 return JSONResponse({"error": "Чат не найден"}, status_code=404)
@@ -27828,11 +27983,11 @@ def create_app() -> FastAPI:
         # Если это личная переписка владельца, отвечаем от его имени —
         # клиент писал человеку, и ответ от бота выглядит подменой.
         connection_id = ""
-        if _telegram_business_chat(wid, chat_id):
+        if not thread_id.startswith("telegram-thread-") and _telegram_business_chat(wid, chat_id):
             connection = telegram_business_connection(wid) or {}
             connection_id = str(connection.get("connection_id") or "")
         try:
-            tg_send_message(
+            sent = tg_send_message(
                 token,
                 chat_id,
                 text_body,
@@ -27841,7 +27996,21 @@ def create_app() -> FastAPI:
             )
         except TelegramApiError as exc:
             return JSONResponse({"error": str(exc)}, status_code=400)
-        return {"ok": True, "as_owner": bool(connection_id)}
+        history_saved = False
+        try:
+            if connection_id:
+                from upos.telegram_business_store import save_message as business_save_message
+
+                history_saved = business_save_message(wid, sent, connection_id=connection_id, direction="out")
+            else:
+                from upos.telegram_inbox import save_outgoing
+
+                actor = request.session.get("user") or {}
+                author = str(actor.get("name") or actor.get("username") or "UPOS")
+                history_saved = save_outgoing(wid, chat_id, sent, text_body, author=author)
+        except Exception:
+            logger.exception("[messenger] Telegram message sent but not saved to history wid=%s", wid)
+        return {"ok": True, "as_owner": bool(connection_id), "history_saved": history_saved}
 
     @app.get("/api/messengers/notifications")
     def api_messenger_notifications(request: Request):

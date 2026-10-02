@@ -145,8 +145,29 @@ body.sidebar-rail .sidebar-messenger-notice > b { display: none; }
 .messenger-journal-row strong { font-size: 0.8rem; }
 .messenger-journal-row p { margin: 0.25rem 0 0; overflow-wrap: anywhere; font-size: 0.78rem; }
 .messenger-journal-row small { color: var(--muted-foreground); text-align: right; font-size: 0.7rem; }
+.messenger-campaign-picker { display: grid; gap: .55rem; padding: .8rem; border: 1px solid var(--border); border-radius: .65rem; background: var(--card, #fff); }
+.messenger-campaign-picker-head { display: flex; justify-content: space-between; gap: .5rem; align-items: center; }
+.messenger-campaign-picker-head strong { font-size: .82rem; }
+.messenger-campaign-picker-head span, .messenger-campaign-picker > small { color: var(--muted-foreground); font-size: .73rem; }
+.messenger-campaign-picker-head .is-limit { color: #c32b2b; font-weight: 700; }
+.messenger-campaign-picker > input { width: 100%; min-height: 2.25rem; padding: .35rem .55rem; border: 1px solid var(--border); border-radius: .45rem; }
+.messenger-campaign-recipient-list { max-height: 17rem; overflow-y: auto; border: 1px solid var(--border); border-radius: .45rem; }
+.messenger-campaign-recipient { display: flex; align-items: center; gap: .6rem; padding: .55rem .65rem; border-bottom: 1px solid var(--border); cursor: pointer; }
+.messenger-campaign-recipient:last-child { border-bottom: 0; }
+.messenger-campaign-recipient:hover { background: color-mix(in srgb, var(--primary), transparent 95%); }
+.messenger-campaign-recipient[hidden] { display: none; }
+.messenger-campaign-recipient input { margin: 0; }
+.messenger-campaign-recipient span { display: grid; gap: .1rem; }
+.messenger-campaign-recipient strong { font-size: .76rem; }
+.messenger-campaign-recipient small { font-size: .68rem; color: var(--muted-foreground); }
+.messenger-campaign-results { margin-top: .3rem; font-size: .7rem; max-height: 8rem; overflow-y: auto; }
+.messenger-campaign-results summary { cursor: pointer; color: var(--primary); }
+.messenger-campaign-results div { padding: .2rem 0; }
+.messenger-campaign-reuse { padding: .2rem .4rem; font-size: .7rem; }
 .messenger-journal-direction { font-size: 0.7rem; font-weight: 700; color: var(--primary); }
 .messenger-journal-direction--out { color: var(--muted-foreground); }
+.messenger-journal-unread { display: block; width: fit-content; margin: 0.35rem 0 0 auto; padding: 0.15rem 0.35rem; border-radius: 999px; background: color-mix(in srgb, var(--primary), transparent 86%); color: var(--primary); font-size: 0.66rem; }
+.messenger-journal-local { display: inline-block; margin-top: 0.2rem; color: var(--muted-foreground); font-size: 0.65rem; font-weight: 500; }
 
 @media (max-width: 40rem) {
   .sidebar-messenger-modal { width: calc(100vw - 18px); }

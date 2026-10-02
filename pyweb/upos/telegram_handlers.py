@@ -6,6 +6,7 @@ import html
 import logging
 import re
 import time
+from contextvars import ContextVar
 from typing import Any
 
 from upos.telegram_client import (
@@ -16,7 +17,7 @@ from upos.telegram_client import (
     edit_message_text,
     get_chat_member,
     remove_keyboard,
-    send_message,
+    send_message as telegram_send_message,
 )
 from upos.telegram_reports import (
     balance_report_keyboard,
@@ -38,6 +39,22 @@ from upos.telegram_business_store import (
 from upos.transactions_store import decide_transaction_telegram_limit_approval
 
 logger = logging.getLogger(__name__)
+_private_reply: ContextVar[tuple[str, int] | None] = ContextVar("telegram_private_reply", default=None)
+
+
+def send_message(token: str, chat_id: int, text: str, **kwargs: Any) -> dict[str, Any]:
+    """Record bot replies in the same private conversation as the inbound update."""
+    sent = telegram_send_message(token, chat_id, text, **kwargs)
+    context = _private_reply.get()
+    if context and int(chat_id) == context[1]:
+        try:
+            from upos.telegram_inbox import save_outgoing
+
+            plain = html.unescape(re.sub(r"<[^>]+>", "", text)) if kwargs.get("parse_mode", "HTML") == "HTML" else text
+            save_outgoing(context[0], int(chat_id), sent, plain, author="UPOS Bot")
+        except Exception:
+            logger.exception("[telegram] bot reply sent but not saved wid=%s chat=%s", context[0], chat_id)
+    return sent
 
 
 def _handle_business_message(workspace_owner_id: str, bot_id: int, message: dict[str, Any]) -> None:
@@ -166,10 +183,17 @@ def _send_group_welcome(
 def handle_telegram_update(workspace_owner_id: str, update: dict[str, Any]) -> None:
     if not isinstance(update, dict):
         return
+    message = update.get("message") if isinstance(update.get("message"), dict) else {}
+    chat = message.get("chat") if isinstance(message.get("chat"), dict) else {}
+    chat_id = int(chat.get("id") or 0)
+    context = (workspace_owner_id, chat_id) if chat_id and chat.get("type") == "private" else None
+    token = _private_reply.set(context)
     try:
         _handle_telegram_update_inner(workspace_owner_id, update)
     except Exception:
         logger.exception("[telegram] update handling failed wid=%s", workspace_owner_id)
+    finally:
+        _private_reply.reset(token)
 
 
 def _handle_telegram_update_inner(workspace_owner_id: str, update: dict[str, Any]) -> None:

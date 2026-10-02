@@ -70,31 +70,26 @@
   }
 
   function messageKey(message) {
-    return String((message && message.kind) || "") + "\u0000" + String((message && message.text) || "");
+    return [message && message.kind, message && message.text, Date.parse((message && message.created_at) || "") || ""].join("\u0000");
   }
 
   function mergeThreadMessages(local, incoming) {
-    /* Сервер — источник правды по доставленным сообщениям, но только что
-       отправленное ещё не успело до него доехать. Раньше ответ сервера
-       затирал переписку целиком, и свежие реплики пропадали на глазах.
-       Поэтому держим их локально, пока сервер их не подтвердит. */
-    if (!incoming.length) return local.slice();
-    var pending = local.filter(function (message) {
-      return message && message.pending;
-    });
-    if (!pending.length) return incoming.slice();
-    var keys = incoming.map(messageKey);
+    /* Preserve cached older pages while accepting newly persisted messages. */
     var merged = incoming.slice();
-    pending.forEach(function (message) {
-      var at = keys.indexOf(messageKey(message));
-      if (at !== -1) {
-        // Сервер уже знает это сообщение — второй раз не показываем.
-        keys[at] = "\u0000matched";
-        return;
-      }
+    var keys = new Set(incoming.map(messageKey));
+    local.forEach(function (message) {
+      if (!message) return;
+      var duplicatePending = message.pending && incoming.some(function (fresh) {
+        return fresh.kind === message.kind && fresh.text === message.text &&
+          Math.abs((Date.parse(fresh.created_at || "") || 0) - (Date.parse(message.created_at || "") || 0)) < 120000;
+      });
+      var key = messageKey(message);
+      if (duplicatePending || keys.has(key)) return;
+      keys.add(key);
       merged.push(message);
     });
-    return merged;
+    merged.sort(function (a, b) { return (Date.parse(a.created_at || "") || 0) - (Date.parse(b.created_at || "") || 0); });
+    return merged.slice(-500);
   }
 
   function initialsFor(thread) {
@@ -145,15 +140,13 @@
       avatar_ttl_days: Number(thread.avatar_ttl_days || 5) || 5,
       is_new: Boolean(thread.is_new),
       telegram_url: thread.telegram_url || "",
-      messages: threadMessages(thread).slice(-200),
+      messages: threadMessages(thread).slice(-500),
     };
     // Кеш переписки не укорачиваем: сервер мог ответить обрезанным списком
     // (или вовсе заглушкой), и раньше это стирало историю насовсем.
     var stored = readJsonStorage(storageKey(thread.id), null);
     var storedMessages = stored && Array.isArray(stored.messages) ? stored.messages : [];
-    if (storedMessages.length > payload.messages.length) {
-      payload.messages = storedMessages;
-    }
+    payload.messages = mergeThreadMessages(storedMessages, payload.messages);
     writeJsonStorage(storageKey(thread.id), payload);
     var index = readJsonStorage(THREAD_INDEX_KEY, []);
     if (!Array.isArray(index)) index = [];
@@ -171,9 +164,7 @@
       return thread;
     }
     var savedMessages = Array.isArray(saved.messages) ? saved.messages : [];
-    if (savedMessages.length > threadMessages(thread).length) {
-      thread.messages = savedMessages;
-    }
+    thread.messages = mergeThreadMessages(savedMessages, threadMessages(thread));
     var savedAvatar = String(saved.avatar_url || "").trim();
     var savedAt = Number(saved.avatar_saved_at || 0);
     var ttl = Number(saved.avatar_ttl_days || thread.avatar_ttl_days || 5) * 24 * 60 * 60 * 1000;
@@ -194,6 +185,8 @@
         if (!saved || !saved.id) return null;
         if (activeChannel && channelKey(saved.channel) !== activeChannel) return null;
         saved.restored = true;
+        saved.unread = 0;
+        saved.is_new = false;
         return normalizeThread(saved);
       })
       .filter(Boolean);
@@ -209,41 +202,20 @@
   }
 
   function messageFooter(message, kind) {
-    /* Время и статус доставки: одна галочка — отправлено, две — прочитано. */
+    /* A sent tick is confirmed; Telegram does not expose recipient reads. */
     var time = timeLabelFor(message);
     var ticks = "";
     if (kind === "out") {
-      var read = String(message.status || "sent") === "read";
       ticks =
-        '<i class="messenger-message-ticks' +
-        (read ? " messenger-message-ticks--read" : "") +
-        '" aria-label="' +
-        (read ? "Прочитано" : "Отправлено") +
-        '" title="' +
-        (read ? "Прочитано" : "Отправлено") +
-        '"><svg viewBox="0 0 20 12" aria-hidden="true">' +
-        '<path d="M1.5 6.6 4.6 9.8 11 2.6" />' +
-        (read ? '<path d="M7.6 9.8 14 2.6" />' : "") +
-        "</svg></i>";
+        '<i class="messenger-message-ticks" aria-label="Отправлено" title="Отправлено">' +
+        '<svg viewBox="0 0 20 12" aria-hidden="true"><path d="M1.5 6.6 4.6 9.8 11 2.6" /></svg></i>';
     }
     if (!time && !ticks) return "";
     return '<span class="messenger-message-meta">' + (time ? "<time>" + escapeHtml(time) + "</time>" : "") + ticks + "</span>";
   }
 
   function applyDeliveryStatus(messages) {
-    /* Ответ собеседника означает, что всё отправленное до него прочитано. */
-    var lastIn = 0;
-    messages.forEach(function (message) {
-      if (String(message.kind || "") !== "in") return;
-      var moment = Date.parse(message.created_at || "");
-      if (moment && moment > lastIn) lastIn = moment;
-    });
-    messages.forEach(function (message) {
-      if (String(message.kind || "") !== "out") return;
-      if (String(message.status || "") === "read") return;
-      var moment = Date.parse(message.created_at || "");
-      message.status = lastIn && moment && moment <= lastIn ? "read" : "sent";
-    });
+    /* Telegram Bot API does not provide recipient read receipts. */
     return messages;
   }
 
@@ -429,7 +401,7 @@
       item.hidden = true;
     });
     var button = document.createElement("button");
-    var count = threadMessages(thread).length;
+    var count = thread.restored ? 0 : Number(thread.unread || 0);
     button.type = "button";
     button.className = "messenger-dialog-item messenger-dialog-item--restored";
     button.setAttribute("data-messenger-thread-id", thread.id);
@@ -453,7 +425,7 @@
       "</strong>" +
       (thread.is_new ? '<mark class="messenger-new-badge">NEW</mark>' : "") +
       "</span><small>" +
-      escapeHtml(thread.topic || thread.last_message || thread.channel || "") +
+      escapeHtml(thread.restored ? "История этого браузера" : (thread.topic || thread.last_message || thread.channel || "")) +
       // Подпись статуса убрана: «Активный» стоял почти у всех диалогов и
       // ничего не сообщал — время и счётчик непрочитанных полезнее.
       '</small></span><span class="messenger-dialog-side">' +
@@ -486,7 +458,7 @@
     var name = item.querySelector(".messenger-dialog-name-line strong");
     if (name) name.textContent = thread.contact || "Диалог";
     var preview = item.querySelector(".messenger-dialog-main small");
-    if (preview) preview.textContent = thread.topic || thread.last_message || thread.channel || "";
+    if (preview) preview.textContent = thread.restored ? "История этого браузера" : (thread.topic || thread.last_message || thread.channel || "");
     var timeNode = item.querySelector(".messenger-dialog-time");
     if (timeNode && thread.time_label) timeNode.textContent = thread.time_label;
     // Старую подпись статуса убираем и у диалогов, отрисованных шаблоном.
@@ -531,7 +503,8 @@
         (thread.channel || "Канал") +
         " · " +
         (thread.topic || thread.status_label || "обращение") +
-        (thread.client ? " · клиент: " + thread.client : "");
+        (thread.client ? " · клиент: " + thread.client : "") +
+        (thread.restored ? " · сохранено только в этом браузере" : "");
     }
     if (presence) {
       var token = classToken(thread.presence, "offline");
@@ -676,7 +649,7 @@
     root.querySelectorAll("[data-messenger-thread-id]").forEach(function (item) {
       item.classList.toggle("active", item.getAttribute("data-messenger-thread-id") === String(thread.id));
     });
-    clearUnread(root, thread);
+    if (!root.hidden) clearUnread(root, thread);
     updateThreadHeader(root, thread);
     renderMessages(root, thread);
     root.dataset.selectedThreadId = thread.id || "";
@@ -1469,6 +1442,11 @@
     var requestedId = new URLSearchParams(window.location.search).get("thread") || "";
     var initialThread = byId[String(requestedId)] || byId[String(initialId)] || threads[0];
     if (initialThread) selectThread(root, initialThread);
+    window.addEventListener("hashchange", function () {
+      window.setTimeout(function () {
+        if (!root.hidden && currentThread()) clearUnread(root, currentThread());
+      }, 0);
+    });
 
     var sendToCrm = root.querySelector("[data-messenger-attach-client]");
     if (sendToCrm) {
@@ -1591,6 +1569,10 @@
           text.focus();
           return;
         }
+        if (current.restored) {
+          showSendStatus(root, "Это локальная история. Для ответа подключите соответствующий Telegram-аккаунт или дождитесь нового сообщения подключённому боту.", "error");
+          return;
+        }
         showSendStatus(root, "");
 
         // Telegram Business, чаты бота и Instagram Direct уходят клиенту
@@ -1668,6 +1650,7 @@
             rememberThread(current);
             renderMessages(root, current);
             showSendStatus(root, "Сообщение отправлено клиенту.", "ok");
+            refreshThreads();
           })
           .catch(function (error) {
             showSendStatus(root, sendErrorText(error.message), "error");
@@ -1819,7 +1802,7 @@
         });
     }
 
-    window.setInterval(refreshThreads, 12000);
+    window.setInterval(refreshThreads, 4000);
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) refreshThreads();
     });

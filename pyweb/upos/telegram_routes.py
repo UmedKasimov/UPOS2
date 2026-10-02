@@ -169,6 +169,8 @@ def register_telegram_routes(
         return payload
 
     def _collect_pending_updates(workspace_owner_id: str, token: str) -> int:
+        from upos.telegram_inbox import save_incoming
+
         updates = get_updates(token, timeout_seconds=0)
         max_update_id: int | None = None
         count = 0
@@ -176,10 +178,15 @@ def register_telegram_routes(
             if not isinstance(update, dict):
                 continue
             try:
+                incoming = update.get("message")
+                if isinstance(incoming, dict):
+                    config, _ = get_bot_config_with_token(workspace_owner_id)
+                    save_incoming(workspace_owner_id, incoming, bot_id=int((config or {}).get("bot_id") or 0))
                 handle_telegram_update(workspace_owner_id, update)
                 count += 1
             except Exception:
                 logger.exception("[telegram] pending update handling failed wid=%s", workspace_owner_id)
+                break
             try:
                 update_id = int(update.get("update_id"))
                 max_update_id = update_id if max_update_id is None else max(max_update_id, update_id)
@@ -247,6 +254,19 @@ def register_telegram_routes(
         update = body if isinstance(body, dict) else {}
         update_id = update.get("update_id")
         logger.info("[telegram] webhook wid=%s update_id=%s", wid, update_id)
+        incoming = update.get("message")
+        if isinstance(incoming, dict):
+            from upos.telegram_inbox import save_incoming
+
+            try:
+                saved = save_incoming(wid, incoming, bot_id=int(cfg.get("bot_id") or 0))
+            except Exception:
+                logger.exception("[telegram] could not persist update wid=%s update_id=%s", wid, update_id)
+                # Telegram retries non-2xx webhook deliveries. Do not acknowledge
+                # a private message before it has reached durable storage.
+                return JSONResponse({"error": "message_not_saved"}, status_code=503)
+            if not saved and str((incoming.get("chat") or {}).get("type") or "") == "private":
+                return JSONResponse({"ok": True})
         callback_query = update.get("callback_query") if isinstance(update.get("callback_query"), dict) else None
         if callback_query:
             callback_id = str(callback_query.get("id") or "")
