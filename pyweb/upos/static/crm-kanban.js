@@ -2712,6 +2712,7 @@
       setField("client", params.get("crm_client") || "");
       setField("contact_type", params.get("crm_contact_type") || "Чат Telegram");
       setField("chat_ref", params.get("crm_chat_ref") || "");
+      setField("messenger_thread_id", params.get("crm_messenger_thread_id") || "");
       setField("note", params.get("crm_note") || "Создано из диалога мессенджера");
       setField("lead_source", params.get("crm_source") || "Telegram");
       setSelectByValueOrText("stage_id", params.get("crm_stage") || "leads", "лид");

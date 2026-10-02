@@ -168,6 +168,9 @@ body.sidebar-rail .sidebar-messenger-notice > b { display: none; }
 .messenger-journal-direction--out { color: var(--muted-foreground); }
 .messenger-journal-unread { display: block; width: fit-content; margin: 0.35rem 0 0 auto; padding: 0.15rem 0.35rem; border-radius: 999px; background: color-mix(in srgb, var(--primary), transparent 86%); color: var(--primary); font-size: 0.66rem; }
 .messenger-journal-local { display: inline-block; margin-top: 0.2rem; color: var(--muted-foreground); font-size: 0.65rem; font-weight: 500; }
+.messenger-thread-client-link { display: inline-block; margin-top: 0.3rem; padding: 0.22rem 0.5rem; border-radius: 0.45rem; background: color-mix(in srgb, var(--primary), transparent 88%); color: var(--primary); font-size: 0.72rem; font-weight: 700; text-decoration: none; }
+.messenger-thread-client-link:hover { text-decoration: underline; }
+.messenger-thread-client-link[hidden] { display: none; }
 
 @media (max-width: 40rem) {
   .sidebar-messenger-modal { width: calc(100vw - 18px); }

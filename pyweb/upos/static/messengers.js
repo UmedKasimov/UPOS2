@@ -497,13 +497,13 @@
     var meta = root.querySelector("[data-messenger-thread-meta]");
     var presence = root.querySelector("[data-messenger-thread-presence]");
     var avatar = root.querySelector("[data-messenger-thread-avatar]");
+    var clientLink = root.querySelector("[data-messenger-thread-client-link]");
     if (title) title.textContent = thread.contact || "Диалог";
     if (meta) {
       meta.textContent =
         (thread.channel || "Канал") +
         " · " +
         (thread.topic || thread.status_label || "обращение") +
-        (thread.client ? " · клиент: " + thread.client : "") +
         (thread.restored ? " · сохранено только в этом браузере" : "");
     }
     if (presence) {
@@ -515,6 +515,39 @@
       avatar.innerHTML = avatarMarkup(thread);
       avatar.setAttribute("data-messenger-avatar-open", thread.id || "");
     }
+    if (clientLink) clientLink.hidden = true;
+  }
+
+  function clientCardUrl(thread) {
+    var url = "/api/messengers/threads/" + encodeURIComponent(thread.id) + "/client";
+    if (!thread.restored) return url;
+    var params = new URLSearchParams({
+      restored: "1", channel: thread.channel || "", contact: thread.contact || "",
+      username: thread.username || "", phone: thread.phone || "",
+    });
+    return url + "?" + params.toString();
+  }
+
+  function showClientIdentity(root, card) {
+    if (!card || String(root.dataset.selectedThreadId || "") !== String(card.thread_id || "")) return;
+    var link = root.querySelector("[data-messenger-thread-client-link]");
+    if (!link) return;
+    var client = card.client;
+    if (!client || !client.id || !client.url) {
+      link.hidden = true;
+      return;
+    }
+    link.href = client.url;
+    link.textContent = "Клиент в CRM: " + (client.name || "Открыть карточку");
+    link.hidden = false;
+  }
+
+  function refreshClientIdentity(root, thread) {
+    var url = clientCardUrl(thread);
+    fetch(url + (url.indexOf("?") === -1 ? "?" : "&") + "summary=1", { credentials: "same-origin" })
+      .then(function (response) { return response.ok ? response.json() : null; })
+      .then(function (body) { if (body && body.card) showClientIdentity(root, body.card); })
+      .catch(function () {});
   }
 
   function csrfToken() {
@@ -653,6 +686,7 @@
     updateThreadHeader(root, thread);
     renderMessages(root, thread);
     root.dataset.selectedThreadId = thread.id || "";
+    refreshClientIdentity(root, thread);
     try {
       window.localStorage && window.localStorage.setItem(SELECTED_THREAD_KEY, thread.id || "");
     } catch (err) {
@@ -1014,6 +1048,7 @@
     var box = root.querySelector("[data-messenger-client-body]");
     if (!box) return;
     var client = card && card.client;
+    showClientIdentity(root, card);
     var docs = (card && card.documents) || [];
     var totals = (card && card.totals) || {};
     var head = client
@@ -1269,6 +1304,10 @@
           phone: String(formNode.elements.phone.value || "").trim(),
           comment: String(formNode.elements.comment.value || "").trim(),
           client_id: String(formNode.elements.client_id.value || "").trim(),
+          thread_hint: card && card.restored ? {
+            restored: "1", channel: card.channel || "", contact: card.contact || "",
+            username: card.username || "", phone: card.phone || "",
+          } : {},
         };
         window
           .fetch("/api/messengers/threads/" + encodeURIComponent(card.thread_id) + "/client", {
@@ -1303,7 +1342,7 @@
     if (box) box.innerHTML = '<p class="messenger-empty">Загружаем карточку…</p>';
     dialog.hidden = false;
     window
-      .fetch("/api/messengers/threads/" + encodeURIComponent(thread.id) + "/client", { credentials: "same-origin" })
+      .fetch(clientCardUrl(thread), { credentials: "same-origin" })
       .then(function (response) {
         return response.json().catch(function () { return {}; });
       })
@@ -1360,6 +1399,7 @@
     params.set("crm_source", channel);
     params.set("crm_contact_type", channel === "Telegram" ? "Чат Telegram" : "Чат");
     params.set("crm_chat_ref", thread.username || thread.topic || thread.id || "");
+    params.set("crm_messenger_thread_id", thread.id || "");
     params.set("crm_note", note);
     return "/crm?" + params.toString() + "#tasks";
   }

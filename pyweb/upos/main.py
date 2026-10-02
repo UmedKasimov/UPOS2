@@ -21799,6 +21799,9 @@ def create_app() -> FastAPI:
             target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
             return RedirectResponse(url=f"/crm?error={quote(validation_error)}#{target_hash}", status_code=302)
         _crm_append_activity(data, "Карточка создана", _crm_actor_name(request))
+        messenger_thread_id = str(form.get("messenger_thread_id") or "").strip()
+        if len(messenger_thread_id) > 180:
+            messenger_thread_id = ""
         with session_scope() as session:
             counterparty_id = _crm_apply_related_order(session, wid, data)
             selected_client_id = str(form.get("counterparty_id") or "").strip()
@@ -21826,6 +21829,9 @@ def create_app() -> FastAPI:
             elif data["client"]:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
                 counterparty_id = counterparty.id if counterparty else None
+            if not counterparty_id and messenger_thread_id and data["client"] and data["item_type"] == "deal":
+                counterparty = _ensure_counterparty(session, wid, name=data["client"], role="client")
+                counterparty_id = counterparty.id
             _crm_apply_deal_segments(session, wid, data, form, counterparty_id)
             row = CrmRecord(
                 id=str(uuid.uuid4()),
@@ -21842,6 +21848,13 @@ def create_app() -> FastAPI:
             session.add(row)
             if counterparty_id:
                 _sync_counterparty_crm_status_from_stage(session, wid, row, stages)
+        if counterparty_id and messenger_thread_id and data["item_type"] == "deal":
+            settings = load_workspace_settings(wid)
+            links = settings.get("messenger_client_links")
+            links = dict(links) if isinstance(links, dict) else {}
+            links[messenger_thread_id] = str(counterparty_id)
+            settings["messenger_client_links"] = links
+            save_workspace_settings(wid, settings)
         target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
         return RedirectResponse(url=f"/crm?msg=saved#{target_hash}", status_code=302)
 
@@ -27457,7 +27470,9 @@ def create_app() -> FastAPI:
         except Exception:
             return ""
 
-    def _messenger_thread_client_card(workspace_owner_id: str, thread_id: str) -> dict[str, Any]:
+    def _messenger_thread_client_card(
+        workspace_owner_id: str, thread_id: str, hint: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Карточка клиента для открытого диалога.
 
         Сотруднику в переписке нужно сразу видеть, знаком ли собеседник:
@@ -27472,14 +27487,29 @@ def create_app() -> FastAPI:
             ),
             None,
         )
-        if thread is None:
-            return {}
+        restored = thread is None
+        if restored:
+            # Older Telegram conversations can exist only in this browser's
+            # cache. Their client association can still be kept in the
+            # workspace, without treating their messages as server history.
+            hint = hint or {}
+            if (not hint.get("restored") or len(thread_id) > 180
+                    or str(hint.get("channel") or "") not in {"Telegram", "Instagram", "WhatsApp", "Facebook", "Сайт"}):
+                return {}
+            thread = {
+                "id": thread_id,
+                "channel": str(hint.get("channel") or "")[:40],
+                "contact": str(hint.get("contact") or "")[:180],
+                "username": str(hint.get("username") or "")[:100],
+                "phone": str(hint.get("phone") or "")[:64],
+            }
 
         contact_name = str(thread.get("contact") or "").strip()
         username = str(thread.get("username") or "").strip()
         phone = str(thread.get("phone") or "").strip()
         payload: dict[str, Any] = {
             "thread_id": thread_id,
+            "restored": restored,
             "channel": str(thread.get("channel") or ""),
             "contact": contact_name,
             "username": username,
@@ -27494,7 +27524,8 @@ def create_app() -> FastAPI:
                 select(Counterparty).where(Counterparty.workspace_owner_id == workspace_owner_id)
             ).scalars().all()
             row = None
-            linked_id = str(thread.get("counterparty_id") or "").strip()
+            links = load_workspace_settings(workspace_owner_id).get("messenger_client_links") or {}
+            linked_id = str((links.get(thread_id) if isinstance(links, dict) else "") or thread.get("counterparty_id") or "").strip()
             if linked_id:
                 row = next((item for item in clients if str(item.id) == linked_id), None)
             if row is None:
@@ -27517,6 +27548,9 @@ def create_app() -> FastAPI:
                 "comment": str(extra.get("comment") or extra.get("note") or ""),
                 "url": f"/clients?client={row.id}#client-card",
             }
+
+            if hint and hint.get("summary"):
+                return payload
 
             names = {str(row.name or "").strip().casefold()}
             names.discard("")
@@ -27883,7 +27917,7 @@ def create_app() -> FastAPI:
         if err:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         assert wid is not None
-        card = _messenger_thread_client_card(wid, str(thread_id or "").strip())
+        card = _messenger_thread_client_card(wid, str(thread_id or "").strip(), dict(request.query_params))
         if not card:
             return JSONResponse({"error": "not_found"}, status_code=404)
         return {"ok": True, "card": card}
@@ -27901,17 +27935,19 @@ def create_app() -> FastAPI:
             body = await request.json()
         except Exception:
             body = {}
+        hint = (body or {}).get("thread_hint") if isinstance((body or {}).get("thread_hint"), dict) else {}
+        thread_key = str(thread_id or "").strip()
+        if not _messenger_thread_client_card(wid, thread_key, hint):
+            return JSONResponse({"error": "Диалог не найден"}, status_code=404)
         name = str((body or {}).get("name") or "").strip()
         phone = str((body or {}).get("phone") or "").strip()
         comment = str((body or {}).get("comment") or "").strip()
         client_id = str((body or {}).get("client_id") or "").strip()
-        if not name and not client_id:
+        if not name:
             return JSONResponse({"error": "Укажите имя клиента"}, status_code=400)
 
         with session_scope() as session:
-            row = _resolve_counterparty(session, wid, counterparty_id=client_id, name=name, role="client")
-            if row is None:
-                return JSONResponse({"error": "Не удалось создать клиента"}, status_code=400)
+            row = _ensure_counterparty(session, wid, counterparty_id=client_id, name=name, role="client", phone=phone)
             # Новый словарь, а не правка на месте: иначе SQLAlchemy не видит
             # изменения JSON-поля и заметка теряется.
             extra = dict(_counterparty_extra(row))
@@ -27923,7 +27959,13 @@ def create_app() -> FastAPI:
             row.data = extra
             row.updated_at = datetime.now(timezone.utc)
             saved_id = str(row.id)
-        return {"ok": True, "card": _messenger_thread_client_card(wid, str(thread_id or "").strip()), "client_id": saved_id}
+        settings = load_workspace_settings(wid)
+        links = settings.get("messenger_client_links")
+        links = dict(links) if isinstance(links, dict) else {}
+        links[thread_key] = saved_id
+        settings["messenger_client_links"] = links
+        save_workspace_settings(wid, settings)
+        return {"ok": True, "card": _messenger_thread_client_card(wid, thread_key, hint), "client_id": saved_id}
 
     @app.post("/api/messengers/telegram/send")
     async def api_messenger_telegram_send(request: Request):

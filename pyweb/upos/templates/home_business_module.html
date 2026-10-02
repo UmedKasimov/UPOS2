@@ -3,12 +3,12 @@
 {% block extra_head %}
   {% if not module_home_only %}
   {% if active == "messengers" %}
-    <script src="{{ url_for('static', path='messengers.js') }}?v=30" defer></script>
+    <script src="{{ url_for('static', path='messengers.js') }}?v=33" defer></script>
     <script src="{{ url_for('static', path='messenger-journal.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='messenger-campaigns.js') }}?v=1" defer></script>
     <script src="{{ url_for('static', path='messengers-telegram.js') }}?v=2" defer></script>
   {% elif active == "crm" %}
-    <script src="{{ url_for('static', path='crm-kanban.js') }}?v=66" defer></script>
+    <script src="{{ url_for('static', path='crm-kanban.js') }}?v=67" defer></script>
   {% elif active == "telephony" %}
     <link rel="stylesheet" href="{{ url_for('static', path='telephony-contacts.css') }}?v=105" />
     <script src="{{ url_for('static', path='telephony.js') }}?v=13" defer></script>
