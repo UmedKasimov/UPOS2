@@ -33950,7 +33950,7 @@ html.dark .sales-installation-calendar-order.is-completed {
   background: transparent;
   color: var(--card-foreground);
   font: inherit;
-  font-weight: 700;
+  font-weight: 800;
   text-align: left;
   cursor: pointer;
 }

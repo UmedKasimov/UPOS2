@@ -890,7 +890,7 @@
       showMessengerThread("");
       fillFeed(taskFeed, card, "template[data-crm-card-tasks]", "Задач пока нет.");
       fillFeed(commentFeed, card, "template[data-crm-card-comments]", "Комментариев пока нет.");
-      showDetailPane("documents");
+      showDetailPane("comments");
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {

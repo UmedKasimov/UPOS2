@@ -1014,11 +1014,11 @@
           <button class="btn crm-card-detail-order-btn" type="button" data-crm-card-detail-order hidden>+ Добавить заказ</button>
         </div>
         <nav class="crm-card-detail-tabs" aria-label="Разделы карточки">
-          <button type="button" class="is-active" data-crm-detail-tab="documents">Заказы/отгрузки</button>
+          <button type="button" class="is-active" data-crm-detail-tab="comments">Комментарии</button>
+          <button type="button" data-crm-detail-tab="documents">Заказы/отгрузки</button>
           <button type="button" data-crm-detail-tab="chat">Чат</button>
           <button type="button" data-crm-detail-tab="tasks">Задачи</button>
           <button type="button" data-crm-detail-tab="history">История</button>
-          <button type="button" data-crm-detail-tab="comments">Комментарии</button>
         </nav>
         <div class="crm-card-detail-chatbox" data-crm-detail-pane="chat" hidden>
           <div class="crm-card-detail-messengers" data-crm-card-detail-messengers></div>
@@ -1032,14 +1032,14 @@
         <div class="crm-card-detail-history" data-crm-card-detail-history data-crm-detail-pane="history" hidden>
           <p class="crm-card-detail-empty">История по клиенту пока пустая.</p>
         </div>
-        <div class="crm-card-detail-documents" data-crm-card-detail-documents data-crm-detail-pane="documents">
+        <div class="crm-card-detail-documents" data-crm-card-detail-documents data-crm-detail-pane="documents" hidden>
           <p class="crm-card-detail-empty">Заказов и отгрузок по клиенту пока нет.</p>
         </div>
         <div class="crm-card-detail-work-pane" data-crm-detail-pane="tasks" hidden>
           <div class="crm-card-detail-feed" data-crm-card-detail-task-feed></div>
           <button class="btn crm-card-detail-add-task" type="button" data-crm-card-task-open>+ Добавить задачу</button>
         </div>
-        <div class="crm-card-detail-work-pane" data-crm-detail-pane="comments" hidden>
+        <div class="crm-card-detail-work-pane" data-crm-detail-pane="comments">
           <div class="crm-card-detail-feed" data-crm-card-detail-comment-feed></div>
           <form class="crm-card-detail-activity-form" data-crm-activity-form="comment">
             <textarea name="text" maxlength="500" rows="3" placeholder="Добавить комментарий" required></textarea>
