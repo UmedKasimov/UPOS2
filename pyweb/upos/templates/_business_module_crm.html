@@ -389,6 +389,9 @@
               {% if row.chat_label %}
                 <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
               {% endif %}
+              {% if row.first_contact_employees %}
+                <div class="crm-kanban-contact-employees" title="Сотрудники первого контакта">Первый контакт: {{ row.first_contact_employees|join(', ') }}</div>
+              {% endif %}
               <div class="crm-kanban-card-tags" data-crm-card-tags>
                 {% for tag in row.tags %}
                   <span>{{ tag }}</span>
@@ -845,9 +848,6 @@
                   {% endfor %}
                 </div>
               </div>
-              {% if row.first_contact_employees %}
-                <div class="crm-kanban-contact-employees" title="Сотрудники первого контакта">Первый контакт: {{ row.first_contact_employees|join(', ') }}</div>
-              {% endif %}
             </details>
           </div>
           <div class="wide crm-deal-segment-field crm-deal-contact-employees" data-crm-deal-create-field data-crm-task-hidden data-crm-contact-employees-field>
