@@ -7955,6 +7955,29 @@ a.messenger-message-attachment:focus-visible {
   font-weight: 800;
 }
 
+.crm-card-detail-list .crm-card-detail-employees {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.crm-card-detail-list .crm-card-detail-employees[hidden] {
+  display: none;
+}
+
+.crm-card-detail-employees dt {
+  flex: 1 0 100%;
+}
+
+.crm-card-detail-employees dd {
+  flex: 1 1 10rem;
+}
+
+.crm-card-detail-employees button {
+  font-size: var(--text-xs);
+}
+
 .crm-card-detail-money {
   color: #2563eb;
 }

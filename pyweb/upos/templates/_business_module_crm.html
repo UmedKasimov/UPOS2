@@ -313,6 +313,7 @@
               {% if loop.index > 20 %}hidden data-crm-deferred="true"{% endif %}
               draggable="true"
               data-crm-record-id="{{ row.id }}"
+              data-crm-item-type="{{ row.item_type|e }}"
               data-crm-detail-title="{{ row.title|e }}"
               data-crm-detail-client="{{ row.client|e }}"
               data-crm-detail-client-href="{{ row.client_href|e }}"
@@ -1001,6 +1002,11 @@
           <div><dt>Вероятность</dt><dd data-crm-card-detail-field="probability">-</dd></div>
           <div><dt>Сумма</dt><dd class="crm-card-detail-money" data-crm-card-detail-field="amount">-</dd></div>
           <div><dt>Ответственный</dt><dd data-crm-card-detail-field="responsible">-</dd></div>
+          <div class="wide crm-card-detail-employees">
+            <dt>Сотрудники первого контакта</dt>
+            <dd data-crm-card-detail-field="contactEmployees">Не прикреплены</dd>
+            <button class="btn btn-secondary" type="button" data-crm-card-detail-attach-employee>+ Прикрепить сотрудника</button>
+          </div>
           <div><dt>Дата</dt><dd data-crm-card-detail-field="date">-</dd></div>
           <div><dt>Срок</dt><dd data-crm-card-detail-field="dueDate">-</dd></div>
           <div class="wide"><dt>Следующий шаг</dt><dd data-crm-card-detail-field="nextStep">-</dd></div>

@@ -540,6 +540,7 @@
     const client = dialog.querySelector("[data-crm-card-detail-client]");
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
+    const attachEmployeeButton = dialog.querySelector("[data-crm-card-detail-attach-employee]");
     const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
     const orderDialog = document.getElementById("crm-order-dialog");
     const orderFrame = orderDialog?.querySelector("[data-crm-order-dialog-frame]");
@@ -572,6 +573,7 @@
       probability: dialog.querySelector('[data-crm-card-detail-field="probability"]'),
       amount: dialog.querySelector('[data-crm-card-detail-field="amount"]'),
       responsible: dialog.querySelector('[data-crm-card-detail-field="responsible"]'),
+      contactEmployees: dialog.querySelector('[data-crm-card-detail-field="contactEmployees"]'),
       date: dialog.querySelector('[data-crm-card-detail-field="date"]'),
       dueDate: dialog.querySelector('[data-crm-card-detail-field="dueDate"]'),
       nextStep: dialog.querySelector('[data-crm-card-detail-field="nextStep"]'),
@@ -851,6 +853,7 @@
         const payload = data.crmEditPayload || "";
         editButton.hidden = !payload;
         editButton.dataset.crmEditPayload = payload;
+        if (attachEmployeeButton) attachEmployeeButton.hidden = !payload || data.crmItemType !== "deal";
       }
       if (orderButton) {
         if (data.crmDetailOrderHref) {
@@ -872,6 +875,8 @@
       setText(fields.probability, data.crmDetailProbability);
       setText(fields.amount, data.crmDetailAmount);
       setText(fields.responsible, data.crmDetailResponsible);
+      setText(fields.contactEmployees, data.crmContactEmployees || "Не прикреплены");
+      fields.contactEmployees?.closest(".crm-card-detail-employees")?.toggleAttribute("hidden", data.crmItemType !== "deal");
       setText(fields.date, data.crmDetailDate);
       setText(fields.dueDate, data.crmDetailDueDate);
       setText(fields.nextStep, data.crmDetailNextStep);
@@ -987,6 +992,13 @@
       const raw = editButton.dataset.crmEditPayload || "{}";
       closeDetails();
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
+    });
+    attachEmployeeButton?.addEventListener("click", () => {
+      const raw = editButton?.dataset.crmEditPayload || "{}";
+      closeDetails();
+      document.dispatchEvent(new CustomEvent("crm:edit-record", {
+        detail: { payload: raw, focus: "first_contact_employees" },
+      }));
     });
     orderButton?.addEventListener("click", openOrderDialog);
     taskOpenButton?.addEventListener("click", () => openTaskDialog());
@@ -2656,6 +2668,11 @@
       const payload = parsePayload(event.detail?.payload);
       if (!payload?.id) return;
       openDialog(payload.item_type || "deal", payload, "edit");
+      if (event.detail?.focus === "first_contact_employees" && contactEmployeesField && !contactEmployeesField.hidden) {
+        if (contactEmployeesDropdown) contactEmployeesDropdown.open = true;
+        contactEmployeesField.scrollIntoView({ block: "center" });
+        contactEmployeesSearch?.focus();
+      }
     });
     document.addEventListener("crm:create-task", (event) => {
       const dueDate = String(event.detail?.dueDate || new Date().toISOString().slice(0, 10));
