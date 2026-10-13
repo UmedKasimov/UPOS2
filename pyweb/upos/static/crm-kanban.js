@@ -67,6 +67,23 @@
     });
   }
 
+  function postContactEmployees(root, recordId, names) {
+    const template = root.dataset.crmEmployeesUrlTemplate || "/crm/__record__/contact-employees";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    names.forEach((name) => body.append("first_contact_employees", name));
+    return fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: body.toString(),
+    }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить сотрудников.");
+      return result;
+    });
+  }
+
   function postActivity(root, recordId, payload) {
     const template = root.dataset.crmActivityUrlTemplate || "/crm/__record__/activity";
     const url = template.replace("__record__", encodeURIComponent(recordId));
@@ -541,6 +558,11 @@
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
     const attachEmployeeButton = dialog.querySelector("[data-crm-card-detail-attach-employee]");
+    const employeeForm = dialog.querySelector("[data-crm-card-detail-employees-form]");
+    const employeeSearch = employeeForm?.querySelector("[data-crm-card-detail-employees-search]");
+    const employeeRows = Array.from(employeeForm?.querySelectorAll("[data-crm-card-detail-employee-row]") || []);
+    const employeeChecks = Array.from(employeeForm?.querySelectorAll('[name="first_contact_employees"]') || []);
+    const employeeError = employeeForm?.querySelector("[data-crm-card-detail-employees-error]");
     const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
     const orderDialog = document.getElementById("crm-order-dialog");
     const orderFrame = orderDialog?.querySelector("[data-crm-order-dialog-frame]");
@@ -583,6 +605,26 @@
 
     const setText = (node, value) => {
       if (node) node.textContent = valueOrDash(value);
+    };
+
+    const selectedEmployees = (card) => {
+      try {
+        const payload = JSON.parse(card?.dataset.crmEditPayload || "{}");
+        return Array.isArray(payload.first_contact_employees) ? payload.first_contact_employees : [];
+      } catch (_) {
+        return [];
+      }
+    };
+
+    const resetEmployeePicker = () => {
+      if (!employeeForm) return;
+      const current = new Set(selectedEmployees(detailCard));
+      employeeChecks.forEach((input) => { input.checked = current.has(input.value); });
+      if (employeeSearch) employeeSearch.value = "";
+      employeeRows.forEach((row) => { row.hidden = false; });
+      if (employeeError) { employeeError.hidden = true; employeeError.textContent = ""; }
+      employeeForm.hidden = true;
+      attachEmployeeButton?.setAttribute("aria-expanded", "false");
     };
 
     const showDetailPane = (name) => {
@@ -877,6 +919,7 @@
       setText(fields.responsible, data.crmDetailResponsible);
       setText(fields.contactEmployees, data.crmContactEmployees || "Не прикреплены");
       fields.contactEmployees?.closest(".crm-card-detail-employees")?.toggleAttribute("hidden", data.crmItemType !== "deal");
+      resetEmployeePicker();
       setText(fields.date, data.crmDetailDate);
       setText(fields.dueDate, data.crmDetailDueDate);
       setText(fields.nextStep, data.crmDetailNextStep);
@@ -994,11 +1037,58 @@
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
     });
     attachEmployeeButton?.addEventListener("click", () => {
-      const raw = editButton?.dataset.crmEditPayload || "{}";
-      closeDetails();
-      document.dispatchEvent(new CustomEvent("crm:edit-record", {
-        detail: { payload: raw, focus: "first_contact_employees" },
-      }));
+      if (!employeeForm || !detailCard) return;
+      if (!employeeForm.hidden) { resetEmployeePicker(); return; }
+      resetEmployeePicker();
+      employeeForm.hidden = false;
+      attachEmployeeButton.setAttribute("aria-expanded", "true");
+      employeeSearch?.focus();
+    });
+    employeeForm?.querySelector("[data-crm-card-detail-employees-cancel]")?.addEventListener("click", resetEmployeePicker);
+    employeeSearch?.addEventListener("input", () => {
+      const query = employeeSearch.value.trim().toLocaleLowerCase();
+      employeeRows.forEach((row) => { row.hidden = !row.textContent.toLocaleLowerCase().includes(query); });
+    });
+    employeeForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const root = document.querySelector("[data-crm-employees-url-template]");
+      const card = detailCard;
+      const recordId = card?.dataset.crmRecordId || "";
+      if (!root || !card || !recordId || employeeForm.classList.contains("is-saving")) return;
+      const names = employeeChecks.filter((input) => input.checked).map((input) => input.value);
+      employeeForm.classList.add("is-saving");
+      employeeForm.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+      if (employeeError) employeeError.hidden = true;
+      postContactEmployees(root, recordId, names)
+        .then((result) => {
+          const saved = result.first_contact_employees || [];
+          card.dataset.crmContactEmployees = saved.join(", ");
+          const cardLabel = card.querySelector(".crm-kanban-contact-employees");
+          if (saved.length) {
+            const label = cardLabel || document.createElement("div");
+            label.className = "crm-kanban-contact-employees";
+            label.title = "Сотрудники первого контакта";
+            label.textContent = `Первый контакт: ${saved.join(", ")}`;
+            if (!cardLabel) card.querySelector(".crm-kanban-card-tags")?.before(label);
+          } else cardLabel?.remove();
+          try {
+            const payload = JSON.parse(card.dataset.crmEditPayload || "{}");
+            payload.first_contact_employees = saved;
+            card.dataset.crmEditPayload = JSON.stringify(payload);
+            if (editButton) editButton.dataset.crmEditPayload = card.dataset.crmEditPayload;
+          } catch (_) { /* Подпись карточки уже обновлена. */ }
+          if (detailCard === card) {
+            setText(fields.contactEmployees, saved.join(", ") || "Не прикреплены");
+            resetEmployeePicker();
+          }
+        })
+        .catch((error) => {
+          if (employeeError) { employeeError.textContent = error.message || "Не удалось сохранить сотрудников."; employeeError.hidden = false; }
+        })
+        .finally(() => {
+          employeeForm.classList.remove("is-saving");
+          employeeForm.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+        });
     });
     orderButton?.addEventListener("click", openOrderDialog);
     taskOpenButton?.addEventListener("click", () => openTaskDialog());
@@ -2668,11 +2758,6 @@
       const payload = parsePayload(event.detail?.payload);
       if (!payload?.id) return;
       openDialog(payload.item_type || "deal", payload, "edit");
-      if (event.detail?.focus === "first_contact_employees" && contactEmployeesField && !contactEmployeesField.hidden) {
-        if (contactEmployeesDropdown) contactEmployeesDropdown.open = true;
-        contactEmployeesField.scrollIntoView({ block: "center" });
-        contactEmployeesSearch?.focus();
-      }
     });
     document.addEventListener("crm:create-task", (event) => {
       const dueDate = String(event.detail?.dueDate || new Date().toISOString().slice(0, 10));

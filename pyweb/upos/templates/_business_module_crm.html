@@ -286,6 +286,7 @@
     data-crm-archive-url-template="/crm/__record__/archive"
     data-crm-restore-url-template="/crm/__record__/restore"
     data-crm-tag-url-template="/crm/__record__/tag"
+    data-crm-employees-url-template="/crm/__record__/contact-employees"
     data-crm-activity-url-template="/crm/__record__/activity"
   >
     {% for column in crm_kanban_columns %}
@@ -1005,7 +1006,22 @@
           <div class="wide crm-card-detail-employees">
             <dt>Сотрудники первого контакта</dt>
             <dd data-crm-card-detail-field="contactEmployees">Не прикреплены</dd>
-            <button class="btn btn-secondary" type="button" data-crm-card-detail-attach-employee>+ Прикрепить сотрудника</button>
+            <button class="btn btn-secondary" type="button" data-crm-card-detail-attach-employee aria-expanded="false" aria-controls="crm-card-detail-employee-picker">+ Прикрепить сотрудника</button>
+            <form id="crm-card-detail-employee-picker" class="crm-card-detail-employee-picker" data-crm-card-detail-employees-form hidden>
+              <input type="search" autocomplete="off" placeholder="Найти сотрудника" aria-label="Найти сотрудника" data-crm-card-detail-employees-search />
+              <div class="crm-card-detail-employee-options">
+                {% for name in crm_options.contact_employees %}
+                  <label data-crm-card-detail-employee-row><input type="checkbox" name="first_contact_employees" value="{{ name }}" /><span>{{ name }}</span></label>
+                {% else %}
+                  <small>Сотрудников пока нет.</small>
+                {% endfor %}
+              </div>
+              <p class="crm-card-detail-employee-error" data-crm-card-detail-employees-error role="alert" hidden></p>
+              <div class="crm-card-detail-employee-actions">
+                <button class="btn btn-secondary" type="button" data-crm-card-detail-employees-cancel>Отмена</button>
+                <button class="btn" type="submit">Сохранить</button>
+              </div>
+            </form>
           </div>
           <div><dt>Дата</dt><dd data-crm-card-detail-field="date">-</dd></div>
           <div><dt>Срок</dt><dd data-crm-card-detail-field="dueDate">-</dd></div>

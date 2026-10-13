@@ -22137,6 +22137,53 @@ def create_app() -> FastAPI:
             flag_modified(row, "data")
         return RedirectResponse(url="/crm?msg=saved#deals", status_code=302)
 
+    @app.post("/crm/{record_id}/contact-employees", name="crm_contact_employees_update")
+    async def crm_contact_employees_update(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "Сессия устарела. Обновите страницу."}, status_code=403)
+        denied = _employee_module_denied(request, "crm", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "Войдите в систему заново."}, status_code=401)
+        assert wid is not None
+        raw_names = form.getlist("first_contact_employees")
+        if len(raw_names) > 20:
+            return JSONResponse({"ok": False, "error": "Можно выбрать не более 20 сотрудников."}, status_code=400)
+        names = list(dict.fromkeys(
+            name for value in raw_names
+            if (name := re.sub(r"\s+", " ", str(value or "")).strip()[:120])
+        ))
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid or row.item_type != "deal":
+                return JSONResponse({"ok": False, "error": "Сделка не найдена."}, status_code=404)
+            data = _json_object(row.data).copy()
+            previous = [str(value).strip() for value in data.get("first_contact_employees", []) if str(value).strip()] if isinstance(data.get("first_contact_employees"), list) else []
+            allowed = {
+                str(emp.get("name") or emp.get("username") or "").strip()
+                for emp in list_employees_safe(wid)
+            } | set(previous) | {str(request.session.get("user", {}).get("name") or "").strip()}
+            # В форме также показаны сотрудники из старых карточек, даже если
+            # их больше нет в текущем списке работников.
+            known_rows = session.execute(
+                select(CrmRecord.data).where(CrmRecord.workspace_owner_id == wid, CrmRecord.item_type == "deal")
+            ).scalars()
+            for known_data in known_rows:
+                known_names = _json_object(known_data).get("first_contact_employees")
+                if isinstance(known_names, list):
+                    allowed.update(str(value).strip() for value in known_names if str(value).strip())
+            if any(name not in allowed for name in names):
+                return JSONResponse({"ok": False, "error": "Список сотрудников изменился. Обновите страницу."}, status_code=400)
+            if names != previous:
+                data["first_contact_employees"] = names
+                _crm_append_activity(data, "Сотрудники первого контакта изменены", _crm_actor_name(request), ", ".join(names) or "Не прикреплены")
+                row.data = data
+                flag_modified(row, "data")
+        return JSONResponse({"ok": True, "first_contact_employees": names})
+
     @app.post("/crm/{record_id}/tag", name="crm_tag_add")
     async def crm_tag_add(request: Request, record_id: str):
         form = await request.form()

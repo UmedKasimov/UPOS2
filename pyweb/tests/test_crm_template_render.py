@@ -40,6 +40,18 @@ class CrmTemplateRenderTests(unittest.TestCase):
         html = template.render(**context)
         self.assertIn("Первый контакт: Alice, Bob", html)
 
+    def test_detail_employee_picker_renders_in_card(self):
+        env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
+        env.globals["url_for"] = lambda endpoint, **kwargs: f"/{endpoint}"
+        source = (TEMPLATES / "_business_module_crm.html").read_text(encoding="utf-8")
+        context = {name: {} for name in meta.find_undeclared_variables(env.parse(source))}
+        context.update(module={"heading": "CRM"}, csrf_token="test", crm_kanban_columns=[])
+        context["crm_options"] = {"contact_employees": ["Амир Акбаралиев"]}
+        html = env.get_template("_business_module_crm.html").render(**context)
+        self.assertIn('data-crm-card-detail-employees-form hidden', html)
+        self.assertIn('name="first_contact_employees" value="Амир Акбаралиев"', html)
+        self.assertIn('data-crm-employees-url-template="/crm/__record__/contact-employees"', html)
+
 
 if __name__ == "__main__":
     unittest.main()
