@@ -13855,6 +13855,10 @@ def create_app() -> FastAPI:
             "client": str(form.get("client") or "").strip(),
             "contact": str(form.get("contact") or "").strip(),
             "responsible": str(form.get("responsible") or "").strip(),
+            "first_contact_employees": list(dict.fromkeys(
+                name for value in form.getlist("first_contact_employees")
+                if (name := re.sub(r"\s+", " ", str(value or "")).strip()[:120])
+            ))[:20] if item_type == "deal" else [],
             "date": str(form.get("date") or "").strip(),
             "due_date": str(form.get("due_date") or "").strip(),
             "stage": str(form.get("stage") or "").strip(),
@@ -13988,6 +13992,7 @@ def create_app() -> FastAPI:
             "business_segment_ids": [str(value) for value in data.get("business_segment_ids", [])] if isinstance(data.get("business_segment_ids"), list) else [],
             "business_segment": str(data.get("business_segment") or ""),
             "responsible": str(data.get("responsible") or ""),
+            "first_contact_employees": [str(value).strip() for value in data.get("first_contact_employees", []) if str(value).strip()][:20] if isinstance(data.get("first_contact_employees"), list) else [],
             "date": str(data.get("date") or ""),
             "due_date": row.due_date or str(data.get("due_date") or ""),
             "stage": str(data.get("stage") or ""),
@@ -14029,6 +14034,7 @@ def create_app() -> FastAPI:
             "contact",
             "business_segment_ids",
             "responsible",
+            "first_contact_employees",
             "lead_source",
             "stage_id",
             "related_deal_id",
@@ -14050,7 +14056,7 @@ def create_app() -> FastAPI:
         )
         payload: dict[str, Any] = {}
         for key in keys:
-            if key == "business_segment_ids":
+            if key in {"business_segment_ids", "first_contact_employees"}:
                 payload[key] = list(item.get(key) or [])
                 continue
             if key == "tags":
@@ -17648,6 +17654,7 @@ def create_app() -> FastAPI:
         q: str = "",
         client: str = "",
         responsible: str = "",
+        contact_employee: str = "",
         status: str = "all",
         priority: str = "all",
         date_from: str = "",
@@ -17667,6 +17674,7 @@ def create_app() -> FastAPI:
             "q": q.strip(),
             "client": client.strip(),
             "responsible": responsible.strip(),
+            "contact_employee": contact_employee.strip(),
             "status": status.strip() or "all",
             "priority": priority.strip() or "all",
             "date_from": date_from.strip(),
@@ -17702,7 +17710,7 @@ def create_app() -> FastAPI:
         summary_pipeline_total = Decimal("0")
         summary_won = 0
         summary_lost = 0
-        crm_options = {"clients": [], "contacts": [], "responsibles": [], "deals": [], "orders": [], "currencies": ["UZS", "USD", "RUB", "EUR"]}
+        crm_options = {"clients": [], "contacts": [], "responsibles": [], "contact_employees": [], "deals": [], "orders": [], "currencies": ["UZS", "USD", "RUB", "EUR"]}
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_task_types = _crm_clean_task_types(crm_workspace_settings.get("crm_task_types"))
@@ -17937,8 +17945,10 @@ def create_app() -> FastAPI:
                 if status_by_record_id.get(item["id"], "") not in closed_statuses
             ]
             deal_title_by_id = {item["id"]: item["title"] for item in all_deal_options}
+            known_contact_employees: set[str] = set()
             for row in rows:
                 item = _crm_record_data(row)
+                known_contact_employees.update(item["first_contact_employees"])
                 created_at = row.created_at
                 if created_at is not None:
                     if created_at.tzinfo is None:
@@ -18105,6 +18115,7 @@ def create_app() -> FastAPI:
                         item["title"],
                         item["client"],
                         item["responsible"],
+                        " ".join(item["first_contact_employees"]),
                         item["status_label"],
                         item["stage"],
                         item["lead_source"],
@@ -18119,6 +18130,8 @@ def create_app() -> FastAPI:
                 if filters["client"] and item["client"] != filters["client"]:
                     continue
                 if filters["responsible"] and item["responsible"] != filters["responsible"]:
+                    continue
+                if filters["contact_employee"] and filters["contact_employee"] not in item["first_contact_employees"]:
                     continue
                 if filters["priority"] != "all" and item["priority"] != filters["priority"]:
                     continue
@@ -18212,6 +18225,11 @@ def create_app() -> FastAPI:
                     | {str(item.get("currency") or "").upper() for item in crm_records if item.get("currency")},
                     key=lambda value: (value != "UZS", value),
                 ),
+                "contact_employees": sorted((
+                    {name for name in employee_responsibles if name}
+                    | known_contact_employees
+                    | ({str(request.session.get("user", {}).get("name") or "")} if request.session.get("user") else set())
+                ) - {""}),
             }
         crm_kanban_columns = []
         for stage in crm_stages:

@@ -1576,6 +1576,11 @@
     const segmentSearch = segmentField?.querySelector("[data-crm-segment-search]");
     const segmentChanged = segmentField?.querySelector("[data-crm-segment-changed]");
     const segmentBoxes = Array.from(segmentField?.querySelectorAll("[data-crm-segment-option]") || []);
+    const contactEmployeesField = form?.querySelector("[data-crm-contact-employees-field]");
+    const contactEmployeesDropdown = contactEmployeesField?.querySelector("[data-crm-contact-employees-dropdown]");
+    const contactEmployeesSummary = contactEmployeesField?.querySelector("[data-crm-contact-employees-summary]");
+    const contactEmployeesSearch = contactEmployeesField?.querySelector("[data-crm-contact-employees-search]");
+    const contactEmployeeBoxes = Array.from(contactEmployeesField?.querySelectorAll("[data-crm-contact-employee]") || []);
     const sourceInput = form?.querySelector("[data-crm-source-input]");
     const sourceValue = form?.querySelector("[data-crm-source-value]");
     const sourcePanel = form?.querySelector("[data-crm-source-panel]");
@@ -2127,6 +2132,26 @@
       syncSegmentSummary();
     };
 
+    const syncContactEmployeesSummary = () => {
+      if (!contactEmployeesSummary) return;
+      const names = contactEmployeeBoxes.filter((box) => box.checked).map((box) => box.value);
+      contactEmployeesSummary.textContent = names.length
+        ? names.slice(0, 2).join(" · ") + (names.length > 2 ? ` · ещё ${names.length - 2}` : "")
+        : "Не выбраны";
+    };
+    const setContactEmployees = (names) => {
+      const selected = new Set(Array.isArray(names) ? names.map(String) : []);
+      contactEmployeeBoxes.forEach((box) => { box.checked = selected.has(box.value); });
+      syncContactEmployeesSummary();
+    };
+    contactEmployeeBoxes.forEach((box) => box.addEventListener("change", syncContactEmployeesSummary));
+    contactEmployeesSearch?.addEventListener("input", () => {
+      const query = contactEmployeesSearch.value.trim().toLocaleLowerCase();
+      contactEmployeesField.querySelectorAll("[data-crm-contact-employee-row]").forEach((row) => {
+        row.hidden = Boolean(query) && !row.textContent.toLocaleLowerCase().includes(query);
+      });
+    });
+
     segmentBoxes.forEach((box) => box.addEventListener("change", () => {
       if (segmentChanged) segmentChanged.value = "1";
       syncSegmentSummary();
@@ -2331,6 +2356,7 @@
       form.classList.toggle("is-compact-deal-create", isCompactDeal);
       form.classList.toggle("is-task-mode", isTaskMode);
       if (segmentField) segmentField.hidden = kind !== "deal";
+      if (contactEmployeesField) contactEmployeesField.hidden = kind !== "deal";
       form.querySelectorAll("[data-crm-task-hidden]").forEach((field) => {
         field.hidden = isTaskMode;
       });
@@ -2360,6 +2386,10 @@
       if (!form) return;
       form.reset();
       setSegmentIds([]);
+      setContactEmployees([]);
+      if (contactEmployeesSearch) contactEmployeesSearch.value = "";
+      contactEmployeesField?.querySelectorAll("[data-crm-contact-employee-row]").forEach((row) => { row.hidden = false; });
+      if (contactEmployeesDropdown) contactEmployeesDropdown.open = false;
       if (segmentSearch) segmentSearch.value = "";
       segmentField?.querySelectorAll("[data-crm-segment-option-row]").forEach((row) => { row.hidden = false; });
       if (segmentDropdown) segmentDropdown.open = false;
@@ -2390,6 +2420,8 @@
           setField("record_id", value || "");
         } else if (name === "business_segment_ids") {
           setSegmentIds(value);
+        } else if (name === "first_contact_employees") {
+          setContactEmployees(value);
         } else if (name === "amount_input") {
           setField("amount", value || "");
         } else {

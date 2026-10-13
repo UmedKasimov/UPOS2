@@ -232,11 +232,12 @@
   <header class="crm-pipeline-head crm-pipeline-head--filters">
     <div class="crm-pipeline-head-actions">
       <details class="crm-filter-popover">
-        <summary class="btn btn-secondary">Фильтры{% if crm_filters.q or crm_filters.client or crm_filters.responsible or crm_filters.status != 'all' or crm_filters.priority != 'all' %} · активны{% endif %}</summary>
+        <summary class="btn btn-secondary">Фильтры{% if crm_filters.q or crm_filters.client or crm_filters.responsible or crm_filters.contact_employee or crm_filters.status != 'all' or crm_filters.priority != 'all' %} · активны{% endif %}</summary>
         <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
       <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" data-crm-search-dropdown="deals" placeholder="Задача, клиент, ответственный" autocomplete="off" /></label>
       <label><span>Клиент</span><input name="client" value="{{ crm_filters.client }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-client-list" data-crm-search-meta="Клиент" placeholder="Клиент" autocomplete="off" /></label>
       <label><span>Ответственный</span><input name="responsible" value="{{ crm_filters.responsible }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-responsible-list" data-crm-search-meta="Ответственный" placeholder="Ответственный" autocomplete="off" /></label>
+      <label><span>Первый контакт · сотрудник</span><select name="contact_employee"><option value="">Все сотрудники</option>{% for name in crm_options.contact_employees %}<option value="{{ name }}" {% if crm_filters.contact_employee == name %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
       <label>
         <span>Статус</span>
         <select name="status">
@@ -329,6 +330,7 @@
               data-crm-amount-currency="{{ (row.order_currency or row.currency or 'UZS')|e }}"
               data-crm-order-count="{{ row.order_count or 0 }}"
               data-crm-detail-responsible="{{ (row.responsible or 'Без ответственного')|e }}"
+              data-crm-contact-employees="{{ row.first_contact_employees|join(', ')|e }}"
               data-crm-detail-date="{{ (row.date or '-')|e }}"
               data-crm-detail-due-date="{{ (row.due_date or '-')|e }}"
               data-crm-detail-next-step="{{ row.next_step|e }}"
@@ -840,6 +842,25 @@
                     </label>
                   {% else %}
                     <small>Сегменты пока не созданы в разделе «Клиенты».</small>
+                  {% endfor %}
+                </div>
+              </div>
+              {% if row.first_contact_employees %}
+                <div class="crm-kanban-contact-employees" title="Сотрудники первого контакта">Первый контакт: {{ row.first_contact_employees|join(', ') }}</div>
+              {% endif %}
+            </details>
+          </div>
+          <div class="wide crm-deal-segment-field crm-deal-contact-employees" data-crm-deal-create-field data-crm-task-hidden data-crm-contact-employees-field>
+            <span>Сотрудники первого контакта</span>
+            <details class="crm-deal-segment-dropdown" data-crm-contact-employees-dropdown>
+              <summary><span data-crm-contact-employees-summary>Не выбраны</span></summary>
+              <div class="crm-deal-segment-menu">
+                <input type="search" autocomplete="off" placeholder="Найти сотрудника" aria-label="Найти сотрудника" data-crm-contact-employees-search />
+                <div class="crm-deal-segment-options">
+                  {% for name in crm_options.contact_employees %}
+                    <label data-crm-contact-employee-row><input type="checkbox" name="first_contact_employees" value="{{ name }}" data-crm-contact-employee /><span>{{ name }}</span></label>
+                  {% else %}
+                    <small>Сотрудников пока нет.</small>
                   {% endfor %}
                 </div>
               </div>
