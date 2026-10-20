@@ -17757,7 +17757,7 @@ def create_app() -> FastAPI:
                 row.id: _counterparty_program_names(_counterparty_extra(row))[0]
                 for row in counterparty_rows
             }
-            crm_options["programs"] = sorted({
+            crm_program_options = sorted({
                 program_name
                 for names in programs_by_counterparty_id.values()
                 for program_name in names
@@ -18230,6 +18230,7 @@ def create_app() -> FastAPI:
                     | {item["client"] for item in crm_records if item["client"]}
                     | {item["client"] for item in crm_task_records if item["client"]}
                 ),
+                "programs": crm_program_options,
                 "contacts": crm_contacts,
                 "responsibles": sorted(
                     {item["responsible"] for item in crm_records if item["responsible"]}
