@@ -17761,7 +17761,7 @@ def create_app() -> FastAPI:
                 program_name
                 for names in programs_by_counterparty_id.values()
                 for program_name in names
-            }, key=str.casefold)
+            } | {"YESPOS", "BILLZ", "1C", "iiko", "R-Keeper", "Poster", "Jowi", "МойСклад", "Excel"}, key=str.casefold)
             sale_by_key: dict[str, dict[str, Any]] = {}
             sales_by_key: dict[str, list[dict[str, Any]]] = {}
             sale_by_id: dict[str, dict[str, Any]] = {}
