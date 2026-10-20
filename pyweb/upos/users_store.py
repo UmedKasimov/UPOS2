@@ -1095,6 +1095,27 @@ def workspace_owner_id_for_record(rec: dict[str, Any]) -> str:
     return str(rec.get("id") or "")
 
 
+def compact_employee_permissions(raw: dict[str, Any] | None) -> dict[str, Any]:
+    """Keep large button and category rules in the role, outside the cookie."""
+    permissions = dict(raw or {})
+    permissions.pop("button_access", None)
+    permissions.pop("category_access", None)
+    return permissions
+
+
+def compact_session_organizations(organizations: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Keep only the organization fields used by the session switcher."""
+    return [
+        {
+            "id": str(org.get("id") or ""),
+            "name": str(org.get("name") or ""),
+            "note": str(org.get("note") or "")[:120],
+        }
+        for org in organizations
+        if isinstance(org, dict) and str(org.get("id") or "").strip()
+    ]
+
+
 def session_payload(rec: dict[str, Any]) -> dict[str, Any]:
     uid = str(rec.get("id") or "")
     emp = rec.get("employer_user_id")
@@ -1125,10 +1146,7 @@ def session_payload(rec: dict[str, Any]) -> dict[str, Any]:
             # button_access перестал влезать, и Set-Cookie молча отбрасывался —
             # сотрудники не могли войти. В куке держим только булевы разделы,
             # тяжёлые части (кнопки, категории) читаются из роли по запросу.
-            compact_permissions = dict(role_payload.get("permissions") or {})
-            compact_permissions.pop("button_access", None)
-            compact_permissions.pop("category_access", None)
-            out["employee_permissions"] = compact_permissions
+            out["employee_permissions"] = compact_employee_permissions(role_payload.get("permissions"))
         owner = get_by_id(str(emp))
         if owner:
             out["workspace_owner_name"] = str(

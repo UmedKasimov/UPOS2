@@ -274,6 +274,8 @@ from upos.users_store import (
     add_billing_account,
     add_employee,
     bootstrap_from_env,
+    compact_employee_permissions,
+    compact_session_organizations,
     delete_employee,
     ensure_all_user_ids,
     ensure_account_ids,
@@ -1328,7 +1330,7 @@ def create_app() -> FastAPI:
                     payload["employee_role_id"] = str(role.get("id") or "")
                     payload["employee_role_key"] = str(role.get("key") or "")
                     payload["employee_role_name"] = str(role.get("name") or "")
-                    payload["employee_permissions"] = role.get("permissions") or {}
+                    payload["employee_permissions"] = compact_employee_permissions(role.get("permissions"))
             if _is_employee_general_director(payload):
                 orgs = list_organizations(owner_id)
                 fallback = next((item for item in orgs if item.get("is_default")), None) or (orgs[0] if orgs else None)
@@ -1338,7 +1340,7 @@ def create_app() -> FastAPI:
                     payload["workspace_owner_id"] = str(active["id"])
                     payload["active_org_id"] = str(active["id"])
                     payload["active_organization_name"] = str(active.get("name") or "")
-                payload["organizations"] = orgs
+                payload["organizations"] = compact_session_organizations(orgs)
                 payload["org_scope"] = "general" if prev.get("org_scope") == "general" else "organization"
                 payload["can_switch_organizations"] = True
                 payload["organization_switch_general_value"] = ORG_GENERAL_VALUE
@@ -1347,7 +1349,7 @@ def create_app() -> FastAPI:
                 payload["workspace_owner_id"] = str(org["id"])
                 payload["active_org_id"] = str(org["id"])
                 payload["active_organization_name"] = str(org.get("name") or "")
-            payload["organizations"] = employee_orgs
+            payload["organizations"] = compact_session_organizations(employee_orgs)
             payload["org_scope"] = "organization"
             payload["can_switch_organizations"] = len(employee_orgs) > 1
             payload["organization_switch_general_value"] = ORG_GENERAL_VALUE
@@ -1364,7 +1366,7 @@ def create_app() -> FastAPI:
             payload["workspace_owner_id"] = str(active["id"])
             payload["active_org_id"] = str(active["id"])
             payload["active_organization_name"] = str(active.get("name") or "")
-        payload["organizations"] = orgs
+        payload["organizations"] = compact_session_organizations(orgs)
         payload["org_scope"] = "general" if prev.get("org_scope") == "general" else "organization"
         payload["can_switch_organizations"] = True
         payload["organization_switch_general_value"] = ORG_GENERAL_VALUE
@@ -23994,7 +23996,7 @@ def create_app() -> FastAPI:
             u["workspace_owner_id"] = str(active_org["id"])
             u["active_org_id"] = str(active_org["id"])
             u["active_organization_name"] = str(active_org.get("name") or "")
-        u["organizations"] = orgs
+        u["organizations"] = compact_session_organizations(orgs)
         u["can_switch_organizations"] = _is_director(u) or _is_employee_general_director(u) or len(orgs) > 1
         u["organization_switch_general_value"] = ORG_GENERAL_VALUE
         if org_scope:
