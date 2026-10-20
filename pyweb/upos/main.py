@@ -39,6 +39,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
+from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
 from upos.config import get_settings
 from upos.csrf import csrf_matches_session, ensure_csrf_token, rotate_csrf_token
 from upos.db import get_engine, init_db, list_public_tables, session_scope, startup_timings_ms
@@ -763,29 +764,11 @@ def post_login_redirect(user: dict, next_raw: str | None) -> str:
     if user.get("role") == "admin":
         default = "/admin"
     elif user.get("is_employee"):
-        perms = user.get("employee_permissions") if isinstance(user.get("employee_permissions"), dict) else {}
-        default = (
-            "/schet"
-            if perms.get("schet")
-            else "/kassa"
-            if perms.get("kassa")
-            else "/reports"
-            if perms.get("reports")
-            else "/settings?tab=employees"
-            if perms.get("employees")
-            else "/settings"
-            if perms.get("settings")
-            # Установщик без офисных прав живёт в PWA: отправлять его на /auth
-            # означало бесконечный редирект и «не могу зайти» на телефоне.
-            else "/installer"
-            if perms.get("installations")
-            else "/earnings"
-            if perms.get("earnings")
-            else "/auth"
-        )
+        default = employee_landing_path(user)
     else:
         default = "/schet"
     target = safe_internal_path(next_raw, default)
+    target = prevent_auth_redirect_loop(target, default)
     if user.get("role") == "admin":
         return _admin_post_login_path(target)
     return target
@@ -1108,6 +1091,8 @@ def create_app() -> FastAPI:
         return _employee_role_key(data) in {"general_director", "administrator"}
 
     def _first_allowed_user_path(user: dict | None) -> str:
+        if (user or {}).get("is_employee"):
+            return employee_landing_path(user)
         if _has_permission(user, "schet"):
             return "/schet"
         if _has_permission(user, "kassa"):
@@ -1673,6 +1658,16 @@ def create_app() -> FastAPI:
                 "csrf_token": ensure_csrf_token(request),
                 **context_i18n(loc),
             },
+        )
+
+    @app.get("/auth/no-access", response_class=HTMLResponse)
+    def auth_no_access(request: Request):
+        if not request.session.get("user"):
+            return RedirectResponse(url="/auth", status_code=302)
+        return HTMLResponse(
+            "<h1>Доступ ограничен</h1><p>Вашей роли не назначен ни один раздел. "
+            "Обратитесь к администратору.</p>",
+            status_code=403,
         )
 
     @app.post("/auth/login")
