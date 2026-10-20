@@ -232,12 +232,13 @@
   <header class="crm-pipeline-head crm-pipeline-head--filters">
     <div class="crm-pipeline-head-actions">
       <details class="crm-filter-popover">
-        <summary class="btn btn-secondary">Фильтры{% if crm_filters.q or crm_filters.client or crm_filters.program or crm_filters.responsible or crm_filters.contact_employee or crm_filters.status != 'all' or crm_filters.priority != 'all' %} · активны{% endif %}</summary>
+        <summary class="btn btn-secondary">Фильтры{% if crm_filters.q or crm_filters.client or crm_filters.program or crm_filters.responsible or crm_filters.own_deals == 'mine' or crm_filters.contact_employee or crm_filters.status != 'all' or crm_filters.priority != 'all' %} · активны{% endif %}</summary>
         <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
       <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" data-crm-search-dropdown="deals" placeholder="Задача, клиент, ответственный" autocomplete="off" /></label>
       <label><span>Клиент</span><input name="client" value="{{ crm_filters.client }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-client-list" data-crm-search-meta="Клиент" placeholder="Клиент" autocomplete="off" /></label>
       <label><span>Программа клиента</span><select name="program"><option value="">Все программы</option>{% for name in crm_options.programs %}<option value="{{ name }}" {% if crm_filters.program == name %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
       <label><span>Ответственный</span><input name="responsible" value="{{ crm_filters.responsible }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-responsible-list" data-crm-search-meta="Ответственный" placeholder="Ответственный" autocomplete="off" /></label>
+      <label><span>Сделки</span><select name="own_deals"><option value="all" {% if crm_filters.own_deals != 'mine' %}selected{% endif %}>Все сделки</option><option value="mine" {% if crm_filters.own_deals == 'mine' %}selected{% endif %}>Только свои</option></select></label>
       <label><span>Первый контакт · сотрудник</span><select name="contact_employee"><option value="">Все сотрудники</option>{% for name in crm_options.contact_employees %}<option value="{{ name }}" {% if crm_filters.contact_employee == name %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
       <label>
         <span>Статус</span>

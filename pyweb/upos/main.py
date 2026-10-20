@@ -17656,6 +17656,7 @@ def create_app() -> FastAPI:
         client: str = "",
         program: str = "",
         responsible: str = "",
+        own_deals: str = "all",
         contact_employee: str = "",
         status: str = "all",
         priority: str = "all",
@@ -17677,6 +17678,7 @@ def create_app() -> FastAPI:
             "client": client.strip(),
             "program": program.strip(),
             "responsible": responsible.strip(),
+            "own_deals": "mine" if own_deals == "mine" else "all",
             "contact_employee": contact_employee.strip(),
             "status": status.strip() or "all",
             "priority": priority.strip() or "all",
@@ -17685,6 +17687,11 @@ def create_app() -> FastAPI:
         }
         if filters["priority"] not in {"all", *CRM_PRIORITY_LABELS.keys()}:
             filters["priority"] = "all"
+        session_user = request.session.get("user") or {}
+        own_deal_responsibles = {
+            value for field in ("name", "username")
+            if (value := str(session_user.get(field) or "").strip().casefold())
+        }
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
         crm_task_records: list[dict[str, Any]] = []
@@ -18146,6 +18153,10 @@ def create_app() -> FastAPI:
                 if filters["program"] and filters["program"] not in item["client_programs"]:
                     continue
                 if filters["responsible"] and item["responsible"] != filters["responsible"]:
+                    continue
+                if filters["own_deals"] == "mine" and item["item_type"] == "deal" and (
+                    item["responsible"].strip().casefold() not in own_deal_responsibles
+                ):
                     continue
                 if filters["contact_employee"] and filters["contact_employee"] not in item["first_contact_employees"]:
                     continue

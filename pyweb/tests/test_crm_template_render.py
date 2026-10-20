@@ -65,6 +65,18 @@ class CrmTemplateRenderTests(unittest.TestCase):
         self.assertIn('value="BILLZ" selected', html)
         self.assertIn("Фильтры · активны", html)
 
+    def test_own_deals_filter_keeps_selection(self):
+        env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
+        env.globals["url_for"] = lambda endpoint, **kwargs: f"/{endpoint}"
+        source = (TEMPLATES / "_business_module_crm.html").read_text(encoding="utf-8")
+        context = {name: {} for name in meta.find_undeclared_variables(env.parse(source))}
+        context.update(module={"heading": "CRM"}, csrf_token="test", crm_kanban_columns=[])
+        context["crm_filters"] = {"own_deals": "mine", "status": "all", "priority": "all"}
+        html = env.get_template("_business_module_crm.html").render(**context)
+        self.assertIn('name="own_deals"', html)
+        self.assertIn('value="mine" selected>Только свои', html)
+        self.assertIn("Фильтры · активны", html)
+
 
 if __name__ == "__main__":
     unittest.main()
