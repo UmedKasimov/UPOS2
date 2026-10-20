@@ -32372,6 +32372,27 @@ html.dark .general-report-launcher {
   background: color-mix(in srgb, var(--workbench-surface), var(--background) 18%);
 }
 
+/* Messenger highlights must keep dark surfaces behind light theme text. */
+html.dark .messenger-channel-tab {
+  --channel-brand-soft: color-mix(in srgb, var(--channel-brand), var(--card) 82%);
+}
+
+html.dark .messenger-channel-tab:not(:hover):not(.active)::before {
+  border-color: color-mix(in srgb, var(--channel-brand), var(--card) 58%);
+}
+
+html.dark .messenger-dialog-item:hover,
+html.dark .messenger-dialog-item.active {
+  background: color-mix(in srgb, var(--primary), var(--card) 82%);
+  color: var(--foreground);
+}
+
+html.dark .messenger-thread-message--out {
+  border-color: color-mix(in srgb, var(--primary), var(--border) 55%);
+  background: color-mix(in srgb, var(--primary), var(--card) 77%);
+  color: var(--foreground);
+}
+
 html.dark .settings-page-wrap .settings-tab.settings-tab--rail {
   border-color: var(--workbench-line);
   background: oklch(1 0 0 / 0.045);

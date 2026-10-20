@@ -26,6 +26,13 @@
   outline: none;
 }
 
+html.dark .sidebar-messenger-notice:hover,
+html.dark .sidebar-messenger-notice:focus-visible,
+html.dark .sidebar-messenger-notice[data-state="new"] {
+  background: color-mix(in srgb, var(--primary), var(--sidebar) 78%);
+  color: var(--sidebar-foreground);
+}
+
 .sidebar-messenger-notice-icon {
   display: grid;
   width: 2rem;
