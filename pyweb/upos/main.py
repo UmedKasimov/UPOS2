@@ -4713,6 +4713,30 @@ def create_app() -> FastAPI:
         user = request.session.get("user") or {}
         return str(user.get("name") or user.get("username") or user.get("login") or "UPOS").strip() or "UPOS"
 
+    def _crm_can_view_all_deals(user: dict[str, Any]) -> bool:
+        return str(user.get("role") or "") == "admin" or _employee_role_key(user) == "administrator"
+
+    def _crm_created_by_user(data: dict[str, Any], user: dict[str, Any]) -> bool:
+        """Match a saved creator ID, or the creation event on older CRM cards."""
+        user_id = _session_user_id(user)
+        creator_id = str(data.get("created_by_user_id") or "").strip()
+        if creator_id:
+            return bool(user_id and creator_id == user_id)
+        creator_name = str(data.get("created_by_name") or "").strip()
+        if not creator_name:
+            events = data.get("activity_log") if isinstance(data.get("activity_log"), list) else []
+            for event in events:
+                if not isinstance(event, dict):
+                    continue
+                if str(event.get("action") or "") in {"Карточка создана", "Сделка создана из продажи"}:
+                    creator_name = str(event.get("actor") or "").strip()
+                    break
+        user_names = {
+            value for field in ("name", "username")
+            if (value := str(user.get(field) or "").strip().casefold())
+        }
+        return bool(creator_name and creator_name.casefold() in user_names)
+
     def _crm_lost_reasons_from_form(form: Any) -> tuple[list[str], str]:
         """Причин потери может быть несколько: галочки из справочника плюс своя
         формулировка. Возвращает список причин и готовую строку для показа."""
@@ -11631,6 +11655,8 @@ def create_app() -> FastAPI:
             deal_data: dict[str, Any] = {
                 "item_type": "deal",
                 "client": client_name,
+                "created_by_user_id": _session_user_id(request.session.get("user") or {}),
+                "created_by_name": actor,
                 "responsible": responsible or str(sale_data.get("manager") or actor).strip(),
                 "date": str(sale_data.get("date") or ""),
                 "due_date": "",
@@ -12659,6 +12685,8 @@ def create_app() -> FastAPI:
                 deal_data: dict[str, Any] = {
                     "item_type": "deal",
                     "client": client_name,
+                    "created_by_user_id": _session_user_id(request.session.get("user") or {}),
+                    "created_by_name": actor,
                     "responsible": str(sale_data.get("manager") or actor).strip(),
                     "date": str(sale_data.get("date") or ""),
                     "due_date": "",
@@ -17688,10 +17716,9 @@ def create_app() -> FastAPI:
         if filters["priority"] not in {"all", *CRM_PRIORITY_LABELS.keys()}:
             filters["priority"] = "all"
         session_user = request.session.get("user") or {}
-        own_deal_responsibles = {
-            value for field in ("name", "username")
-            if (value := str(session_user.get(field) or "").strip().casefold())
-        }
+        crm_can_view_all_deals = _crm_can_view_all_deals(session_user)
+        if not crm_can_view_all_deals:
+            filters["own_deals"] = "mine"
         q_clean = filters["q"].lower()
         crm_records: list[dict[str, Any]] = []
         crm_task_records: list[dict[str, Any]] = []
@@ -17952,7 +17979,9 @@ def create_app() -> FastAPI:
             all_deal_options = [
                 deal_option(row)
                 for row in rows
-                if row.item_type == "deal"
+                if row.item_type == "deal" and (
+                    filters["own_deals"] == "all" or _crm_created_by_user(_json_object(row.data), session_user)
+                )
             ]
             # Статус сделки раньше искали перебором всех записей CRM на каждую
             # сделку. Берём его из готового словаря.
@@ -18128,6 +18157,10 @@ def create_app() -> FastAPI:
                 item["action_state"] = _crm_due_state(item["due_date"], item["status"], today_iso)
                 item["activity_state"] = _crm_activity_state(row, crm_activity_settings)
                 item["edit_payload"] = _crm_record_edit_payload(item)
+                if item["item_type"] in {"deal", "lead"} and filters["own_deals"] == "mine" and not _crm_created_by_user(
+                    _json_object(row.data), session_user
+                ):
+                    continue
                 # Фильтры применяем до разветвления по типу записи: раньше
                 # задачи отбирались раньше фильтров и поиск с ответственным на
                 # них не действовали.
@@ -18153,10 +18186,6 @@ def create_app() -> FastAPI:
                 if filters["program"] and filters["program"] not in item["client_programs"]:
                     continue
                 if filters["responsible"] and item["responsible"] != filters["responsible"]:
-                    continue
-                if filters["own_deals"] == "mine" and item["item_type"] == "deal" and (
-                    item["responsible"].strip().casefold() not in own_deal_responsibles
-                ):
                     continue
                 if filters["contact_employee"] and filters["contact_employee"] not in item["first_contact_employees"]:
                     continue
@@ -18377,6 +18406,7 @@ def create_app() -> FastAPI:
             active="crm",
             module=_business_module_context("crm"),
             crm_filters=filters,
+            crm_can_view_all_deals=crm_can_view_all_deals,
             crm_options=crm_options,
             crm_records=crm_records,
             crm_task_records=crm_task_records,
@@ -21844,6 +21874,8 @@ def create_app() -> FastAPI:
         if validation_error:
             target_hash = {"task": "tasks", "deal": "deals", "history": "history"}.get(str(data.get("item_type") or "task"), "tasks")
             return RedirectResponse(url=f"/crm?error={quote(validation_error)}#{target_hash}", status_code=302)
+        data["created_by_user_id"] = _session_user_id(request.session.get("user") or {})
+        data["created_by_name"] = _crm_actor_name(request)
         _crm_append_activity(data, "Карточка создана", _crm_actor_name(request))
         messenger_thread_id = str(form.get("messenger_thread_id") or "").strip()
         if len(messenger_thread_id) > 180:
@@ -21963,7 +21995,7 @@ def create_app() -> FastAPI:
             data["activity_log"] = list(old_log)
             # Форма карточки не знает про служебные поля, а payload собирается
             # с нуля: без переноса терялись связь с продажами и признак архива.
-            carry_keys = ["archived_status", "archived_at", "counterparty_id"]
+            carry_keys = ["archived_status", "archived_at", "counterparty_id", "created_by_user_id", "created_by_name"]
             if data.get("item_type") != "task":
                 carry_keys = [
                     "related_sale_id",

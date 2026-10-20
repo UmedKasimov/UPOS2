@@ -72,10 +72,18 @@ class CrmTemplateRenderTests(unittest.TestCase):
         context = {name: {} for name in meta.find_undeclared_variables(env.parse(source))}
         context.update(module={"heading": "CRM"}, csrf_token="test", crm_kanban_columns=[])
         context["crm_filters"] = {"own_deals": "mine", "status": "all", "priority": "all"}
+        context["crm_can_view_all_deals"] = True
         html = env.get_template("_business_module_crm.html").render(**context)
         self.assertIn('name="own_deals"', html)
+        self.assertIn('value="all" >Все сделки', html)
         self.assertIn('value="mine" selected>Только свои', html)
         self.assertIn("Фильтры · активны", html)
+
+        context["crm_can_view_all_deals"] = False
+        html = env.get_template("_business_module_crm.html").render(**context)
+        self.assertNotIn('value="all" >Все сделки', html)
+        self.assertIn('value="mine" selected>Только свои', html)
+        self.assertNotIn("Фильтры · активны", html)
 
 
 if __name__ == "__main__":
