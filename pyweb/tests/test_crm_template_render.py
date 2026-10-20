@@ -52,6 +52,19 @@ class CrmTemplateRenderTests(unittest.TestCase):
         self.assertIn('name="first_contact_employees" value="Амир Акбаралиев"', html)
         self.assertIn('data-crm-employees-url-template="/crm/__record__/contact-employees"', html)
 
+    def test_program_filter_keeps_selected_client_program(self):
+        env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
+        env.globals["url_for"] = lambda endpoint, **kwargs: f"/{endpoint}"
+        source = (TEMPLATES / "_business_module_crm.html").read_text(encoding="utf-8")
+        context = {name: {} for name in meta.find_undeclared_variables(env.parse(source))}
+        context.update(module={"heading": "CRM"}, csrf_token="test", crm_kanban_columns=[])
+        context["crm_options"] = {"programs": ["YESPOS", "BILLZ"]}
+        context["crm_filters"] = {"program": "BILLZ", "status": "all", "priority": "all"}
+        html = env.get_template("_business_module_crm.html").render(**context)
+        self.assertIn('name="program"', html)
+        self.assertIn('value="BILLZ" selected', html)
+        self.assertIn("Фильтры · активны", html)
+
 
 if __name__ == "__main__":
     unittest.main()

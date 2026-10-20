@@ -13399,6 +13399,22 @@ def create_app() -> FastAPI:
         prefix = "-" if amount > 0 else ""
         return f"{prefix}{_sales_money_label(abs(amount))}"
 
+    def _counterparty_program_names(extra: dict[str, Any]) -> tuple[list[str], bool]:
+        raw_programs = extra.get("programs")
+        if isinstance(raw_programs, list):
+            programs = [str(item).strip() for item in raw_programs if str(item).strip()]
+        elif isinstance(raw_programs, str) and raw_programs.strip():
+            programs = [item.strip() for item in raw_programs.split(",") if item.strip()]
+        else:
+            programs = []
+        # Категория из старых карточек видна в списке программ, но не делает
+        # клиента «нашим» без явно закреплённой программы.
+        has_own_program = bool(programs)
+        legacy_program = str(extra.get("program") or extra.get("software") or extra.get("category") or "").strip()
+        if legacy_program and legacy_program not in programs:
+            programs.append(legacy_program)
+        return programs, has_own_program
+
     def _counterparty_view_data(
         row: Counterparty,
         *,
@@ -13453,19 +13469,7 @@ def create_app() -> FastAPI:
                     "value": "0",
                 }
             )
-        raw_programs = extra.get("programs")
-        if isinstance(raw_programs, list):
-            programs = [str(item).strip() for item in raw_programs if str(item).strip()]
-        elif isinstance(raw_programs, str) and raw_programs.strip():
-            programs = [item.strip() for item in raw_programs.split(",") if item.strip()]
-        else:
-            programs = []
-        # Признак «наш клиент» — только закреплённые программы, без подстановок
-        # из категории: иначе заведение из справочника выглядит работающим с нами.
-        has_own_program = bool(programs)
-        legacy_program = str(extra.get("program") or extra.get("software") or extra.get("category") or "").strip()
-        if legacy_program and legacy_program not in programs:
-            programs.append(legacy_program)
+        programs, has_own_program = _counterparty_program_names(extra)
         crm_status = str(
             (crm_status_by_id or {}).get(row.id)
             or (crm_status_by_name or {}).get(row.name.lower())
@@ -17653,6 +17657,7 @@ def create_app() -> FastAPI:
         request: Request,
         q: str = "",
         client: str = "",
+        program: str = "",
         responsible: str = "",
         contact_employee: str = "",
         status: str = "all",
@@ -17673,6 +17678,7 @@ def create_app() -> FastAPI:
         filters = {
             "q": q.strip(),
             "client": client.strip(),
+            "program": program.strip(),
             "responsible": responsible.strip(),
             "contact_employee": contact_employee.strip(),
             "status": status.strip() or "all",
@@ -17710,7 +17716,7 @@ def create_app() -> FastAPI:
         summary_pipeline_total = Decimal("0")
         summary_won = 0
         summary_lost = 0
-        crm_options = {"clients": [], "contacts": [], "responsibles": [], "contact_employees": [], "deals": [], "orders": [], "currencies": ["UZS", "USD", "RUB", "EUR"]}
+        crm_options = {"clients": [], "programs": [], "contacts": [], "responsibles": [], "contact_employees": [], "deals": [], "orders": [], "currencies": ["UZS", "USD", "RUB", "EUR"]}
         crm_workspace_settings = load_workspace_settings(wid)
         crm_stages = _crm_clean_stages(crm_workspace_settings.get("crm_pipeline_stages"))
         crm_task_types = _crm_clean_task_types(crm_workspace_settings.get("crm_task_types"))
@@ -17747,6 +17753,15 @@ def create_app() -> FastAPI:
             )
             counterparty_by_id = {row.id: row for row in counterparty_rows}
             counterparty_by_name = {row.name.strip().lower(): row for row in counterparty_rows if row.name}
+            programs_by_counterparty_id = {
+                row.id: _counterparty_program_names(_counterparty_extra(row))[0]
+                for row in counterparty_rows
+            }
+            crm_options["programs"] = sorted({
+                program_name
+                for names in programs_by_counterparty_id.values()
+                for program_name in names
+            }, key=str.casefold)
             sale_by_key: dict[str, dict[str, Any]] = {}
             sales_by_key: dict[str, list[dict[str, Any]]] = {}
             sale_by_id: dict[str, dict[str, Any]] = {}
@@ -17970,6 +17985,7 @@ def create_app() -> FastAPI:
                 if counterparty is not None:
                     item["client_id"] = counterparty.id
                     item["client_href"] = f"/clients?client={counterparty.id}#client-card"
+                    item["client_programs"] = programs_by_counterparty_id.get(counterparty.id, [])
                     counterparty_extra = _counterparty_extra(counterparty)
                     item["contact_phone"] = str(
                         counterparty.phone or counterparty_extra.get("phone") or counterparty_extra.get("telegram_phone") or ""
@@ -17984,6 +18000,7 @@ def create_app() -> FastAPI:
                 else:
                     item["client_id"] = ""
                     item["client_href"] = ""
+                    item["client_programs"] = []
                     item["contact_phone"] = ""
                 record_data = _json_object(row.data)
                 linked_sale = (
@@ -18128,6 +18145,8 @@ def create_app() -> FastAPI:
                 if q_clean and q_clean not in hay:
                     continue
                 if filters["client"] and item["client"] != filters["client"]:
+                    continue
+                if filters["program"] and filters["program"] not in item["client_programs"]:
                     continue
                 if filters["responsible"] and item["responsible"] != filters["responsible"]:
                     continue
