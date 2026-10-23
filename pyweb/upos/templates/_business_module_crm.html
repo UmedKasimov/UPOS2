@@ -365,19 +365,19 @@
               {% endif %}
               <div class="crm-kanban-card-top">
                 <div class="crm-kanban-card-titleline">
-                  <strong>{{ row.title }}</strong>
+                  <strong title="{{ row.title|e }}">{{ row.title }}</strong>
                   {% if activity.age_label %}
                     <span class="crm-kanban-age crm-kanban-age--{{ activity.state }}">{{ activity.age_label }}</span>
                   {% endif %}
                 </div>
-                <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
+                <span title="{{ (row.lead_source or row.contact_type or 'Ручной ввод')|e }}">{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
               </div>
               {% if row.client %}
                 <div class="crm-kanban-client-line">
                   {% if row.client_href %}
-                    <a class="crm-kanban-client" href="{{ row.client_href }}">{{ row.client }}</a>
+                    <a class="crm-kanban-client" href="{{ row.client_href }}" title="{{ row.client|e }}">{{ row.client }}</a>
                   {% else %}
-                    <span class="crm-kanban-client">{{ row.client }}</span>
+                    <span class="crm-kanban-client" title="{{ row.client|e }}">{{ row.client }}</span>
                   {% endif %}
                 </div>
               {% endif %}
@@ -396,7 +396,7 @@
                 <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
               {% endif %}
               {% if row.first_contact_employees %}
-                <div class="crm-kanban-contact-employees" title="Сотрудники первого контакта">Первый контакт: {{ row.first_contact_employees|join(', ') }}</div>
+                <div class="crm-kanban-contact-employees" title="Первый контакт: {{ row.first_contact_employees|join(', ')|e }}">Первый контакт: {{ row.first_contact_employees|join(', ') }}</div>
               {% endif %}
               <div class="crm-kanban-card-tags" data-crm-card-tags>
                 {% for tag in row.tags %}

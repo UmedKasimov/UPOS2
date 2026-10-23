@@ -7092,11 +7092,12 @@ a.messenger-message-attachment:focus-visible {
 
 .crm-kanban-card {
   position: relative;
-  display: grid;
-  gap: 0.34rem;
-  height: max-content;
-  min-height: 12.75rem;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  box-sizing: border-box;
+  height: 16rem;
+  flex: 0 0 16rem;
   min-width: 0;
   padding: 0.82rem 0.75rem 0.7rem;
   overflow: hidden;
@@ -7291,18 +7292,37 @@ a.messenger-message-attachment:focus-visible {
 }
 
 .crm-kanban-card-titleline {
-  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem;
   min-width: 0;
-  overflow: visible;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  align-items: start;
 }
 
 .crm-kanban-card-titleline strong {
-  flex: 1 1 8rem;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
-.crm-kanban-card-top > span,
+.crm-kanban-card-top {
+  display: grid;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.crm-kanban-card-top > span {
+  display: block;
+  width: fit-content;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .crm-kanban-card-money small {
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -7338,9 +7358,19 @@ a.messenger-message-attachment:focus-visible {
 }
 
 .crm-kanban-card-tags {
+  flex: 0 0 1.35rem;
   min-height: 1.35rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 0.3rem;
+}
+
+.crm-kanban-card-tags span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crm-kanban-tag-form {
@@ -7455,6 +7485,10 @@ a.messenger-message-attachment:focus-visible {
   background: color-mix(in srgb, var(--primary) 9%, var(--card));
 }
 
+.crm-kanban-card-top > span {
+  display: block;
+}
+
 .crm-kanban-card-tags span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
@@ -7482,6 +7516,33 @@ a.messenger-message-attachment:focus-visible {
 .crm-kanban-client-line {
   min-width: 0;
   justify-content: flex-start;
+}
+
+.crm-kanban-client-line .crm-kanban-client {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.crm-kanban-card-money,
+.crm-kanban-chat,
+.crm-kanban-contact-employees {
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-kanban-card-money {
+  flex-wrap: nowrap;
+}
+
+.crm-kanban-card-money-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crm-kanban-age {
