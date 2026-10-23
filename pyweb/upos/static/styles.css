@@ -7924,6 +7924,41 @@ a.messenger-message-attachment:focus-visible {
   text-decoration: none;
 }
 
+.crm-card-detail-phones {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--workbench-line, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+}
+
+.crm-card-detail-phones-head,
+.crm-card-detail-phone-list,
+.crm-card-detail-phone-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+}
+
+.crm-card-detail-phones-head { justify-content: space-between; }
+.crm-card-detail-phones-head span { color: var(--muted-foreground); font-size: var(--text-xs); }
+.crm-card-detail-phones-head button { font-size: var(--text-xs); }
+.crm-card-detail-phone-list a {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.crm-card-detail-phone-list a:hover { text-decoration: underline; }
+.crm-card-detail-phone-list small { color: var(--muted-foreground); }
+.crm-card-detail-phone-form[hidden],
+.crm-card-detail-phone-form [hidden] { display: none; }
+.crm-card-detail-phone-form input { flex: 1 1 12rem; min-width: 0; }
+.crm-card-detail-phone-form button { font-size: var(--text-xs); }
+.crm-card-detail-phone-form p { flex-basis: 100%; margin: 0; color: var(--destructive, #c3263e); font-size: var(--text-xs); }
+
 .crm-card-detail-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

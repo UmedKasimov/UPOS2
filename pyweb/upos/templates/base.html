@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=726" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=727" />
     {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
     {% endif %}

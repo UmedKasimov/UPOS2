@@ -67,6 +67,23 @@
     });
   }
 
+  function postPhone(root, recordId, phone) {
+    const template = root.dataset.crmPhoneUrlTemplate || "/crm/__record__/phones";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    body.set("phone", phone);
+    return fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: body.toString(),
+    }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить номер.");
+      return result;
+    });
+  }
+
   function postContactEmployees(root, recordId, names) {
     const template = root.dataset.crmEmployeesUrlTemplate || "/crm/__record__/contact-employees";
     const url = template.replace("__record__", encodeURIComponent(recordId));
@@ -556,6 +573,11 @@
     const subtitle = dialog.querySelector("[data-crm-card-detail-subtitle]");
     const client = dialog.querySelector("[data-crm-card-detail-client]");
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
+    const phoneList = dialog.querySelector("[data-crm-card-detail-phone-list]");
+    const phoneToggle = dialog.querySelector("[data-crm-card-detail-phone-toggle]");
+    const phoneForm = dialog.querySelector("[data-crm-card-detail-phone-form]");
+    const phoneInput = phoneForm?.querySelector('input[name="phone"]');
+    const phoneError = phoneForm?.querySelector("[data-crm-card-detail-phone-error]");
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
     const attachEmployeeButton = dialog.querySelector("[data-crm-card-detail-attach-employee]");
     const employeeForm = dialog.querySelector("[data-crm-card-detail-employees-form]");
@@ -625,6 +647,36 @@
       if (employeeError) { employeeError.hidden = true; employeeError.textContent = ""; }
       employeeForm.hidden = true;
       attachEmployeeButton?.setAttribute("aria-expanded", "false");
+    };
+
+    const resetPhoneForm = () => {
+      if (!phoneForm) return;
+      phoneForm.hidden = true;
+      if (phoneInput) phoneInput.value = "";
+      if (phoneError) { phoneError.hidden = true; phoneError.textContent = ""; }
+      phoneToggle?.setAttribute("aria-expanded", "false");
+    };
+
+    const renderPhoneList = (card) => {
+      if (!phoneList) return;
+      phoneList.replaceChildren();
+      let phones = [];
+      try { phones = JSON.parse(card?.dataset.crmContactPhones || "[]"); } catch (_) { /* Ignore malformed legacy data. */ }
+      if (!Array.isArray(phones) || !phones.length) {
+        const empty = document.createElement("small");
+        empty.textContent = "Номер не указан";
+        phoneList.appendChild(empty);
+        return;
+      }
+      phones.forEach((phone) => {
+        const value = String(phone || "").trim();
+        const digits = value.replace(/\D/g, "");
+        if (digits.length < 7) return;
+        const link = document.createElement("a");
+        link.href = `tel:${value.startsWith("+") ? "+" : ""}${digits}`;
+        link.textContent = value;
+        phoneList.appendChild(link);
+      });
     };
 
     const showDetailPane = (name) => {
@@ -891,6 +943,8 @@
           clientLink.removeAttribute("href");
         }
       }
+      renderPhoneList(card);
+      resetPhoneForm();
       if (editButton) {
         const payload = data.crmEditPayload || "";
         editButton.hidden = !payload;
@@ -1043,6 +1097,41 @@
       employeeForm.hidden = false;
       attachEmployeeButton.setAttribute("aria-expanded", "true");
       employeeSearch?.focus();
+    });
+    phoneToggle?.addEventListener("click", () => {
+      if (!phoneForm || !detailCard) return;
+      if (!phoneForm.hidden) { resetPhoneForm(); return; }
+      resetPhoneForm();
+      phoneForm.hidden = false;
+      phoneToggle.setAttribute("aria-expanded", "true");
+      phoneInput?.focus();
+    });
+    phoneForm?.querySelector("[data-crm-card-detail-phone-cancel]")?.addEventListener("click", resetPhoneForm);
+    phoneForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const root = document.querySelector("[data-crm-phone-url-template]");
+      const card = detailCard;
+      const recordId = card?.dataset.crmRecordId || "";
+      const phone = String(phoneInput?.value || "").trim();
+      if (!root || !card || !recordId || !phone || phoneForm.classList.contains("is-saving")) return;
+      phoneForm.classList.add("is-saving");
+      phoneForm.querySelectorAll("button, input").forEach((node) => { node.disabled = true; });
+      if (phoneError) phoneError.hidden = true;
+      postPhone(root, recordId, phone)
+        .then((result) => {
+          card.dataset.crmContactPhones = JSON.stringify(result.phones || []);
+          if (detailCard === card) {
+            renderPhoneList(card);
+            resetPhoneForm();
+          }
+        })
+        .catch((error) => {
+          if (phoneError) { phoneError.textContent = error.message || "Не удалось сохранить номер."; phoneError.hidden = false; }
+        })
+        .finally(() => {
+          phoneForm.classList.remove("is-saving");
+          phoneForm.querySelectorAll("button, input").forEach((node) => { node.disabled = false; });
+        });
     });
     employeeForm?.querySelector("[data-crm-card-detail-employees-cancel]")?.addEventListener("click", resetEmployeePicker);
     employeeSearch?.addEventListener("input", () => {

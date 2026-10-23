@@ -288,6 +288,7 @@
     data-crm-archive-url-template="/crm/__record__/archive"
     data-crm-restore-url-template="/crm/__record__/restore"
     data-crm-tag-url-template="/crm/__record__/tag"
+    data-crm-phone-url-template="/crm/__record__/phones"
     data-crm-employees-url-template="/crm/__record__/contact-employees"
     data-crm-activity-url-template="/crm/__record__/activity"
   >
@@ -335,6 +336,7 @@
               data-crm-order-count="{{ row.order_count or 0 }}"
               data-crm-detail-responsible="{{ (row.responsible or 'Без ответственного')|e }}"
               data-crm-contact-employees="{{ row.first_contact_employees|join(', ')|e }}"
+              data-crm-contact-phones='{{ row.contact_phones|tojson|forceescape }}'
               data-crm-detail-date="{{ (row.date or '-')|e }}"
               data-crm-detail-due-date="{{ (row.due_date or '-')|e }}"
               data-crm-detail-next-step="{{ row.next_step|e }}"
@@ -983,6 +985,19 @@
             data-crm-card-detail-client-link
             hidden
           >Открыть клиента</a>
+        </div>
+        <div class="crm-card-detail-phones">
+          <div class="crm-card-detail-phones-head">
+            <span>Номера клиента</span>
+            <button type="button" class="btn btn-secondary" data-crm-card-detail-phone-toggle aria-expanded="false" aria-controls="crm-card-detail-phone-form">+ Добавить номер</button>
+          </div>
+          <div class="crm-card-detail-phone-list" data-crm-card-detail-phone-list></div>
+          <form id="crm-card-detail-phone-form" class="crm-card-detail-phone-form" data-crm-card-detail-phone-form hidden>
+            <input type="tel" name="phone" autocomplete="tel" maxlength="64" placeholder="+998 90 123 45 67" aria-label="Номер телефона" required />
+            <button class="btn" type="submit">Сохранить</button>
+            <button class="btn btn-secondary" type="button" data-crm-card-detail-phone-cancel>Отмена</button>
+            <p data-crm-card-detail-phone-error role="alert" hidden></p>
+          </form>
         </div>
         <div class="crm-card-detail-tags">
           <div class="crm-card-detail-tags-head">

@@ -3536,6 +3536,33 @@ def create_app() -> FastAPI:
             return ""
         return digits[-9:] if len(digits) >= 9 else digits
 
+    def _crm_phone_list(*sources: Any) -> list[str]:
+        phones: list[str] = []
+        seen: set[str] = set()
+        for source in sources:
+            values = source if isinstance(source, (list, tuple)) else [source]
+            for value in values:
+                phone = re.sub(r"\s+", " ", str(value or "")).strip()
+                digits = re.sub(r"\D+", "", phone)
+                if not re.fullmatch(r"\+?[0-9 ()-]{7,64}", phone) or not 7 <= len(digits) <= 15:
+                    continue
+                key = _identity_phone(phone)
+                if key in seen:
+                    continue
+                seen.add(key)
+                phones.append(phone)
+                if len(phones) >= 10:
+                    return phones
+        return phones
+
+    def _crm_phone_from_label(value: Any) -> str:
+        """Old imported contacts sometimes put a marked phone in their name."""
+        match = re.search(r"(?:📞\s*|^\s*)(\+?\d[\d ()-]{6,}\d)", str(value or ""))
+        if not match or len(re.sub(r"\D+", "", match.group(1))) < 9:
+            return ""
+        phones = _crm_phone_list(match.group(1))
+        return phones[0] if phones else ""
+
     def _identity_email(value: Any) -> str:
         email = re.sub(r"\s+", "", str(value or "")).casefold()
         return email if len(email) >= 5 and "@" in email else ""
@@ -3582,12 +3609,10 @@ def create_app() -> FastAPI:
             if submitted_email and submitted_email == _identity_email(extra.get("email")):
                 return row, "email"
             existing_phones = {
-                item
-                for item in (
-                    _identity_phone(row.phone),
-                    _identity_phone(extra.get("phone")),
+                _identity_phone(value)
+                for value in _crm_phone_list(
+                    row.phone, extra.get("phone"), extra.get("crm_phones"), _crm_phone_from_label(row.name)
                 )
-                if item
             }
             if submitted_phone and submitted_phone in existing_phones:
                 return row, "phone"
@@ -13546,6 +13571,7 @@ def create_app() -> FastAPI:
             "photo_url": str(extra.get("photo_url") or extra.get("photo") or ""),
             "phone": row.phone,
             "phone_primary": row.phone,
+            "phones": _crm_phone_list(row.phone, extra.get("phone"), extra.get("crm_phones"), _crm_phone_from_label(row.name)),
             "tax_id": row.tax_id,
             "inn": str(extra.get("inn") or row.tax_id or ""),
             "pinfl": str(extra.get("pinfl") or ""),
@@ -13883,6 +13909,7 @@ def create_app() -> FastAPI:
             "checklist": checklist,
             "client": str(form.get("client") or "").strip(),
             "contact": str(form.get("contact") or "").strip(),
+            "contact_phones": _crm_phone_list(form.get("contact")),
             "responsible": str(form.get("responsible") or "").strip(),
             "first_contact_employees": list(dict.fromkeys(
                 name for value in form.getlist("first_contact_employees")
@@ -14018,6 +14045,7 @@ def create_app() -> FastAPI:
             "checklist": checklist[:40],
             "checklist_text": "\n".join(checklist[:40]),
             "contact": str(data.get("contact") or ""),
+            "contact_phones": _crm_phone_list(data.get("contact_phones")),
             "business_segment_ids": [str(value) for value in data.get("business_segment_ids", [])] if isinstance(data.get("business_segment_ids"), list) else [],
             "business_segment": str(data.get("business_segment") or ""),
             "responsible": str(data.get("responsible") or ""),
@@ -18036,6 +18064,18 @@ def create_app() -> FastAPI:
                     item["client_programs"] = []
                     item["contact_phone"] = ""
                 record_data = _json_object(row.data)
+                item["contact_phones"] = _crm_phone_list(
+                    counterparty.phone if counterparty is not None else "",
+                    counterparty_extra.get("phone") if counterparty is not None else "",
+                    record_data.get("contact"),
+                    record_data.get("contact_phones"),
+                    counterparty_extra.get("crm_phones") if counterparty is not None else [],
+                    counterparty_extra.get("telegram_phone") if counterparty is not None else "",
+                    _crm_phone_from_label(counterparty.name) if counterparty is not None else "",
+                    _crm_phone_from_label(item["title"]),
+                )
+                if item["contact_phones"]:
+                    item["contact_phone"] = item["contact_phones"][0]
                 linked_sale = (
                     sale_by_id.get(str(record_data.get("related_sale_id") or ""))
                     or sale_by_key.get(str(item.get("counterparty_id") or ""))
@@ -18250,10 +18290,10 @@ def create_app() -> FastAPI:
             crm_contacts = []
             for row in counterparty_rows:
                 extra = _counterparty_extra(row)
-                phones = list(dict.fromkeys(
-                    phone for value in (row.phone, extra.get("phone"), extra.get("telegram_phone"), extra.get("telegram"))
-                    if (phone := str(value or "").strip())
-                ))
+                phones = _crm_phone_list(
+                    row.phone, extra.get("phone"), extra.get("crm_phones"),
+                    extra.get("telegram_phone"), extra.get("telegram"), _crm_phone_from_label(row.name),
+                )
                 crm_contacts.append({
                     "id": row.id,
                     "name": row.name,
@@ -21990,6 +22030,9 @@ def create_app() -> FastAPI:
                 counterparty = _resolve_counterparty(session, wid, name=data["client"], role="client")
                 counterparty_id = counterparty.id if counterparty else None
             old_data = _json_object(row.data)
+            data["contact_phones"] = _crm_phone_list(
+                old_data.get("contact_phones"), old_data.get("contact"), data.get("contact")
+            )
             old_stage = str(old_data.get("stage") or "")
             old_log = old_data.get("activity_log") if isinstance(old_data.get("activity_log"), list) else []
             data["activity_log"] = list(old_log)
@@ -22243,6 +22286,56 @@ def create_app() -> FastAPI:
                 row.data = data
                 flag_modified(row, "data")
         return JSONResponse({"ok": True, "first_contact_employees": names})
+
+    @app.post("/crm/{record_id}/phones", name="crm_phone_add")
+    async def crm_phone_add(request: Request, record_id: str):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return JSONResponse({"ok": False, "error": "Сессия устарела. Обновите страницу."}, status_code=403)
+        denied = _employee_module_denied(request, "crm", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir or wid is None:
+            return JSONResponse({"ok": False, "error": "Войдите в систему заново."}, status_code=401)
+        submitted = re.sub(r"\s+", " ", str(form.get("phone") or "")).strip()
+        if not _crm_phone_list(submitted):
+            return JSONResponse({"ok": False, "error": "Укажите номер телефона от 7 до 15 цифр."}, status_code=400)
+        with session_scope() as session:
+            row = session.get(CrmRecord, record_id)
+            if not row or row.workspace_owner_id != wid or row.item_type not in {"deal", "lead"}:
+                return JSONResponse({"ok": False, "error": "Карточка не найдена."}, status_code=404)
+            data = _json_object(row.data).copy()
+            user = request.session.get("user") or {}
+            if not _crm_can_view_all_deals(user) and not _crm_created_by_user(data, user):
+                return JSONResponse({"ok": False, "error": "Карточка не найдена."}, status_code=404)
+            counterparty = session.get(Counterparty, row.counterparty_id) if row.counterparty_id else None
+            if counterparty is not None and counterparty.workspace_owner_id != wid:
+                counterparty = None
+            extra = _counterparty_extra(counterparty).copy() if counterparty is not None else {}
+            current = _crm_phone_list(
+                counterparty.phone if counterparty is not None else "",
+                extra.get("phone"), data.get("contact"), data.get("contact_phones"),
+                extra.get("crm_phones"), extra.get("telegram_phone"),
+                _crm_phone_from_label(counterparty.name) if counterparty is not None else "",
+                _crm_phone_from_label(row.title),
+            )
+            if _identity_phone(submitted) in {_identity_phone(phone) for phone in current}:
+                return JSONResponse({"ok": False, "error": "Этот номер уже добавлен."}, status_code=400)
+            if len(current) >= 10:
+                return JSONResponse({"ok": False, "error": "Можно сохранить не более 10 номеров."}, status_code=400)
+            data["contact_phones"] = _crm_phone_list(data.get("contact_phones"), submitted)
+            _crm_append_activity(data, "Добавлен номер клиента", _crm_actor_name(request), submitted)
+            row.data = data
+            flag_modified(row, "data")
+            if counterparty is not None:
+                if not counterparty.phone:
+                    counterparty.phone = current[0] if current else submitted
+                extra["crm_phones"] = _crm_phone_list(extra.get("crm_phones"), submitted)
+                counterparty.data = extra
+                flag_modified(counterparty, "data")
+            phones = _crm_phone_list(current, submitted)
+        return JSONResponse({"ok": True, "phones": phones})
 
     @app.post("/crm/{record_id}/tag", name="crm_tag_add")
     async def crm_tag_add(request: Request, record_id: str):

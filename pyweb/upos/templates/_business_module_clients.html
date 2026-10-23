@@ -1021,7 +1021,7 @@
           </div>
         </header>
         <dl class="client-card-info">
-          <div><dt>Телефон</dt><dd>{{ selected_client_card.phone or "-" }}</dd></div>
+          <div><dt>Телефоны</dt><dd>{% for phone in selected_client_card.phones or [] %}<a href="tel:{{ phone|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') }}">{{ phone }}</a>{% if not loop.last %}<br />{% endif %}{% else %}-{% endfor %}</dd></div>
           <div><dt>Telegram</dt><dd>{{ selected_client_card.telegram_phone or "-" }}</dd></div>
           <div><dt>Email</dt><dd>{{ selected_client_card.email or "-" }}</dd></div>
           <div><dt>ИНН</dt><dd>{{ selected_client_card.inn or "-" }}</dd></div>

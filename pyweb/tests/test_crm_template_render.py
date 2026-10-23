@@ -26,6 +26,7 @@ class CrmTemplateRenderTests(unittest.TestCase):
             "title": "Test deal",
             "client": "Test client",
             "first_contact_employees": ["Alice", "Bob"],
+            "contact_phones": ["+998 90 123 45 67", "+998 91 765 43 21"],
             "edit_payload": {},
             "tags": [],
             "activity_log": [],
@@ -39,6 +40,9 @@ class CrmTemplateRenderTests(unittest.TestCase):
         ]
         html = template.render(**context)
         self.assertIn("Первый контакт: Alice, Bob", html)
+        self.assertIn('data-crm-contact-phones=', html)
+        self.assertIn('data-crm-phone-url-template="/crm/__record__/phones"', html)
+        self.assertIn('data-crm-card-detail-phone-form hidden', html)
 
     def test_detail_employee_picker_renders_in_card(self):
         env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
