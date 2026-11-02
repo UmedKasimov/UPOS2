@@ -13,8 +13,10 @@ import re
 import threading
 import secrets
 import socket
+import ssl
 import time
 import uuid
+import zipfile
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -40,6 +42,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
+from upos.telephony_access import sip_provider_assigned_to
 from upos.config import get_settings
 from upos.csrf import csrf_matches_session, ensure_csrf_token, rotate_csrf_token
 from upos.db import get_engine, init_db, list_public_tables, session_scope, startup_timings_ms
@@ -9820,7 +9823,11 @@ def create_app() -> FastAPI:
             return _installer_api_error("Нужно войти заново", 401)
         data = load_workspace_settings(wid)
         accounts = []
-        for account in _telephony_sip_accounts_for_softphone(data):
+        user = request.session.get("user") or {}
+        employee_user_id = _session_user_id(user)
+        for account in _telephony_sip_accounts_for_softphone(
+            data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
+        ):
             host = str(account.get("host") or "")
             ws_url = str(account.get("ws_url") or "") or _installer_sip_ws_url(host, "")
             accounts.append(
@@ -18503,6 +18510,10 @@ def create_app() -> FastAPI:
         user = request.session.get("user") or {}
         return str(user.get("name") or user.get("login") or "").strip()
 
+    def _telephony_can_manage_providers(request: Request) -> bool:
+        user = request.session.get("user") or {}
+        return bool(user and (not user.get("is_employee") or _has_permission(user, "settings")))
+
     def _telephony_status_label(kind: str, value: str) -> str:
         clean = str(value or "").strip()
         if kind == "call":
@@ -19062,6 +19073,10 @@ def create_app() -> FastAPI:
     def _telephony_sip_accounts_for_softphone(
         data: dict[str, Any],
         provider_id: str = "",
+        *,
+        employee_user_id: str = "",
+        employee_name: str = "",
+        owner_user_id: str = "",
     ) -> list[dict[str, Any]]:
         providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
         accounts: list[dict[str, Any]] = []
@@ -19069,6 +19084,8 @@ def create_app() -> FastAPI:
             if not isinstance(provider, dict):
                 continue
             if provider_id and str(provider.get("id") or "").strip() != provider_id:
+                continue
+            if not sip_provider_assigned_to(provider, employee_user_id, employee_name, owner_user_id):
                 continue
             host, port, endpoint = _telephony_parse_sip_host(
                 provider.get("host") or provider.get("endpoint"),
@@ -19112,13 +19129,20 @@ def create_app() -> FastAPI:
         браузер регистрируется на АТС сам, поэтому пароль нужен на клиенте.
         Отдаём только авторизованному сотруднику своей организации по HTTPS.
         """
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
         wid, err = _product_workspace_owner(request)
         if err:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         assert wid is not None
         data = load_workspace_settings(wid)
         accounts = []
-        for account in _telephony_sip_accounts_for_softphone(data):
+        user = request.session.get("user") or {}
+        employee_user_id = _session_user_id(user)
+        for account in _telephony_sip_accounts_for_softphone(
+            data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
+        ):
             host = str(account.get("host") or "")
             if not host:
                 continue
@@ -19199,13 +19223,13 @@ def create_app() -> FastAPI:
 
     def _telephony_token_allowed(workspace_owner_id: str, provided_token: str) -> bool:
         expected_global = str(os.getenv("UPOS_SIP_TOKEN") or "").strip()
-        if expected_global and provided_token == expected_global:
+        if expected_global and provided_token and secrets.compare_digest(provided_token, expected_global):
             return True
         data = _telephony_settings_payload(workspace_owner_id)
         expected_workspace = str(data.get("telephony_webhook_token") or "").strip()
-        if expected_workspace and provided_token == expected_workspace:
+        if expected_workspace and provided_token and secrets.compare_digest(provided_token, expected_workspace):
             return True
-        return not expected_global and not expected_workspace and provided_token == "upos-local-sip"
+        return False
 
     def _telephony_default_workspace_owner_id() -> str:
         with session_scope() as session:
@@ -19834,7 +19858,33 @@ def create_app() -> FastAPI:
         message = "Не указан SIP-сервер"
         if host:
             try:
-                if transport in {"TCP", "TLS"}:
+                if transport == "WSS":
+                    ws_url = _installer_sip_ws_url(host, str(target.get("ws_url") or ""))
+                    parsed_ws = urlparse(ws_url)
+                    if parsed_ws.scheme != "wss" or not parsed_ws.hostname:
+                        raise OSError("Укажите адрес WSS для звонков из браузера")
+                    ws_port = parsed_ws.port or 443
+                    ws_path = parsed_ws.path or "/"
+                    if parsed_ws.query:
+                        ws_path += "?" + parsed_ws.query
+                    websocket_key = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+                    with socket.create_connection((parsed_ws.hostname, ws_port), timeout=4) as tcp:
+                        with ssl.create_default_context().wrap_socket(tcp, server_hostname=parsed_ws.hostname) as tls:
+                            tls.settimeout(4)
+                            tls.sendall((
+                                f"GET {ws_path} HTTP/1.1\r\n"
+                                f"Host: {parsed_ws.hostname}:{ws_port}\r\n"
+                                "Upgrade: websocket\r\n"
+                                "Connection: Upgrade\r\n"
+                                f"Sec-WebSocket-Key: {websocket_key}\r\n"
+                                "Sec-WebSocket-Version: 13\r\n"
+                                "Sec-WebSocket-Protocol: sip\r\n\r\n"
+                            ).encode("ascii"))
+                            handshake = tls.recv(512)
+                    if not handshake.startswith((b"HTTP/1.1 101", b"HTTP/1.0 101")):
+                        raise OSError("АТС не подтвердила SIP WebSocket")
+                    message = "WSS и сертификат работают. Ожидается регистрация SIP-линии"
+                elif transport in {"TCP", "TLS"}:
                     with socket.create_connection((host, port), timeout=3):
                         pass
                     message = f"{transport} адрес {host}:{port} доступен. Ожидается вход U-POS Sip"
@@ -19855,7 +19905,7 @@ def create_app() -> FastAPI:
                     message = f"Тест REGISTER отправлен на {host}:{port}. Ожидается вход U-POS Sip"
                 target["last_probe_ok"] = True
                 status = "online" if is_connected else "testing"
-            except OSError as exc:
+            except (OSError, ValueError) as exc:
                 message = str(exc) or "SIP-сервер не отвечает"
                 target["last_probe_ok"] = False
         target["status"] = status
@@ -20703,6 +20753,12 @@ def create_app() -> FastAPI:
         data = _telephony_settings_payload(wid)
         integration_context = _telephony_integration_context(request, wid, data)
         providers = _telephony_provider_rows(data)
+        if not _telephony_can_manage_providers(request):
+            session_user = request.session.get("user") or {}
+            providers = [
+                row for row in providers
+                if sip_provider_assigned_to(row, _session_user_id(session_user), user_name, wid)
+            ]
         numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
         calls = _telephony_calls_with_accounts(
             _telephony_rows_with_labels(list(data.get("telephony_calls") or []), "call"),
@@ -20732,6 +20788,11 @@ def create_app() -> FastAPI:
             }
             - {""}
         )
+        telephony_staff = [{"id": wid, "name": "Владелец организации"}] + [
+            {"id": str(employee.get("id") or ""), "name": str(employee.get("name") or employee.get("username") or "")}
+            for employee in list_employees_safe(wid)
+            if employee.get("id")
+        ]
         client_options = _telephony_client_options(wid)
         contacts = _telephony_contact_directory(wid, calls)
         calls_without_status_filter = _telephony_filter_rows(
@@ -20771,8 +20832,33 @@ def create_app() -> FastAPI:
             telephony_recordings=recordings,
             telephony_dashboard=telephony_account_dashboard(wid),
             telephony_integration=integration_context,
+            telephony_staff=telephony_staff,
+            telephony_can_manage_providers=_telephony_can_manage_providers(request),
             flash_ok=request.query_params.get("msg"),
             flash_err=_module_flash_error(request),
+        )
+
+    @app.get("/telephony/chrome-extension.zip", name="telephony_chrome_extension_download")
+    def telephony_chrome_extension_download(request: Request):
+        denied = _employee_module_denied(request, "telephony")
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        folder = Path(__file__).resolve().parent / "chrome_extension"
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
+            for name in ("manifest.json", "background.js", "upos-tab.js", "README.md"):
+                zipped.write(folder / name, arcname=name)
+        return Response(
+            archive.getvalue(),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": 'attachment; filename="upos-chrome-extension.zip"',
+                "Cache-Control": "no-store",
+            },
         )
 
     @app.post("/telephony/calls/save", name="telephony_call_save")
@@ -21000,6 +21086,8 @@ def create_app() -> FastAPI:
         wid, redir = _product_workspace_owner(request)
         if redir or not valid_workspace_owner_id(wid):
             return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        if not _telephony_can_manage_providers(request):
+            return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
         provider_id = str(form.get("provider_id") or "").strip()
         data = _telephony_settings_payload(str(wid))
         provider = next(
@@ -21026,6 +21114,8 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        if not _telephony_can_manage_providers(request):
+            return RedirectResponse(url="/telephony?error=" + quote("Нет доступа к настройке SIP") + "#integrations", status_code=302)
         provider_id = str(form.get("provider_id") or "").strip()
         device_id = str(form.get("device_id") or "").strip()
         if not provider_id or not device_id:
@@ -21121,6 +21211,8 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        if not _telephony_can_manage_providers(request):
+            return RedirectResponse(url="/telephony?error=" + quote("Нет доступа к настройке SIP") + "#integrations", status_code=302)
         provider_id = str(form.get("provider_id") or "").strip()
         name = str(form.get("name") or "").strip()
         raw_host = str(form.get("host") or "").strip()
@@ -21128,6 +21220,14 @@ def create_app() -> FastAPI:
         login = str(form.get("login") or "").strip()
         if not name or not host or not login:
             return RedirectResponse(url="/telephony?error=" + quote("Название, SIP-сервер и логин обязательны") + "#integrations", status_code=302)
+        ws_url = str(form.get("ws_url") or "").strip()
+        if ws_url and not ws_url.startswith("wss://"):
+            return RedirectResponse(url="/telephony?error=" + quote("Для звонков из Chrome нужен адрес wss://") + "#integrations", status_code=302)
+        employee_user_id = str(form.get("employee_user_id") or "").strip()
+        staff_names = {str(item.get("id")): str(item.get("name") or item.get("username") or "") for item in list_employees_safe(wid)}
+        staff_names[wid] = "Владелец организации"
+        if employee_user_id and employee_user_id not in staff_names:
+            return RedirectResponse(url="/telephony?error=" + quote("Сотрудник не найден") + "#integrations", status_code=302)
         data = _telephony_settings_payload(wid)
         providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
         existing_index = next(
@@ -21157,8 +21257,9 @@ def create_app() -> FastAPI:
             "transport": str(form.get("transport") or "UDP").strip().upper(),
             # WebSocket-адрес для звонков из браузера (софтфон в PWA). Обычный
             # SIP по UDP/TCP браузер не умеет, поэтому нужен wss://host:port/ws.
-            "ws_url": str(form.get("ws_url") or "").strip(),
-            "employee": str(form.get("employee") or "").strip(),
+            "ws_url": ws_url,
+            "employee_user_id": employee_user_id,
+            "employee": staff_names.get(employee_user_id, ""),
             "note": str(form.get("note") or "").strip(),
             "created_at": existing.get("created_at") or datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -21194,6 +21295,58 @@ def create_app() -> FastAPI:
         save_workspace_settings(wid, data)
         return RedirectResponse(url="/telephony?msg=saved#integrations", status_code=302)
 
+    @app.post("/telephony/providers/bulk-save", name="telephony_providers_bulk_save")
+    async def telephony_providers_bulk_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#integrations", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        if not _telephony_can_manage_providers(request):
+            return RedirectResponse(url="/telephony?error=" + quote("Нет доступа к настройке SIP") + "#integrations", status_code=302)
+        host, port, endpoint = _telephony_parse_sip_host(form.get("host"), form.get("port") or "5060")
+        ws_url = str(form.get("ws_url") or "").strip()
+        password = str(form.get("password") or "").strip()
+        raw_extensions = str(form.get("extensions") or "").strip()
+        extension_parts = [part for part in re.split(r"[\s,;\-]+", raw_extensions) if part]
+        extensions = list(dict.fromkeys(extension_parts))
+        if not host or not password or not extensions or len(extensions) > 50 or any(not re.fullmatch(r"\d{2,6}", part) for part in extensions):
+            return RedirectResponse(url="/telephony?error=" + quote("Укажите SIP-сервер, пароль и до 50 внутренних номеров") + "#integrations", status_code=302)
+        if not ws_url.startswith("wss://"):
+            return RedirectResponse(url="/telephony?error=" + quote("Укажите рабочий адрес WSS для звонков из Chrome") + "#integrations", status_code=302)
+        name_prefix = str(form.get("name_prefix") or "АТС").strip()[:80] or "АТС"
+        data = _telephony_settings_payload(wid)
+        providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for extension in extensions:
+            existing = next((item for item in providers if isinstance(item, dict) and str(item.get("host") or "").strip() == host and str(item.get("login") or "").strip() == extension), None)
+            provider = existing if existing is not None else {}
+            provider.update({
+                "id": provider.get("id") or str(uuid.uuid4()),
+                "name": f"{name_prefix} · {extension}",
+                "kind": "SIP",
+                "host": host,
+                "port": str(port),
+                "endpoint": endpoint,
+                "login": extension,
+                "account": extension,
+                "auth_id": extension,
+                "password": password,
+                "ws_url": ws_url,
+                "transport": "WSS",
+                "codec": "G711",
+                "status": "draft",
+                "created_at": provider.get("created_at") or now_iso,
+                "updated_at": now_iso,
+            })
+            if existing is None:
+                providers.append(provider)
+        data["telephony_providers"] = providers[:500]
+        save_workspace_settings(wid, data)
+        return RedirectResponse(url="/telephony?msg=saved#integrations", status_code=302)
+
     @app.post("/telephony/providers/test", name="telephony_provider_test")
     async def telephony_provider_test(request: Request):
         form = await request.form()
@@ -21203,6 +21356,8 @@ def create_app() -> FastAPI:
         if redir:
             return redir
         assert wid is not None
+        if not _telephony_can_manage_providers(request):
+            return RedirectResponse(url="/telephony?error=" + quote("Нет доступа к настройке SIP") + "#integrations", status_code=302)
         status_value, message = _telephony_update_provider_test(wid, str(form.get("provider_id") or ""))
         key = "saved" if status_value in {"online", "testing"} else "sip_test_failed"
         return RedirectResponse(url=f"/telephony?msg={quote(key)}&note={quote(message)}#integrations", status_code=302)
@@ -21532,6 +21687,99 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
         assert wid is not None
         return JSONResponse({"ok": True, "dashboard": telephony_account_dashboard(wid)})
+
+    @app.get("/api/telephony/lookup", name="telephony_client_lookup_api")
+    def telephony_client_lookup_api(request: Request, phone: str = ""):
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        clean_phone = _telephony_normalized_phone(phone)
+        if len(clean_phone) < 7 or len(clean_phone) > 15:
+            return JSONResponse({"ok": False, "error": "invalid_phone"}, status_code=400)
+        with session_scope() as session:
+            clients = session.execute(
+                select(Counterparty)
+                .where(Counterparty.workspace_owner_id == wid, Counterparty.kind.in_(["client", "both"]))
+                .order_by(Counterparty.updated_at.desc())
+            ).scalars().all()
+            for client in clients:
+                extra = _counterparty_extra(client)
+                phones = _crm_phone_list(
+                    client.phone, extra.get("phone"), extra.get("crm_phones"), extra.get("telegram_phone")
+                )
+                if any(_telephony_phone_matches(clean_phone, candidate) for candidate in phones):
+                    response = JSONResponse({
+                        "ok": True,
+                        "client": {
+                            "id": str(client.id),
+                            "name": str(client.name or "Клиент"),
+                            "href": f"/clients?client={quote(str(client.id))}#client-card",
+                        },
+                    })
+                    response.headers["Cache-Control"] = "no-store"
+                    return response
+        return JSONResponse({"ok": True, "client": None}, headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/telephony/browser-call", name="telephony_browser_call_api")
+    async def telephony_browser_call_api(request: Request):
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        if not csrf_matches_session(request, str(request.headers.get("X-CSRF-Token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        if not isinstance(body, dict):
+            return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
+        provider_id = str(body.get("provider_id") or "").strip()
+        phone = str(body.get("phone") or "").strip()[:64]
+        clean_phone = _telephony_normalized_phone(phone)
+        if not 7 <= len(clean_phone) <= 15:
+            return JSONResponse({"ok": False, "error": "invalid_phone"}, status_code=400)
+        direction = str(body.get("direction") or "").strip()
+        status = str(body.get("status") or "").strip()
+        if direction not in {"incoming", "outgoing"} or status not in {"planned", "answered", "missed"}:
+            return JSONResponse({"ok": False, "error": "invalid_state"}, status_code=400)
+        try:
+            call_id = str(uuid.UUID(str(body.get("call_id") or "")))
+        except (ValueError, AttributeError):
+            return JSONResponse({"ok": False, "error": "invalid_call_id"}, status_code=400)
+        user = request.session.get("user") or {}
+        data = _telephony_settings_payload(wid)
+        provider = next((
+            item for item in data.get("telephony_providers", [])
+            if isinstance(item, dict)
+            and str(item.get("id") or "") == provider_id
+            and sip_provider_assigned_to(item, _session_user_id(user), _telephony_user_name(request), wid)
+        ), None)
+        if provider is None:
+            return JSONResponse({"ok": False, "error": "provider_not_assigned"}, status_code=403)
+        duration_text = str(body.get("duration") or "0")
+        duration = min(int(duration_text), 86400) if duration_text.isdigit() and len(duration_text) <= 8 else 0
+        call_payload = {
+            "call_id": call_id,
+            "phone": phone,
+            "direction": direction,
+            "status": status,
+            "account": str(provider.get("login") or ""),
+            "responsible": _telephony_user_name(request),
+            "duration": str(duration) if status != "planned" else "",
+            "started_at": str(body.get("started_at") or "")[:40],
+            "ended_at": datetime.now(timezone.utc).isoformat() if status != "planned" else "",
+            "event": "browser_call",
+        }
+        call = _telephony_upsert_call_from_payload(wid, call_payload)
+        return JSONResponse({"ok": True, "call_id": call_id, "status": call.get("status")})
 
     @app.post("/api/telephony/incoming-call", name="telephony_incoming_call_api")
     async def telephony_incoming_call_api(request: Request):

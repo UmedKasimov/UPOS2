@@ -9013,6 +9013,31 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   padding: 1rem;
 }
 
+.telephony-integration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.telephony-bulk-setup {
+  margin: 0 1rem 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.telephony-bulk-setup summary {
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.telephony-bulk-setup .product-form {
+  margin-top: 1rem;
+}
+
+.telephony-bulk-setup p {
+  color: var(--muted-foreground);
+}
+
 .telephony-sip-form,
 .telephony-provider-table {
   min-width: 0;
@@ -31839,6 +31864,30 @@ body.sidebar-rail .nav > .menu-order-toolbar {
 }
 
 .upos-floating-phone-hangup[hidden] {
+  display: none;
+}
+
+.upos-floating-phone-call-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.upos-floating-phone-call-actions[hidden] {
+  display: none;
+}
+
+.upos-floating-phone-call-actions .btn {
+  flex: 1;
+}
+
+.upos-floating-phone-client-link {
+  display: inline-block;
+  color: var(--primary);
+  font-weight: 700;
+  margin-top: 0.5rem;
+}
+
+.upos-floating-phone-client-link[hidden] {
   display: none;
 }
 

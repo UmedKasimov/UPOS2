@@ -542,7 +542,7 @@
       setProviderField("password", "");
       setProviderField("codec", data.providerCodec || "G711");
       setProviderField("transport", data.providerTransport || "UDP");
-      setProviderField("employee", data.providerEmployee);
+      setProviderField("employee_user_id", data.providerEmployeeUserId);
       setProviderField("note", data.providerNote);
       var hasPassword = data.providerHasPassword === "1";
       var password = providerForm.querySelector('[name="password"]');

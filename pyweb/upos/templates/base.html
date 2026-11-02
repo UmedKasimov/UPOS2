@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=729" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=731" />
     {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
     {% endif %}
@@ -357,9 +357,13 @@
             <button class="btn btn-secondary" type="button" data-floating-phone-reject>Отклонить</button>
           </div>
         </section>
+        <a class="upos-floating-phone-client-link" data-floating-phone-client-link href="/clients" hidden>Открыть клиента в CRM</a>
         {# Разговор идёт в самом браузере, поэтому нужен приёмник звука и
            кнопка отбоя — раньше вызов только уходил в десктопное приложение. #}
-        <button class="btn btn-secondary upos-floating-phone-hangup" type="button" data-floating-phone-hangup hidden>Завершить</button>
+        <div class="upos-floating-phone-call-actions" data-floating-phone-call-actions hidden>
+          <button class="btn btn-secondary" type="button" data-floating-phone-mute aria-pressed="false">Выключить микрофон</button>
+          <button class="btn btn-secondary upos-floating-phone-hangup" type="button" data-floating-phone-hangup>Завершить</button>
+        </div>
         <audio id="upos-floating-phone-audio" autoplay playsinline></audio>
         <div class="upos-floating-phone-status" data-floating-phone-status>
           <span aria-hidden="true"></span>
@@ -394,7 +398,7 @@
     {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=6" defer></script>
     {% endif %}
-    <script src="{{ url_for('static', path='floating-phone.js') }}?v=5" defer></script>
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=9" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

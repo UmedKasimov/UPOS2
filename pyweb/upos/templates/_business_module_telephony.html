@@ -399,7 +399,10 @@
         <h2>Интеграции АТС и SIP</h2>
         <span>Всего: {{ telephony_providers|length }}</span>
       </div>
-      <button type="button" class="btn" data-telephony-open-provider>+ SIP</button>
+      <div class="telephony-integration-actions">
+        <a class="btn btn-secondary" href="/telephony/chrome-extension.zip" download>Виджет для Chrome</a>
+        {% if telephony_can_manage_providers %}<button type="button" class="btn" data-telephony-open-provider>+ SIP</button>{% endif %}
+      </div>
     </header>
 
     <div class="telephony-integrations-grid">
@@ -441,7 +444,7 @@
                             {% if device.app_version %}v{{ device.app_version }}{% endif %}
                           </small>
                         </span>
-                        <form method="post" action="/telephony/providers/device/unbind" class="inline-form" data-telephony-device-unbind data-device-name="{{ device.name }}">
+                        {% if telephony_can_manage_providers %}<form method="post" action="/telephony/providers/device/unbind" class="inline-form" data-telephony-device-unbind data-device-name="{{ device.name }}">
                           {% include "_csrf_field.html" %}
                           <input type="hidden" name="provider_id" value="{{ row.id }}" />
                           <input type="hidden" name="device_id" value="{{ device.device_id }}" />
@@ -452,7 +455,7 @@
                               <path d="m4 4 16 16" />
                             </svg>
                           </button>
-                        </form>
+                        </form>{% endif %}
                       </div>
                     {% endfor %}
                   {% else %}
@@ -460,11 +463,11 @@
                   {% endif %}
                 </td>
                 <td>
-                  <form method="post" action="/telephony/providers/test" class="inline-form">
+                  {% if telephony_can_manage_providers %}<form method="post" action="/telephony/providers/test" class="inline-form">
                     {% include "_csrf_field.html" %}
                     <input type="hidden" name="provider_id" value="{{ row.id }}" />
                     <button class="btn btn-secondary" type="submit">Проверить соединение</button>
-                  </form>
+                  </form>{% endif %}
                 </td>
                 <td class="telephony-provider-connection">
                   {% if row.connected %}
@@ -474,7 +477,7 @@
                   {% else %}
                     <span class="telephony-provider-not-connected" aria-label="Нет подтверждённого соединения" title="{{ row.connection_message }}">—</span>
                   {% endif %}
-                  <button
+                  {% if telephony_can_manage_providers %}<button
                     type="button"
                     class="telephony-provider-edit"
                     aria-label="Редактировать {{ row.name }}"
@@ -493,8 +496,9 @@
                     data-provider-codec="{{ row.codec or 'G711' }}"
                     data-provider-transport="{{ row.transport or 'UDP' }}"
                     data-provider-employee="{{ row.employee or '' }}"
+                    data-provider-employee-user-id="{{ row.employee_user_id or '' }}"
                     data-provider-note="{{ row.note or '' }}"
-                  >✎</button>
+                  >✎</button>{% endif %}
                 </td>
               </tr>
             {% else %}
@@ -504,6 +508,24 @@
         </table>
       </div>
     </div>
+    {% if telephony_can_manage_providers %}
+      <details class="products-list-panel telephony-bulk-setup">
+        <summary>Подключить несколько внутренних линий</summary>
+        <form method="post" action="/telephony/providers/bulk-save" class="product-form">
+          {% include "_csrf_field.html" %}
+          <p>Каждая линия создаётся отдельно. После сохранения назначьте её сотруднику кнопкой редактирования. Неназначенные линии доступны только владельцу организации.</p>
+          <div class="product-form-grid">
+            <label><span>Название АТС</span><input name="name_prefix" value="UCALL Centre" maxlength="80" /></label>
+            <label><span>SIP-сервер*</span><input name="host" required placeholder="call.example.com" /></label>
+            <label><span>SIP-порт</span><input name="port" inputmode="numeric" value="5060" /></label>
+            <label class="wide"><span>WebSocket для Chrome*</span><input name="ws_url" type="url" required placeholder="wss://call.example.com:8089/ws" /></label>
+            <label class="wide"><span>Внутренние номера*</span><textarea name="extensions" required rows="2" placeholder="210, 220, 230"></textarea></label>
+            <label><span>Общий пароль линий*</span><input name="password" type="password" required autocomplete="new-password" /></label>
+          </div>
+          <div class="product-form-actions"><button class="btn" type="submit">Сохранить линии</button></div>
+        </form>
+      </details>
+    {% endif %}
   </article>
 </div>
 
@@ -559,7 +581,7 @@
               <option value="WSS">WSS / WebRTC</option>
             </select>
           </label>
-          <label><span>Сотрудник по умолчанию</span><input name="employee" list="telephony-responsible-list" /></label>
+          <label><span>Линия сотрудника</span><select name="employee_user_id"><option value="">Не назначена — доступна владельцу</option>{% for employee in telephony_staff %}<option value="{{ employee.id }}">{{ employee.name }}</option>{% endfor %}</select></label>
           <label class="wide"><span>Комментарий</span><input name="note" placeholder="Номер, правила маршрутизации, часы работы" /></label>
         </div>
         <div class="product-form-actions">

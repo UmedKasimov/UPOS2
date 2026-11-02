@@ -24,8 +24,11 @@
   const status = root.querySelector("[data-floating-phone-status]");
   const submitButton = form?.querySelector('button[type="submit"]');
   const hangupButton = root.querySelector("[data-floating-phone-hangup]");
+  const callActions = root.querySelector("[data-floating-phone-call-actions]");
+  const muteButton = root.querySelector("[data-floating-phone-mute]");
   const incomingPanel = root.querySelector("[data-floating-phone-incoming]");
   const incomingCaller = root.querySelector("[data-floating-phone-caller]");
+  const clientLink = root.querySelector("[data-floating-phone-client-link]");
   const answerButton = root.querySelector("[data-floating-phone-answer]");
   const rejectButton = root.querySelector("[data-floating-phone-reject]");
   const bridgeUrl = root.dataset.floatingPhoneBridge || "http://127.0.0.1:5058/call";
@@ -188,8 +191,47 @@
   let softphoneReady = null;
   let accounts = [];
   let inCall = false;
+  let activeCall = null;
+  let callSync = Promise.resolve();
   let ringTimer = null;
   let ringContext = null;
+  let incomingLookupId = 0;
+
+  function recordBrowserCall(status, call) {
+    if (!call) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
+    if (!csrf) return;
+    const duration = call.answeredAt ? Math.max(0, Math.floor((Date.now() - call.answeredAt) / 1000)) : 0;
+    callSync = callSync.catch(() => {}).then(() => fetch("/api/telephony/browser-call", {
+      method: "POST",
+      credentials: "same-origin",
+      keepalive: status !== "planned",
+      headers: {"Content-Type": "application/json", "X-CSRF-Token": csrf},
+      body: JSON.stringify({...call, duration, status}),
+    })).catch(() => {});
+  }
+
+  function beginBrowserCall(direction, phone) {
+    if (!/^\+?\d{7,15}$/.test(String(phone || "").replace(/[\s().-]/g, ""))) {
+      activeCall = null;
+      return;
+    }
+    activeCall = {
+      call_id: window.crypto?.randomUUID?.() || "",
+      provider_id: String(selectedAccount()?.id || ""),
+      direction,
+      phone: String(phone),
+      started_at: new Date().toISOString(),
+      answeredAt: 0,
+    };
+    recordBrowserCall("planned", activeCall);
+  }
+
+  function finishBrowserCall() {
+    if (!activeCall) return;
+    recordBrowserCall(activeCall.answeredAt ? "answered" : "missed", activeCall);
+    activeCall = null;
+  }
 
   function ringOnce() {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -231,8 +273,33 @@
     const active = Boolean(event);
     if (incomingPanel) incomingPanel.hidden = !active;
     if (incomingCaller && active) incomingCaller.textContent = event.name || event.from || "Неизвестный номер";
+    if (clientLink && (active || !inCall)) clientLink.hidden = true;
     if (submitButton) submitButton.disabled = active || inCall;
-    if (!active) stopRinging();
+    if (!active) {
+      if (!inCall) incomingLookupId += 1;
+      stopRinging();
+    }
+  }
+
+  async function lookupIncomingClient(event) {
+    const phone = String(event?.from || "").trim();
+    if (!/^\+?\d{7,15}$/.test(phone)) return;
+    const lookupId = ++incomingLookupId;
+    try {
+      const response = await fetch(`/api/telephony/lookup?phone=${encodeURIComponent(phone)}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const result = await response.json();
+      if (!response.ok || lookupId !== incomingLookupId || (!inCall && incomingPanel?.hidden) || !result?.client) return;
+      if (incomingCaller) incomingCaller.textContent = `${result.client.name} · ${phone}`;
+      if (clientLink) {
+        clientLink.href = result.client.href;
+        clientLink.hidden = false;
+      }
+    } catch (_error) {
+      // Caller ID remains visible even if CRM is unavailable.
+    }
   }
 
   const loadScript = (src) =>
@@ -331,26 +398,34 @@
     sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
     sip.on("accepted", () => {
       inCall = true;
+      if (activeCall && !activeCall.answeredAt) {
+        activeCall.answeredAt = Date.now();
+        recordBrowserCall("answered", activeCall);
+      }
       setIncomingUi(null);
       setStatus("Разговор идёт", "ok");
       setCallUi(true);
     });
     sip.on("incoming", (event) => {
       inCall = true;
+      beginBrowserCall("incoming", event?.from);
       panel.hidden = false;
       toggle.setAttribute("aria-expanded", "true");
       setIncomingUi(event || {});
+      void lookupIncomingClient(event);
       startRinging();
       window.requestAnimationFrame(alignPanel);
       setStatus(`Входящий: ${event?.name || event?.from || "неизвестный"}`, "pending");
     });
     sip.on("ended", () => {
+      finishBrowserCall();
       inCall = false;
       setIncomingUi(null);
       setStatus("Звонок завершён", "ready");
       setCallUi(false);
     });
     sip.on("failed", (event) => {
+      finishBrowserCall();
       inCall = false;
       setIncomingUi(null);
       setStatus(`Звонок не состоялся: ${event?.cause || "ошибка"}`, "error");
@@ -359,7 +434,11 @@
   }
 
   function setCallUi(active) {
-    if (hangupButton) hangupButton.hidden = !active;
+    if (callActions) callActions.hidden = !active;
+    if (!active && muteButton) {
+      muteButton.setAttribute("aria-pressed", "false");
+      muteButton.textContent = "Выключить микрофон";
+    }
     if (submitButton) submitButton.disabled = active || (incomingPanel && !incomingPanel.hidden);
   }
 
@@ -368,11 +447,15 @@
     softphoneReady = (async () => {
       const response = await fetch("/api/telephony/sip", { credentials: "same-origin" });
       const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus(response.status === 403 ? "Нет доступа к телефонии" : "Не удалось загрузить SIP-линию", "error");
+        return null;
+      }
       accounts = Array.isArray(payload.accounts)
         ? payload.accounts.filter((item) => item && item.ws_url && item.sip_uri)
         : [];
       if (!accounts.length) {
-        setStatus("SIP-аккаунт не настроен — вызов уйдёт в приложение", "ready");
+        setStatus("SIP-линия не назначена. Администратор может назначить её в Телефонии", "ready");
         return null;
       }
       fillProviders();
@@ -421,10 +504,19 @@
 
   hangupButton?.addEventListener("click", () => {
     window.UposSoftphone?.hangup();
+    finishBrowserCall();
     inCall = false;
     setIncomingUi(null);
     setCallUi(false);
     setStatus("Звонок завершён", "ready");
+  });
+
+  muteButton?.addEventListener("click", () => {
+    if (!inCall || typeof window.UposSoftphone?.setMuted !== "function") return;
+    const muted = muteButton.getAttribute("aria-pressed") !== "true";
+    window.UposSoftphone.setMuted(muted);
+    muteButton.setAttribute("aria-pressed", muted ? "true" : "false");
+    muteButton.textContent = muted ? "Включить микрофон" : "Выключить микрофон";
   });
 
   answerButton?.addEventListener("click", () => {
@@ -437,6 +529,7 @@
   rejectButton?.addEventListener("click", () => {
     if (typeof window.UposSoftphone?.reject === "function") window.UposSoftphone.reject();
     else window.UposSoftphone?.hangup();
+    finishBrowserCall();
     inCall = false;
     setIncomingUi(null);
     setCallUi(false);
@@ -476,6 +569,7 @@
       // Первый путь — звонок прямо из браузера.
       if (sip && sip.isRegistered() && sip.call(phone)) {
         inCall = true;
+        beginBrowserCall("outgoing", phone);
         setCallUi(true);
         setStatus("Набираю…", "pending");
         return;
@@ -500,6 +594,26 @@
       if (!inCall) submitButton?.removeAttribute("disabled");
     }
   });
+
+  // Chrome extension and links from CRM can prepare a number without starting
+  // a call. The operator confirms the call in the widget.
+  function prepareDial(rawPhone) {
+    const phone = String(rawPhone || "").trim();
+    if (!/^\+?[\d\s().-]{2,30}$/.test(phone) || !input) return false;
+    openPanel();
+    input.value = phone;
+    input.focus();
+    return true;
+  }
+
+  window.addEventListener("upos:phone:dial", (event) => {
+    prepareDial(event.detail?.phone);
+  });
+  const dialUrl = new URL(window.location.href);
+  if (dialUrl.searchParams.has("dial") && prepareDial(dialUrl.searchParams.get("dial"))) {
+    dialUrl.searchParams.delete("dial");
+    window.history.replaceState(window.history.state, "", dialUrl.pathname + dialUrl.search + dialUrl.hash);
+  }
 
   // A receiver must be registered before the first call arrives, not after the panel is opened.
   window.setTimeout(() => {

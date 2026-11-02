@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "U-POS: звонок из Chrome",
+  "version": "0.1.0",
+  "description": "Отправляет выделенный номер в телефон U-POS для подтверждения звонка.",
+  "permissions": ["contextMenus", "tabs"],
+  "host_permissions": ["https://app.u-pos.uz/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://app.u-pos.uz/*"],
+      "js": ["upos-tab.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
