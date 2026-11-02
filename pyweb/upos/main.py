@@ -18878,6 +18878,7 @@ def create_app() -> FastAPI:
         provider = filters.get("provider", "").casefold()
         responsible = filters.get("responsible", "").casefold()
         status = filters.get("status", "all")
+        direction = filters.get("direction", "all")
         date_from = filters.get("date_from", "")
         date_to = filters.get("date_to", "")
         result: list[dict[str, Any]] = []
@@ -18890,6 +18891,8 @@ def create_app() -> FastAPI:
             if responsible and responsible not in str(row.get("responsible") or "").casefold():
                 continue
             if status and status != "all" and str(row.get("status") or "") != status:
+                continue
+            if kind == "call" and direction in {"incoming", "outgoing"} and str(row.get("direction") or "") != direction:
                 continue
             if kind == "call" and (date_from or date_to):
                 row_date = str(row.get("started_at") or row.get("created_at") or "")[:10]
@@ -19705,7 +19708,12 @@ def create_app() -> FastAPI:
             direction = str(existing_call.get("direction") or direction)
         raw_phone = raw_phone or str(existing_call.get("phone") or "").strip()
         clean_name = str(_telephony_first(payload, "client", "client_name", "display_name", "name", "contact_name")).strip()
-        synced_client = _telephony_upsert_web_client(workspace_owner_id, payload, phone=raw_phone, name=clean_name)
+        # Внутренние номера АТС должны попадать в журнал, но не создавать
+        # фиктивных клиентов с короткими номерами 210, 220 и т. п.
+        synced_client = (
+            _telephony_upsert_web_client(workspace_owner_id, payload, phone=raw_phone, name=clean_name)
+            if len(_telephony_normalized_phone(raw_phone)) >= 7 else None
+        )
         if synced_client:
             clean_name = str(synced_client.get("name") or clean_name).strip()
         if not clean_name:
@@ -20728,6 +20736,7 @@ def create_app() -> FastAPI:
         provider: str = "",
         responsible: str = "",
         status: str = "all",
+        direction: str = "all",
         date_from: str = "",
         date_to: str = "",
     ):
@@ -20746,6 +20755,7 @@ def create_app() -> FastAPI:
             "provider": provider.strip(),
             "responsible": responsible.strip(),
             "status": status.strip() or "all",
+            "direction": direction.strip() if direction.strip() in {"incoming", "outgoing"} else "all",
             "date_from": date_from.strip(),
             "date_to": date_to.strip(),
         }
@@ -20807,6 +20817,16 @@ def create_app() -> FastAPI:
             "planned": sum(1 for item in calls_without_status_filter if item.get("status") == "planned"),
             "blocked": sum(1 for item in calls_without_status_filter if item.get("status") == "blocked"),
         }
+        calls_without_direction_filter = _telephony_filter_rows(
+            calls,
+            {**filters, "direction": "all"},
+            kind="call",
+        )
+        telephony_direction_counts = {
+            "all": len(calls_without_direction_filter),
+            "incoming": sum(1 for item in calls_without_direction_filter if item.get("direction") == "incoming"),
+            "outgoing": sum(1 for item in calls_without_direction_filter if item.get("direction") == "outgoing"),
+        }
         return tpl(
             request,
             "home_business_module.html",
@@ -20826,6 +20846,7 @@ def create_app() -> FastAPI:
             telephony_calls=_telephony_filter_rows(calls, filters, kind="call"),
             telephony_contacts=contacts,
             telephony_status_counts=telephony_status_counts,
+            telephony_direction_counts=telephony_direction_counts,
             telephony_numbers=_telephony_filter_rows(numbers, filters, kind="number"),
             telephony_providers=_telephony_filter_rows(providers, filters, kind="provider"),
             telephony_devices=devices,
@@ -21724,6 +21745,117 @@ def create_app() -> FastAPI:
                     return response
         return JSONResponse({"ok": True, "client": None}, headers={"Cache-Control": "no-store"})
 
+    @app.get("/api/telephony/quick-panel", name="telephony_quick_panel_api")
+    def telephony_quick_panel_api(request: Request):
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        user = request.session.get("user") or {}
+        user_id = _session_user_id(user)
+        user_name = _telephony_user_name(request).casefold()
+        data = _telephony_settings_payload(wid)
+        accounts = _telephony_sip_accounts_for_softphone(
+            data, employee_user_id=user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
+        )
+        allowed_accounts = {
+            str(account.get("extension") or "").strip().casefold()
+            for account in accounts
+        }
+        calls = [row for row in (data.get("telephony_calls") or []) if isinstance(row, dict)]
+        if user_id != wid:
+            calls = [
+                row for row in calls
+                if (user_name and str(row.get("responsible") or "").strip().casefold() == user_name)
+                or (str(row.get("account") or "").strip() and str(row.get("account") or "").strip().casefold() in allowed_accounts)
+            ]
+        calls.sort(key=lambda row: str(row.get("started_at") or row.get("created_at") or ""), reverse=True)
+        recent = [
+            {
+                "phone": str(row.get("phone") or "")[:64],
+                "name": str(row.get("client") or "")[:255],
+                "direction": "incoming" if row.get("direction") == "incoming" else "outgoing",
+                "status": str(row.get("status") or "")[:24],
+                "started_at": str(row.get("started_at") or row.get("created_at") or "")[:40],
+                "duration": str(row.get("duration") or "")[:12],
+            }
+            for row in calls[:30]
+        ]
+        return JSONResponse({"ok": True, "calls": recent}, headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/telephony/quick-contact", name="telephony_quick_contact_api")
+    async def telephony_quick_contact_api(request: Request):
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        if not csrf_matches_session(request, str(request.headers.get("X-CSRF-Token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        if not isinstance(body, dict):
+            return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
+        name = str(body.get("name") or "").strip()[:255]
+        phone = str(body.get("phone") or "").strip()[:64]
+        digits = _telephony_normalized_phone(phone)
+        if not name or not 7 <= len(digits) <= 15 or not re.fullmatch(r"\+?[\d\s().-]+", phone):
+            return JSONResponse({"ok": False, "error": "Укажите имя и корректный номер"}, status_code=400)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with session_scope() as session:
+            candidates = session.execute(
+                select(Counterparty).where(Counterparty.workspace_owner_id == wid)
+                .order_by(Counterparty.updated_at.desc())
+            ).scalars().all()
+            row = next(
+                (item for item in candidates if _telephony_phone_matches(phone, item.phone or _counterparty_extra(item).get("phone"))),
+                None,
+            )
+            if row is None:
+                row = Counterparty(
+                    id=str(uuid.uuid4()), workspace_owner_id=wid, kind="client",
+                    name=name, phone=phone, tax_id="", external_source="upos-sip",
+                    external_id=f"phone:{digits}", data={},
+                )
+                session.add(row)
+            else:
+                _, has_supplier = _counterparty_role_flags(row.kind)
+                row.kind = _counterparty_kind_from_flags(True, has_supplier)
+                row.name = name
+                row.phone = phone
+            extra = _counterparty_extra(row)
+            extra.update({
+                "phone": phone, "is_client": True, "telephony_confirmed": True,
+                "telephony_confirmed_at": now_iso,
+                "telephony_confirmed_by": _telephony_user_name(request),
+            })
+            row.data = extra
+            flag_modified(row, "data")
+            session.flush()
+            contact_id = str(row.id)
+        data = _telephony_settings_payload(wid)
+        stored_calls = data.get("telephony_calls") if isinstance(data.get("telephony_calls"), list) else []
+        changed = False
+        for call in stored_calls:
+            if isinstance(call, dict) and _telephony_phone_matches(phone, call.get("phone")):
+                call["client"] = name
+                changed = True
+        if changed:
+            data["telephony_calls"] = stored_calls
+            save_workspace_settings(wid, data)
+        return JSONResponse({
+            "ok": True,
+            "contact": {"id": contact_id, "name": name, "phone": phone,
+                        "href": f"/clients?client={quote(contact_id)}#client-card"},
+        }, headers={"Cache-Control": "no-store"})
+
     @app.post("/api/telephony/browser-call", name="telephony_browser_call_api")
     async def telephony_browser_call_api(request: Request):
         denied = _employee_module_denied(request, "telephony", json_error=True)
@@ -21744,7 +21876,7 @@ def create_app() -> FastAPI:
         provider_id = str(body.get("provider_id") or "").strip()
         phone = str(body.get("phone") or "").strip()[:64]
         clean_phone = _telephony_normalized_phone(phone)
-        if not 7 <= len(clean_phone) <= 15:
+        if not 2 <= len(clean_phone) <= 15:
             return JSONResponse({"ok": False, "error": "invalid_phone"}, status_code=400)
         direction = str(body.get("direction") or "").strip()
         status = str(body.get("status") or "").strip()

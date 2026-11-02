@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=731" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=732" />
     {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
     {% endif %}
@@ -326,6 +326,11 @@
           </div>
           <button class="upos-floating-phone-close" type="button" data-floating-phone-close aria-label="Закрыть">×</button>
         </div>
+        <div class="upos-floating-phone-tabs" role="tablist" aria-label="Разделы телефона">
+          <button type="button" class="is-active" data-floating-phone-tab="dial" role="tab" aria-selected="true">Набор</button>
+          <button type="button" data-floating-phone-tab="history" role="tab" aria-selected="false">История</button>
+        </div>
+        <div class="upos-floating-phone-view" data-floating-phone-view="dial">
         <form class="upos-floating-phone-form" data-floating-phone-form>
           {% set floating_phone_providers = telephony_providers|default([]) %}
           <label>
@@ -347,7 +352,37 @@
             <span>Номер</span>
             <input data-floating-phone-input type="tel" inputmode="tel" autocomplete="tel" placeholder="+998">
           </label>
-          <button class="btn" type="submit">Позвонить</button>
+          <div class="upos-floating-phone-dial-actions">
+            <button class="btn" type="submit">Позвонить</button>
+            <button class="btn btn-secondary" type="button" data-floating-phone-save-contact>Сохранить контакт</button>
+          </div>
+        </form>
+        <div class="upos-floating-phone-keypad" aria-label="Клавиатура набора номера">
+          {% for key in ['1','2','3','4','5','6','7','8','9','*','0','#'] %}
+          <button type="button" data-floating-phone-key="{{ key }}" aria-label="Набрать {{ key }}">{{ key }}</button>
+          {% endfor %}
+          <button type="button" data-floating-phone-key="+" aria-label="Добавить плюс">+</button>
+          <button type="button" class="upos-floating-phone-keypad-delete" data-floating-phone-key="backspace" aria-label="Удалить символ">⌫</button>
+        </div>
+        </div>
+        <div class="upos-floating-phone-view" data-floating-phone-view="history" hidden>
+          <div class="upos-floating-phone-history-filters" aria-label="Направление звонка">
+            <button type="button" class="is-active" data-floating-phone-history-filter="all">Все <span data-floating-phone-count="all">0</span></button>
+            <button type="button" data-floating-phone-history-filter="incoming">Входящие <span data-floating-phone-count="incoming">0</span></button>
+            <button type="button" data-floating-phone-history-filter="outgoing">Исходящие <span data-floating-phone-count="outgoing">0</span></button>
+          </div>
+          <div class="upos-floating-phone-history-list" data-floating-phone-history-list aria-live="polite">Загружаю звонки…</div>
+          <button type="button" class="upos-floating-phone-refresh" data-floating-phone-history-refresh>Обновить историю</button>
+        </div>
+        <form class="upos-floating-phone-contact-editor" data-floating-phone-contact-editor hidden>
+          <strong>Сохранить контакт</strong>
+          <label>Имя<input name="name" required maxlength="255" autocomplete="name" placeholder="Имя клиента"></label>
+          <label>Номер<input name="phone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="+998 ..."></label>
+          <p data-floating-phone-contact-message role="status" hidden></p>
+          <div class="upos-floating-phone-contact-actions">
+            <button class="btn" type="submit">Сохранить</button>
+            <button class="btn btn-secondary" type="button" data-floating-phone-contact-cancel>Отмена</button>
+          </div>
         </form>
         <section class="upos-floating-phone-incoming" data-floating-phone-incoming hidden aria-live="assertive">
           <span>Входящий звонок</span>
@@ -398,7 +433,7 @@
     {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=6" defer></script>
     {% endif %}
-    <script src="{{ url_for('static', path='floating-phone.js') }}?v=9" defer></script>
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=10" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

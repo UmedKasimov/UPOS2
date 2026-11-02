@@ -21,6 +21,16 @@
   const form = root.querySelector("[data-floating-phone-form]");
   const input = root.querySelector("[data-floating-phone-input]");
   const providerSelect = root.querySelector("[data-floating-phone-provider]");
+  const tabs = Array.from(root.querySelectorAll("[data-floating-phone-tab]"));
+  const views = Array.from(root.querySelectorAll("[data-floating-phone-view]"));
+  const keypad = root.querySelector("[data-floating-phone-keypad]") || root.querySelector(".upos-floating-phone-keypad");
+  const historyList = root.querySelector("[data-floating-phone-history-list]");
+  const historyFilters = Array.from(root.querySelectorAll("[data-floating-phone-history-filter]"));
+  const historyRefresh = root.querySelector("[data-floating-phone-history-refresh]");
+  const saveContactButton = root.querySelector("[data-floating-phone-save-contact]");
+  const contactEditor = root.querySelector("[data-floating-phone-contact-editor]");
+  const contactCancel = root.querySelector("[data-floating-phone-contact-cancel]");
+  const contactMessage = root.querySelector("[data-floating-phone-contact-message]");
   const status = root.querySelector("[data-floating-phone-status]");
   const submitButton = form?.querySelector('button[type="submit"]');
   const hangupButton = root.querySelector("[data-floating-phone-hangup]");
@@ -47,17 +57,17 @@
     if (!panel || panel.hidden) return;
     panel.style.left = "0";
     panel.style.right = "auto";
-    panel.style.top = "auto";
-    panel.style.bottom = "70px";
     const phoneRect = root.getBoundingClientRect();
+    const spaceAbove = phoneRect.top - edgeGap - 70;
+    const spaceBelow = window.innerHeight - phoneRect.bottom - edgeGap - 70;
+    const placeAbove = spaceAbove >= 320 || spaceAbove >= spaceBelow;
+    panel.style.maxHeight = `${Math.max(180, Math.min(680, placeAbove ? spaceAbove : spaceBelow))}px`;
+    panel.style.top = placeAbove ? "auto" : "70px";
+    panel.style.bottom = placeAbove ? "70px" : "auto";
     const panelRect = panel.getBoundingClientRect();
     if (phoneRect.left + panelRect.width > window.innerWidth - edgeGap) {
       panel.style.left = "auto";
       panel.style.right = "0";
-    }
-    if (phoneRect.top - panelRect.height < edgeGap) {
-      panel.style.top = "70px";
-      panel.style.bottom = "auto";
     }
   };
 
@@ -99,6 +109,7 @@
       input?.focus();
     });
     ensureSoftphone();
+    if (activeView === "history") void loadHistory();
   };
 
   const closePanel = () => {
@@ -186,6 +197,203 @@
     status.append(document.createTextNode(message));
   };
 
+  let activeView = "dial";
+  let historyDirection = "all";
+  let historyCalls = [];
+  let historyLoading = false;
+
+  function switchView(view) {
+    activeView = view === "history" ? "history" : "dial";
+    tabs.forEach((tab) => {
+      const selected = tab.dataset.floatingPhoneTab === activeView;
+      tab.classList.toggle("is-active", selected);
+      tab.setAttribute("aria-selected", selected ? "true" : "false");
+    });
+    views.forEach((node) => { node.hidden = node.dataset.floatingPhoneView !== activeView; });
+    if (activeView === "history") void loadHistory();
+    else input?.focus();
+    window.requestAnimationFrame(alignPanel);
+  }
+
+  function phoneDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function validContactPhone(value) {
+    const digits = phoneDigits(value);
+    return digits.length >= 7 && digits.length <= 15;
+  }
+
+  function openContactEditor(phone, name = "") {
+    if (!contactEditor) return;
+    const contactPhone = String(phone || "").trim();
+    if (!validContactPhone(contactPhone)) {
+      setStatus("Введите номер клиента для сохранения", "error");
+      switchView("dial");
+      input?.focus();
+      return;
+    }
+    const phoneField = contactEditor.elements.namedItem("phone");
+    const nameField = contactEditor.elements.namedItem("name");
+    phoneField.value = contactPhone;
+    nameField.value = /^Контакт \+?\d+$/i.test(String(name || "")) ? "" : String(name || "");
+    contactMessage.hidden = true;
+    contactMessage.textContent = "";
+    contactEditor.hidden = false;
+    nameField.focus();
+    window.requestAnimationFrame(alignPanel);
+  }
+
+  function formatCallTime(value) {
+    const date = new Date(String(value || ""));
+    return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    }).format(date);
+  }
+
+  function renderHistory() {
+    if (!historyList) return;
+    const counts = {
+      all: historyCalls.length,
+      incoming: historyCalls.filter((call) => call.direction === "incoming").length,
+      outgoing: historyCalls.filter((call) => call.direction === "outgoing").length,
+    };
+    root.querySelectorAll("[data-floating-phone-count]").forEach((node) => {
+      node.textContent = String(counts[node.dataset.floatingPhoneCount] || 0);
+    });
+    historyFilters.forEach((button) => {
+      const selected = button.dataset.floatingPhoneHistoryFilter === historyDirection;
+      button.classList.toggle("is-active", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+    const shown = historyCalls.filter((call) => historyDirection === "all" || call.direction === historyDirection);
+    historyList.replaceChildren();
+    if (!shown.length) {
+      const empty = document.createElement("p");
+      empty.className = "upos-floating-phone-history-empty";
+      empty.textContent = historyCalls.length ? "Для этого направления звонков пока нет." : "Звонков пока нет.";
+      historyList.append(empty);
+      return;
+    }
+    shown.forEach((call) => {
+      const row = document.createElement("div");
+      row.className = "upos-floating-phone-history-item";
+      const dial = document.createElement("button");
+      dial.type = "button";
+      dial.className = "upos-floating-phone-history-dial";
+      dial.title = "Подставить номер для звонка";
+      const icon = document.createElement("span");
+      icon.className = `upos-floating-phone-history-direction is-${call.direction}`;
+      icon.textContent = call.direction === "incoming" ? "↙" : "↗";
+      const details = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = call.name && !/^Контакт \+?\d+$/i.test(call.name) ? call.name : call.phone;
+      const meta = document.createElement("small");
+      const statusLabel = {answered: "Отвечен", missed: "Пропущен", planned: "Запланирован"}[call.status] || "Звонок";
+      meta.textContent = `${call.phone} · ${formatCallTime(call.started_at)} · ${statusLabel}`;
+      details.append(name, meta);
+      dial.append(icon, details);
+      dial.addEventListener("click", () => {
+        switchView("dial");
+        input.value = call.phone;
+        input.focus();
+      });
+      row.append(dial);
+      if (validContactPhone(call.phone)) {
+        const save = document.createElement("button");
+        save.type = "button";
+        save.className = "upos-floating-phone-history-save";
+        save.textContent = "+";
+        save.title = "Сохранить контакт";
+        save.setAttribute("aria-label", `Сохранить контакт ${call.phone}`);
+        save.addEventListener("click", () => openContactEditor(call.phone, call.name));
+        row.append(save);
+      }
+      historyList.append(row);
+    });
+  }
+
+  async function loadHistory() {
+    if (!historyList || historyLoading) return;
+    historyLoading = true;
+    if (!historyCalls.length) historyList.textContent = "Загружаю звонки…";
+    try {
+      const response = await fetch("/api/telephony/quick-panel", {credentials: "same-origin", cache: "no-store"});
+      const payload = await response.json();
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "Не удалось загрузить звонки");
+      historyCalls = Array.isArray(payload.calls) ? payload.calls : [];
+      renderHistory();
+    } catch (_error) {
+      historyList.textContent = "История недоступна. Попробуйте обновить.";
+    } finally {
+      historyLoading = false;
+    }
+  }
+
+  tabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.floatingPhoneTab)));
+  historyFilters.forEach((button) => button.addEventListener("click", () => {
+    historyDirection = button.dataset.floatingPhoneHistoryFilter || "all";
+    renderHistory();
+  }));
+  historyRefresh?.addEventListener("click", () => { void loadHistory(); });
+  saveContactButton?.addEventListener("click", () => openContactEditor(input?.value));
+  contactCancel?.addEventListener("click", () => { contactEditor.hidden = true; window.requestAnimationFrame(alignPanel); });
+  keypad?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-floating-phone-key]");
+    if (!button || !input) return;
+    const key = button.dataset.floatingPhoneKey;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    if (key === "backspace") {
+      const from = start === end ? Math.max(0, start - 1) : start;
+      input.setRangeText("", from, end, "end");
+    } else {
+      input.setRangeText(key, start, end, "end");
+    }
+    input.focus();
+    input.dispatchEvent(new Event("input", {bubbles: true}));
+  });
+  contactEditor?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = String(contactEditor.elements.namedItem("name").value || "").trim();
+    const phone = String(contactEditor.elements.namedItem("phone").value || "").trim();
+    if (!name || !validContactPhone(phone)) {
+      contactMessage.textContent = "Укажите имя и корректный номер.";
+      contactMessage.hidden = false;
+      return;
+    }
+    const save = contactEditor.querySelector('button[type="submit"]');
+    save.disabled = true;
+    try {
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
+      const response = await fetch("/api/telephony/quick-contact", {
+        method: "POST", credentials: "same-origin",
+        headers: {"Content-Type": "application/json", "X-CSRF-Token": csrf},
+        body: JSON.stringify({name, phone}),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "Не удалось сохранить контакт");
+      const tail = phoneDigits(phone).slice(-9);
+      historyCalls.forEach((call) => { if (phoneDigits(call.phone).endsWith(tail)) call.name = name; });
+      renderHistory();
+      contactMessage.replaceChildren(document.createTextNode("Контакт сохранён · "));
+      const link = document.createElement("a");
+      link.href = payload.contact.href;
+      link.textContent = "Открыть карточку";
+      contactMessage.append(link);
+      contactMessage.hidden = false;
+    } catch (error) {
+      contactMessage.textContent = error.message || "Не удалось сохранить контакт";
+      contactMessage.hidden = false;
+    } finally {
+      save.disabled = false;
+      window.requestAnimationFrame(alignPanel);
+    }
+  });
+  window.setInterval(() => {
+    if (!panel.hidden && activeView === "history" && !document.hidden) void loadHistory();
+  }, 20000);
+
   /* ── Софтфон ───────────────────────────────────────────────────────── */
 
   let softphoneReady = null;
@@ -208,11 +416,13 @@
       keepalive: status !== "planned",
       headers: {"Content-Type": "application/json", "X-CSRF-Token": csrf},
       body: JSON.stringify({...call, duration, status}),
-    })).catch(() => {});
+    })).then(() => {
+      if (status !== "planned" && !panel.hidden && activeView === "history") void loadHistory();
+    }).catch(() => {});
   }
 
   function beginBrowserCall(direction, phone) {
-    if (!/^\+?\d{7,15}$/.test(String(phone || "").replace(/[\s().-]/g, ""))) {
+    if (!/^\+?\d{2,15}$/.test(String(phone || "").replace(/[\s().-]/g, ""))) {
       activeCall = null;
       return;
     }
@@ -409,6 +619,8 @@
     sip.on("incoming", (event) => {
       inCall = true;
       beginBrowserCall("incoming", event?.from);
+      if (input && event?.from) input.value = String(event.from);
+      switchView("dial");
       panel.hidden = false;
       toggle.setAttribute("aria-expanded", "true");
       setIncomingUi(event || {});
@@ -601,6 +813,7 @@
     const phone = String(rawPhone || "").trim();
     if (!/^\+?[\d\s().-]{2,30}$/.test(phone) || !input) return false;
     openPanel();
+    switchView("dial");
     input.value = phone;
     input.focus();
     return true;

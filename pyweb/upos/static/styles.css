@@ -31811,6 +31811,9 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   left: 0;
   bottom: 70px;
   width: min(330px, calc(100vw - 32px));
+  max-height: min(680px, 80vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   border: 1px solid #bfd4ee;
   border-radius: var(--workbench-radius-sm, 10px);
@@ -31855,6 +31858,227 @@ body.sidebar-rail .nav > .menu-order-toolbar {
 .upos-floating-phone-form {
   display: grid;
   gap: 8px;
+}
+
+.upos-floating-phone-view[hidden],
+.upos-floating-phone-contact-editor[hidden] {
+  display: none;
+}
+
+.upos-floating-phone-tabs,
+.upos-floating-phone-history-filters {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border: 1px solid #d6e3f5;
+  border-radius: 10px;
+  background: #f2f6fc;
+}
+
+.upos-floating-phone-tabs button,
+.upos-floating-phone-history-filters button {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 4px;
+  background: transparent;
+  color: #52677f;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upos-floating-phone-tabs button.is-active,
+.upos-floating-phone-history-filters button.is-active {
+  background: #fff;
+  color: #1557c0;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, .12);
+}
+
+.upos-floating-phone-history-filters button {
+  font-size: 10px;
+}
+
+.upos-floating-phone-history-filters span {
+  margin-left: 2px;
+  color: #2563eb;
+}
+
+.upos-floating-phone-dial-actions,
+.upos-floating-phone-contact-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.upos-floating-phone-dial-actions .btn,
+.upos-floating-phone-contact-actions .btn {
+  min-width: 0;
+  padding-inline: 5px;
+  font-size: 12px;
+}
+
+.upos-floating-phone-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.upos-floating-phone-keypad button {
+  min-height: 38px;
+  border: 1px solid #d3e0f1;
+  border-radius: 9px;
+  background: #f7faff;
+  color: #152d4a;
+  font-size: 17px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.upos-floating-phone-keypad button:hover,
+.upos-floating-phone-keypad button:focus-visible {
+  border-color: #2f80ed;
+  background: #eaf3ff;
+}
+
+.upos-floating-phone-keypad-delete {
+  grid-column: 3;
+}
+
+.upos-floating-phone-history-list {
+  display: grid;
+  gap: 5px;
+  max-height: 275px;
+  overflow-y: auto;
+}
+
+.upos-floating-phone-history-item {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid #d9e5f5;
+  border-radius: 9px;
+  background: #f9fbff;
+}
+
+.upos-floating-phone-history-dial {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  border: 0;
+  padding: 8px;
+  background: transparent;
+  color: #1f3450;
+  text-align: left;
+  cursor: pointer;
+}
+
+.upos-floating-phone-history-dial > span:last-child {
+  min-width: 0;
+}
+
+.upos-floating-phone-history-dial strong,
+.upos-floating-phone-history-dial small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upos-floating-phone-history-dial small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.upos-floating-phone-history-direction {
+  display: grid;
+  flex: 0 0 25px;
+  place-items: center;
+  height: 25px;
+  border-radius: 8px;
+  background: #e4f5ec;
+  color: #16803c;
+  font-size: 17px;
+}
+
+.upos-floating-phone-history-direction.is-outgoing {
+  background: #e7f0ff;
+  color: #2563eb;
+}
+
+.upos-floating-phone-history-save {
+  border: 0;
+  border-left: 1px solid #d9e5f5;
+  padding: 0 10px;
+  background: transparent;
+  color: #2563eb;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upos-floating-phone-history-empty {
+  margin: 0;
+  padding: 16px 8px;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
+
+.upos-floating-phone-refresh {
+  width: 100%;
+  margin-top: 7px;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upos-floating-phone-contact-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  border: 1px solid #bfd4ee;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f7fbff;
+}
+
+.upos-floating-phone-contact-editor > strong {
+  font-size: 12px;
+}
+
+.upos-floating-phone-contact-editor label {
+  display: grid;
+  gap: 4px;
+  color: #53657f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.upos-floating-phone-contact-editor input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #c7d7ea;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  color: #10213a;
+}
+
+.upos-floating-phone-contact-editor p {
+  margin: 0;
+  color: #166534;
+  font-size: 11px;
 }
 
 /* Разговор идёт в браузере — кнопка отбоя появляется под набором. */
@@ -32309,6 +32533,18 @@ body.is-sidebar-collapsed .upos-floating-phone,
   display: none;
 }
 
+.telephony-direction-filters {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.telephony-direction-caption {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .telephony-status-filter {
   display: inline-flex;
   min-height: 34px;
@@ -32620,6 +32856,41 @@ html.dark .upos-floating-phone-links a {
 html.dark .upos-floating-phone-close:hover,
 html.dark .upos-floating-phone-links a:hover {
   background: oklch(1 0 0 / 0.08);
+}
+
+html.dark .upos-floating-phone-tabs,
+html.dark .upos-floating-phone-history-filters,
+html.dark .upos-floating-phone-history-item,
+html.dark .upos-floating-phone-contact-editor,
+html.dark .upos-floating-phone-keypad button {
+  border-color: var(--workbench-line);
+  background: var(--workbench-muted-surface);
+  color: var(--foreground);
+}
+
+html.dark .upos-floating-phone-tabs button,
+html.dark .upos-floating-phone-history-filters button,
+html.dark .upos-floating-phone-history-dial,
+html.dark .upos-floating-phone-contact-editor label {
+  color: var(--foreground);
+}
+
+html.dark .upos-floating-phone-tabs button.is-active,
+html.dark .upos-floating-phone-history-filters button.is-active,
+html.dark .upos-floating-phone-keypad button:hover {
+  background: color-mix(in srgb, #2563eb, var(--card) 82%);
+  color: #bfdbfe;
+}
+
+html.dark .upos-floating-phone-contact-editor input {
+  border-color: var(--workbench-line);
+  background: var(--workbench-surface);
+  color: var(--foreground);
+}
+
+html.dark .upos-floating-phone-history-dial small,
+html.dark .upos-floating-phone-history-empty {
+  color: var(--muted-foreground);
 }
 
 html.dark .upos-floating-phone-status {

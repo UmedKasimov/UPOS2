@@ -1,4 +1,4 @@
-{% set telephony_filters = telephony_filters|default({'q': '', 'provider': '', 'responsible': '', 'status': 'all', 'date_from': '', 'date_to': ''}) %}
+{% set telephony_filters = telephony_filters|default({'q': '', 'provider': '', 'responsible': '', 'status': 'all', 'direction': 'all', 'date_from': '', 'date_to': ''}) %}
 {% set telephony_options = telephony_options|default({'providers': [], 'responsibles': [], 'clients': []}) %}
 {% set telephony_calls = telephony_calls|default([]) %}
 {% set telephony_contacts = telephony_contacts|default([]) %}
@@ -8,6 +8,7 @@
 {% set telephony_recordings = telephony_recordings|default([]) %}
 {% set telephony_dashboard = telephony_dashboard|default({}) %}
 {% set telephony_status_counts = telephony_status_counts|default({'all': 0, 'answered': 0, 'missed': 0, 'planned': 0, 'blocked': 0}) %}
+{% set telephony_direction_counts = telephony_direction_counts|default({'all': 0, 'incoming': 0, 'outgoing': 0}) %}
 
 <div class="business-module-toolbar" data-workspace-view="dashboard calls numbers integrations" hidden>
   <div>
@@ -18,6 +19,7 @@
 </div>
 
 <form class="business-module-filters" method="get" action="/telephony#calls" data-workspace-view="calls integrations" data-telephony-filter-form hidden>
+  <input type="hidden" name="direction" value="{{ telephony_filters.direction }}" />
   <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
   <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
   <label><span>Поиск</span><input name="q" value="{{ telephony_filters.q }}" placeholder="Аккаунт, клиент, номер, сотрудник" /></label>
@@ -179,6 +181,7 @@
         <input type="hidden" name="provider" value="{{ telephony_filters.provider }}" />
         <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
         <input type="hidden" name="status" value="{{ telephony_filters.status }}" />
+        <input type="hidden" name="direction" value="{{ telephony_filters.direction }}" />
         <input name="date_from" type="date" value="{{ telephony_filters.date_from }}" data-upos-date-range data-upos-date-to="date_to" data-upos-date-inline-label data-upos-date-period-modes data-upos-date-period-mode="range" aria-label="Дата звонков от и до" />
         <input name="date_to" type="hidden" value="{{ telephony_filters.date_to }}" />
       </form>
@@ -189,11 +192,24 @@
       <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
       <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
       <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
+      <input type="hidden" name="direction" value="{{ telephony_filters.direction }}" />
       <button type="submit" name="status" value="all" class="telephony-status-filter{% if telephony_filters.status == 'all' %} is-active{% endif %}">Все <strong>{{ telephony_status_counts.all }}</strong></button>
       <button type="submit" name="status" value="answered" class="telephony-status-filter telephony-status-filter--answered{% if telephony_filters.status == 'answered' %} is-active{% endif %}">Отвеченные <strong>{{ telephony_status_counts.answered }}</strong></button>
       <button type="submit" name="status" value="missed" class="telephony-status-filter telephony-status-filter--missed{% if telephony_filters.status == 'missed' %} is-active{% endif %}">Пропущенные <strong>{{ telephony_status_counts.missed }}</strong></button>
       <button type="submit" name="status" value="planned" class="telephony-status-filter telephony-status-filter--planned{% if telephony_filters.status == 'planned' %} is-active{% endif %}">Запланированные <strong>{{ telephony_status_counts.planned }}</strong></button>
       <button type="submit" name="status" value="blocked" class="telephony-status-filter telephony-status-filter--blocked{% if telephony_filters.status == 'blocked' %} is-active{% endif %}">Заблокированные <strong>{{ telephony_status_counts.blocked }}</strong></button>
+    </form>
+    <form class="telephony-status-filters telephony-direction-filters" method="get" action="/telephony#calls" aria-label="Фильтр звонков по направлению">
+      <span class="telephony-direction-caption">Направление:</span>
+      <input type="hidden" name="q" value="{{ telephony_filters.q }}" />
+      <input type="hidden" name="provider" value="{{ telephony_filters.provider }}" />
+      <input type="hidden" name="responsible" value="{{ telephony_filters.responsible }}" />
+      <input type="hidden" name="status" value="{{ telephony_filters.status }}" />
+      <input type="hidden" name="date_from" value="{{ telephony_filters.date_from }}" />
+      <input type="hidden" name="date_to" value="{{ telephony_filters.date_to }}" />
+      <button type="submit" name="direction" value="all" class="telephony-status-filter{% if telephony_filters.direction == 'all' %} is-active{% endif %}">Все <strong>{{ telephony_direction_counts.all }}</strong></button>
+      <button type="submit" name="direction" value="incoming" class="telephony-status-filter{% if telephony_filters.direction == 'incoming' %} is-active{% endif %}">↙ Входящие <strong>{{ telephony_direction_counts.incoming }}</strong></button>
+      <button type="submit" name="direction" value="outgoing" class="telephony-status-filter{% if telephony_filters.direction == 'outgoing' %} is-active{% endif %}">↗ Исходящие <strong>{{ telephony_direction_counts.outgoing }}</strong></button>
     </form>
     <div class="products-table-wrap">
       <table class="products-table telephony-calls-table">
@@ -219,7 +235,7 @@
                 data-telephony-dial-phone="{{ row.phone }}"
                 role="button"
                 tabindex="0"
-                title="Двойной щелчок — позвонить через Upos Sip"
+                title="Нажмите, чтобы набрать номер в телефоне"
               >{{ row.phone }}</td>
               <td>
                 <span class="telephony-direction telephony-direction--{{ row.direction or 'outgoing' }}">

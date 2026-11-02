@@ -62,6 +62,10 @@
     var normalizedPhone = String(phone || "").trim().replace(/[^\d+*#]/g, "");
     if (!normalizedPhone) return;
     var detail = { phone: normalizedPhone, client: String(client || "").trim() };
+    if (document.querySelector("[data-floating-phone]")) {
+      window.dispatchEvent(new CustomEvent("upos:phone:dial", { detail: detail }));
+      return;
+    }
     if (typeof window.UPOS_TELEPHONY_DIAL === "function") {
       window.UPOS_TELEPHONY_DIAL(detail);
       return;
@@ -78,7 +82,7 @@
         var client = row ? row.querySelector(".telephony-call-client strong") : null;
         dialWithUposSip(phoneCell.dataset.telephonyDialPhone, client ? client.textContent : "");
       };
-      phoneCell.addEventListener("dblclick", function (event) {
+      phoneCell.addEventListener("click", function (event) {
         event.preventDefault();
         call();
       });
