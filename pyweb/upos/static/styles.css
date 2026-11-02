@@ -32228,6 +32228,10 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   font-weight: 800;
 }
 
+.upos-floating-phone-status[hidden] {
+  display: none;
+}
+
 .upos-floating-phone-status span {
   width: 8px;
   height: 8px;

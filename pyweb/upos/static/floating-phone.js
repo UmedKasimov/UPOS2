@@ -189,14 +189,45 @@
     if (event.key === "Escape" && !inCall) closePanel();
   });
 
-  const setStatus = (message, tone = "ready") => {
+  let statusHideTimer = null;
+  const hideStatus = () => {
+    window.clearTimeout(statusHideTimer);
+    statusHideTimer = null;
+    if (status) status.hidden = true;
+    window.requestAnimationFrame(alignPanel);
+  };
+  const setStatus = (message, tone = "ready", options = {}) => {
     if (!status) return;
+    window.clearTimeout(statusHideTimer);
+    statusHideTimer = null;
+    status.hidden = false;
     status.dataset.state = tone;
+    status.dataset.kind = options.kind || "";
     const dot = status.querySelector("span");
     status.textContent = "";
     if (dot) status.append(dot);
     status.append(document.createTextNode(message));
+    if (options.autoHideMs) {
+      statusHideTimer = window.setTimeout(hideStatus, options.autoHideMs);
+    }
+    window.requestAnimationFrame(alignPanel);
   };
+
+  const notifiedConnections = new Set();
+  function showConnectedNotice(account) {
+    if (inCall) return;
+    const accountKey = String(account?.id || account?.extension || "default");
+    const storageKey = `upos:floating-phone-connected:${accountKey}`;
+    let alreadyShown = notifiedConnections.has(storageKey);
+    try { alreadyShown ||= window.sessionStorage.getItem(storageKey) === "1"; } catch (_error) { /* storage may be blocked */ }
+    if (alreadyShown) {
+      if (status?.dataset.kind === "connection-pending") hideStatus();
+      return;
+    }
+    notifiedConnections.add(storageKey);
+    try { window.sessionStorage.setItem(storageKey, "1"); } catch (_error) { /* storage may be blocked */ }
+    setStatus("SIP на связи — можно звонить", "ok", {kind: "connection-ready", autoHideMs: 4000});
+  }
 
   let activeView = "dial";
   let historyDirection = "all";
@@ -615,9 +646,7 @@
   function bindSoftphoneEvents(sip) {
     if (sip.__floatingPhoneBound) return;
     sip.__floatingPhoneBound = true;
-    sip.on("registered", () => {
-      if (!inCall) setStatus("SIP на связи — можно звонить", "ok");
-    });
+    sip.on("registered", (event) => showConnectedNotice(event?.account || selectedAccount()));
     sip.on("registrationFailed", (event) => {
       const statusCode = Number(event?.statusCode || 0);
       const reasonPhrase = String(event?.reasonPhrase || "").trim();
@@ -706,9 +735,10 @@
       bindSoftphoneEvents(sip);
       const account = selectedAccount();
       if (!account) return sip;
-      setStatus("Подключаюсь к АТС…", "pending");
+      setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
       try {
         await sip.connect(account);
+        showConnectedNotice(account);
       } catch (error) {
         // Регистрация не удалась — остаются мост и набор через SIM.
         setStatus(connectErrorText(account, error), "error");
@@ -730,9 +760,10 @@
     const sip = await ensureSoftphone();
     const account = selectedAccount();
     if (!sip || !account) return;
-    setStatus("Подключаюсь к АТС…", "pending");
+    setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
     try {
       await sip.connect(account);
+      showConnectedNotice(account);
     } catch (error) {
       setStatus(connectErrorText(account, error), "error");
     }
