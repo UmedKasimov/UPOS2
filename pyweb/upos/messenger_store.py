@@ -193,8 +193,6 @@ def add_message(
             thread.last_message_at = moment
             if row.direction == "in":
                 thread.unread_count = int(thread.unread_count or 0) + 1
-            else:
-                thread.unread_count = 0
         session.flush()
         return {"id": row.id, "duplicate": False}
 
@@ -253,9 +251,10 @@ def list_messages(workspace_owner_id: str, thread_id: str, *, limit: int = 200) 
                 MessengerMessage.workspace_owner_id == workspace_owner_id,
                 MessengerMessage.thread_id == thread_id,
             )
-            .order_by(MessengerMessage.sent_at.asc())
+            .order_by(MessengerMessage.sent_at.desc(), MessengerMessage.created_at.desc())
             .limit(cap)
         ).scalars().all()
+        rows.reverse()
         return [
             {
                 "id": row.id,

@@ -4,7 +4,7 @@
   {% for item in crm_options.clients %}<option value="{{ item }}">{% endfor %}
 </datalist>
 <datalist id="crm-contact-list">
-  {% for item in crm_options.contacts %}<option value="{{ item.phone }}" data-client-name="{{ item.name }}">{{ item.name }}</option>{% endfor %}
+  {% for item in crm_options.contacts %}<option value="{{ item.phone or item.name }}" data-client-id="{{ item.id }}" data-client-name="{{ item.name }}" data-client-phone="{{ item.phone }}" data-client-phones="{{ item.phones | join(' · ') }}" data-client-segment-ids="{{ item.segment_ids | join(',') }}">{{ item.name }}</option>{% endfor %}
 </datalist>
 <datalist id="crm-responsible-list">
   {% for item in crm_options.responsibles %}{% if item %}<option value="{{ item }}">{% endif %}{% endfor %}
@@ -81,6 +81,38 @@
           </tr>
         </thead>
         <tbody>
+          {% for item in crm_contact_queue %}
+            <tr
+              class="crm-task-followup-row{% if item.rank == 0 %} is-overdue{% endif %}"
+              data-crm-task-row
+              data-crm-followup-row
+              data-task-title="Связаться с {{ item.client|e }}"
+              data-task-client="{{ item.client|e }}"
+              data-task-order=""
+              data-task-responsible="{{ item.responsible|e }}"
+              data-task-priority="{{ 'high' if item.rank == 0 else 'normal' }}"
+              data-task-status="new"
+              data-task-due-date="{{ item.due_date }}"
+              data-task-action-state="{{ 'overdue' if item.rank == 0 else 'today' }}"
+              data-task-complete="false"
+            >
+              <td class="crm-task-complete-cell"><span class="crm-task-followup-mark" title="Напоминание по сделке">↗</span></td>
+              <td>
+                <button class="crm-task-title-button" type="button" data-crm-queue-action="open" data-crm-queue-record-id="{{ item.record_id }}">Связаться с {{ item.client }}</button>
+                <small>{{ item.title }} · {{ item.amount }} UZS · {{ item.days_without_contact }} дн. без контакта</small>
+              </td>
+              <td>{{ item.client }}</td>
+              <td>{{ item.responsible or "Не назначен" }}</td>
+              <td><span class="crm-task-priority crm-task-priority--{{ 'high' if item.rank == 0 else 'normal' }}">{{ 'Высокий' if item.rank == 0 else 'Обычный' }}</span></td>
+              <td>{{ item.due_date }}</td>
+              <td class="crm-task-followup-state">
+                <span class="crm-task-state crm-task-state--{{ 'overdue' if item.rank == 0 else 'today' }}">{{ item.reason }}</span>
+                {% if item.call_href %}<a href="{{ item.call_href }}">Позвонить</a>{% endif %}
+                {% if item.message_href %}<a href="{{ item.message_href }}" {% if item.message_external %}target="_blank" rel="noopener"{% endif %}>Написать</a>{% endif %}
+                <button type="button" data-crm-queue-action="task" data-crm-queue-record-id="{{ item.record_id }}" data-crm-queue-today="{{ crm_queue_today }}">Назначить задачу</button>
+              </td>
+            </tr>
+          {% endfor %}
           {% for row in crm_task_records %}
             {% set action_state = row.get("action_state") or {"id": "", "label": ""} %}
             {% set is_done = row.status == "done" %}
@@ -128,9 +160,10 @@
                 </span>
               </td>
             </tr>
-          {% else %}
-            <tr data-crm-task-server-empty><td colspan="7">Задач пока нет.</td></tr>
           {% endfor %}
+          {% if not crm_task_records and not crm_contact_queue %}
+            <tr data-crm-task-server-empty><td colspan="7">Задач пока нет.</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
@@ -197,10 +230,16 @@
 
 <section class="crm-pipeline-shell" data-workspace-view="deals" hidden>
   <header class="crm-pipeline-head crm-pipeline-head--filters">
-    <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
+    <div class="crm-pipeline-head-actions">
+      <details class="crm-filter-popover">
+        <summary class="btn btn-secondary">Фильтры{% if crm_filters.q or crm_filters.client or crm_filters.program or crm_filters.responsible or (crm_can_view_all_deals and crm_filters.own_deals == 'mine') or crm_filters.contact_employee or crm_filters.status != 'all' or crm_filters.priority != 'all' %} · активны{% endif %}</summary>
+        <form class="crm-kanban-filters" method="get" action="{{ url_for('crm_get') }}">
       <label><span>Поиск</span><input name="q" value="{{ crm_filters.q }}" data-crm-search-dropdown="deals" placeholder="Задача, клиент, ответственный" autocomplete="off" /></label>
       <label><span>Клиент</span><input name="client" value="{{ crm_filters.client }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-client-list" data-crm-search-meta="Клиент" placeholder="Клиент" autocomplete="off" /></label>
+      <label><span>Программа клиента</span><select name="program"><option value="">Все программы</option>{% for name in crm_options.programs %}<option value="{{ name }}" {% if crm_filters.program == name %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
       <label><span>Ответственный</span><input name="responsible" value="{{ crm_filters.responsible }}" data-crm-search-dropdown="datalist" data-crm-search-list="crm-responsible-list" data-crm-search-meta="Ответственный" placeholder="Ответственный" autocomplete="off" /></label>
+      <label><span>Сделки</span><select name="own_deals">{% if crm_can_view_all_deals %}<option value="all" {% if crm_filters.own_deals != 'mine' %}selected{% endif %}>Все сделки</option>{% endif %}<option value="mine" {% if crm_filters.own_deals == 'mine' %}selected{% endif %}>Только свои</option></select></label>
+      <label><span>Первый контакт · сотрудник</span><select name="contact_employee"><option value="">Все сотрудники</option>{% for name in crm_options.contact_employees %}<option value="{{ name }}" {% if crm_filters.contact_employee == name %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
       <label>
         <span>Статус</span>
         <select name="status">
@@ -224,9 +263,11 @@
       </label>
       <button class="btn btn-secondary" type="submit">Применить</button>
       <a class="btn btn-secondary" href="{{ url_for('crm_get') }}">Очистить</a>
+        </form>
+      </details>
       <button class="btn" type="button" data-crm-open-dialog data-crm-kind="deal">+ Сделка</button>
       <button class="btn btn-secondary" type="button" data-crm-open-dialog data-crm-kind="history">+ Контакт</button>
-    </form>
+    </div>
     <button
       class="btn btn-secondary crm-archive-toggle"
       type="button"
@@ -247,6 +288,8 @@
     data-crm-archive-url-template="/crm/__record__/archive"
     data-crm-restore-url-template="/crm/__record__/restore"
     data-crm-tag-url-template="/crm/__record__/tag"
+    data-crm-phone-url-template="/crm/__record__/phones"
+    data-crm-employees-url-template="/crm/__record__/contact-employees"
     data-crm-activity-url-template="/crm/__record__/activity"
   >
     {% for column in crm_kanban_columns %}
@@ -274,6 +317,7 @@
               {% if loop.index > 20 %}hidden data-crm-deferred="true"{% endif %}
               draggable="true"
               data-crm-record-id="{{ row.id }}"
+              data-crm-item-type="{{ row.item_type|e }}"
               data-crm-detail-title="{{ row.title|e }}"
               data-crm-detail-client="{{ row.client|e }}"
               data-crm-detail-client-href="{{ row.client_href|e }}"
@@ -287,10 +331,12 @@
               data-crm-detail-priority="{{ row.priority_label|e }}"
               data-crm-detail-probability="{{ row.probability_label|e }}"
               data-crm-detail-amount="{{ ((row.kanban_amount ~ ' ' ~ (row.order_currency or row.currency)) if row.kanban_amount else 'Сумма не указана')|e }}"
-              data-crm-amount-value="{{ row.kanban_amount_value }}"
+              data-crm-amount-value="{{ row.kanban_amount_uzs_value }}"
               data-crm-amount-currency="{{ (row.order_currency or row.currency or 'UZS')|e }}"
               data-crm-order-count="{{ row.order_count or 0 }}"
               data-crm-detail-responsible="{{ (row.responsible or 'Без ответственного')|e }}"
+              data-crm-contact-employees="{{ row.first_contact_employees|join(', ')|e }}"
+              data-crm-contact-phones='{{ row.contact_phones|tojson|forceescape }}'
               data-crm-detail-date="{{ (row.date or '-')|e }}"
               data-crm-detail-due-date="{{ (row.due_date or '-')|e }}"
               data-crm-detail-next-step="{{ row.next_step|e }}"
@@ -307,24 +353,31 @@
                 style="--crm-activity-fill: {{ activity.fill }}%;"
                 title="{{ activity.label }}"
               ></div>
-              {% if row.date or row.due_date %}
-                <div class="crm-kanban-card-date">{{ row.date or row.due_date }}</div>
+              {% if row.date or row.due_date or row.created_age_label %}
+                <div class="crm-kanban-card-dates">
+                  {% if row.date or row.due_date %}
+                    <span class="crm-kanban-card-date">{{ row.date or row.due_date }}</span>
+                  {% endif %}
+                  {% if row.created_age_label %}
+                    <span class="crm-kanban-card-date" title="Со дня создания сделки">{{ row.created_age_label }}</span>
+                  {% endif %}
+                </div>
               {% endif %}
               <div class="crm-kanban-card-top">
                 <div class="crm-kanban-card-titleline">
-                  <strong>{{ row.title }}</strong>
+                  <strong title="{{ row.title|e }}">{{ row.title }}</strong>
                   {% if activity.age_label %}
                     <span class="crm-kanban-age crm-kanban-age--{{ activity.state }}">{{ activity.age_label }}</span>
                   {% endif %}
                 </div>
-                <span>{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
+                <span title="{{ (row.lead_source or row.contact_type or 'Ручной ввод')|e }}">{{ row.lead_source or row.contact_type or "Ручной ввод" }}</span>
               </div>
               {% if row.client %}
                 <div class="crm-kanban-client-line">
                   {% if row.client_href %}
-                    <a class="crm-kanban-client" href="{{ row.client_href }}">{{ row.client }}</a>
+                    <a class="crm-kanban-client" href="{{ row.client_href }}" title="{{ row.client|e }}">{{ row.client }}</a>
                   {% else %}
-                    <span class="crm-kanban-client">{{ row.client }}</span>
+                    <span class="crm-kanban-client" title="{{ row.client|e }}">{{ row.client }}</span>
                   {% endif %}
                 </div>
               {% endif %}
@@ -341,6 +394,9 @@
               </div>
               {% if row.chat_label %}
                 <div class="crm-kanban-chat">Чат: {{ row.chat_label }}</div>
+              {% endif %}
+              {% if row.first_contact_employees %}
+                <div class="crm-kanban-contact-employees" title="Первый контакт: {{ row.first_contact_employees|join(', ')|e }}">Первый контакт: {{ row.first_contact_employees|join(', ') }}</div>
               {% endif %}
               <div class="crm-kanban-card-tags" data-crm-card-tags>
                 {% for tag in row.tags %}
@@ -653,7 +709,7 @@
     <header class="settings-profile-modal-head">
       <div>
         <h2 id="crm-client-create-dialog-title" class="settings-profile-modal-title">Новый клиент</h2>
-        <p class="settings-profile-modal-sub">Клиент сохранится и сразу подставится в задачу.</p>
+        <p class="settings-profile-modal-sub" data-crm-client-create-subtitle>Клиент сохранится и сразу подставится в задачу.</p>
       </div>
       <button type="button" class="settings-profile-modal-close" data-crm-client-create-close aria-label="Закрыть">×</button>
     </header>
@@ -681,6 +737,29 @@
   </form>
 </dialog>
 
+<dialog class="settings-profile-modal" id="crm-source-create-dialog" aria-labelledby="crm-source-create-dialog-title">
+  <form class="settings-profile-modal-surface" data-crm-source-create-form>
+    <header class="settings-profile-modal-head">
+      <div>
+        <h2 id="crm-source-create-dialog-title" class="settings-profile-modal-title">Новый канал продаж</h2>
+        <p class="settings-profile-modal-sub">Канал сохранится и сразу подставится в сделку.</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-source-create-close aria-label="Закрыть">×</button>
+    </header>
+    <div class="settings-profile-modal-body">
+      <label class="settings-profile-field">
+        <span class="settings-profile-field-label">Название канала*</span>
+        <input class="settings-profile-input" name="name" required maxlength="80" data-crm-source-create-name />
+      </label>
+      <p class="sales-product-dialog-status" data-crm-source-create-status aria-live="polite"></p>
+    </div>
+    <footer class="settings-profile-modal-foot">
+      <button type="button" class="btn btn-secondary" data-crm-source-create-close>Отмена</button>
+      <button type="submit" class="btn" data-crm-source-create-submit>Создать канал</button>
+    </footer>
+  </form>
+</dialog>
+
 <dialog class="settings-profile-modal crm-record-dialog" id="crm-record-dialog" aria-labelledby="crm-record-dialog-title">
   <div class="settings-profile-modal-surface crm-record-dialog-surface">
     <header class="settings-profile-modal-head">
@@ -694,6 +773,8 @@
       <form method="post" action="{{ url_for('crm_save') }}" class="product-form crm-record-form">
         {% include "_csrf_field.html" %}
         <input type="hidden" name="record_id" value="" data-crm-record-id-field />
+        <input type="hidden" name="counterparty_id" value="" data-crm-client-id />
+        <input type="hidden" name="messenger_thread_id" value="" />
         <input type="hidden" name="tags" value="" />
         <div class="product-kind-toggle" data-crm-extended-field>
           <label><input type="radio" name="item_type" value="task" /> Задача</label>
@@ -701,7 +782,7 @@
           <label><input type="radio" name="item_type" value="history" /> История</label>
         </div>
         <div class="product-form-grid crm-record-form-grid">
-          <label class="wide" data-crm-deal-create-field><span>Название*</span><input name="title" required placeholder="Название сделки" /></label>
+          <label class="wide" data-crm-deal-create-field><span data-crm-title-label>Название*</span><input name="title" required placeholder="Название сделки" /></label>
           <label class="crm-client-picker-field">
             <span>Клиент</span>
             <input name="client" autocomplete="off" data-crm-client-input placeholder="Выберите или введите клиента" />
@@ -740,12 +821,57 @@
             <input autocomplete="off" data-crm-order-input placeholder="Номер заказа или клиент" />
             <div class="sales-combo-panel sales-combo-panel--wide" data-crm-order-panel hidden></div>
           </label>
-          <label data-crm-deal-create-field data-crm-task-hidden><span>Канал · Откуда о нас узнали</span><select name="lead_source">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></label>
+          <label class="crm-source-picker-field" data-crm-deal-create-field data-crm-task-hidden>
+            <span>Канал · Откуда о нас узнали</span>
+            <input type="hidden" name="lead_source" value="{{ crm_lead_sources[0] if crm_lead_sources else '' }}" data-crm-source-value />
+            <input type="search" autocomplete="off" data-crm-source-input value="{{ crm_lead_sources[0] if crm_lead_sources else '' }}" placeholder="Найти или создать канал" aria-label="Найти канал" />
+            <div class="sales-combo-panel crm-source-panel" data-crm-source-panel hidden></div>
+            <small class="crm-source-error" data-crm-source-error hidden></small>
+          </label>
+          <select data-crm-source-options hidden aria-hidden="true" tabindex="-1">{% for item in crm_lead_sources %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
           <label class="wide crm-deal-contact-field" data-crm-deal-create-field data-crm-task-hidden>
             <span>Контакт*</span>
-            <input name="contact" type="tel" inputmode="tel" autocomplete="tel" list="crm-contact-list" placeholder="+998 90 123 45 67" />
+            <input name="contact" type="search" autocomplete="off" data-crm-contact-input placeholder="Имя клиента или номер телефона" />
+            <div class="sales-combo-panel crm-contact-panel" data-crm-contact-panel hidden></div>
             <small class="crm-client-duplicate-note" data-crm-contact-match hidden></small>
+            <a class="crm-contact-card-link" data-crm-contact-card target="_blank" rel="noopener" hidden>Карточка клиента ↗</a>
           </label>
+          <div class="wide crm-deal-segment-field" data-crm-deal-create-field data-crm-task-hidden data-crm-segment-field>
+            <span>Сегменты клиента</span>
+            <input type="hidden" name="business_segment_changed" value="0" data-crm-segment-changed />
+            <details class="crm-deal-segment-dropdown" data-crm-segment-dropdown>
+              <summary><span data-crm-segment-summary>Не выбраны</span></summary>
+              <div class="crm-deal-segment-menu">
+                <input type="search" autocomplete="off" placeholder="Найти сегмент" aria-label="Найти сегмент" data-crm-segment-search />
+                <div class="crm-deal-segment-options">
+                  {% for segment in crm_client_segments %}
+                    <label data-crm-segment-option-row>
+                      <input type="checkbox" name="business_segment_ids" value="{{ segment.id }}" data-crm-segment-option />
+                      <span>{{ segment.icon }} {{ segment.name }}</span>
+                    </label>
+                  {% else %}
+                    <small>Сегменты пока не созданы в разделе «Клиенты».</small>
+                  {% endfor %}
+                </div>
+              </div>
+            </details>
+          </div>
+          <div class="wide crm-deal-segment-field crm-deal-contact-employees" data-crm-deal-create-field data-crm-task-hidden data-crm-contact-employees-field>
+            <span>Сотрудники первого контакта</span>
+            <details class="crm-deal-segment-dropdown" data-crm-contact-employees-dropdown>
+              <summary><span data-crm-contact-employees-summary>Не выбраны</span></summary>
+              <div class="crm-deal-segment-menu">
+                <input type="search" autocomplete="off" placeholder="Найти сотрудника" aria-label="Найти сотрудника" data-crm-contact-employees-search />
+                <div class="crm-deal-segment-options">
+                  {% for name in crm_options.contact_employees %}
+                    <label data-crm-contact-employee-row><input type="checkbox" name="first_contact_employees" value="{{ name }}" data-crm-contact-employee /><span>{{ name }}</span></label>
+                  {% else %}
+                    <small>Сотрудников пока нет.</small>
+                  {% endfor %}
+                </div>
+              </div>
+            </details>
+          </div>
           <label data-crm-task-hidden><span>Этап</span><select name="stage_id">{% for item in crm_pipeline_stages %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label>
           <label class="crm-deal-picker-field">
             <span>Связать со сделкой</span>
@@ -763,8 +889,10 @@
              в работу: select не находил своего значения и слал «Новый». #}
           <label><span>Статус</span><select name="status"><option value="new">Новый</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="done">Завершено</option><option value="won">Успешно</option><option value="lost">Потеряно</option><option value="archived">Архив</option></select></label>
           <label data-crm-task-hidden><span>Вероятность</span><input name="probability" inputmode="numeric" placeholder="0-100" /></label>
-          <label class="wide" data-crm-deal-create-field data-crm-task-hidden><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" placeholder="0" /></label>
-          <label data-crm-task-hidden><span>Валюта</span><input name="currency" value="UZS" maxlength="3" /></label>
+          <div class="wide crm-deal-money-row" data-crm-deal-create-field data-crm-task-hidden>
+            <label class="crm-deal-amount-field"><span>Примерная сумма сделки</span><input name="amount" inputmode="decimal" autocomplete="off" data-crm-deal-amount placeholder="0" /></label>
+            <label class="crm-deal-currency-field"><span>Валюта</span><select name="currency" data-crm-deal-currency><option value="UZS" selected>UZS</option><option value="USD">USD</option></select></label>
+          </div>
           <label class="wide" data-crm-next-step-field><span>Следующий шаг*</span><input name="next_step" placeholder="Позвонить, выставить счёт, согласовать дату" /></label>
           <label class="wide" data-crm-task-only hidden>
             <span>Чеклист</span>
@@ -858,6 +986,19 @@
             hidden
           >Открыть клиента</a>
         </div>
+        <div class="crm-card-detail-phones">
+          <div class="crm-card-detail-phones-head">
+            <span>Номера клиента</span>
+            <button type="button" class="btn btn-secondary" data-crm-card-detail-phone-toggle aria-expanded="false" aria-controls="crm-card-detail-phone-form">+ Добавить номер</button>
+          </div>
+          <div class="crm-card-detail-phone-list" data-crm-card-detail-phone-list></div>
+          <form id="crm-card-detail-phone-form" class="crm-card-detail-phone-form" data-crm-card-detail-phone-form hidden>
+            <input type="tel" name="phone" autocomplete="tel" maxlength="64" placeholder="+998 90 123 45 67" aria-label="Номер телефона" required />
+            <button class="btn" type="submit">Сохранить</button>
+            <button class="btn btn-secondary" type="button" data-crm-card-detail-phone-cancel>Отмена</button>
+            <p data-crm-card-detail-phone-error role="alert" hidden></p>
+          </form>
+        </div>
         <div class="crm-card-detail-tags">
           <div class="crm-card-detail-tags-head">
             <span>Теги</span>
@@ -879,6 +1020,26 @@
           <div><dt>Вероятность</dt><dd data-crm-card-detail-field="probability">-</dd></div>
           <div><dt>Сумма</dt><dd class="crm-card-detail-money" data-crm-card-detail-field="amount">-</dd></div>
           <div><dt>Ответственный</dt><dd data-crm-card-detail-field="responsible">-</dd></div>
+          <div class="wide crm-card-detail-employees">
+            <dt>Сотрудники первого контакта</dt>
+            <dd data-crm-card-detail-field="contactEmployees">Не прикреплены</dd>
+            <button class="btn btn-secondary" type="button" data-crm-card-detail-attach-employee aria-expanded="false" aria-controls="crm-card-detail-employee-picker">+ Прикрепить сотрудника</button>
+            <form id="crm-card-detail-employee-picker" class="crm-card-detail-employee-picker" data-crm-card-detail-employees-form hidden>
+              <input type="search" autocomplete="off" placeholder="Найти сотрудника" aria-label="Найти сотрудника" data-crm-card-detail-employees-search />
+              <div class="crm-card-detail-employee-options">
+                {% for name in crm_options.contact_employees %}
+                  <label data-crm-card-detail-employee-row><input type="checkbox" name="first_contact_employees" value="{{ name }}" /><span>{{ name }}</span></label>
+                {% else %}
+                  <small>Сотрудников пока нет.</small>
+                {% endfor %}
+              </div>
+              <p class="crm-card-detail-employee-error" data-crm-card-detail-employees-error role="alert" hidden></p>
+              <div class="crm-card-detail-employee-actions">
+                <button class="btn btn-secondary" type="button" data-crm-card-detail-employees-cancel>Отмена</button>
+                <button class="btn" type="submit">Сохранить</button>
+              </div>
+            </form>
+          </div>
           <div><dt>Дата</dt><dd data-crm-card-detail-field="date">-</dd></div>
           <div><dt>Срок</dt><dd data-crm-card-detail-field="dueDate">-</dd></div>
           <div class="wide"><dt>Следующий шаг</dt><dd data-crm-card-detail-field="nextStep">-</dd></div>
@@ -907,7 +1068,7 @@
             <button class="btn" type="submit">Отправить</button>
           </form>
         </div>
-        <div class="crm-card-detail-history" data-crm-card-detail-history data-crm-detail-pane="history">
+        <div class="crm-card-detail-history" data-crm-card-detail-history data-crm-detail-pane="history" hidden>
           <p class="crm-card-detail-empty">История по клиенту пока пустая.</p>
         </div>
         <div class="crm-card-detail-documents" data-crm-card-detail-documents data-crm-detail-pane="documents" hidden>
@@ -915,24 +1076,9 @@
         </div>
         <div class="crm-card-detail-work-pane" data-crm-detail-pane="tasks" hidden>
           <div class="crm-card-detail-feed" data-crm-card-detail-task-feed></div>
-          <form class="crm-card-detail-activity-form crm-card-detail-task-form" data-crm-activity-form="task">
-            <div class="crm-task-form-main">
-              <input name="text" maxlength="500" placeholder="Название задачи" required />
-              <label class="crm-task-done-toggle"><input name="completed" type="checkbox" value="1" /> Выполнено</label>
-            </div>
-            <div class="crm-task-form-grid">
-              <label><span>Дата</span><input name="due_date" type="date" /></label>
-              <label><span>Время</span><input name="due_time" type="time" /></label>
-              <label><span>Ответственный</span><input name="assignee" list="crm-responsible-list" placeholder="Сотрудник" /></label>
-              <label><span>Приоритет</span><select name="priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
-              <label><span>Участники</span><input name="participants" list="crm-responsible-list" placeholder="Через запятую" /></label>
-              <label><span>Напоминание</span><input name="reminder_at" type="datetime-local" /></label>
-            </div>
-            <textarea name="checklist" rows="3" maxlength="800" placeholder="Чеклист: каждый пункт с новой строки"></textarea>
-            <button class="btn" type="submit">Добавить задачу</button>
-          </form>
+          <button class="btn crm-card-detail-add-task" type="button" data-crm-card-task-open>+ Добавить задачу</button>
         </div>
-        <div class="crm-card-detail-work-pane" data-crm-detail-pane="comments" hidden>
+        <div class="crm-card-detail-work-pane" data-crm-detail-pane="comments">
           <div class="crm-card-detail-feed" data-crm-card-detail-comment-feed></div>
           <form class="crm-card-detail-activity-form" data-crm-activity-form="comment">
             <textarea name="text" maxlength="500" rows="3" placeholder="Добавить комментарий" required></textarea>
@@ -941,6 +1087,35 @@
         </div>
       </section>
     </div>
+  </div>
+</dialog>
+
+<dialog class="settings-profile-modal crm-card-task-dialog" id="crm-card-task-dialog" aria-labelledby="crm-card-task-dialog-title">
+  <div class="settings-profile-modal-surface">
+    <header class="settings-profile-modal-head">
+      <div class="settings-profile-modal-head-text">
+        <h2 id="crm-card-task-dialog-title" class="settings-profile-modal-title">Новая задача</h2>
+        <p class="settings-profile-modal-sub" data-crm-card-task-subtitle>Задача по сделке</p>
+      </div>
+      <button type="button" class="settings-profile-modal-close" data-crm-card-task-close aria-label="Закрыть">×</button>
+    </header>
+    <form class="crm-card-detail-activity-form crm-card-detail-task-form crm-card-task-dialog-form" data-crm-activity-form="task">
+      <div class="settings-profile-modal-scroll crm-card-task-dialog-fields">
+        <label class="wide"><span>Название задачи*</span><input name="text" maxlength="500" placeholder="Что нужно сделать" required /></label>
+        <label><span>Дата</span><input name="due_date" type="date" /></label>
+        <label><span>Время</span><input name="due_time" type="time" /></label>
+        <label><span>Ответственный</span><input name="assignee" list="crm-responsible-list" placeholder="Сотрудник" /></label>
+        <label><span>Приоритет</span><select name="priority"><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочно</option><option value="low">Низкий</option></select></label>
+        <label><span>Участники</span><input name="participants" list="crm-responsible-list" placeholder="Через запятую" /></label>
+        <label><span>Напоминание</span><input name="reminder_at" type="datetime-local" /></label>
+        <label class="wide"><span>Чеклист</span><textarea name="checklist" rows="3" maxlength="800" placeholder="Каждый пункт с новой строки"></textarea></label>
+        <label class="crm-task-done-toggle wide"><input name="completed" type="checkbox" value="1" /> Выполнено</label>
+      </div>
+      <footer class="settings-profile-modal-foot">
+        <button class="btn btn-secondary" type="button" data-crm-card-task-close>Отмена</button>
+        <button class="btn" type="submit">Добавить задачу</button>
+      </footer>
+    </form>
   </div>
 </dialog>
 

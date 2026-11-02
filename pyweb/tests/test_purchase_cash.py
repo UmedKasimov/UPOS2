@@ -52,6 +52,40 @@ class PurchaseCashPayloadTests(unittest.TestCase):
         self.assertEqual(rows[0]["data"]["purchase_entry_kind"], "extra_expense")
         self.assertNotIn("from_account_id", rows[0])
 
+    def test_additional_expense_payment_can_be_split_between_accounts(self) -> None:
+        rows = build_purchase_cash_transaction_payloads(
+            purchase_id="purchase-2",
+            purchase_number="P-102",
+            data={
+                "supplier": "Поставщик",
+                "payment_lines": [],
+                "extra_expenses": [{"name": "Доставка", "amount": "50000"}],
+                "expense_payment_lines": [
+                    {
+                        "amount": "25000",
+                        "currency": "UZS",
+                        "account_id": "cash-1",
+                        "account": "Наличные",
+                    },
+                    {
+                        "amount": "2",
+                        "currency": "USD",
+                        "account_id": "card-1",
+                        "account": "Карта",
+                    },
+                ],
+            },
+            currency="UZS",
+            created_at="2026-08-10T12:00:00",
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row["amount"] for row in rows], [Decimal("25000"), Decimal("2")])
+        self.assertEqual([row["currency"] for row in rows], ["UZS", "USD"])
+        self.assertEqual([row["from_account_id"] for row in rows], ["cash-1", "card-1"])
+        self.assertTrue(all(row["category"] == "Дополнительные расходы" for row in rows))
+        self.assertTrue(all(row["data"]["purchase_entry_kind"] == "extra_expense" for row in rows))
+
     def test_zero_rows_are_not_written_to_cash_journal(self) -> None:
         rows = build_purchase_cash_transaction_payloads(
             purchase_id="purchase-3",

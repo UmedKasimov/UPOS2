@@ -66,6 +66,48 @@ def build_purchase_cash_transaction_payloads(
             payload["from_account_id"] = account_id
         result.append(payload)
 
+    expense_payments = (
+        data.get("expense_payment_lines")
+        if isinstance(data.get("expense_payment_lines"), list)
+        else None
+    )
+    if expense_payments is not None:
+        for index, payment in enumerate(expense_payments, start=1):
+            if not isinstance(payment, dict):
+                continue
+            amount = _amount(payment.get("amount"))
+            if amount <= 0:
+                continue
+            account_id = str(payment.get("account_id") or "").strip()
+            account_name = str(payment.get("account") or "").strip()
+            payload = {
+                "amount": amount,
+                "currency": str(payment.get("currency") or clean_currency).strip().upper() or clean_currency,
+                "type": "expense",
+                "status": "confirmed",
+                "is_confirmed": True,
+                "category": "Дополнительные расходы",
+                "supplier": supplier,
+                "employee_id": employee_id,
+                "created_at": str(payment.get("date") or created_at).strip() or created_at,
+                "note": f"Оплата дополнительных расходов по закупке {purchase_number}",
+                "data": {
+                    "source": "purchase",
+                    "purchase_document_id": purchase_id,
+                    "purchase_number": purchase_number,
+                    "purchase_entry_kind": "extra_expense",
+                    "expense_payment_index": index,
+                    "payment_account_id": account_id,
+                    "payment_account": account_name,
+                    "manager": actor_name,
+                },
+            }
+            if account_id:
+                payload["from_pocket_id"] = account_id
+                payload["from_account_id"] = account_id
+            result.append(payload)
+        return result
+
     expenses = data.get("extra_expenses") if isinstance(data.get("extra_expenses"), list) else []
     for index, expense in enumerate(expenses, start=1):
         if not isinstance(expense, dict):

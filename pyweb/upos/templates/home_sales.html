@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Продажи{% endblock %}
 {% block extra_head %}
+  {% if not module_home_only %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="{{ url_for('static', path='clients.js') }}?v=51" defer></script>
+  {% endif %}
 {% endblock %}
 
 {% set sales_saved_messages = ['saved', 'order_saved', 'return_saved', 'updated', 'paid', 'converted', 'already_converted'] %}
@@ -32,6 +34,7 @@
     data-workspace-force-tab="{{ '' if sales_embed else ('journal' if flash_ok in sales_saved_messages else '') }}"
     data-workspace-close-tabs-on-load="{{ '' if sales_embed else ('new' if flash_ok in ['saved', 'order_saved', 'return_saved', 'updated'] else '') }}"
     data-workspace-home-href="{{ url_for('sales_get') }}"
+    data-workspace-lazy-home-enabled="1"
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Успешно продано. Продажа добавлена в журнал.</div>
@@ -109,6 +112,7 @@
     </section>
 
 
+    {% if not module_home_only %}
     <div class="workspace-module-stack" data-workspace-view="new journal order return debt"{% if not sales_default_tab %} hidden{% endif %}>
     {% macro render_sales_journal_filter(form_id, target_view, workspace_views) %}
     <form id="{{ form_id }}" class="products-catalog-filter sales-filter-bar sales-journal-filter" method="get" action="{{ url_for('sales_get') }}{{ '#debt' if target_view == 'debt' else '#sales-journal' }}" data-sales-journal-auto-filter data-sales-filter-target="{{ target_view }}" data-workspace-view="{{ workspace_views }}">
@@ -397,7 +401,10 @@
             <h2>Журнал продаж</h2>
             <span>Всего: {{ sales_journal_pagination.total }}</span>
           </div>
-          <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="{{ sales_form_title }}" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}{% if sales_form_doc_type != 'sale' %}?doc_type={{ sales_form_doc_type }}{% endif %}#sales-form">{{ sales_form_action_label }}</a>
+          <div class="products-panel-top-actions">
+            <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="Новая продажа" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}#sales-form">+ Продажа</a>
+            <a class="btn sales-journal-create-btn" href="#sales-form" data-workspace-trigger="new" data-workspace-tab-title="Новый заказ" data-workspace-tab-hash="sales-form" data-workspace-navigate-href="{{ url_for('sales_get') }}?doc_type=order#sales-form">+ Заказ</a>
+          </div>
           {% if sales_filters.status != 'debt' %}
             {{ render_sales_journal_filter('sales-journal-filter', 'journal', 'journal order return') }}
           {% endif %}
@@ -1008,6 +1015,7 @@
               </span>
               <div class="sales-lock-field">
                 <input name="client" required autocomplete="off" value="{{ sales_prefill.client|e }}" placeholder="Выберите или введите клиента" data-sales-combo-input />
+                <input type="hidden" name="counterparty_id" value="" data-sales-client-id />
                 <button type="button" class="sales-combo-add" data-sales-client-create-open aria-label="Добавить нового клиента" title="Добавить клиента">+</button>
                 <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить клиента" title="Сменить клиента" hidden>✎</button>
               </div>
@@ -1156,6 +1164,7 @@
                       <label class="sales-combobox sales-product-picker" data-sales-combobox="product">
                         <div class="sales-lock-field">
                           <input name="line_product" autocomplete="off" placeholder="Товар" data-sales-combo-input />
+                          <input type="hidden" name="line_product_id" value="" data-sales-line-product-id />
                           <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить товар" title="Сменить товар" hidden>✎</button>
                         </div>
                         <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
@@ -1245,6 +1254,7 @@
                   <label class="sales-combobox sales-product-picker" data-sales-combobox="service">
                     <div class="sales-lock-field">
                       <input name="line_product" autocomplete="off" placeholder="Услуга" data-sales-combo-input />
+                      <input type="hidden" name="line_product_id" value="" data-sales-line-product-id />
                       <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить услугу" title="Сменить услугу" hidden>✎</button>
                     </div>
                     <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
@@ -1318,6 +1328,7 @@
                   <label class="sales-combobox sales-product-picker" data-sales-combobox="subscription">
                     <div class="sales-lock-field">
                       <input name="line_product" autocomplete="off" placeholder="Подписка" data-sales-combo-input />
+                      <input type="hidden" name="line_product_id" value="" data-sales-line-product-id />
                       <button type="button" class="sales-combo-edit" data-sales-combo-edit aria-label="Сменить подписку" title="Сменить подписку" hidden>✎</button>
                     </div>
                     <div class="sales-combo-panel sales-combo-panel--wide" data-sales-combo-panel hidden></div>
@@ -2005,14 +2016,16 @@
       </aside>
     </div>
     </div>
+    {% endif %}
   </section>
 {% endblock %}
 {% block scripts %}
   {{ super() }}
+  {% if not module_home_only %}
   <script type="application/json" data-price-tag-settings>{{ (sales_price_tag or {}) | tojson }}</script>
-  <script src="{{ url_for('static', path='sales-journal.js') }}?v=39" defer></script>
+  <script src="{{ url_for('static', path='sales-journal.js') }}?v=40" defer></script>
   <script src="{{ url_for('static', path='sale-done.js') }}?v=6" defer></script>
-  <script src="{{ url_for('static', path='sales-form.js') }}?v=79" defer></script>
+  <script src="{{ url_for('static', path='sales-form.js') }}?v=83" defer></script>
   {% if sales_embed %}
     <script>
       (() => {
@@ -2030,5 +2043,6 @@
         }
       })();
     </script>
+  {% endif %}
   {% endif %}
 {% endblock %}

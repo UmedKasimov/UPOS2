@@ -7,7 +7,9 @@
 {% block main %}
   {% set active_settings_tab = settings_default_tab | default('general') %}
   {% set active_settings_label = 'Основное' %}
-  {% if active_settings_tab == 'dictionary' %}
+  {% if active_settings_tab == 'advanced' %}
+    {% set active_settings_label = 'Доп. настройки' %}
+  {% elif active_settings_tab == 'dictionary' %}
     {% set active_settings_label = 'Справочники' %}
   {% elif active_settings_tab == 'integrations' %}
     {% set active_settings_label = 'Интеграции' %}
@@ -135,6 +137,8 @@
             </div>
           </div>
         </section>
+      {% elif active_settings_tab == 'advanced' %}
+        {% include "_settings_sales_defaults.html" %}
       {% elif active_settings_tab == 'dictionary' %}
         <section class="settings-ios-group settings-dict-section org-settings-direct-panel">
           <div class="settings-dict-head">
@@ -350,6 +354,7 @@
                       <button type="button" class="btn btn-secondary btn-sm" data-ibox-sync>Синхронизировать всё</button>
                     </div>
                     <p class="integr-sync-status" data-ibox-status></p>
+                    <p class="integr-sync-last" data-ibox-last-sync hidden></p>
                   </div>
                   <div class="integr-card-body" data-integr-form="clopos" hidden>
                     <label for="clopos_api_base_url">{{ _('settings.api_base_url') }}</label><input id="clopos_api_base_url" type="url" value="{{ settings.integrations.clopos.api_base_url }}" />
@@ -574,6 +579,7 @@
       currentTab: {{ settings_default_tab | default('general') | tojson }},
       labels: {
         general: "Основное",
+        advanced: "Доп. настройки",
         users: "Пользователи",
         dictionary: "Справочники",
         integrations: "Интеграции",
@@ -585,7 +591,7 @@
     };
   </script>
   <script src="{{ url_for('static', path='org-settings-tabs.js') }}?v=5" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=33" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=36" defer></script>
   {% if settings_default_tab | default('general') == 'telegram' %}
     <link rel="stylesheet" href="{{ url_for('static', path='telegram-settings.css') }}?v=114" />
     <script src="{{ url_for('static', path='telegram-settings.js') }}?v=23" defer></script>

@@ -562,8 +562,12 @@
     if (!item) return "";
     var lines = Array.isArray(item.balance_lines) ? item.balance_lines : [];
     if (lines.length) {
+      var kinds = lines.map(function (line) { return String(line.kind || "zero"); }).filter(function (kind) { return kind !== "zero"; });
+      var mixed = kinds.indexOf("debt") >= 0 && kinds.indexOf("advance") >= 0;
       return lines.map(function (line) {
-        return String(line.amount || "0") + " " + String(line.currency || "UZS");
+        var value = String(line.amount || "0") + " " + String(line.currency || "UZS");
+        if (!mixed) return value;
+        return (line.kind === "debt" ? "Долг " : line.kind === "advance" ? "Депозит " : "") + value;
       }).join(" / ");
     }
     return item.balance ? String(item.balance || "0") + " UZS" : "";
@@ -598,19 +602,24 @@
       });
     }
     var kind = item ? String(item.balance_kind || "zero") : "zero";
-    var text = item && kind !== "zero" ? clientBalanceText(item) : "";
+    var text = item ? clientBalanceText(item) : "";
     var clientInput = root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]');
+    var clientIdInput = root.querySelector("[data-sales-client-id]");
     if (clientInput) {
       if (item && item.id) clientInput.dataset.salesClientId = String(item.id);
       else if (!item) delete clientInput.dataset.salesClientId;
     }
+    if (clientIdInput) clientIdInput.value = item && item.id ? String(item.id) : "";
     var segmentSelect = root.querySelector("[data-sales-segment-select]");
     if (segmentSelect) {
       segmentSelect.value = item ? String(item.business_segment_id || "") : "";
     }
     node.dataset.balanceKind = kind;
     node.hidden = !text;
-    node.textContent = text ? String(item.balance_note || "Баланс") + ": " + text : "";
+    node.textContent = text
+      ? (kind === "debt" ? "Долг" : kind === "advance" ? "Депозит" : "Баланс") + ": " + text
+      : "";
+    node.title = node.textContent;
   }
 
   function clientCardTable(headers, rows, emptyText) {
@@ -1066,6 +1075,8 @@
     resetCombo(row.querySelector('[data-sales-combobox="product"]'));
     resetCombo(row.querySelector('[data-sales-combobox="service"]'));
     resetCombo(row.querySelector('[data-sales-combobox="subscription"]'));
+    var productId = row.querySelector("[data-sales-line-product-id]");
+    if (productId) productId.value = "";
     var categoryCell = row.querySelector("[data-sales-line-category]");
     if (categoryCell) categoryCell.textContent = "";
     row.querySelectorAll('input[name="line_quantity"], input[name="line_price"], input[name="line_discount_value"]').forEach(function (input) {
@@ -1133,6 +1144,8 @@
     });
     resetCombo(row.querySelector('[data-sales-combobox="product"]'));
     resetCombo(row.querySelector('[data-sales-combobox="warehouse"]'));
+    var productId = row.querySelector("[data-sales-line-product-id]");
+    if (productId) productId.value = "";
     var sourceWarehouse = sourceRow.querySelector('input[name="line_warehouse"]');
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     if (warehouse) warehouse.value = sourceWarehouse ? sourceWarehouse.value : warehouse.defaultValue || "";
@@ -1167,7 +1180,7 @@
     if (!root) return;
     [
       {kind: "service", block: "[data-sales-services-block]", button: "[data-sales-add-service]"},
-      {kind: "subscription", block: "[data-sales-subscriptions-block]", button: ""}
+      {kind: "subscription", block: "[data-sales-subscriptions-block]", button: "[data-sales-subscription-open]"}
     ].forEach(function (config) {
       var hasRows = extraLineRows(root, config.kind).length > 0;
       var block = root.querySelector(config.block);
@@ -1336,6 +1349,7 @@
   function lineDraft(row) {
     var combo = row.querySelector('[data-sales-combobox="product"], [data-sales-combobox="service"], [data-sales-combobox="subscription"]');
     var input = combo ? combo.querySelector("[data-sales-combo-input]") : null;
+    var productId = row.querySelector("[data-sales-line-product-id]");
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     var quantity = row.querySelector('input[name="line_quantity"]');
     var price = row.querySelector('input[name="line_price"]');
@@ -1349,6 +1363,7 @@
     return {
       kind: rowKind(row),
       product: input ? input.value || "" : "",
+      productId: productId ? productId.value || "" : "",
       warehouse: warehouse ? warehouse.value || "" : "",
       quantity: quantity ? quantity.value || "" : "",
       price: price ? price.value || "" : "",
@@ -1382,6 +1397,7 @@
       date: root.querySelector('input[name="date"]')?.value || "",
       dateTo: root.querySelector('input[name="date_to"]')?.value || "",
       client: root.querySelector('[data-sales-combobox="client"] [data-sales-combo-input]')?.value || "",
+      counterpartyId: root.querySelector("[data-sales-client-id]")?.value || "",
       businessSegmentId: root.querySelector("[data-sales-segment-select]")?.value || "",
       installerUserId: root.querySelector('select[name="installer_user_id"]')?.value || "",
       installationScheduledAt: root.querySelector('input[name="installation_scheduled_at"]')?.value || "",
@@ -1454,6 +1470,8 @@
       displayProduct += " · " + draftPlan;
     }
     if (combo) commitCombo(combo, displayProduct);
+    var productId = row.querySelector("[data-sales-line-product-id]");
+    if (productId) productId.value = line.productId || "";
     var warehouse = row.querySelector('input[name="line_warehouse"]');
     if (warehouse && line.warehouse !== undefined) warehouse.value = line.warehouse || warehouse.value || "";
     var quantity = row.querySelector('input[name="line_quantity"]');
@@ -1537,6 +1555,7 @@
     setDraftField(root, "[data-sales-next-status]", draft.nextStatus || "");
     setDraftField(root, 'input[name="date"]', draft.date);
     setDraftField(root, 'input[name="date_to"]', draft.dateTo);
+    setDraftField(root, "[data-sales-client-id]", draft.counterpartyId);
     var restoredDate = root.querySelector('input[name="date"]');
     if (restoredDate) {
       // The custom date picker is enhanced before the saved draft is restored.
@@ -1556,13 +1575,10 @@
     setDraftField(root, "[data-sales-payment-type]", draft.paymentType);
     setDraftField(root, "[data-sales-payment-lines]", draft.paymentLines);
     setDraftField(root, 'textarea[name="note"]', draft.note);
-    // Рассрочку из черновика не восстанавливаем: она задаётся заново для
-    // каждой продажи и раскрывается только нажатием «+ Рассрочка». Иначе
-    // блок наследовался от прошлой продажи и открывался сам.
-    setDraftField(root, "[data-sales-installment-enabled]", "0");
-    setDraftField(root, "[data-sales-installment-months-field]", "");
-    setDraftField(root, "[data-sales-installment-initial-field]", "");
-    setDraftField(root, "[data-sales-installment-markup-field]", "");
+    setDraftField(root, "[data-sales-installment-enabled]", draft.installmentEnabled || "0");
+    setDraftField(root, "[data-sales-installment-months-field]", draft.installmentMonths || "");
+    setDraftField(root, "[data-sales-installment-initial-field]", draft.installmentInitial || "");
+    setDraftField(root, "[data-sales-installment-markup-field]", draft.installmentMarkup || "");
     if (draft.manualOriginalTotal) root.dataset.salesManualOriginalTotal = draft.manualOriginalTotal;
     else delete root.dataset.salesManualOriginalTotal;
     var clientCombo = root.querySelector('[data-sales-combobox="client"]');
@@ -1604,6 +1620,7 @@
       return normalize(item.name) === normalize(draft.client);
     });
     updateClientBalance(root, matchedClient || (draft.client ? draft.client : null));
+    if (!matchedClient && draft.counterpartyId) setDraftField(root, "[data-sales-client-id]", draft.counterpartyId);
     setDraftField(root, "[data-sales-segment-select]", draft.businessSegmentId);
     var editing = !!String(draft.documentId || "").trim();
     var typeLabel = draft.docType === "order" ? "заказа" : draft.docType === "return" ? "возврата" : "продажи";
@@ -1739,7 +1756,8 @@
     var quantityOutput = root.querySelector("[data-sales-lines-quantity]");
     if (quantityOutput) quantityOutput.textContent = rowsQuantity(root).toLocaleString("ru-RU");
     var output = root.querySelector("[data-sales-lines-total]");
-    if (output) output.textContent = formatMoney(total, selectedCurrency(root)) + " " + selectedCurrency(root);
+    var documentTotal = installmentState(root).on ? installmentNumbers(root).grand : total;
+    if (output) output.textContent = formatMoney(documentTotal, selectedCurrency(root)) + " " + selectedCurrency(root);
     updateDiscountBadge(root, total);
     updatePaymentBreakdown(root);
     updateInstallmentSummary(root);
@@ -1778,6 +1796,10 @@
       grand: roundCurrency(initial + restTotal, currency),
       monthly: roundCurrency(restTotal / state.months, currency),
     };
+  }
+
+  function documentAmountDue(root) {
+    return installmentState(root).on ? installmentNumbers(root).grand : rowsTotal(root, false);
   }
 
   function setMoneyText(root, selector, value, currency) {
@@ -1887,24 +1909,21 @@
       // Расчёт появляется, когда условия заданы.
       if (enabledField) enabledField.value = "1";
       if (monthsField && !monthsField.value) monthsField.value = "1";
-      updateInstallmentSummary(root);
-      scheduleSalesDraft(root);
+      updateTotal(root);
     });
     root.querySelector("[data-sales-installment-remove]")?.addEventListener("click", function () {
       if (enabledField) enabledField.value = "0";
       if (monthsField) monthsField.value = "";
       if (initialField) initialField.value = "";
       if (markupField) markupField.value = "";
-      updateInstallmentSummary(root);
-      scheduleSalesDraft(root);
+      updateTotal(root);
     });
     root.querySelector("[data-sales-installment-open]")?.addEventListener("click", function () {
       openInstallmentDialog(root);
     });
     root.querySelector("[data-sales-installment-months]")?.addEventListener("input", function (event) {
       if (monthsField) monthsField.value = String(Math.max(1, Math.round(numberValue(event.target.value) || 1)));
-      updateInstallmentSummary(root);
-      scheduleSalesDraft(root);
+      updateTotal(root);
     });
     root.querySelector("[data-sales-installment-details-toggle]")?.addEventListener("click", function (event) {
       var details = root.querySelector("[data-sales-installment-details]");
@@ -1934,8 +1953,7 @@
         if (markupField) markupField.value = String(markup);
         if (monthsField) monthsField.value = String(months);
         closeInstallmentDialog();
-        updateInstallmentSummary(root);
-        scheduleSalesDraft(root);
+        updateTotal(root);
       });
     }
     updateInstallmentSummary(root);
@@ -2117,6 +2135,10 @@
     }
     var price = salesPrice(item, selectedPriceTypeId(root), selectedCurrency(root), options);
     commitCombo(combo, item.name || "");
+    if (line) {
+      var productId = line.querySelector("[data-sales-line-product-id]");
+      if (productId) productId.value = item.id || "";
+    }
     if (line && price.price) {
       line.dataset.salesBasePrice = price.basePrice || price.price;
       line.dataset.salesBaseCurrency = price.baseCurrency || price.currency || selectedCurrency(root);
@@ -2552,6 +2574,13 @@
       });
     }
     input.addEventListener("input", render);
+    if (type === "product" || type === "service" || type === "subscription") {
+      input.addEventListener("input", function () {
+        var row = combo.closest(".sales-line-grid");
+        var productId = row ? row.querySelector("[data-sales-line-product-id]") : null;
+        if (productId) productId.value = "";
+      });
+    }
     if (type === "client") {
       input.addEventListener("input", function () {
         updateClientBalance(root, input.value);
@@ -2845,7 +2874,13 @@
     var options = readOptions();
     var target = String(targetCurrency || "UZS").toUpperCase();
     return (Array.isArray(payments) ? payments : []).reduce(function (sum, item) {
-      return sum + convertPrice(item.amount, item.currency || target, target, options);
+      var source = String(item.currency || target).toUpperCase();
+      var rate = numberValue(item.exchange_rate) || usdRate(options);
+      var amount = numberValue(item.amount);
+      if (source === target) return sum + amount;
+      if (source === "USD" && target === "UZS") return sum + amount * rate;
+      if (source === "UZS" && target === "USD") return sum + amount / rate;
+      return sum + amount;
     }, 0);
   }
 
@@ -2867,6 +2902,7 @@
       }
     }
     row.dataset.salesPaymentCurrency = target;
+    row.dataset.salesPaymentExchangeRate = String(usdRate(readOptions()));
   }
 
   function selectedPaymentLabel(select) {
@@ -2903,7 +2939,8 @@
         account: selectedPaymentLabel(account),
         currency: paymentCurrency || selectedCurrency(root),
         type: selectedPaymentLabel(account),
-        amount: String(amount)
+        amount: String(amount),
+        exchange_rate: row.dataset.salesPaymentExchangeRate || String(usdRate(readOptions()))
       });
     });
     return payments;
@@ -2920,7 +2957,7 @@
     var summary = dialog ? dialog.querySelector("[data-sales-payment-summary]") : null;
     if (!summary) return;
     var currency = selectedCurrency(root);
-    var due = rowsTotal(root, false);
+    var due = documentAmountDue(root);
     var paid = paymentTotalInCurrency(root, currency);
     var rest = Math.max(0, due - paid);
     var overpaid = Math.max(0, paid - due);
@@ -2965,7 +3002,7 @@
     if (!box) return;
     var items = Array.isArray(payments) ? payments : parsePaymentLines(root);
     var currency = selectedCurrency(root);
-    var total = rowsTotal(root, false);
+    var total = documentAmountDue(root);
     var paid = paymentListTotalInCurrency(items, currency);
     var debt = Math.max(0, total - paid);
     var totalOutput = box.querySelector("[data-sales-payment-breakdown-total]");
@@ -3011,6 +3048,7 @@
       if (currency) {
         setPaymentSelect(currency, selectedCurrency(root));
         row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+        row.dataset.salesPaymentExchangeRate = String(usdRate(readOptions()));
       }
     });
     updatePaymentSummary(root);
@@ -3054,12 +3092,14 @@
       setPaymentSelect(currency, values.currency || selectedCurrency(root));
       if (amount && values.amount) amount.value = formatMoney(numberValue(values.amount), values.currency || selectedCurrency(root));
       row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+      row.dataset.salesPaymentExchangeRate = String(numberValue(values.exchange_rate) || usdRate(readOptions()));
     } else {
       var defaultAccount = row.querySelector("[data-sales-payment-account]");
       var defaultCurrency = row.querySelector("[data-sales-payment-currency]");
       if (defaultAccount && defaultAccount.options.length) defaultAccount.selectedIndex = 0;
       setPaymentSelect(defaultCurrency, selectedCurrency(root));
       row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+      row.dataset.salesPaymentExchangeRate = String(usdRate(readOptions()));
     }
     wrap.appendChild(row);
     wirePaymentLine(root, row);
@@ -3077,6 +3117,7 @@
     if (currency) {
       setPaymentSelect(currency, selectedCurrency(root));
       row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+      row.dataset.salesPaymentExchangeRate = String(usdRate(readOptions()));
     }
   }
 
@@ -3094,6 +3135,7 @@
         : "";
     }
     row.dataset.salesPaymentCurrency = paymentCurrency(row, root);
+    row.dataset.salesPaymentExchangeRate = String(numberValue(values && values.exchange_rate) || usdRate(readOptions()));
   }
 
   function hydratePaymentRows(root, payments) {
@@ -3133,7 +3175,7 @@
     var rows = hydratePaymentRows(root, savedPayments);
     var first = rows[0] || ensureSingleEmptyPaymentLine(root);
     var currentPaid = numberValue(root.querySelector("[data-sales-paid-amount]")?.value || "");
-    var total = rowsTotal(root, false);
+    var total = documentAmountDue(root);
     var amountInput;
     if (savedPayments.length) {
       var extraRow = addPaymentLine(root, null);
@@ -3235,7 +3277,7 @@
       event.preventDefault();
       updatePaymentSummary(root);
       var currency = selectedCurrency(root);
-      var due = rowsTotal(root, false);
+      var due = documentAmountDue(root);
       var paid = paymentTotalInCurrency(root, currency);
       if (paid > due) return;
       syncPaymentHidden(root);
@@ -3354,6 +3396,7 @@
         day.dataset.date = key;
         if (date.getMonth() !== monthStart.getMonth()) day.classList.add("is-outside");
         if (date.getDay() === 0 || date.getDay() === 6) day.classList.add("is-weekend");
+        if (key < todayKey) day.classList.add("is-past");
         if (key === todayKey) day.classList.add("is-today");
         if (key === selectedKey) day.classList.add("is-selected");
 

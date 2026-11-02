@@ -9,6 +9,38 @@
 </datalist>
 <script type="application/json" data-messenger-thread-json>{{ messenger_threads_json|safe }}</script>
 <script type="application/json" data-messenger-template-json>{{ messenger_templates_json|default('[]')|safe }}</script>
+<script type="application/json" data-messenger-campaign-json>{{ messenger_campaigns_json|default('[]')|safe }}</script>
+
+<section class="messenger-journal" data-workspace-view="sms_journal" data-messenger-message-journal hidden>
+  <header class="messenger-journal-head">
+    <div><h2>Журнал чатов</h2><p>Входящие и исходящие сообщения из подключённых мессенджеров</p></div>
+    <span data-messenger-journal-summary></span>
+  </header>
+  <div class="messenger-journal-filters">
+    <label>Поиск <input type="search" placeholder="Клиент или текст сообщения" data-messenger-journal-search /></label>
+    <div class="messenger-journal-channels" aria-label="Каналы">
+      <button type="button" class="active" data-messenger-journal-channel="" aria-pressed="true">Все</button>
+      {% for channel_name in messenger_options.channels %}
+      <button type="button" data-messenger-journal-channel="{{ channel_name|lower }}" aria-pressed="false">{{ channel_name }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="messenger-journal-list">
+    {% for row in messenger_journal_rows|default([]) %}
+    <article class="messenger-journal-row" tabindex="0" role="link"
+      data-messenger-journal-row data-channel="{{ row.channel|lower }}"
+      data-thread-id="{{ row.thread_id|e }}" data-created-at="{{ row.created_at|e }}"
+      data-kind="{{ row.kind|e }}" data-unread="{{ '1' if row.unread else '0' }}"
+      data-search="{{ (row.contact ~ ' ' ~ row.author ~ ' ' ~ row.message ~ ' ' ~ row.channel)|lower|e }}"
+      data-thread-url="/messengers?channel={{ row.channel|urlencode }}&amp;thread={{ row.thread_id|urlencode }}#inbox">
+      <span class="messenger-journal-direction messenger-journal-direction--{{ row.kind }}">{{ 'Входящее' if row.kind == 'in' else 'Исходящее' }}</span>
+      <div><strong>{{ row.contact }}</strong><p>{{ row.message }}</p></div>
+      <small>{{ row.channel }}<br />{{ row.time_label }}{% if row.unread %}<b class="messenger-journal-unread">Новое</b>{% endif %}</small>
+    </article>
+    {% endfor %}
+    <p class="messenger-empty" data-messenger-journal-empty{% if messenger_journal_rows %} hidden{% endif %}>Сообщений пока нет.</p>
+  </div>
+</section>
 
 {% set active_messenger_channel = messenger_filters.channel or 'Telegram' %}
 {% set messenger_channel_unread_counts = messenger_channel_unread_counts|default({}) %}
@@ -152,6 +184,7 @@
             <p class="settings-ios-footnote" data-messenger-thread-meta>Выберите диалог слева</p>
             <h3 data-messenger-thread-title>Диалог</h3>
             <span class="messenger-thread-presence messenger-thread-presence--offline" data-messenger-thread-presence>Не в сети</span>
+            <a class="messenger-thread-client-link" data-messenger-thread-client-link target="_blank" rel="noopener" hidden></a>
           </div>
         </div>
         <div class="messenger-dialog-chat-tools">
@@ -341,8 +374,8 @@
           <tr>
             <th>Название</th>
             <th>Канал</th>
-            <th>Сегмент</th>
-            <th>Дата запуска</th>
+            <th>Получатели</th>
+            <th>Дата отправки</th>
             <th>Статус</th>
           </tr>
         </thead>
@@ -351,9 +384,9 @@
             <tr>
               <td><strong>{{ row.title }}</strong><small>{{ row.note or row.message or row.segment }}</small></td>
               <td>{{ row.channel }}</td>
-              <td>{{ row.segment or "-" }}</td>
+              <td>{{ row.recipient_count|default(0) }}{% if row.results %}<details class="messenger-campaign-results"><summary>Результаты</summary>{% for result in row.results %}<div>{{ result.contact or result.chat_id }} — {{ 'Отправлено' if result.status == 'sent' else 'Ошибка: ' ~ (result.error or 'нет ответа') }}</div>{% endfor %}</details>{% endif %}</td>
               <td>{{ row.run_at or "-" }}</td>
-              <td>{{ row.status_label or row.status or "-" }}</td>
+              <td>{{ row.status_label or row.status or "-" }}{% if row.status == 'draft' %} <button type="button" class="btn btn-secondary messenger-campaign-reuse" data-messenger-campaign-reuse="{{ row.id }}">Продолжить</button>{% endif %}</td>
             </tr>
           {% else %}
             <tr><td colspan="5">Рассылок пока нет. Создайте первую кампанию справа.</td></tr>
@@ -367,21 +400,29 @@
     <header>
       <div>
         <h2>Новая рассылка</h2>
-        <span>Сегменты и шаблоны сообщений</span>
+        <span>Только вручную выбранные чаты Telegram</span>
       </div>
     </header>
-    <form class="products-form" method="post" action="/messengers/campaigns/save">
+    <form class="products-form" method="post" action="/messengers/campaigns/save" data-messenger-campaign-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="hidden" name="form_id" value="{{ messenger_campaign_form_id }}" />
       <label><span>Название кампании*</span><input name="title" required /></label>
-      <div class="products-form-grid products-form-grid--two">
-        <label><span>Канал</span><select name="channel"><option>Telegram</option><option>Instagram</option><option>WhatsApp</option><option>Facebook</option><option>Сайт</option></select></label>
-        <label><span>Сегмент получателей</span><select name="segment"><option>Все клиенты</option><option>По маршруту</option><option>По категории</option><option>Вручную</option></select></label>
+      <div class="messenger-campaign-picker">
+        <div class="messenger-campaign-picker-head"><strong>Получатели</strong><span data-messenger-campaign-count>Выбрано: 0 из {{ messenger_campaign_recipients|length }}</span></div>
+        <input type="search" placeholder="Найти чат по имени или @username" data-messenger-campaign-search aria-label="Поиск чата" />
+        <div class="messenger-campaign-recipient-list" data-messenger-campaign-list>
+          {% for row in messenger_campaign_recipients %}
+          <label class="messenger-campaign-recipient" data-messenger-campaign-recipient data-search="{{ (row.contact ~ ' ' ~ (row.username or ''))|lower }}"><input type="checkbox" name="recipient_ids" value="{{ row.id }}" /><span><strong>{{ row.contact }}</strong><small>{{ '@' ~ row.username if row.username else row.topic }}</small></span></label>
+          {% else %}
+          <p>Доступных чатов бота пока нет. Личная история Telegram, сохранённая в этом браузере, не даёт боту права писать клиентам. Попросите клиента написать подключённому боту.</p>
+          {% endfor %}
+        </div>
+        <small>Выберите до 20 чатов. Сообщение получат только отмеченные клиенты.</small>
       </div>
-      <label><span>Шаблон сообщения</span><textarea name="message" rows="4" placeholder="Здравствуйте, {{ '{{name}}' }}. Ваш баланс: {{ '{{balance}}' }}"></textarea></label>
-      <label><span>Дата и время запуска</span><input type="datetime-local" name="run_at" /></label>
+      <label><span>Сообщение*</span><textarea name="message" rows="5" maxlength="4000" placeholder="Текст сообщения для выбранных чатов"></textarea></label>
       <label><span>Комментарий</span><input name="note" /></label>
       <div class="products-form-actions">
-        <button class="btn" name="action" value="launch" type="submit">Запустить</button>
+        <button class="btn" name="action" value="launch" type="submit">Отправить выбранным</button>
         <button class="btn btn-secondary" name="action" value="draft" type="submit">Сохранить черновик</button>
       </div>
     </form>

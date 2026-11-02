@@ -1432,7 +1432,8 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   }
 }
 
-.sales-add-service-btn[hidden] {
+.sales-add-service-btn[hidden],
+.sales-add-subscription-btn[hidden] {
   display: none !important;
 }
 
@@ -2349,6 +2350,169 @@ body.sidebar-rail .sidebar-rail-toggle-icon {
   align-items: center;
   gap: 0.55rem;
   padding: 0 1.35rem 1.1rem;
+}
+
+.products-bulk-edit-dialog {
+  width: min(46rem, calc(100vw - 2rem));
+  overflow: visible;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-panel {
+  border-radius: 14px;
+  overflow: visible;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-head {
+  align-items: flex-start;
+  padding: 1.25rem 1.4rem;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-head p {
+  margin: 0.4rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.3rem 1.4rem;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-row:has([data-products-bulk-toggle]:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--card));
+}
+
+.products-bulk-edit-dialog .products-bulk-field-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  cursor: pointer;
+  color: var(--foreground);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-row input[data-products-bulk-input] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--control-border, var(--border));
+  border-radius: 8px;
+  background: var(--control-bg, var(--background));
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 500;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-row input[data-products-bulk-input]:disabled {
+  opacity: 0.65;
+}
+
+.products-bulk-combo {
+  position: relative;
+  min-width: 0;
+}
+
+.products-bulk-combo input[data-products-bulk-input] {
+  padding-right: 2.5rem;
+}
+
+.products-bulk-combo > button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2.4rem;
+  height: 2.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.products-bulk-combo > button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.products-bulk-combo-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  max-height: 13rem;
+  overflow-y: auto;
+  padding: 0.3rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 9px;
+  background: var(--card);
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.18);
+}
+
+.products-bulk-combo-panel[hidden] { display: none; }
+
+.products-bulk-combo-panel button {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.products-bulk-combo-panel button:hover,
+.products-bulk-combo-panel button:focus-visible {
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+
+.products-bulk-combo-panel .products-bulk-combo-create {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.products-bulk-combo-empty {
+  display: block;
+  padding: 0.55rem 0.65rem;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.products-bulk-edit-dialog .products-bulk-dialog-actions {
+  justify-content: flex-end;
+  padding: 0 1.4rem 1.3rem;
+}
+
+@media (max-width: 580px) {
+  .products-bulk-edit-dialog .products-bulk-dialog-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .products-table {
@@ -6155,6 +6319,171 @@ a.messenger-message-attachment:focus-visible {
   margin-bottom: 1rem;
 }
 
+.crm-contact-queue {
+  min-width: 0;
+  margin-bottom: 1rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  box-shadow: var(--workspace-module-panel-shadow, 0 12px 24px rgb(15 23 42 / 0.06));
+  overflow: hidden;
+}
+
+.crm-contact-queue[hidden] {
+  display: none;
+}
+
+.crm-contact-queue-head {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+}
+
+.crm-contact-queue-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.crm-contact-queue-head h2 span {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  color: var(--primary);
+  font-size: var(--text-xs);
+}
+
+.crm-contact-queue-head p {
+  margin: 0.2rem 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-contact-queue-scroll {
+  max-height: 19rem;
+  overflow: auto;
+}
+
+.crm-contact-queue-list {
+  min-width: 57rem;
+}
+
+.crm-contact-queue-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.4fr) minmax(7.5rem, 0.8fr) minmax(7rem, 0.7fr) minmax(9rem, 0.8fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--workbench-line, var(--border));
+  font-size: var(--text-xs);
+}
+
+.crm-contact-queue-row:last-child {
+  border-bottom: 0;
+}
+
+.crm-contact-queue-row:nth-child(even) {
+  background: color-mix(in srgb, var(--primary) 3%, var(--card));
+}
+
+.crm-contact-queue-client {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.crm-contact-queue-client button {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-client button:hover {
+  text-decoration: underline;
+}
+
+.crm-contact-queue-client small,
+.crm-contact-queue-days {
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-reason {
+  width: fit-content;
+  padding: 0.2rem 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  color: var(--primary);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-row[data-priority="0"] .crm-contact-queue-reason,
+.crm-contact-queue-row[data-priority="1"] .crm-contact-queue-reason {
+  background: color-mix(in srgb, #dc2626 10%, var(--card));
+  color: #b91c1c;
+}
+
+.crm-contact-queue-amount {
+  white-space: nowrap;
+}
+
+.crm-contact-queue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.crm-contact-queue-actions a,
+.crm-contact-queue-actions button,
+.crm-contact-queue-actions span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.9rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.crm-contact-queue-actions a:hover,
+.crm-contact-queue-actions button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.crm-contact-queue-actions span {
+  color: var(--muted-foreground);
+  cursor: default;
+}
+
+.crm-contact-queue-empty {
+  margin: 0;
+  padding: 0.8rem 0.85rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
 .crm-service-metrics {
   display: grid;
   grid-template-columns: repeat(7, minmax(7.5rem, 1fr));
@@ -6763,11 +7092,12 @@ a.messenger-message-attachment:focus-visible {
 
 .crm-kanban-card {
   position: relative;
-  display: grid;
-  gap: 0.34rem;
-  height: max-content;
-  min-height: 12.75rem;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  box-sizing: border-box;
+  height: 16rem;
+  flex: 0 0 16rem;
   min-width: 0;
   padding: 0.82rem 0.75rem 0.7rem;
   overflow: hidden;
@@ -6962,22 +7292,48 @@ a.messenger-message-attachment:focus-visible {
 }
 
 .crm-kanban-card-titleline {
-  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem;
   min-width: 0;
-  overflow: visible;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  align-items: start;
 }
 
 .crm-kanban-card-titleline strong {
-  flex: 1 1 8rem;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
-.crm-kanban-card-top > span,
+.crm-kanban-card-top {
+  display: grid;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.crm-kanban-card-top > span {
+  display: block;
+  width: fit-content;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .crm-kanban-card-money small {
   max-width: 100%;
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.crm-kanban-card-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .crm-kanban-card-date {
@@ -7002,9 +7358,19 @@ a.messenger-message-attachment:focus-visible {
 }
 
 .crm-kanban-card-tags {
+  flex: 0 0 1.35rem;
   min-height: 1.35rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 0.3rem;
+}
+
+.crm-kanban-card-tags span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crm-kanban-tag-form {
@@ -7119,6 +7485,10 @@ a.messenger-message-attachment:focus-visible {
   background: color-mix(in srgb, var(--primary) 9%, var(--card));
 }
 
+.crm-kanban-card-top > span {
+  display: block;
+}
+
 .crm-kanban-card-tags span {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
@@ -7146,6 +7516,33 @@ a.messenger-message-attachment:focus-visible {
 .crm-kanban-client-line {
   min-width: 0;
   justify-content: flex-start;
+}
+
+.crm-kanban-client-line .crm-kanban-client {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.crm-kanban-card-money,
+.crm-kanban-chat,
+.crm-kanban-contact-employees {
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-kanban-card-money {
+  flex-wrap: nowrap;
+}
+
+.crm-kanban-card-money-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crm-kanban-age {
@@ -7209,7 +7606,177 @@ a.messenger-message-attachment:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.crm-deal-money-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.crm-deal-money-row[hidden] {
+  display: none;
+}
+
+.crm-deal-money-row > label {
+  min-width: 0;
+}
+
+.crm-deal-money-row input,
+.crm-deal-money-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.crm-deal-currency-field select {
+  width: 100%;
+  max-width: none;
+}
+
+.crm-record-form-grid > [data-crm-source-options] {
+  display: none;
+}
+
+.crm-source-picker-field [data-crm-source-input] {
+  width: 100%;
+}
+
+.crm-source-picker-field .crm-source-error {
+  color: var(--destructive, #c03636);
+  font-weight: 600;
+}
+
+.crm-source-create-option .sales-combo-main {
+  color: var(--primary, #2563eb);
+}
+
 .crm-deal-contact-field {
+  display: none;
+}
+
+.crm-deal-contact-field input.crm-contact-known {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.crm-contact-option .crm-contact-phone {
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  background: #e7f0ff;
+  color: #1d4ed8;
+}
+
+.crm-contact-option .crm-contact-search-hit {
+  padding: 0 0.1rem;
+  border-radius: 0.2rem;
+  background: #fde68a;
+  color: #713f12;
+  font: inherit;
+}
+
+.crm-contact-card-link {
+  width: fit-content;
+  margin-top: 0.2rem;
+  color: var(--primary, #2563eb);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.crm-contact-card-link:hover {
+  text-decoration: underline;
+}
+
+.crm-deal-segment-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.crm-deal-segment-field[hidden] {
+  display: none;
+}
+
+.crm-kanban-contact-employees {
+  margin-top: auto;
+  padding-top: 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.crm-deal-segment-field > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.crm-deal-segment-dropdown {
+  position: relative;
+  min-width: 0;
+}
+
+.crm-deal-segment-dropdown > summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--card);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.crm-deal-segment-dropdown > summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-deal-segment-menu {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 13rem;
+  overflow: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--card);
+}
+
+.crm-deal-segment-menu > input {
+  width: 100%;
+}
+
+.crm-deal-segment-options {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.product-form .crm-deal-segment-options > label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.product-form .crm-deal-segment-options > label input {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.product-form .crm-deal-segment-options > label:hover {
+  background: color-mix(in srgb, var(--primary), transparent 92%);
+}
+
+.product-form .crm-deal-segment-options > label[hidden] {
   display: none;
 }
 
@@ -7418,6 +7985,41 @@ a.messenger-message-attachment:focus-visible {
   text-decoration: none;
 }
 
+.crm-card-detail-phones {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--workbench-line, var(--border)));
+  border-radius: var(--workbench-radius-sm, 8px);
+  background: var(--card);
+}
+
+.crm-card-detail-phones-head,
+.crm-card-detail-phone-list,
+.crm-card-detail-phone-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+}
+
+.crm-card-detail-phones-head { justify-content: space-between; }
+.crm-card-detail-phones-head span { color: var(--muted-foreground); font-size: var(--text-xs); }
+.crm-card-detail-phones-head button { font-size: var(--text-xs); }
+.crm-card-detail-phone-list a {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.crm-card-detail-phone-list a:hover { text-decoration: underline; }
+.crm-card-detail-phone-list small { color: var(--muted-foreground); }
+.crm-card-detail-phone-form[hidden],
+.crm-card-detail-phone-form [hidden] { display: none; }
+.crm-card-detail-phone-form input { flex: 1 1 12rem; min-width: 0; }
+.crm-card-detail-phone-form button { font-size: var(--text-xs); }
+.crm-card-detail-phone-form p { flex-basis: 100%; margin: 0; color: var(--destructive, #c3263e); font-size: var(--text-xs); }
+
 .crm-card-detail-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7447,6 +8049,86 @@ a.messenger-message-attachment:focus-visible {
   margin: 0;
   overflow-wrap: break-word;
   font-weight: 800;
+}
+
+.crm-card-detail-list .crm-card-detail-employees {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.crm-card-detail-list .crm-card-detail-employees[hidden] {
+  display: none;
+}
+
+.crm-card-detail-employees dt {
+  flex: 1 0 100%;
+}
+
+.crm-card-detail-employees dd {
+  flex: 1 1 10rem;
+}
+
+.crm-card-detail-employees button {
+  font-size: var(--text-xs);
+}
+
+.crm-card-detail-employee-picker {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--card);
+}
+
+.crm-card-detail-employee-picker[hidden],
+.crm-card-detail-employee-error[hidden] {
+  display: none;
+}
+
+.crm-card-detail-employee-picker > input {
+  width: 100%;
+  min-width: 0;
+}
+
+.crm-card-detail-employee-options {
+  display: grid;
+  gap: 0.15rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.crm-card-detail-employee-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.crm-card-detail-employee-options label:hover {
+  background: var(--muted);
+}
+
+.crm-card-detail-employee-options label[hidden] {
+  display: none;
+}
+
+.crm-card-detail-employee-error {
+  margin: 0;
+  color: var(--destructive);
+  font-size: var(--text-xs);
+}
+
+.crm-card-detail-employee-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
 }
 
 .crm-card-detail-money {
@@ -7777,6 +8459,54 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .crm-card-detail-task-form {
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
+}
+
+.crm-card-detail-add-task {
+  width: 100%;
+}
+
+.settings-profile-modal.crm-card-task-dialog {
+  width: min(38rem, 94vw);
+  max-width: min(38rem, 94vw);
+}
+
+.crm-card-task-dialog-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crm-card-task-dialog-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+}
+
+.crm-card-task-dialog-fields label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.crm-card-task-dialog-fields label.wide {
+  grid-column: 1 / -1;
+}
+
+.crm-card-task-dialog-fields .crm-task-done-toggle {
+  display: flex;
+  color: var(--foreground);
+}
+
+@media (max-width: 560px) {
+  .crm-card-task-dialog-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .crm-task-form-main {
@@ -9822,6 +10552,57 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   justify-content: flex-start;
 }
 
+.purchase-document-payment-action-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.document-detail-expense-pay-btn {
+  width: auto;
+  min-width: 12rem;
+  min-height: 2.1rem;
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  white-space: nowrap;
+}
+
+.warehouse-expense-payment-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.warehouse-expense-payment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--workbench-radius-sm, 10px);
+  background: var(--card);
+}
+
+.warehouse-expense-payment-info {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.warehouse-expense-payment-info span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 640px) {
+  .warehouse-expense-payment-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .purchase-document-payment-table .document-detail-payment-pay-btn {
   width: auto;
   min-width: 8.5rem;
@@ -11339,7 +12120,7 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  margin-left: auto;
+  margin-left: 0;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-weight: 800;
@@ -11476,6 +12257,26 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   line-height: 1.25;
 }
 
+.upos-catalog-picker-product {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.upos-catalog-picker-product > input {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 1.05rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.upos-catalog-picker-product > span {
+  min-width: 0;
+}
+
 .upos-catalog-picker-table small {
   display: block;
   margin-top: 0.18rem;
@@ -11559,6 +12360,11 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
   .upos-catalog-picker-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .upos-catalog-picker-select-all {
+    width: 100%;
+    margin-left: 0;
   }
 
   .upos-catalog-picker-search {
@@ -11835,8 +12641,16 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 }
 
 .sales-client-balance {
+  max-width: min(48%, 20rem);
+  overflow: hidden;
+  padding: 0.24rem 0.52rem;
+  border: 1px solid color-mix(in srgb, var(--brand-box, #2563eb) 24%, var(--workbench-line, var(--border)));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-accent, #2563eb) 8%, var(--card));
   font-size: var(--text-xs);
   font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -11846,6 +12660,10 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 
 .sales-client-balance[data-balance-kind="advance"] {
   color: #2563eb;
+}
+
+.sales-client-balance[data-balance-kind="zero"] {
+  color: var(--muted-foreground);
 }
 
 .sales-combobox {
@@ -11959,6 +12777,31 @@ body[data-embed="sales-order"] .sales-workspace--embed #sales-form > .products-p
 .warehouse-adjustment-product-control {
   display: block;
   min-width: 0;
+}
+
+.warehouse-adjustment-picker-stock {
+  color: var(--brand-box, #2563eb);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.upos-catalog-picker-select-all {
+  min-height: 2.25rem;
+  margin-left: auto;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.upos-catalog-picker-select-all:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .warehouse-adjustment-product-control .sales-combo-add {
@@ -16769,6 +17612,15 @@ details.integr-card:not(.integr-card--ios)[open] > summary .integr-card-chevron 
   justify-self: end;
 }
 
+.billing-client-size {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+}
+
+.billing-client-size strong {
+  color: var(--foreground);
+}
+
 .billing-client-row small {
   grid-column: 1 / -1;
   overflow-wrap: anywhere;
@@ -18884,6 +19736,12 @@ details.integr-card--ios[open] > summary .integr-card-chevron--ios svg {
 
 .integr-sync-status[data-variant="err"] {
   color: var(--destructive);
+}
+
+.integr-sync-last {
+  margin: 0.1rem 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 
 html.dark .settings-ios-plate--list .integr-card--ios .integr-card-body input {
@@ -30389,8 +31247,113 @@ body.upos-table-column-resizing * {
 }
 
 .upos-table-column-control {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+/* Menu order is changed only while the owner has opened its edit controls. */
+.menu-order-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  min-height: 1.75rem;
+  flex: none;
+}
+
+.general-report-launcher > .menu-order-toolbar {
+  grid-column: 1 / -1;
+  justify-self: end;
+  width: 100%;
+}
+
+.menu-order-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--border), var(--primary) 16%);
+  border-radius: 0.45rem;
+  background: var(--background);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.menu-order-button:hover,
+.menu-order-button:focus-visible {
+  background: color-mix(in srgb, var(--primary), transparent 90%);
+  outline: 2px solid color-mix(in srgb, var(--primary), transparent 55%);
+  outline-offset: 1px;
+}
+
+.menu-order-button--save,
+.menu-order-button--cancel,
+.menu-order-editing .menu-order-button--edit {
+  display: none;
+}
+
+.menu-order-editing .menu-order-button--save,
+.menu-order-editing .menu-order-button--cancel {
+  display: inline-flex;
+}
+
+.menu-order-button--save {
+  color: #fff;
+  background: var(--primary);
+}
+
+.menu-order-grip {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
+  color: currentColor;
+  opacity: 0.85;
+  cursor: grab;
+  touch-action: none;
+}
+
+.menu-order-editing > .general-report-card,
+.menu-order-editing > .nav-link,
+.menu-order-editing > .nav-sublink {
+  position: relative;
+  cursor: default;
+}
+
+.menu-order-editing > .general-report-card > .menu-order-grip {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  padding: 0.15rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, black, transparent 80%);
+}
+
+.menu-order-editing > .nav-link > .menu-order-grip,
+.menu-order-editing > .nav-sublink > .menu-order-grip {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.menu-order-editing .menu-order-grip:active {
+  cursor: grabbing;
+}
+
+.menu-order-dragging {
+  opacity: 0.55;
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+}
+
+body.sidebar-rail .nav > .menu-order-toolbar {
+  display: none;
 }
 
 .upos-table-column-btn {
@@ -30407,7 +31370,8 @@ body.upos-table-column-resizing * {
 }
 
 .upos-table-column-btn:hover,
-.upos-table-column-control.is-column-menu-open .upos-table-column-btn {
+.upos-table-column-control.is-column-menu-open [data-upos-column-menu-toggle],
+.upos-table-column-control.is-width-editor-open .upos-table-width-btn {
   border-color: color-mix(in srgb, var(--primary), transparent 26%);
   background: color-mix(in srgb, var(--primary), transparent 88%);
 }
@@ -30444,6 +31408,35 @@ body.upos-table-column-resizing * {
 
 .upos-table-column-menu[hidden] {
   display: none;
+}
+
+.upos-table-width-panel p {
+  margin: 0 0 0.4rem;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.upos-table-width-panel-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.upos-table-width-save {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.upos-table-width-save:hover {
+  background: color-mix(in srgb, var(--primary), black 12%);
+}
+
+.upos-table-width-editing .upos-table-column-resize-handle::after {
+  width: 3px;
+  background: var(--primary);
+  opacity: 1;
 }
 
 .upos-table-column-menu-title {
@@ -31475,6 +32468,27 @@ html.dark .general-report-launcher {
   background: color-mix(in srgb, var(--workbench-surface), var(--background) 18%);
 }
 
+/* Messenger highlights must keep dark surfaces behind light theme text. */
+html.dark .messenger-channel-tab {
+  --channel-brand-soft: color-mix(in srgb, var(--channel-brand), var(--card) 82%);
+}
+
+html.dark .messenger-channel-tab:not(:hover):not(.active)::before {
+  border-color: color-mix(in srgb, var(--channel-brand), var(--card) 58%);
+}
+
+html.dark .messenger-dialog-item:hover,
+html.dark .messenger-dialog-item.active {
+  background: color-mix(in srgb, var(--primary), var(--card) 82%);
+  color: var(--foreground);
+}
+
+html.dark .messenger-thread-message--out {
+  border-color: color-mix(in srgb, var(--primary), var(--border) 55%);
+  background: color-mix(in srgb, var(--primary), var(--card) 77%);
+  color: var(--foreground);
+}
+
 html.dark .settings-page-wrap .settings-tab.settings-tab--rail {
   border-color: var(--workbench-line);
   background: oklch(1 0 0 / 0.045);
@@ -31676,6 +32690,17 @@ html.dark .clients-map-empty {
 }
 
 /* Warehouse stock receipt and write-off editor */
+.warehouse-adjustment-documents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.warehouse-adjustment-documents-head .btn {
+  flex: none;
+}
+
 .warehouse-adjustment-entry {
   width: 100%;
   max-width: none;
@@ -31767,6 +32792,74 @@ html.dark .clients-map-empty {
   margin-bottom: 0.55rem;
 }
 
+.warehouse-adjustment-document-row {
+  cursor: pointer;
+}
+
+.warehouse-adjustment-document-row:hover td {
+  background: color-mix(in srgb, var(--products-table-blue-strong) 9%, var(--card));
+}
+
+.warehouse-adjustment-document-number {
+  border: 0;
+  background: transparent;
+  color: var(--brand-box, var(--primary));
+  font: inherit;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.warehouse-adjustment-document-number:focus-visible {
+  outline: 2px solid var(--brand-box, var(--primary));
+  outline-offset: 2px;
+}
+
+.warehouse-adjustment-detail {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.warehouse-adjustment-detail-note {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--workbench-line, var(--border));
+}
+
+.warehouse-adjustment-detail-note p {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.warehouse-adjustment-detail-table td:nth-child(n+3) {
+  white-space: nowrap;
+}
+
+.warehouse-adjustment-detail .warehouse-purchase-detail-table-wrap {
+  border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 30%, var(--border, #cbd5e1));
+  border-radius: 6px;
+}
+
+.warehouse-adjustment-detail-table th,
+.warehouse-adjustment-detail-table td {
+  border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 25%, var(--border, #cbd5e1));
+}
+
+.warehouse-adjustment-detail-table thead th {
+  background: var(--products-table-head-bg, #e8efff);
+}
+
+.warehouse-adjustment-detail-table tbody tr:nth-child(even) td {
+  background: var(--products-table-row-alt-bg, #f4f7ff);
+}
+
+.warehouse-adjustment-detail-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--primary, #2563eb) 10%, var(--card, #fff));
+}
+
+.warehouse-adjustment-detail-table tfoot td {
+  border-top: 2px solid color-mix(in srgb, var(--primary, #2563eb) 40%, var(--border, #cbd5e1));
+  background: var(--products-table-head-bg, #e8efff);
+}
+
 .warehouse-adjustment-add {
   min-height: 34px;
   padding: 6px 12px;
@@ -31844,6 +32937,11 @@ html.dark .clients-map-empty {
   border-color: color-mix(in srgb, var(--brand-box, #2563eb) 18%, var(--workbench-line, var(--border)));
 }
 
+.warehouse-adjustment-table th {
+  white-space: normal;
+  line-height: 1.25;
+}
+
 .warehouse-adjustment-table td:nth-child(3) {
   white-space: normal;
 }
@@ -31907,7 +33005,7 @@ html.dark .clients-map-empty {
 
 .warehouse-adjustment-change {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
 }
 
@@ -32668,6 +33766,15 @@ html.dark .warehouse-adjustment-summary {
   opacity: 0.72;
 }
 
+.sales-installation-calendar-day.is-past:not(.is-outside) {
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--muted) 82%, var(--card));
+}
+
+.sales-installation-calendar-day.is-past:not(.is-outside):hover {
+  background: color-mix(in srgb, var(--muted) 92%, var(--card));
+}
+
 .sales-installation-calendar-day.is-today .sales-installation-calendar-day-number {
   border-color: #1f75d6;
   background: #1f75d6;
@@ -33040,7 +34147,7 @@ html.dark .sales-installation-calendar-order.is-completed {
   background: transparent;
   color: var(--card-foreground);
   font: inherit;
-  font-weight: 700;
+  font-weight: 800;
   text-align: left;
   cursor: pointer;
 }
@@ -33048,6 +34155,133 @@ html.dark .sales-installation-calendar-order.is-completed {
 .crm-task-title-button:hover {
   color: var(--primary);
   text-decoration: underline;
+}
+
+.crm-task-followup-mark {
+  display: inline-grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid var(--control-border);
+  border-radius: 50%;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  font-weight: 800;
+}
+
+.crm-task-followup-state button,
+.crm-task-followup-state a {
+  display: inline-block;
+  margin: 5px 5px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.crm-task-followup-state button:hover,
+.crm-task-followup-state a:hover {
+  text-decoration: underline;
+}
+
+/* Keep the deals board inside the viewport while each column scrolls independently. */
+.crm-pipeline-shell .crm-kanban {
+  height: max(340px, calc(100dvh - 330px));
+  min-height: 0;
+}
+
+.crm-pipeline-shell .crm-kanban-column {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+}
+
+.crm-pipeline-shell .crm-kanban-dropzone {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+
+.crm-pipeline-shell .crm-kanban-dropzone::-webkit-scrollbar {
+  width: 6px;
+}
+
+.crm-pipeline-shell .crm-kanban-dropzone::-webkit-scrollbar-thumb {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+.crm-pipeline-head--filters {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.crm-pipeline-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.crm-filter-popover {
+  position: relative;
+}
+
+.crm-filter-popover[open] {
+  z-index: 30;
+}
+
+.crm-filter-popover summary {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.crm-filter-popover summary::-webkit-details-marker {
+  display: none;
+}
+
+.crm-filter-popover .crm-kanban-filters {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(560px, calc(100vw - 260px));
+  max-height: calc(100dvh - 190px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--workbench-line, var(--border));
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 20px 48px rgb(15 23 42 / 0.2);
+}
+
+.crm-filter-popover .crm-kanban-filters label:first-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .crm-filter-popover .crm-kanban-filters {
+    width: min(90vw, 430px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .crm-filter-popover .crm-kanban-filters label:first-child {
+    grid-column: auto;
+  }
+  .crm-pipeline-shell .crm-kanban {
+    height: max(300px, calc(100dvh - 260px));
+  }
 }
 
 .crm-task-table td small {
@@ -34264,6 +35498,53 @@ html.dark .crm-task-calendar-event {
   color: var(--primary);
 }
 
+/* В закреплённой колонке каталога иконки истории должны читаться без hover. */
+#products-catalog-table .product-history-actions .product-history-btn {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  opacity: 1;
+}
+
+#products-catalog-table .product-history-actions .product-history-btn svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+#products-catalog-table .product-history-actions .product-history-btn:hover {
+  background: color-mix(in srgb, var(--primary) 22%, var(--card));
+}
+
+/* Действия справа в каталоге видны постоянно, а не только при наведении. */
+#products-catalog-table .products-row-actions .products-action-icon--edit {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  opacity: 1;
+}
+
+#products-catalog-table .products-row-actions .products-action-icon--delete:not(:disabled),
+.products-bulk-actions .products-action-icon--delete:not(:disabled) {
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 10%, var(--card));
+  opacity: 1;
+}
+
+#products-catalog-table .products-row-actions .products-action-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+#products-catalog-table .products-row-actions .products-action-icon--delete:disabled {
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--muted-foreground) 10%, var(--card));
+  opacity: 0.72;
+}
+
 /* Брендбук: контролы в ячейках журнала не выходят за границы колонок. */
 .sales-journal-table td select {
   width: 100%;
@@ -34429,8 +35710,10 @@ html.dark .crm-task-calendar-event {
 }
 
 .upos-table-column-control-slot .upos-table-column-control {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
   vertical-align: middle;
 }
 
@@ -35778,4 +37061,50 @@ html.dark .client-own-tag--other {
   opacity: 0.55;
   pointer-events: none;
   transition: opacity 0.12s ease;
+}
+
+/* The adjustment editor opens above its document list. */
+.workspace-module-root .warehouse-adjustment-dialog {
+  position: fixed;
+  width: min(1180px, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border-radius: 0.75rem;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+}
+
+.warehouse-adjustment-dialog::backdrop {
+  background: rgb(15 23 42 / 48%);
+}
+
+.warehouse-adjustment-dialog-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.warehouse-adjustment-dialog-head-actions .warehouse-adjustment-direction {
+  text-decoration: none;
+}
+
+.warehouse-adjustment-direction--selected {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.warehouse-adjustment-dialog-error {
+  margin: 0.75rem 1rem 0;
+}
+
+@media (max-width: 720px) {
+  .warehouse-adjustment-documents-head,
+  .warehouse-adjustment-entry-head {
+    flex-wrap: wrap;
+  }
+
+  .warehouse-adjustment-documents-head .btn {
+    width: 100%;
+  }
 }

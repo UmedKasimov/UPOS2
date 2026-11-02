@@ -233,7 +233,8 @@
 
   function syncPurchasePriceTitle(form) {
     const priceType = selectedPurchasePriceType(form);
-    const title = priceType.name || "Продажная цена";
+    const documentCurrency = String(form?.querySelector("[data-purchase-entry-currency]")?.value || "UZS").toUpperCase();
+    const title = `${priceType.name || "Продажная цена"} · ${documentCurrency}`;
     const header = form?.querySelector("[data-purchase-sale-price-title]");
     if (header) header.textContent = title;
     form?.querySelectorAll("[data-purchase-entry-sale-price]").forEach((input) => {
@@ -339,7 +340,7 @@
         <header class="upos-catalog-picker-head">
           <div>
             <h2>Подбор товаров</h2>
-            <p>Выберите товары из каталога и массово добавьте в приход.</p>
+            <p data-purchase-catalog-subtitle>Выберите товары из каталога и массово добавьте в приход.</p>
           </div>
           <button type="button" class="upos-catalog-picker-close" data-purchase-catalog-close aria-label="Закрыть">×</button>
         </header>
@@ -348,6 +349,7 @@
             <span>Поиск</span>
             <input type="search" autocomplete="off" placeholder="Название, артикул, штрихкод" data-purchase-catalog-search />
           </label>
+          <button type="button" class="upos-catalog-picker-select-all" data-purchase-catalog-select-all title="Выбрать все товары текущей категории с учётом поиска и фильтра">Выбрать все показанные</button>
           <label class="upos-catalog-picker-check">
             <input type="checkbox" data-purchase-catalog-only-stock />
             <span>Только с остатком</span>
@@ -400,6 +402,18 @@
     total.textContent = `Выбрано: ${count} · Кол-во: ${quantityText(amount)}`;
   }
 
+  function updatePurchaseCatalogSelectionControls(dialog) {
+    const keys = dialog._uposPurchaseCatalogVisibleKeys || [];
+    const quantities = dialog._uposPurchaseCatalogQuantities || new Map();
+    const selectAll = dialog.querySelector("[data-purchase-catalog-select-all]");
+    if (!selectAll) return;
+    const allSelected = keys.length > 0 && keys.every((key) => purchaseEntryNumber(quantities.get(key)) > 0);
+    selectAll.disabled = keys.length === 0;
+    selectAll.textContent = allSelected
+      ? `Снять выбор показанных (${keys.length})`
+      : `Выбрать все показанные (${keys.length})`;
+  }
+
   function renderPurchaseCatalogPicker(dialog) {
     const state = dialog._uposPurchaseCatalogState || {};
     const options = readPurchaseOptions();
@@ -409,9 +423,10 @@
     const activeCategory = state.category || "";
     const byCategory = allRows.filter((item) => !activeCategory || catalogProductCategory(item) === activeCategory);
     const rows = byCategory.filter((item) => {
-      if (onlyStock && !purchaseEntryNumber(productStockLabel(item))) return false;
+      if (onlyStock && !(state.stockValue ? state.stockValue(item) : purchaseEntryNumber(productStockLabel(item)))) return false;
       return normalize(catalogProductSearchText(item)).includes(normalize(query));
     });
+    dialog._uposPurchaseCatalogVisibleKeys = [...new Set(rows.map(purchaseProductKey))];
     const categoriesNode = dialog.querySelector("[data-purchase-catalog-categories]");
     if (categoriesNode) {
       const categories = purchaseCatalogCategories(allRows);
@@ -431,20 +446,23 @@
         const quantity = quantities.get(key) || "";
         return `
           <tr data-purchase-catalog-key="${escapeHtml(key)}">
-            <td><strong>${highlightCatalogText(item.name, query)}</strong><small>${escapeHtml([item.category || "", item.sku || item.barcode || ""].filter(Boolean).join(" · "))}</small></td>
+            <td><label class="upos-catalog-picker-product"><input type="checkbox" data-purchase-catalog-select aria-label="Выбрать ${escapeHtml(item.name)}" ${quantity ? "checked" : ""} /><span><strong>${highlightCatalogText(item.name, query)}</strong><small>${escapeHtml([item.category || "", item.sku || item.barcode || ""].filter(Boolean).join(" · "))}</small></span></label></td>
             <td>${escapeHtml(purchasePrice ? `${purchaseEntryFormatCurrency(purchasePrice, currency)} ${currency}` : "Без цены")}</td>
-            <td>${escapeHtml(productStockLabel(item))}</td>
+            <td>${escapeHtml(state.stockLabel ? state.stockLabel(item) : productStockLabel(item))}</td>
             <td><div class="upos-catalog-qty"><button type="button" data-purchase-catalog-step="-1">−</button><input inputmode="decimal" value="${escapeHtml(quantity)}" data-purchase-catalog-qty /><button type="button" data-purchase-catalog-step="1">+</button></div></td>
             <td>${escapeHtml(item.unit || "шт")}</td>
           </tr>`;
       }).join("") : '<tr><td colspan="5" class="upos-catalog-picker-empty">Товары не найдены.</td></tr>';
     }
     updatePurchaseCatalogTotal(dialog);
+    updatePurchaseCatalogSelectionControls(dialog);
   }
 
-  function openPurchaseCatalogPicker(form, onApply) {
+  function openPurchaseCatalogPicker(form, onApply, settings = {}) {
     const dialog = ensurePurchaseCatalogDialog();
-    dialog._uposPurchaseCatalogState = { form, category: "", onApply };
+    dialog._uposPurchaseCatalogState = { form, category: "", onApply, ...settings };
+    const subtitle = dialog.querySelector("[data-purchase-catalog-subtitle]");
+    if (subtitle) subtitle.textContent = settings.subtitle || "Выберите товары из каталога и массово добавьте в приход.";
     dialog._uposPurchaseCatalogQuantities = new Map();
     renderPurchaseCatalogPicker(dialog);
     if (dialog.dataset.purchaseCatalogReady !== "1") {
@@ -457,6 +475,14 @@
         const category = event.target.closest("[data-purchase-catalog-category]");
         if (category) {
           dialog._uposPurchaseCatalogState.category = category.getAttribute("data-purchase-catalog-category") || "";
+          renderPurchaseCatalogPicker(dialog);
+        }
+        const selectAll = event.target.closest("[data-purchase-catalog-select-all]");
+        if (selectAll) {
+          const keys = dialog._uposPurchaseCatalogVisibleKeys || [];
+          const quantities = dialog._uposPurchaseCatalogQuantities || new Map();
+          const allSelected = keys.length > 0 && keys.every((key) => purchaseEntryNumber(quantities.get(key)) > 0);
+          keys.forEach((key) => setPurchaseCatalogQty(dialog, key, allSelected ? 0 : (quantities.get(key) || 1)));
           renderPurchaseCatalogPicker(dialog);
         }
         const step = event.target.closest("[data-purchase-catalog-step]");
@@ -489,12 +515,26 @@
         if (event.target.matches("[data-purchase-catalog-search], [data-purchase-catalog-only-stock]")) renderPurchaseCatalogPicker(dialog);
         if (event.target.matches("[data-purchase-catalog-qty]")) {
           const row = event.target.closest("[data-purchase-catalog-key]");
-          if (row) setPurchaseCatalogQty(dialog, row.getAttribute("data-purchase-catalog-key"), event.target.value);
+          if (row) {
+            const quantity = purchaseEntryNumber(event.target.value);
+            setPurchaseCatalogQty(dialog, row.getAttribute("data-purchase-catalog-key"), quantity);
+            const checkbox = row.querySelector("[data-purchase-catalog-select]");
+            if (checkbox) checkbox.checked = quantity > 0;
+          }
           updatePurchaseCatalogTotal(dialog);
+          updatePurchaseCatalogSelectionControls(dialog);
         }
       });
       dialog.addEventListener("change", (event) => {
         if (event.target.matches("[data-purchase-catalog-only-stock]")) renderPurchaseCatalogPicker(dialog);
+        if (event.target.matches("[data-purchase-catalog-select]")) {
+          const row = event.target.closest("[data-purchase-catalog-key]");
+          if (!row) return;
+          const key = row.getAttribute("data-purchase-catalog-key");
+          const previous = purchaseEntryNumber(dialog._uposPurchaseCatalogQuantities?.get(key));
+          setPurchaseCatalogQty(dialog, key, event.target.checked ? (previous || 1) : 0);
+          renderPurchaseCatalogPicker(dialog);
+        }
       });
     }
     if (typeof dialog.showModal === "function") {
@@ -2344,7 +2384,10 @@
         });
         updatePurchasePaymentBreakdown([]);
       });
-      currencyInput?.addEventListener("change", () => convertVisiblePrices(currency()));
+      currencyInput?.addEventListener("change", () => {
+        convertVisiblePrices(currency());
+        syncPurchasePriceTitle(form);
+      });
       form.querySelector("[data-purchase-price-type]")?.addEventListener("change", () => {
         const priceType = syncPurchasePriceTitle(form);
         rows().forEach((row) => {
@@ -2392,8 +2435,6 @@
       const options = readPurchaseOptions();
       const products = Array.isArray(options.product_rows) ? options.product_rows : [];
       wireProductDialog(form);
-      wireSupplierPicker(form);
-      wireSupplierDialog(form);
       const body = form.querySelector("[data-adjustment-lines]");
       const supplierInput = form.querySelector("[data-adjustment-supplier]");
       const supplierNameInput = form.querySelector("[data-adjustment-supplier-name]");
@@ -2410,9 +2451,9 @@
       const productsQuantityOutput = form.querySelector("[data-adjustment-products-quantity]");
       const expenseTotalOutput = form.querySelector("[data-adjustment-expense-total]");
       const landedTotalOutput = form.querySelector("[data-adjustment-landed-total]");
-      const direction = form.dataset.adjustmentDirection === "in" ? "in" : "out";
-      const directionSign = direction === "in" ? 1 : -1;
-      const signLabel = direction === "in" ? "+" : "−";
+      const direction = "adjustment";
+      const directionSign = 1;
+      const signLabel = "+";
       const expenseRowCurrency = (row) => row.querySelector("[data-adjustment-expense-currency-select]")?.value || currency();
       const syncSupplier = () => {
         const supplierId = String(supplierInput?.value || "").trim();
@@ -2442,8 +2483,13 @@
         if (matching.length) {
           return matching.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
         }
-        const totalStock = stocks.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0);
-        return stocks.length ? totalStock : purchaseEntryNumber(product?.quantity);
+        return stocks.length ? 0 : purchaseEntryNumber(product?.quantity);
+      };
+      const totalStockForProduct = (product) => {
+        const stocks = Array.isArray(product?.stocks) ? product.stocks : [];
+        return stocks.length
+          ? stocks.reduce((sum, stock) => sum + purchaseEntryNumber(stock?.quantity), 0)
+          : purchaseEntryNumber(product?.quantity);
       };
       const priceForProduct = (product) => {
         const warehouse = normalize(warehouseInput?.value);
@@ -2503,33 +2549,34 @@
       const recalc = () => {
         let total = 0;
         let hasLine = false;
-        let invalidStock = false;
         let duplicateProduct = false;
         const selectedProducts = new Set();
         rows().forEach((row) => {
           const product = productForRow(row);
+          const targetInput = row.querySelector("[data-adjustment-target]");
           const quantityInput = row.querySelector("[data-adjustment-quantity]");
           const priceInput = row.querySelector("[data-adjustment-price]");
           const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
-          const quantity = Math.max(0, purchaseEntryNumber(quantityInput?.value));
           const price = Math.max(0, purchaseEntryNumber(priceInput?.value));
           const current = product ? stockForProduct(product) : 0;
-          const after = current + directionSign * quantity;
-          const lineTotal = quantity * price;
+          const targetEntered = targetInput?.dataset.adjustmentTargetTouched === "1" && String(targetInput.value || "").trim() !== "";
+          const target = targetEntered ? Math.max(0, purchaseEntryNumber(targetInput.value)) : current;
+          const difference = target - current;
+          const quantity = targetEntered ? Math.abs(difference) : 0;
+          const rowInvalid = false;
+          if (quantityInput) quantityInput.value = quantity > 0 ? quantityText(quantity) : "";
+          const lineTotal = difference * price;
           const productId = String(product?.id || "");
           if (productId) {
             if (selectedProducts.has(productId)) duplicateProduct = true;
             selectedProducts.add(productId);
           }
           hasLine = hasLine || Boolean(product && quantity > 0);
-          const rowInvalid = direction === "out" && Boolean(product) && quantity > current;
-          invalidStock = invalidStock || rowInvalid;
           row.classList.toggle("is-insufficient", rowInvalid);
-          quantityInput?.setAttribute("aria-invalid", rowInvalid ? "true" : "false");
+          targetInput?.setAttribute("aria-invalid", rowInvalid ? "true" : "false");
           setOutput(row, "[data-adjustment-current]", quantityText(current));
-          setOutput(row, "[data-adjustment-after]", quantityText(after));
+          setOutput(row, "[data-adjustment-after]", difference > 0 ? `+${quantityText(difference)}` : difference < 0 ? `−${quantityText(-difference)}` : "0");
           setOutput(row, "[data-adjustment-unit]", product?.unit || "");
-          setOutput(row, "[data-adjustment-sign]", signLabel);
           if (salePriceInput && salePriceInput.dataset.adjustmentManualSalePrice !== "1") {
             const salesPrice = product ? salesPriceForProduct(product) : { price: 0, currency: "UZS" };
             salePriceInput.value = salesPrice.price
@@ -2539,11 +2586,11 @@
           setOutput(
             row,
             "[data-adjustment-line-total]",
-            `${signLabel} ${purchaseEntryMoney(lineTotal, currency())}`,
+            `${difference > 0 ? "+" : difference < 0 ? "−" : ""} ${purchaseEntryMoney(Math.abs(lineTotal), currency())}`,
           );
           if (product && quantity > 0) total += lineTotal;
         });
-        const extraTotal = direction === "in" ? expenseTotal() : 0;
+        const extraTotal = 0;
         const quantityTotal = rows().reduce((sum, row) => {
           if (!productForRow(row)) return sum;
           return sum + Math.max(0, purchaseEntryNumber(row.querySelector("[data-adjustment-quantity]")?.value));
@@ -2556,11 +2603,10 @@
           const basis = total > 0 ? lineTotal : quantity;
           const basisTotal = total > 0 ? total : quantityTotal;
           const allocatedExpense = product && basisTotal > 0 ? extraTotal * basis / basisTotal : 0;
-          const costPrice = quantity > 0 ? (lineTotal + allocatedExpense) / quantity : 0;
-          setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(costPrice, currency()));
+          setOutput(row, "[data-adjustment-cost-price]", purchaseEntryMoney(lineTotal + allocatedExpense, currency()));
         });
         const landedTotal = total + extraTotal;
-        if (totalOutput) totalOutput.textContent = `${signLabel} ${purchaseEntryMoney(direction === "in" ? landedTotal : total, currency())}`;
+        if (totalOutput) totalOutput.textContent = `${total > 0 ? "+" : total < 0 ? "−" : ""} ${purchaseEntryMoney(Math.abs(total), currency())}`;
         goodsTotalOutputs.forEach((output) => {
           output.textContent = purchaseEntryMoney(total, currency());
         });
@@ -2570,11 +2616,9 @@
         if (errorOutput) {
           errorOutput.textContent = duplicateProduct
             ? "Один товар нельзя добавлять дважды."
-            : invalidStock
-              ? "Количество списания превышает доступный остаток."
-              : "";
+            : "";
         }
-        if (submitButton) submitButton.disabled = !hasLine || invalidStock || duplicateProduct;
+        if (submitButton) submitButton.disabled = !hasLine || duplicateProduct;
         renumber();
         syncSearchRows();
       };
@@ -2586,6 +2630,12 @@
           delete control.dataset.adjustmentAutoPrice;
           delete control.dataset.adjustmentManualSalePrice;
         });
+        const targetInput = row.querySelector("[data-adjustment-target]");
+        if (targetInput) {
+          targetInput.value = "0";
+          targetInput.dataset.adjustmentTargetTouched = "0";
+          targetInput.dataset.adjustmentTargetEdited = "0";
+        }
         // Разблокировать комбобокс товара и скрыть его панель.
         const picker = row.querySelector("[data-adjustment-product-picker]");
         if (picker) picker.classList.remove("is-locked");
@@ -2602,6 +2652,16 @@
         const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
         if (salePriceInput) salePriceInput.value = "";
         setOutput(row, "[data-adjustment-line-total]", `${signLabel} ${purchaseEntryMoney(0, currency())}`);
+      };
+      const autoSelectStockWarehouse = (product) => {
+        if (!warehouseInput || warehouseInput.dataset.adjustmentWarehouseTouched === "1" || rows().some(productForRow)) return;
+        const warehousesWithStock = [...new Set((Array.isArray(product?.stocks) ? product.stocks : [])
+          .filter((stock) => purchaseEntryNumber(stock?.quantity) > 0)
+          .map((stock) => String(stock?.warehouse || "").trim())
+          .filter(Boolean))];
+        if (warehousesWithStock.length !== 1 || stockForProduct(product) > 0) return;
+        const option = Array.from(warehouseInput.options).find((entry) => normalize(entry.value) === normalize(warehousesWithStock[0]));
+        if (option) warehouseInput.value = option.value;
       };
       // Выбор товара — поиском (комбобокс как в продаже), а не выпадающим
       // списком: печатаешь название, выпадают совпадения с остатком.
@@ -2623,6 +2683,7 @@
         };
         const pick = (item) => {
           if (!item) return;
+          autoSelectStockWarehouse(item);
           search.value = item.name || "";
           hidden.value = item.id || "";
           lock(true);
@@ -2647,11 +2708,14 @@
             (list.length
             ? list
                 .map((item) => {
+                  const stock = totalStockForProduct(item);
                   return (
                     '<button type="button" class="sales-combo-option">' +
                     '<span class="sales-combo-main">' +
                     highlightText(item.name, query) +
-                    "</span></button>"
+                    ' <span class="warehouse-adjustment-picker-stock">' + escapeHtml(quantityText(stock)) + '</span>' +
+                    "</span>" +
+                    "</button>"
                   );
                 })
                 .join("")
@@ -2710,11 +2774,17 @@
         row.dataset.warehouseAdjustmentRowReady = "1";
         wireAdjustmentPicker(row);
         const productInput = row.querySelector("[data-adjustment-product]");
-        const quantityInput = row.querySelector("[data-adjustment-quantity]");
+        const targetInput = row.querySelector("[data-adjustment-target]");
         const priceInput = row.querySelector("[data-adjustment-price]");
         const salePriceInput = row.querySelector("[data-adjustment-sale-price]");
         productInput?.addEventListener("change", () => {
-          const suggestedPrice = priceForProduct(productForRow(row));
+          const product = productForRow(row);
+          const suggestedPrice = priceForProduct(product);
+          if (targetInput) {
+            targetInput.value = "0";
+            targetInput.dataset.adjustmentTargetTouched = product ? "1" : "0";
+            targetInput.dataset.adjustmentTargetEdited = "0";
+          }
           if (priceInput) {
             priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
             priceInput.dataset.adjustmentAutoPrice = "1";
@@ -2724,10 +2794,12 @@
           if (productForRow(row) && rows().every((line) => Boolean(productForRow(line)))) {
             addRow({ focus: false });
           }
-          quantityInput?.focus();
+          targetInput?.focus();
         });
-        quantityInput?.addEventListener("input", () => {
-          quantityInput.value = quantityInput.value.replace(/[^\d\s.,]/g, "");
+        targetInput?.addEventListener("input", () => {
+          targetInput.value = targetInput.value.replace(/[^\d\s.,]/g, "");
+          targetInput.dataset.adjustmentTargetTouched = "1";
+          targetInput.dataset.adjustmentTargetEdited = "1";
           recalc();
         });
         priceInput?.addEventListener("input", () => {
@@ -2740,18 +2812,16 @@
           formatPurchasePriceInput(salePriceInput, saleCurrency);
           salePriceInput.dataset.adjustmentManualSalePrice = "1";
         });
-        [quantityInput, priceInput, salePriceInput].forEach((input) => {
+        [targetInput, priceInput, salePriceInput].forEach((input) => {
           input?.addEventListener("focus", () => window.setTimeout(() => input.select(), 0));
           input?.addEventListener("blur", () => {
             const value = purchaseEntryNumber(input.value);
-            input.value = value
-              ? input === quantityInput
-                ? quantityText(value)
-                : purchaseEntryFormatCurrency(
-                  value,
-                  input === salePriceInput ? selectedAdjustmentPriceType().currency : currency(),
-                )
-              : "";
+            input.value = input === targetInput
+              ? String(input.value).trim() === "" ? "" : quantityText(Math.max(0, value))
+              : value ? purchaseEntryFormatCurrency(
+                value,
+                input === salePriceInput ? selectedAdjustmentPriceType().currency : currency(),
+              ) : "";
             recalc();
           });
         });
@@ -2771,6 +2841,47 @@
         wireRow(clone);
         recalc();
         if (focus) clone.querySelector("[data-adjustment-product-input]")?.focus();
+      };
+      const addCatalogProductToAdjustment = (item, quantity) => {
+        const productId = String(item?.id || "");
+        if (!productId || quantity <= 0) return;
+        let row = rows().find((entry) => String(entry.querySelector("[data-adjustment-product]")?.value || "") === productId);
+        if (row) {
+          const input = row.querySelector("[data-adjustment-target]");
+          if (input) {
+            const currentTarget = input.dataset.adjustmentTargetEdited === "1"
+              ? purchaseEntryNumber(input.value)
+              : stockForProduct(item);
+            input.value = quantityText(Math.max(0, currentTarget + directionSign * quantity));
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          return;
+        }
+        autoSelectStockWarehouse(item);
+        row = rows().find((entry) => !entry.querySelector("[data-adjustment-product]")?.value);
+        if (!row) {
+          addRow({ focus: false });
+          row = rows()[rows().length - 1];
+        }
+        if (!row) return;
+        const picker = row.querySelector("[data-adjustment-product-picker]");
+        const search = row.querySelector("[data-adjustment-product-input]");
+        const hidden = row.querySelector("[data-adjustment-product]");
+        const edit = row.querySelector("[data-adjustment-product-edit]");
+        const panel = row.querySelector("[data-adjustment-product-panel]");
+        if (!search || !hidden) return;
+        search.value = item.name || "";
+        search.readOnly = true;
+        hidden.value = productId;
+        picker?.classList.add("is-locked");
+        if (edit) edit.hidden = false;
+        if (panel) panel.hidden = true;
+        hidden.dispatchEvent(new Event("change", { bubbles: true }));
+        const input = row.querySelector("[data-adjustment-target]");
+        if (input) {
+          input.value = quantityText(Math.max(0, stockForProduct(item) + directionSign * quantity));
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
       };
       const wireExpenseRow = (row) => {
         if (!row || row.dataset.adjustmentExpenseReady === "1") return;
@@ -2825,6 +2936,39 @@
       rows().forEach(wireRow);
       expenseRows().forEach(wireExpenseRow);
       wireExpenseTypeDialog(form);
+      form.querySelector("[data-adjustment-catalog-pick]")?.addEventListener("click", () => {
+        openPurchaseCatalogPicker(form, addCatalogProductToAdjustment, {
+          subtitle: "Выберите товары и количество. Показаны остатки на выбранном складе и всего.",
+          stockValue: totalStockForProduct,
+          stockLabel: (item) => {
+            const selected = stockForProduct(item);
+            const total = totalStockForProduct(item);
+            const label = `${quantityText(selected)} ${item.unit || "шт"}`;
+            return total === selected ? label : `${label} · всего ${quantityText(total)}`;
+          },
+        });
+      });
+      form.querySelector("[data-adjustment-zero-all]")?.addEventListener("click", () => {
+        const selectedRows = rows().filter((row) => productForRow(row));
+        if (!selectedRows.length) {
+          window.alert("Сначала добавьте товары в корректировку.");
+          return;
+        }
+        const warehouseName = warehouseInput?.selectedOptions?.[0]?.textContent?.trim() || "выбранном складе";
+        const confirmed = window.confirm(
+          `Обнулить фактический остаток у ${selectedRows.length} товаров в текущей корректировке на складе «${warehouseName}»? ` +
+          "Все введённые остатки этих товаров будут заменены на 0. Изменение запасов произойдёт только после нажатия «Сохранить»."
+        );
+        if (!confirmed) return;
+        selectedRows.forEach((row) => {
+          const targetInput = row.querySelector("[data-adjustment-target]");
+          if (!targetInput) return;
+          targetInput.value = "0";
+          targetInput.dataset.adjustmentTargetTouched = "1";
+          targetInput.dataset.adjustmentTargetEdited = "1";
+        });
+        recalc();
+      });
       form.querySelector("[data-adjustment-add-row]")?.addEventListener("click", addRow);
       form.querySelector("[data-adjustment-expense-add]")?.addEventListener("click", () => {
         const row = addExpenseRow();
@@ -2844,10 +2988,18 @@
         if (expenseSection) expenseSection.hidden = true;
       });
       warehouseInput?.addEventListener("change", () => {
+        warehouseInput.dataset.adjustmentWarehouseTouched = "1";
         rows().forEach((row) => {
+          const product = productForRow(row);
+          const targetInput = row.querySelector("[data-adjustment-target]");
+          if (targetInput) {
+            targetInput.value = "0";
+            targetInput.dataset.adjustmentTargetTouched = product ? "1" : "0";
+            targetInput.dataset.adjustmentTargetEdited = "0";
+          }
           const priceInput = row.querySelector("[data-adjustment-price]");
           if (!priceInput || priceInput.dataset.adjustmentAutoPrice === "0") return;
-          const suggestedPrice = priceForProduct(productForRow(row));
+          const suggestedPrice = priceForProduct(product);
           priceInput.value = suggestedPrice ? purchaseEntryFormatCurrency(suggestedPrice, currency()) : "";
         });
         recalc();
@@ -2868,6 +3020,8 @@
           return;
         }
         rows().forEach((row) => {
+          const targetInput = row.querySelector("[data-adjustment-target]");
+          if (targetInput && targetInput.dataset.adjustmentTargetTouched !== "1") targetInput.value = "";
           row.querySelectorAll("[data-adjustment-quantity], [data-adjustment-price], [data-adjustment-sale-price]").forEach((input) => {
             const value = purchaseEntryNumber(input.value);
             input.value = value ? String(value) : "";
@@ -2881,6 +3035,88 @@
       });
       syncSupplier();
       recalc();
+    });
+  }
+
+  function initWarehouseAdjustmentDocuments(root = document) {
+    const view = root.querySelector(".warehouse-adjustment-documents");
+    if (!view || view.dataset.adjustmentDocumentsReady === "1") return;
+    view.dataset.adjustmentDocumentsReady = "1";
+    const panel = view.querySelector("[data-adjustment-document-detail]");
+    const backdrop = view.querySelector(".warehouse-adjustment-detail-backdrop");
+    if (!panel || !backdrop) return;
+    let opener = null;
+    const setText = (selector, value) => {
+      const element = panel.querySelector(selector);
+      if (element) element.textContent = value;
+    };
+    const formatQuantity = (raw) => {
+      if (raw === "" || raw == null) return "—";
+      const value = Number(String(raw).replace(",", "."));
+      return Number.isFinite(value) ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(value) : String(raw);
+    };
+    const close = () => {
+      panel.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
+      window.setTimeout(() => {
+        if (panel.classList.contains("is-open")) return;
+        panel.hidden = true;
+        backdrop.hidden = true;
+      }, 180);
+      opener?.focus?.();
+    };
+    const open = (id, trigger) => {
+      const source = document.getElementById(`warehouse-adjustment-document-${id}`);
+      if (!source) return;
+      let documentData;
+      try { documentData = JSON.parse(source.textContent || "{}"); }
+      catch (_error) { return; }
+      opener = trigger;
+      setText("[data-adjustment-detail-title]", `${documentData.operation_label || "Корректировка"} ${documentData.number || ""}`);
+      setText("[data-adjustment-detail-date]", documentData.date || "");
+      setText("[data-adjustment-detail-warehouse]", documentData.warehouse || "—");
+      setText("[data-adjustment-detail-count]", String(documentData.position_count || 0));
+      setText("[data-adjustment-detail-responsible]", documentData.responsible || "—");
+      setText("[data-adjustment-detail-total]", `${documentData.amount || "0"} ${documentData.currency || ""}`.trim());
+      setText("[data-adjustment-detail-note]", documentData.note || "Комментарий не указан");
+      const body = panel.querySelector("[data-adjustment-detail-lines]");
+      body?.replaceChildren();
+      (documentData.lines || []).forEach((line, index) => {
+        const row = document.createElement("tr");
+        const cells = [
+          index + 1,
+          line.product || "—",
+          formatQuantity(line.stock_before),
+          formatQuantity(line.stock_after),
+          formatQuantity(line.quantity),
+          `${formatQuantity(line.price)} ${documentData.currency || ""}`.trim(),
+          `${line.amount || "0"} ${documentData.currency || ""}`.trim(),
+        ];
+        cells.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          row.append(cell);
+        });
+        body?.append(row);
+      });
+      panel.hidden = false;
+      backdrop.hidden = false;
+      requestAnimationFrame(() => {
+        panel.classList.add("is-open");
+        backdrop.classList.add("is-open");
+      });
+      panel.querySelector("[data-adjustment-document-close]")?.focus();
+    };
+    view.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-adjustment-document-open]");
+      if (trigger) {
+        open(trigger.dataset.adjustmentDocumentOpen || "", trigger.matches("button") ? trigger : trigger.querySelector("button"));
+        return;
+      }
+      if (event.target.closest("[data-adjustment-document-close]")) close();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) close();
     });
   }
 
@@ -3049,6 +3285,47 @@
     return String(row?.querySelector("[data-detail-payment-currency]")?.value || dialog?.dataset.paymentCurrency || "UZS").toUpperCase();
   }
 
+  function detailPaymentRate(dialog) {
+    const customRate = purchaseEntryNumber(dialog?.querySelector("[data-detail-payment-rate]")?.value || "");
+    return customRate > 0 ? customRate : purchaseEntryUsdRate(readPurchaseOptions());
+  }
+
+  function detailPaymentConversionOptions(dialog) {
+    const options = readPurchaseOptions();
+    return {
+      ...options,
+      fx: {
+        ...(options.fx || {}),
+        USD_UZS: detailPaymentRate(dialog),
+      },
+    };
+  }
+
+  function detailPaymentSummaryMoney(value, currency, dialog) {
+    const primary = purchaseEntryMoney(value, currency);
+    if (String(currency || "UZS").toUpperCase() === "UZS") return primary;
+    const amountUzs = convertPurchaseCurrency(value, currency, "UZS", detailPaymentConversionOptions(dialog));
+    return `${primary} · ${purchaseEntryMoney(amountUzs, "UZS")}`;
+  }
+
+  function resetDetailPaymentRate(dialog) {
+    const input = dialog?.querySelector("[data-detail-payment-rate]");
+    if (!input) return;
+    input.value = purchaseEntryFormatCurrency(purchaseEntryUsdRate(readPurchaseOptions()), "UZS");
+  }
+
+  function wireDetailPaymentRate(dialog) {
+    const input = dialog?.querySelector("[data-detail-payment-rate]");
+    if (!input || input.dataset.detailPaymentRateReady === "1") return;
+    input.dataset.detailPaymentRateReady = "1";
+    ["input", "change"].forEach((eventName) => {
+      input.addEventListener(eventName, () => {
+        formatPurchasePriceInput(input, "UZS");
+        updateDetailPaymentSummary(dialog);
+      });
+    });
+  }
+
   function collectDetailPayments(dialog) {
     if (!dialog) return [];
     return detailPaymentRows(dialog).map((row) => {
@@ -3070,7 +3347,7 @@
   }
 
   function detailPaymentTotal(dialog) {
-    const options = readPurchaseOptions();
+    const options = detailPaymentConversionOptions(dialog);
     const currency = String(dialog?.dataset.paymentCurrency || "UZS").toUpperCase();
     return collectDetailPayments(dialog).reduce((sum, item) => {
       return sum + convertPurchaseCurrency(item.amount, item.currency || currency, currency, options);
@@ -3084,17 +3361,17 @@
     const paid = detailPaymentTotal(dialog);
     const rest = Math.max(0, due - paid);
     const overpaid = Math.max(0, paid - due);
-    setText(dialog, "[data-detail-payment-due]", purchaseEntryMoney(due, currency));
-    setText(dialog, "[data-detail-payment-paid]", purchaseEntryMoney(paid, currency));
-    setText(dialog, "[data-detail-payment-rest]", purchaseEntryMoney(rest, currency));
-    setText(dialog, "[data-detail-payment-over]", purchaseEntryMoney(overpaid, currency));
+    setText(dialog, "[data-detail-payment-due]", detailPaymentSummaryMoney(due, currency, dialog));
+    setText(dialog, "[data-detail-payment-paid]", detailPaymentSummaryMoney(paid, currency, dialog));
+    setText(dialog, "[data-detail-payment-rest]", detailPaymentSummaryMoney(rest, currency, dialog));
+    setText(dialog, "[data-detail-payment-over]", detailPaymentSummaryMoney(overpaid, currency, dialog));
     const overRow = dialog.querySelector("[data-detail-payment-over-row]");
     if (overRow) overRow.hidden = overpaid <= 0;
     dialog.querySelector("[data-detail-payment-summary]")?.classList.toggle("is-overpaid", overpaid > 0);
     const submit = dialog.querySelector("[data-detail-payment-submit]");
     if (submit) {
       submit.disabled = paid <= 0 || overpaid > 0;
-      submit.title = overpaid > 0 ? `Оплата больше суммы на ${purchaseEntryMoney(overpaid, currency)}` : "";
+      submit.title = overpaid > 0 ? `Оплата больше суммы на ${detailPaymentSummaryMoney(overpaid, currency, dialog)}` : "";
     }
   }
 
@@ -3155,6 +3432,7 @@
     const due = purchaseEntryNumber(actionForm.dataset.paymentDue || "0");
     dialog.dataset.paymentCurrency = currency;
     dialog.dataset.paymentDue = String(due);
+    resetDetailPaymentRate(dialog);
     modalForm.action = actionForm.action || "";
     detailPaymentRows(dialog).forEach((row, index) => {
       if (index > 0) row.remove();
@@ -3197,6 +3475,8 @@
   function updatePurchasePaymentButton(panel, purchase) {
     const form = panel.querySelector("[data-purchase-payment-form]");
     const button = panel.querySelector("[data-purchase-payment-pay]");
+    const expenseForm = panel.querySelector("[data-purchase-expense-payment-form]");
+    const expenseButton = panel.querySelector("[data-purchase-expense-payment-pay]");
     if (!form || !button) return;
     const purchaseId = String(purchase.id || panel.dataset.purchaseId || "").trim();
     const template = String(form.dataset.purchasePaymentUrlTemplate || "");
@@ -3208,10 +3488,69 @@
     form.dataset.paymentCurrency = String(purchase.currency || "UZS").toUpperCase();
     const canPay = Boolean(purchaseId && debt > 0);
     form.hidden = !canPay;
-    const actionRow = form.closest("tr");
-    if (actionRow) actionRow.hidden = !canPay;
     button.disabled = !canPay;
     button.textContent = canPay ? `Оплатить ${moneyWithCurrency(debt, purchase.currency || "UZS")}` : "Оплачено";
+    const extraExpenseTotal = purchaseEntryNumber(purchase.extra_expense_total);
+    const extraExpensePaid = purchaseEntryNumber(purchase.expense_paid_amount);
+    const extraExpenseDebt = Math.max(0, extraExpenseTotal - extraExpensePaid);
+    const canPayExpenses = Boolean(purchaseId && extraExpenseDebt > 0);
+    if (expenseForm && expenseButton) {
+      const expenseTemplate = String(expenseForm.dataset.purchaseExpensePaymentUrlTemplate || "");
+      if (purchaseId && expenseTemplate) {
+        expenseForm.action = expenseTemplate.replace("__purchase_id__", encodeURIComponent(purchaseId));
+      }
+      expenseForm.hidden = !canPayExpenses;
+      expenseButton.disabled = !canPayExpenses;
+      expenseButton.textContent = canPayExpenses
+        ? `Оплатить доп. расходы ${moneyWithCurrency(extraExpenseDebt, purchase.currency || "UZS")}`
+        : extraExpenseTotal > 0 ? "Доп. расходы оплачены" : "Доп. расходов нет";
+    }
+    const actionRow = form.closest("tr");
+    if (actionRow) actionRow.hidden = !canPay && !canPayExpenses;
+  }
+
+  function closePurchaseExpensePaymentDialog(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    dialog.removeAttribute("open");
+  }
+
+  function openPurchaseExpensePaymentDialog(root, panel) {
+    const dialog = root.querySelector("[data-purchase-expense-payment-dialog]");
+    const modalForm = dialog?.querySelector("[data-purchase-expense-payment-modal-form]");
+    const actionForm = panel?.querySelector("[data-purchase-expense-payment-form]");
+    const purchase = readPurchase(panel?.dataset.purchaseId || "");
+    if (!dialog || !modalForm || !actionForm || !purchase) return;
+    modalForm.action = actionForm.action || "";
+    const currency = String(purchase.currency || "UZS").toUpperCase();
+    const total = purchaseEntryNumber(purchase.extra_expense_total);
+    const paid = purchaseEntryNumber(purchase.expense_paid_amount);
+    const due = Math.max(0, total - paid);
+    dialog.dataset.paymentCurrency = currency;
+    dialog.dataset.paymentDue = String(due);
+    resetDetailPaymentRate(dialog);
+    detailPaymentRows(dialog).forEach((row, index) => {
+      if (index > 0) row.remove();
+    });
+    const row = detailPaymentRows(dialog)[0] || addDetailPaymentRow(dialog);
+    const currencyInput = row?.querySelector("[data-detail-payment-currency]");
+    const amountInput = row?.querySelector("[data-detail-payment-amount]");
+    if (currencyInput) currencyInput.value = currency;
+    if (amountInput) amountInput.value = purchaseEntryFormatCurrency(due, currency);
+    updateDetailPaymentSummary(dialog);
+    if (typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (_err) {
+        dialog.setAttribute("open", "");
+      }
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    window.setTimeout(() => {
+      amountInput?.focus();
+      amountInput?.select();
+    }, 0);
   }
 
   function renderPurchasePayments(panel, purchase) {
@@ -3242,7 +3581,9 @@
     }
 
     paymentLinesRoot.replaceChildren();
-    paymentList.hidden = paymentLines.length === 0 && purchaseEntryNumber(purchase.debt_amount) <= 0;
+    paymentList.hidden = paymentLines.length === 0
+      && purchaseEntryNumber(purchase.debt_amount) <= 0
+      && purchaseEntryNumber(purchase.extra_expense_total) <= 0;
     paymentLines.forEach((payment, index) => {
       const row = document.createElement("tr");
       [index + 1, payment.date || "—", payment.account, payment.type].forEach((value) => {
@@ -3356,7 +3697,11 @@
     renderPurchasePaymentSummary(panel, purchase);
     renderPurchaseExtraExpenses(panel, purchase);
     updatePurchasePaymentButton(panel, purchase);
-    setText(panel, "[data-purchase-detail-sale-price-title]", purchase.price_type_name || "Продажная цена");
+    setText(
+      panel,
+      "[data-purchase-detail-sale-price-title]",
+      `${purchase.price_type_name || "Продажная цена"} · ${String(currency).toUpperCase()}`,
+    );
     setText(
       panel,
       "[data-purchase-detail-quantity-total]",
@@ -3434,7 +3779,7 @@
       const qty = quantityText(line.quantity);
       const price = line.price ? moneyWithCurrency(line.price, currency) : "-";
       const costPrice = line.cost_price ? moneyWithCurrency(line.cost_price, currency) : price;
-      const salePrice = line.sale_price ? moneyWithCurrency(line.sale_price, purchase.price_type_currency || currency) : "-";
+      const salePrice = line.sale_price ? moneyWithCurrency(line.sale_price, currency) : "-";
       const total = line.total ? moneyWithCurrency(line.total, currency) : "-";
       const isService = String(line.kind || "product") === "service";
       appendCell(row, index + 1);
@@ -3543,6 +3888,7 @@
   function init(root = document) {
     initPurchaseEntry(root);
     initWarehouseAdjustment(root);
+    initWarehouseAdjustmentDocuments(root);
     initPurchasesSort(root);
     root.querySelectorAll("[data-warehouse-purchases-filter]").forEach((form) => {
       if (form.dataset.warehousePurchasesReady === "1") return;
@@ -3659,6 +4005,7 @@
       detailPaymentRows(paymentDialog).forEach((row) => {
         wireDetailPaymentRow(paymentDialog, row);
       });
+      wireDetailPaymentRate(paymentDialog);
       paymentDialog.querySelector("[data-detail-payment-add-line]")?.addEventListener("click", () => {
         const row = addDetailPaymentRow(paymentDialog);
         row?.querySelector("[data-detail-payment-amount]")?.focus();
@@ -3686,6 +4033,40 @@
         openDetailPaymentDialog(root, panel);
       });
     });
+    root.querySelectorAll("[data-purchase-expense-payment-pay]").forEach((button) => {
+      if (button.dataset.purchaseExpensePaymentOpenReady === "1") return;
+      button.dataset.purchaseExpensePaymentOpenReady = "1";
+      button.addEventListener("click", () => {
+        const panel = button.closest("[data-warehouse-purchase-detail]");
+        openPurchaseExpensePaymentDialog(root, panel);
+      });
+    });
+    const expensePaymentDialog = root.querySelector("[data-purchase-expense-payment-dialog]");
+    if (expensePaymentDialog && expensePaymentDialog.dataset.purchaseExpensePaymentReady !== "1") {
+      expensePaymentDialog.dataset.purchaseExpensePaymentReady = "1";
+      detailPaymentRows(expensePaymentDialog).forEach((row) => {
+        wireDetailPaymentRow(expensePaymentDialog, row);
+      });
+      wireDetailPaymentRate(expensePaymentDialog);
+      expensePaymentDialog.querySelector("[data-purchase-expense-payment-add-line]")?.addEventListener("click", () => {
+        const row = addDetailPaymentRow(expensePaymentDialog);
+        row?.querySelector("[data-detail-payment-amount]")?.focus();
+      });
+      expensePaymentDialog.querySelectorAll("[data-purchase-expense-payment-close], [data-purchase-expense-payment-cancel]").forEach((button) => {
+        button.addEventListener("click", () => closePurchaseExpensePaymentDialog(expensePaymentDialog));
+      });
+      expensePaymentDialog.querySelector("[data-purchase-expense-payment-modal-form]")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        updateDetailPaymentSummary(expensePaymentDialog);
+        const payments = collectDetailPayments(expensePaymentDialog);
+        const paid = detailPaymentTotal(expensePaymentDialog);
+        const due = purchaseEntryNumber(expensePaymentDialog.dataset.paymentDue || "0");
+        if (!payments.length || paid <= 0 || paid > due) return;
+        const hidden = expensePaymentDialog.querySelector("[data-purchase-expense-payment-lines]");
+        if (hidden) hidden.value = JSON.stringify(payments);
+        event.currentTarget.submit();
+      });
+    }
     // Один раз на страницу — иначе повторная инициализация (AJAX-переключение
     // разделов закупок) множит обработчики Escape на document.
     if (document.body.dataset.warehouseEscGlobalReady !== "1") {
@@ -3869,6 +4250,7 @@
       saved: "Закупка сохранена",
       updated: "Закупка обновлена",
       paid: "Оплата внесена",
+      expenses_paid: "Дополнительные расходы оплачены",
     };
     if (!(message in titles)) return;
     const purchaseId = String(params.get("purchase_id") || "").trim();
@@ -3882,11 +4264,11 @@
     const sum = dialog.querySelector("[data-purchase-done-sum]");
     const meta = dialog.querySelector("[data-purchase-done-meta]");
     if (title) title.textContent = titles[message];
-    if (sum) sum.textContent = message === "paid" && paidNow ? `${paidNow}${currency ? " " + currency : ""}` : "";
+    if (sum) sum.textContent = (message === "paid" || message === "expenses_paid") && paidNow ? `${paidNow}${currency ? " " + currency : ""}` : "";
     const metaParts = [];
     if (number) metaParts.push(`Закупка ${number}`);
     if (cashWarning) {
-      metaParts.push(message === "paid" ? "Операция кассы не записалась" : "Операции кассы не записались");
+      metaParts.push(message === "paid" || message === "expenses_paid" ? "Операция кассы не записалась" : "Операции кассы не записались");
     }
     if (meta) meta.textContent = metaParts.join(" · ");
     renderPurchaseDoneSummary(dialog, doc);

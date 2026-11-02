@@ -75,6 +75,7 @@
       </div>
 
       <form id="clients-filter-form" class="products-catalog-filter clients-filter-form" method="get" action="{{ url_for('clients_get') }}#clients">
+        <input type="hidden" name="module_view" value="clients" />
         <input type="hidden" name="client_sort" value="{{ clients_sort_key }}" />
         <input type="hidden" name="client_sort_dir" value="{{ clients_sort_direction }}" />
         <input type="hidden" name="page_size" value="{{ clients_page_size }}" data-clients-page-size-value />
@@ -445,6 +446,7 @@
   </div>
 </dialog>
 
+{% if not module_selected_view or module_selected_view == 'clients_map' %}
 <section
   id="clients-map"
   class="products-list-panel clients-map-shell"
@@ -723,6 +725,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 <section id="client-create" class="products-list-panel client-create-shell" data-workspace-view="client_create" hidden>
   <header class="products-panel-head">
@@ -1018,7 +1021,7 @@
           </div>
         </header>
         <dl class="client-card-info">
-          <div><dt>Телефон</dt><dd>{{ selected_client_card.phone or "-" }}</dd></div>
+          <div><dt>Телефоны</dt><dd>{% for phone in selected_client_card.phones or [] %}<a href="tel:{{ phone|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') }}">{{ phone }}</a>{% if not loop.last %}<br />{% endif %}{% else %}-{% endfor %}</dd></div>
           <div><dt>Telegram</dt><dd>{{ selected_client_card.telegram_phone or "-" }}</dd></div>
           <div><dt>Email</dt><dd>{{ selected_client_card.email or "-" }}</dd></div>
           <div><dt>ИНН</dt><dd>{{ selected_client_card.inn or "-" }}</dd></div>

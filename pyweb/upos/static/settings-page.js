@@ -131,6 +131,20 @@
     else el.removeAttribute("data-variant");
   }
 
+  function setIBOXLastSync(value, root) {
+    var scope = root || document;
+    var el = scope.querySelector("[data-ibox-last-sync]");
+    if (!el) return;
+    var moment = new Date(String(value || ""));
+    var valid = String(value || "").trim() && !isNaN(moment.getTime());
+    el.textContent = valid
+      ? "Последняя успешная синхронизация: " + moment.toLocaleString("ru-RU", {
+        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+      })
+      : "";
+    el.hidden = !valid;
+  }
+
   function iboxOrganizationId(root) {
     var scope = root || document;
     var select = scope.querySelector("[data-ibox-organization]");
@@ -184,6 +198,7 @@
       checkbox.checked = !config.sync_modules || config.sync_modules[moduleKey] !== false;
     });
     fillIBOXBranches(scope, body.branches || [], config.upos_branch_id || "");
+    setIBOXLastSync(config.last_sync_at, scope);
     if (body.status) {
       var status = body.status;
       if (status.status === "running") setIBOXStatus("Синхронизация выполняется…", "", scope);
@@ -245,6 +260,7 @@
       fetch(endpoint("/api/integrations/ibox/status"))
         .then(readJsonResponse)
         .then(function (body) {
+          setIBOXLastSync(body.last_sync_at, scope);
           var status = body.status;
           if (!status) return;
           if (status.status === "running") {
@@ -266,7 +282,7 @@
 
     if (organization) {
       organization.addEventListener("change", function () {
-        loadIBOXConfig(scope);
+        loadIBOXConfig(scope).then(poll);
       });
     }
     if (btnTest) {
@@ -325,6 +341,10 @@
           });
       });
     }
+    return {
+      poll: poll,
+      stop: function () { clearTimeout(pollTimer); },
+    };
   }
 
   function initLanguageDropdowns() {
@@ -593,6 +613,7 @@
     var dialog = document.getElementById("settings-integr-dialog");
     if (!dialog) return;
     var activeKey = "";
+    var iboxActions = null;
     var titleEl = dialog.querySelector("[data-integr-modal-title]");
     var logoEl = dialog.querySelector("[data-integr-modal-logo]");
     var saveBtn = dialog.querySelector("[data-integr-save]");
@@ -605,6 +626,7 @@
     }
 
     function closeDialog() {
+      if (iboxActions) iboxActions.stop();
       if (dialog.open) dialog.close();
       else dialog.removeAttribute("open");
       activeKey = "";
@@ -632,7 +654,11 @@
       }
       if (typeof dialog.showModal === "function") dialog.showModal();
       else dialog.setAttribute("open", "open");
-      if (key === "ibox") loadIBOXConfig(dialog);
+      if (key === "ibox") {
+        loadIBOXConfig(dialog).then(function () {
+          if (activeKey === "ibox" && iboxActions) iboxActions.poll();
+        });
+      }
       var firstInput = dialog.querySelector('[data-integr-form="' + key + '"] input:not([type="checkbox"])');
       if (firstInput) firstInput.focus();
     }
@@ -655,7 +681,7 @@
     });
 
     initGreenWhiteActions(dialog);
-    initIBOXActions(dialog);
+    iboxActions = initIBOXActions(dialog);
 
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
@@ -1938,6 +1964,68 @@
     });
   }
 
+  function initSalesDefaultsAutoSave() {
+    var root = document.querySelector("[data-sales-defaults]");
+    if (!root) return;
+    var sale = root.querySelector('[data-sales-default-status="sale"]');
+    var order = root.querySelector('[data-sales-default-status="order"]');
+    var status = root.querySelector("[data-sales-defaults-status]");
+    var actions = root.querySelector("[data-sales-defaults-actions]");
+    var saveButton = root.querySelector("[data-sales-defaults-save]");
+    if (!sale || !order || !actions || !saveButton) return;
+    var saved = { sale: sale.value || "new", order: order.value || "new" };
+
+    function setStatus(message, variant) {
+      if (!status) return;
+      status.textContent = message || "";
+      if (variant) status.setAttribute("data-variant", variant);
+      else status.removeAttribute("data-variant");
+    }
+
+    function isDirty() {
+      return (sale.value || "new") !== saved.sale || (order.value || "new") !== saved.order;
+    }
+
+    function refreshDirtyState() {
+      actions.hidden = !isDirty();
+      if (isDirty()) setStatus("Есть несохранённые изменения", "");
+      else setStatus("", "");
+    }
+
+    function saveDefaults() {
+      var next = { sale: sale.value || "new", order: order.value || "new" };
+      sale.disabled = true;
+      order.disabled = true;
+      saveButton.disabled = true;
+      saveButton.textContent = "Сохранение…";
+      setStatus("Сохранение…", "");
+      savePreferences({ sales_default_statuses: next })
+        .then(function (body) {
+          var values = body.sales_default_statuses || next;
+          saved = { sale: values.sale || "new", order: values.order || "new" };
+          sale.value = saved.sale;
+          order.value = saved.order;
+          actions.hidden = true;
+          setStatus("Сохранено", "ok");
+        })
+        .catch(function (err) {
+          setStatus(err.message || t("settings.js.save_err"), "err");
+          actions.hidden = false;
+        })
+        .finally(function () {
+          sale.disabled = false;
+          order.disabled = false;
+          saveButton.disabled = false;
+          saveButton.textContent = "Сохранить изменения";
+        });
+    }
+
+    sale.addEventListener("change", refreshDirtyState);
+    order.addEventListener("change", refreshDirtyState);
+    saveButton.addEventListener("click", saveDefaults);
+    refreshDirtyState();
+  }
+
   function initCrmStagesList() {
     var root = document.querySelector("[data-crm-stages-list]");
     if (!root) return;
@@ -2060,6 +2148,7 @@
     document.querySelectorAll(".js-anti-autofill").forEach(initTokenAntiAutofill);
     initLanguageDropdowns();
     initPreferencesAutoSave();
+    initSalesDefaultsAutoSave();
     initIntegrationModals();
     initSocialSettings();
     initSocialTelegramIntegration();

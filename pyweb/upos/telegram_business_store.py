@@ -430,10 +430,11 @@ def thread_messages(workspace_owner_id: str, chat_id: int, limit: int = 200) -> 
                     TelegramBusinessMessage.workspace_owner_id == workspace_owner_id,
                     TelegramBusinessMessage.chat_id == int(chat_id),
                 )
-                .order_by(TelegramBusinessMessage.sent_at.asc())
+                .order_by(TelegramBusinessMessage.sent_at.desc(), TelegramBusinessMessage.id.desc())
                 .limit(max(1, min(int(limit or 200), 500)))
             ).scalars()
         )
+        rows.reverse()
         return [
             {
                 "id": row.id,

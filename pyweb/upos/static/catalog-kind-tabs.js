@@ -38,6 +38,8 @@
     panel.dataset.catalogKindReady = "1";
 
     const searchInput = form.querySelector('input[name="q"]');
+    const zeroStockInput = form.querySelector('input[name="zero_stock"]');
+    const zeroStockToggle = panel.querySelector("[data-products-zero-stock-toggle]");
     const totalLabel = panel.querySelector("[data-products-total-count]");
     const shownLabel = panel.querySelector("[data-products-shown-range]");
     const totalCountCell = table.querySelector("[data-catalog-total-count]");
@@ -158,6 +160,7 @@
       updateTotals(shown, qtyByUnit);
       if (totalLabel) totalLabel.textContent = String(shown);
       if (shownLabel) shownLabel.textContent = shown ? "1-" + shown : "0";
+      table.dispatchEvent(new Event("catalog-filter-applied"));
     }
 
     // Клик по вкладке = выбор одного вида: синхронизируем чекбоксы «Тип»,
@@ -170,12 +173,25 @@
       if (kindLabel) kindLabel.textContent = KIND_LABELS[kind] || kindLabel.textContent;
     }
 
+    if (zeroStockToggle && zeroStockInput) {
+      zeroStockToggle.addEventListener("click", () => {
+        zeroStockInput.value = zeroStockInput.value === "1" ? "0" : "1";
+        if (zeroStockInput.value === "1") selectKind("product");
+        form.requestSubmit();
+      });
+    }
+
     tabs.forEach((tab) => {
       tab.addEventListener("click", (event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) return;
         event.preventDefault();
         const kind = kindOf(tab.getAttribute("href"));
         selectKind(kind);
+        if (zeroStockInput && zeroStockInput.value === "1" && kind !== "product") {
+          zeroStockInput.value = "0";
+          form.requestSubmit();
+          return;
+        }
         apply();
         try {
           const url = new URL(window.location.href);

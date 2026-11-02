@@ -37,6 +37,7 @@
         if (event.target === dialog) closeDialog(dialog);
       });
     }
+
   }
 
   if (document.readyState === "loading") {

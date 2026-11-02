@@ -67,6 +67,40 @@
     });
   }
 
+  function postPhone(root, recordId, phone) {
+    const template = root.dataset.crmPhoneUrlTemplate || "/crm/__record__/phones";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    body.set("phone", phone);
+    return fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: body.toString(),
+    }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить номер.");
+      return result;
+    });
+  }
+
+  function postContactEmployees(root, recordId, names) {
+    const template = root.dataset.crmEmployeesUrlTemplate || "/crm/__record__/contact-employees";
+    const url = template.replace("__record__", encodeURIComponent(recordId));
+    const body = new URLSearchParams();
+    body.set("csrf_token", root.dataset.crmCsrf || "");
+    names.forEach((name) => body.append("first_contact_employees", name));
+    return fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: body.toString(),
+    }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить сотрудников.");
+      return result;
+    });
+  }
+
   function postActivity(root, recordId, payload) {
     const template = root.dataset.crmActivityUrlTemplate || "/crm/__record__/activity";
     const url = template.replace("__record__", encodeURIComponent(recordId));
@@ -539,10 +573,25 @@
     const subtitle = dialog.querySelector("[data-crm-card-detail-subtitle]");
     const client = dialog.querySelector("[data-crm-card-detail-client]");
     const clientLink = dialog.querySelector("[data-crm-card-detail-client-link]");
+    const phoneList = dialog.querySelector("[data-crm-card-detail-phone-list]");
+    const phoneToggle = dialog.querySelector("[data-crm-card-detail-phone-toggle]");
+    const phoneForm = dialog.querySelector("[data-crm-card-detail-phone-form]");
+    const phoneInput = phoneForm?.querySelector('input[name="phone"]');
+    const phoneError = phoneForm?.querySelector("[data-crm-card-detail-phone-error]");
     const editButton = dialog.querySelector("[data-crm-card-detail-edit]");
+    const attachEmployeeButton = dialog.querySelector("[data-crm-card-detail-attach-employee]");
+    const employeeForm = dialog.querySelector("[data-crm-card-detail-employees-form]");
+    const employeeSearch = employeeForm?.querySelector("[data-crm-card-detail-employees-search]");
+    const employeeRows = Array.from(employeeForm?.querySelectorAll("[data-crm-card-detail-employee-row]") || []);
+    const employeeChecks = Array.from(employeeForm?.querySelectorAll('[name="first_contact_employees"]') || []);
+    const employeeError = employeeForm?.querySelector("[data-crm-card-detail-employees-error]");
     const orderButton = dialog.querySelector("[data-crm-card-detail-order]");
     const orderDialog = document.getElementById("crm-order-dialog");
     const orderFrame = orderDialog?.querySelector("[data-crm-order-dialog-frame]");
+    const taskDialog = document.getElementById("crm-card-task-dialog");
+    const taskForm = taskDialog?.querySelector('[data-crm-activity-form="task"]');
+    const taskOpenButton = dialog.querySelector("[data-crm-card-task-open]");
+    const taskSubtitle = taskDialog?.querySelector("[data-crm-card-task-subtitle]");
     const chat = dialog.querySelector("[data-crm-card-detail-chat]");
     const history = dialog.querySelector("[data-crm-card-detail-history]");
     const documents = dialog.querySelector("[data-crm-card-detail-documents]");
@@ -555,6 +604,7 @@
     const taskFeed = dialog.querySelector("[data-crm-card-detail-task-feed]");
     const commentFeed = dialog.querySelector("[data-crm-card-detail-comment-feed]");
     const activityForms = Array.from(dialog.querySelectorAll("[data-crm-activity-form]"));
+    if (taskForm) activityForms.push(taskForm);
     let detailCard = null;
     const fields = {
       title: dialog.querySelector('[data-crm-card-detail-field="title"]'),
@@ -567,6 +617,7 @@
       probability: dialog.querySelector('[data-crm-card-detail-field="probability"]'),
       amount: dialog.querySelector('[data-crm-card-detail-field="amount"]'),
       responsible: dialog.querySelector('[data-crm-card-detail-field="responsible"]'),
+      contactEmployees: dialog.querySelector('[data-crm-card-detail-field="contactEmployees"]'),
       date: dialog.querySelector('[data-crm-card-detail-field="date"]'),
       dueDate: dialog.querySelector('[data-crm-card-detail-field="dueDate"]'),
       nextStep: dialog.querySelector('[data-crm-card-detail-field="nextStep"]'),
@@ -576,6 +627,56 @@
 
     const setText = (node, value) => {
       if (node) node.textContent = valueOrDash(value);
+    };
+
+    const selectedEmployees = (card) => {
+      try {
+        const payload = JSON.parse(card?.dataset.crmEditPayload || "{}");
+        return Array.isArray(payload.first_contact_employees) ? payload.first_contact_employees : [];
+      } catch (_) {
+        return [];
+      }
+    };
+
+    const resetEmployeePicker = () => {
+      if (!employeeForm) return;
+      const current = new Set(selectedEmployees(detailCard));
+      employeeChecks.forEach((input) => { input.checked = current.has(input.value); });
+      if (employeeSearch) employeeSearch.value = "";
+      employeeRows.forEach((row) => { row.hidden = false; });
+      if (employeeError) { employeeError.hidden = true; employeeError.textContent = ""; }
+      employeeForm.hidden = true;
+      attachEmployeeButton?.setAttribute("aria-expanded", "false");
+    };
+
+    const resetPhoneForm = () => {
+      if (!phoneForm) return;
+      phoneForm.hidden = true;
+      if (phoneInput) phoneInput.value = "";
+      if (phoneError) { phoneError.hidden = true; phoneError.textContent = ""; }
+      phoneToggle?.setAttribute("aria-expanded", "false");
+    };
+
+    const renderPhoneList = (card) => {
+      if (!phoneList) return;
+      phoneList.replaceChildren();
+      let phones = [];
+      try { phones = JSON.parse(card?.dataset.crmContactPhones || "[]"); } catch (_) { /* Ignore malformed legacy data. */ }
+      if (!Array.isArray(phones) || !phones.length) {
+        const empty = document.createElement("small");
+        empty.textContent = "Номер не указан";
+        phoneList.appendChild(empty);
+        return;
+      }
+      phones.forEach((phone) => {
+        const value = String(phone || "").trim();
+        const digits = value.replace(/\D/g, "");
+        if (digits.length < 7) return;
+        const link = document.createElement("a");
+        link.href = `tel:${value.startsWith("+") ? "+" : ""}${digits}`;
+        link.textContent = value;
+        phoneList.appendChild(link);
+      });
     };
 
     const showDetailPane = (name) => {
@@ -842,10 +943,13 @@
           clientLink.removeAttribute("href");
         }
       }
+      renderPhoneList(card);
+      resetPhoneForm();
       if (editButton) {
         const payload = data.crmEditPayload || "";
         editButton.hidden = !payload;
         editButton.dataset.crmEditPayload = payload;
+        if (attachEmployeeButton) attachEmployeeButton.hidden = !payload || data.crmItemType !== "deal";
       }
       if (orderButton) {
         if (data.crmDetailOrderHref) {
@@ -867,6 +971,9 @@
       setText(fields.probability, data.crmDetailProbability);
       setText(fields.amount, data.crmDetailAmount);
       setText(fields.responsible, data.crmDetailResponsible);
+      setText(fields.contactEmployees, data.crmContactEmployees || "Не прикреплены");
+      fields.contactEmployees?.closest(".crm-card-detail-employees")?.toggleAttribute("hidden", data.crmItemType !== "deal");
+      resetEmployeePicker();
       setText(fields.date, data.crmDetailDate);
       setText(fields.dueDate, data.crmDetailDueDate);
       setText(fields.nextStep, data.crmDetailNextStep);
@@ -895,6 +1002,7 @@
 
     const closeDetails = () => {
       detailCard = null;
+      if (taskDialog?.open) taskDialog.close();
       if (dialog.open && typeof dialog.close === "function") {
         dialog.close();
       } else {
@@ -924,6 +1032,27 @@
       } else {
         orderDialog.setAttribute("open", "");
       }
+    };
+
+    const closeTaskDialog = () => {
+      if (!taskDialog) return;
+      if (taskDialog.open && typeof taskDialog.close === "function") taskDialog.close();
+      else taskDialog.removeAttribute("open");
+    };
+
+    const openTaskDialog = (preset = {}) => {
+      if (!taskDialog || !detailCard) return;
+      taskForm?.reset();
+      if (preset.title) taskForm.querySelector('[name="text"]').value = preset.title;
+      if (preset.dueDate) {
+        const dueDate = taskForm.querySelector('[name="due_date"]');
+        dueDate.value = preset.dueDate;
+        dueDate.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (taskSubtitle) taskSubtitle.textContent = `По сделке «${detailCard.dataset.crmDetailTitle || ""}»`;
+      if (typeof taskDialog.showModal === "function") taskDialog.showModal();
+      else taskDialog.setAttribute("open", "");
+      taskForm?.querySelector('[name="text"]')?.focus();
     };
 
     document.querySelectorAll(".crm-kanban-card").forEach((card) => {
@@ -961,7 +1090,123 @@
       closeDetails();
       document.dispatchEvent(new CustomEvent("crm:edit-record", { detail: { payload: raw } }));
     });
+    attachEmployeeButton?.addEventListener("click", () => {
+      if (!employeeForm || !detailCard) return;
+      if (!employeeForm.hidden) { resetEmployeePicker(); return; }
+      resetEmployeePicker();
+      employeeForm.hidden = false;
+      attachEmployeeButton.setAttribute("aria-expanded", "true");
+      employeeSearch?.focus();
+    });
+    phoneToggle?.addEventListener("click", () => {
+      if (!phoneForm || !detailCard) return;
+      if (!phoneForm.hidden) { resetPhoneForm(); return; }
+      resetPhoneForm();
+      phoneForm.hidden = false;
+      phoneToggle.setAttribute("aria-expanded", "true");
+      phoneInput?.focus();
+    });
+    phoneForm?.querySelector("[data-crm-card-detail-phone-cancel]")?.addEventListener("click", resetPhoneForm);
+    phoneForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const root = document.querySelector("[data-crm-phone-url-template]");
+      const card = detailCard;
+      const recordId = card?.dataset.crmRecordId || "";
+      const phone = String(phoneInput?.value || "").trim();
+      if (!root || !card || !recordId || !phone || phoneForm.classList.contains("is-saving")) return;
+      phoneForm.classList.add("is-saving");
+      phoneForm.querySelectorAll("button, input").forEach((node) => { node.disabled = true; });
+      if (phoneError) phoneError.hidden = true;
+      postPhone(root, recordId, phone)
+        .then((result) => {
+          card.dataset.crmContactPhones = JSON.stringify(result.phones || []);
+          if (detailCard === card) {
+            renderPhoneList(card);
+            resetPhoneForm();
+          }
+        })
+        .catch((error) => {
+          if (phoneError) { phoneError.textContent = error.message || "Не удалось сохранить номер."; phoneError.hidden = false; }
+        })
+        .finally(() => {
+          phoneForm.classList.remove("is-saving");
+          phoneForm.querySelectorAll("button, input").forEach((node) => { node.disabled = false; });
+        });
+    });
+    employeeForm?.querySelector("[data-crm-card-detail-employees-cancel]")?.addEventListener("click", resetEmployeePicker);
+    employeeSearch?.addEventListener("input", () => {
+      const query = employeeSearch.value.trim().toLocaleLowerCase();
+      employeeRows.forEach((row) => { row.hidden = !row.textContent.toLocaleLowerCase().includes(query); });
+    });
+    employeeForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const root = document.querySelector("[data-crm-employees-url-template]");
+      const card = detailCard;
+      const recordId = card?.dataset.crmRecordId || "";
+      if (!root || !card || !recordId || employeeForm.classList.contains("is-saving")) return;
+      const names = employeeChecks.filter((input) => input.checked).map((input) => input.value);
+      employeeForm.classList.add("is-saving");
+      employeeForm.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+      if (employeeError) employeeError.hidden = true;
+      postContactEmployees(root, recordId, names)
+        .then((result) => {
+          const saved = result.first_contact_employees || [];
+          card.dataset.crmContactEmployees = saved.join(", ");
+          const cardLabel = card.querySelector(".crm-kanban-contact-employees");
+          if (saved.length) {
+            const label = cardLabel || document.createElement("div");
+            label.className = "crm-kanban-contact-employees";
+            label.title = "Сотрудники первого контакта";
+            label.textContent = `Первый контакт: ${saved.join(", ")}`;
+            if (!cardLabel) card.querySelector(".crm-kanban-card-tags")?.before(label);
+          } else cardLabel?.remove();
+          try {
+            const payload = JSON.parse(card.dataset.crmEditPayload || "{}");
+            payload.first_contact_employees = saved;
+            card.dataset.crmEditPayload = JSON.stringify(payload);
+            if (editButton) editButton.dataset.crmEditPayload = card.dataset.crmEditPayload;
+          } catch (_) { /* Подпись карточки уже обновлена. */ }
+          if (detailCard === card) {
+            setText(fields.contactEmployees, saved.join(", ") || "Не прикреплены");
+            resetEmployeePicker();
+          }
+        })
+        .catch((error) => {
+          if (employeeError) { employeeError.textContent = error.message || "Не удалось сохранить сотрудников."; employeeError.hidden = false; }
+        })
+        .finally(() => {
+          employeeForm.classList.remove("is-saving");
+          employeeForm.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+        });
+    });
     orderButton?.addEventListener("click", openOrderDialog);
+    taskOpenButton?.addEventListener("click", () => openTaskDialog());
+    document.querySelectorAll("[data-crm-queue-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const recordId = button.dataset.crmQueueRecordId || "";
+        const card = Array.from(document.querySelectorAll(".crm-kanban-card"))
+          .find((candidate) => candidate.dataset.crmRecordId === recordId);
+        if (!card) return;
+        openDetails(card);
+        if (button.dataset.crmQueueAction === "task") {
+          showDetailPane("tasks");
+          openTaskDialog({
+            title: `Связаться с ${card.dataset.crmDetailClient || "клиентом"}`,
+            dueDate: button.dataset.crmQueueToday || "",
+          });
+        }
+      });
+    });
+    taskDialog?.querySelectorAll("[data-crm-card-task-close]").forEach((button) => {
+      button.addEventListener("click", closeTaskDialog);
+    });
+    taskDialog?.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeTaskDialog();
+    });
+    taskDialog?.addEventListener("click", (event) => {
+      if (event.target === taskDialog) closeTaskDialog();
+    });
     orderDialog?.querySelectorAll("[data-crm-order-dialog-close]").forEach((button) => {
       button.addEventListener("click", closeOrderDialog);
     });
@@ -1086,6 +1331,7 @@
               history.insertAdjacentHTML("afterbegin", renderActivityEvent(eventData, kind));
             }
             form.reset();
+            if (kind === "task") closeTaskDialog();
           })
           .catch(() => window.location.reload())
           .finally(() => form.classList.remove("is-saving"));
@@ -1501,6 +1747,7 @@
     const form = dialog.querySelector("form");
     const defaultAction = form?.getAttribute("action") || "/crm/save";
     const title = dialog.querySelector("#crm-record-dialog-title");
+    const titleFieldLabel = form?.querySelector("[data-crm-title-label]");
     const subtitle = dialog.querySelector(".settings-profile-modal-sub");
     const submit = dialog.querySelector('.crm-record-form-actions button[type="submit"]');
     const clientInput = form?.querySelector('input[name="client"]');
@@ -1510,6 +1757,31 @@
     const orderSelect = form?.querySelector("[data-crm-order-select]");
     const orderInput = form?.querySelector("[data-crm-order-input]");
     const contactInput = form?.querySelector('input[name="contact"]');
+    const amountInput = form?.querySelector("[data-crm-deal-amount]");
+    const contactClientId = form?.querySelector("[data-crm-client-id]");
+    const contactPanel = form?.querySelector("[data-crm-contact-panel]");
+    const contactCardLink = form?.querySelector("[data-crm-contact-card]");
+    const segmentField = form?.querySelector("[data-crm-segment-field]");
+    const segmentDropdown = segmentField?.querySelector("[data-crm-segment-dropdown]");
+    const segmentSummary = segmentField?.querySelector("[data-crm-segment-summary]");
+    const segmentSearch = segmentField?.querySelector("[data-crm-segment-search]");
+    const segmentChanged = segmentField?.querySelector("[data-crm-segment-changed]");
+    const segmentBoxes = Array.from(segmentField?.querySelectorAll("[data-crm-segment-option]") || []);
+    const contactEmployeesField = form?.querySelector("[data-crm-contact-employees-field]");
+    const contactEmployeesDropdown = contactEmployeesField?.querySelector("[data-crm-contact-employees-dropdown]");
+    const contactEmployeesSummary = contactEmployeesField?.querySelector("[data-crm-contact-employees-summary]");
+    const contactEmployeesSearch = contactEmployeesField?.querySelector("[data-crm-contact-employees-search]");
+    const contactEmployeeBoxes = Array.from(contactEmployeesField?.querySelectorAll("[data-crm-contact-employee]") || []);
+    const sourceInput = form?.querySelector("[data-crm-source-input]");
+    const sourceValue = form?.querySelector("[data-crm-source-value]");
+    const sourcePanel = form?.querySelector("[data-crm-source-panel]");
+    const sourceError = form?.querySelector("[data-crm-source-error]");
+    const sourceCreateDialog = document.querySelector("#crm-source-create-dialog");
+    const sourceCreateForm = sourceCreateDialog?.querySelector("[data-crm-source-create-form]");
+    const sourceCreateName = sourceCreateForm?.querySelector("[data-crm-source-create-name]");
+    const sourceCreateStatus = sourceCreateForm?.querySelector("[data-crm-source-create-status]");
+    const sourceRows = Array.from(form?.querySelectorAll("[data-crm-source-options] option") || [])
+      .map((option) => String(option.value || "").trim()).filter(Boolean);
     const duplicateNote = dialog.querySelector("[data-crm-client-duplicate]");
     const contactMatchNote = dialog.querySelector("[data-crm-contact-match]");
     const clientPanel = dialog.querySelector("[data-crm-client-panel]");
@@ -1519,6 +1791,8 @@
     const clientCreateDialog = document.querySelector("#crm-client-create-dialog");
     const clientCreateForm = clientCreateDialog?.querySelector("[data-crm-client-create-form]");
     const clientCreateStatus = clientCreateDialog?.querySelector("[data-crm-client-create-status]");
+    const clientCreateSubtitle = clientCreateDialog?.querySelector("[data-crm-client-create-subtitle]");
+    let clientCreateFromContact = false;
     const taskTypeSelect = form?.querySelector("[data-crm-task-type-select]");
     const taskChecklist = form?.querySelector("[data-crm-task-checklist]");
     const clientRows = Array.from(document.querySelectorAll("#crm-client-list option"))
@@ -1558,17 +1832,16 @@
       if (digits.length < 7) return "";
       return digits.length >= 9 ? digits.slice(-9) : digits;
     };
-    const clientsByPhone = new Map(
-      Array.from(document.querySelectorAll("#crm-contact-list option"))
-        .map((option) => [
-          normalizePhone(option.value),
-          {
-            name: String(option.dataset.clientName || option.textContent || "").trim(),
-            phone: String(option.value || "").trim(),
-          },
-        ])
-        .filter(([phone, client]) => phone && client.name),
-    );
+    const contactRows = Array.from(document.querySelectorAll("#crm-contact-list option"))
+      .map((option) => ({
+        id: String(option.dataset.clientId || "").trim(),
+        name: String(option.dataset.clientName || option.textContent || "").trim(),
+        phone: String(option.dataset.clientPhone || "").trim(),
+        phones: String(option.dataset.clientPhones || option.dataset.clientPhone || "").trim(),
+        segmentIds: String(option.dataset.clientSegmentIds || "").split(",").filter(Boolean),
+      }))
+      .filter((item) => item.id && item.name)
+      .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 
     const syncDuplicateNotice = () => {
       if (!duplicateNote || !clientInput) return;
@@ -1599,17 +1872,27 @@
       }
     };
 
-    const openClientCreateDialog = () => {
+    const openClientCreateDialog = (fromContact = false) => {
       if (!clientCreateDialog || !clientCreateForm) return;
-      const suggestedName = String(clientInput?.value || "").trim();
+      clientCreateFromContact = fromContact;
+      const suggestion = String((fromContact ? contactInput : clientInput)?.value || "").trim();
+      const suggestedPhone = fromContact && /^[+\d\s().-]+$/.test(suggestion) && normalizePhone(suggestion)
+        ? suggestion : "";
+      const suggestedName = suggestedPhone ? "" : suggestion;
       clientCreateForm.reset();
       const nameInput = clientCreateForm.querySelector("[data-crm-client-create-name]");
       if (nameInput) nameInput.value = suggestedName;
+      const phoneInput = clientCreateForm.querySelector('input[name="phone"]');
+      if (phoneInput) phoneInput.value = suggestedPhone;
+      if (clientCreateSubtitle) clientCreateSubtitle.textContent = fromContact
+        ? "Клиент сохранится и сразу подставится в сделку."
+        : "Клиент сохранится и сразу подставится в задачу.";
       if (clientCreateStatus) {
         clientCreateStatus.textContent = "";
         clientCreateStatus.dataset.status = "";
       }
       closeClientPanel();
+      closeContactPanel();
       if (typeof clientCreateDialog.showModal === "function") {
         clientCreateDialog.showModal();
       } else {
@@ -1667,6 +1950,147 @@
         });
       });
     };
+    const formatDealAmount = () => {
+      if (!amountInput) return;
+      const raw = amountInput.value;
+      const cursor = amountInput.selectionStart ?? raw.length;
+      const beforeCursor = raw.slice(0, cursor);
+      const digitsBefore = (beforeCursor.match(/\d/g) || []).length;
+      const afterSeparator = /[.,]/.test(beforeCursor);
+      const cleaned = raw.replace(/[^\d.,]/g, "");
+      const separator = cleaned.search(/[.,]/);
+      const whole = (separator < 0 ? cleaned : cleaned.slice(0, separator)).replace(/\D/g, "");
+      const fraction = separator < 0 ? "" : cleaned.slice(separator + 1).replace(/\D/g, "");
+      const formatted = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (separator < 0 ? "" : `,${fraction}`);
+      if (raw === formatted) return;
+      amountInput.value = formatted;
+      let nextCursor = 0;
+      let seenDigits = 0;
+      while (nextCursor < formatted.length && seenDigits < digitsBefore) {
+        if (/\d/.test(formatted[nextCursor])) seenDigits += 1;
+        nextCursor += 1;
+      }
+      if (afterSeparator && separator >= 0) {
+        nextCursor = Math.max(nextCursor, formatted.indexOf(",") + 1);
+      } else {
+        while (formatted[nextCursor] === " ") nextCursor += 1;
+      }
+      amountInput.setSelectionRange(nextCursor, nextCursor);
+    };
+
+    const closeSourcePanel = () => {
+      if (!sourcePanel) return;
+      sourcePanel.hidden = true;
+      sourcePanel.innerHTML = "";
+    };
+
+    const positionSourcePanel = () => {
+      if (!sourceInput || !sourcePanel || sourcePanel.hidden) return;
+      const rect = sourceInput.getBoundingClientRect();
+      const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 24);
+      sourcePanel.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+      sourcePanel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 96)}px`;
+      sourcePanel.style.width = `${width}px`;
+    };
+
+    const syncSourceDisplay = () => {
+      if (sourceInput && sourceValue) sourceInput.value = sourceValue.value;
+      if (sourceError) sourceError.hidden = true;
+    };
+
+    const chooseSource = (name) => {
+      if (!sourceInput || !sourceValue) return;
+      sourceValue.value = name;
+      sourceInput.value = name;
+      sourceValue.dispatchEvent(new Event("change", { bubbles: true }));
+      if (sourceError) sourceError.hidden = true;
+      closeSourcePanel();
+    };
+
+    const closeSourceCreateDialog = () => {
+      if (sourceCreateDialog?.open) sourceCreateDialog.close();
+    };
+
+    const openSourceCreateDialog = (suggestedName = "") => {
+      if (!sourceCreateDialog || !sourceCreateForm) return;
+      sourceCreateForm.reset();
+      if (sourceCreateName) sourceCreateName.value = suggestedName;
+      if (sourceCreateStatus) {
+        sourceCreateStatus.textContent = "";
+        sourceCreateStatus.dataset.status = "";
+      }
+      closeSourcePanel();
+      sourceCreateDialog.showModal();
+      sourceCreateName?.focus();
+    };
+
+    const renderSourcePanel = () => {
+      if (!sourceInput || !sourcePanel) return;
+      const query = String(sourceInput.value || "").trim();
+      const filterQuery = query === String(sourceValue?.value || "").trim() ? "" : query;
+      const rows = sourceRows.filter((name) => name.toLocaleLowerCase().includes(filterQuery.toLocaleLowerCase()));
+      const exact = sourceRows.some((name) => name.toLocaleLowerCase() === query.toLocaleLowerCase());
+      sourcePanel.innerHTML = (rows.length
+        ? rows.map((name) => `<button type="button" class="sales-combo-option" data-crm-source-choice><span class="sales-combo-main">${escapeHtml(name)}</span></button>`).join("")
+        : '<div class="sales-combo-empty">Канал не найден</div>')
+        + '<button type="button" class="sales-combo-option crm-source-create-option" data-crm-source-create>'
+        + '<span class="sales-combo-main">+ Создать канал продаж</span>'
+        + '<span class="sales-combo-meta"><span>Добавить новый канал</span></span></button>';
+      sourcePanel.hidden = false;
+      positionSourcePanel();
+      sourcePanel.querySelectorAll("[data-crm-source-choice]").forEach((button, index) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          chooseSource(rows[index]);
+        });
+      });
+      sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("mousedown", (event) => event.preventDefault());
+      sourcePanel.querySelector("[data-crm-source-create]")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        openSourceCreateDialog(exact ? "" : query);
+      });
+    };
+
+    sourceCreateDialog?.querySelectorAll("[data-crm-source-create-close]").forEach((button) => {
+      button.addEventListener("click", closeSourceCreateDialog);
+    });
+    sourceCreateDialog?.addEventListener("click", (event) => {
+      if (event.target === sourceCreateDialog) closeSourceCreateDialog();
+    });
+    sourceCreateForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!sourceCreateForm.checkValidity()) {
+        sourceCreateForm.reportValidity();
+        return;
+      }
+      const name = String(sourceCreateName?.value || "").trim();
+      const submitButton = sourceCreateForm.querySelector("[data-crm-source-create-submit]");
+      if (submitButton) submitButton.disabled = true;
+      if (sourceCreateStatus) {
+        sourceCreateStatus.textContent = "Сохраняю...";
+        sourceCreateStatus.dataset.status = "";
+      }
+      try {
+        const body = new FormData();
+        body.set("csrf_token", form.querySelector('input[name="csrf_token"]')?.value || "");
+        body.set("name", name);
+        const response = await fetch("/crm/lead-sources", { method: "POST", body, headers: { Accept: "application/json" } });
+        const result = await response.json();
+        if (!response.ok || !result.name) throw new Error(result.error || "Не удалось создать канал");
+        const savedName = String(result.name);
+        if (!sourceRows.some((item) => item.toLocaleLowerCase() === savedName.toLocaleLowerCase())) sourceRows.push(savedName);
+        closeSourceCreateDialog();
+        chooseSource(savedName);
+      } catch (error) {
+        if (sourceCreateStatus) {
+          sourceCreateStatus.textContent = error.message || "Не удалось создать канал";
+          sourceCreateStatus.dataset.status = "error";
+        }
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
 
     const positionResponsiblePanel = () => {
       if (!responsibleInput || !responsiblePanel || responsiblePanel.hidden) return;
@@ -1868,23 +2292,192 @@
       });
     };
 
+    const closeContactPanel = () => {
+      if (!contactPanel) return;
+      contactPanel.hidden = true;
+      contactPanel.innerHTML = "";
+    };
+
+    const positionContactPanel = () => {
+      if (!contactInput || !contactPanel || contactPanel.hidden) return;
+      const rect = contactInput.getBoundingClientRect();
+      const width = Math.min(Math.max(rect.width, 300), window.innerWidth - 24);
+      contactPanel.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+      contactPanel.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 96)}px`;
+      contactPanel.style.width = `${width}px`;
+    };
+
+    const syncSegmentSummary = () => {
+      if (!segmentSummary) return;
+      const selected = segmentBoxes.filter((box) => box.checked)
+        .map((box) => String(box.closest("label")?.querySelector("span")?.textContent || box.value).trim());
+      segmentSummary.textContent = selected.length
+        ? selected.slice(0, 2).join(" · ") + (selected.length > 2 ? ` · ещё ${selected.length - 2}` : "")
+        : "Не выбраны";
+    };
+
+    const setSegmentIds = (ids) => {
+      const selected = new Set(Array.isArray(ids) ? ids.map(String) : []);
+      segmentBoxes.forEach((box) => { box.checked = selected.has(box.value); });
+      if (segmentChanged) segmentChanged.value = "0";
+      syncSegmentSummary();
+    };
+
+    const syncContactEmployeesSummary = () => {
+      if (!contactEmployeesSummary) return;
+      const names = contactEmployeeBoxes.filter((box) => box.checked).map((box) => box.value);
+      contactEmployeesSummary.textContent = names.length
+        ? names.slice(0, 2).join(" · ") + (names.length > 2 ? ` · ещё ${names.length - 2}` : "")
+        : "Не выбраны";
+    };
+    const setContactEmployees = (names) => {
+      const selected = new Set(Array.isArray(names) ? names.map(String) : []);
+      contactEmployeeBoxes.forEach((box) => { box.checked = selected.has(box.value); });
+      syncContactEmployeesSummary();
+    };
+    contactEmployeeBoxes.forEach((box) => box.addEventListener("change", syncContactEmployeesSummary));
+    contactEmployeesSearch?.addEventListener("input", () => {
+      const query = contactEmployeesSearch.value.trim().toLocaleLowerCase();
+      contactEmployeesField.querySelectorAll("[data-crm-contact-employee-row]").forEach((row) => {
+        row.hidden = Boolean(query) && !row.textContent.toLocaleLowerCase().includes(query);
+      });
+    });
+
+    segmentBoxes.forEach((box) => box.addEventListener("change", () => {
+      if (segmentChanged) segmentChanged.value = "1";
+      syncSegmentSummary();
+    }));
+    segmentSearch?.addEventListener("input", () => {
+      const query = segmentSearch.value.trim().toLocaleLowerCase();
+      segmentField.querySelectorAll("[data-crm-segment-option-row]").forEach((row) => {
+        row.hidden = Boolean(query) && !row.textContent.toLocaleLowerCase().includes(query);
+      });
+    });
+
     const syncContactMatch = () => {
       if (!contactInput || !contactMatchNote || !clientInput) return;
-      const match = clientsByPhone.get(normalizePhone(contactInput.value));
-      const previousMatch = String(clientInput.dataset.crmContactMatch || "");
-      if (!match) {
-        contactMatchNote.hidden = true;
-        contactMatchNote.textContent = "";
+      const phone = normalizePhone(contactInput.value);
+      const previousClientId = String(contactClientId?.value || "");
+      let selected = contactRows.find((item) => item.id === String(contactClientId?.value || ""));
+      const selectedText = selected?.phone || selected?.name || "";
+      const stillSelected = selected && (selected.phone
+        ? normalizePhone(selected.phone) === phone
+        : selectedText.toLocaleLowerCase() === String(contactInput.value || "").trim().toLocaleLowerCase());
+      if (selected && !stillSelected) {
+        if (contactClientId) contactClientId.value = "";
+        selected = null;
+      }
+      const matches = phone ? contactRows.filter((item) => normalizePhone(item.phone) === phone) : [];
+      if (!selected && matches.length === 1) {
+        selected = matches[0];
+        if (contactClientId) contactClientId.value = selected.id;
+        if (selected.id !== previousClientId) setSegmentIds(selected.segmentIds);
+      }
+      contactInput.classList.toggle("crm-contact-known", matches.length > 0);
+      if (selected) {
+        clientInput.value = selected.name;
+        clientInput.dataset.crmContactMatch = selected.name;
+        contactMatchNote.textContent = selected.phone
+          ? `Номер есть в базе: ${selected.name}`
+          : `Клиент есть в базе: ${selected.name}. Номер не указан.`;
+        contactMatchNote.hidden = false;
+        if (contactCardLink) {
+          contactCardLink.href = `/clients?client=${encodeURIComponent(selected.id)}#client-card`;
+          contactCardLink.hidden = false;
+        }
+      } else {
+        const previousMatch = String(clientInput.dataset.crmContactMatch || "");
         if (previousMatch && clientInput.value === previousMatch) clientInput.value = "";
         delete clientInput.dataset.crmContactMatch;
-        syncDuplicateNotice();
-        return;
+        contactMatchNote.textContent = matches.length > 1
+          ? `Номер есть у ${matches.length} клиентов. Выберите нужное имя из списка.` : "";
+        contactMatchNote.hidden = matches.length <= 1;
+        if (contactCardLink) {
+          contactCardLink.hidden = true;
+          contactCardLink.removeAttribute("href");
+        }
       }
-      clientInput.value = match.name;
-      clientInput.dataset.crmContactMatch = match.name;
-      contactMatchNote.textContent = `Номер уже есть: ${match.name}. Сделка будет привязана к этому клиенту.`;
-      contactMatchNote.hidden = false;
       syncDuplicateNotice();
+    };
+
+    const chooseContact = (item) => {
+      if (!contactInput || !item) return;
+      contactInput.value = item.phone || item.name;
+      if (contactClientId) contactClientId.value = item.id;
+      setSegmentIds(item.segmentIds);
+      syncContactMatch();
+      contactInput.focus();
+      closeContactPanel();
+    };
+
+    const highlightContactName = (value, query) => {
+      const name = String(value || "");
+      if (!query) return escapeHtml(name);
+      const start = name.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+      if (start < 0) return escapeHtml(name);
+      return escapeHtml(name.slice(0, start))
+        + `<mark class="crm-contact-search-hit">${escapeHtml(name.slice(start, start + query.length))}</mark>`
+        + escapeHtml(name.slice(start + query.length));
+    };
+
+    const highlightContactPhone = (value, digits) => {
+      const phone = String(value || "");
+      if (digits.length < 2) return escapeHtml(phone);
+      const match = phone.replace(/\D+/g, "").indexOf(digits);
+      if (match < 0) return escapeHtml(phone);
+      let seen = 0;
+      let start = -1;
+      let end = -1;
+      for (let index = 0; index < phone.length; index += 1) {
+        if (!/\d/.test(phone[index])) continue;
+        if (seen === match) start = index;
+        if (seen === match + digits.length - 1) {
+          end = index + 1;
+          break;
+        }
+        seen += 1;
+      }
+      if (start < 0 || end < 0) return escapeHtml(phone);
+      return escapeHtml(phone.slice(0, start))
+        + `<mark class="crm-contact-search-hit">${escapeHtml(phone.slice(start, end))}</mark>`
+        + escapeHtml(phone.slice(end));
+    };
+
+    const renderContactPanel = () => {
+      if (!contactInput || !contactPanel) return;
+      const query = String(contactInput.value || "").trim();
+      const selected = contactRows.find((item) => item.id === String(contactClientId?.value || ""));
+      const search = selected && query === (selected.phone || selected.name) ? "" : query;
+      const digits = search.replace(/\D+/g, "");
+      const rows = contactRows.filter((item) => !search
+        || item.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())
+        || (digits.length >= 2 && item.phones.split(" · ").some((value) => value.replace(/\D+/g, "").includes(digits)))).slice(0, 80);
+      contactPanel.innerHTML = rows.length
+        ? rows.map((item) => (
+          '<button type="button" class="sales-combo-option crm-contact-option" data-crm-contact-choice>'
+          + `<span class="sales-combo-main">${highlightContactName(item.name, search)}</span>`
+          + `<span class="sales-combo-meta"><span class="${item.phones ? "crm-contact-phone" : ""}">${item.phones ? item.phones.split(" · ").map((phone) => highlightContactPhone(phone, digits)).join(" · ") : "Номер не указан"}</span><strong>В базе клиентов</strong></span>`
+          + '</button>'
+        )).join("")
+        : '<div class="sales-combo-empty">Клиент не найден. Номер можно ввести вручную.</div>'
+          + '<button type="button" class="sales-combo-option crm-client-create-option" data-crm-contact-create-open>'
+          + '<span class="sales-combo-main">+ Создать клиента</span>'
+          + '<span class="sales-combo-meta">Добавить в базу клиентов</span></button>';
+      contactPanel.hidden = false;
+      positionContactPanel();
+      contactPanel.querySelectorAll("[data-crm-contact-choice]").forEach((button, index) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          chooseContact(rows[index]);
+        });
+      });
+      const createButton = contactPanel.querySelector("[data-crm-contact-create-open]");
+      createButton?.addEventListener("mousedown", (event) => event.preventDefault());
+      createButton?.addEventListener("click", (event) => {
+        event.preventDefault();
+        openClientCreateDialog(true);
+      });
     };
 
     const syncConditionalFields = () => {
@@ -1931,7 +2524,18 @@
         return;
       }
       const field = fields[0];
-      field.value = value;
+      if (name === "currency" && field.tagName === "SELECT") {
+        field.querySelectorAll("[data-crm-legacy-currency]").forEach((option) => option.remove());
+        const currency = String(value || "UZS").trim().toUpperCase();
+        if (!Array.from(field.options).some((option) => option.value === currency)) {
+          const option = new Option(`${currency} (сохранено ранее)`, currency);
+          option.dataset.crmLegacyCurrency = "";
+          field.add(option);
+        }
+        field.value = currency;
+      } else {
+        field.value = value;
+      }
       field.dispatchEvent(new Event("change", { bubbles: true }));
       field.dispatchEvent(new Event("input", { bubbles: true }));
     };
@@ -1942,6 +2546,8 @@
       const isTaskMode = kind === "task";
       form.classList.toggle("is-compact-deal-create", isCompactDeal);
       form.classList.toggle("is-task-mode", isTaskMode);
+      if (segmentField) segmentField.hidden = kind !== "deal";
+      if (contactEmployeesField) contactEmployeesField.hidden = kind !== "deal";
       form.querySelectorAll("[data-crm-task-hidden]").forEach((field) => {
         field.hidden = isTaskMode;
       });
@@ -1949,6 +2555,9 @@
         field.hidden = !isTaskMode;
       });
       if (contactInput) contactInput.required = isCompactDeal;
+      if (titleFieldLabel) titleFieldLabel.textContent = isCompactDeal ? "Описание сделки*" : "Название*";
+      const titleInput = form.querySelector('input[name="title"]');
+      if (titleInput) titleInput.placeholder = isCompactDeal ? "Краткое описание сделки" : isTaskMode ? "Название задачи" : "Название сделки";
       if (isCompactDeal) {
         if (title) title.textContent = "Новая сделка";
         if (subtitle) subtitle.textContent = "Основные данные сделки";
@@ -1959,8 +2568,6 @@
         if (title) title.textContent = mode === "edit" ? "Редактировать задачу" : "Новая задача";
         if (subtitle) subtitle.textContent = "Клиент, ответственный, срок и следующий шаг";
         if (submit) submit.textContent = mode === "edit" ? "Сохранить задачу" : "Создать задачу";
-        const titleInput = form.querySelector('input[name="title"]');
-        if (titleInput) titleInput.placeholder = "Название задачи";
         applyTaskTypeChecklist(false);
       }
       syncConditionalFields();
@@ -1969,6 +2576,15 @@
     const resetDialog = () => {
       if (!form) return;
       form.reset();
+      setSegmentIds([]);
+      setContactEmployees([]);
+      if (contactEmployeesSearch) contactEmployeesSearch.value = "";
+      contactEmployeesField?.querySelectorAll("[data-crm-contact-employee-row]").forEach((row) => { row.hidden = false; });
+      if (contactEmployeesDropdown) contactEmployeesDropdown.open = false;
+      if (segmentSearch) segmentSearch.value = "";
+      segmentField?.querySelectorAll("[data-crm-segment-option-row]").forEach((row) => { row.hidden = false; });
+      if (segmentDropdown) segmentDropdown.open = false;
+      form.querySelectorAll("[data-crm-legacy-currency]").forEach((option) => option.remove());
       form.dataset.crmDialogMode = "create";
       form.classList.remove("is-compact-deal-create", "is-task-mode");
       form.setAttribute("action", defaultAction);
@@ -1976,7 +2592,11 @@
       if (taskChecklist) delete taskChecklist.dataset.crmTaskAutofilled;
       syncDealDisplay();
       syncOrderDisplay();
+      syncSourceDisplay();
+      closeSourcePanel();
+      closeContactPanel();
       if (title) title.textContent = "Новая запись";
+      if (titleFieldLabel) titleFieldLabel.textContent = "Название*";
       if (subtitle) subtitle.textContent = "Сделка, задача или история контакта";
       if (submit) submit.textContent = "Сохранить запись";
       syncConditionalFields();
@@ -1989,6 +2609,10 @@
       Object.entries(payload).forEach(([name, value]) => {
         if (name === "id") {
           setField("record_id", value || "");
+        } else if (name === "business_segment_ids") {
+          setSegmentIds(value);
+        } else if (name === "first_contact_employees") {
+          setContactEmployees(value);
         } else if (name === "amount_input") {
           setField("amount", value || "");
         } else {
@@ -2019,6 +2643,7 @@
       syncFormPresentation(mode, kind);
       syncDuplicateNotice();
       syncContactMatch();
+      closeContactPanel();
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       } else {
@@ -2054,6 +2679,11 @@
       field.addEventListener("change", syncConditionalFields);
     });
     clientInput?.addEventListener("input", () => {
+      if (document.activeElement === clientInput && contactClientId) {
+        contactClientId.value = "";
+        delete clientInput.dataset.crmContactMatch;
+        if (contactCardLink) contactCardLink.hidden = true;
+      }
       syncDuplicateNotice();
       renderClientPanel();
     });
@@ -2062,6 +2692,15 @@
     responsibleInput?.addEventListener("input", renderResponsiblePanel);
     responsibleInput?.addEventListener("focus", renderResponsiblePanel);
     responsibleInput?.addEventListener("click", renderResponsiblePanel);
+    sourceInput?.addEventListener("input", () => {
+      const exact = sourceRows.find((name) => name.toLocaleLowerCase() === sourceInput.value.trim().toLocaleLowerCase());
+      if (sourceValue) sourceValue.value = exact || "";
+      if (sourceError) sourceError.hidden = true;
+      renderSourcePanel();
+    });
+    sourceInput?.addEventListener("focus", renderSourcePanel);
+    sourceInput?.addEventListener("click", renderSourcePanel);
+    sourceValue?.addEventListener("change", syncSourceDisplay);
     dealInput?.addEventListener("input", () => {
       if (dealSelect) dealSelect.value = "";
       renderDealPanel();
@@ -2084,10 +2723,35 @@
     window.addEventListener("resize", positionResponsiblePanel);
     window.addEventListener("resize", positionDealPanel);
     window.addEventListener("resize", positionOrderPanel);
+    window.addEventListener("resize", positionSourcePanel);
+    window.addEventListener("resize", positionContactPanel);
     window.addEventListener("scroll", positionClientPanel, true);
     window.addEventListener("scroll", positionResponsiblePanel, true);
     window.addEventListener("scroll", positionDealPanel, true);
     window.addEventListener("scroll", positionOrderPanel, true);
+    window.addEventListener("scroll", positionSourcePanel, true);
+    window.addEventListener("scroll", positionContactPanel, true);
+    document.addEventListener("mousedown", (event) => {
+      if (!contactPanel || !contactInput) return;
+      if (event.target === contactInput || contactPanel.contains(event.target)) return;
+      closeContactPanel();
+    });
+    document.addEventListener("mousedown", (event) => {
+      if (!sourcePanel || !sourceInput) return;
+      if (event.target === sourceInput || sourcePanel.contains(event.target)) return;
+      closeSourcePanel();
+    });
+    form?.addEventListener("submit", (event) => {
+      if (form.querySelector('input[name="item_type"]:checked')?.value === "task") return;
+      if (sourceValue?.value) return;
+      event.preventDefault();
+      sourceInput?.focus();
+      renderSourcePanel();
+      if (sourceError) {
+        sourceError.textContent = "Выберите канал из списка или создайте новый.";
+        sourceError.hidden = false;
+      }
+    });
     document.addEventListener("mousedown", (event) => {
       if (!clientPanel || !clientInput) return;
       if (event.target === clientInput || clientPanel.contains(event.target)) return;
@@ -2108,7 +2772,15 @@
       if (event.target === orderInput || orderPanel.contains(event.target)) return;
       closeOrderPanel();
     });
-    contactInput?.addEventListener("input", syncContactMatch);
+    contactInput?.addEventListener("input", () => {
+      const previousClientId = String(contactClientId?.value || "");
+      syncContactMatch();
+      if (previousClientId && !contactClientId?.value) setSegmentIds([]);
+      renderContactPanel();
+    });
+    amountInput?.addEventListener("input", formatDealAmount);
+    contactInput?.addEventListener("focus", renderContactPanel);
+    contactInput?.addEventListener("click", renderContactPanel);
     clientCreateDialog?.querySelectorAll("[data-crm-client-create-close]").forEach((button) => {
       button.addEventListener("click", closeClientCreateDialog);
     });
@@ -2144,15 +2816,22 @@
             clientRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
           }
           if (name) existingClients.add(name.toLocaleLowerCase());
-          const phoneKey = normalizePhone(phone);
-          if (phoneKey && name) clientsByPhone.set(phoneKey, { name, phone });
-          if (clientInput) {
+          const id = String(client.id || "").trim();
+          if (id && name && !contactRows.some((item) => item.id === id)) {
+            contactRows.push({ id, name, phone, phones: phone });
+            contactRows.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+          }
+          if (!clientCreateFromContact && clientInput) {
             clientInput.value = name;
             clientInput.dispatchEvent(new Event("change", { bubbles: true }));
           }
           syncDuplicateNotice();
           closeClientCreateDialog();
-          clientInput?.focus();
+          if (clientCreateFromContact && id) {
+            chooseContact({ id, name, phone });
+          } else {
+            clientInput?.focus();
+          }
         })
         .catch((error) => {
           if (clientCreateStatus) {
@@ -2256,8 +2935,9 @@
       setField("client", params.get("crm_client") || "");
       setField("contact_type", params.get("crm_contact_type") || "Чат Telegram");
       setField("chat_ref", params.get("crm_chat_ref") || "");
+      setField("messenger_thread_id", params.get("crm_messenger_thread_id") || "");
       setField("note", params.get("crm_note") || "Создано из диалога мессенджера");
-      setSelectByValueOrText("lead_source", params.get("crm_source") || "Telegram", params.get("crm_source") || "Telegram");
+      setField("lead_source", params.get("crm_source") || "Telegram");
       setSelectByValueOrText("stage_id", params.get("crm_stage") || "leads", "лид");
       setSelectByValueOrText("status", params.get("crm_status") || "new", "нов");
       syncFormPresentation("create", "deal");
@@ -2369,6 +3049,11 @@
 
     const openTaskInfoDialog = (row) => {
       if (!taskInfoDialog || !row) return;
+      if (row.hasAttribute("data-crm-followup-row")) {
+        closeDayDialog();
+        row.querySelector('[data-crm-queue-action="open"]')?.click();
+        return;
+      }
       activeTaskRow = row;
       const payload = taskEditPayload(row);
       if (taskInfoTitle) taskInfoTitle.textContent = row.dataset.taskTitle || payload.title || "Задача";
@@ -2630,6 +3315,15 @@
   }
 
   function init() {
+    const filterPopover = document.querySelector(".crm-filter-popover");
+    if (filterPopover) {
+      document.addEventListener("click", (event) => {
+        if (filterPopover.open && !filterPopover.contains(event.target)) filterPopover.open = false;
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && filterPopover.open) filterPopover.open = false;
+      });
+    }
     initSearchDropdowns();
     document.querySelectorAll("[data-crm-kanban]").forEach(initKanban);
     initDialog();

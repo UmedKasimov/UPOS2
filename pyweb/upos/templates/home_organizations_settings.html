@@ -27,6 +27,13 @@
         <span>Основное</span>
         <small>Параметры системы</small>
       </a>
+      <a class="general-report-card general-settings-card" href="{{ url_for('organizations_settings_get') }}?tab=advanced" data-org-settings-launch-tab="advanced">
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><circle cx="12" cy="12" r="4"/><path d="m5.6 5.6 2.1 2.1"/><path d="m16.3 16.3 2.1 2.1"/><path d="m18.4 5.6-2.1 2.1"/><path d="m7.7 16.3-2.1 2.1"/></svg>
+        </span>
+        <span>Доп. настройки</span>
+        <small>Продажи и заказы</small>
+      </a>
       <a class="general-report-card general-settings-card" href="{{ url_for('organizations_users_get') }}" data-org-settings-launch-tab="users">
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M18 8l1.2 1.2L22 6.4"/><path d="M18.5 14.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/><path d="M18.5 16v3"/></svg>
@@ -78,6 +85,7 @@
       restoreActive: true,
       labels: {
         general: {{ _('settings.tab.general') | tojson }},
+        advanced: "Доп. настройки",
         users: "Пользователи",
         dictionary: {{ _('settings.tab.dictionary') | tojson }},
         integrations: {{ _('settings.tab.integrations') | tojson }},

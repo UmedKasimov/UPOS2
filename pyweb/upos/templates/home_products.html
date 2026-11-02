@@ -21,12 +21,14 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="{{ url_for('static', path='products-table.js') }}?v=13" defer></script>
-  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=5" defer></script>
+  {% if not module_home_only %}
+  <script src="{{ url_for('static', path='products-table.js') }}?v=15" defer></script>
+  <script src="{{ url_for('static', path='catalog-kind-tabs.js') }}?v=7" defer></script>
   {% if can_edit_catalog_price %}
     <script src="{{ url_for('static', path='product-price-inline.js') }}?v=2" defer></script>
   {% endif %}
   <script src="{{ url_for('static', path='product-history.js') }}?v=1" defer></script>
+  {% endif %}
 {% endblock %}
 
 {% block main %}
@@ -36,6 +38,7 @@
     data-workspace-key="products"
     data-workspace-default-tab="{{ products_default_tab }}"
     data-workspace-home-href="{{ url_for('products_get') }}"
+    data-workspace-lazy-home-enabled="1"
   >
     {% if flash_ok == "saved" %}
       <div class="flash ok settings-ios-flash">Товар сохранён.</div>
@@ -45,6 +48,8 @@
       <div class="flash ok settings-ios-flash">Импорт завершён: {{ imported_count }} строк.</div>
     {% elif flash_ok == "bulk_saved" %}
       <div class="flash ok settings-ios-flash">Обновлено товаров: {{ bulk_updated_count }}.</div>
+    {% elif flash_ok == "bulk_deleted" %}
+      <div class="flash ok settings-ios-flash">Удалено товаров: {{ bulk_updated_count }}.</div>
     {% endif %}
     {% if flash_err %}
       <div class="flash err settings-ios-flash">{{ flash_err }}</div>
@@ -56,7 +61,7 @@
     {% include "_workspace_tabs_early.html" %}
 
     <section class="general-report-launcher workbench-launcher products-launcher" aria-label="Разделы товаров" data-workspace-launcher>
-      <a class="general-report-card {{ 'active' if product_filters.kind == 'product' else '' }}" href="{{ url_for('products_get') }}#catalog" data-workspace-card="catalog" data-workspace-tab-title="Каталог и остатки" data-workspace-tab-hash="catalog" data-workspace-tab-href="{{ url_for('products_get') }}" {% if product_filters.kind == 'product' %}aria-current="page"{% endif %}>
+      <a class="general-report-card {{ 'active' if product_filters.kind == 'product' else '' }}" href="{{ url_for('products_get') }}#catalog" data-workspace-card="catalog" data-workspace-tab-title="Каталог" data-workspace-tab-hash="catalog" data-workspace-tab-href="{{ url_for('products_get') }}" {% if product_filters.kind == 'product' %}aria-current="page"{% endif %}>
         <span class="general-report-card-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
@@ -92,6 +97,7 @@
       </a>
     </section>
 
+    {% if not module_home_only %}
     <div class="workspace-module-stack" data-workspace-view="catalog service create price_types price_type_detail categories" hidden>
 
     <datalist id="product-category-list">
@@ -115,6 +121,7 @@
           </div>
           <div class="products-panel-top-actions">
             <div class="products-panel-actions">
+              <button class="btn{% if not zero_stock_active %} btn-secondary{% endif %}" type="button" data-products-zero-stock-toggle aria-pressed="{{ 'true' if zero_stock_active else 'false' }}" title="Показать только товары с нулевым остатком">Нулевой остаток</button>
               {% set create_kind = product_filters.kind if product_filters.kind in ['product', 'service', 'subscription'] else 'product' %}
               <a class="btn" href="{{ url_for('products_get') }}?kind={{ create_kind }}#product-form" data-workspace-trigger="create" data-workspace-tab-title="{% if edit_product %}Редактирование{% else %}Создание{% endif %}" data-workspace-tab-hash="product-form" data-workspace-tab-href="{{ url_for('products_get') }}?kind={{ create_kind }}">
                 + Создать
@@ -150,6 +157,7 @@
             data-products-auto-filter
             data-products-filter-base-action="{{ url_for('products_get') }}"
           >
+            <input type="hidden" name="zero_stock" value="{{ '1' if zero_stock_active else '0' }}" />
             <label class="products-catalog-search">
               <span>Поиск</span>
               <input name="q" type="search" value="{{ product_filters.q }}" placeholder="Поиск" />
@@ -288,45 +296,85 @@
           {% for item in product_filters.catalog_currency_values %}<input type="hidden" name="catalog_currency" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.status_values %}<input type="hidden" name="status" value="{{ item }}" />{% endfor %}
           {% for item in product_filters.kind_values %}<input type="hidden" name="kind" value="{{ item }}" />{% endfor %}
+          <input type="hidden" name="zero_stock" value="{{ '1' if zero_stock_active else '0' }}" />
           <input type="hidden" name="page_size" value="{{ product_page_size }}" />
           <div class="products-bulk-summary">
             <strong>Выбрано: <span data-products-selected-count>0</span></strong>
           </div>
           <div class="products-bulk-actions">
             <button class="btn" type="button" data-products-bulk-open disabled>Редактировать</button>
-            <button class="btn btn-secondary" type="button" data-products-clear-selection disabled>Снять выбор</button>
+            {% if can_bulk_delete_products %}
+              <button class="products-action-icon products-action-icon--delete" type="button" data-products-bulk-delete aria-label="Удалить выбранные товары" title="Удалить выбранные" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v5" />
+                  <path d="M14 11v5" />
+                </svg>
+              </button>
+            {% endif %}
+            <button class="products-action-icon" type="button" data-products-clear-selection aria-label="Снять выбор товаров" title="Снять выбор" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
           </div>
-          <dialog class="products-bulk-dialog" data-products-bulk-dialog>
+          {% if can_bulk_delete_products %}
+            <dialog class="products-bulk-dialog" data-products-bulk-delete-dialog>
+              <div class="products-bulk-dialog-panel">
+                <header class="products-bulk-dialog-head">
+                  <h3>Удалить выбранные товары?</h3>
+                  <button type="button" class="products-bulk-dialog-close" data-products-bulk-delete-close aria-label="Закрыть">×</button>
+                </header>
+                <div class="products-bulk-dialog-body">
+                  <p>Выбрано товаров: <strong data-products-bulk-delete-count>0</strong>. Удаление нельзя отменить. Если хотя бы один товар есть в наличии, ни один из выбранных товаров не будет удалён.</p>
+                </div>
+                <footer class="products-bulk-dialog-actions">
+                  <button class="btn btn-danger-ghost" type="submit" name="confirm_delete" value="1" formaction="{{ url_for('products_bulk_delete') }}">Удалить товары</button>
+                  <button class="btn btn-secondary" type="button" data-products-bulk-delete-close>Отмена</button>
+                </footer>
+              </div>
+            </dialog>
+          {% endif %}
+          <dialog class="products-bulk-dialog products-bulk-edit-dialog" data-products-bulk-dialog>
             <div class="products-bulk-dialog-panel">
               <header class="products-bulk-dialog-head">
-                <h3>Массовое редактирование</h3>
+                <div>
+                  <h3>Массовое редактирование</h3>
+                  <p>Выбрано товаров: <strong data-products-selected-count>0</strong>. Отметьте поля, которые нужно изменить.</p>
+                </div>
                 <button type="button" class="products-bulk-dialog-close" data-products-bulk-close aria-label="Закрыть">×</button>
               </header>
               <div class="products-bulk-dialog-body">
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Категория</span>
-                  <input name="bulk_category" list="product-category-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Группа товара</span>
-                  <input name="bulk_group" list="product-group-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Бренд</span>
-                  <input name="bulk_brand" list="product-brand-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
-                <label class="products-bulk-dialog-row">
-                  <input type="checkbox" data-products-bulk-toggle />
-                  <span>Папка</span>
-                  <input name="bulk_folder" list="product-folder-list" placeholder="Выбрать" data-products-bulk-input disabled />
-                </label>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Категория</span></label>
+                  <div class="products-bulk-combo" data-products-bulk-combo data-list-id="product-category-list" data-create-label="категорию">
+                    <input name="bulk_category" placeholder="Выберите или создайте категорию" autocomplete="off" data-products-bulk-input disabled />
+                    <button type="button" data-products-bulk-combo-open aria-label="Показать категории" disabled>⌄</button>
+                    <div class="products-bulk-combo-panel" data-products-bulk-combo-panel hidden></div>
+                  </div>
+                </div>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Группа товара</span></label>
+                  <input name="bulk_group" list="product-group-list" placeholder="Выберите группу" data-products-bulk-input disabled />
+                </div>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Бренд</span></label>
+                  <div class="products-bulk-combo" data-products-bulk-combo data-list-id="product-brand-list" data-create-label="бренд">
+                    <input name="bulk_brand" placeholder="Выберите или создайте бренд" autocomplete="off" data-products-bulk-input disabled />
+                    <button type="button" data-products-bulk-combo-open aria-label="Показать бренды" disabled>⌄</button>
+                    <div class="products-bulk-combo-panel" data-products-bulk-combo-panel hidden></div>
+                  </div>
+                </div>
+                <div class="products-bulk-dialog-row">
+                  <label class="products-bulk-field-label"><input type="checkbox" data-products-bulk-toggle /><span>Папка</span></label>
+                  <input name="bulk_folder" list="product-folder-list" placeholder="Выберите папку" data-products-bulk-input disabled />
+                </div>
               </div>
               <footer class="products-bulk-dialog-actions">
-                <button class="btn" type="submit" data-products-bulk-submit disabled>Сохранить</button>
-                <button class="btn btn-secondary" type="button" data-products-bulk-close>Отменить</button>
+                <button class="btn btn-secondary" type="button" data-products-bulk-close>Отмена</button>
+                <button class="btn" type="submit" data-products-bulk-submit disabled>Сохранить изменения</button>
               </footer>
             </div>
           </dialog>
@@ -355,7 +403,7 @@
                   <input type="checkbox" class="products-bulk-checkbox" data-products-select-all aria-label="Выбрать все товары" />
                 </th>
                 <th data-column-label="Фото" class="products-photo-col"></th>
-                <th data-column-label="Название" aria-sort="none">
+                <th data-column-label="Название" data-upos-min-width="414" aria-sort="none">
                   <button type="button" class="org-shipments-sort-btn products-sort-btn" data-products-sort="name">
                     <span>Название</span><span class="org-shipments-sort-arrow" aria-hidden="true">&#8597;</span>
                   </button>
@@ -1372,7 +1420,9 @@
       </form>
     </dialog>
     </div>
+    {% endif %}
   </section>
+	  {% if not module_home_only %}
 	  <script>
 	    (() => {
 	      const priceDialog = document.getElementById('products-price-type-dialog');
@@ -1676,4 +1726,5 @@
       });
     })();
   </script>
+  {% endif %}
 {% endblock %}

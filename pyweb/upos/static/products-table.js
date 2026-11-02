@@ -416,10 +416,52 @@
     return selectionInputs(table).filter((input) => input.checked);
   }
 
+  function closeBulkCombos(form, except = null) {
+    form.querySelectorAll("[data-products-bulk-combo]").forEach((combo) => {
+      if (combo !== except) combo.querySelector("[data-products-bulk-combo-panel]")?.setAttribute("hidden", "");
+    });
+  }
+
+  function showBulkCombo(combo, showAll = false) {
+    const input = combo.querySelector("[data-products-bulk-input]");
+    const panel = combo.querySelector("[data-products-bulk-combo-panel]");
+    if (!input || !panel || input.disabled) return;
+    const list = document.getElementById(combo.dataset.listId || "");
+    const values = Array.from(list?.options || []).map((option) => option.value).filter(Boolean);
+    const query = input.value.trim();
+    const matches = values.filter((value) => showAll || value.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+    const exactMatch = values.some((value) => value.toLocaleLowerCase() === query.toLocaleLowerCase());
+    panel.replaceChildren();
+    matches.slice(0, 100).forEach((value) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.dataset.productsBulkComboValue = value;
+      option.textContent = value;
+      panel.append(option);
+    });
+    if (query && !exactMatch) {
+      const create = document.createElement("button");
+      create.type = "button";
+      create.className = "products-bulk-combo-create";
+      create.dataset.productsBulkComboValue = query;
+      create.textContent = `+ Создать ${combo.dataset.createLabel || "значение"} «${query}»`;
+      panel.append(create);
+    }
+    if (!panel.childElementCount) {
+      const empty = document.createElement("span");
+      empty.className = "products-bulk-combo-empty";
+      empty.textContent = "Нет значений. Начните вводить название.";
+      panel.append(empty);
+    }
+    closeBulkCombos(combo.closest("form"), combo);
+    panel.hidden = false;
+  }
+
   function updateBulkDialogState(form) {
     if (!form) return;
     const selectedCount = Number(form.dataset.productsSelectedCount || "0");
     let hasEnabledField = false;
+    let hasEmptyField = false;
     form.querySelectorAll("[data-products-bulk-toggle]").forEach((toggle) => {
       const row = toggle.closest(".products-bulk-dialog-row");
       const input = row?.querySelector("[data-products-bulk-input]");
@@ -427,11 +469,15 @@
       if (input) {
         input.disabled = !enabled;
         if (!enabled) input.value = "";
+        if (enabled && !input.value.trim()) hasEmptyField = true;
       }
+      const comboButton = row?.querySelector("[data-products-bulk-combo-open]");
+      if (comboButton) comboButton.disabled = !enabled;
+      if (!enabled) row?.querySelector("[data-products-bulk-combo-panel]")?.setAttribute("hidden", "");
       if (enabled) hasEnabledField = true;
     });
     form.querySelectorAll("[data-products-bulk-submit]").forEach((node) => {
-      node.disabled = selectedCount <= 0 || !hasEnabledField;
+      node.disabled = selectedCount <= 0 || !hasEnabledField || hasEmptyField;
     });
   }
 
@@ -440,11 +486,12 @@
     const selected = selectedInputs(table);
     const count = selected.length;
     const allToggle = table.querySelector("[data-products-select-all]");
-    const rowInputs = selectionInputs(table);
+    const rowInputs = selectionInputs(table).filter((input) => !input.closest("tr")?.hidden);
+    const visibleSelectedCount = rowInputs.filter((input) => input.checked).length;
 
     if (allToggle) {
-      allToggle.checked = count > 0 && count === rowInputs.length;
-      allToggle.indeterminate = count > 0 && count < rowInputs.length;
+      allToggle.checked = rowInputs.length > 0 && visibleSelectedCount === rowInputs.length;
+      allToggle.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < rowInputs.length;
     }
 
     if (!form) return;
@@ -453,12 +500,17 @@
     form.querySelectorAll("[data-products-selected-count]").forEach((node) => {
       node.textContent = String(count);
     });
-    form.querySelectorAll("[data-products-bulk-open], [data-products-clear-selection]").forEach((node) => {
+    form.querySelectorAll("[data-products-bulk-open], [data-products-bulk-delete], [data-products-clear-selection]").forEach((node) => {
       node.disabled = count <= 0;
+    });
+    form.querySelectorAll("[data-products-bulk-delete-count]").forEach((node) => {
+      node.textContent = String(count);
     });
     if (count <= 0) {
       const dialog = form.querySelector("[data-products-bulk-dialog]");
       if (dialog?.open) dialog.close();
+      const deleteDialog = form.querySelector("[data-products-bulk-delete-dialog]");
+      if (deleteDialog?.open) deleteDialog.close();
       form.querySelectorAll("[data-products-bulk-toggle]").forEach((toggle) => {
         toggle.checked = false;
       });
@@ -506,7 +558,7 @@
     table.addEventListener("change", (event) => {
       const selectAll = event.target.closest("[data-products-select-all]");
       if (selectAll) {
-        selectionInputs(table).forEach((input) => {
+        selectionInputs(table).filter((input) => !input.closest("tr")?.hidden).forEach((input) => {
           input.checked = selectAll.checked;
         });
         updateSelectionControls(table);
@@ -516,6 +568,7 @@
       if (!checkbox) return;
       updateSelectionControls(table);
     });
+    table.addEventListener("catalog-filter-applied", () => updateSelectionControls(table));
 
     const form = bulkForm(table);
     form?.addEventListener("click", (event) => {
@@ -536,6 +589,22 @@
         else if (dialog) dialog.removeAttribute("open");
         return;
       }
+      const deleteButton = event.target.closest("[data-products-bulk-delete]");
+      if (deleteButton) {
+        event.preventDefault();
+        const dialog = form.querySelector("[data-products-bulk-delete-dialog]");
+        if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+        else if (dialog) dialog.setAttribute("open", "");
+        return;
+      }
+      const deleteCloseButton = event.target.closest("[data-products-bulk-delete-close]");
+      if (deleteCloseButton) {
+        event.preventDefault();
+        const dialog = form.querySelector("[data-products-bulk-delete-dialog]");
+        if (dialog?.open && typeof dialog.close === "function") dialog.close();
+        else if (dialog) dialog.removeAttribute("open");
+        return;
+      }
       const clearButton = event.target.closest("[data-products-clear-selection]");
       if (!clearButton) return;
       event.preventDefault();
@@ -545,6 +614,50 @@
     form?.addEventListener("change", (event) => {
       if (!event.target.closest("[data-products-bulk-toggle]")) return;
       updateBulkDialogState(form);
+      if (event.target.checked) event.target.closest(".products-bulk-dialog-row")?.querySelector("[data-products-bulk-input]")?.focus();
+    });
+
+    form?.addEventListener("input", (event) => {
+      const input = event.target.closest("[data-products-bulk-input]");
+      if (!input) return;
+      updateBulkDialogState(form);
+      const combo = input.closest("[data-products-bulk-combo]");
+      if (combo) showBulkCombo(combo);
+    });
+
+    form?.addEventListener("focusin", (event) => {
+      const combo = event.target.closest("[data-products-bulk-combo]");
+      if (combo && event.target.matches("[data-products-bulk-input]")) showBulkCombo(combo);
+    });
+
+    form?.addEventListener("click", (event) => {
+      const option = event.target.closest("[data-products-bulk-combo-value]");
+      if (option) {
+        const combo = option.closest("[data-products-bulk-combo]");
+        const input = combo?.querySelector("[data-products-bulk-input]");
+        if (input) input.value = option.dataset.productsBulkComboValue || "";
+        closeBulkCombos(form);
+        updateBulkDialogState(form);
+        return;
+      }
+      const open = event.target.closest("[data-products-bulk-combo-open]");
+      if (open) {
+        const combo = open.closest("[data-products-bulk-combo]");
+        if (combo) showBulkCombo(combo, true);
+        return;
+      }
+      if (!event.target.closest("[data-products-bulk-combo]")) closeBulkCombos(form);
+    });
+
+    form?.addEventListener("keydown", (event) => {
+      if (!event.target.matches("[data-products-bulk-input]")) return;
+      const combo = event.target.closest("[data-products-bulk-combo]");
+      if (event.key === "Escape") closeBulkCombos(form);
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const first = combo?.querySelector("[data-products-bulk-combo-value]");
+        if (first && !combo.querySelector("[data-products-bulk-combo-panel]")?.hidden) first.click();
+      }
     });
 
     const initial = readState(table);

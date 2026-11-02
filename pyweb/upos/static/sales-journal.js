@@ -393,9 +393,12 @@
 
   function lineKind(line) {
     var kind = textValue(line.kind || line.line_kind || line.type).toLowerCase();
+    if (kind === "subscription") return "subscription";
+    if (line.subscription || line.subscription_program || line.subscription_plan) return "subscription";
     if (kind === "service") return "service";
     if (line.service) return "service";
     var warehouse = textValue(lineValue(line, ["warehouse", "stock_warehouse"], "")).toLowerCase();
+    if (warehouse.indexOf("subscription") >= 0 || /\u043f\u043e\u0434\u043f\u0438\u0441\u043a/i.test(warehouse)) return "subscription";
     if (warehouse.indexOf("service") >= 0 || /\u0443\u0441\u043b\u0443\u0433/i.test(warehouse)) return "service";
     return "product";
   }
@@ -403,12 +406,14 @@
   function draftLineFromSaleLine(line, sale) {
     var kind = lineKind(line);
     var price = numericText(lineValue(line, ["price", "unit_price", "price_label"], ""));
+    var subscription = line.subscription && typeof line.subscription === "object" ? line.subscription : {};
     var discountMode = textValue(lineValue(line, ["discount_mode", "discountMode"], "discount")) || "discount";
     var discountUnit = textValue(lineValue(line, ["discount_unit", "discountUnit"], "percent")) || "percent";
     return {
       kind: kind,
+      productId: textValue(lineValue(line, ["product_id", "productId"], "")),
       product: textValue(lineValue(line, ["product", "product_name", "name", "service", "title"], "")),
-      warehouse: kind === "service" ? "\u0423\u0441\u043b\u0443\u0433\u0438" : textValue(lineValue(line, ["warehouse", "stock_warehouse"], sale.warehouse || "")),
+      warehouse: kind === "service" ? "\u0423\u0441\u043b\u0443\u0433\u0438" : kind === "subscription" ? "\u041f\u043e\u0434\u043f\u0438\u0441\u043a\u0438" : textValue(lineValue(line, ["warehouse", "stock_warehouse"], sale.warehouse || "")),
       quantity: numericText(lineValue(line, ["quantity", "qty", "count"], "1")) || "1",
       price: price,
       discountMode: discountMode === "markup" ? "markup" : "discount",
@@ -417,7 +422,12 @@
       category: textValue(lineValue(line, ["category", "service_category"], "")),
       basePrice: numericText(lineValue(line, ["base_price", "basePrice", "original_price", "price", "unit_price"], price)),
       baseCurrency: textValue(lineValue(line, ["base_currency", "baseCurrency"], sale.currency || "")),
-      priceTypeId: textValue(lineValue(line, ["price_type_id", "priceTypeId"], ""))
+      priceTypeId: textValue(lineValue(line, ["price_type_id", "priceTypeId"], "")),
+      subscriptionProgram: textValue(line.subscription_program || subscription.program || ""),
+      subscriptionPlan: textValue(line.subscription_plan || subscription.plan || ""),
+      subscriptionMonths: numericText(line.subscription_months || subscription.months || ""),
+      subscriptionMonthly: numericText(line.subscription_monthly || subscription.monthly || ""),
+      subscriptionCurrency: textValue(line.subscription_currency || subscription.currency || sale.currency || "")
     };
   }
 
@@ -425,6 +435,7 @@
     var draft = {
       sourceSaleId: sale.id || "",
       client: sale.client || "",
+      counterpartyId: sale.counterparty_id || "",
       businessSegmentId: sale.business_segment_id || "",
       currency: sale.currency || "UZS",
       priceTypeId: sale.price_type_id || sale.priceTypeId || "",
@@ -432,13 +443,16 @@
       paymentType: "",
       paymentLines: "[]",
       products: [],
-      services: []
+      services: [],
+      subscriptions: []
     };
     var lines = Array.isArray(sale.lines) ? sale.lines : [];
     lines.forEach(function (line) {
       var draftLine = draftLineFromSaleLine(line, sale);
       if (!draftLine.product) return;
-      if (draftLine.kind === "service") {
+      if (draftLine.kind === "subscription") {
+        draft.subscriptions.push(draftLine);
+      } else if (draftLine.kind === "service") {
         draft.services.push(draftLine);
       } else {
         draft.products.push(draftLine);
@@ -461,6 +475,11 @@
     draft.paymentType = sale.payment_type || "";
     draft.paymentLines = JSON.stringify(Array.isArray(sale.payment_lines) ? sale.payment_lines : []);
     draft.note = sale.note || "";
+    var installment = sale.installment && typeof sale.installment === "object" ? sale.installment : {};
+    draft.installmentEnabled = installment.enabled ? "1" : "0";
+    draft.installmentMonths = numericText(installment.months || "");
+    draft.installmentInitial = numericText(installment.initial || "");
+    draft.installmentMarkup = numericText(installment.markup_percent || "");
     draft.installerUserId = sale.installer_user_id || "";
     draft.installationScheduledAt = sale.installation_scheduled_at || "";
     draft.installationTemplateId = sale.installation_template_id || "";
@@ -492,7 +511,7 @@
   function updateReturnButton(panel, sale) {
     var button = panel.querySelector("[data-sales-detail-return]");
     if (!button) return;
-    var canReturn = textValue(sale.doc_type).toLowerCase() === "sale";
+    var canReturn = textValue(sale.doc_type).toLowerCase() === "sale" && !!sale.inventory_applied;
     button.hidden = !canReturn;
     button.dataset.saleId = canReturn ? String(sale.id || "") : "";
     panel.querySelectorAll("[data-sales-detail-menu-return]").forEach(function (menuButton) {

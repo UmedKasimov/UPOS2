@@ -36,7 +36,9 @@
 
   {% set active_settings_tab = settings_default_tab | default('') %}
   {% set active_settings_label = _('settings.tab.general') %}
-  {% if active_settings_tab == 'employees' %}
+  {% if active_settings_tab == 'advanced' %}
+    {% set active_settings_label = 'Доп. настройки' %}
+  {% elif active_settings_tab == 'employees' %}
     {% set active_settings_label = 'Сотрудники' %}
   {% elif active_settings_tab == 'telegram' %}
     {% set active_settings_label = _('settings.tab.telegram') %}
@@ -75,6 +77,13 @@
         </span>
         <span>{{ _('settings.tab.general') }}</span>
         <small>Параметры системы</small>
+      </a>
+      <a class="general-report-card general-settings-card {{ 'active' if active_settings_tab == 'advanced' else '' }}" href="{{ settings_base_url }}?tab=advanced" {% if active_settings_tab == 'advanced' %}aria-current="page"{% endif %}>
+        <span class="general-report-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><circle cx="12" cy="12" r="4"/><path d="m5.6 5.6 2.1 2.1"/><path d="m16.3 16.3 2.1 2.1"/><path d="m18.4 5.6-2.1 2.1"/><path d="m7.7 16.3-2.1 2.1"/></svg>
+        </span>
+        <span>Доп. настройки</span>
+        <small>Продажи и заказы</small>
       </a>
       {% endif %}
       {% if settings_can_manage_employees | default(false) %}
@@ -165,6 +174,18 @@
               >
                 <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
                 <span class="settings-tab-title">{{ _('settings.tab.general') }}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="settings-tab settings-tab--rail"
+                id="tab-advanced"
+                data-settings-tab="advanced"
+                aria-selected="false"
+                aria-controls="panel-advanced"
+              >
+                <svg class="settings-tab-icon settings-tab-icon--rail" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+                <span class="settings-tab-title">Доп. настройки</span>
               </button>
             {% endif %}
             {% if settings_can_manage_employees | default(false) %}
@@ -588,6 +609,19 @@
               </div>
             </div>
           </div>
+
+          {% if settings_can_manage_settings | default(false) %}
+          <div
+            class="settings-panel"
+            id="panel-advanced"
+            data-settings-panel="advanced"
+            role="tabpanel"
+            aria-labelledby="tab-advanced"
+            hidden
+          >
+            {% include "_settings_sales_defaults.html" %}
+          </div>
+          {% endif %}
 
           {% if settings_can_manage_settings | default(false) %}
           {% set price_tag = settings.get("price_tag", {}) %}
@@ -1696,6 +1730,7 @@
                       <button type="button" class="btn btn-secondary btn-sm" data-ibox-sync>Синхронизировать всё</button>
                     </div>
                     <p class="integr-sync-status" data-ibox-status></p>
+                    <p class="integr-sync-last" data-ibox-last-sync hidden></p>
                       </div>
                       <div class="integr-card-body" data-integr-form="clopos" hidden>
                     <label for="clopos_api_base_url">{{ _('settings.api_base_url') }}</label>
@@ -2285,6 +2320,6 @@
   <script src="{{ url_for('static', path='settings-tabs.js') }}?v=8" defer></script>
   <script src="{{ url_for('static', path='price-template-editor.js') }}?v=4" defer></script>
   <script src="{{ url_for('static', path='price-tag.js') }}?v=6" defer></script>
-  <script src="{{ url_for('static', path='settings-page.js') }}?v=33" defer></script>
+  <script src="{{ url_for('static', path='settings-page.js') }}?v=36" defer></script>
   <script src="{{ url_for('static', path='employees-page.js') }}?v=18" defer></script>
 {% endblock %}

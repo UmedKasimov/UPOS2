@@ -17,7 +17,10 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=687" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=729" />
+    {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
+    <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', path='date-range-picker.css') }}?v=8" />
     {% block extra_head %}{% endblock %}
   </head>
@@ -232,36 +235,17 @@
             {% endif %}
           {% endif %}
         </nav>
+        {% if user and user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
+        <div class="sidebar-messenger-notice-wrap">
+          <button type="button" class="sidebar-messenger-notice" data-sidebar-messenger-notifications data-state="idle" aria-label="Сообщения мессенджеров" title="Сообщения мессенджеров">
+            <span class="sidebar-messenger-notice-icon" aria-hidden="true">✉</span>
+            <span class="sidebar-messenger-notice-copy"><strong>Сообщения</strong><small data-sidebar-messenger-status>Загружаем…</small></span>
+            <b data-sidebar-messenger-count hidden></b>
+          </button>
+        </div>
+        {% endif %}
         <div class="sidebar-foot">
           {% if user %}
-            {% if user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('settings')) %}
-              <div class="sidebar-ibox-sync-wrap">
-                <button
-                  type="button"
-                  class="sidebar-ibox-sync"
-                  data-sidebar-ibox-sync
-                  data-state="idle"
-                  aria-label="Синхронизировать данные с IBOX"
-                  title="Ручная синхронизация с IBOX"
-                >
-                  <span class="sidebar-ibox-sync-icon" aria-hidden="true">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M20 7h-5V2" />
-                      <path d="M4 17h5v5" />
-                      <path d="M5.1 9a8 8 0 0 1 13.2-3L20 7" />
-                      <path d="M18.9 15a8 8 0 0 1-13.2 3L4 17" />
-                    </svg>
-                  </span>
-                  <span class="sidebar-ibox-sync-copy">
-                    <strong>IBOX</strong>
-                    <small data-sidebar-ibox-sync-status>Синхронизировать вручную</small>
-                    <small class="sidebar-ibox-sync-last" data-sidebar-ibox-sync-last hidden></small>
-                  </span>
-                  <span class="sidebar-ibox-sync-dot" aria-hidden="true"></span>
-                </button>
-                <span class="sidebar-ibox-sync-live" data-sidebar-ibox-sync-live aria-live="polite"></span>
-              </div>
-            {% endif %}
             <div class="sidebar-user">
               <div class="sidebar-user-avatar" id="sidebar-avatar-trigger" style="cursor: pointer; position: relative; overflow: hidden;" title="{{ _('profile.avatar') }}">
                 {% if user.avatar_path %}
@@ -396,17 +380,20 @@
     <script src="{{ url_for('static', path='theme.js') }}"></script>
     <script src="{{ url_for('static', path='workspace-section-reset.js') }}?v=12" defer></script>
     <script src="{{ url_for('static', path='layout-sidebar.js') }}?v=3" defer></script>
-    <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=22" defer></script>
+    <script src="{{ url_for('static', path='menu-order.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', path='workspace-module-tabs.js') }}?v=23" defer></script>
     <script src="{{ url_for('static', path='module-tabs-sync.js') }}?v=9" defer></script>
-    <script src="{{ url_for('static', path='table-column-controls.js') }}?v=19" defer></script>
+    <script src="{{ url_for('static', path='table-column-controls.js') }}?v=21" defer></script>
     <script src="{{ url_for('static', path='cell-title.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='uz-phone.js') }}?v=1" defer></script>
-    <script src="{{ url_for('static', path='warehouse-purchases.js') }}?v=75" defer></script>
     <script src="{{ url_for('static', path='ajax-sections.js') }}?v=8" defer></script>
     <script src="{{ url_for('static', path='password-toggle.js') }}" defer></script>
     <script src="{{ url_for('static', path='date-range-picker.js') }}?v=17"></script>
     <script src="{{ url_for('static', path='date-auto-picker.js') }}?v=8" defer></script>
     {% if user %}
+    {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
+    <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=6" defer></script>
+    {% endif %}
     <script src="{{ url_for('static', path='floating-phone.js') }}?v=5" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
