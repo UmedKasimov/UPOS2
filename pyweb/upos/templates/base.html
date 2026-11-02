@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=732" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=733" />
     {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
     {% endif %}
@@ -364,6 +364,7 @@
           <button type="button" data-floating-phone-key="+" aria-label="Добавить плюс">+</button>
           <button type="button" class="upos-floating-phone-keypad-delete" data-floating-phone-key="backspace" aria-label="Удалить символ">⌫</button>
         </div>
+        <p class="upos-floating-phone-dtmf-hint" data-floating-phone-dtmf-hint hidden>Во время разговора цифры, * и # отправляются в линию.</p>
         </div>
         <div class="upos-floating-phone-view" data-floating-phone-view="history" hidden>
           <div class="upos-floating-phone-history-filters" aria-label="Направление звонка">
@@ -433,7 +434,7 @@
     {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=6" defer></script>
     {% endif %}
-    <script src="{{ url_for('static', path='floating-phone.js') }}?v=10" defer></script>
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=11" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

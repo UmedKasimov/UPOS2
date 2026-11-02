@@ -724,7 +724,15 @@
     },
 
     sendDtmf(tone) {
-      if (session) { try { session.sendDTMF(tone); } catch (_e) { /* нет активной сессии */ } }
+      const digit = String(tone ?? "");
+      if (!/^[0-9*#]$/.test(digit) || !session?.isEstablished?.()) return false;
+      try {
+        session.sendDTMF(digit);
+        return true;
+      } catch (error) {
+        diagnostic("dtmf_failed", {name: error?.name, message: error?.message});
+        return false;
+      }
     },
 
     disconnect(options) {

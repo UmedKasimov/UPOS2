@@ -24,6 +24,7 @@
   const tabs = Array.from(root.querySelectorAll("[data-floating-phone-tab]"));
   const views = Array.from(root.querySelectorAll("[data-floating-phone-view]"));
   const keypad = root.querySelector("[data-floating-phone-keypad]") || root.querySelector(".upos-floating-phone-keypad");
+  const dtmfHint = root.querySelector("[data-floating-phone-dtmf-hint]");
   const historyList = root.querySelector("[data-floating-phone-history-list]");
   const historyFilters = Array.from(root.querySelectorAll("[data-floating-phone-history-filter]"));
   const historyRefresh = root.querySelector("[data-floating-phone-history-refresh]");
@@ -338,10 +339,22 @@
   historyRefresh?.addEventListener("click", () => { void loadHistory(); });
   saveContactButton?.addEventListener("click", () => openContactEditor(input?.value));
   contactCancel?.addEventListener("click", () => { contactEditor.hidden = true; window.requestAnimationFrame(alignPanel); });
+  function sendTone(tone) {
+    if (!inCall || !/^[0-9*#]$/.test(tone)) return;
+    if (window.UposSoftphone?.sendDtmf?.(tone)) {
+      setStatus("Разговор идёт · сигнал отправлен", "ok");
+    } else {
+      setStatus("Дождитесь ответа, чтобы нажимать цифры", "pending");
+    }
+  }
   keypad?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-floating-phone-key]");
     if (!button || !input) return;
     const key = button.dataset.floatingPhoneKey;
+    if (inCall) {
+      sendTone(key);
+      return;
+    }
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? start;
     if (key === "backspace") {
@@ -352,6 +365,12 @@
     }
     input.focus();
     input.dispatchEvent(new Event("input", {bubbles: true}));
+  });
+  root.addEventListener("keydown", (event) => {
+    if (!inCall || panel.hidden || activeView !== "dial" || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (!/^[0-9*#]$/.test(event.key) || contactEditor?.contains(event.target)) return;
+    event.preventDefault();
+    sendTone(event.key);
   });
   contactEditor?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -647,6 +666,11 @@
 
   function setCallUi(active) {
     if (callActions) callActions.hidden = !active;
+    if (dtmfHint) dtmfHint.hidden = !active;
+    if (input) input.readOnly = active;
+    keypad?.querySelectorAll('[data-floating-phone-key="+"], [data-floating-phone-key="backspace"]').forEach((button) => {
+      button.disabled = active;
+    });
     if (!active && muteButton) {
       muteButton.setAttribute("aria-pressed", "false");
       muteButton.textContent = "Выключить микрофон";
@@ -672,7 +696,7 @@
       }
       fillProviders();
       await loadScript("/static/jssip.min.js?v=1");
-      await loadScript("/static/installer-softphone.js?v=11");
+      await loadScript("/static/installer-softphone.js?v=14");
       const sip = window.UposSoftphone;
       if (!sip || !sip.available()) {
         setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");

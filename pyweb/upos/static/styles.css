@@ -31944,8 +31944,25 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   background: #eaf3ff;
 }
 
+.upos-floating-phone-keypad button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 .upos-floating-phone-keypad-delete {
   grid-column: 3;
+}
+
+.upos-floating-phone-dtmf-hint {
+  margin: 8px 0 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .upos-floating-phone-history-list {
@@ -32886,6 +32903,12 @@ html.dark .upos-floating-phone-contact-editor input {
   border-color: var(--workbench-line);
   background: var(--workbench-surface);
   color: var(--foreground);
+}
+
+html.dark .upos-floating-phone-dtmf-hint {
+  border-color: color-mix(in srgb, #2563eb, transparent 55%);
+  background: color-mix(in srgb, #2563eb, var(--card) 88%);
+  color: #bfdbfe;
 }
 
 html.dark .upos-floating-phone-history-dial small,
