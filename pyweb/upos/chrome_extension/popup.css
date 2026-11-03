@@ -1,5 +1,6 @@
 :root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; background: #0c1018; color: #f4f7ff; }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { width: 344px; min-height: 350px; margin: 0; }
 main { padding: 18px; }
 header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
