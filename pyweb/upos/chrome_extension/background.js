@@ -33,6 +33,14 @@ async function sendToPhone(command) {
   return chrome.runtime.sendMessage({target: "offscreen", ...command});
 }
 
+async function showPhoneWindow() {
+  const url = chrome.runtime.getURL("popup.html");
+  const windows = await chrome.windows.getAll({populate: true});
+  const existing = windows.find((window) => window.tabs?.some((tab) => tab.url === url));
+  if (existing) return chrome.windows.update(existing.id, {focused: true});
+  return chrome.windows.create({url, type: "popup", width: 370, height: 560});
+}
+
 async function resumePhone() {
   const {session} = await chrome.storage.session.get("session");
   if (session?.account) await sendToPhone({type: "connect", session});
@@ -49,7 +57,8 @@ async function onPhoneState(state) {
       type: "basic", iconUrl: chrome.runtime.getURL("icon.png"),
       title: "Входящий звонок U-POS", message: state.phone || "Неизвестный номер",
       buttons: [{title: "Принять"}, {title: "Отклонить"}], requireInteraction: true,
-    });
+    }).catch(() => {});
+    await showPhoneWindow().catch(() => {});
   } else if (previous.phase === "incoming" && state.phase !== "incoming") {
     await chrome.notifications.clear("upos-incoming");
   }
@@ -110,7 +119,7 @@ chrome.notifications.onButtonClicked.addListener((id, index) => {
   if (id === "upos-incoming") void sendToPhone({type: index === 0 ? "answer" : "reject"}).catch(() => {});
 });
 chrome.notifications.onClicked.addListener((id) => {
-  if (id === "upos-incoming") void chrome.windows.create({url: chrome.runtime.getURL("popup.html"), type: "popup", width: 370, height: 560});
+  if (id === "upos-incoming") void showPhoneWindow().catch(() => {});
 });
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== MENU_ID) return;
@@ -119,7 +128,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   const {session} = await chrome.storage.session.get("session");
   if (session?.account) {
     await sendToPhone({type: "dial", phone});
-    await chrome.windows.create({url: chrome.runtime.getURL("popup.html"), type: "popup", width: 370, height: 560});
+    await showPhoneWindow();
   } else {
     await chrome.tabs.create({url: `${APP_URL}/telephony?dial=${encodeURIComponent(phone)}`});
   }

@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=740" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=741" />
     {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
     {% endif %}
@@ -421,6 +421,22 @@
         </div>
       </section>
     </div>
+    <section class="upos-incoming-overlay" data-floating-phone-incoming-overlay hidden role="dialog" aria-modal="true" aria-labelledby="upos-incoming-title" aria-describedby="upos-incoming-caller">
+      <div class="upos-incoming-card">
+        <div class="upos-incoming-animation" aria-hidden="true">
+          <span class="upos-incoming-wave"></span><span class="upos-incoming-wave"></span>
+          <span class="upos-incoming-avatar">☎</span>
+        </div>
+        <p class="upos-incoming-eyebrow" id="upos-incoming-title">Входящий звонок</p>
+        <strong class="upos-incoming-caller" id="upos-incoming-caller" data-floating-phone-overlay-caller>Неизвестный номер</strong>
+        <p class="upos-incoming-message" data-floating-phone-overlay-message>Вызов на SIP-линию U-POS</p>
+        <button class="upos-incoming-sound" type="button" data-floating-phone-enable-ring hidden>Включить звук звонка</button>
+        <div class="upos-incoming-actions">
+          <button class="upos-incoming-action is-reject" type="button" data-floating-phone-overlay-reject><span aria-hidden="true">✕</span>Отклонить</button>
+          <button class="upos-incoming-action is-answer" type="button" data-floating-phone-overlay-answer><span aria-hidden="true">☎</span>Принять</button>
+        </div>
+      </div>
+    </section>
     {% endif %}
 
     <script>
@@ -443,7 +459,7 @@
     {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=6" defer></script>
     {% endif %}
-    <script src="{{ url_for('static', path='floating-phone.js') }}?v=16" defer></script>
+    <script src="{{ url_for('static', path='floating-phone.js') }}?v=17" defer></script>
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>

@@ -5,6 +5,7 @@ const vm = require("node:vm");
 
 const data = {};
 const notifications = [];
+const openedWindows = [];
 let offscreenCreated = false;
 let listener;
 let fetched;
@@ -39,7 +40,9 @@ const chrome = {
     clear: async () => {}, onButtonClicked: event(), onClicked: event(),
   },
   contextMenus: {create: () => {}, onClicked: event()},
-  windows: {create: async () => {}},
+  windows: {getAll: async () => openedWindows, update: async () => {},
+    create: async (options) => { openedWindows.push({id: openedWindows.length + 1,
+      tabs: [{url: options.url}]}); }},
   tabs: {create: async () => {}},
 };
 const source = fs.readFileSync(path.join(__dirname, "../upos/chrome_extension/background.js"), "utf8");
@@ -65,6 +68,8 @@ function message(type, extra = {}) {
   assert.equal(JSON.stringify(state).includes("sensitive-token"), false);
   await message("state", {state: {phase: "incoming", phone: "998557016060"}});
   assert.equal(notifications[0].options.buttons.length, 2);
+  assert.equal(openedWindows.length, 1);
+  assert.equal(openedWindows[0].tabs[0].url, "chrome-extension://test/popup.html");
   await message("logout");
   assert.equal(data.session, undefined);
   console.log("Chrome background flow OK");

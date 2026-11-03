@@ -39,6 +39,12 @@
   const muteButton = root.querySelector("[data-floating-phone-mute]");
   const incomingPanel = root.querySelector("[data-floating-phone-incoming]");
   const incomingCaller = root.querySelector("[data-floating-phone-caller]");
+  const incomingOverlay = document.querySelector("[data-floating-phone-incoming-overlay]");
+  const overlayCaller = incomingOverlay?.querySelector("[data-floating-phone-overlay-caller]");
+  const overlayMessage = incomingOverlay?.querySelector("[data-floating-phone-overlay-message]");
+  const overlayAnswer = incomingOverlay?.querySelector("[data-floating-phone-overlay-answer]");
+  const overlayReject = incomingOverlay?.querySelector("[data-floating-phone-overlay-reject]");
+  const enableRingButton = incomingOverlay?.querySelector("[data-floating-phone-enable-ring]");
   const clientLink = root.querySelector("[data-floating-phone-client-link]");
   const answerButton = root.querySelector("[data-floating-phone-answer]");
   const rejectButton = root.querySelector("[data-floating-phone-reject]");
@@ -474,8 +480,10 @@
   let browserRecording = null;
   let ringTimer = null;
   let ringContext = null;
+  let ringOscillators = [];
   let incomingLookupId = 0;
   let redirecting = false;
+  let rejecting = false;
 
   function recordBrowserCall(status, call) {
     if (!call) return;
@@ -589,29 +597,52 @@
     if (!AudioContext) return;
     try {
       ringContext = ringContext || new AudioContext();
-      if (ringContext.state !== "running") ringContext.resume().catch(() => {});
+      if (ringContext.state !== "running") {
+        ringContext.resume().then(updateRingSoundButton).catch(() => {});
+      }
     } catch (_error) { /* Browser audio may require a later gesture. */ }
   }
 
   document.addEventListener("pointerdown", unlockRingtone);
   document.addEventListener("keydown", unlockRingtone);
 
+  function updateRingSoundButton() {
+    if (enableRingButton && incomingOverlay && !incomingOverlay.hidden) {
+      enableRingButton.hidden = Boolean(ringContext && ringContext.state === "running");
+    }
+  }
+
   function ringOnce() {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     try {
       ringContext = ringContext || new AudioContext();
-      ringContext.resume().catch(() => {});
-      const oscillator = ringContext.createOscillator();
-      const gain = ringContext.createGain();
-      oscillator.frequency.value = 440;
-      gain.gain.setValueAtTime(0.0001, ringContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.12, ringContext.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ringContext.currentTime + 0.38);
-      oscillator.connect(gain);
-      gain.connect(ringContext.destination);
-      oscillator.start();
-      oscillator.stop(ringContext.currentTime + 0.4);
+      if (ringContext.state !== "running") ringContext.resume().then(updateRingSoundButton).catch(() => {});
+      updateRingSoundButton();
+      [0, 0.55].forEach((delay) => {
+        const gain = ringContext.createGain();
+        let remaining = 2;
+        const start = ringContext.currentTime + delay;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.07, start + 0.025);
+        gain.gain.setValueAtTime(0.07, start + 0.32);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.38);
+        gain.connect(ringContext.destination);
+        [440, 480].forEach((frequency) => {
+          const oscillator = ringContext.createOscillator();
+          oscillator.frequency.value = frequency;
+          oscillator.connect(gain);
+          oscillator.onended = () => {
+            ringOscillators = ringOscillators.filter((item) => item !== oscillator);
+            oscillator.disconnect();
+            if (--remaining === 0) gain.disconnect();
+          };
+          ringOscillators.push(oscillator);
+          oscillator.start(start);
+          oscillator.stop(start + 0.4);
+        });
+      });
+      navigator.vibrate?.([150, 100, 150]);
     } catch (_error) {
       // Some browsers block sound until the first user interaction; visual ringing remains active.
     }
@@ -620,9 +651,8 @@
   function startRinging() {
     stopRinging();
     root.classList.add("is-ringing");
-    navigator.vibrate?.([250, 120, 250]);
     ringOnce();
-    ringTimer = window.setInterval(ringOnce, 1800);
+    ringTimer = window.setInterval(ringOnce, 3000);
   }
 
   function stopRinging() {
@@ -630,12 +660,26 @@
     navigator.vibrate?.(0);
     window.clearInterval(ringTimer);
     ringTimer = null;
+    ringOscillators.forEach((oscillator) => {
+      try { oscillator.stop(); } catch (_error) { /* Already stopped. */ }
+    });
+    ringOscillators = [];
   }
 
   function setIncomingUi(event = null) {
     const active = Boolean(event);
     if (incomingPanel) incomingPanel.hidden = !active;
-    if (incomingCaller && active) incomingCaller.textContent = event.name || event.from || "Неизвестный номер";
+    if (incomingOverlay) incomingOverlay.hidden = !active;
+    if (active) {
+      const caller = event.name || event.from || "Неизвестный номер";
+      if (incomingCaller) incomingCaller.textContent = caller;
+      if (overlayCaller) overlayCaller.textContent = caller;
+      if (overlayMessage) overlayMessage.textContent = "Вызов на SIP-линию U-POS";
+      updateRingSoundButton();
+      overlayAnswer?.focus();
+    } else if (enableRingButton) {
+      enableRingButton.hidden = true;
+    }
     if (!active && redirectForm) redirectForm.hidden = true;
     if (!active && redirectInput) redirectInput.value = "";
     if (clientLink && (active || !inCall)) clientLink.hidden = true;
@@ -658,6 +702,7 @@
       const result = await response.json();
       if (!response.ok || lookupId !== incomingLookupId || (!inCall && incomingPanel?.hidden) || !result?.client) return;
       if (incomingCaller) incomingCaller.textContent = `${result.client.name} · ${phone}`;
+      if (overlayCaller) overlayCaller.textContent = `${result.client.name} · ${phone}`;
       if (clientLink) {
         clientLink.href = result.client.href;
         clientLink.hidden = false;
@@ -772,23 +817,25 @@
         recordBrowserCall("answered", activeCall);
       }
       setIncomingUi(null);
+      panel.hidden = false;
+      toggle.setAttribute("aria-expanded", "true");
       setStatus("Разговор идёт", "ok");
       setCallUi(true);
+      window.requestAnimationFrame(alignPanel);
+      hangupButton?.focus();
       startBrowserRecording();
     });
     sip.on("remoteTrack", startBrowserRecording);
     sip.on("incoming", (event) => {
       inCall = true;
       redirecting = false;
+      rejecting = false;
       beginBrowserCall("incoming", event?.from);
       if (input && event?.from) input.value = String(event.from);
       switchView("dial");
-      panel.hidden = false;
-      toggle.setAttribute("aria-expanded", "true");
       setIncomingUi(event || {});
       void lookupIncomingClient(event);
       startRinging();
-      window.requestAnimationFrame(alignPanel);
       setStatus(`Входящий: ${event?.name || event?.from || "неизвестный"}`, "pending");
     });
     sip.on("ended", () => {
@@ -796,8 +843,9 @@
       finishBrowserCall(redirecting ? "forwarded" : "");
       inCall = false;
       setIncomingUi(null);
-      setStatus(redirecting ? "Запрос переадресации отправлен" : "Звонок завершён", "ready");
+      setStatus(rejecting ? "Входящий звонок отклонён" : redirecting ? "Запрос переадресации отправлен" : "Звонок завершён", "ready");
       redirecting = false;
+      rejecting = false;
       setCallUi(false);
     });
     sip.on("failed", (event) => {
@@ -805,9 +853,11 @@
       finishBrowserCall(redirecting ? "forwarded" : "");
       inCall = false;
       setIncomingUi(null);
-      if (redirecting) setStatus("Запрос переадресации отправлен", "ready");
+      if (rejecting) setStatus("Входящий звонок отклонён", "ready");
+      else if (redirecting) setStatus("Запрос переадресации отправлен", "ready");
       else setStatus(`Звонок не состоялся: ${event?.cause || "ошибка"}`, "error");
       redirecting = false;
+      rejecting = false;
       setCallUi(false);
     });
   }
@@ -926,8 +976,9 @@
     muteButton.textContent = muted ? "Включить микрофон" : "Выключить микрофон";
   });
 
-  answerButton?.addEventListener("click", async () => {
-    answerButton.disabled = true;
+  async function answerIncoming() {
+    if (answerButton) answerButton.disabled = true;
+    if (overlayAnswer) overlayAnswer.disabled = true;
     try {
       if (!await window.UposSoftphone?.answer()) throw new Error("Нет активного входящего звонка");
       setIncomingUi(null);
@@ -935,12 +986,17 @@
       setStatus(activeCall?.answeredAt ? "Разговор идёт" : "Соединяю разговор…", activeCall?.answeredAt ? "ok" : "pending");
     } catch (_error) {
       setStatus("Не удалось принять звонок — проверьте доступ к микрофону", "error");
+      if (overlayMessage) overlayMessage.textContent = "Не удалось принять — проверьте доступ к микрофону";
     } finally {
-      answerButton.disabled = false;
+      if (answerButton) answerButton.disabled = false;
+      if (overlayAnswer) overlayAnswer.disabled = false;
     }
-  });
+  }
+  answerButton?.addEventListener("click", answerIncoming);
+  overlayAnswer?.addEventListener("click", answerIncoming);
 
-  rejectButton?.addEventListener("click", () => {
+  function rejectIncoming() {
+    rejecting = true;
     if (typeof window.UposSoftphone?.reject === "function") window.UposSoftphone.reject();
     else window.UposSoftphone?.hangup();
     finishBrowserCall();
@@ -948,6 +1004,12 @@
     setIncomingUi(null);
     setCallUi(false);
     setStatus("Входящий звонок отклонён", "ready");
+  }
+  rejectButton?.addEventListener("click", rejectIncoming);
+  overlayReject?.addEventListener("click", rejectIncoming);
+  enableRingButton?.addEventListener("click", () => {
+    unlockRingtone();
+    ringOnce();
   });
 
   redirectToggle?.addEventListener("click", () => {

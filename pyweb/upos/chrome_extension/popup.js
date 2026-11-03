@@ -22,9 +22,11 @@
       $("phase").textContent = phaseLabels[phase] || phase;
       $("login-form").hidden = result.connected;
       $("phone").hidden = !result.connected;
+      $("phone").dataset.phase = phase;
       $("line-label").textContent = result.label || "";
       $("message").textContent = state.message || (result.connected ? "Линия подключена" : "Подключите SIP-линию для работы без вкладки U-POS.");
       $("incoming").hidden = phase !== "incoming";
+      $("incoming-phone").textContent = state.phone || "Неизвестный номер";
       $("call-actions").hidden = !["dialing", "active"].includes(phase);
       $("redirect-form").hidden = phase !== "incoming";
       $("dial").disabled = busy || phase !== "ready";

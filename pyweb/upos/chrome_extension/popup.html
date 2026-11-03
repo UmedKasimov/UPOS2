@@ -21,10 +21,15 @@
       <div class="line"><span>Линия</span><strong id="line-label"></strong><button id="logout" type="button">Отключить</button></div>
       <label class="number-label">Номер телефона<input id="number" type="tel" inputmode="tel" placeholder="+998 …"></label>
       <button id="dial" type="button" class="primary">Позвонить</button>
-      <div id="incoming" class="actions" hidden>
-        <button id="answer" type="button" class="accept">Принять</button>
-        <button id="reject" type="button" class="danger">Отклонить</button>
-      </div>
+      <section id="incoming" class="incoming-call" hidden aria-live="assertive">
+        <span class="incoming-avatar" aria-hidden="true">☎</span>
+        <strong>Входящий звонок</strong>
+        <span id="incoming-phone" class="incoming-phone"></span>
+        <div class="actions">
+          <button id="reject" type="button" class="danger">Отклонить</button>
+          <button id="answer" type="button" class="accept">Принять</button>
+        </div>
+      </section>
       <div id="call-actions" class="actions" hidden>
         <button id="hangup" type="button" class="danger">Завершить</button>
       </div>

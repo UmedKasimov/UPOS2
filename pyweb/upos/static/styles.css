@@ -32194,6 +32194,119 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   display: none;
 }
 
+.upos-incoming-overlay[hidden],
+.upos-incoming-sound[hidden] {
+  display: none;
+}
+
+.upos-incoming-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 11, 23, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.upos-incoming-card {
+  width: min(100%, 390px);
+  padding: 32px 24px 26px;
+  border: 1px solid rgba(139, 187, 255, 0.32);
+  border-radius: 24px;
+  background: #121a28;
+  color: #f4f8ff;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  animation: upos-incoming-appear .24s ease-out both;
+}
+
+.upos-incoming-animation {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 14px;
+}
+
+.upos-incoming-wave,
+.upos-incoming-avatar {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.upos-incoming-wave {
+  width: 84px;
+  height: 84px;
+  border: 2px solid rgba(74, 222, 128, .75);
+  animation: upos-incoming-wave 1.8s ease-out infinite;
+}
+
+.upos-incoming-wave:nth-child(2) { animation-delay: .9s; }
+
+.upos-incoming-avatar {
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  background: #16944d;
+  color: #fff;
+  font-size: 36px;
+  box-shadow: 0 0 30px rgba(34, 197, 94, .34);
+  animation: upos-incoming-phone .65s ease-in-out infinite alternate;
+}
+
+.upos-incoming-eyebrow {
+  margin: 0 0 8px;
+  color: #82eaa6;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.upos-incoming-caller {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: clamp(20px, 5vw, 26px);
+  line-height: 1.2;
+}
+
+.upos-incoming-message { min-height: 22px; margin: 10px 0 18px; color: #aebdd3; }
+.upos-incoming-sound { margin: 0 auto 18px; padding: 8px 12px; border: 1px solid #6394ca; border-radius: 9px; background: #1f3654; color: #fff; cursor: pointer; }
+.upos-incoming-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+.upos-incoming-action {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 13px 8px;
+  border: 0;
+  border-radius: 16px;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upos-incoming-action span { font-size: 24px; line-height: 1; }
+.upos-incoming-action.is-answer { background: #16944d; }
+.upos-incoming-action.is-reject { background: #bd3742; }
+.upos-incoming-action:hover { filter: brightness(1.12); }
+.upos-incoming-action:disabled { opacity: .55; cursor: wait; }
+.upos-incoming-action:focus-visible,
+.upos-incoming-sound:focus-visible { outline: 3px solid #a8caff; outline-offset: 3px; }
+
+@keyframes upos-incoming-appear { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes upos-incoming-wave { from { opacity: .9; transform: scale(.88); } to { opacity: 0; transform: scale(1.6); } }
+@keyframes upos-incoming-phone { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .upos-incoming-card, .upos-incoming-wave, .upos-incoming-avatar { animation: none; }
+}
+
 .upos-floating-phone-incoming > span {
   font-size: 11px;
   font-weight: 800;

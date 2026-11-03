@@ -26,6 +26,14 @@ small { color: #8796ae; font-size: 11px; }
 .line button { margin-left: auto; padding: 5px 8px; font-size: 11px; }
 .number-label { margin-bottom: 10px; }
 .number-label input { font-size: 18px; font-weight: 750; }
+#phone[data-phase="incoming"] .number-label, #phone[data-phase="incoming"] #dial { display: none; }
 .actions { display: flex; gap: 8px; margin-top: 10px; }
+.incoming-call { display: grid; justify-items: center; gap: 8px; margin-top: 16px; padding: 20px 12px; border: 1px solid #2e8d5a; border-radius: 16px; background: #10291e; text-align: center; }
+.incoming-call strong { color: #a9efc3; font-size: 15px; }
+.incoming-phone { color: #fff; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }
+.incoming-call .actions { width: 100%; gap: 12px; margin-top: 8px; }
+.incoming-avatar { display: grid; place-items: center; width: 64px; height: 64px; margin: 12px 0 6px; border-radius: 50%; background: #168a4b; color: #fff; font-size: 30px; box-shadow: 0 0 0 8px #168a4b33; animation: incoming-ring .6s ease-in-out infinite alternate; }
+@keyframes incoming-ring { from { transform: rotate(-8deg) scale(.96); box-shadow: 0 0 0 6px #168a4b55; } to { transform: rotate(8deg) scale(1.04); box-shadow: 0 0 0 18px #168a4b11; } }
+@media (prefers-reduced-motion: reduce) { .incoming-avatar { animation: none; } }
 .redirect { display: grid; gap: 9px; margin-top: 16px; padding-top: 15px; border-top: 1px solid #293447; }
 .site-link { display: block; margin-top: 18px; color: #78aaff; font-size: 12px; text-decoration: none; }
