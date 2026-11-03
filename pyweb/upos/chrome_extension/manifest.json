@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "116",
   "name": "U-POS Телефон",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "SIP-звонки в отдельном виджете Chrome при закрытой вкладке U-POS.",
   "permissions": ["contextMenus", "tabs", "storage", "offscreen", "notifications", "alarms", "scripting"],
   "host_permissions": ["https://app.u-pos.uz/*"],

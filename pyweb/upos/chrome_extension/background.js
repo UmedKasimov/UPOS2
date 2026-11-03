@@ -35,9 +35,11 @@ async function sendToPhone(command) {
 }
 
 async function showPhoneWindow() {
-  const url = chrome.runtime.getURL("popup.html");
+  const base = chrome.runtime.getURL("popup.html");
+  const url = `${base}?setup=1`;
   const windows = await chrome.windows.getAll({populate: true});
-  const existing = windows.find((window) => window.tabs?.some((tab) => tab.url === url));
+  const existing = windows.find((window) => window.type === "popup" &&
+    window.tabs?.some((tab) => tab.url?.startsWith(`${base}?setup=1`)));
   if (existing) return chrome.windows.update(existing.id, {focused: true});
   return chrome.windows.create({url, type: "popup", width: 370, height: 560});
 }
