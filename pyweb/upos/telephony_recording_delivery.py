@@ -19,6 +19,8 @@ from upos.db import session_scope
 from upos.db_models import TelephonyRecordingDelivery
 
 logger = logging.getLogger(__name__)
+# httpx INFO lines include the full Bot API URL and therefore the bot token.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 _UPLOAD_ROOT = Path(__file__).resolve().parent / "static" / "uploads" / "telephony"
 _URL_PREFIX = "/static/uploads/telephony/"
 
@@ -118,7 +120,7 @@ def _send(row: TelephonyRecordingDelivery, chat_id: str, token: str) -> int:
     except ValueError:
         raise RuntimeError(f"Telegram returned invalid JSON ({response.status_code})") from None
     if not payload.get("ok"):
-        reason = str(payload.get("description") or "API error")[:200]
+        reason = str(payload.get("description") or "API error").replace(token, "[redacted]")[:200]
         raise RuntimeError(f"Telegram rejected recording ({response.status_code}): {reason}")
     return int((payload.get("result") or {}).get("message_id") or 0)
 
