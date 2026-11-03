@@ -63,5 +63,10 @@ for name in ("pjsip.conf", "extensions.conf", "http.conf", "rtp.conf"):
     target.write_text(output, encoding="utf-8")
     target.chmod(0o600 if name == "pjsip.conf" else 0o644)
 
+# Ubuntu's package autoloads the legacy chan_sip driver on UDP 5060. It must
+# not claim that port before PJSIP starts, or the WebSocket transport fails.
+with (ASTERISK / "modules.conf").open("a", encoding="utf-8") as modules:
+    modules.write("\nnoload => chan_sip.so\n")
+
 print("UPOS SIP gateway configuration ready; provider registration " + ("enabled" if register else "disabled"), flush=True)
 subprocess.run(["/usr/sbin/asterisk", "-f", "-vvv"], check=True)
