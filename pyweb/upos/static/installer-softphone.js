@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const SOFTPHONE_VERSION = "14";
+  const SOFTPHONE_VERSION = "15";
   const listeners = {};
   function emit(event, detail) {
     (listeners[event] || []).forEach((fn) => {
@@ -462,7 +462,7 @@
     },
 
     isRegistered() {
-      return registered;
+      return Boolean(ua && (typeof ua.isRegistered === "function" ? ua.isRegistered() : registered));
     },
 
     on(event, fn) {
@@ -521,7 +521,7 @@
     connect(acc) {
       if (!softphone.available()) return Promise.reject(new Error("Библиотека софтфона не загрузилась"));
       if (!acc || !acc.ws_url || !acc.sip_uri) return Promise.reject(new Error("no_ws"));
-      if (ua && account && account.id === acc.id && registered) return Promise.resolve();
+      if (ua && account && account.id === acc.id && softphone.isRegistered()) return Promise.resolve();
       if (connecting && connectingAccountId === String(acc.id || "")) return connecting;
       if (session) {
         const error = new Error("account_change_during_call");
@@ -559,13 +559,22 @@
           if (acc.realm) configuration.realm = String(acc.realm).trim();
           if (acc.registrar_server) configuration.registrar_server = registrarUri(acc.registrar_server);
           ua = new window.JsSIP.UA(configuration);
+          const currentUa = ua;
           ua.on("registered", () => {
+            if (ua !== currentUa) return;
             registered = true;
             emit("registered", {account: acc});
             diagnostic("registered", {wsUrl: acc.ws_url, host: acc.host});
             settle(resolve);
           });
+          ua.on("unregistered", () => {
+            if (ua !== currentUa) return;
+            registered = false;
+            emit("unregistered", {account: acc});
+            diagnostic("unregistered", {wsUrl: acc.ws_url, host: acc.host});
+          });
           ua.on("registrationFailed", (e) => {
+            if (ua !== currentUa) return;
             registered = false;
             const response = e && e.response;
             const detail = {
@@ -581,6 +590,7 @@
             settle(reject, error);
           });
           ua.on("disconnected", (e) => {
+            if (ua !== currentUa) return;
             registered = false;
             const detail = {
               code: (e && (e.code || (e.socket && e.socket.code))) || 0,
@@ -604,6 +614,7 @@
             settle(reject, new Error("disconnected"));
           });
           ua.on("newRTCSession", (data) => {
+            if (ua !== currentUa) return;
             if (data.originator === "remote") {
               wireSession(data.session, "incoming");
               emit("incoming", {
@@ -633,7 +644,7 @@
     },
 
     call(number) {
-      if (!ua || !registered) return false;
+      if (!softphone.isRegistered()) return false;
       beginNativeCall();
       const target = `sip:${String(number).replace(/[^\d+*#]/g, "")}@${account.host}`;
       const lifecycle = {responded: false};

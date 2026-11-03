@@ -226,6 +226,9 @@
     try { alreadyShown ||= window.sessionStorage.getItem(storageKey) === "1"; } catch (_error) { /* storage may be blocked */ }
     if (alreadyShown) {
       if (status?.dataset.kind === "connection-pending") hideStatus();
+      if (status?.dataset.kind === "registration-lost") {
+        setStatus("SIP снова на связи — входящие готовы", "ok", {kind: "connection-ready", autoHideMs: 4000});
+      }
       return;
     }
     notifiedConnections.add(storageKey);
@@ -463,6 +466,7 @@
   /* ── Софтфон ───────────────────────────────────────────────────────── */
 
   let softphoneReady = null;
+  let registrationRecovery = null;
   let accounts = [];
   let inCall = false;
   let activeCall = null;
@@ -682,7 +686,13 @@
       const statusCode = Number(event?.statusCode || 0);
       const reasonPhrase = String(event?.reasonPhrase || "").trim();
       const details = statusCode ? `${statusCode}${reasonPhrase ? ` ${reasonPhrase}` : ""}` : event?.cause || "ошибка";
-      setStatus(`АТС отклонила регистрацию (${details}) — звоним через телефон`, "error");
+      setStatus(`АТС отклонила регистрацию (${details}) — входящие недоступны`, "error", {kind: "registration-lost"});
+    });
+    sip.on("unregistered", () => {
+      if (!inCall) setStatus("SIP-регистрация потеряна — переподключаюсь", "error", {kind: "registration-lost"});
+    });
+    sip.on("disconnected", () => {
+      if (!inCall) setStatus("Связь с АТС потеряна — переподключаюсь", "error", {kind: "registration-lost"});
     });
     sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
     sip.on("accepted", () => {
@@ -742,8 +752,24 @@
     if (submitButton) submitButton.disabled = active || (incomingPanel && !incomingPanel.hidden);
   }
 
+  function recoverRegistration(sip) {
+    if (!sip || sip.isRegistered() || inCall) return Promise.resolve(sip);
+    if (registrationRecovery) return registrationRecovery;
+    const account = selectedAccount();
+    if (!account) return Promise.resolve(sip);
+    setStatus("Подключаюсь к АТС…", "pending", {kind: "registration-lost"});
+    registrationRecovery = sip.connect(account).then(() => {
+      showConnectedNotice(account);
+      return sip;
+    }, (error) => {
+      setStatus(connectErrorText(account, error), "error", {kind: "registration-lost"});
+      return sip;
+    }).finally(() => { registrationRecovery = null; });
+    return registrationRecovery;
+  }
+
   function ensureSoftphone() {
-    if (softphoneReady) return softphoneReady;
+    if (softphoneReady) return softphoneReady.then(recoverRegistration);
     softphoneReady = (async () => {
       const response = await fetch("/api/telephony/sip", { credentials: "same-origin" });
       const payload = await response.json().catch(() => ({}));
@@ -760,7 +786,7 @@
       }
       fillProviders();
       await loadScript("/static/jssip.min.js?v=1");
-      await loadScript("/static/installer-softphone.js?v=15");
+      await loadScript("/static/installer-softphone.js?v=16");
       const sip = window.UposSoftphone;
       if (!sip || !sip.available()) {
         setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");
@@ -776,14 +802,18 @@
         showConnectedNotice(account);
       } catch (error) {
         // Регистрация не удалась — остаются мост и набор через SIM.
-        setStatus(connectErrorText(account, error), "error");
+        setStatus(connectErrorText(account, error), "error", {kind: "registration-lost"});
       }
       return sip;
     })().catch((error) => {
       setStatus(`Телефон недоступен: ${error?.message || "ошибка"}`, "error");
       return null;
     });
-    return softphoneReady;
+    const pending = softphoneReady;
+    pending.then((sip) => {
+      if (!sip && softphoneReady === pending) softphoneReady = null;
+    });
+    return pending;
   }
 
   providerSelect?.addEventListener("change", async () => {
@@ -961,6 +991,12 @@
 
   // A receiver must be registered before the first call arrives, not after the panel is opened.
   window.setTimeout(() => {
-    ensureSoftphone();
+    void ensureSoftphone();
   }, 300);
+  // JsSIP reconnects its socket; also recover if initial loading or SIP registration failed.
+  window.setInterval(() => { void ensureSoftphone(); }, 30000);
+  window.addEventListener("online", () => { void ensureSoftphone(); });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void ensureSoftphone();
+  });
 })();
