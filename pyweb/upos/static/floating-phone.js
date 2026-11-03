@@ -484,6 +484,24 @@
   let incomingLookupId = 0;
   let redirecting = false;
   let rejecting = false;
+  let browserStatusQueue = Promise.resolve();
+  let browserTabId = "";
+  try {
+    browserTabId = window.sessionStorage.getItem("upos:sip-tab-id") || window.crypto.randomUUID();
+    window.sessionStorage.setItem("upos:sip-tab-id", browserTabId);
+  } catch (_error) { browserTabId = window.crypto?.randomUUID?.() || ""; }
+
+  function reportBrowserStatus(event, details = {}, providerId = "") {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
+    const selectedProviderId = String(providerId || selectedAccount()?.id || "");
+    if (!csrf || !browserTabId || !selectedProviderId) return;
+    browserStatusQueue = browserStatusQueue.catch(() => {}).then(() => fetch("/api/telephony/browser-status", {
+      method: "POST", credentials: "same-origin", keepalive: true,
+      headers: {"Content-Type": "application/json", "X-CSRF-Token": csrf},
+      body: JSON.stringify({tab_id: browserTabId, provider_id: selectedProviderId, event,
+        status_code: Number(details.statusCode || 0), cause: String(details.cause || details.reason || "").slice(0, 100)}),
+    })).catch(() => {});
+  }
 
   function recordBrowserCall(status, call) {
     if (!call) return;
@@ -796,17 +814,23 @@
   function bindSoftphoneEvents(sip) {
     if (sip.__floatingPhoneBound) return;
     sip.__floatingPhoneBound = true;
-    sip.on("registered", (event) => showConnectedNotice(event?.account || selectedAccount()));
+    sip.on("registered", (event) => {
+      showConnectedNotice(event?.account || selectedAccount());
+      reportBrowserStatus("registered", {}, event?.account?.id);
+    });
     sip.on("registrationFailed", (event) => {
+      reportBrowserStatus("registration_failed", event);
       const statusCode = Number(event?.statusCode || 0);
       const reasonPhrase = String(event?.reasonPhrase || "").trim();
       const details = statusCode ? `${statusCode}${reasonPhrase ? ` ${reasonPhrase}` : ""}` : event?.cause || "ошибка";
       setStatus(`АТС отклонила регистрацию (${details}) — входящие недоступны`, "error", {kind: "registration-lost"});
     });
     sip.on("unregistered", () => {
+      reportBrowserStatus("unregistered");
       if (!inCall) setStatus("SIP-регистрация потеряна — переподключаюсь", "error", {kind: "registration-lost"});
     });
     sip.on("disconnected", () => {
+      reportBrowserStatus("disconnected");
       if (!inCall) setStatus("Связь с АТС потеряна — переподключаюсь", "error", {kind: "registration-lost"});
     });
     sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
@@ -827,6 +851,7 @@
     });
     sip.on("remoteTrack", startBrowserRecording);
     sip.on("incoming", (event) => {
+      reportBrowserStatus("incoming");
       inCall = true;
       redirecting = false;
       rejecting = false;
@@ -882,10 +907,12 @@
     const account = selectedAccount();
     if (!account) return Promise.resolve(sip);
     setStatus("Подключаюсь к АТС…", "pending", {kind: "registration-lost"});
+    reportBrowserStatus("connecting", {}, account.id);
     registrationRecovery = sip.connect(account).then(() => {
       showConnectedNotice(account);
       return sip;
     }, (error) => {
+      reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
       setStatus(connectErrorText(account, error), "error", {kind: "registration-lost"});
       return sip;
     }).finally(() => { registrationRecovery = null; });
@@ -921,10 +948,12 @@
       const account = selectedAccount();
       if (!account) return sip;
       setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
+      reportBrowserStatus("connecting", {}, account.id);
       try {
         await sip.connect(account);
         showConnectedNotice(account);
       } catch (error) {
+        reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
         // Регистрация не удалась — остаются мост и набор через SIM.
         setStatus(connectErrorText(account, error), "error", {kind: "registration-lost"});
       }
@@ -950,10 +979,12 @@
     const account = selectedAccount();
     if (!sip || !account) return;
     setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
+    reportBrowserStatus("connecting", {}, account.id);
     try {
       await sip.connect(account);
       showConnectedNotice(account);
     } catch (error) {
+      reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
       setStatus(connectErrorText(account, error), "error");
     }
   });
@@ -1131,7 +1162,12 @@
     void ensureSoftphone();
   }, 300);
   // JsSIP reconnects its socket; also recover if initial loading or SIP registration failed.
-  window.setInterval(() => { void ensureSoftphone(); }, 30000);
+  window.setInterval(() => {
+    void ensureSoftphone();
+  }, 30000);
+  window.setInterval(() => {
+    if (window.UposSoftphone?.isRegistered?.()) reportBrowserStatus("heartbeat");
+  }, 60000);
   window.addEventListener("online", () => { void ensureSoftphone(); });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) void ensureSoftphone();

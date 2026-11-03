@@ -43,6 +43,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
 from upos.telephony_access import sip_provider_assigned_to
+from upos.telephony_browser_status import browser_status_event
 from upos.ivr_routing import validate_ivr_form
 from upos.telephony_recording_delivery import enqueue_recording
 from upos.config import get_settings
@@ -22031,6 +22032,46 @@ def create_app() -> FastAPI:
         }
         call = _telephony_upsert_call_from_payload(wid, call_payload)
         return JSONResponse({"ok": True, "call_id": call_id, "status": call.get("status")})
+
+    @app.post("/api/telephony/browser-status", name="telephony_browser_status_api")
+    async def telephony_browser_status_api(request: Request):
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        if not csrf_matches_session(request, str(request.headers.get("X-CSRF-Token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        try:
+            body = await request.json()
+            tab_id = str(uuid.UUID(str(body.get("tab_id") or "")))
+        except (ValueError, AttributeError, TypeError):
+            return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
+        if not isinstance(body, dict):
+            return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
+        provider_id = str(body.get("provider_id") or "").strip()
+        data = _telephony_settings_payload(wid)
+        user = request.session.get("user") or {}
+        assigned = any(
+            isinstance(row, dict)
+            and str(row.get("id") or "") == provider_id
+            and sip_provider_assigned_to(row, _session_user_id(user), _telephony_user_name(request), wid)
+            for row in data.get("telephony_providers", [])
+        )
+        if not assigned:
+            return JSONResponse({"ok": False, "error": "provider_not_assigned"}, status_code=403)
+        try:
+            event, status_code, cause = browser_status_event(
+                body.get("event"), body.get("status_code"), body.get("cause"))
+        except ValueError:
+            return JSONResponse({"ok": False, "error": "invalid_event"}, status_code=400)
+        logger.info(
+            "[telephony] browser_sip workspace=%s provider=%s tab=%s event=%s code=%s cause=%s",
+            wid, provider_id, tab_id[:8], event, status_code, cause,
+        )
+        return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/telephony/browser-recording", name="telephony_browser_recording_api")
     async def telephony_browser_recording_api(request: Request):
