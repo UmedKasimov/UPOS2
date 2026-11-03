@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import mimetypes
 import os
 import re
+import subprocess
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -97,24 +98,30 @@ def _send(row: TelephonyRecordingDelivery, chat_id: str, token: str) -> int:
     if path.stat().st_size > 50 * 1024 * 1024:
         raise ValueError("recording exceeds Telegram upload limit")
     caption, filename = _caption(row)
-    suffix = path.suffix.lower()
-    is_audio = suffix in {".mp3", ".m4a"}
-    method = "sendAudio" if is_audio else "sendDocument"
-    field = "audio" if is_audio else "document"
-    media_type = {".mp3": "audio/mpeg", ".m4a": "audio/mp4"}.get(
-        suffix, mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    )
-    try:
-        with path.open("rb") as stream:
-            response = httpx.post(
-                f"https://api.telegram.org/bot{token}/{method}",
-                data={"chat_id": chat_id, "caption": caption},
-                files={field: (filename + suffix, stream, media_type)},
-                timeout=90,
+    with tempfile.TemporaryDirectory(prefix="upos-voice-") as temp_dir:
+        voice_path = Path(temp_dir) / (filename + ".ogg")
+        try:
+            subprocess.run(
+                ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                 "-i", str(path), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "48000",
+                 "-c:a", "libopus", "-b:a", "32k", "-f", "ogg", str(voice_path)],
+                capture_output=True, check=True, timeout=120,
             )
-    except httpx.HTTPError as exc:
-        # httpx exceptions can contain the URL, which includes the bot token.
-        raise RuntimeError(f"Telegram transport error: {type(exc).__name__}") from None
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise RuntimeError(f"recording voice conversion failed: {type(exc).__name__}") from None
+        if not voice_path.is_file() or voice_path.stat().st_size > 50 * 1024 * 1024:
+            raise ValueError("converted voice is unavailable or exceeds Telegram upload limit")
+        try:
+            with voice_path.open("rb") as stream:
+                response = httpx.post(
+                    f"https://api.telegram.org/bot{token}/sendVoice",
+                    data={"chat_id": chat_id, "caption": caption},
+                    files={"voice": (voice_path.name, stream, "audio/ogg")},
+                    timeout=90,
+                )
+        except httpx.HTTPError as exc:
+            # httpx exceptions can contain the URL, which includes the bot token.
+            raise RuntimeError(f"Telegram transport error: {type(exc).__name__}") from None
     try:
         payload = response.json()
     except ValueError:
@@ -122,7 +129,10 @@ def _send(row: TelephonyRecordingDelivery, chat_id: str, token: str) -> int:
     if not payload.get("ok"):
         reason = str(payload.get("description") or "API error").replace(token, "[redacted]")[:200]
         raise RuntimeError(f"Telegram rejected recording ({response.status_code}): {reason}")
-    return int((payload.get("result") or {}).get("message_id") or 0)
+    result = payload.get("result") or {}
+    if not result.get("voice"):
+        raise RuntimeError("Telegram did not return a voice message")
+    return int(result.get("message_id") or 0)
 
 
 def process_due_recordings(max_items: int = 8) -> int:
@@ -156,7 +166,7 @@ def process_due_recordings(max_items: int = 8) -> int:
                 break
             row.status = "sending"
             row.attempts += 1
-            row.lease_until = now + timedelta(minutes=3)
+            row.lease_until = now + timedelta(minutes=10)
             delivery_id = row.id
             session.flush()
             session.expunge(row)

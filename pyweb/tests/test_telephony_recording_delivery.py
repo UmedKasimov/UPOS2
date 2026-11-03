@@ -35,22 +35,29 @@ class RecordingDeliveryTests(TestCase):
             )
             seen = {}
 
+            def fake_convert(command, *, capture_output, check, timeout):
+                Path(command[-1]).write_bytes(b"ogg opus voice")
+
             def fake_post(url, *, data, files, timeout):
                 seen["method"] = url.rsplit("/", 1)[-1]
                 seen["chat_id"] = data["chat_id"]
                 seen["caption"] = data["caption"]
-                seen["name"], stream, seen["mime"] = files["document"]
+                seen["name"], stream, seen["mime"] = files["voice"]
                 seen["content"] = stream.read()
                 return type("Response", (), {"status_code": 200, "json": lambda self: {
-                    "ok": True, "result": {"message_id": 42}
+                    "ok": True, "result": {"message_id": 42, "voice": {"file_id": "voice-id"}}
                 }})()
 
-            with patch.object(delivery, "_UPLOAD_ROOT", root), patch.object(delivery.httpx, "post", fake_post):
+            with patch.object(delivery, "_UPLOAD_ROOT", root), \
+                    patch.object(delivery.subprocess, "run", fake_convert), \
+                    patch.object(delivery.httpx, "post", fake_post):
                 self.assertEqual(delivery._send(row, "-100123", "test-token"), 42)
             self.assertEqual(seen["chat_id"], "-100123")
-            self.assertEqual(seen["method"], "sendDocument")
+            self.assertEqual(seen["method"], "sendVoice")
             self.assertIn("Звонок от Коллцентра", seen["caption"])
             self.assertIn("Клиент: Алина", seen["caption"])
             self.assertIn("03.11.2026 11:00", seen["caption"])
             self.assertIn("Алина", seen["name"])
-            self.assertEqual(seen["content"], b"recorded audio")
+            self.assertTrue(seen["name"].endswith(".ogg"))
+            self.assertEqual(seen["mime"], "audio/ogg")
+            self.assertEqual(seen["content"], b"ogg opus voice")
