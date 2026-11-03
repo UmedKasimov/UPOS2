@@ -32011,6 +32011,11 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   background: #f9fbff;
 }
 
+.upos-floating-phone-history-item.is-known-client {
+  border-color: #9fd6b4;
+  background: #edf9f0;
+}
+
 .upos-floating-phone-history-dial {
   display: flex;
   flex: 1;
@@ -32022,6 +32027,7 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   background: transparent;
   color: #1f3450;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -32924,6 +32930,11 @@ html.dark .upos-floating-phone-history-filters button,
 html.dark .upos-floating-phone-history-dial,
 html.dark .upos-floating-phone-contact-editor label {
   color: var(--foreground);
+}
+
+html.dark .upos-floating-phone-history-item.is-known-client {
+  border-color: #296547;
+  background: #183628;
 }
 
 html.dark .upos-floating-phone-tabs button.is-active,

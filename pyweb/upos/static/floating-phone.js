@@ -310,28 +310,31 @@
     shown.forEach((call) => {
       const row = document.createElement("div");
       row.className = "upos-floating-phone-history-item";
-      const dial = document.createElement("button");
-      dial.type = "button";
+      const knownClient = call.client?.href?.startsWith("/clients?") ? call.client : null;
+      if (knownClient) row.classList.add("is-known-client");
+      const dial = document.createElement(knownClient ? "a" : "button");
+      if (knownClient) dial.href = knownClient.href;
+      else dial.type = "button";
       dial.className = "upos-floating-phone-history-dial";
-      dial.title = "Подставить номер для звонка";
+      dial.title = knownClient ? "Открыть карточку клиента" : "Подставить номер для звонка";
       const icon = document.createElement("span");
       icon.className = `upos-floating-phone-history-direction is-${call.direction}`;
       icon.textContent = call.direction === "incoming" ? "↙" : "↗";
       const details = document.createElement("span");
       const name = document.createElement("strong");
-      name.textContent = call.name && !/^Контакт \+?\d+$/i.test(call.name) ? call.name : call.phone;
+      name.textContent = knownClient?.name || (call.name && !/^Контакт \+?\d+$/i.test(call.name) ? call.name : call.phone);
       const meta = document.createElement("small");
       const statusLabel = {answered: "Отвечен", missed: "Пропущен", planned: "Запланирован"}[call.status] || "Звонок";
       meta.textContent = `${call.phone} · ${formatCallTime(call.started_at)} · ${statusLabel}`;
       details.append(name, meta);
       dial.append(icon, details);
-      dial.addEventListener("click", () => {
+      if (!knownClient) dial.addEventListener("click", () => {
         switchView("dial");
         input.value = call.phone;
         input.focus();
       });
       row.append(dial);
-      if (validContactPhone(call.phone)) {
+      if (!knownClient && validContactPhone(call.phone)) {
         const save = document.createElement("button");
         save.type = "button";
         save.className = "upos-floating-phone-history-save";
@@ -423,8 +426,17 @@
       });
       const payload = await response.json();
       if (!response.ok || payload.ok === false) throw new Error(payload.error || "Не удалось сохранить контакт");
-      const tail = phoneDigits(phone).slice(-9);
-      historyCalls.forEach((call) => { if (phoneDigits(call.phone).endsWith(tail)) call.name = name; });
+      const savedDigits = phoneDigits(phone);
+      const phoneKey = (value) => {
+        const digits = phoneDigits(value);
+        return digits.length >= 9 ? digits.slice(-9) : digits;
+      };
+      historyCalls.forEach((call) => {
+        if (phoneKey(call.phone) === phoneKey(savedDigits)) {
+          call.name = name;
+          call.client = payload.contact;
+        }
+      });
       renderHistory();
       contactMessage.replaceChildren(document.createTextNode("Контакт сохранён · "));
       const link = document.createElement("a");

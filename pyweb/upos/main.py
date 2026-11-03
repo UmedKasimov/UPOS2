@@ -21773,10 +21773,37 @@ def create_app() -> FastAPI:
                 or (str(row.get("account") or "").strip() and str(row.get("account") or "").strip().casefold() in allowed_accounts)
             ]
         calls.sort(key=lambda row: str(row.get("started_at") or row.get("created_at") or ""), reverse=True)
+        clients_by_phone: dict[str, dict[str, str]] = {}
+        if calls:
+            with session_scope() as session:
+                clients = session.execute(
+                    select(Counterparty)
+                    .where(Counterparty.workspace_owner_id == wid, Counterparty.kind.in_(["client", "both"]))
+                    .order_by(Counterparty.updated_at.desc())
+                ).scalars().all()
+                for client in clients:
+                    extra = _counterparty_extra(client)
+                    client_info = {
+                        "id": str(client.id),
+                        "name": str(client.name or "Клиент"),
+                        "href": f"/clients?client={quote(str(client.id))}#client-card",
+                    }
+                    for phone in _crm_phone_list(
+                        client.phone, extra.get("phone"), extra.get("crm_phones"), extra.get("telegram_phone")
+                    ):
+                        digits = _telephony_normalized_phone(phone)
+                        if digits:
+                            clients_by_phone.setdefault(digits[-9:] if len(digits) >= 9 else digits, client_info)
+
+        def client_for_call_phone(phone: Any) -> dict[str, str] | None:
+            digits = _telephony_normalized_phone(phone)
+            return clients_by_phone.get(digits[-9:] if len(digits) >= 9 else digits) if digits else None
+
         recent = [
             {
                 "phone": str(row.get("phone") or "")[:64],
                 "name": str(row.get("client") or "")[:255],
+                "client": client_for_call_phone(row.get("phone")),
                 "direction": "incoming" if row.get("direction") == "incoming" else "outgoing",
                 "status": str(row.get("status") or "")[:24],
                 "started_at": str(row.get("started_at") or row.get("created_at") or "")[:40],
