@@ -317,6 +317,26 @@ class WorkspaceSetting(Base):
     )
 
 
+class TelephonyRecordingDelivery(Base):
+    __tablename__ = "telephony_recording_deliveries"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_owner_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    recording_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    client_name: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    phone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    started_at: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    last_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
 class Treasury(Base):
     __tablename__ = "treasuries"
 

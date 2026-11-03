@@ -24,7 +24,7 @@ class InstallerSipUiTests(unittest.TestCase):
         self.assertIn("autoGainControl: false", script)
         self.assertIn("channelCount: {ideal: 1}", script)
         self.assertNotIn("latency: {ideal: 0.02}", script)
-        self.assertIn('const SOFTPHONE_VERSION = "13"', script)
+        self.assertIn('const SOFTPHONE_VERSION = "16"', script)
         self.assertIn("softphoneVersion: SOFTPHONE_VERSION", script)
         self.assertIn("mediaStream: liveMicrophoneStream() || undefined", script)
         self.assertIn("disconnect({preserveMicrophone: true})", script)
@@ -32,7 +32,8 @@ class InstallerSipUiTests(unittest.TestCase):
     def test_softphone_connects_remote_voice_and_speaker_control(self):
         script = (ROOT / "upos" / "static" / "installer-softphone.js").read_text(encoding="utf-8")
 
-        self.assertIn('pc.addEventListener("track", attachRemoteAudio)', script)
+        self.assertIn('pc.addEventListener("track", (event) => {', script)
+        self.assertIn('emit("remoteTrack", {})', script)
         self.assertIn("el.srcObject = remoteStream", script)
         self.assertIn("setSpeaker(enabled)", script)
         self.assertIn("resumeRemoteAudio()", script)

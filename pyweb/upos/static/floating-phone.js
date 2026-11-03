@@ -471,6 +471,7 @@
   let inCall = false;
   let activeCall = null;
   let callSync = Promise.resolve();
+  let browserRecording = null;
   let ringTimer = null;
   let ringContext = null;
   let incomingLookupId = 0;
@@ -512,6 +513,75 @@
     if (!activeCall) return;
     recordBrowserCall(status || (activeCall.answeredAt ? "answered" : "missed"), activeCall);
     activeCall = null;
+  }
+
+  async function uploadBrowserRecording(call, blob, extension) {
+    await callSync.catch(() => {});
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
+    if (!csrf || !blob.size || blob.size > 50 * 1024 * 1024) {
+      setStatus("Запись звонка не сохранена: файл слишком большой или нет доступа", "error");
+      return;
+    }
+    const body = new FormData();
+    body.set("call_id", call.call_id);
+    body.set("provider_id", call.provider_id);
+    body.set("file", blob, `call.${extension}`);
+    try {
+      const response = await fetch("/api/telephony/browser-recording", {
+        method: "POST", credentials: "same-origin", headers: {"X-CSRF-Token": csrf}, body,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!panel.hidden && activeView === "history") void loadHistory();
+    } catch (_error) {
+      setStatus("Не удалось сохранить запись звонка — проверьте соединение", "error");
+    }
+  }
+
+  function startBrowserRecording() {
+    if (browserRecording || !activeCall?.answeredAt || !window.MediaRecorder) return;
+    const tracks = window.UposSoftphone?.recordingTracks?.();
+    if (!tracks?.local?.length || !tracks?.remote?.length) return;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const format = [
+      ["audio/webm;codecs=opus", "webm"], ["audio/webm", "webm"], ["audio/mp4", "m4a"],
+    ].find(([mime]) => window.MediaRecorder.isTypeSupported?.(mime));
+    if (!format) return;
+    let context = null;
+    try {
+      context = new AudioContext();
+      const destination = context.createMediaStreamDestination();
+      const sources = [tracks.local[0], tracks.remote[0]].map((track) => {
+        const source = context.createMediaStreamSource(new MediaStream([track]));
+        source.connect(destination);
+        return source;
+      });
+      const recorder = new window.MediaRecorder(destination.stream, {mimeType: format[0]});
+      const call = {...activeCall};
+      const chunks = [];
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data?.size) chunks.push(event.data);
+      });
+      recorder.addEventListener("stop", () => {
+        sources.forEach((source) => source.disconnect());
+        destination.stream.getTracks().forEach((track) => track.stop());
+        void context.close();
+        const blob = new Blob(chunks, {type: format[0]});
+        if (blob.size) void uploadBrowserRecording(call, blob, format[1]);
+      }, {once: true});
+      recorder.start(1000);
+      void context.resume().catch(() => {});
+      browserRecording = recorder;
+    } catch (_error) {
+      if (context) void context.close();
+      setStatus("Браузер не смог начать запись звонка", "error");
+    }
+  }
+
+  function stopBrowserRecording() {
+    const recorder = browserRecording;
+    browserRecording = null;
+    if (recorder?.state === "recording") recorder.stop();
   }
 
   function unlockRingtone() {
@@ -704,7 +774,9 @@
       setIncomingUi(null);
       setStatus("Разговор идёт", "ok");
       setCallUi(true);
+      startBrowserRecording();
     });
+    sip.on("remoteTrack", startBrowserRecording);
     sip.on("incoming", (event) => {
       inCall = true;
       redirecting = false;
@@ -720,6 +792,7 @@
       setStatus(`Входящий: ${event?.name || event?.from || "неизвестный"}`, "pending");
     });
     sip.on("ended", () => {
+      stopBrowserRecording();
       finishBrowserCall(redirecting ? "forwarded" : "");
       inCall = false;
       setIncomingUi(null);
@@ -728,6 +801,7 @@
       setCallUi(false);
     });
     sip.on("failed", (event) => {
+      stopBrowserRecording();
       finishBrowserCall(redirecting ? "forwarded" : "");
       inCall = false;
       setIncomingUi(null);
@@ -786,7 +860,7 @@
       }
       fillProviders();
       await loadScript("/static/jssip.min.js?v=1");
-      await loadScript("/static/installer-softphone.js?v=16");
+      await loadScript("/static/installer-softphone.js?v=17");
       const sip = window.UposSoftphone;
       if (!sip || !sip.available()) {
         setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");
@@ -835,6 +909,7 @@
   });
 
   hangupButton?.addEventListener("click", () => {
+    stopBrowserRecording();
     window.UposSoftphone?.hangup();
     finishBrowserCall();
     inCall = false;

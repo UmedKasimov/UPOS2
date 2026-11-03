@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const SOFTPHONE_VERSION = "15";
+  const SOFTPHONE_VERSION = "16";
   const listeners = {};
   function emit(event, detail) {
     (listeners[event] || []).forEach((fn) => {
@@ -356,7 +356,10 @@
   function wirePeerConnection(pc) {
     if (!pc || pc.__uposSoftphoneWired) return;
     pc.__uposSoftphoneWired = true;
-    pc.addEventListener("track", attachRemoteAudio);
+    pc.addEventListener("track", (event) => {
+      attachRemoteAudio(event);
+      emit("remoteTrack", {});
+    });
     pc.addEventListener("connectionstatechange", () => {
       emit("connectionState", {state: pc.connectionState || ""});
       diagnostic("peer_connection", {state: pc.connectionState || ""});
@@ -455,6 +458,16 @@
 
     inCall() {
       return Boolean(session);
+    },
+
+    recordingTracks() {
+      const pc = session?.connection;
+      if (!pc) return {local: [], remote: []};
+      const liveAudio = (entry) => entry?.track?.kind === "audio" && entry.track.readyState === "live";
+      return {
+        local: (pc.getSenders?.() || []).filter(liveAudio).map((sender) => sender.track),
+        remote: (pc.getReceivers?.() || []).filter(liveAudio).map((receiver) => receiver.track),
+      };
     },
 
     available() {

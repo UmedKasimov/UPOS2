@@ -30,6 +30,8 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    volumes:
+      - upos_telephony_uploads:/app/upos/static/uploads/telephony
     environment:
       REDIS_URL: redis://redis:6379/0
       UPOS_RUN_SCHEDULERS: "0"
@@ -47,6 +49,8 @@ services:
     restart: unless-stopped
     command: python -m upos.worker
     env_file: .env
+    volumes:
+      - upos_telephony_uploads:/app/upos/static/uploads/telephony
     environment:
       REDIS_URL: redis://redis:6379/0
       UPOS_RUN_SCHEDULERS: "1"
@@ -59,3 +63,4 @@ services:
 volumes:
   upos_postgres_data:
   upos_redis_data:
+  upos_telephony_uploads:

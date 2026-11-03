@@ -43,6 +43,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
 from upos.telephony_access import sip_provider_assigned_to
+from upos.telephony_recording_delivery import enqueue_recording
 from upos.config import get_settings
 from upos.csrf import csrf_matches_session, ensure_csrf_token, rotate_csrf_token
 from upos.db import get_engine, init_db, list_public_tables, session_scope, startup_timings_ms
@@ -21505,6 +21506,13 @@ def create_app() -> FastAPI:
             )
 
         call_item = _telephony_upsert_call_from_payload(wid, payload)
+        if recording_upload is not None or _telephony_first(
+            payload, "recording_base64", "audio_base64", "file_base64", "record_base64"
+        ):
+            try:
+                enqueue_recording(wid, str(payload.get("recording_url") or ""), call_item)
+            except Exception:
+                logger.exception("[telephony] could not queue Telegram recording delivery")
         integration = _telephony_integration_context(request, wid, _telephony_settings_payload(wid))
         return JSONResponse(
             {
@@ -21589,6 +21597,10 @@ def create_app() -> FastAPI:
         payload["recording_path"] = recording_url
         payload["event"] = str(payload.get("event") or "recording")
         call_item = _telephony_upsert_call_from_payload(wid, payload)
+        try:
+            enqueue_recording(wid, recording_url, call_item)
+        except Exception:
+            logger.exception("[telephony] could not queue Telegram recording delivery")
         logger.info(
             "[telephony] recording upload completed; workspace=%s call=%s bytes=%s",
             wid,
@@ -21947,6 +21959,66 @@ def create_app() -> FastAPI:
         }
         call = _telephony_upsert_call_from_payload(wid, call_payload)
         return JSONResponse({"ok": True, "call_id": call_id, "status": call.get("status")})
+
+    @app.post("/api/telephony/browser-recording", name="telephony_browser_recording_api")
+    async def telephony_browser_recording_api(request: Request):
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        if not csrf_matches_session(request, str(request.headers.get("X-CSRF-Token") or "")):
+            return JSONResponse({"ok": False, "error": "csrf"}, status_code=403)
+        try:
+            form = await request.form()
+            payload, upload = _telephony_recording_upload_from_form(form)
+            call_id = str(uuid.UUID(str(payload.get("call_id") or "")))
+        except Exception:
+            return JSONResponse({"ok": False, "error": "invalid_call_id"}, status_code=400)
+        if upload is None:
+            return JSONResponse({"ok": False, "error": "recording_required"}, status_code=400)
+        provider_id = str(payload.get("provider_id") or "").strip()
+        data = _telephony_settings_payload(wid)
+        user = request.session.get("user") or {}
+        provider = next((
+            row for row in data.get("telephony_providers", [])
+            if isinstance(row, dict)
+            and str(row.get("id") or "") == provider_id
+            and sip_provider_assigned_to(row, _session_user_id(user), _telephony_user_name(request), wid)
+        ), None)
+        call = next((
+            row for row in data.get("telephony_calls", [])
+            if isinstance(row, dict)
+            and _telephony_call_reference(row.get("id")) == call_id
+            and row.get("source") == "upos-sip"
+        ), None)
+        if provider is None or call is None or str(call.get("account") or "") != str(provider.get("login") or ""):
+            return JSONResponse({"ok": False, "error": "call_not_found"}, status_code=404)
+        existing_url = _telephony_recording_public_url(call.get("recording_path"))
+        if existing_url.startswith("/static/uploads/telephony/"):
+            return JSONResponse({"ok": True, "recording_url": existing_url})
+        recording_url, error, error_status, _size = await _telephony_store_recording_upload(wid, payload, upload)
+        if error:
+            return JSONResponse({"ok": False, "error": error}, status_code=error_status)
+        update = {
+            "call_id": call_id,
+            "phone": call.get("phone"),
+            "direction": call.get("direction"),
+            "status": call.get("status"),
+            "account": call.get("account"),
+            "started_at": call.get("started_at"),
+            "duration": call.get("duration"),
+            "recording_url": recording_url,
+            "event": "recording",
+        }
+        updated_call = _telephony_upsert_call_from_payload(wid, update)
+        try:
+            enqueue_recording(wid, recording_url, updated_call)
+        except Exception:
+            logger.exception("[telephony] could not queue browser recording delivery")
+        return JSONResponse({"ok": True, "recording_url": recording_url})
 
     @app.post("/api/telephony/incoming-call", name="telephony_incoming_call_api")
     async def telephony_incoming_call_api(request: Request):
