@@ -476,6 +476,14 @@
   let accounts = [];
   let inCall = false;
   let extensionOwnsLine = document.documentElement?.dataset.uposExtensionPhone === "active";
+  let registrationLease = null;
+  let leaseAttempt = null;
+  let lineInOtherTab = false;
+  const registrationChannel = typeof BroadcastChannel === "function"
+    ? new BroadcastChannel("upos-sip-registration") : null;
+  if (registrationChannel) registrationChannel.onmessage = (event) => {
+    if (event.data?.type === "released" && !extensionOwnsLine && !inCall) void ensureSoftphone();
+  };
   let activeCall = null;
   let callSync = Promise.resolve();
   let browserRecording = null;
@@ -816,8 +824,9 @@
     if (sip.__floatingPhoneBound) return;
     sip.__floatingPhoneBound = true;
     sip.on("registered", (event) => {
-      if (extensionOwnsLine && !inCall) {
+      if ((extensionOwnsLine || !registrationLease) && !inCall) {
         sip.disconnect();
+        releaseRegistrationLease();
         return;
       }
       showConnectedNotice(event?.account || selectedAccount());
@@ -880,7 +889,7 @@
       redirecting = false;
       rejecting = false;
       setCallUi(false);
-      if (extensionOwnsLine) sip.disconnect();
+      if (extensionOwnsLine) { sip.disconnect(); releaseRegistrationLease(); }
     });
     sip.on("failed", (event) => {
       stopBrowserRecording();
@@ -893,7 +902,7 @@
       redirecting = false;
       rejecting = false;
       setCallUi(false);
-      if (extensionOwnsLine) sip.disconnect();
+      if (extensionOwnsLine) { sip.disconnect(); releaseRegistrationLease(); }
     });
   }
 
@@ -911,22 +920,68 @@
     if (submitButton) submitButton.disabled = active || (incomingPanel && !incomingPanel.hidden);
   }
 
+  function releaseRegistrationLease() {
+    const lease = registrationLease;
+    registrationLease = null;
+    lease?.release();
+    if (lease) registrationChannel?.postMessage({type: "released", key: lease.key});
+  }
+
+  async function acquireRegistrationLease(account) {
+    if (!account || extensionOwnsLine) return false;
+    const key = `upos-sip-${account.sip_uri}`;
+    if (registrationLease?.key === key) return true;
+    if (registrationLease) releaseRegistrationLease();
+    if (leaseAttempt) await leaseAttempt;
+    if (registrationLease?.key === key) return true;
+    if (registrationLease) releaseRegistrationLease();
+    if (!navigator.locks?.request) {
+      setStatus("Этот браузер не поддерживает защиту SIP-линии от повторной регистрации", "error");
+      return false;
+    }
+    let settle;
+    const attempt = new Promise((resolve) => { settle = resolve; });
+    leaseAttempt = attempt;
+    void navigator.locks.request(key, {ifAvailable: true}, async (lock) => {
+      if (!lock || extensionOwnsLine) {
+        settle(false);
+        return;
+      }
+      await new Promise((release) => {
+        registrationLease = {key, release};
+        settle(true);
+      });
+    }).catch(() => settle(false));
+    const acquired = await attempt;
+    if (leaseAttempt === attempt) leaseAttempt = null;
+    lineInOtherTab = !acquired && !extensionOwnsLine;
+    if (lineInOtherTab) {
+      setStatus(`SIP ${account.extension || ""} уже работает в другой вкладке U-POS`, "ready");
+    }
+    return acquired && !extensionOwnsLine;
+  }
+
   function recoverRegistration(sip) {
     if (extensionOwnsLine) return Promise.resolve(null);
-    if (!sip || sip.isRegistered() || inCall) return Promise.resolve(sip);
+    if (!sip || inCall) return Promise.resolve(sip);
+    if (sip.isRegistered()) return Promise.resolve(registrationLease ? sip : null);
     if (registrationRecovery) return registrationRecovery;
     const account = selectedAccount();
     if (!account) return Promise.resolve(sip);
-    setStatus("Подключаюсь к АТС…", "pending", {kind: "registration-lost"});
-    reportBrowserStatus("connecting", {}, account.id);
-    registrationRecovery = sip.connect(account).then(() => {
-      showConnectedNotice(account);
+    registrationRecovery = (async () => {
+      if (!await acquireRegistrationLease(account)) return null;
+      setStatus("Подключаюсь к АТС…", "pending", {kind: "registration-lost"});
+      reportBrowserStatus("connecting", {}, account.id);
+      try {
+        await sip.connect(account);
+        if (extensionOwnsLine) { sip.disconnect(); releaseRegistrationLease(); return null; }
+        showConnectedNotice(account);
+      } catch (error) {
+        reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
+        setStatus(connectErrorText(account, error), "error", {kind: "registration-lost"});
+      }
       return sip;
-    }, (error) => {
-      reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
-      setStatus(connectErrorText(account, error), "error", {kind: "registration-lost"});
-      return sip;
-    }).finally(() => { registrationRecovery = null; });
+    })().finally(() => { registrationRecovery = null; });
     return registrationRecovery;
   }
 
@@ -960,11 +1015,12 @@
       const account = selectedAccount();
       if (!account) return sip;
       if (extensionOwnsLine) return sip;
+      if (!await acquireRegistrationLease(account)) return sip;
       setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
       reportBrowserStatus("connecting", {}, account.id);
       try {
         await sip.connect(account);
-        if (extensionOwnsLine && !inCall) sip.disconnect();
+        if (extensionOwnsLine && !inCall) { sip.disconnect(); releaseRegistrationLease(); }
         else showConnectedNotice(account);
       } catch (error) {
         reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
@@ -992,6 +1048,11 @@
     const sip = await ensureSoftphone();
     const account = selectedAccount();
     if (!sip || !account) return;
+    if (sip.isRegistered() && sip.account()?.id !== account.id) {
+      sip.disconnect();
+      releaseRegistrationLease();
+    }
+    if (!await acquireRegistrationLease(account)) return;
     setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
     reportBrowserStatus("connecting", {}, account.id);
     try {
@@ -1155,6 +1216,10 @@
         return;
       }
       const sip = await ensureSoftphone();
+      if (lineInOtherTab) {
+        setStatus("Линия уже работает в другой вкладке U-POS", "ready");
+        return;
+      }
       // Первый путь — звонок прямо из браузера.
       if (sip && sip.isRegistered() && sip.call(phone)) {
         inCall = true;
@@ -1205,9 +1270,15 @@
     extensionOwnsLine = active;
     if (active) {
       setStatus("Линия работает в расширении Chrome", "ok");
-      if (!inCall) window.UposSoftphone?.disconnect?.();
+      if (!inCall) {
+        window.UposSoftphone?.disconnect?.();
+        releaseRegistrationLease();
+      }
       void softphoneReady?.then((sip) => {
-        if (extensionOwnsLine && !inCall) sip?.disconnect();
+        if (extensionOwnsLine && !inCall) {
+          sip?.disconnect();
+          releaseRegistrationLease();
+        }
       });
     } else if (!inCall) {
       void ensureSoftphone();
@@ -1231,6 +1302,11 @@
     if (window.UposSoftphone?.isRegistered?.()) reportBrowserStatus("heartbeat");
   }, 60000);
   window.addEventListener("online", () => { void ensureSoftphone(); });
+  window.addEventListener("pagehide", () => {
+    window.UposSoftphone?.disconnect?.();
+    releaseRegistrationLease();
+  });
+  window.addEventListener("pageshow", () => { void ensureSoftphone(); });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) void ensureSoftphone();
   });

@@ -45,8 +45,16 @@
   }
 
   async function allowMicrophone() {
-    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-    stream.getTracks().forEach((track) => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      if (error?.name === "NotAllowedError" || /permission dismissed/i.test(error?.message || "")) {
+        throw new Error("Доступ к микрофону не разрешён. Нажмите «Подключить» ещё раз и выберите «Разрешить» в Chrome.");
+      }
+      if (error?.name === "NotFoundError") throw new Error("Chrome не видит микрофон. Подключите его и повторите попытку.");
+      throw error;
+    }
   }
 
   $("show-manual").addEventListener("click", () => {
