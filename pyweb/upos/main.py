@@ -44,6 +44,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
 from upos.telephony_access import sip_provider_assigned_to
 from upos.telephony_browser_status import browser_status_event
+from upos.telephony_gateway import browser_gateway_account
 from upos.ivr_routing import validate_ivr_form
 from upos.telephony_recording_delivery import enqueue_recording
 from upos.config import get_settings
@@ -19153,9 +19154,10 @@ def create_app() -> FastAPI:
         accounts = []
         user = request.session.get("user") or {}
         employee_user_id = _session_user_id(user)
-        for account in _telephony_sip_accounts_for_softphone(
+        for raw_account in _telephony_sip_accounts_for_softphone(
             data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
         ):
+            account = browser_gateway_account(raw_account)
             host = str(account.get("host") or "")
             if not host:
                 continue
@@ -21766,7 +21768,7 @@ def create_app() -> FastAPI:
         sessions[session_key] = auth_entry
         data["telephony_softphone_sessions"] = dict(list(sessions.items())[-100:])
         save_workspace_settings(wid, data)
-        accounts = _telephony_sip_accounts_for_softphone(data, provider_id)
+        accounts = [browser_gateway_account(account) for account in _telephony_sip_accounts_for_softphone(data, provider_id)]
         config_query = urlencode({"provider_id": provider_id})
         return JSONResponse(
             {

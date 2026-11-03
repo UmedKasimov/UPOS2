@@ -1,0 +1,13 @@
+services:
+  sip-gateway:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    env_file: ./runtime/gateway.env
+    volumes:
+      - ./runtime/asterisk:/var/lib/asterisk/upos-gateway
+    healthcheck:
+      test: ["CMD", "asterisk", "-rx", "core show uptime"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
