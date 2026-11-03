@@ -219,7 +219,7 @@
     container.appendChild(row);
   }
 
-  function openContactDialog(dialog, contact) {
+  function openContactDialog(dialog, contact, returnTo) {
     if (!dialog || !contact) return;
     var title = dialog.querySelector("[data-telephony-contact-title]");
     var subtitle = dialog.querySelector("[data-telephony-contact-subtitle]");
@@ -227,6 +227,12 @@
     var id = dialog.querySelector("[data-telephony-contact-id]");
     var name = dialog.querySelector("[data-telephony-contact-name]");
     var phone = dialog.querySelector("[data-telephony-contact-phone]");
+    var extraPhones = dialog.querySelector("[data-telephony-contact-extra-phones]");
+    var category = dialog.querySelector("[data-telephony-contact-category-field]");
+    var email = dialog.querySelector("[data-telephony-contact-email]");
+    var address = dialog.querySelector("[data-telephony-contact-address]");
+    var note = dialog.querySelector("[data-telephony-contact-note]");
+    var returnField = dialog.querySelector("[data-telephony-contact-return]");
     var save = dialog.querySelector("[data-telephony-contact-save]");
     var history = dialog.querySelector("[data-telephony-contact-history]");
     if (title) title.textContent = contact.name || "Контакт";
@@ -236,9 +242,17 @@
       state.textContent = contact.state_label || (contact.pending ? "Нужно подтвердить" : "Подтвержден");
     }
     if (id) id.value = contact.id || "";
-    if (name) name.value = contact.name || "";
+    if (name) name.value = /^Контакт \+?\d+$/i.test(contact.name || "") ? "" : (contact.name || "");
     if (phone) phone.value = contact.phone || "";
-    if (save) save.textContent = contact.pending ? "Подтвердить и сохранить" : "Обновить контакт";
+    if (extraPhones) extraPhones.value = (contact.phones || []).filter(function (value) {
+      return phone && value !== phone.value;
+    }).join("\n");
+    if (category) category.value = contact.category === "Без категории" ? "" : (contact.category || "");
+    if (email) email.value = contact.email || "";
+    if (address) address.value = contact.address || "";
+    if (note) note.value = contact.note || "";
+    if (returnField) returnField.value = returnTo === "calls" ? "calls" : "numbers";
+    if (save) save.textContent = contact.pending || !contact.id ? "Сохранить клиента" : "Обновить клиента";
     var counters = {
       "[data-telephony-contact-calls]": contact.calls_count || 0,
       "[data-telephony-contact-incoming]": contact.incoming_count || 0,
@@ -263,6 +277,38 @@
       }
     }
     openDialog(dialog);
+  }
+
+  function initCallClientCards() {
+    var dialog = document.getElementById("telephony-contact-dialog");
+    var contacts = telephonyContacts();
+    function digits(value) {
+      return String(value || "").replace(/\D/g, "");
+    }
+    function samePhone(left, right) {
+      var a = digits(left);
+      var b = digits(right);
+      if (!a || !b) return false;
+      return a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9));
+    }
+    document.querySelectorAll("[data-telephony-call-client]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var phone = button.dataset.phone || "";
+        var contact = contacts.find(function (item) {
+          return (item.phones || [item.phone]).some(function (candidate) {
+            return samePhone(candidate, phone);
+          });
+        });
+        if (!contact) {
+          contact = {
+            id: "", name: button.dataset.name || "", phone: phone,
+            phones: [phone], pending: true, state: "pending",
+            state_label: "Заполните карточку клиента", calls: []
+          };
+        }
+        openContactDialog(dialog, contact, "calls");
+      });
+    });
   }
 
   function initContactDirectory() {
@@ -477,6 +523,7 @@
     initAutomaticFilters();
     initClickToDial();
     initContactDirectory();
+    initCallClientCards();
 
     document.querySelectorAll("[data-telephony-open-call]").forEach(function (button) {
       button.addEventListener("click", function () {

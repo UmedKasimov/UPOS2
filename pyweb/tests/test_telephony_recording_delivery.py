@@ -49,6 +49,7 @@ class RecordingDeliveryTests(TestCase):
                 }})()
 
             with patch.object(delivery, "_UPLOAD_ROOT", root), \
+                    patch.object(delivery, "_ffmpeg_executable", return_value="ffmpeg"), \
                     patch.object(delivery.subprocess, "run", fake_convert), \
                     patch.object(delivery.httpx, "post", fake_post):
                 self.assertEqual(delivery._send(row, "-100123", "test-token"), 42)

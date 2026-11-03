@@ -91,6 +91,11 @@ def _caption(row: TelephonyRecordingDelivery) -> tuple[str, str]:
     return "\n".join(parts)[:1024], f"Звонок_{safe_name}_{date_label.replace('.', '-').replace(':', '-') or 'запись'}"
 
 
+def _ffmpeg_executable() -> str:
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
 def _send(row: TelephonyRecordingDelivery, chat_id: str, token: str) -> int:
     path = _local_path(row.workspace_owner_id, row.recording_path)
     if path is None or not path.is_file():
@@ -102,7 +107,7 @@ def _send(row: TelephonyRecordingDelivery, chat_id: str, token: str) -> int:
         voice_path = Path(temp_dir) / (filename + ".ogg")
         try:
             subprocess.run(
-                ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                [_ffmpeg_executable(), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                  "-i", str(path), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "48000",
                  "-c:a", "libopus", "-b:a", "32k", "-f", "ogg", str(voice_path)],
                 capture_output=True, check=True, timeout=120,

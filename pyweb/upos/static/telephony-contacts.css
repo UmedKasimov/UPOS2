@@ -294,8 +294,13 @@
   font-weight: 700;
 }
 
-.telephony-contact-profile form input {
+.telephony-contact-profile form input,
+.telephony-contact-profile form textarea {
   width: 100%;
+}
+
+.telephony-contact-profile {
+  overflow-y: auto;
 }
 
 .telephony-contact-summary {

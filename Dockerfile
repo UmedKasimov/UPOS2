@@ -9,8 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 COPY pyweb/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir imageio-ffmpeg==0.7.0
 
 COPY pyweb/upos ./upos
 

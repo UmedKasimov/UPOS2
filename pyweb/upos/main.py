@@ -18985,13 +18985,15 @@ def create_app() -> FastAPI:
                     continue
                 name = str(row.name or "Без имени").strip()
                 phone = str(row.phone or extra.get("phone") or "").strip()
+                phones = _crm_phone_list(phone, extra.get("crm_phones"), extra.get("telegram_phone"))
                 matched_indexes: set[int] = set()
-                phone_digits = _telephony_normalized_phone(phone)
-                if phone_digits:
-                    if len(phone_digits) >= 9:
-                        matched_indexes.update(calls_by_phone_tail.get(phone_digits[-9:], ()))
-                    else:
-                        matched_indexes.update(calls_by_phone_exact.get(phone_digits, ()))
+                for contact_phone in phones:
+                    phone_digits = _telephony_normalized_phone(contact_phone)
+                    if phone_digits:
+                        if len(phone_digits) >= 9:
+                            matched_indexes.update(calls_by_phone_tail.get(phone_digits[-9:], ()))
+                        else:
+                            matched_indexes.update(calls_by_phone_exact.get(phone_digits, ()))
                 if name:
                     matched_indexes.update(calls_by_client.get(name.casefold(), ()))
                 matching_calls = [
@@ -19009,6 +19011,10 @@ def create_app() -> FastAPI:
                         "id": str(row.id),
                         "name": name,
                         "phone": phone,
+                        "phones": phones,
+                        "email": str(extra.get("email") or ""),
+                        "address": str(extra.get("address") or ""),
+                        "note": str(extra.get("note") or ""),
                         "pending": is_pending,
                         "state": "pending" if is_pending else "confirmed",
                         "state_label": "Нужно подтвердить" if is_pending else "Подтвержден",
@@ -20951,8 +20957,12 @@ def create_app() -> FastAPI:
     @app.post("/telephony/contacts/confirm", name="telephony_contact_confirm")
     async def telephony_contact_confirm(request: Request):
         form = await request.form()
+        anchor = "calls" if str(form.get("return_to") or "") == "calls" else "numbers"
         if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
-            return RedirectResponse(url="/telephony?err=csrf#numbers", status_code=302)
+            return RedirectResponse(url=f"/telephony?err=csrf#{anchor}", status_code=302)
+        denied = _employee_module_denied(request, "telephony")
+        if denied is not None:
+            return denied
         wid, redir = _product_workspace_owner(request)
         if redir:
             return redir
@@ -20960,42 +20970,75 @@ def create_app() -> FastAPI:
         contact_id = str(form.get("contact_id") or "").strip()
         name = str(form.get("name") or "").strip()
         phone = str(form.get("phone") or "").strip()
-        if not contact_id or not name or len(_telephony_normalized_phone(phone)) < 7:
+        raw_extras = [value.strip() for value in re.split(r"[\n,;]+", str(form.get("extra_phones") or "")) if value.strip()]
+        submitted_phones = [phone, *raw_extras]
+        if not name or len(raw_extras) > 9 or any(
+            not 7 <= len(_telephony_normalized_phone(value)) <= 15
+            or not re.fullmatch(r"\+?[\d\s()-]+", value)
+            for value in submitted_phones
+        ):
             return RedirectResponse(
-                url="/telephony?error=" + quote("Укажите имя и корректный номер телефона") + "#numbers",
+                url="/telephony?error=" + quote("Укажите имя и до 10 корректных номеров") + f"#{anchor}",
                 status_code=302,
             )
         previous_name = ""
-        previous_phone = ""
+        previous_phones: list[str] = []
+        saved_phones = _crm_phone_list(submitted_phones)
         with session_scope() as session:
-            row = session.get(Counterparty, contact_id)
-            if not row or row.workspace_owner_id != wid or row.kind not in {"client", "both"}:
+            candidates = session.execute(
+                select(Counterparty).where(Counterparty.workspace_owner_id == wid)
+            ).scalars().all()
+            row = next((item for item in candidates if str(item.id) == contact_id), None) if contact_id else None
+            if contact_id and (not row or row.kind not in {"client", "both"}):
                 return RedirectResponse(
-                    url="/telephony?error=" + quote("Контакт не найден") + "#numbers",
+                    url="/telephony?error=" + quote("Контакт не найден") + f"#{anchor}",
                     status_code=302,
                 )
-            candidates = session.execute(
-                select(Counterparty).where(
-                    Counterparty.workspace_owner_id == wid,
-                    Counterparty.id != row.id,
-                )
-            ).scalars().all()
+            if row is None:
+                row = next((item for item in candidates if any(
+                    _telephony_phone_matches(phone, candidate_phone)
+                    for candidate_phone in _crm_phone_list(
+                        item.phone, _counterparty_extra(item).get("phone"),
+                        _counterparty_extra(item).get("crm_phones"),
+                    )
+                )), None)
             if any(
-                _telephony_phone_matches(phone, candidate.phone or _counterparty_extra(candidate).get("phone"))
-                for candidate in candidates
+                any(_telephony_phone_matches(value, candidate_phone)
+                    for candidate_phone in _crm_phone_list(
+                        candidate.phone, _counterparty_extra(candidate).get("phone"),
+                        _counterparty_extra(candidate).get("crm_phones"),
+                    ))
+                for candidate in candidates if candidate is not row for value in saved_phones
             ):
                 return RedirectResponse(
-                    url="/telephony?error=" + quote("Этот номер уже сохранен у другого контакта") + "#numbers",
+                    url="/telephony?error=" + quote("Этот номер уже сохранен у другого контакта") + f"#{anchor}",
                     status_code=302,
                 )
-            previous_name = str(row.name or "").strip()
-            previous_phone = str(row.phone or _counterparty_extra(row).get("phone") or "").strip()
+            if row is None:
+                row = Counterparty(
+                    id=str(uuid.uuid4()), workspace_owner_id=wid, kind="client",
+                    name=name[:255], phone=phone[:64], tax_id="",
+                    external_source="upos-sip", external_id=f"phone:{_telephony_normalized_phone(phone)}", data={},
+                )
+                session.add(row)
+            else:
+                previous_name = str(row.name or "").strip()
+                old_extra = _counterparty_extra(row)
+                previous_phones = _crm_phone_list(row.phone, old_extra.get("phone"), old_extra.get("crm_phones"))
+                _, has_supplier = _counterparty_role_flags(row.kind)
+                row.kind = _counterparty_kind_from_flags(True, has_supplier)
             row.name = name[:255]
             row.phone = phone[:64]
             extra = _counterparty_extra(row)
+            extra.pop("telephony_deleted", None)
             extra.update(
                 {
                     "phone": phone,
+                    "crm_phones": [value for value in saved_phones if value != phone],
+                    "category": str(form.get("category") or "").strip()[:120],
+                    "email": str(form.get("email") or "").strip()[:255],
+                    "address": str(form.get("address") or "").strip()[:500],
+                    "note": str(form.get("note") or "").strip()[:2000],
                     "is_client": True,
                     "telephony_confirmed": True,
                     "telephony_confirmed_at": datetime.now(timezone.utc).isoformat(),
@@ -21013,16 +21056,15 @@ def create_app() -> FastAPI:
                 continue
             call_phone = str(call.get("phone") or "").strip()
             call_client = str(call.get("client") or "").strip()
-            if (previous_phone and _telephony_phone_matches(previous_phone, call_phone)) or (
+            if any(_telephony_phone_matches(value, call_phone) for value in [*previous_phones, *saved_phones]) or (
                 previous_name and call_client.casefold() == previous_name.casefold()
             ):
                 call["client"] = name
-                call["phone"] = phone
                 changed = True
         if changed:
             data["telephony_calls"] = stored_calls
             save_workspace_settings(wid, data)
-        return RedirectResponse(url="/telephony?msg=saved#numbers", status_code=302)
+        return RedirectResponse(url=f"/telephony?msg=saved#{anchor}", status_code=302)
 
     @app.post("/telephony/contacts/delete", name="telephony_contacts_delete")
     async def telephony_contacts_delete(request: Request):

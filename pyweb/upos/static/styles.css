@@ -32524,6 +32524,26 @@ body.is-sidebar-collapsed .upos-floating-phone,
   line-height: 1.2;
 }
 
+.telephony-call-client-button {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.telephony-call-client-button:hover strong {
+  text-decoration: underline;
+}
+
+.telephony-call-client-button:focus-visible {
+  outline: 2px solid var(--primary, #2563eb);
+  outline-offset: 3px;
+}
+
 .telephony-calls-table th:nth-child(4),
 .telephony-calls-table td:nth-child(4) {
   width: 13%;

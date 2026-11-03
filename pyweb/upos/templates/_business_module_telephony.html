@@ -230,7 +230,7 @@
           {% for row in telephony_calls %}
             <tr>
               <td class="telephony-account-cell"><strong>{{ row.account_label }}</strong><small>{{ row.operator_name }}</small></td>
-              <td class="telephony-call-client"><strong data-telephony-search-highlight>{{ row.client }}</strong><small>{{ row.note or "-" }}</small></td>
+              <td class="telephony-call-client"><button type="button" class="telephony-call-client-button" data-telephony-call-client data-phone="{{ row.phone }}" data-name="{{ row.client }}" title="Открыть карточку клиента"><strong data-telephony-search-highlight>{{ row.client }}</strong></button><small>{{ row.note or "-" }}</small></td>
               <td
                 class="telephony-call-phone"
                 data-telephony-search-highlight
@@ -669,8 +669,14 @@
         <form method="post" action="/telephony/contacts/confirm" class="product-form" data-telephony-contact-form>
           {% include "_csrf_field.html" %}
           <input type="hidden" name="contact_id" data-telephony-contact-id />
+          <input type="hidden" name="return_to" value="numbers" data-telephony-contact-return />
           <label><span>Имя клиента</span><input name="name" required data-telephony-contact-name /></label>
           <label><span>Номер телефона</span><input name="phone" required placeholder="+998 ..." data-telephony-contact-phone /></label>
+          <label><span>Дополнительные номера (по одному в строке)</span><textarea name="extra_phones" rows="3" placeholder="+998 ..." data-telephony-contact-extra-phones></textarea></label>
+          <label><span>Категория</span><input name="category" data-telephony-contact-category-field /></label>
+          <label><span>Email</span><input name="email" type="email" data-telephony-contact-email /></label>
+          <label><span>Адрес</span><input name="address" data-telephony-contact-address /></label>
+          <label><span>Заметка</span><textarea name="note" rows="3" data-telephony-contact-note></textarea></label>
           <button class="btn" type="submit" data-telephony-contact-save>Подтвердить и сохранить</button>
         </form>
         <dl class="telephony-contact-summary">
