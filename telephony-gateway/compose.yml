@@ -5,6 +5,7 @@ services:
     network_mode: host
     env_file: ./runtime/gateway.env
     volumes:
+      - ./entrypoint.py:/opt/upos-gateway/entrypoint.py:ro
       - ./runtime/asterisk:/var/lib/asterisk/upos-gateway
     healthcheck:
       test: ["CMD", "asterisk", "-rx", "core show uptime"]
