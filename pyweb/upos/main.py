@@ -18485,6 +18485,7 @@ def create_app() -> FastAPI:
         "answered": "Отвечен",
         "missed": "Пропущен",
         "planned": "Запланирован",
+        "forwarded": "Переадресован",
         "blocked": "Заблокирован",
     }
     TELEPHONY_NUMBER_STATUS = {
@@ -19205,6 +19206,8 @@ def create_app() -> FastAPI:
             return "answered"
         if compact in {"missed", "no_answer", "noanswer", "busy", "failed", "fail", "cancelled", "canceled", "rejected", "abandoned"}:
             return "missed"
+        if compact in {"forwarded", "redirected"}:
+            return "forwarded"
         if compact in {"blocked", "blacklist", "forbidden"}:
             return "blocked"
         duration = str(_telephony_first(payload, "duration", "duration_sec", "billsec", "seconds")).strip()
@@ -20815,6 +20818,7 @@ def create_app() -> FastAPI:
             "answered": sum(1 for item in calls_without_status_filter if item.get("status") == "answered"),
             "missed": sum(1 for item in calls_without_status_filter if item.get("status") == "missed"),
             "planned": sum(1 for item in calls_without_status_filter if item.get("status") == "planned"),
+            "forwarded": sum(1 for item in calls_without_status_filter if item.get("status") == "forwarded"),
             "blocked": sum(1 for item in calls_without_status_filter if item.get("status") == "blocked"),
         }
         calls_without_direction_filter = _telephony_filter_rows(
@@ -21907,8 +21911,11 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": False, "error": "invalid_phone"}, status_code=400)
         direction = str(body.get("direction") or "").strip()
         status = str(body.get("status") or "").strip()
-        if direction not in {"incoming", "outgoing"} or status not in {"planned", "answered", "missed"}:
+        if direction not in {"incoming", "outgoing"} or status not in {"planned", "answered", "missed", "forwarded"}:
             return JSONResponse({"ok": False, "error": "invalid_state"}, status_code=400)
+        forwarded_to = str(body.get("forwarded_to") or "").strip() if status == "forwarded" else ""
+        if status == "forwarded" and (direction != "incoming" or not re.fullmatch(r"\+?\d{2,15}", forwarded_to)):
+            return JSONResponse({"ok": False, "error": "invalid_forward_target"}, status_code=400)
         try:
             call_id = str(uuid.UUID(str(body.get("call_id") or "")))
         except (ValueError, AttributeError):
@@ -21936,6 +21943,7 @@ def create_app() -> FastAPI:
             "started_at": str(body.get("started_at") or "")[:40],
             "ended_at": datetime.now(timezone.utc).isoformat() if status != "planned" else "",
             "event": "browser_call",
+            "note": f"Переадресован на {forwarded_to}" if forwarded_to else "",
         }
         call = _telephony_upsert_call_from_payload(wid, call_payload)
         return JSONResponse({"ok": True, "call_id": call_id, "status": call.get("status")})

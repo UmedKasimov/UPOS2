@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const SOFTPHONE_VERSION = "13";
+  const SOFTPHONE_VERSION = "14";
   const listeners = {};
   function emit(event, detail) {
     (listeners[event] || []).forEach((fn) => {
@@ -674,6 +674,24 @@
       if (!session) return false;
       try { session.terminate({status_code: 486, reason_phrase: "Busy Here"}); } catch (_e) { session = null; }
       return true;
+    },
+
+    redirectIncoming(number) {
+      if (!session || session.direction !== "incoming" || session.isEstablished?.() || !account?.host) return false;
+      const destination = String(number || "").replace(/[\s().-]/g, "");
+      if (!/^\+?\d{2,15}$/.test(destination)) return false;
+      try {
+        session.terminate({
+          status_code: 302,
+          reason_phrase: "Moved Temporarily",
+          extraHeaders: [`Contact: <sip:${destination}@${account.host}>`],
+        });
+        diagnostic("incoming_redirect", {destinationDigits: destination.replace(/\D/g, "").length});
+        return true;
+      } catch (error) {
+        diagnostic("incoming_redirect_failed", {name: error?.name, message: error?.message});
+        return false;
+      }
     },
 
     hangup() {

@@ -42,6 +42,10 @@
   const clientLink = root.querySelector("[data-floating-phone-client-link]");
   const answerButton = root.querySelector("[data-floating-phone-answer]");
   const rejectButton = root.querySelector("[data-floating-phone-reject]");
+  const redirectToggle = root.querySelector("[data-floating-phone-redirect-toggle]");
+  const redirectForm = root.querySelector("[data-floating-phone-redirect-form]");
+  const redirectInput = redirectForm?.querySelector("input");
+  const redirectCancel = root.querySelector("[data-floating-phone-redirect-cancel]");
   const bridgeUrl = root.dataset.floatingPhoneBridge || "http://127.0.0.1:5058/call";
 
   /* ── Положение и раскрытие панели (поведение прежнее) ───────────────── */
@@ -324,7 +328,7 @@
       const name = document.createElement("strong");
       name.textContent = knownClient?.name || (call.name && !/^Контакт \+?\d+$/i.test(call.name) ? call.name : call.phone);
       const meta = document.createElement("small");
-      const statusLabel = {answered: "Отвечен", missed: "Пропущен", planned: "Запланирован"}[call.status] || "Звонок";
+      const statusLabel = {answered: "Отвечен", missed: "Пропущен", planned: "Запланирован", forwarded: "Переадресован"}[call.status] || "Звонок";
       meta.textContent = `${call.phone} · ${formatCallTime(call.started_at)} · ${statusLabel}`;
       details.append(name, meta);
       dial.append(icon, details);
@@ -466,6 +470,7 @@
   let ringTimer = null;
   let ringContext = null;
   let incomingLookupId = 0;
+  let redirecting = false;
 
   function recordBrowserCall(status, call) {
     if (!call) return;
@@ -499,11 +504,23 @@
     recordBrowserCall("planned", activeCall);
   }
 
-  function finishBrowserCall() {
+  function finishBrowserCall(status = "") {
     if (!activeCall) return;
-    recordBrowserCall(activeCall.answeredAt ? "answered" : "missed", activeCall);
+    recordBrowserCall(status || (activeCall.answeredAt ? "answered" : "missed"), activeCall);
     activeCall = null;
   }
+
+  function unlockRingtone() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    try {
+      ringContext = ringContext || new AudioContext();
+      if (ringContext.state !== "running") ringContext.resume().catch(() => {});
+    } catch (_error) { /* Browser audio may require a later gesture. */ }
+  }
+
+  document.addEventListener("pointerdown", unlockRingtone);
+  document.addEventListener("keydown", unlockRingtone);
 
   function ringOnce() {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -545,6 +562,8 @@
     const active = Boolean(event);
     if (incomingPanel) incomingPanel.hidden = !active;
     if (incomingCaller && active) incomingCaller.textContent = event.name || event.from || "Неизвестный номер";
+    if (!active && redirectForm) redirectForm.hidden = true;
+    if (!active && redirectInput) redirectInput.value = "";
     if (clientLink && (active || !inCall)) clientLink.hidden = true;
     if (submitButton) submitButton.disabled = active || inCall;
     if (!active) {
@@ -678,6 +697,7 @@
     });
     sip.on("incoming", (event) => {
       inCall = true;
+      redirecting = false;
       beginBrowserCall("incoming", event?.from);
       if (input && event?.from) input.value = String(event.from);
       switchView("dial");
@@ -690,17 +710,20 @@
       setStatus(`Входящий: ${event?.name || event?.from || "неизвестный"}`, "pending");
     });
     sip.on("ended", () => {
-      finishBrowserCall();
+      finishBrowserCall(redirecting ? "forwarded" : "");
       inCall = false;
       setIncomingUi(null);
-      setStatus("Звонок завершён", "ready");
+      setStatus(redirecting ? "Запрос переадресации отправлен" : "Звонок завершён", "ready");
+      redirecting = false;
       setCallUi(false);
     });
     sip.on("failed", (event) => {
-      finishBrowserCall();
+      finishBrowserCall(redirecting ? "forwarded" : "");
       inCall = false;
       setIncomingUi(null);
-      setStatus(`Звонок не состоялся: ${event?.cause || "ошибка"}`, "error");
+      if (redirecting) setStatus("Запрос переадресации отправлен", "ready");
+      else setStatus(`Звонок не состоялся: ${event?.cause || "ошибка"}`, "error");
+      redirecting = false;
       setCallUi(false);
     });
   }
@@ -737,7 +760,7 @@
       }
       fillProviders();
       await loadScript("/static/jssip.min.js?v=1");
-      await loadScript("/static/installer-softphone.js?v=14");
+      await loadScript("/static/installer-softphone.js?v=15");
       const sip = window.UposSoftphone;
       if (!sip || !sip.available()) {
         setStatus("Софтфон не загрузился — вызов уйдёт в приложение", "error");
@@ -798,11 +821,18 @@
     muteButton.textContent = muted ? "Включить микрофон" : "Выключить микрофон";
   });
 
-  answerButton?.addEventListener("click", () => {
-    if (!window.UposSoftphone?.answer()) return;
-    setIncomingUi(null);
-    setCallUi(true);
-    setStatus("Соединяю разговор…", "pending");
+  answerButton?.addEventListener("click", async () => {
+    answerButton.disabled = true;
+    try {
+      if (!await window.UposSoftphone?.answer()) throw new Error("Нет активного входящего звонка");
+      setIncomingUi(null);
+      setCallUi(true);
+      setStatus(activeCall?.answeredAt ? "Разговор идёт" : "Соединяю разговор…", activeCall?.answeredAt ? "ok" : "pending");
+    } catch (_error) {
+      setStatus("Не удалось принять звонок — проверьте доступ к микрофону", "error");
+    } finally {
+      answerButton.disabled = false;
+    }
   });
 
   rejectButton?.addEventListener("click", () => {
@@ -813,6 +843,40 @@
     setIncomingUi(null);
     setCallUi(false);
     setStatus("Входящий звонок отклонён", "ready");
+  });
+
+  redirectToggle?.addEventListener("click", () => {
+    if (!redirectForm || !inCall) return;
+    redirectForm.hidden = false;
+    redirectInput?.focus();
+    window.requestAnimationFrame(alignPanel);
+  });
+  redirectCancel?.addEventListener("click", () => {
+    redirectForm.hidden = true;
+    window.requestAnimationFrame(alignPanel);
+  });
+  redirectForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const destination = String(redirectInput?.value || "").trim();
+    const normalized = destination.replace(/[\s().-]/g, "");
+    if (!/^\+?\d{2,15}$/.test(normalized)) {
+      setStatus("Введите внутренний или телефонный номер", "error");
+      redirectInput?.focus();
+      return;
+    }
+    redirecting = true;
+    if (activeCall) activeCall.forwarded_to = normalized;
+    if (!window.UposSoftphone?.redirectIncoming?.(normalized)) {
+      redirecting = false;
+      if (activeCall) delete activeCall.forwarded_to;
+      setStatus("Не удалось переадресовать звонок — проверьте SIP-линию", "error");
+      return;
+    }
+    finishBrowserCall("forwarded");
+    inCall = false;
+    setIncomingUi(null);
+    setCallUi(false);
+    setStatus("Запрос переадресации отправлен", "ready");
   });
 
   /* ── Набор номера ──────────────────────────────────────────────────── */

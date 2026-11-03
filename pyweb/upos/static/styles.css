@@ -32217,6 +32217,41 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   min-width: 0;
 }
 
+.upos-floating-phone-incoming-actions [data-floating-phone-redirect-toggle] {
+  grid-column: 1 / -1;
+}
+
+.upos-floating-phone-redirect {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.upos-floating-phone-redirect[hidden] {
+  display: none;
+}
+
+.upos-floating-phone-redirect input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  color: #14532d;
+}
+
+.upos-floating-phone-redirect > div {
+  display: flex;
+  gap: 6px;
+}
+
+.upos-floating-phone-redirect .btn {
+  flex: 1;
+  min-width: 0;
+}
+
 #upos-floating-phone-audio {
   display: none;
 }
@@ -32731,6 +32766,11 @@ body.is-sidebar-collapsed .upos-floating-phone,
   color: #1d4ed8;
 }
 
+.telephony-calls-table .telephony-call-status-cell--forwarded {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .telephony-calls-table .telephony-call-status-cell--unknown {
   background: #f1f5f9;
   color: #475569;
@@ -33062,6 +33102,12 @@ html.dark .telephony-calls-table .telephony-call-status-cell--planned,
 html.dark .telephony-calls-table th:nth-child(7) {
   background: color-mix(in srgb, var(--primary), var(--card) 86%);
   color: #93c5fd;
+}
+
+html.dark .telephony-status-filter--forwarded,
+html.dark .telephony-calls-table .telephony-call-status-cell--forwarded {
+  background: color-mix(in srgb, #16a34a, var(--card) 86%);
+  color: #86efac;
 }
 
 html.dark .client-location-map .leaflet-control-zoom a,

@@ -7,7 +7,7 @@
 {% set telephony_devices = telephony_devices|default([]) %}
 {% set telephony_recordings = telephony_recordings|default([]) %}
 {% set telephony_dashboard = telephony_dashboard|default({}) %}
-{% set telephony_status_counts = telephony_status_counts|default({'all': 0, 'answered': 0, 'missed': 0, 'planned': 0, 'blocked': 0}) %}
+{% set telephony_status_counts = telephony_status_counts|default({'all': 0, 'answered': 0, 'missed': 0, 'planned': 0, 'forwarded': 0, 'blocked': 0}) %}
 {% set telephony_direction_counts = telephony_direction_counts|default({'all': 0, 'incoming': 0, 'outgoing': 0}) %}
 
 <div class="business-module-toolbar" data-workspace-view="dashboard calls numbers integrations" hidden>
@@ -38,6 +38,7 @@
       <option value="answered" {% if telephony_filters.status == 'answered' %}selected{% endif %}>Отвечен</option>
       <option value="missed" {% if telephony_filters.status == 'missed' %}selected{% endif %}>Пропущен</option>
       <option value="planned" {% if telephony_filters.status == 'planned' %}selected{% endif %}>Запланирован</option>
+      <option value="forwarded" {% if telephony_filters.status == 'forwarded' %}selected{% endif %}>Переадресован</option>
       <option value="blocked" {% if telephony_filters.status == 'blocked' %}selected{% endif %}>Заблокирован</option>
     </select>
   </label>
@@ -197,6 +198,7 @@
       <button type="submit" name="status" value="answered" class="telephony-status-filter telephony-status-filter--answered{% if telephony_filters.status == 'answered' %} is-active{% endif %}">Отвеченные <strong>{{ telephony_status_counts.answered }}</strong></button>
       <button type="submit" name="status" value="missed" class="telephony-status-filter telephony-status-filter--missed{% if telephony_filters.status == 'missed' %} is-active{% endif %}">Пропущенные <strong>{{ telephony_status_counts.missed }}</strong></button>
       <button type="submit" name="status" value="planned" class="telephony-status-filter telephony-status-filter--planned{% if telephony_filters.status == 'planned' %} is-active{% endif %}">Запланированные <strong>{{ telephony_status_counts.planned }}</strong></button>
+      <button type="submit" name="status" value="forwarded" class="telephony-status-filter telephony-status-filter--forwarded{% if telephony_filters.status == 'forwarded' %} is-active{% endif %}">Переадресованные <strong>{{ telephony_status_counts.forwarded }}</strong></button>
       <button type="submit" name="status" value="blocked" class="telephony-status-filter telephony-status-filter--blocked{% if telephony_filters.status == 'blocked' %} is-active{% endif %}">Заблокированные <strong>{{ telephony_status_counts.blocked }}</strong></button>
     </form>
     <form class="telephony-status-filters telephony-direction-filters" method="get" action="/telephony#calls" aria-label="Фильтр звонков по направлению">
