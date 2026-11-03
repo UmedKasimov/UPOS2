@@ -43,6 +43,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
 from upos.telephony_access import sip_provider_assigned_to
+from upos.ivr_routing import validate_ivr_form
 from upos.telephony_recording_delivery import enqueue_recording
 from upos.config import get_settings
 from upos.csrf import csrf_matches_session, ensure_csrf_token, rotate_csrf_token
@@ -20772,6 +20773,7 @@ def create_app() -> FastAPI:
         user_name = _telephony_user_name(request)
         data = _telephony_settings_payload(wid)
         integration_context = _telephony_integration_context(request, wid, data)
+        ivr = data.get("telephony_ivr") if isinstance(data.get("telephony_ivr"), dict) else {}
         providers = _telephony_provider_rows(data)
         if not _telephony_can_manage_providers(request):
             session_user = request.session.get("user") or {}
@@ -20864,6 +20866,8 @@ def create_app() -> FastAPI:
             telephony_recordings=recordings,
             telephony_dashboard=telephony_account_dashboard(wid),
             telephony_integration=integration_context,
+            telephony_ivr=ivr,
+            telephony_ivr_routes={str(route.get("digit")): route for route in ivr.get("routes", []) if isinstance(route, dict)},
             telephony_staff=telephony_staff,
             telephony_can_manage_providers=_telephony_can_manage_providers(request),
             flash_ok=request.query_params.get("msg"),
@@ -20882,7 +20886,11 @@ def create_app() -> FastAPI:
         folder = Path(__file__).resolve().parent / "chrome_extension"
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
-            for name in ("manifest.json", "background.js", "upos-tab.js", "README.md"):
+            for name in (
+                "manifest.json", "background.js", "offscreen.html", "offscreen.js",
+                "popup.html", "popup.css", "popup.js", "icon.png",
+                "jssip.min.js", "softphone.js", "README.md",
+            ):
                 zipped.write(folder / name, arcname=name)
         return Response(
             archive.getvalue(),
@@ -20953,6 +20961,28 @@ def create_app() -> FastAPI:
             },
         )
         return RedirectResponse(url="/telephony?msg=saved#numbers", status_code=302)
+
+    @app.post("/telephony/ivr/save", name="telephony_ivr_save")
+    async def telephony_ivr_save(request: Request):
+        form = await request.form()
+        if not csrf_matches_session(request, str(form.get("csrf_token") or "")):
+            return RedirectResponse(url="/telephony?err=csrf#integrations", status_code=302)
+        wid, redir = _product_workspace_owner(request)
+        if redir:
+            return redir
+        assert wid is not None
+        if not _telephony_can_manage_providers(request):
+            return RedirectResponse(url="/telephony?error=" + quote("Нет доступа к настройке маршрутизации") + "#integrations", status_code=302)
+        try:
+            ivr = validate_ivr_form(form)
+        except ValueError as exc:
+            return RedirectResponse(url="/telephony?error=" + quote(str(exc)) + "#integrations", status_code=302)
+        ivr["updated_at"] = datetime.now(timezone.utc).isoformat()
+        ivr["updated_by"] = _telephony_user_name(request)
+        data = _telephony_settings_payload(wid)
+        data["telephony_ivr"] = ivr
+        save_workspace_settings(wid, data)
+        return RedirectResponse(url="/telephony?msg=saved#integrations", status_code=302)
 
     @app.post("/telephony/contacts/confirm", name="telephony_contact_confirm")
     async def telephony_contact_confirm(request: Request):

@@ -1,16 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "U-POS: звонок из Chrome",
-  "version": "0.1.0",
-  "description": "Отправляет выделенный номер в телефон U-POS для подтверждения звонка.",
-  "permissions": ["contextMenus", "tabs"],
+  "minimum_chrome_version": "116",
+  "name": "U-POS Телефон",
+  "version": "0.2.0",
+  "description": "SIP-звонки в отдельном виджете Chrome при закрытой вкладке U-POS.",
+  "permissions": ["contextMenus", "tabs", "storage", "offscreen", "notifications", "alarms"],
   "host_permissions": ["https://app.u-pos.uz/*"],
-  "background": { "service_worker": "background.js" },
-  "content_scripts": [
-    {
-      "matches": ["https://app.u-pos.uz/*"],
-      "js": ["upos-tab.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  "background": {"service_worker": "background.js"},
+  "action": {"default_title": "U-POS Телефон", "default_popup": "popup.html", "default_icon": "icon.png"}
 }

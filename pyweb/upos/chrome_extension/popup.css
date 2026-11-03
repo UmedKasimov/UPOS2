@@ -1,0 +1,30 @@
+:root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; background: #0c1018; color: #f4f7ff; }
+* { box-sizing: border-box; }
+body { width: 344px; min-height: 350px; margin: 0; }
+main { padding: 18px; }
+header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.logo { color: #6ba6ff; font-size: 16px; font-weight: 900; letter-spacing: -.03em; }
+.phase { margin-left: auto; padding: 3px 8px; border-radius: 99px; background: #1b2433; color: #a9bad3; font-size: 11px; }
+.phase.ready { color: #8ee7aa; background: #173424; }
+.phase.incoming { color: #a4f1b8; background: #155c32; }
+.phase.active { color: #a7cbff; background: #1d3a65; }
+.message { min-height: 20px; color: #aebbd1; margin: 0 0 16px; }
+.stack { display: grid; gap: 12px; }
+label { display: grid; gap: 5px; color: #cbd6e7; font-size: 12px; font-weight: 650; }
+input { width: 100%; border: 1px solid #39475b; border-radius: 9px; background: #171d27; color: #fff; padding: 10px 11px; font: inherit; outline: none; }
+input:focus { border-color: #6ba6ff; box-shadow: 0 0 0 2px #4d88f344; }
+button { border: 1px solid #43516a; border-radius: 9px; background: #242e3e; color: #fff; padding: 10px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+button:hover { filter: brightness(1.13); }
+button:disabled { opacity: .5; cursor: wait; }
+button.primary { width: 100%; border-color: #3677d8; background: #2869cf; }
+button.accept { flex: 1; border-color: #18844c; background: #166638; }
+button.danger { flex: 1; border-color: #a73b48; background: #822a37; }
+small { color: #8796ae; font-size: 11px; }
+.line { display: flex; align-items: center; gap: 7px; margin-bottom: 16px; color: #9baac2; }
+.line strong { color: #fff; }
+.line button { margin-left: auto; padding: 5px 8px; font-size: 11px; }
+.number-label { margin-bottom: 10px; }
+.number-label input { font-size: 18px; font-weight: 750; }
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+.redirect { display: grid; gap: 9px; margin-top: 16px; padding-top: 15px; border-top: 1px solid #293447; }
+.site-link { display: block; margin-top: 18px; color: #78aaff; font-size: 12px; text-decoration: none; }

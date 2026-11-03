@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>U-POS Телефон</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header><span class="logo">U-POS</span><strong>Телефон</strong><span id="phase" class="phase">Отключён</span></header>
+    <p id="message" class="message" role="status">Подключите SIP-линию для работы без вкладки U-POS.</p>
+    <form id="login-form" class="stack">
+      <label>Аккаунт организации<input id="account-id" required autocomplete="organization" placeholder="UPOS2026"></label>
+      <label>Логин SIP<input id="sip-login" required autocomplete="username" placeholder="210"></label>
+      <label>Пароль SIP<input id="sip-password" required type="password" autocomplete="current-password"></label>
+      <button type="submit" class="primary">Подключить линию</button>
+      <small>Микрофон будет запрошен при подключении. Данные линии хранятся только до закрытия Chrome.</small>
+    </form>
+    <section id="phone" hidden>
+      <div class="line"><span>Линия</span><strong id="line-label"></strong><button id="logout" type="button">Отключить</button></div>
+      <label class="number-label">Номер телефона<input id="number" type="tel" inputmode="tel" placeholder="+998 …"></label>
+      <button id="dial" type="button" class="primary">Позвонить</button>
+      <div id="incoming" class="actions" hidden>
+        <button id="answer" type="button" class="accept">Принять</button>
+        <button id="reject" type="button" class="danger">Отклонить</button>
+      </div>
+      <div id="call-actions" class="actions" hidden>
+        <button id="hangup" type="button" class="danger">Завершить</button>
+      </div>
+      <form id="redirect-form" class="redirect" hidden>
+        <label>Переадресовать на внутренний или обычный номер<input id="redirect-number" type="tel" placeholder="+998 … или 211"></label>
+        <button type="submit">Переадресовать</button>
+        <small>Сработает, если АТС разрешает SIP-переадресацию.</small>
+      </form>
+    </section>
+    <a class="site-link" href="https://app.u-pos.uz/telephony#calls" target="_blank" rel="noopener">Открыть журнал звонков ↗</a>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

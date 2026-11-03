@@ -2,6 +2,52 @@
   min-height: min(45rem, calc(100vh - 9rem));
 }
 
+.telephony-ivr-panel {
+  margin: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.telephony-ivr-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.telephony-ivr-panel h3,
+.telephony-ivr-panel p { margin: 0 0 .35rem; }
+
+.telephony-ivr-pending {
+  flex: none;
+  padding: .3rem .6rem;
+  border-radius: 99px;
+  background: #603c13;
+  color: #ffe1a5;
+  font-size: .75rem;
+  font-weight: 800;
+}
+
+.telephony-ivr-notice { margin: .6rem 0 1rem !important; color: var(--muted-foreground); }
+.telephony-ivr-form { display: grid; gap: 1rem; }
+.telephony-ivr-routes { overflow-x: auto; }
+.telephony-ivr-route-head,
+.telephony-ivr-route {
+  display: grid;
+  grid-template-columns: 3.5rem 9rem minmax(12rem, 1fr) 7rem 12rem 9rem;
+  align-items: center;
+  gap: .45rem;
+  min-width: 68rem;
+  padding: .4rem 0;
+}
+.telephony-ivr-route-head { color: var(--muted-foreground); font-size: .75rem; font-weight: 700; }
+.telephony-ivr-route { border-top: 1px solid var(--border); }
+.telephony-ivr-route strong { font-size: 1rem; text-align: center; }
+.telephony-ivr-route input,
+.telephony-ivr-route select { width: 100%; min-width: 0; }
+
 .telephony-contacts-head b {
   color: var(--foreground);
 }
