@@ -22067,10 +22067,11 @@ def create_app() -> FastAPI:
                 body.get("event"), body.get("status_code"), body.get("cause"))
         except ValueError:
             return JSONResponse({"ok": False, "error": "invalid_event"}, status_code=400)
-        logger.info(
-            "[telephony] browser_sip workspace=%s provider=%s tab=%s event=%s code=%s cause=%s",
-            wid, provider_id, tab_id[:8], event, status_code, cause,
-        )
+        if event != "heartbeat":
+            logging.getLogger("uvicorn.error").info(
+                "[telephony] browser_sip workspace=%s provider=%s tab=%s event=%s code=%s cause=%s",
+                wid, provider_id, tab_id[:8], event, status_code, cause,
+            )
         return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/telephony/browser-recording", name="telephony_browser_recording_api")
