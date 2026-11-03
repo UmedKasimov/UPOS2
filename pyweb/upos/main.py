@@ -20920,7 +20920,7 @@ def create_app() -> FastAPI:
             for name in (
                 "manifest.json", "background.js", "offscreen.html", "offscreen.js",
                 "popup.html", "popup.css", "popup.js", "icon.png",
-                "jssip.min.js", "softphone.js", "site-bridge.js", "README.md",
+                "jssip.min.js", "softphone.js", "site-bridge.js", "overlay.js", "README.md",
             ):
                 zipped.write(folder / name, arcname=name)
         return Response(

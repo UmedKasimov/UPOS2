@@ -34,14 +34,40 @@ async function sendToPhone(command) {
   return chrome.runtime.sendMessage({target: "offscreen", ...command});
 }
 
-async function showPhoneWindow() {
+async function openStandaloneWindow() {
   const base = chrome.runtime.getURL("popup.html");
   const url = `${base}?setup=1`;
   const windows = await chrome.windows.getAll({populate: true});
   const existing = windows.find((window) => window.type === "popup" &&
     window.tabs?.some((tab) => tab.url?.startsWith(`${base}?setup=1`)));
   if (existing) return chrome.windows.update(existing.id, {focused: true});
-  return chrome.windows.create({url, type: "popup", width: 370, height: 560});
+  return chrome.windows.create({url, type: "popup", width: 430, height: 760});
+}
+
+async function showPhoneWindow() {
+  const normalWindow = await chrome.windows.getLastFocused({populate: true, windowTypes: ["normal"]});
+  const tab = normalWindow?.tabs?.find((item) => item.active);
+  if (tab?.id && /^https?:\/\//.test(tab.url || "")) {
+    try {
+      const result = await chrome.tabs.sendMessage(tab.id, {type: "upos:open-overlay"});
+      if (result?.ok) return result;
+    } catch (_) {
+      /* The content script has not loaded in this tab. */
+    }
+    try {
+      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["overlay.js"]});
+      const result = await chrome.tabs.sendMessage(tab.id, {type: "upos:open-overlay"});
+      if (result?.ok) return result;
+    } catch (_) { /* This tab does not allow extension injection. */ }
+  }
+  return openStandaloneWindow();
+}
+
+async function installOverlayInOpenTabs() {
+  const tabs = await chrome.tabs.query({url: ["http://*/*", "https://*/*"]});
+  await Promise.all(tabs.map((tab) => chrome.scripting.executeScript({
+    target: {tabId: tab.id}, files: ["overlay.js"],
+  }).catch(() => {})));
 }
 
 async function resumePhone() {
@@ -172,6 +198,7 @@ chrome.runtime.onInstalled.addListener(() => {
   void chrome.contextMenus.removeAll().then(() => {
     chrome.contextMenus.create({id: MENU_ID, title: "Позвонить через U-POS", contexts: ["selection"]});
   });
+  void installOverlayInOpenTabs();
 });
 chrome.runtime.onStartup.addListener(() => { void resumePhone().catch(() => {}); });
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -208,7 +235,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "pairFromSite") return pairFromSite();
     if (message.type === "retry") return resumePhone();
     if (message.type === "logout") return logout();
-    if (["dial", "answer", "reject", "redirect", "hangup", "dtmf"].includes(message.type)) return sendToPhone(message);
+    if (["dial", "answer", "reject", "redirect", "hangup", "dtmf", "mute"].includes(message.type)) return sendToPhone(message);
+    if (message.type === "openWindow") return showPhoneWindow().then(() => ({ok: true}));
+    if (message.type === "openFallbackWindow") return openStandaloneWindow().then(() => ({ok: true}));
     return {ok: false, error: "unknown_action"};
   })().then(sendResponse, (error) => sendResponse({ok: false, error: error?.message || "Ошибка подключения"}));
   return true;

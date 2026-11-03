@@ -2,11 +2,15 @@
   "manifest_version": 3,
   "minimum_chrome_version": "116",
   "name": "U-POS Телефон",
-  "version": "0.4.2",
-  "description": "SIP-звонки в отдельном виджете Chrome при закрытой вкладке U-POS.",
+  "version": "0.5.0",
+  "description": "Плавающий SIP-телефон поверх вкладок Chrome при закрытом сайте U-POS.",
   "permissions": ["contextMenus", "tabs", "storage", "offscreen", "notifications", "alarms", "scripting"],
   "host_permissions": ["https://app.u-pos.uz/*"],
-  "content_scripts": [{"matches": ["https://app.u-pos.uz/*"], "js": ["site-bridge.js"], "run_at": "document_start"}],
+  "content_scripts": [
+    {"matches": ["https://app.u-pos.uz/*"], "js": ["site-bridge.js"], "run_at": "document_start"},
+    {"matches": ["http://*/*", "https://*/*"], "js": ["overlay.js"], "run_at": "document_idle"}
+  ],
+  "web_accessible_resources": [{"resources": ["popup.html", "popup.css", "popup.js"], "matches": ["http://*/*", "https://*/*"]}],
   "background": {"service_worker": "background.js"},
   "action": {"default_title": "U-POS Телефон", "default_popup": "popup.html", "default_icon": "icon.png"}
 }

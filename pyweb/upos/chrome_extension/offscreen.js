@@ -126,7 +126,7 @@
     if (recorder?.state === "recording") recorder.stop();
     recorder = null;
     if (call) void syncCall(status || (call.answeredAt ? "answered" : "missed"), call);
-    publish({phase: softphone.isRegistered() ? "ready" : "offline", phone: ""});
+    publish({phase: softphone.isRegistered() ? "ready" : "offline", phone: "", muted: false});
   }
 
   softphone.on("registered", () => publish({phase: "ready", message: "Линия подключена"}));
@@ -142,7 +142,7 @@
   softphone.on("accepted", () => {
     stopRing();
     if (currentCall) currentCall.answeredAt = Date.now();
-    publish({phase: "active", message: "Разговор"});
+    publish({phase: "active", message: "Разговор", muted: false});
     void softphone.resumeRemoteAudio();
     startRecording();
   });
@@ -189,12 +189,17 @@
         return {ok: true};
       case "dtmf":
         return {ok: softphone.sendDtmf(message.digit)};
+      case "mute":
+        if (!softphone.inCall()) throw new Error("Нет активного разговора");
+        softphone.setMuted(Boolean(message.muted));
+        publish({muted: Boolean(message.muted)});
+        return {ok: true, muted: Boolean(message.muted)};
       case "disconnect":
         stopRing();
         softphone.disconnect();
         credentials = null;
         currentCall = null;
-        publish({phase: "offline", phone: "", message: "Отключено"});
+        publish({phase: "offline", phone: "", muted: false, message: "Отключено"});
         return {ok: true};
       default:
         throw new Error("Неизвестное действие");
