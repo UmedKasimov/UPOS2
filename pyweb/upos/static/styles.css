@@ -31875,6 +31875,14 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   overflow-y: auto;
 }
 
+.upos-floating-phone-view[data-floating-phone-view="dial"] {
+  scrollbar-width: none;
+}
+
+.upos-floating-phone-view[data-floating-phone-view="dial"]::-webkit-scrollbar {
+  display: none;
+}
+
 .upos-floating-phone-view[data-floating-phone-view="history"]:not([hidden]) {
   display: flex;
   flex-direction: column;
