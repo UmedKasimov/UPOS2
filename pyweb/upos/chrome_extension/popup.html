@@ -9,8 +9,13 @@
 <body>
   <main>
     <header><span class="logo">U-POS</span><strong>Телефон</strong><span id="phase" class="phase">Отключён</span></header>
-    <p id="message" class="message" role="status">Подключите SIP-линию для работы без вкладки U-POS.</p>
-    <form id="login-form" class="stack">
+    <p id="message" class="message" role="status">Подключите линию из U-POS.</p>
+    <section id="pair-panel" class="pair-panel">
+      <button id="pair-site" type="button" class="primary">Подключить из открытой U-POS</button>
+      <small>Войдите в U-POS один раз. После статуса «На линии» вкладку сайта можно закрыть.</small>
+      <button id="show-manual" type="button" class="link-button">Ввести SIP-данные вручную</button>
+    </section>
+    <form id="login-form" class="stack" hidden>
       <label>Аккаунт организации<input id="account-id" required autocomplete="organization" placeholder="UPOS2026"></label>
       <label>Логин SIP<input id="sip-login" required autocomplete="username" placeholder="210"></label>
       <label>Пароль SIP<input id="sip-password" required type="password" autocomplete="current-password"></label>
@@ -19,6 +24,7 @@
     </form>
     <section id="phone" hidden>
       <div class="line"><span>Линия</span><strong id="line-label"></strong><button id="logout" type="button">Отключить</button></div>
+      <button id="retry" type="button" hidden>Переподключить линию</button>
       <label class="number-label">Номер телефона<input id="number" type="tel" inputmode="tel" placeholder="+998 …"></label>
       <button id="dial" type="button" class="primary">Позвонить</button>
       <section id="incoming" class="incoming-call" hidden aria-live="assertive">

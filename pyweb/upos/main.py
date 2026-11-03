@@ -19179,6 +19179,34 @@ def create_app() -> FastAPI:
             )
         return JSONResponse({"ok": True, "accounts": accounts})
 
+    @app.get("/api/telephony/extension-session", name="telephony_extension_session_api")
+    def telephony_extension_session_api(request: Request):
+        """Pair the Chrome phone from an already authenticated U-POS tab."""
+        denied = _employee_module_denied(request, "telephony", json_error=True)
+        if denied is not None:
+            return denied
+        wid, err = _product_workspace_owner(request)
+        if err:
+            return JSONResponse({"ok": False, "error": "login_required"}, status_code=401)
+        assert wid is not None
+        data = load_workspace_settings(wid)
+        user = request.session.get("user") or {}
+        accounts = [browser_gateway_account(account) for account in _telephony_sip_accounts_for_softphone(
+            data, employee_user_id=_session_user_id(user), employee_name=_telephony_user_name(request), owner_user_id=wid
+        )]
+        for item in accounts:
+            item["ws_url"] = item.get("ws_url") or _installer_sip_ws_url(str(item.get("host") or ""), "")
+        account = next((item for item in accounts if str(item.get("extension") or "").isdigit()), None)
+        if account is None:
+            account = accounts[0] if accounts else None
+        if not account or not account.get("ws_url") or not account.get("password"):
+            return JSONResponse({"ok": False, "error": "sip_line_unavailable"}, status_code=404)
+        integration = _telephony_integration_context(request, wid, data)
+        return JSONResponse({
+            "ok": True, "workspace_owner_id": wid, "token": integration["token"],
+            "account": account,
+        }, headers={"Cache-Control": "no-store"})
+
     def _telephony_first(payload: dict[str, Any], *keys: str) -> Any:
         for key in keys:
             value = payload.get(key)
@@ -20892,7 +20920,7 @@ def create_app() -> FastAPI:
             for name in (
                 "manifest.json", "background.js", "offscreen.html", "offscreen.js",
                 "popup.html", "popup.css", "popup.js", "icon.png",
-                "jssip.min.js", "softphone.js", "README.md",
+                "jssip.min.js", "softphone.js", "site-bridge.js", "README.md",
             ):
                 zipped.write(folder / name, arcname=name)
         return Response(

@@ -475,6 +475,7 @@
   let registrationRecovery = null;
   let accounts = [];
   let inCall = false;
+  let extensionOwnsLine = document.documentElement?.dataset.uposExtensionPhone === "active";
   let activeCall = null;
   let callSync = Promise.resolve();
   let browserRecording = null;
@@ -815,11 +816,16 @@
     if (sip.__floatingPhoneBound) return;
     sip.__floatingPhoneBound = true;
     sip.on("registered", (event) => {
+      if (extensionOwnsLine && !inCall) {
+        sip.disconnect();
+        return;
+      }
       showConnectedNotice(event?.account || selectedAccount());
       reportBrowserStatus("registered", {}, event?.account?.id);
     });
     sip.on("registrationFailed", (event) => {
       reportBrowserStatus("registration_failed", event);
+      if (extensionOwnsLine) return;
       const statusCode = Number(event?.statusCode || 0);
       const reasonPhrase = String(event?.reasonPhrase || "").trim();
       const details = statusCode ? `${statusCode}${reasonPhrase ? ` ${reasonPhrase}` : ""}` : event?.cause || "ошибка";
@@ -827,10 +833,12 @@
     });
     sip.on("unregistered", () => {
       reportBrowserStatus("unregistered");
+      if (extensionOwnsLine) return;
       if (!inCall) setStatus("SIP-регистрация потеряна — переподключаюсь", "error", {kind: "registration-lost"});
     });
     sip.on("disconnected", () => {
       reportBrowserStatus("disconnected");
+      if (extensionOwnsLine) return;
       if (!inCall) setStatus("Связь с АТС потеряна — переподключаюсь", "error", {kind: "registration-lost"});
     });
     sip.on("progress", () => setStatus("Идёт вызов…", "pending"));
@@ -872,6 +880,7 @@
       redirecting = false;
       rejecting = false;
       setCallUi(false);
+      if (extensionOwnsLine) sip.disconnect();
     });
     sip.on("failed", (event) => {
       stopBrowserRecording();
@@ -884,6 +893,7 @@
       redirecting = false;
       rejecting = false;
       setCallUi(false);
+      if (extensionOwnsLine) sip.disconnect();
     });
   }
 
@@ -902,6 +912,7 @@
   }
 
   function recoverRegistration(sip) {
+    if (extensionOwnsLine) return Promise.resolve(null);
     if (!sip || sip.isRegistered() || inCall) return Promise.resolve(sip);
     if (registrationRecovery) return registrationRecovery;
     const account = selectedAccount();
@@ -920,6 +931,7 @@
   }
 
   function ensureSoftphone() {
+    if (extensionOwnsLine) return Promise.resolve(null);
     if (softphoneReady) return softphoneReady.then(recoverRegistration);
     softphoneReady = (async () => {
       const response = await fetch("/api/telephony/sip", { credentials: "same-origin" });
@@ -947,11 +959,13 @@
       bindSoftphoneEvents(sip);
       const account = selectedAccount();
       if (!account) return sip;
+      if (extensionOwnsLine) return sip;
       setStatus("Подключаюсь к АТС…", "pending", {kind: "connection-pending"});
       reportBrowserStatus("connecting", {}, account.id);
       try {
         await sip.connect(account);
-        showConnectedNotice(account);
+        if (extensionOwnsLine && !inCall) sip.disconnect();
+        else showConnectedNotice(account);
       } catch (error) {
         reportBrowserStatus("registration_failed", {cause: error?.message, statusCode: error?.statusCode}, account.id);
         // Регистрация не удалась — остаются мост и набор через SIM.
@@ -1097,6 +1111,30 @@
     }
   }
 
+  function callViaExtension(rawPhone) {
+    const phone = String(rawPhone || "").replace(/[^\d+]/g, "");
+    if (!/^\+?\d{2,15}$/.test(phone)) return Promise.reject(new Error("Проверьте номер"));
+    return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID();
+      const timer = window.setTimeout(() => {
+        window.removeEventListener("message", onResult);
+        reject(new Error("Расширение не ответило"));
+      }, 10000);
+      function onResult(event) {
+        const data = event.data;
+        if (event.source !== window || event.origin !== location.origin ||
+          data?.source !== "upos-extension" || data?.type !== "extension-dial-result" ||
+          data.requestId !== requestId) return;
+        window.clearTimeout(timer);
+        window.removeEventListener("message", onResult);
+        if (data.ok) resolve();
+        else reject(new Error(data.error || "Не удалось набрать номер"));
+      }
+      window.addEventListener("message", onResult);
+      window.postMessage({source: "upos-site", type: "extension-dial", requestId, phone}, location.origin);
+    });
+  }
+
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const phone = (input?.value || "").trim();
@@ -1106,6 +1144,16 @@
     }
     submitButton?.setAttribute("disabled", "disabled");
     try {
+      if (extensionOwnsLine) {
+        setStatus("Набираю через расширение…", "pending");
+        try {
+          await callViaExtension(phone);
+          setStatus("Вызов открыт в расширении Chrome", "ok");
+        } catch (error) {
+          setStatus(`Расширение: ${error.message || "ошибка"}`, "error");
+        }
+        return;
+      }
       const sip = await ensureSoftphone();
       // Первый путь — звонок прямо из браузера.
       if (sip && sip.isRegistered() && sip.call(phone)) {
@@ -1150,6 +1198,20 @@
 
   window.addEventListener("upos:phone:dial", (event) => {
     prepareDial(event.detail?.phone);
+  });
+  window.addEventListener("upos:extension-phone-status", () => {
+    const active = document.documentElement?.dataset.uposExtensionPhone === "active";
+    if (extensionOwnsLine === active) return;
+    extensionOwnsLine = active;
+    if (active) {
+      setStatus("Линия работает в расширении Chrome", "ok");
+      if (!inCall) window.UposSoftphone?.disconnect?.();
+      void softphoneReady?.then((sip) => {
+        if (extensionOwnsLine && !inCall) sip?.disconnect();
+      });
+    } else if (!inCall) {
+      void ensureSoftphone();
+    }
   });
   const dialUrl = new URL(window.location.href);
   if (dialUrl.searchParams.has("dial") && prepareDial(dialUrl.searchParams.get("dial"))) {

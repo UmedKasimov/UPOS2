@@ -10,6 +10,10 @@ header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .phase.incoming { color: #a4f1b8; background: #155c32; }
 .phase.active { color: #a7cbff; background: #1d3a65; }
 .message { min-height: 20px; color: #aebbd1; margin: 0 0 16px; }
+.pair-panel { display: grid; gap: 10px; margin-bottom: 14px; }
+.link-button { border: 0; background: transparent; color: #78aaff; padding: 4px 0; text-align: left; font-size: 12px; }
+.pair-panel small { line-height: 1.5; }
+.stack { padding-top: 10px; border-top: 1px solid #293447; }
 .stack { display: grid; gap: 12px; }
 label { display: grid; gap: 5px; color: #cbd6e7; font-size: 12px; font-weight: 650; }
 input { width: 100%; border: 1px solid #39475b; border-radius: 9px; background: #171d27; color: #fff; padding: 10px 11px; font: inherit; outline: none; }
