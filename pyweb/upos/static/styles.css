@@ -31810,9 +31810,13 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   position: absolute;
   left: 0;
   bottom: 70px;
+  display: flex;
+  flex-direction: column;
   width: min(330px, calc(100vw - 32px));
+  height: 570px;
   max-height: min(680px, 80vh);
-  overflow-y: auto;
+  box-sizing: border-box;
+  overflow: hidden;
   overscroll-behavior: contain;
   padding: 12px;
   border: 1px solid #bfd4ee;
@@ -31863,6 +31867,18 @@ body.sidebar-rail .nav > .menu-order-toolbar {
 .upos-floating-phone-view[hidden],
 .upos-floating-phone-contact-editor[hidden] {
   display: none;
+}
+
+.upos-floating-phone-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.upos-floating-phone-view[data-floating-phone-view="history"]:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .upos-floating-phone-tabs,
@@ -31967,8 +31983,10 @@ body.sidebar-rail .nav > .menu-order-toolbar {
 
 .upos-floating-phone-history-list {
   display: grid;
+  flex: 1 1 auto;
+  align-content: start;
   gap: 5px;
-  max-height: 275px;
+  min-height: 0;
   overflow-y: auto;
 }
 
