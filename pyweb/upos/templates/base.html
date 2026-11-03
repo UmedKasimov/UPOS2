@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=735" />
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=736" />
     {% if user and user.get('role') != 'admin' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <link rel="stylesheet" href="{{ url_for('static', path='messenger-notice.css') }}?v=7" />
     {% endif %}
@@ -372,7 +372,7 @@
             <button type="button" data-floating-phone-history-filter="incoming">Входящие <span data-floating-phone-count="incoming">0</span></button>
             <button type="button" data-floating-phone-history-filter="outgoing">Исходящие <span data-floating-phone-count="outgoing">0</span></button>
           </div>
-          <div class="upos-floating-phone-history-list" data-floating-phone-history-list aria-live="polite">Загружаю звонки…</div>
+          <div class="upos-floating-phone-history-list" data-floating-phone-history-list aria-label="История звонков" aria-live="polite" tabindex="0">Загружаю звонки…</div>
           <button type="button" class="upos-floating-phone-refresh" data-floating-phone-history-refresh>Обновить историю</button>
         </div>
         <form class="upos-floating-phone-contact-editor" data-floating-phone-contact-editor hidden>

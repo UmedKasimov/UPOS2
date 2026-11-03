@@ -31987,7 +31987,11 @@ body.sidebar-rail .nav > .menu-order-toolbar {
   align-content: start;
   gap: 5px;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #9bb8dc transparent;
+  scrollbar-gutter: stable;
 }
 
 .upos-floating-phone-history-item {
