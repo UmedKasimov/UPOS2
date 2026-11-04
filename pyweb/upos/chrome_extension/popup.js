@@ -4,11 +4,13 @@
   const phaseLabels = {offline: "Отключён", connecting: "Подключение", ready: "На линии",
     dialing: "Набор", incoming: "Входящий", active: "Разговор", error: "Ошибка"};
   const params = new URLSearchParams(location.search);
-  const setupWindow = params.has("setup");
+  const phoneTab = params.has("phone");
+  const setupWindow = params.has("setup") || phoneTab;
   const embedded = params.has("embed");
   const fullUi = setupWindow || embedded;
   document.body.dataset.setup = setupWindow ? "true" : "false";
   document.body.dataset.embed = embedded ? "true" : "false";
+  document.body.dataset.phoneTab = phoneTab ? "true" : "false";
   let busy = false;
   let manualOpen = params.has("manual");
   let errorText = "";
@@ -65,7 +67,7 @@
     }
   }
 
-  void chrome.storage.local.get(["keySounds", "keyVolume", "transferTargets"]).then((settings) => {
+  void chrome.storage.local.get(["keySounds", "keyVolume", "transferTargets", "incomingSurface"]).then((settings) => {
     keySounds = settings.keySounds !== false;
     keyVolume = Number.isFinite(settings.keyVolume) ? Math.max(0, Math.min(100, settings.keyVolume)) : 18;
     transferTargets = Array.isArray(settings.transferTargets)
@@ -73,6 +75,7 @@
     $("key-sounds").checked = keySounds;
     $("key-volume").value = String(keyVolume);
     $("transfer-targets").value = transferTargets.join(", ");
+    $("incoming-surface").value = settings.incomingSurface === "window" ? "window" : "tab";
     renderTransferPresets();
   });
 
@@ -367,6 +370,9 @@
   $("tab-dial").addEventListener("click", () => switchView("dial"));
   $("tab-history").addEventListener("click", () => switchView("history"));
   $("tab-settings").addEventListener("click", () => switchView("settings"));
+  $("incoming-surface").addEventListener("change", () => {
+    void chrome.storage.local.set({incomingSurface: $("incoming-surface").value});
+  });
   $("key-sounds").addEventListener("change", () => {
     keySounds = $("key-sounds").checked;
     void chrome.storage.local.set({keySounds});

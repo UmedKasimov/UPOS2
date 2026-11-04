@@ -27,7 +27,7 @@
       <button type="submit" class="primary">Подключить линию</button>
       <small>Микрофон будет запрошен при подключении. Данные линии хранятся только до закрытия Chrome.</small>
     </form>
-    <button id="open-window" type="button" class="primary" hidden>Открыть телефон в отдельном окне</button>
+    <button id="open-window" type="button" class="primary" hidden>Открыть телефон</button>
     <section id="phone" hidden>
       <div class="line"><span>Линия</span><strong id="line-label"></strong><button id="logout" type="button">Отключить</button></div>
       <button id="retry" type="button" hidden>Переподключить линию</button>
@@ -83,6 +83,7 @@
         <button id="refresh-history" type="button" class="link-button">Обновить историю</button>
       </section>
       <section id="settings-view" class="settings-view" hidden>
+        <label>Открывать телефон при звонке<select id="incoming-surface"><option value="tab">Новая вкладка Chrome</option><option value="window">Отдельное окно</option></select></label>
         <label class="check-setting"><input id="key-sounds" type="checkbox" checked> Звук кнопок набора</label>
         <label>Громкость кнопок<input id="key-volume" type="range" min="0" max="100" value="18"></label>
         <label>Быстрые номера переадресации<input id="transfer-targets" type="text" placeholder="210, 220, 230"></label>

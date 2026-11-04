@@ -9,8 +9,11 @@ const script = fs.readFileSync(path.join(__dirname, "../upos/chrome_extension/ba
 function phoneBackground() {
   const created = [];
   const updated = [];
+  const createdTabs = [];
+  const updatedTabs = [];
   const notifications = [];
-  const windows = [];
+  const windows = [{id: 10, type: "normal", tabs: []}];
+  const tabs = [];
   const stored = {phoneState: {phase: "ready"}};
   const listeners = {};
   const event = (name) => ({addListener(callback) { listeners[name] = callback; }});
@@ -21,19 +24,27 @@ function phoneBackground() {
       setBadgeBackgroundColor: async () => {}},
     windows: {
       getAll: async () => windows,
+      getLastFocused: async () => windows.find((window) => window.type === "normal"),
       create: async (options) => {
         created.push(options);
-        const window = {id: created.length, type: "popup", tabs: [{url: options.url}]};
+        const window = {id: 10 + created.length, type: options.type, tabs: [{url: options.url}]};
         windows.push(window);
         return window;
       },
       update: async (id, options) => { updated.push({id, options}); return windows.find((window) => window.id === id); },
     },
-    storage: {session: {get: async (keys) => {
+    storage: {local: {get: async () => ({incomingSurface: stored.incomingSurface})}, session: {get: async (keys) => {
       if (typeof keys === "string") return {[keys]: stored[keys]};
       return Object.fromEntries(keys.map((key) => [key, stored[key]]));
     }, set: async (value) => Object.assign(stored, value)}},
-    tabs: {query: async () => []},
+    tabs: {query: async (query) => query?.url ? [] : tabs,
+      create: async (options) => {
+        createdTabs.push(options);
+        const tab = {id: 100 + createdTabs.length, windowId: options.windowId, url: options.url};
+        tabs.push(tab);
+        return tab;
+      },
+      update: async (id, options) => { updatedTabs.push({id, options}); return tabs.find((tab) => tab.id === id); }},
     notifications: {create: async (id) => { notifications.push(id); }, clear: async () => {} ,
       onButtonClicked: event("notificationButton"), onClicked: event("notificationClick")},
     contextMenus: {onClicked: event("contextMenu"), removeAll: async () => {}, create: () => {}},
@@ -41,19 +52,26 @@ function phoneBackground() {
   };
   const context = vm.createContext({chrome, setTimeout, clearTimeout, crypto: globalThis.crypto});
   vm.runInContext(script, context);
-  return {context, created, updated, notifications, stored, listeners};
+  return {context, created, updated, createdTabs, updatedTabs, notifications, stored, listeners};
 }
 
-test("incoming call opens one dedicated phone window and focuses the same window again", async () => {
+test("incoming call opens and focuses one dedicated Chrome tab by default", async () => {
   const app = phoneBackground();
-  await vm.runInContext("Promise.all([openStandaloneWindow(), openStandaloneWindow()])", app.context);
-  assert.equal(app.created.length, 1);
-  assert.match(app.created[0].url, /popup\.html\?setup=1$/);
-  await vm.runInContext("openStandaloneWindow()", app.context);
-  assert.equal(app.created.length, 1);
-  assert.equal(app.updated.length, 1);
+  await vm.runInContext("Promise.all([openPhoneTab(), openPhoneTab()])", app.context);
+  assert.equal(app.createdTabs.length, 1);
+  assert.match(app.createdTabs[0].url, /popup\.html\?phone=1$/);
   await vm.runInContext("onPhoneState({phase: 'incoming', phone: '210'})", app.context);
   assert.equal(app.notifications.length, 1);
+  assert.equal(app.createdTabs.length, 1);
+  assert.equal(app.updatedTabs.length, 1);
+  assert.equal(app.created.length, 0);
+});
+
+test("window preference keeps the separate phone window option", async () => {
+  const app = phoneBackground();
+  app.stored.incomingSurface = "window";
+  await vm.runInContext("onPhoneState({phase: 'incoming', phone: '210'})", app.context);
   assert.equal(app.created.length, 1);
-  assert.equal(app.updated.length, 2);
+  assert.match(app.created[0].url, /popup\.html\?setup=1$/);
+  assert.equal(app.createdTabs.length, 0);
 });

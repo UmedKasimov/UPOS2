@@ -4,6 +4,7 @@ const ALARM_ID = "upos-softphone-reconnect";
 let creatingOffscreen = null;
 let pairing = false;
 let openingPhoneWindow = null;
+let openingPhoneTab = null;
 
 function selectedPhone(text) {
   const candidate = String(text || "").trim();
@@ -49,7 +50,30 @@ async function openStandaloneWindow() {
   return openingPhoneWindow;
 }
 
-const showPhoneWindow = openStandaloneWindow;
+async function openPhoneTab() {
+  if (openingPhoneTab) return openingPhoneTab;
+  openingPhoneTab = (async () => {
+    const url = `${chrome.runtime.getURL("popup.html")}?phone=1`;
+    const tabs = await chrome.tabs.query({});
+    const existing = tabs.find((tab) => tab.url?.startsWith(url));
+    if (existing?.id) {
+      await chrome.tabs.update(existing.id, {active: true});
+      if (existing.windowId) await chrome.windows.update(existing.windowId, {focused: true});
+      return existing;
+    }
+    const normalWindow = await chrome.windows.getLastFocused({windowTypes: ["normal"]}).catch(() => null);
+    if (!normalWindow?.id) return chrome.windows.create({url, type: "normal", focused: true});
+    const tab = await chrome.tabs.create({windowId: normalWindow.id, url, active: true});
+    await chrome.windows.update(normalWindow.id, {focused: true});
+    return tab;
+  })().finally(() => { openingPhoneTab = null; });
+  return openingPhoneTab;
+}
+
+async function showPhoneSurface() {
+  const {incomingSurface} = await chrome.storage.local.get("incomingSurface");
+  return incomingSurface === "window" ? openStandaloneWindow() : openPhoneTab();
+}
 
 async function resumePhone() {
   const {session} = await chrome.storage.session.get("session");
@@ -88,13 +112,13 @@ async function onPhoneState(state) {
   await chrome.action.setBadgeText({text: label});
   if (label) await chrome.action.setBadgeBackgroundColor({color: state.phase === "incoming" ? "#16a34a" : "#2563eb"});
   if (state.phase === "incoming" && previous.phase !== "incoming") {
-    const windowOpening = showPhoneWindow().catch(() => {});
+    const surfaceOpening = showPhoneSurface().catch(() => {});
     await chrome.notifications.create("upos-incoming", {
       type: "basic", iconUrl: chrome.runtime.getURL("icon.png"),
       title: "Входящий звонок U-POS", message: state.phone || "Неизвестный номер",
       buttons: [{title: "Принять"}, {title: "Отклонить"}], requireInteraction: true,
     }).catch(() => {});
-    await windowOpening;
+    await surfaceOpening;
   } else if (previous.phase === "incoming" && state.phase !== "incoming") {
     await chrome.notifications.clear("upos-incoming");
   }
@@ -181,7 +205,7 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.create({id: MENU_ID, title: "Позвонить через U-POS", contexts: ["selection"]});
   });
 });
-chrome.action.onClicked.addListener(() => { void showPhoneWindow().catch(() => {}); });
+chrome.action.onClicked.addListener(() => { void showPhoneSurface().catch(() => {}); });
 chrome.runtime.onStartup.addListener(() => { void resumePhone().catch(() => {}); });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_ID) void resumePhone().catch(() => {});
@@ -189,11 +213,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.notifications.onButtonClicked.addListener((id, index) => {
   if (id === "upos-incoming") {
     void sendToPhone({type: index === 0 ? "answer" : "reject"}).catch(() => {});
-    if (index === 0) void showPhoneWindow().catch(() => {});
+    if (index === 0) void showPhoneSurface().catch(() => {});
   }
 });
 chrome.notifications.onClicked.addListener((id) => {
-  if (id === "upos-incoming") void showPhoneWindow().catch(() => {});
+  if (id === "upos-incoming") void showPhoneSurface().catch(() => {});
 });
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== MENU_ID) return;
@@ -202,7 +226,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   const {session} = await chrome.storage.session.get("session");
   if (session?.account) {
     await sendToPhone({type: "dial", phone});
-    await showPhoneWindow();
+    await showPhoneSurface();
   } else {
     await chrome.tabs.create({url: `${APP_URL}/telephony?dial=${encodeURIComponent(phone)}`});
   }
@@ -222,11 +246,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "logout") return logout();
     if (message.type === "dial") {
       const result = await sendToPhone(message);
-      if (result?.ok) void showPhoneWindow().catch(() => {});
+      if (result?.ok) void showPhoneSurface().catch(() => {});
       return result;
     }
     if (["answer", "reject", "redirect", "transfer", "hangup", "dtmf", "mute", "hold"].includes(message.type)) return sendToPhone(message);
-    if (message.type === "openWindow") return showPhoneWindow().then(() => ({ok: true}));
+    if (message.type === "openWindow") return showPhoneSurface().then(() => ({ok: true}));
     if (message.type === "openFallbackWindow") return openStandaloneWindow().then(() => ({ok: true}));
     return {ok: false, error: "unknown_action"};
   })().then(sendResponse, (error) => sendResponse({ok: false, error: error?.message || "Ошибка подключения"}));
