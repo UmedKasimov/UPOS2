@@ -14,6 +14,9 @@ header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .phase.incoming { color: #a4f1b8; background: #155c32; }
 .phase.active { color: #a7cbff; background: #1d3a65; }
 .message { min-height: 20px; color: #aebbd1; margin: 0 0 16px; }
+.recent-missed { display: grid; gap: 5px; margin-bottom: 14px; padding: 12px; border: 1px solid #aa644a; border-radius: 12px; background: #302019; }
+.recent-missed strong { color: #ffd0a8; }
+.recent-missed .primary { width: auto; }
 .pair-panel { display: grid; gap: 10px; margin-bottom: 14px; }
 .link-button { border: 0; background: transparent; color: #78aaff; padding: 4px 0; text-align: left; font-size: 12px; }
 .pair-panel small { line-height: 1.5; }

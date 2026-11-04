@@ -88,12 +88,13 @@ async function onPhoneState(state) {
   await chrome.action.setBadgeText({text: label});
   if (label) await chrome.action.setBadgeBackgroundColor({color: state.phase === "incoming" ? "#16a34a" : "#2563eb"});
   if (state.phase === "incoming" && previous.phase !== "incoming") {
+    const windowOpening = showPhoneWindow().catch(() => {});
     await chrome.notifications.create("upos-incoming", {
       type: "basic", iconUrl: chrome.runtime.getURL("icon.png"),
       title: "Входящий звонок U-POS", message: state.phone || "Неизвестный номер",
       buttons: [{title: "Принять"}, {title: "Отклонить"}], requireInteraction: true,
     }).catch(() => {});
-    await showPhoneWindow().catch(() => {});
+    await windowOpening;
   } else if (previous.phase === "incoming" && state.phase !== "incoming") {
     await chrome.notifications.clear("upos-incoming");
   }

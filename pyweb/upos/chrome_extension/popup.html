@@ -10,6 +10,11 @@
   <main>
     <header><span class="logo">U-POS</span><strong>Телефон <small id="version"></small></strong><span id="phase" class="phase">Отключён</span></header>
     <p id="message" class="message" role="status">Подключите линию из U-POS.</p>
+    <section id="recent-missed" class="recent-missed" hidden>
+      <strong>Пропущенный входящий звонок</strong>
+      <span id="recent-missed-phone"></span>
+      <div class="actions"><button id="recent-redial" type="button" class="primary">Перезвонить</button><button id="recent-save" type="button">+ Контакт</button></div>
+    </section>
     <section id="pair-panel" class="pair-panel">
       <button id="pair-site" type="button" class="primary">Подключить из открытой U-POS</button>
       <small>Войдите в U-POS один раз. После статуса «На линии» вкладку сайта можно закрыть.</small>

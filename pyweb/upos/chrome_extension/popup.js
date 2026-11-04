@@ -120,6 +120,15 @@
       $("line-label").textContent = result.label || "Не подключена";
       $("message").textContent = errorUntil > Date.now() ? errorText :
         (state.message || (result.connected ? "Линия подключена" : "Подключите линию из U-POS."));
+      const recent = state.lastCall;
+      const showMissed = phase === "ready" && recent?.direction === "incoming" &&
+        recent.status === "missed" && Date.now() - Number(recent.endedAt || 0) < 60000;
+      $("recent-missed").hidden = !showMissed;
+      if (showMissed) {
+        $("recent-missed-phone").textContent = recent.phone || "Неизвестный номер";
+        $("recent-redial").disabled = !validContactPhone(recent.phone);
+        $("recent-save").hidden = !validContactPhone(recent.phone);
+      }
       $("incoming").hidden = phase !== "incoming";
       if (["incoming", "dialing", "active"].includes(phase) && state.phone && lookupPhone !== state.phone) {
         lookupPhone = state.phone;
@@ -404,6 +413,23 @@
     void request("dtmf", {digit: event.key}).catch(showError);
   });
   $("save-number").addEventListener("click", () => openContactEditor($("number").value));
+  $("recent-redial").addEventListener("click", async () => {
+    try {
+      const result = await request("getState");
+      const phone = result.state?.lastCall?.phone;
+      if (result.state?.phase !== "ready" || !validContactPhone(phone)) return;
+      $("number").value = phone;
+      switchView("dial");
+      await request("dial", {phone});
+      await refresh();
+    } catch (error) { showError(error); }
+  });
+  $("recent-save").addEventListener("click", async () => {
+    try {
+      const result = await request("getState");
+      openContactEditor(result.state?.lastCall?.phone);
+    } catch (error) { showError(error); }
+  });
   $("incoming-save").addEventListener("click", () => openContactEditor(lookupPhone));
   $("save-call").addEventListener("click", () => openContactEditor(lookupPhone || $("number").value));
   $("cancel-contact").addEventListener("click", () => { $("contact-form").hidden = true; });

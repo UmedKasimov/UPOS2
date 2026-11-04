@@ -125,8 +125,13 @@
     currentCall = null;
     if (recorder?.state === "recording") recorder.stop();
     recorder = null;
-    if (call) void syncCall(status || (call.answeredAt ? "answered" : "missed"), call);
-    publish({phase: softphone.isRegistered() ? "ready" : "offline", phone: "", muted: false, held: false, answeredAt: 0});
+    if (!call) return;
+    const finalStatus = status || (call.answeredAt ? "answered" : "missed");
+    void syncCall(finalStatus, call);
+    publish({phase: softphone.isRegistered() ? "ready" : "offline", phone: "", muted: false,
+      held: false, answeredAt: 0, message: finalStatus === "missed" && call.direction === "incoming"
+        ? "Пропущенный входящий звонок" : "Звонок завершён",
+      lastCall: {phone: call.phone, direction: call.direction, status: finalStatus, endedAt: Date.now()}});
   }
 
   softphone.on("registered", () => publish({phase: "ready", message: "Линия подключена"}));
@@ -138,7 +143,9 @@
     publish({phase: "incoming", phone: event.from || "", held: false, answeredAt: 0, message: event.name || "Входящий вызов"});
     startRing();
   });
-  softphone.on("progress", () => publish({phase: "dialing", message: "Вызов идёт"}));
+  softphone.on("progress", () => {
+    if (currentCall?.direction === "outgoing") publish({phase: "dialing", message: "Вызов идёт"});
+  });
   softphone.on("accepted", () => {
     stopRing();
     if (currentCall) currentCall.answeredAt = Date.now();
@@ -179,8 +186,8 @@
         return {ok: true};
       }
       case "answer":
-        stopRing();
-        return {ok: await softphone.answer()};
+        if (await softphone.answer()) { stopRing(); return {ok: true}; }
+        return {ok: false, error: "Не удалось принять вызов"};
       case "reject":
         stopRing();
         return {ok: softphone.reject()};
