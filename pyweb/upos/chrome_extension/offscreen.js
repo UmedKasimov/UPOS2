@@ -184,6 +184,8 @@
         return {ok: softphone.reject()};
       case "redirect":
         return {ok: softphone.redirectIncoming(message.phone), error: "АТС не разрешила переадресацию"};
+      case "transfer":
+        return {ok: softphone.transferActive(message.phone), error: "АТС не приняла запрос перевода"};
       case "hangup":
         softphone.hangup();
         return {ok: true};

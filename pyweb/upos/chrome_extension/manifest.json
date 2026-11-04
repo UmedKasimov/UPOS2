@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "116",
   "name": "U-POS Телефон",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Плавающий SIP-телефон поверх вкладок Chrome при закрытом сайте U-POS.",
   "permissions": ["contextMenus", "tabs", "storage", "offscreen", "notifications", "alarms", "scripting"],
   "host_permissions": ["https://app.u-pos.uz/*"],

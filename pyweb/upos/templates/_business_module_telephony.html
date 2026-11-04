@@ -541,8 +541,10 @@
           <label><span>Рабочий входящий номер*</span><input name="public_number" required value="{{ telephony_ivr.public_number or '+998557016060' }}" placeholder="+998 …" /></label>
           <label class="wide"><span>Текст голосового приветствия</span><textarea name="greeting_text" rows="2" maxlength="1000" placeholder="Здравствуйте. Для отдела продаж нажмите 1…">{{ telephony_ivr.greeting_text or '' }}</textarea></label>
         </div>
+        <button type="button" id="telephony-ivr-preview" class="btn btn-secondary">Прослушать приветствие в браузере</button>
+        <p class="telephony-ivr-notice">Прослушивание работает только для проверки текста в браузере. Звонящему голос проиграет АТС после подключения входящего маршрута.</p>
         <div class="telephony-ivr-routes">
-          <div class="telephony-ivr-route-head"><span>Кнопка</span><span>Направление</span><span>Внутренняя линия, номера очереди или внешний номер</span><span>Ожидание, сек</span><span>Если нет ответа</span><span>Очередь</span></div>
+          <div class="telephony-ivr-route-head"><span>Кнопка</span><span>Направление</span><span>Внутренняя линия, номера очереди или внешний номер</span><span>Ожидание, сек</span><span>Запасной после цепочки</span><span>Очередь</span></div>
           {% for digit in range(10) %}
             {% set route = telephony_ivr_routes.get(digit|string, {}) %}
             <div class="telephony-ivr-route">
@@ -554,13 +556,14 @@
                 <option value="external"{% if route.kind == 'external' %} selected{% endif %}>Внешний номер</option>
               </select>
               <input name="route_{{ digit }}_target" aria-label="Цель кнопки {{ digit }}" value="{{ route.target|join(', ') if route.target is sequence and route.target is not string else (route.target or '') }}" placeholder="210, 211 или +998 …" />
-              <input name="route_{{ digit }}_wait" aria-label="Ожидание кнопки {{ digit }}" type="number" min="5" max="120" value="{{ route.wait_seconds or 30 }}" />
+              <input name="route_{{ digit }}_wait" aria-label="Ожидание кнопки {{ digit }}" type="number" min="5" max="120" value="{{ route.wait_seconds or 5 }}" />
               <input name="route_{{ digit }}_fallback" aria-label="Запасной номер кнопки {{ digit }}" value="{{ route.fallback.target if route.fallback else '' }}" placeholder="211 или +998 …" />
               <select name="route_{{ digit }}_strategy" aria-label="Стратегия очереди кнопки {{ digit }}">
                 <option value="ring_all"{% if route.strategy != 'round_robin' %} selected{% endif %}>Все сразу</option>
                 <option value="round_robin"{% if route.strategy == 'round_robin' %} selected{% endif %}>По очереди</option>
               </select>
             </div>
+            <label class="wide"><span>Кнопка {{ digit }}: следующие направления через 5 секунд каждое</span><input name="route_{{ digit }}_chain" value="{{ route.forward_chain|map(attribute='target')|join(', ') if route.forward_chain else '' }}" placeholder="220, 230, +998901234567" /><small>До 10 внутренних и обычных номеров через запятую; сработает после подключения маршрута АТС.</small></label>
           {% endfor %}
         </div>
         <div class="product-form-grid">

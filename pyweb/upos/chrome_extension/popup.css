@@ -38,7 +38,7 @@ small { color: #8796ae; font-size: 11px; }
 #phone[data-phase="incoming"] .dial-actions, #phone[data-phase="incoming"] .keypad { display: none; }
 #phone[data-phase="active"] .dial-actions, #phone[data-phase="dialing"] .dial-actions { display: none; }
 .view-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-.view-tabs button { flex: 1; padding: 7px; }
+.view-tabs button { flex: 1; padding: 7px 3px; font-size: 12px; }
 .view-tabs .selected, .history-filters .selected { color: #bcd8ff; border-color: #3b72c5; background: #183052; }
 .dial-actions { display: flex; gap: 8px; }
 .dial-actions .primary { flex: 1; }
@@ -46,8 +46,8 @@ small { color: #8796ae; font-size: 11px; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 12px; }
 .keypad button { min-height: 40px; font-size: 17px; }
 .keypad .delete-key { grid-column: 3; }
-.history-filters { display: flex; gap: 5px; margin-bottom: 10px; }
-.history-filters button { flex: 1; padding: 7px 4px; font-size: 11px; }
+.history-filters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-bottom: 10px; }
+.history-filters button { padding: 7px 4px; font-size: 11px; }
 .history-list { display: grid; align-content: start; gap: 6px; max-height: 460px; min-height: 100px; overflow-y: auto; padding-right: 3px; }
 .history-row { display: flex; align-items: stretch; border: 1px solid #344258; border-radius: 9px; background: #171d27; }
 .history-row.known { border-color: #366e53; background: #15291f; }
@@ -69,4 +69,11 @@ small { color: #8796ae; font-size: 11px; }
 @keyframes incoming-ring { from { transform: rotate(-8deg) scale(.96); box-shadow: 0 0 0 6px #168a4b55; } to { transform: rotate(8deg) scale(1.04); box-shadow: 0 0 0 18px #168a4b11; } }
 @media (prefers-reduced-motion: reduce) { .incoming-avatar { animation: none; } }
 .redirect { display: grid; gap: 9px; margin-top: 16px; padding-top: 15px; border-top: 1px solid #293447; }
+.transfer-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.transfer-presets button { padding: 6px 10px; border-color: #42745a; background: #173426; }
+.settings-view { display: grid; gap: 14px; }
+.settings-view a { color: #8ebcff; text-decoration: none; }
+.settings-view input[type="range"] { padding: 0; }
+.check-setting { display: flex; align-items: center; gap: 8px; }
+.check-setting input { width: auto; }
 .site-link { display: block; margin-top: 18px; color: #78aaff; font-size: 12px; text-decoration: none; }

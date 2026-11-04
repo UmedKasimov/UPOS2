@@ -21,7 +21,60 @@
   let incomingClient = null;
   let lookupPhone = "";
   let currentPhase = "offline";
+  let keyAudio = null;
+  let keySounds = true;
+  let keyVolume = 18;
+  let transferTargets = ["210", "220", "230"];
   const APP_URL = "https://app.u-pos.uz";
+  $("version").textContent = `v${chrome.runtime.getManifest().version}`;
+
+  function playKeySound(key) {
+    if (!keySounds || key === "backspace" || keyVolume <= 0) return;
+    try {
+      keyAudio ||= new AudioContext();
+      if (keyAudio.state === "suspended") void keyAudio.resume();
+      const tone = keyAudio.createOscillator();
+      const volume = keyAudio.createGain();
+      const frequencies = {"*": 941, "#": 1477, "+": 440};
+      tone.frequency.value = frequencies[key] || 440 + Number(key || 0) * 35;
+      tone.type = "sine";
+      volume.gain.setValueAtTime(0.001, keyAudio.currentTime);
+      volume.gain.exponentialRampToValueAtTime(Math.max(0.001, keyVolume / 1000), keyAudio.currentTime + 0.01);
+      volume.gain.exponentialRampToValueAtTime(0.001, keyAudio.currentTime + 0.11);
+      tone.connect(volume).connect(keyAudio.destination);
+      tone.start();
+      tone.stop(keyAudio.currentTime + 0.12);
+    } catch (_) { /* Calling still works if audio output is unavailable. */ }
+  }
+
+  function normalizeTargets(raw) {
+    return [...new Set(String(raw || "").split(/[,;\n]+/).map((item) => item.trim())
+      .filter((item) => /^\+?\d{2,15}$/.test(item)))].slice(0, 10);
+  }
+
+  function renderTransferPresets() {
+    const container = $("transfer-presets");
+    container.replaceChildren();
+    for (const number of transferTargets) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = number;
+      button.title = `Подставить ${number} для переадресации`;
+      button.addEventListener("click", () => { $("redirect-number").value = number; });
+      container.append(button);
+    }
+  }
+
+  void chrome.storage.local.get(["keySounds", "keyVolume", "transferTargets"]).then((settings) => {
+    keySounds = settings.keySounds !== false;
+    keyVolume = Number.isFinite(settings.keyVolume) ? Math.max(0, Math.min(100, settings.keyVolume)) : 18;
+    transferTargets = Array.isArray(settings.transferTargets)
+      ? normalizeTargets(settings.transferTargets.join(",")) : transferTargets;
+    $("key-sounds").checked = keySounds;
+    $("key-volume").value = String(keyVolume);
+    $("transfer-targets").value = transferTargets.join(", ");
+    renderTransferPresets();
+  });
 
   async function request(type, extra = {}) {
     const response = await chrome.runtime.sendMessage({target: "background", type, ...extra});
@@ -75,7 +128,9 @@
       $("incoming-phone").textContent = incomingClient?.name || state.phone || "Неизвестный номер";
       $("incoming-client").hidden = !incomingClient;
       $("call-actions").hidden = !["dialing", "active"].includes(phase);
-      $("redirect-form").hidden = phase !== "incoming";
+      $("redirect-form").hidden = !["incoming", "active"].includes(phase);
+      $("redirect-form").querySelector("label").firstChild.textContent =
+        phase === "active" ? "Перевести разговор на номер" : "Переадресовать входящий на номер";
       $("dial").disabled = busy || phase !== "ready";
       $("number").readOnly = ["incoming", "dialing", "active"].includes(phase);
       muted = phase === "active" && Boolean(state.muted);
@@ -124,10 +179,11 @@
   }
 
   function switchView(view) {
-    activeView = view === "history" ? "history" : "dial";
+    activeView = ["history", "settings"].includes(view) ? view : "dial";
     $("dial-view").hidden = activeView !== "dial";
     $("history-view").hidden = activeView !== "history";
-    for (const name of ["dial", "history"]) {
+    $("settings-view").hidden = activeView !== "settings";
+    for (const name of ["dial", "history", "settings"]) {
       $("tab-" + name).classList.toggle("selected", activeView === name);
       $("tab-" + name).setAttribute("aria-pressed", String(activeView === name));
     }
@@ -148,12 +204,14 @@
     for (const direction of ["incoming", "outgoing"]) {
       $("count-" + direction).textContent = String(historyCalls.filter((call) => call.direction === direction).length);
     }
+    $("count-missed").textContent = String(historyCalls.filter((call) => call.status === "missed").length);
     document.querySelectorAll("[data-filter]").forEach((button) => {
       button.classList.toggle("selected", button.dataset.filter === historyDirection);
     });
     const list = $("history-list");
     list.replaceChildren();
-    const shown = historyCalls.filter((call) => historyDirection === "all" || call.direction === historyDirection);
+    const shown = historyCalls.filter((call) => historyDirection === "all" ||
+      (historyDirection === "missed" ? call.status === "missed" : call.direction === historyDirection));
     if (!shown.length) {
       list.textContent = historyCalls.length ? "Для этого направления звонков пока нет." : "Звонков пока нет.";
       return;
@@ -283,6 +341,21 @@
   });
   $("tab-dial").addEventListener("click", () => switchView("dial"));
   $("tab-history").addEventListener("click", () => switchView("history"));
+  $("tab-settings").addEventListener("click", () => switchView("settings"));
+  $("key-sounds").addEventListener("change", () => {
+    keySounds = $("key-sounds").checked;
+    void chrome.storage.local.set({keySounds});
+  });
+  $("key-volume").addEventListener("input", () => {
+    keyVolume = Number($("key-volume").value);
+    void chrome.storage.local.set({keyVolume});
+  });
+  $("transfer-targets").addEventListener("change", () => {
+    transferTargets = normalizeTargets($("transfer-targets").value);
+    $("transfer-targets").value = transferTargets.join(", ");
+    void chrome.storage.local.set({transferTargets});
+    renderTransferPresets();
+  });
   $("refresh-history").addEventListener("click", () => { void loadHistory(); });
   document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
     historyDirection = button.dataset.filter || "all";
@@ -292,6 +365,7 @@
     const button = event.target.closest("[data-key]");
     if (!button) return;
     const key = button.dataset.key;
+    playKeySound(key);
     if (currentPhase === "active") {
       if (/^[0-9*#]$/.test(key)) {
         try { await request("dtmf", {digit: key}); } catch (error) { showError(error); }
@@ -310,6 +384,7 @@
     if (currentPhase !== "active" || event.repeat || event.ctrlKey || event.altKey || event.metaKey ||
       !/^[0-9*#]$/.test(event.key) || !$("contact-form").hidden) return;
     event.preventDefault();
+    playKeySound(event.key);
     void request("dtmf", {digit: event.key}).catch(showError);
   });
   $("save-number").addEventListener("click", () => openContactEditor($("number").value));
@@ -377,7 +452,11 @@
   });
   $("redirect-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await request("redirect", {phone: $("redirect-number").value}); await refresh(); }
+    try {
+      await request(currentPhase === "active" ? "transfer" : "redirect", {phone: $("redirect-number").value});
+      if (currentPhase === "active") $("message").textContent = "Запрос перевода отправлен в АТС";
+      else await refresh();
+    }
     catch (error) { showError(error); }
   });
   $("logout").addEventListener("click", async () => {

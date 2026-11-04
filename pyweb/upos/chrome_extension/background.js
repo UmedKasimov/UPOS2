@@ -235,7 +235,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "pairFromSite") return pairFromSite();
     if (message.type === "retry") return resumePhone();
     if (message.type === "logout") return logout();
-    if (["dial", "answer", "reject", "redirect", "hangup", "dtmf", "mute"].includes(message.type)) return sendToPhone(message);
+    if (["dial", "answer", "reject", "redirect", "transfer", "hangup", "dtmf", "mute"].includes(message.type)) return sendToPhone(message);
     if (message.type === "openWindow") return showPhoneWindow().then(() => ({ok: true}));
     if (message.type === "openFallbackWindow") return openStandaloneWindow().then(() => ({ok: true}));
     return {ok: false, error: "unknown_action"};

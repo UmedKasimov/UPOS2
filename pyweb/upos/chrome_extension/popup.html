@@ -8,7 +8,7 @@
 </head>
 <body>
   <main>
-    <header><span class="logo">U-POS</span><strong>Телефон</strong><span id="phase" class="phase">Отключён</span></header>
+    <header><span class="logo">U-POS</span><strong>Телефон <small id="version"></small></strong><span id="phase" class="phase">Отключён</span></header>
     <p id="message" class="message" role="status">Подключите линию из U-POS.</p>
     <section id="pair-panel" class="pair-panel">
       <button id="pair-site" type="button" class="primary">Подключить из открытой U-POS</button>
@@ -29,6 +29,7 @@
       <nav class="view-tabs" aria-label="Разделы телефона">
         <button id="tab-dial" type="button" class="selected" aria-pressed="true">Набор</button>
         <button id="tab-history" type="button" aria-pressed="false">История</button>
+        <button id="tab-settings" type="button" aria-pressed="false">Настройки</button>
       </nav>
       <section id="dial-view">
       <label class="number-label">Номер телефона<input id="number" type="tel" inputmode="tel" placeholder="+998 …"></label>
@@ -56,8 +57,9 @@
       </div>
       <form id="redirect-form" class="redirect" hidden>
         <label>Переадресовать на внутренний или обычный номер<input id="redirect-number" type="tel" placeholder="+998 … или 211"></label>
+        <div id="transfer-presets" class="transfer-presets" aria-label="Быстрая переадресация"></div>
         <button type="submit">Переадресовать</button>
-        <small>Сработает, если АТС разрешает SIP-переадресацию.</small>
+        <small>Перевод зависит от поддержки SIP REFER/302 на АТС. Отправка запроса ещё не подтверждает соединение с новым номером.</small>
       </form>
       </section>
       <section id="history-view" hidden>
@@ -65,9 +67,18 @@
           <button type="button" data-filter="all" class="selected">Все <span id="count-all">0</span></button>
           <button type="button" data-filter="incoming">Входящие <span id="count-incoming">0</span></button>
           <button type="button" data-filter="outgoing">Исходящие <span id="count-outgoing">0</span></button>
+          <button type="button" data-filter="missed">Пропущенные <span id="count-missed">0</span></button>
         </div>
         <div id="history-list" class="history-list" aria-live="polite">Загружаю звонки…</div>
         <button id="refresh-history" type="button" class="link-button">Обновить историю</button>
+      </section>
+      <section id="settings-view" class="settings-view" hidden>
+        <label class="check-setting"><input id="key-sounds" type="checkbox" checked> Звук кнопок набора</label>
+        <label>Громкость кнопок<input id="key-volume" type="range" min="0" max="100" value="18"></label>
+        <label>Быстрые номера переадресации<input id="transfer-targets" type="text" placeholder="210, 220, 230"></label>
+        <small>Укажите внутренние или обычные номера через запятую. При входящем вызове они появятся в меню переадресации.</small>
+        <a href="https://app.u-pos.uz/telephony#integrations" target="_blank" rel="noopener">Настроить IVR и маршруты ↗</a>
+        <small>Голосовое IVR и последовательные переадресации начнут работать после подключения маршрута рабочего номера на АТС.</small>
       </section>
       <form id="contact-form" class="contact-form" hidden>
         <strong>Сохранить контакт</strong>

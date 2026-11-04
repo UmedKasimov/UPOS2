@@ -54,7 +54,7 @@ def validate_ivr_form(form: Mapping[str, object]) -> dict:
             raise ValueError(f"Кнопка {digit}: неизвестный тип направления")
         try:
             target = _destination(kind, form.get(prefix + "target"), public_number)
-            wait_seconds = int(str(form.get(prefix + "wait") or "30"))
+            wait_seconds = int(str(form.get(prefix + "wait") or "5"))
             if not 5 <= wait_seconds <= 120:
                 raise ValueError("время ожидания должно быть от 5 до 120 секунд")
             fallback_raw = str(form.get(prefix + "fallback") or "").strip()
@@ -62,6 +62,19 @@ def validate_ivr_form(form: Mapping[str, object]) -> dict:
             if fallback_raw:
                 fallback_kind = "internal" if re.fullmatch(r"\d{2,6}", fallback_raw) else "external"
                 fallback = {"kind": fallback_kind, "target": _destination(fallback_kind, fallback_raw, public_number)}
+            chain_raw = str(form.get(prefix + "chain") or "").strip()
+            chain_parts = [part.strip() for part in re.split(r"[,;\n]+", chain_raw) if part.strip()]
+            if len(chain_parts) > 10:
+                raise ValueError("допускается не более 10 последовательных направлений")
+            forward_chain = []
+            seen = set(target if isinstance(target, list) else [target])
+            for part in chain_parts:
+                next_kind = "internal" if re.fullmatch(r"\d{2,6}", part) else "external"
+                next_target = _destination(next_kind, part, public_number)
+                if next_target in seen:
+                    raise ValueError("направления цепочки не должны повторяться")
+                seen.add(next_target)
+                forward_chain.append({"kind": next_kind, "target": next_target, "wait_seconds": 5})
         except ValueError as exc:
             raise ValueError(f"Кнопка {digit}: {exc}") from exc
         strategy = str(form.get(prefix + "strategy") or "ring_all").strip()
@@ -69,6 +82,7 @@ def validate_ivr_form(form: Mapping[str, object]) -> dict:
             raise ValueError(f"Кнопка {digit}: неизвестная стратегия очереди")
         routes.append({"digit": digit, "kind": kind, "target": target,
                        "wait_seconds": wait_seconds, "fallback": fallback,
+                       "forward_chain": forward_chain,
                        "strategy": strategy if kind == "queue" else ""})
     default_kind = str(form.get("default_kind") or "").strip()
     default_target = str(form.get("default_target") or "").strip()

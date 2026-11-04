@@ -497,6 +497,16 @@
   }
 
   function init() {
+    var ivrPreview = document.getElementById("telephony-ivr-preview");
+    if (ivrPreview) ivrPreview.addEventListener("click", function () {
+      var input = document.querySelector('.telephony-ivr-form [name="greeting_text"]');
+      var text = input ? input.value.trim() : "";
+      if (!text || !("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      var preview = new SpeechSynthesisUtterance(text);
+      preview.lang = "ru-RU";
+      window.speechSynthesis.speak(preview);
+    });
     var callDialog = document.getElementById("telephony-call-dialog");
     var numberDialog = document.getElementById("telephony-number-dialog");
     var providerDialog = document.getElementById("telephony-provider-dialog");

@@ -718,6 +718,20 @@
       }
     },
 
+    transferActive(number) {
+      if (!session?.isEstablished?.() || !account?.host) return false;
+      const destination = String(number || "").replace(/[\s().-]/g, "");
+      if (!/^\+?\d{2,15}$/.test(destination)) return false;
+      try {
+        session.refer(`sip:${destination}@${account.host}`);
+        diagnostic("active_transfer_requested", {destinationDigits: destination.replace(/\D/g, "").length});
+        return true;
+      } catch (error) {
+        diagnostic("active_transfer_failed", {name: error?.name, message: error?.message});
+        return false;
+      }
+    },
+
     hangup() {
       clearResponseTimer();
       stopMediaQualityMonitor();
