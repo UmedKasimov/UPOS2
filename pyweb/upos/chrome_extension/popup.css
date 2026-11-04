@@ -61,6 +61,12 @@ small { color: #8796ae; font-size: 11px; }
 .contact-form #contact-message { color: #a9efc3; }
 .contact-form a, #incoming-client { color: #8ebcff; text-decoration: none; font-size: 12px; }
 .actions { display: flex; gap: 8px; margin-top: 10px; }
+.call-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.call-controls button { min-width: 0; }
+.call-controls #hangup { grid-column: 1 / -1; }
+.call-timer { grid-column: 1 / -1; text-align: center; color: #bcd8ff; font-size: 20px; font-variant-numeric: tabular-nums; }
+#active-client { grid-column: 1 / -1; color: #8ebcff; text-decoration: none; }
+#hold[aria-pressed="true"] { border-color: #e5a431; background: #5f4118; }
 .incoming-call { display: grid; justify-items: center; gap: 8px; margin-top: 16px; padding: 20px 12px; border: 1px solid #2e8d5a; border-radius: 16px; background: #10291e; text-align: center; }
 .incoming-call strong { color: #a9efc3; font-size: 15px; }
 .incoming-phone { color: #fff; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }

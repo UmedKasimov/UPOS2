@@ -126,7 +126,7 @@
     if (recorder?.state === "recording") recorder.stop();
     recorder = null;
     if (call) void syncCall(status || (call.answeredAt ? "answered" : "missed"), call);
-    publish({phase: softphone.isRegistered() ? "ready" : "offline", phone: "", muted: false});
+    publish({phase: softphone.isRegistered() ? "ready" : "offline", phone: "", muted: false, held: false, answeredAt: 0});
   }
 
   softphone.on("registered", () => publish({phase: "ready", message: "Линия подключена"}));
@@ -135,18 +135,20 @@
   softphone.on("registrationFailed", () => publish({phase: "error", message: "Ошибка регистрации SIP"}));
   softphone.on("incoming", (event) => {
     makeCall("incoming", event.from || "");
-    publish({phase: "incoming", phone: event.from || "", message: event.name || "Входящий вызов"});
+    publish({phase: "incoming", phone: event.from || "", held: false, answeredAt: 0, message: event.name || "Входящий вызов"});
     startRing();
   });
   softphone.on("progress", () => publish({phase: "dialing", message: "Вызов идёт"}));
   softphone.on("accepted", () => {
     stopRing();
     if (currentCall) currentCall.answeredAt = Date.now();
-    publish({phase: "active", message: "Разговор", muted: false});
+    publish({phase: "active", message: "Разговор", muted: false, held: false, answeredAt: currentCall?.answeredAt || Date.now()});
     void softphone.resumeRemoteAudio();
     startRecording();
   });
   softphone.on("remoteTrack", startRecording);
+  softphone.on("holdChanged", (event) => publish({held: Boolean(event.held),
+    message: event.held ? "Клиент на удержании" : "Разговор"}));
   softphone.on("ended", () => finishCall());
   softphone.on("failed", () => finishCall("missed"));
 
@@ -173,7 +175,7 @@
           finishCall("missed");
           throw error;
         }
-        publish({phase: "dialing", phone, message: "Набор номера"});
+        publish({phase: "dialing", phone, held: false, answeredAt: 0, message: "Набор номера"});
         return {ok: true};
       }
       case "answer":
@@ -196,12 +198,15 @@
         softphone.setMuted(Boolean(message.muted));
         publish({muted: Boolean(message.muted)});
         return {ok: true, muted: Boolean(message.muted)};
+      case "hold":
+        return {ok: softphone.setHold(Boolean(message.held)),
+          error: "АТС пока не может изменить состояние удержания"};
       case "disconnect":
         stopRing();
         softphone.disconnect();
         credentials = null;
         currentCall = null;
-        publish({phase: "offline", phone: "", muted: false, message: "Отключено"});
+        publish({phase: "offline", phone: "", muted: false, held: false, answeredAt: 0, message: "Отключено"});
         return {ok: true};
       default:
         throw new Error("Неизвестное действие");

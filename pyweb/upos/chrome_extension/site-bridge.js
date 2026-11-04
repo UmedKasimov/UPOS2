@@ -7,6 +7,12 @@
       return;
     }
     document.documentElement.dataset.uposExtensionPhone = active ? "active" : "inactive";
+    if (!document.getElementById("upos-extension-phone-style")) {
+      const style = document.createElement("style");
+      style.id = "upos-extension-phone-style";
+      style.textContent = 'html[data-upos-extension-phone="active"] .upos-floating-phone{display:none!important}';
+      document.documentElement.append(style);
+    }
     window.dispatchEvent(new Event("upos:extension-phone-status"));
   }
 

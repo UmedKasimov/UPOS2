@@ -22,7 +22,7 @@
       <button type="submit" class="primary">Подключить линию</button>
       <small>Микрофон будет запрошен при подключении. Данные линии хранятся только до закрытия Chrome.</small>
     </form>
-    <button id="open-window" type="button" class="primary" hidden>Открыть плавающий телефон</button>
+    <button id="open-window" type="button" class="primary" hidden>Открыть телефон в отдельном окне</button>
     <section id="phone" hidden>
       <div class="line"><span>Линия</span><strong id="line-label"></strong><button id="logout" type="button">Отключить</button></div>
       <button id="retry" type="button" hidden>Переподключить линию</button>
@@ -46,13 +46,18 @@
         <strong>Входящий звонок</strong>
         <span id="incoming-phone" class="incoming-phone"></span>
         <a id="incoming-client" href="#" target="_blank" rel="noopener" hidden>Открыть карточку клиента ↗</a>
+        <button id="incoming-save" type="button" class="link-button">+ Сохранить контакт</button>
         <div class="actions">
           <button id="reject" type="button" class="danger">Отклонить</button>
           <button id="answer" type="button" class="accept">Принять</button>
         </div>
       </section>
-      <div id="call-actions" class="actions" hidden>
+      <div id="call-actions" class="call-controls" hidden>
+        <div id="call-timer" class="call-timer" hidden>00:00</div>
+        <a id="active-client" href="#" hidden>Открыть карточку клиента ↗</a>
+        <button id="save-call" type="button">+ Сохранить контакт</button>
         <button id="mute" type="button" aria-pressed="false">Выключить микрофон</button>
+        <button id="hold" type="button" aria-pressed="false">Удержать</button>
         <button id="hangup" type="button" class="danger">Завершить</button>
       </div>
       <form id="redirect-form" class="redirect" hidden>

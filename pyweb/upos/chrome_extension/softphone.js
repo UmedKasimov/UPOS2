@@ -438,6 +438,11 @@
       const handlers = createSessionHandlers(direction);
       Object.entries(handlers).forEach(([event, handler]) => newSession.on(event, handler));
     }
+    for (const event of ["hold", "unhold"]) {
+      newSession.on(event, () => {
+        emit("holdChanged", {held: Boolean(newSession.isOnHold?.()?.local)});
+      });
+    }
     wirePeerConnection(session.connection);
   }
 
@@ -728,6 +733,20 @@
         return true;
       } catch (error) {
         diagnostic("active_transfer_failed", {name: error?.name, message: error?.message});
+        return false;
+      }
+    },
+
+    setHold(held) {
+      if (!session?.isEstablished?.()) return false;
+      try {
+        const current = Boolean(session.isOnHold?.()?.local);
+        if (current === Boolean(held)) return true;
+        const requested = held ? session.hold() : session.unhold();
+        diagnostic(held ? "hold_requested" : "unhold_requested", {accepted: requested !== false});
+        return requested !== false;
+      } catch (error) {
+        diagnostic("hold_failed", {name: error?.name, message: error?.message});
         return false;
       }
     },

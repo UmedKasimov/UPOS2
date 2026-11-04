@@ -106,7 +106,9 @@
       const result = await request("getState");
       const state = result.state || {};
       const phase = state.phase || "offline";
+      const previousPhase = currentPhase;
       currentPhase = phase;
+      if (phase === "incoming" && previousPhase !== "incoming") switchView("dial");
       $("phase").className = "phase " + phase;
       $("phase").textContent = phaseLabels[phase] || phase;
       $("pair-panel").hidden = result.connected;
@@ -119,23 +121,36 @@
       $("message").textContent = errorUntil > Date.now() ? errorText :
         (state.message || (result.connected ? "Линия подключена" : "Подключите линию из U-POS."));
       $("incoming").hidden = phase !== "incoming";
-      if (phase === "incoming" && state.phone && lookupPhone !== state.phone) {
+      if (["incoming", "dialing", "active"].includes(phase) && state.phone && lookupPhone !== state.phone) {
         lookupPhone = state.phone;
         incomingClient = null;
         void lookupIncoming(state.phone);
       }
-      if (phase !== "incoming") { lookupPhone = ""; incomingClient = null; }
+      if (!["incoming", "dialing", "active"].includes(phase)) { lookupPhone = ""; incomingClient = null; }
       $("incoming-phone").textContent = incomingClient?.name || state.phone || "Неизвестный номер";
       $("incoming-client").hidden = !incomingClient;
+      $("incoming-save").hidden = Boolean(incomingClient) || !validContactPhone(state.phone);
       $("call-actions").hidden = !["dialing", "active"].includes(phase);
+      $("active-client").hidden = phase !== "active" || !incomingClient;
+      $("save-call").hidden = phase !== "active" || Boolean(incomingClient) || !validContactPhone(state.phone);
+      $("call-timer").hidden = phase !== "active";
+      if (phase === "active" && Number.isFinite(state.answeredAt) && state.answeredAt > 0) {
+        const seconds = Math.max(0, Math.floor((Date.now() - state.answeredAt) / 1000));
+        $("call-timer").textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+      }
       $("redirect-form").hidden = !["incoming", "active"].includes(phase);
       $("redirect-form").querySelector("label").firstChild.textContent =
         phase === "active" ? "Перевести разговор на номер" : "Переадресовать входящий на номер";
       $("dial").disabled = busy || phase !== "ready";
       $("number").readOnly = ["incoming", "dialing", "active"].includes(phase);
       muted = phase === "active" && Boolean(state.muted);
+      const held = phase === "active" && Boolean(state.held);
       $("mute").setAttribute("aria-pressed", String(muted));
       $("mute").textContent = muted ? "Включить микрофон" : "Выключить микрофон";
+      $("mute").disabled = phase !== "active";
+      $("hold").setAttribute("aria-pressed", String(held));
+      $("hold").textContent = held ? "Вернуть клиента" : "Удержать";
+      $("hold").disabled = phase !== "active";
       if (state.phone && ["incoming", "dialing", "active"].includes(phase)) $("number").value = state.phone;
     } catch (error) { showError(error); }
   }
@@ -175,6 +190,7 @@
       incomingClient = data.client?.href?.startsWith("/clients?") ? data.client : null;
       $("incoming-phone").textContent = incomingClient?.name || phone;
       $("incoming-client").hidden = !incomingClient;
+      void refresh();
     } catch (_) { /* The call still works without CRM lookup. */ }
   }
 
@@ -388,6 +404,8 @@
     void request("dtmf", {digit: event.key}).catch(showError);
   });
   $("save-number").addEventListener("click", () => openContactEditor($("number").value));
+  $("incoming-save").addEventListener("click", () => openContactEditor(lookupPhone));
+  $("save-call").addEventListener("click", () => openContactEditor(lookupPhone || $("number").value));
   $("cancel-contact").addEventListener("click", () => { $("contact-form").hidden = true; });
   $("contact-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -406,7 +424,9 @@
       historyCalls.forEach((call) => {
         if (phoneDigits(call.phone).slice(-9) === key) { call.name = name; call.client = data.contact; }
       });
+      if (phoneDigits(lookupPhone).slice(-9) === key) incomingClient = data.contact;
       renderHistory();
+      void refresh();
       const message = $("contact-message");
       message.replaceChildren(document.createTextNode("Контакт сохранён · "));
       const link = document.createElement("a");
@@ -424,6 +444,10 @@
     event.preventDefault();
     openClient(incomingClient?.href);
   });
+  $("active-client").addEventListener("click", (event) => {
+    event.preventDefault();
+    openClient(incomingClient?.href);
+  });
   $("mute").addEventListener("click", async () => {
     try {
       const result = await request("mute", {muted: !muted});
@@ -431,6 +455,15 @@
       $("mute").setAttribute("aria-pressed", String(muted));
       $("mute").textContent = muted ? "Включить микрофон" : "Выключить микрофон";
     } catch (error) { showError(error); }
+  });
+  $("hold").addEventListener("click", async () => {
+    const button = $("hold");
+    button.disabled = true;
+    try {
+      await request("hold", {held: button.getAttribute("aria-pressed") !== "true"});
+      $("message").textContent = "Запрос удержания отправлен в АТС";
+    } catch (error) { showError(error); }
+    finally { await refresh(); }
   });
 
   $("dial").addEventListener("click", async () => {
