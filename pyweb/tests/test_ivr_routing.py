@@ -14,6 +14,7 @@ class IvrRoutingTests(unittest.TestCase):
             "route_2_chain": "220, 230, +998 93 456 78 90",
             "route_3_kind": "external", "route_3_target": "+998 91 234 56 78",
             "default_kind": "internal", "default_target": "210",
+            "inbound_order": "210, 220, 230",
         })
         self.assertEqual(rules["public_number"], "+998557016060")
         self.assertEqual(rules["routes"][1]["target"], ["210", "211"])
@@ -22,6 +23,14 @@ class IvrRoutingTests(unittest.TestCase):
                          ["220", "230", "+998934567890"])
         self.assertTrue(all(step["wait_seconds"] == 5 for step in rules["routes"][1]["forward_chain"]))
         self.assertEqual(rules["default_route"]["target"], "210")
+        self.assertEqual(rules["inbound_order"], ["210", "220", "230"])
+        self.assertEqual(rules["inbound_step_seconds"], 5)
+
+    def test_inbound_order_rejects_duplicate_or_invalid_lines(self):
+        with self.assertRaisesRegex(ValueError, "не должны повторяться"):
+            validate_ivr_form({"public_number": "+998557016060", "inbound_order": "220,210,220"})
+        with self.assertRaisesRegex(ValueError, "Очередь входящих"):
+            validate_ivr_form({"public_number": "+998557016060", "inbound_order": "210, +998901234567"})
 
     def test_rejects_loop_back_to_public_number(self):
         with self.assertRaisesRegex(ValueError, "тот же рабочий номер"):

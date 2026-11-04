@@ -496,7 +496,97 @@
     }, 12000);
   }
 
+  function initInboundOrder() {
+    var root = document.querySelector("[data-telephony-inbound-order]");
+    if (!root) return;
+    var list = root.querySelector("[data-telephony-inbound-list]");
+    var value = root.querySelector("[data-telephony-inbound-value]");
+    var input = root.querySelector("[data-telephony-inbound-input]");
+    var error = root.querySelector("[data-telephony-inbound-error]");
+    var rows = function () { return Array.from(list.querySelectorAll("[data-telephony-inbound-row]")); };
+    var showError = function (message) {
+      error.textContent = message;
+      error.hidden = !message;
+    };
+    var sync = function () {
+      var ordered = rows();
+      value.value = ordered.map(function (row) { return row.dataset.extension; }).join(",");
+      ordered.forEach(function (row, index) {
+        row.querySelector("[data-telephony-inbound-rank]").textContent = String(index + 1);
+        row.querySelector("small").textContent = index ? "Через " + (index * 5) + " сек" : "Звонит первым";
+        row.querySelector('[data-telephony-inbound-move="up"]').disabled = index === 0;
+        row.querySelector('[data-telephony-inbound-move="down"]').disabled = index === ordered.length - 1;
+      });
+      var empty = list.querySelector("[data-telephony-inbound-empty]");
+      if (!ordered.length && !empty) {
+        empty = document.createElement("p");
+        empty.className = "telephony-inbound-empty";
+        empty.dataset.telephonyInboundEmpty = "";
+        empty.textContent = "Добавьте первую внутреннюю линию.";
+        list.append(empty);
+      }
+      if (empty) empty.hidden = Boolean(ordered.length);
+    };
+    var add = function () {
+      var extension = input.value.trim();
+      if (!/^\d{2,6}$/.test(extension)) { showError("Введите внутренний номер из 2–6 цифр."); return; }
+      if (rows().some(function (row) { return row.dataset.extension === extension; })) {
+        showError("Эта линия уже есть в очереди."); return;
+      }
+      if (rows().length >= 20) { showError("Можно добавить не более 20 линий."); return; }
+      var row = document.createElement("div");
+      row.className = "telephony-inbound-row";
+      row.dataset.telephonyInboundRow = "";
+      row.dataset.extension = extension;
+      var rank = document.createElement("span");
+      rank.className = "telephony-inbound-rank";
+      rank.dataset.telephonyInboundRank = "";
+      var number = document.createElement("strong");
+      number.textContent = extension;
+      var timing = document.createElement("small");
+      row.append(rank, number, timing);
+      [["up", "↑", "Поднять"], ["down", "↓", "Опустить"]].forEach(function (item) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.dataset.telephonyInboundMove = item[0];
+        button.textContent = item[1];
+        button.setAttribute("aria-label", item[2] + " линию " + extension);
+        row.append(button);
+      });
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.dataset.telephonyInboundRemove = "";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "Убрать линию " + extension);
+      row.append(remove);
+      list.append(row);
+      input.value = "";
+      showError("");
+      sync();
+      input.focus();
+    };
+    root.querySelector("[data-telephony-inbound-add]").addEventListener("click", add);
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); add(); }
+    });
+    list.addEventListener("click", function (event) {
+      var row = event.target.closest("[data-telephony-inbound-row]");
+      if (!row) return;
+      var ordered = rows();
+      var index = ordered.indexOf(row);
+      var move = event.target.closest("[data-telephony-inbound-move]");
+      if (event.target.closest("[data-telephony-inbound-remove]")) row.remove();
+      else if (move?.dataset.telephonyInboundMove === "up" && index > 0) list.insertBefore(row, ordered[index - 1]);
+      else if (move?.dataset.telephonyInboundMove === "down" && index < ordered.length - 1) list.insertBefore(ordered[index + 1], row);
+      else return;
+      showError("");
+      sync();
+    });
+    sync();
+  }
+
   function init() {
+    initInboundOrder();
     var ivrPreview = document.getElementById("telephony-ivr-preview");
     if (ivrPreview) ivrPreview.addEventListener("click", function () {
       var input = document.querySelector('.telephony-ivr-form [name="greeting_text"]');

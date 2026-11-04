@@ -44,6 +44,15 @@ def validate_ivr_form(form: Mapping[str, object]) -> dict:
     """Return a canonical configuration; no rule here changes a live PBX route."""
     public_number = _phone(form.get("public_number"))
     greeting = str(form.get("greeting_text") or "").strip()[:1000]
+    inbound_parts = [part for part in re.split(r"[,;\s]+", str(form.get("inbound_order") or "").strip()) if part]
+    if len(inbound_parts) > 20:
+        raise ValueError("Очередь входящих: допускается не более 20 внутренних линий")
+    try:
+        inbound_order = [_extension(part) for part in inbound_parts]
+    except ValueError as exc:
+        raise ValueError(f"Очередь входящих: {exc}") from exc
+    if len(inbound_order) != len(set(inbound_order)):
+        raise ValueError("Очередь входящих: внутренние линии не должны повторяться")
     routes = []
     for digit in "0123456789":
         prefix = f"route_{digit}_"
@@ -93,5 +102,6 @@ def validate_ivr_form(form: Mapping[str, object]) -> dict:
         default_route = {"kind": default_kind,
                          "target": _destination(default_kind, default_target, public_number)}
     return {"public_number": public_number, "greeting_text": greeting,
+            "inbound_order": inbound_order, "inbound_step_seconds": 5,
             "routes": routes, "default_route": default_route,
             "state": "awaiting_provider_route"}

@@ -32,6 +32,19 @@
 
 .telephony-ivr-notice { margin: .6rem 0 1rem !important; color: var(--muted-foreground); }
 .telephony-ivr-form { display: grid; gap: 1rem; }
+.telephony-inbound-order { display: grid; gap: .65rem; padding: .9rem; border: 1px solid var(--border); border-radius: 12px; }
+.telephony-inbound-order h4 { margin: 0 0 .25rem; }
+.telephony-inbound-order p { color: var(--muted-foreground); }
+.telephony-inbound-list { display: grid; gap: .4rem; }
+.telephony-inbound-row { display: grid; grid-template-columns: 2rem minmax(5rem, 8rem) minmax(7rem, 1fr) repeat(3, 2.5rem); align-items: center; gap: .35rem; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: 9px; background: var(--card); }
+.telephony-inbound-rank { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: #2169bc; color: #fff; font-weight: 800; }
+.telephony-inbound-row small { color: var(--muted-foreground); }
+.telephony-inbound-row button { min-width: 2rem; min-height: 2rem; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--foreground); cursor: pointer; }
+.telephony-inbound-row button:disabled { opacity: .35; cursor: default; }
+.telephony-inbound-add { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.telephony-inbound-add input { flex: 1 1 8rem; max-width: 14rem; }
+.telephony-inbound-empty { margin: .2rem 0 !important; }
+.telephony-inbound-error { color: #f7a6a6 !important; }
 .telephony-ivr-routes { overflow-x: auto; }
 .telephony-ivr-route-head,
 .telephony-ivr-route {

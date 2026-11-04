@@ -42,7 +42,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from upos.auth_landing import employee_landing_path, prevent_auth_redirect_loop
-from upos.telephony_access import sip_provider_assigned_to
+from upos.telephony_access import has_assigned_sip_line, sip_account_owner_id, sip_provider_assigned_to
 from upos.telephony_browser_status import browser_status_event
 from upos.telephony_gateway import browser_gateway_account
 from upos.ivr_routing import validate_ivr_form
@@ -1540,6 +1540,7 @@ def create_app() -> FastAPI:
             "request": request,
             "user": sess_user,
             "body_theme": "light",
+            "sip_phone_available": False,
         }
         if sess_user:
             if extra.get("variant") == "admin" or sess_user.get("role") == "admin":
@@ -1553,10 +1554,21 @@ def create_app() -> FastAPI:
                 ctx["body_theme"] = "light"
                 if wid:
                     try:
-                        ctx["body_theme"] = load_workspace_settings(str(wid)).get("theme") or "light"
+                        workspace_settings = load_workspace_settings(str(wid))
+                        ctx["body_theme"] = workspace_settings.get("theme") or "light"
+                        if sess_user.get("org_scope") != "general" and (
+                            not sess_user.get("is_employee") or _employee_permissions(sess_user).get("telephony")
+                        ):
+                            ctx["sip_phone_available"] = has_assigned_sip_line(
+                                workspace_settings.get("telephony_providers"),
+                                _session_user_id(sess_user),
+                                str(sess_user.get("name") or sess_user.get("login") or ""),
+                                sip_account_owner_id(sess_user, str(wid)),
+                                str(wid),
+                            )
                     except Exception:
                         logger.exception(
-                            "[upos] load_workspace_settings failed in template context (theme); wid=%s",
+                            "[upos] load_workspace_settings failed in template context; wid=%s",
                             wid,
                         )
         ctx.update(extra)
@@ -9830,7 +9842,8 @@ def create_app() -> FastAPI:
         user = request.session.get("user") or {}
         employee_user_id = _session_user_id(user)
         for account in _telephony_sip_accounts_for_softphone(
-            data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
+            data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request),
+            owner_user_id=sip_account_owner_id(user, wid), legacy_owner_workspace_id=wid
         ):
             host = str(account.get("host") or "")
             ws_url = str(account.get("ws_url") or "") or _installer_sip_ws_url(host, "")
@@ -19091,6 +19104,7 @@ def create_app() -> FastAPI:
         employee_user_id: str = "",
         employee_name: str = "",
         owner_user_id: str = "",
+        legacy_owner_workspace_id: str = "",
     ) -> list[dict[str, Any]]:
         providers = data.get("telephony_providers") if isinstance(data.get("telephony_providers"), list) else []
         accounts: list[dict[str, Any]] = []
@@ -19099,7 +19113,9 @@ def create_app() -> FastAPI:
                 continue
             if provider_id and str(provider.get("id") or "").strip() != provider_id:
                 continue
-            if not sip_provider_assigned_to(provider, employee_user_id, employee_name, owner_user_id):
+            if not sip_provider_assigned_to(
+                provider, employee_user_id, employee_name, owner_user_id, legacy_owner_workspace_id
+            ):
                 continue
             host, port, endpoint = _telephony_parse_sip_host(
                 provider.get("host") or provider.get("endpoint"),
@@ -19155,7 +19171,8 @@ def create_app() -> FastAPI:
         user = request.session.get("user") or {}
         employee_user_id = _session_user_id(user)
         for raw_account in _telephony_sip_accounts_for_softphone(
-            data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
+            data, employee_user_id=employee_user_id, employee_name=_telephony_user_name(request),
+            owner_user_id=sip_account_owner_id(user, wid), legacy_owner_workspace_id=wid
         ):
             account = browser_gateway_account(raw_account)
             host = str(account.get("host") or "")
@@ -19192,7 +19209,8 @@ def create_app() -> FastAPI:
         data = load_workspace_settings(wid)
         user = request.session.get("user") or {}
         accounts = [browser_gateway_account(account) for account in _telephony_sip_accounts_for_softphone(
-            data, employee_user_id=_session_user_id(user), employee_name=_telephony_user_name(request), owner_user_id=wid
+            data, employee_user_id=_session_user_id(user), employee_name=_telephony_user_name(request),
+            owner_user_id=sip_account_owner_id(user, wid), legacy_owner_workspace_id=wid
         )]
         for item in accounts:
             item["ws_url"] = item.get("ws_url") or _installer_sip_ws_url(str(item.get("host") or ""), "")
@@ -20805,12 +20823,15 @@ def create_app() -> FastAPI:
         data = _telephony_settings_payload(wid)
         integration_context = _telephony_integration_context(request, wid, data)
         ivr = data.get("telephony_ivr") if isinstance(data.get("telephony_ivr"), dict) else {}
+        ivr_inbound_order = ivr.get("inbound_order") if isinstance(ivr.get("inbound_order"), list) else []
         providers = _telephony_provider_rows(data)
         if not _telephony_can_manage_providers(request):
             session_user = request.session.get("user") or {}
             providers = [
                 row for row in providers
-                if sip_provider_assigned_to(row, _session_user_id(session_user), user_name, wid)
+                if sip_provider_assigned_to(
+                    row, _session_user_id(session_user), user_name, sip_account_owner_id(session_user, wid), wid
+                )
             ]
         numbers = _telephony_rows_with_labels(list(data.get("telephony_numbers") or []), "number")
         calls = _telephony_calls_with_accounts(
@@ -20841,9 +20862,11 @@ def create_app() -> FastAPI:
             }
             - {""}
         )
-        telephony_staff = [{"id": wid, "name": "Владелец организации"}] + [
+        session_user = request.session.get("user") or {}
+        account_owner_id = sip_account_owner_id(session_user, wid)
+        telephony_staff = [{"id": account_owner_id, "name": "Владелец организации"}] + [
             {"id": str(employee.get("id") or ""), "name": str(employee.get("name") or employee.get("username") or "")}
-            for employee in list_employees_safe(wid)
+            for employee in list_employees_safe(account_owner_id, wid)
             if employee.get("id")
         ]
         client_options = _telephony_client_options(wid)
@@ -20898,6 +20921,7 @@ def create_app() -> FastAPI:
             telephony_dashboard=telephony_account_dashboard(wid),
             telephony_integration=integration_context,
             telephony_ivr=ivr,
+            telephony_ivr_inbound_order=ivr_inbound_order,
             telephony_ivr_routes={str(route.get("digit")): route for route in ivr.get("routes", []) if isinstance(route, dict)},
             telephony_staff=telephony_staff,
             telephony_can_manage_providers=_telephony_can_manage_providers(request),
@@ -21353,7 +21377,13 @@ def create_app() -> FastAPI:
         if ws_url and not ws_url.startswith("wss://"):
             return RedirectResponse(url="/telephony?error=" + quote("Для звонков из Chrome нужен адрес wss://") + "#integrations", status_code=302)
         employee_user_id = str(form.get("employee_user_id") or "").strip()
-        staff_names = {str(item.get("id")): str(item.get("name") or item.get("username") or "") for item in list_employees_safe(wid)}
+        account_owner_id = sip_account_owner_id(request.session.get("user") or {}, wid)
+        staff_names = {
+            str(item.get("id")): str(item.get("name") or item.get("username") or "")
+            for item in list_employees_safe(account_owner_id, wid)
+        }
+        staff_names[account_owner_id] = "Владелец организации"
+        # Previous UI used the organization ID to mean its owner.
         staff_names[wid] = "Владелец организации"
         if employee_user_id and employee_user_id not in staff_names:
             return RedirectResponse(url="/telephony?error=" + quote("Сотрудник не найден") + "#integrations", status_code=302)
@@ -21878,7 +21908,8 @@ def create_app() -> FastAPI:
         user_name = _telephony_user_name(request).casefold()
         data = _telephony_settings_payload(wid)
         accounts = _telephony_sip_accounts_for_softphone(
-            data, employee_user_id=user_id, employee_name=_telephony_user_name(request), owner_user_id=wid
+            data, employee_user_id=user_id, employee_name=_telephony_user_name(request),
+            owner_user_id=sip_account_owner_id(user, wid), legacy_owner_workspace_id=wid
         )
         allowed_accounts = {
             str(account.get("extension") or "").strip().casefold()
@@ -22041,7 +22072,9 @@ def create_app() -> FastAPI:
             item for item in data.get("telephony_providers", [])
             if isinstance(item, dict)
             and str(item.get("id") or "") == provider_id
-            and sip_provider_assigned_to(item, _session_user_id(user), _telephony_user_name(request), wid)
+            and sip_provider_assigned_to(
+                item, _session_user_id(user), _telephony_user_name(request), sip_account_owner_id(user, wid), wid
+            )
         ), None)
         if provider is None:
             return JSONResponse({"ok": False, "error": "provider_not_assigned"}, status_code=403)
@@ -22087,7 +22120,9 @@ def create_app() -> FastAPI:
         assigned = any(
             isinstance(row, dict)
             and str(row.get("id") or "") == provider_id
-            and sip_provider_assigned_to(row, _session_user_id(user), _telephony_user_name(request), wid)
+            and sip_provider_assigned_to(
+                row, _session_user_id(user), _telephony_user_name(request), sip_account_owner_id(user, wid), wid
+            )
             for row in data.get("telephony_providers", [])
         )
         if not assigned:
@@ -22130,7 +22165,9 @@ def create_app() -> FastAPI:
             row for row in data.get("telephony_providers", [])
             if isinstance(row, dict)
             and str(row.get("id") or "") == provider_id
-            and sip_provider_assigned_to(row, _session_user_id(user), _telephony_user_name(request), wid)
+            and sip_provider_assigned_to(
+                row, _session_user_id(user), _telephony_user_name(request), sip_account_owner_id(user, wid), wid
+            )
         ), None)
         call = next((
             row for row in data.get("telephony_calls", [])

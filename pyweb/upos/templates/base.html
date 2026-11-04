@@ -312,7 +312,7 @@
         </div>
       </div>
     </div>
-    {% if user %}
+    {% if user and sip_phone_available %}
     <div class="upos-floating-phone" data-floating-phone data-floating-phone-bridge="http://127.0.0.1:5058/call">
       <button class="upos-floating-phone-toggle" type="button" data-floating-phone-toggle aria-label="Быстрый телефон" aria-expanded="false">
         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.59 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.16a2 2 0 0 1 2.11-.45c.84.27 1.71.47 2.61.59A2 2 0 0 1 22 16.92z"/></svg>
@@ -459,7 +459,7 @@
     {% if user.get('role') != 'admin' and user.get('org_scope') != 'general' and (not user.get('is_employee') or emp_perms.get('messengers')) %}
     <script src="{{ url_for('static', path='messenger-notifications.js') }}?v=6" defer></script>
     {% endif %}
-    <script src="{{ url_for('static', path='floating-phone.js') }}?v=20" defer></script>
+    {% if sip_phone_available %}<script src="{{ url_for('static', path='floating-phone.js') }}?v=20" defer></script>{% endif %}
     <script src="{{ url_for('static', path='amount-format.js') }}?v=4"></script>
     <script src="{{ url_for('static', path='money-auto-format.js') }}?v=2" defer></script>
     <script src="{{ url_for('static', path='currency-meta.js') }}?v=2"></script>
