@@ -55,23 +55,25 @@ function phoneBackground() {
   return {context, created, updated, createdTabs, updatedTabs, notifications, stored, listeners};
 }
 
-test("incoming call opens and focuses one dedicated Chrome tab by default", async () => {
+test("incoming call opens its own compact popup beside the existing phone", async () => {
   const app = phoneBackground();
-  await vm.runInContext("Promise.all([openPhoneTab(), openPhoneTab()])", app.context);
-  assert.equal(app.createdTabs.length, 1);
-  assert.match(app.createdTabs[0].url, /popup\.html\?phone=1$/);
-  await vm.runInContext("onPhoneState({phase: 'incoming', phone: '210'})", app.context);
-  assert.equal(app.notifications.length, 1);
-  assert.equal(app.createdTabs.length, 1);
-  assert.equal(app.updatedTabs.length, 1);
-  assert.equal(app.created.length, 0);
-});
-
-test("window preference keeps the separate phone window option", async () => {
-  const app = phoneBackground();
-  app.stored.incomingSurface = "window";
-  await vm.runInContext("onPhoneState({phase: 'incoming', phone: '210'})", app.context);
+  await vm.runInContext("Promise.all([openStandaloneWindow(), openStandaloneWindow()])", app.context);
   assert.equal(app.created.length, 1);
   assert.match(app.created[0].url, /popup\.html\?setup=1$/);
+  await vm.runInContext("onPhoneState({phase: 'incoming', phone: '210'})", app.context);
+  assert.equal(app.notifications.length, 1);
+  assert.equal(app.created.length, 2);
+  assert.match(app.created[1].url, /call\.html$/);
+  assert.equal(app.created[1].type, "popup");
+  assert.equal(app.createdTabs.length, 0);
+});
+
+test("repeated incoming events focus the same call popup", async () => {
+  const app = phoneBackground();
+  await vm.runInContext("onPhoneState({phase: 'incoming', phone: '210'})", app.context);
+  await vm.runInContext("Promise.all([openIncomingWindow(), openIncomingWindow()])", app.context);
+  assert.equal(app.created.length, 1);
+  assert.equal(app.updated.length, 1);
+  assert.equal(app.updated[0].id, 11);
   assert.equal(app.createdTabs.length, 0);
 });

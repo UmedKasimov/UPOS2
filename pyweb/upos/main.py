@@ -20919,7 +20919,7 @@ def create_app() -> FastAPI:
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
             for name in (
                 "manifest.json", "background.js", "offscreen.html", "offscreen.js",
-                "popup.html", "popup.css", "popup.js", "icon.png",
+                "popup.html", "popup.css", "popup.js", "call.html", "call.css", "call.js", "icon.png",
                 "jssip.min.js", "softphone.js", "site-bridge.js", "README.md",
             ):
                 zipped.write(folder / name, arcname=name)

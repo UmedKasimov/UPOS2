@@ -6,7 +6,6 @@ body[data-setup="true"] { width: auto; min-width: 344px; }
 body[data-setup="true"] { height: 100vh; overflow-y: auto; }
 body[data-embed="true"] { width: auto; height: 100%; min-width: 0; overflow-y: auto; }
 body[data-embed="true"] main { padding: 12px; }
-body[data-phone-tab="true"] main { max-width: 540px; min-height: 100vh; margin: 0 auto; border-inline: 1px solid #263447; }
 main { padding: 18px; }
 header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .logo { color: #6ba6ff; font-size: 16px; font-weight: 900; letter-spacing: -.03em; }
