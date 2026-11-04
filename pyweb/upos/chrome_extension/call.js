@@ -13,7 +13,7 @@
 
   async function request(type, extra = {}) {
     const result = await chrome.runtime.sendMessage({target: "background", type, ...extra});
-    if (!result?.ok) throw new Error(result?.error || "Действие не выполнено");
+    if (!result?.ok) throw new Error(result?.error || "SIP-модуль не ответил. Проверьте состояние линии.");
     return result;
   }
 
@@ -27,6 +27,27 @@
     return /^\d{7,15}$/.test(String(value || "").replace(/\D/g, ""));
   }
 
+  function unnamedContact(name, phone) {
+    if (!name) return true;
+    const value = String(name).trim();
+    return /^Контакт\s*\+?[\d\s().-]+$/i.test(value) &&
+      value.replace(/\D/g, "") === String(phone || "").replace(/\D/g, "");
+  }
+
+  async function ensureMicrophonePermission() {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Микрофон недоступен в Chrome");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      if (error?.name === "NotAllowedError" || /permission dismissed/i.test(error?.message || "")) {
+        throw new Error("Разрешите микрофон для U-POS Телефон в Chrome и нажмите «Принять» ещё раз");
+      }
+      if (error?.name === "NotFoundError") throw new Error("Chrome не видит микрофон");
+      throw error;
+    }
+  }
+
   function render() {
     const phase = state.phase || "offline";
     const live = ["incoming", "active"].includes(phase);
@@ -37,10 +58,12 @@
     $("line").textContent = phase === "offline" ? "Линия отключена" : "SIP-линия U-POS";
     $("eyebrow").textContent = phase === "incoming" ? "Входящий звонок" :
       phase === "active" ? "Идёт разговор" : lastCall?.status === "missed" ? "Пропущенный звонок" : "Вызов завершён";
-    $("caller").textContent = client?.name || phone || "Неизвестный номер";
-    $("phone").textContent = client?.name && phone ? phone : "";
-    $("description").textContent = phase === "incoming" ? "Вызов на SIP-линию U-POS" :
-      phase === "active" ? "Звонок подключён" : (state.message || "Вызов завершён");
+    const named = Boolean(client && !unnamedContact(client.name, phone));
+    $("caller").textContent = named ? client.name : phone || "Неизвестный номер";
+    $("phone").textContent = named ? phone : "";
+    $("phone").hidden = !named;
+    $("caller").title = client ? "Открыть карточку клиента в U-POS" : "Сохранить контакт в U-POS";
+    $("phone").title = $("caller").title;
     $("incoming-actions").hidden = phase !== "incoming";
     $("active-actions").hidden = phase !== "active";
     $("ended-actions").hidden = live;
@@ -57,8 +80,8 @@
     $("hold").textContent = state.held ? "Вернуть клиента" : "Удержать";
     $("hold").setAttribute("aria-pressed", String(Boolean(state.held)));
     $("contact-actions").hidden = !validPhone(phone);
-    $("open-client").hidden = !client;
-    $("show-contact").hidden = Boolean(client) || !validPhone(phone);
+    $("show-contact").hidden = (Boolean(client) && named) || !validPhone(phone);
+    $("show-contact").textContent = client ? "Добавить имя клиента" : "+ Сохранить контакт";
     if (!live) { $("transfer-form").hidden = true; $("keypad").hidden = true; }
     if (errorUntil <= Date.now()) $("error").hidden = true;
   }
@@ -118,11 +141,32 @@
 
   function toggle(id) { $(id).hidden = !$(id).hidden; }
   function openClient() {
-    if (client?.href?.startsWith("/clients?")) void chrome.tabs.create({url: `${APP_URL}${client.href}`});
+    if (client?.href?.startsWith("/clients?")) {
+      const path = client.href.split("#", 1)[0];
+      void chrome.tabs.create({url: `${APP_URL}${path}#history`});
+    }
   }
+  function showContactForm() {
+    if (!validPhone(callerPhone)) return;
+    $("contact-phone").value = callerPhone;
+    $("contact-name").value = client && !unnamedContact(client.name, callerPhone) ? client.name : "";
+    $("contact-form").hidden = false;
+    $("contact-name").focus();
+  }
+  function openCaller() { if (client) openClient(); else showContactForm(); }
   function closeWindow() { window.close(); }
 
-  $("answer").addEventListener("click", () => void act("answer"));
+  $("answer").addEventListener("click", async () => {
+    if (busy || state.phase !== "incoming") return;
+    busy = true;
+    $("answer").disabled = true;
+    try {
+      await ensureMicrophonePermission();
+      await request("answer");
+      await refresh();
+    } catch (error) { showError(error); }
+    finally { busy = false; $("answer").disabled = false; }
+  });
   $("reject").addEventListener("click", () => void act("reject"));
   $("hangup").addEventListener("click", () => void act("hangup"));
   $("mute").addEventListener("click", () => void act("mute", {muted: !state.muted}));
@@ -151,13 +195,9 @@
   });
   $("close").addEventListener("click", closeWindow);
   $("open-phone").addEventListener("click", () => void act("openWindow"));
-  $("open-client").addEventListener("click", openClient);
-  $("show-contact").addEventListener("click", () => {
-    $("contact-phone").value = callerPhone;
-    $("contact-name").value = "";
-    $("contact-form").hidden = false;
-    $("contact-name").focus();
-  });
+  $("caller").addEventListener("click", openCaller);
+  $("phone").addEventListener("click", openCaller);
+  $("show-contact").addEventListener("click", showContactForm);
   $("cancel-contact").addEventListener("click", () => { $("contact-form").hidden = true; });
   $("contact-form").addEventListener("submit", async (event) => {
     event.preventDefault();

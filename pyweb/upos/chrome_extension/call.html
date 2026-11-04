@@ -11,9 +11,8 @@
   <main class="card" data-phase="incoming">
     <div class="avatar" aria-hidden="true">☎</div>
     <p id="eyebrow" class="eyebrow">Входящий звонок</p>
-    <h1 id="caller">Определяем номер…</h1>
-    <p id="phone" class="phone"></p>
-    <p id="description" class="description">Вызов на SIP-линию U-POS</p>
+    <h1><button id="caller" class="identity" type="button">Определяем номер…</button></h1>
+    <button id="phone" class="phone identity" type="button" hidden></button>
     <p id="timer" class="timer" hidden>00:00</p>
     <p id="error" class="error" role="status" hidden></p>
 
@@ -34,7 +33,6 @@
     </div>
 
     <div id="contact-actions" class="contact-actions" hidden>
-      <button id="open-client" type="button" hidden>Открыть карточку клиента ↗</button>
       <button id="show-contact" type="button" hidden>+ Сохранить контакт</button>
     </div>
     <form id="contact-form" class="subpanel" hidden>
@@ -48,7 +46,6 @@
       <label>Внутренняя линия или обычный номер<input id="transfer-phone" type="tel" placeholder="210 или +998…" required></label>
       <div id="transfer-presets" class="presets"></div>
       <div class="subpanel-actions"><button type="submit" class="accept">Перевести</button><button id="cancel-transfer" type="button">Отмена</button></div>
-      <small>АТС должна поддерживать SIP 302 до ответа или REFER во время разговора.</small>
     </form>
     <div id="keypad" class="keypad" hidden aria-label="Клавиатура DTMF">
       <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>

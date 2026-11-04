@@ -13,11 +13,13 @@ class ChromePhoneExtensionTests(unittest.TestCase):
         self.assertEqual(manifest["manifest_version"], 3)
         self.assertIn("offscreen", manifest["permissions"])
         self.assertIn("storage", manifest["permissions"])
-        self.assertEqual(manifest["action"]["default_popup"], "popup.html")
-        for filename in ("background.js", "offscreen.js", "offscreen.html", "popup.js", "popup.css", "popup.html", "icon.png"):
+        self.assertNotIn("default_popup", manifest["action"])
+        for filename in ("background.js", "offscreen.js", "offscreen.html", "popup.js", "popup.css", "popup.html", "call.js", "call.css", "call.html", "icon.png"):
             self.assertTrue((EXTENSION / filename).is_file(), filename)
         self.assertEqual((EXTENSION / "jssip.min.js").read_bytes(), (ROOT / "static" / "jssip.min.js").read_bytes())
-        self.assertEqual((EXTENSION / "softphone.js").read_bytes(), (ROOT / "static" / "installer-softphone.js").read_bytes())
+        softphone = (EXTENSION / "softphone.js").read_text(encoding="utf-8")
+        self.assertIn("async answer()", softphone)
+        self.assertIn("setHold(held)", softphone)
         self.assertIn("WEB_RTC", (EXTENSION / "background.js").read_text(encoding="utf-8"))
         self.assertNotIn('"AUDIO_PLAYBACK"', (EXTENSION / "background.js").read_text(encoding="utf-8"))
 

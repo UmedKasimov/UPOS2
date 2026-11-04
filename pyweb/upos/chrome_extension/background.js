@@ -33,7 +33,7 @@ async function ensureOffscreen() {
 
 async function sendToPhone(command) {
   await ensureOffscreen();
-  return chrome.runtime.sendMessage({target: "offscreen", ...command});
+  return chrome.runtime.sendMessage({...command, target: "offscreen"});
 }
 
 async function openStandaloneWindow() {
